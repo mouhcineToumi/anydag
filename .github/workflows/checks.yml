@@ -52,7 +52,7 @@ jobs:
         run: node scripts/check-version.mjs "$TAG"
       - run: npm ci
       - name: tsc's incremental build info
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules/.cache/tsc
           key: tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}-${{ github.sha }}

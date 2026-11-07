@@ -133,7 +133,7 @@ jobs:
       PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: /tmp/npm-cache
           key: npm-e2e-${{ hashFiles('package-lock.json') }}
