@@ -1,0 +1,159 @@
+/*
+ * The note editor in the theme's colours.
+ *
+ * Chrome, in `chrome.css`'s sense: BlockNote's surface is a text editor, not a diagram, and no theme
+ * has an opinion about the height of its toolbar — so this file is not on `check-literals.mjs`'s
+ * length list. Its **colour** rule applies here as everywhere: every colour below is a `--dag-*`.
+ *
+ * BlockNote reads its colours from `--bn-*` variables, set on every `.bn-root` — the editor *and*
+ * each menu it portals out — and `BlockEditor` puts `dag-blocks` on all of them. Two class names and
+ * an attribute deep, because BlockNote's own defaults sit on `.bn-root[data-color-scheme=dark]` and
+ * this sheet must win whichever of the two loads last.
+ *
+ * Nothing here invents a `--dag-*`: `check-theme.mjs` would then want a key in all three themes for
+ * something no theme has an opinion about.
+ */
+
+.dag-blocks.bn-root[data-color-scheme] {
+  --bn-colors-editor-text: var(--dag-color-ink);
+  --bn-colors-editor-background: var(--dag-color-paper);
+  --bn-colors-menu-text: var(--dag-color-ink);
+  --bn-colors-menu-background: var(--dag-color-card);
+  --bn-colors-tooltip-text: var(--dag-color-ink);
+  --bn-colors-tooltip-background: var(--dag-color-paper200);
+  --bn-colors-hovered-text: var(--dag-color-ink);
+  --bn-colors-hovered-background: var(--dag-color-paper100);
+  --bn-colors-selected-text: var(--dag-color-ink);
+  --bn-colors-selected-background: var(--dag-color-accentSoft);
+  --bn-colors-disabled-text: var(--dag-color-muted);
+  --bn-colors-disabled-background: var(--dag-color-paper100);
+  --bn-colors-shadow: var(--dag-color-outlineSoft);
+  --bn-colors-border: var(--dag-color-outlineSoft);
+  --bn-colors-side-menu: var(--dag-color-muted);
+  --bn-font-family: var(--dag-font-sans);
+  --bn-border-radius: var(--dag-metric-radius-small);
+}
+
+/* The text: the Markdown ramp `markdown.css` draws board text with, so a note reads in the same
+   type as the words beside a diagram. */
+.dag-blocks .bn-editor {
+  font-size: var(--dag-type-mdBody);
+  line-height: var(--dag-type-mdLeading);
+  padding-inline: 54px;
+}
+/* A phone has no pointer to hover the drag handles into the gutter, and 54px a side of a 390px
+   window is a quarter of it: the gutter is the page's own 20px there, and a table the text
+   cannot narrow scrolls inside its block rather than widening the page. */
+@media (max-width: 719px) {
+  .dag-blocks .bn-editor { padding-inline: 20px; }
+  .dag-blocks .bn-block-content[data-content-type="table"] { overflow-x: auto; max-width: 100%; }
+}
+.dag-blocks [data-content-type="heading"][data-level="1"] { --level: var(--dag-type-mdH1); }
+.dag-blocks [data-content-type="heading"][data-level="2"] { --level: var(--dag-type-mdH2); }
+.dag-blocks [data-content-type="heading"][data-level="3"] { --level: var(--dag-type-mdH3); }
+.dag-blocks [data-content-type="heading"][data-level="4"],
+.dag-blocks [data-content-type="heading"][data-level="5"],
+.dag-blocks [data-content-type="heading"][data-level="6"] { --level: var(--dag-type-mdBody); }
+.dag-blocks [data-content-type="heading"] .bn-inline-content { font-weight: 600; }
+
+.dag-blocks .bn-inline-content a { color: var(--dag-color-accent); }
+
+.dag-blocks .bn-inline-content code {
+  font-family: var(--dag-font-mono);
+  font-size: 0.88em;
+  background: var(--dag-color-paper200);
+  border-radius: var(--dag-metric-radius-code);
+  padding: 1px 4px;
+}
+
+/* BlockNote draws a code block white on near-black whatever the theme is; here it is the board's
+   code block, on paper. */
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] {
+  color: var(--dag-color-ink);
+  background-color: var(--dag-color-paper100);
+  border-radius: var(--dag-metric-radius-tile);
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-mdCode);
+  line-height: var(--dag-type-mdCodeLeading);
+}
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] code { font-family: var(--dag-font-mono); }
+/* Its language above its text and a copy button beside it, as a note drawn read-only has them
+   (`src/blocks/code.tsx`). BlockNote lays a block's content out in a row. */
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] { flex-direction: column; }
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] > .dag-code__head {
+  padding: 16px 24px 0;
+  font-size: var(--dag-type-mdCodeLang);
+  color: var(--dag-color-muted);
+  user-select: none;
+}
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] > pre { padding-top: 8px; }
+/* What the block's language could not read, counted after the label. The count is set on
+   the block by a decoration (`src/blocks/syntax.ts`) as `--code-problems`; unset, there is no text. */
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] > .dag-code__head::after {
+  content: " · " var(--code-problems);
+  color: var(--dag-color-dangerText);
+}
+.dag-blocks .bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: var(--dag-color-muted);
+}
+
+.dag-blocks [data-content-type="quote"] blockquote {
+  color: var(--dag-color-slate);
+  border-left-color: var(--dag-color-outline);
+}
+.dag-blocks [data-content-type="divider"] hr { border-top-color: var(--dag-color-outlineSoft); }
+
+/* BlockNote pads a table in by 9px for its handles, so it sat off the text column: the left edge is the text's. */
+.dag-blocks .bn-block-content[data-content-type="table"] .tableWrapper { padding-left: 0; }
+.dag-blocks .bn-block-content[data-content-type="table"] table { font-size: var(--dag-type-mdTable); }
+.dag-blocks .bn-block-content[data-content-type="table"] th,
+.dag-blocks .bn-block-content[data-content-type="table"] td {
+  border-color: var(--dag-color-outline);
+}
+.dag-blocks .bn-block-content[data-content-type="table"] th { background: var(--dag-color-paper100); }
+
+.dag-blocks [data-file-block] .bn-add-file-button {
+  color: var(--dag-color-muted);
+  background-color: var(--dag-color-paper100);
+}
+
+/* A colour is not something a note can hold — the file has no way to say it, and the theme owns
+   every colour there is. The menus do not offer one; a block pasted from another BlockNote editor
+   can still arrive carrying one, and it is drawn as though it did not until the save drops it. */
+.dag-blocks .bn-block:has(> .bn-block-content[data-text-color]) { color: inherit; }
+.dag-blocks .bn-block:has(> .bn-block-content[data-background-color]) { background-color: transparent; }
+
+/* A block a search result or a link opened onto, its words marked for a moment so the eye
+   finds them. A CSS highlight rather than a class or an attribute: ProseMirror redraws any attribute
+   it did not set on a node it owns, so the mark is a range the browser paints over — see
+   `markFound` in `BlockEditor.tsx`. */
+::highlight(dag-found) {
+  background-color: var(--dag-color-accentSoft);
+}
+
+/* An equation in the editor: drawn by KaTeX exactly as `markdown.css` draws one read-only,
+   and a click opens its field — so it says it can be clicked, and says which one is open. */
+.dag-blocks .dag-math-chip {
+  cursor: pointer;
+  border-radius: var(--dag-metric-radius-small);
+}
+.dag-blocks .dag-math-chip[data-dag-math-chip="display"] { display: block; }
+.dag-blocks .dag-math-chip:hover,
+.dag-blocks .dag-equation:hover { background: var(--dag-color-paper100); }
+.dag-blocks .dag-math-chip--open,
+.dag-blocks .ProseMirror-selectednode > .dag-math-chip,
+.dag-blocks .dag-equation--open,
+.dag-blocks .ProseMirror-selectednode .dag-equation { background: var(--dag-color-accentSoft); }
+.dag-blocks .dag-math-chip__empty,
+.dag-blocks .dag-equation__empty {
+  color: var(--dag-color-muted);
+  font-style: italic;
+}
+.dag-blocks .dag-equation {
+  width: 100%;
+  cursor: pointer;
+  border-radius: var(--dag-metric-radius-small);
+  padding: 6px 0;
+}
+.dag-blocks .dag-equation .dag-math--block { margin: 0; }
+.dag-blocks .dag-equation__empty { text-align: center; }

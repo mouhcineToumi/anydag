@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    /* The shell is read on Node globals (`process`, `Buffer`) and on Electron's own declarations,
+       which the `electron` package carries in-tree — no `@types/electron`. */
+    "types": ["node"],
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/desktop.tsbuildinfo"
+  },
+  "include": ["."]
+}

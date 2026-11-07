@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
+    <title>AnyDag</title>
+    <!-- The mark's favicon cut. It was `href="data:,"` before the brand
+         existed: an empty icon, so that a browser asking for /favicon.ico got no 404 — the
+         Playwright run fails on any console error, and a full Chromium (as opposed to the headless
+         shell) asks. A real file in `public/` answers the same request, so that property holds.
+
+         It is the *small* cut of the mark rather than the one `src/ui/Logo.tsx` draws: a wider
+         corner gap, one turn in the coil instead of one and a half, and a heavier stroke. The full
+         drawing closes up below about 20px, and a favicon is 16. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

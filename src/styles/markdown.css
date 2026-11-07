@@ -1,0 +1,189 @@
+/* Markdown items. The measure is deliberately short — a board is read at a glance, not settled into. */
+
+.dag-md {
+  font-size: var(--dag-type-mdBody);
+  line-height: var(--dag-type-mdLeading);
+  color: var(--dag-color-ink);
+}
+.dag-md--note {
+  /* An unhued note has no `--dag-h`/`--dag-t` bound (see `src/render/hue.ts`), so this falls straight
+     through to the plain fill every note has always had; a hued one wears its tint instead. */
+  background: var(--dag-t, var(--dag-color-paper100));
+  border-radius: var(--dag-metric-radius-group);
+  padding: var(--dag-metric-md-notePadY) var(--dag-metric-md-notePadX);
+}
+/* A hued plain paragraph — never a note, which already reads as "highlighted" from its fill — gets
+   a quiet rule down its left edge instead. Reuses the blockquote's own width and indent rather than
+   a new theme key for what is the same idea: a bar that says "this is set apart" beside a card's
+   text. Only present at all when `item.hue` is set (`MarkdownItem` adds the class), so an unhued
+   paragraph's box is untouched. */
+.dag-md--hued {
+  border-left: var(--dag-metric-md-quoteBar) solid var(--dag-h, var(--dag-h-default));
+  padding-left: var(--dag-metric-md-quotePad);
+}
+
+.dag-md > :first-child { margin-top: 0; }
+.dag-md > :last-child { margin-bottom: 0; }
+
+.dag-md h1 {
+  font-size: var(--dag-type-mdH1);
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  line-height: 1.2;
+  margin: 0 0 var(--dag-metric-md-blockGap);
+}
+.dag-md h2 {
+  font-size: var(--dag-type-mdH2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: var(--dag-metric-md-headGapTop) 0 var(--dag-metric-md-headGapBottom);
+}
+.dag-md h3 {
+  font-size: var(--dag-type-mdH3);
+  font-weight: 600;
+  margin: var(--dag-metric-md-h3GapTop) 0 var(--dag-metric-md-h3GapBottom);
+}
+.dag-md p { margin: 0 0 var(--dag-metric-md-blockGap); }
+.dag-md ul, .dag-md ol { margin: 0 0 var(--dag-metric-md-blockGap); padding-left: var(--dag-metric-md-listPad); }
+.dag-md li { margin: var(--dag-metric-md-itemGap) 0; }
+.dag-md a { color: var(--dag-color-accent); text-decoration: none; }
+.dag-md a:hover { text-decoration: underline; }
+.dag-md strong { font-weight: 600; }
+.dag-md hr {
+  border: 0;
+  border-top: var(--dag-metric-line-hair) solid var(--dag-color-outlineSoft);
+  margin: var(--dag-metric-md-ruleGap) 0;
+}
+
+.dag-md code {
+  font-family: var(--dag-font-mono);
+  /* Relative on purpose: inline code sits inside a line of prose and has to match its size. */
+  font-size: 0.88em;
+  background: var(--dag-color-paper200);
+  border-radius: var(--dag-metric-radius-code);
+  padding: var(--dag-metric-md-codePadY) var(--dag-metric-md-codePadX);
+}
+.dag-md pre {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-mdCode);
+  line-height: var(--dag-type-mdCodeLeading);
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-metric-radius-tile);
+  padding: var(--dag-metric-md-prePadY) var(--dag-metric-md-prePadX);
+  overflow-x: auto;
+  margin: 0 0 var(--dag-metric-md-blockGap);
+}
+.dag-md pre code { background: none; padding: 0; font-size: inherit; }
+
+/* A code block says its language above its text, so the block's paper is the wrapper's and
+   the <pre> inside it is only the text. The label is the file's — a snapshot, an export and a PDF
+   draw it — and the copy button beside it is chrome, in chrome.css. */
+.dag-md .dag-code {
+  position: relative;
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-metric-radius-tile);
+  margin: 0 0 var(--dag-metric-md-blockGap);
+}
+.dag-md .dag-code__head {
+  padding: var(--dag-metric-md-prePadY) var(--dag-metric-md-prePadX) 0;
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-mdCodeLang);
+  line-height: var(--dag-type-mdCodeLeading);
+  color: var(--dag-color-muted);
+  /* Selecting the code by hand should not pick up the word above it. */
+  user-select: none;
+}
+.dag-md .dag-code > pre {
+  margin: 0;
+  background: none;
+  border-radius: 0;
+  padding-top: var(--dag-metric-md-codeLangGap);
+}
+
+/* What a block's language could not read, counted beside the label. In the danger colour
+   the equations use for TeX that does not parse, and after the label rather than over it. */
+.dag-code__problems { color: var(--dag-color-dangerText); }
+.dag-code__problems::before { content: " · "; color: var(--dag-color-muted); }
+
+/* A code block's tokens (`src/render/syntax.ts`), in the read-only views and the note editor
+   alike, so not under `.dag-md`. The hues are the theme's: in `neutral`, whose hues are greys on
+   purpose, code is greys too. Nothing here changes a width — weight and style stay the text's — so
+   a coloured block lays out exactly as the plain one it replaces. */
+.dag-tok-keyword { color: var(--dag-color-hues-violet); }
+.dag-tok-string { color: var(--dag-color-hues-spruce); }
+.dag-tok-regexp { color: var(--dag-color-hues-crimson); }
+.dag-tok-number { color: var(--dag-color-hues-ochre); }
+.dag-tok-comment { color: var(--dag-color-muted); }
+.dag-tok-function { color: var(--dag-color-hues-indigo); }
+.dag-tok-type { color: var(--dag-color-hues-teal); }
+.dag-tok-property { color: var(--dag-color-hues-coral); }
+.dag-tok-tag { color: var(--dag-color-hues-magenta); }
+.dag-tok-error {
+  text-decoration: underline wavy var(--dag-color-danger);
+  text-decoration-skip-ink: none;
+}
+
+.dag-md blockquote {
+  margin: 0 0 var(--dag-metric-md-blockGap);
+  padding-left: var(--dag-metric-md-quotePad);
+  border-left: var(--dag-metric-md-quoteBar) solid var(--dag-color-outline);
+  color: var(--dag-color-slate);
+}
+
+.dag-md table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 var(--dag-metric-md-blockGap);
+  font-size: var(--dag-type-mdTable);
+  background: var(--dag-color-card);
+  border: var(--dag-metric-line-hair) solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-tile);
+  overflow: hidden;
+}
+.dag-md thead { background: var(--dag-color-paper100); }
+.dag-md th {
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--dag-type-mdTh);
+  padding: var(--dag-metric-md-cellPadY) var(--dag-metric-md-cellPadX);
+  border-bottom: var(--dag-metric-line-hair) solid var(--dag-color-outline);
+}
+.dag-md td {
+  padding: var(--dag-metric-md-tdPadY) var(--dag-metric-md-cellPadX);
+  border-top: var(--dag-metric-line-hair) solid var(--dag-color-outlineSoft);
+}
+.dag-md tr:first-child td { border-top: 0; }
+
+/* An equation, drawn by KaTeX in its own faces at its own size, 1.21em of the text around
+   it. Display — a `$$` block, or `$$…$$` written mid-line — is a line of its own, centred, and
+   scrolls sideways rather than overflowing the page or the card. Not scoped to `.dag-md`: the note
+   editor draws the same element. */
+.dag-math--display {
+  display: block;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: var(--dag-metric-md-itemGap) 0;
+}
+.dag-math--block { margin: 0 0 var(--dag-metric-md-blockGap); }
+.dag-math .katex-display { margin: 0; }
+/* Room for a tall glyph inside the sideways scroller, which would otherwise clip its top and foot. */
+.dag-math--display > .katex-display,
+.dag-math--display > .katex { padding: 0.15em 0; }
+/* Before KaTeX has landed, and when the TeX does not parse: the TeX itself, in the mono. */
+.dag-math--pending,
+.dag-math--error {
+  font-family: var(--dag-font-mono);
+  font-size: 0.88em;
+  white-space: pre-wrap;
+}
+.dag-math--pending { color: var(--dag-color-muted); }
+.dag-math--error {
+  text-decoration: underline wavy var(--dag-color-danger);
+  text-underline-offset: 0.2em;
+}
+/* A colour written in the TeX is one the theme does not own (`CLAUDE.md`, *A custom colour*): an
+   equation draws in the ink around it, whatever `\color` and `\colorbox` say. */
+.dag-math .katex [style*="color:"] { color: inherit !important; }
+.dag-math .katex [style*="background-color"] { background-color: transparent !important; }
+.dag-math .katex [style*="border-color"] { border-color: currentColor !important; }

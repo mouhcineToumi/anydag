@@ -1,0 +1,5179 @@
+{
+  "aws:account": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/AWS-Account_32.svg",
+    "title": "AWS Account",
+    "aliases": []
+  },
+  "aws:activate": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-Activate_48.svg",
+    "title": "AWS Activate",
+    "aliases": []
+  },
+  "aws:amplify": {
+    "file": "aws-service:Arch_Front-End-Web-Mobile/48/Arch_AWS-Amplify_48.svg",
+    "title": "AWS Amplify",
+    "aliases": []
+  },
+  "aws:apache-mxnet-on-aws": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Apache-MXNet-on-AWS_48.svg",
+    "title": "Apache MXNet on AWS",
+    "aliases": []
+  },
+  "aws:api-gateway": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Amazon-API-Gateway_48.svg",
+    "title": "Amazon API Gateway",
+    "aliases": []
+  },
+  "aws:app-mesh": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-App-Mesh_48.svg",
+    "title": "AWS App Mesh",
+    "aliases": []
+  },
+  "aws:app-runner": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-App-Runner_48.svg",
+    "title": "AWS App Runner",
+    "aliases": []
+  },
+  "aws:app-studio": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-App-Studio_48.svg",
+    "title": "AWS App Studio",
+    "aliases": []
+  },
+  "aws:appconfig": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-AppConfig_48.svg",
+    "title": "AWS AppConfig",
+    "aliases": []
+  },
+  "aws:appfabric": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_AWS-AppFabric_48.svg",
+    "title": "AWS AppFabric",
+    "aliases": []
+  },
+  "aws:appflow": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_Amazon-AppFlow_48.svg",
+    "title": "Amazon AppFlow",
+    "aliases": []
+  },
+  "aws:application-auto-scaling": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Application-Auto-Scaling_48.svg",
+    "title": "AWS Application Auto Scaling",
+    "aliases": []
+  },
+  "aws:application-discovery-service": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Application-Discovery-Service_48.svg",
+    "title": "AWS Application Discovery Service",
+    "aliases": []
+  },
+  "aws:application-migration-service": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Application-Migration-Service_48.svg",
+    "title": "AWS Application Migration Service",
+    "aliases": []
+  },
+  "aws:application-recovery-controller": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Amazon-Application-Recovery-Controller_48.svg",
+    "title": "Amazon Application Recovery Controller",
+    "aliases": []
+  },
+  "aws:appsync": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_AWS-AppSync_48.svg",
+    "title": "AWS AppSync",
+    "aliases": []
+  },
+  "aws:artifact": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Artifact_48.svg",
+    "title": "AWS Artifact",
+    "aliases": []
+  },
+  "aws:athena": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Athena_48.svg",
+    "title": "Amazon Athena",
+    "aliases": []
+  },
+  "aws:audit-manager": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Audit-Manager_48.svg",
+    "title": "AWS Audit Manager",
+    "aliases": []
+  },
+  "aws:augmented-ai-a2i": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Augmented-AI-A2I_48.svg",
+    "title": "Amazon Augmented AI A2I",
+    "aliases": []
+  },
+  "aws:aurora": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-Aurora_48.svg",
+    "title": "Amazon Aurora",
+    "aliases": []
+  },
+  "aws:auto-scaling": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Auto-Scaling_48.svg",
+    "title": "AWS Auto Scaling",
+    "aliases": []
+  },
+  "aws:auto-scaling-group": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Auto-Scaling-group_32.svg",
+    "title": "Auto Scaling group",
+    "aliases": []
+  },
+  "aws:b2b-data-interchange": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_AWS-B2B-Data-Interchange_48.svg",
+    "title": "AWS B2B Data Interchange",
+    "aliases": []
+  },
+  "aws:backint-agent": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Backint-Agent_48.svg",
+    "title": "AWS Backint Agent",
+    "aliases": []
+  },
+  "aws:backup": {
+    "file": "aws-service:Arch_Storage/48/Arch_AWS-Backup_48.svg",
+    "title": "AWS Backup",
+    "aliases": []
+  },
+  "aws:batch": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Batch_48.svg",
+    "title": "AWS Batch",
+    "aliases": []
+  },
+  "aws:bedrock": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Bedrock_48.svg",
+    "title": "Amazon Bedrock",
+    "aliases": []
+  },
+  "aws:bedrock-agentcore": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Bedrock-AgentCore_48.svg",
+    "title": "Amazon Bedrock AgentCore",
+    "aliases": []
+  },
+  "aws:billing-conductor": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_AWS-Billing-Conductor_48.svg",
+    "title": "AWS Billing Conductor",
+    "aliases": []
+  },
+  "aws:bottlerocket": {
+    "file": "aws-service:Arch_Compute/48/Arch_Bottlerocket_48.svg",
+    "title": "Bottlerocket",
+    "aliases": []
+  },
+  "aws:braket": {
+    "file": "aws-service:Arch_Quantum-Technologies/48/Arch_Amazon-Braket_48.svg",
+    "title": "Amazon Braket",
+    "aliases": []
+  },
+  "aws:budgets": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_AWS-Budgets_48.svg",
+    "title": "AWS Budgets",
+    "aliases": []
+  },
+  "aws:cdk": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Cloud-Development-Kit_48.svg",
+    "title": "AWS Cloud Development Kit",
+    "aliases": [
+      "cloud-development-kit",
+      "aws-cdk"
+    ]
+  },
+  "aws:certificate-manager": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Certificate-Manager_48.svg",
+    "title": "AWS Certificate Manager",
+    "aliases": []
+  },
+  "aws:chatbot": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Chatbot_48.svg",
+    "title": "AWS Chatbot",
+    "aliases": []
+  },
+  "aws:chime": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Chime_48.svg",
+    "title": "Amazon Chime",
+    "aliases": []
+  },
+  "aws:chime-sdk": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Chime-SDK_48.svg",
+    "title": "Amazon Chime SDK",
+    "aliases": []
+  },
+  "aws:clean-rooms": {
+    "file": "aws-service:Arch_Analytics/48/Arch_AWS-Clean-Rooms_48.svg",
+    "title": "AWS Clean Rooms",
+    "aliases": []
+  },
+  "aws:cli": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Command-Line-Interface_48.svg",
+    "title": "AWS Command Line Interface",
+    "aliases": [
+      "command-line-interface",
+      "aws-cli"
+    ]
+  },
+  "aws:client-vpn": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Client-VPN_48.svg",
+    "title": "AWS Client VPN",
+    "aliases": []
+  },
+  "aws:cloud": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/AWS-Cloud_32.svg",
+    "title": "AWS Cloud",
+    "aliases": []
+  },
+  "aws:cloud-control-api": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Cloud-Control-API_48.svg",
+    "title": "AWS Cloud Control API",
+    "aliases": []
+  },
+  "aws:cloud-dark": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/AWS-Cloud_32_Dark.svg",
+    "title": "AWS Cloud (Dark)",
+    "aliases": []
+  },
+  "aws:cloud-directory": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Cloud-Directory_48.svg",
+    "title": "Amazon Cloud Directory",
+    "aliases": []
+  },
+  "aws:cloud-logo": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/AWS-Cloud-logo_32.svg",
+    "title": "AWS Cloud logo",
+    "aliases": []
+  },
+  "aws:cloud-logo-dark": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/AWS-Cloud-logo_32_Dark.svg",
+    "title": "AWS Cloud logo (Dark)",
+    "aliases": []
+  },
+  "aws:cloud-map": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Cloud-Map_48.svg",
+    "title": "AWS Cloud Map",
+    "aliases": []
+  },
+  "aws:cloud-wan": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Cloud-WAN_48.svg",
+    "title": "AWS Cloud WAN",
+    "aliases": []
+  },
+  "aws:cloud9": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Cloud9_48.svg",
+    "title": "AWS Cloud9",
+    "aliases": []
+  },
+  "aws:cloudformation": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-CloudFormation_48.svg",
+    "title": "AWS CloudFormation",
+    "aliases": []
+  },
+  "aws:cloudfront": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Amazon-CloudFront_48.svg",
+    "title": "Amazon CloudFront",
+    "aliases": []
+  },
+  "aws:cloudhsm": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-CloudHSM_48.svg",
+    "title": "AWS CloudHSM",
+    "aliases": []
+  },
+  "aws:cloudsearch": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-CloudSearch_48.svg",
+    "title": "Amazon CloudSearch",
+    "aliases": []
+  },
+  "aws:cloudshell": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-CloudShell_48.svg",
+    "title": "AWS CloudShell",
+    "aliases": []
+  },
+  "aws:cloudtrail": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-CloudTrail_48.svg",
+    "title": "AWS CloudTrail",
+    "aliases": []
+  },
+  "aws:cloudwatch": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.svg",
+    "title": "Amazon CloudWatch",
+    "aliases": []
+  },
+  "aws:codeartifact": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-CodeArtifact_48.svg",
+    "title": "AWS CodeArtifact",
+    "aliases": []
+  },
+  "aws:codebuild": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-CodeBuild_48.svg",
+    "title": "AWS CodeBuild",
+    "aliases": []
+  },
+  "aws:codecatalyst": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_Amazon-CodeCatalyst_48.svg",
+    "title": "Amazon CodeCatalyst",
+    "aliases": []
+  },
+  "aws:codecommit": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-CodeCommit_48.svg",
+    "title": "AWS CodeCommit",
+    "aliases": []
+  },
+  "aws:codedeploy": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-CodeDeploy_48.svg",
+    "title": "AWS CodeDeploy",
+    "aliases": []
+  },
+  "aws:codeguru": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-CodeGuru_48.svg",
+    "title": "Amazon CodeGuru",
+    "aliases": []
+  },
+  "aws:codepipeline": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-CodePipeline_48.svg",
+    "title": "AWS CodePipeline",
+    "aliases": []
+  },
+  "aws:codewhisperer": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-CodeWhisperer_48.svg",
+    "title": "Amazon CodeWhisperer",
+    "aliases": []
+  },
+  "aws:cognito": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Cognito_48.svg",
+    "title": "Amazon Cognito",
+    "aliases": []
+  },
+  "aws:comprehend": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Comprehend_48.svg",
+    "title": "Amazon Comprehend",
+    "aliases": []
+  },
+  "aws:comprehend-medical": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Comprehend-Medical_48.svg",
+    "title": "Amazon Comprehend Medical",
+    "aliases": []
+  },
+  "aws:compute-optimizer": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Compute-Optimizer_48.svg",
+    "title": "AWS Compute Optimizer",
+    "aliases": []
+  },
+  "aws:compute-optimizer-management-tools": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Compute-Optimizer_48.svg",
+    "title": "AWS Compute Optimizer",
+    "aliases": []
+  },
+  "aws:config": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Config_48.svg",
+    "title": "AWS Config",
+    "aliases": []
+  },
+  "aws:connect": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Connect_48.svg",
+    "title": "Amazon Connect",
+    "aliases": []
+  },
+  "aws:console-mobile-application": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Console-Mobile-Application_48.svg",
+    "title": "AWS Console Mobile Application",
+    "aliases": []
+  },
+  "aws:control-tower": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Control-Tower_48.svg",
+    "title": "AWS Control Tower",
+    "aliases": []
+  },
+  "aws:corporate-data-center": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Corporate-data-center_32.svg",
+    "title": "Corporate data center",
+    "aliases": []
+  },
+  "aws:corretto": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_Amazon-Corretto_48.svg",
+    "title": "Amazon Corretto",
+    "aliases": []
+  },
+  "aws:cost-and-usage-report": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_AWS-Cost-and-Usage-Report_48.svg",
+    "title": "AWS Cost and Usage Report",
+    "aliases": []
+  },
+  "aws:cost-explorer": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_AWS-Cost-Explorer_48.svg",
+    "title": "AWS Cost Explorer",
+    "aliases": []
+  },
+  "aws:data-exchange": {
+    "file": "aws-service:Arch_Analytics/48/Arch_AWS-Data-Exchange_48.svg",
+    "title": "AWS Data Exchange",
+    "aliases": []
+  },
+  "aws:data-firehose": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Data-Firehose_48.svg",
+    "title": "Amazon Data Firehose",
+    "aliases": []
+  },
+  "aws:data-transfer-terminal": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Data-Transfer-Terminal_48.svg",
+    "title": "AWS Data Transfer Terminal",
+    "aliases": []
+  },
+  "aws:datasync": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-DataSync_48.svg",
+    "title": "AWS DataSync",
+    "aliases": []
+  },
+  "aws:datazone": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-DataZone_48.svg",
+    "title": "Amazon DataZone",
+    "aliases": []
+  },
+  "aws:dcv": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-DCV_48.svg",
+    "title": "Amazon DCV",
+    "aliases": []
+  },
+  "aws:deadline-cloud": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Deadline-Cloud_48.svg",
+    "title": "AWS Deadline Cloud",
+    "aliases": []
+  },
+  "aws:deep-learning-amis": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-Deep-Learning-AMIs_48.svg",
+    "title": "AWS Deep Learning AMIs",
+    "aliases": []
+  },
+  "aws:deep-learning-containers": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-Deep-Learning-Containers_48.svg",
+    "title": "AWS Deep Learning Containers",
+    "aliases": []
+  },
+  "aws:deepracer": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-DeepRacer_48.svg",
+    "title": "AWS DeepRacer",
+    "aliases": []
+  },
+  "aws:detective": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Detective_48.svg",
+    "title": "Amazon Detective",
+    "aliases": []
+  },
+  "aws:device-farm": {
+    "file": "aws-service:Arch_Front-End-Web-Mobile/48/Arch_AWS-Device-Farm_48.svg",
+    "title": "AWS Device Farm",
+    "aliases": []
+  },
+  "aws:devops-agent": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-DevOps-Agent_48.svg",
+    "title": "AWS DevOps Agent",
+    "aliases": []
+  },
+  "aws:devops-guru": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-DevOps-Guru_48.svg",
+    "title": "Amazon DevOps Guru",
+    "aliases": []
+  },
+  "aws:direct-connect": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Direct-Connect_48.svg",
+    "title": "AWS Direct Connect",
+    "aliases": []
+  },
+  "aws:directory-service": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Directory-Service_48.svg",
+    "title": "AWS Directory Service",
+    "aliases": []
+  },
+  "aws:distro-for-opentelemetry": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Distro-for-OpenTelemetry_48.svg",
+    "title": "AWS Distro for OpenTelemetry",
+    "aliases": []
+  },
+  "aws:dms": {
+    "file": "aws-service:Arch_Databases/48/Arch_AWS-Database-Migration-Service_48.svg",
+    "title": "AWS Database Migration Service",
+    "aliases": [
+      "database-migration-service",
+      "aws-dms"
+    ]
+  },
+  "aws:documentdb": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-DocumentDB_48.svg",
+    "title": "Amazon DocumentDB",
+    "aliases": []
+  },
+  "aws:drs": {
+    "file": "aws-service:Arch_Storage/48/Arch_AWS-Elastic-Disaster-Recovery_48.svg",
+    "title": "AWS Elastic Disaster Recovery",
+    "aliases": [
+      "elastic-disaster-recovery",
+      "aws-drs"
+    ]
+  },
+  "aws:dynamodb": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-DynamoDB_48.svg",
+    "title": "Amazon DynamoDB",
+    "aliases": []
+  },
+  "aws:ebs": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-Elastic-Block-Store_48.svg",
+    "title": "Amazon Elastic Block Store",
+    "aliases": [
+      "elastic-block-store",
+      "amazon-ebs"
+    ]
+  },
+  "aws:ec2": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-EC2_48.svg",
+    "title": "Amazon EC2",
+    "aliases": []
+  },
+  "aws:ec2-auto-scaling": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.svg",
+    "title": "Amazon EC2 Auto Scaling",
+    "aliases": []
+  },
+  "aws:ec2-image-builder": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-EC2-Image-Builder_48.svg",
+    "title": "Amazon EC2 Image Builder",
+    "aliases": []
+  },
+  "aws:ec2-instance-contents": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/EC2-instance-contents_32.svg",
+    "title": "EC2 instance contents",
+    "aliases": []
+  },
+  "aws:ecr": {
+    "file": "aws-service:Arch_Containers/48/Arch_Amazon-Elastic-Container-Registry_48.svg",
+    "title": "Amazon Elastic Container Registry",
+    "aliases": [
+      "elastic-container-registry",
+      "amazon-ecr"
+    ]
+  },
+  "aws:ecs": {
+    "file": "aws-service:Arch_Containers/48/Arch_Amazon-Elastic-Container-Service_48.svg",
+    "title": "Amazon Elastic Container Service",
+    "aliases": [
+      "elastic-container-service",
+      "amazon-ecs"
+    ]
+  },
+  "aws:ecs-anywhere": {
+    "file": "aws-service:Arch_Containers/48/Arch_Amazon-ECS-Anywhere_48.svg",
+    "title": "Amazon ECS Anywhere",
+    "aliases": []
+  },
+  "aws:efa": {
+    "file": "aws-service:Arch_Compute/48/Arch_Elastic-Fabric-Adapter_48.svg",
+    "title": "Elastic Fabric Adapter",
+    "aliases": [
+      "elastic-fabric-adapter"
+    ]
+  },
+  "aws:efs": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-EFS_48.svg",
+    "title": "Amazon EFS",
+    "aliases": []
+  },
+  "aws:eks": {
+    "file": "aws-service:Arch_Containers/48/Arch_Amazon-Elastic-Kubernetes-Service_48.svg",
+    "title": "Amazon Elastic Kubernetes Service",
+    "aliases": [
+      "elastic-kubernetes-service",
+      "amazon-eks"
+    ]
+  },
+  "aws:eks-anywhere": {
+    "file": "aws-service:Arch_Containers/48/Arch_Amazon-EKS-Anywhere_48.svg",
+    "title": "Amazon EKS Anywhere",
+    "aliases": []
+  },
+  "aws:eks-distro": {
+    "file": "aws-service:Arch_Containers/48/Arch_Amazon-EKS-Distro_48.svg",
+    "title": "Amazon EKS Distro",
+    "aliases": []
+  },
+  "aws:elastic-beanstalk": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Elastic-Beanstalk_48.svg",
+    "title": "AWS Elastic Beanstalk",
+    "aliases": []
+  },
+  "aws:elastic-inference": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Elastic-Inference_48.svg",
+    "title": "Amazon Elastic Inference",
+    "aliases": []
+  },
+  "aws:elastic-vmware-service": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-Elastic-VMware-Service_48.svg",
+    "title": "Amazon Elastic VMware Service",
+    "aliases": []
+  },
+  "aws:elasticache": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-ElastiCache_48.svg",
+    "title": "Amazon ElastiCache",
+    "aliases": []
+  },
+  "aws:elb": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.svg",
+    "title": "Elastic Load Balancing",
+    "aliases": [
+      "elastic-load-balancing"
+    ]
+  },
+  "aws:elemental-appliances-software": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-Appliances-&-Software_48.svg",
+    "title": "AWS Elemental Appliances & Software",
+    "aliases": []
+  },
+  "aws:elemental-conductor": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-Conductor_48.svg",
+    "title": "AWS Elemental Conductor",
+    "aliases": []
+  },
+  "aws:elemental-delta": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-Delta_48.svg",
+    "title": "AWS Elemental Delta",
+    "aliases": []
+  },
+  "aws:elemental-inference": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-Elemental-Inference_48.svg",
+    "title": "AWS Elemental Inference",
+    "aliases": []
+  },
+  "aws:elemental-link": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-Link_48.svg",
+    "title": "AWS Elemental Link",
+    "aliases": []
+  },
+  "aws:elemental-live": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-Live_48.svg",
+    "title": "AWS Elemental Live",
+    "aliases": []
+  },
+  "aws:elemental-mediaconnect": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-MediaConnect_48.svg",
+    "title": "AWS Elemental MediaConnect",
+    "aliases": []
+  },
+  "aws:elemental-mediaconvert": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-MediaConvert_48.svg",
+    "title": "AWS Elemental MediaConvert",
+    "aliases": []
+  },
+  "aws:elemental-medialive": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-MediaLive_48.svg",
+    "title": "AWS Elemental MediaLive",
+    "aliases": []
+  },
+  "aws:elemental-mediapackage": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-MediaPackage_48.svg",
+    "title": "AWS Elemental MediaPackage",
+    "aliases": []
+  },
+  "aws:elemental-mediastore": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-MediaStore_48.svg",
+    "title": "AWS Elemental MediaStore",
+    "aliases": []
+  },
+  "aws:elemental-mediatailor": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-MediaTailor_48.svg",
+    "title": "AWS Elemental MediaTailor",
+    "aliases": []
+  },
+  "aws:elemental-server": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Elemental-Server_48.svg",
+    "title": "AWS Elemental Server",
+    "aliases": []
+  },
+  "aws:emr": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-EMR_48.svg",
+    "title": "Amazon EMR",
+    "aliases": []
+  },
+  "aws:end-user-messaging": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_AWS-End-User-Messaging_48.svg",
+    "title": "AWS End User Messaging",
+    "aliases": []
+  },
+  "aws:entity-resolution": {
+    "file": "aws-service:Arch_Analytics/48/Arch_AWS-Entity-Resolution_48.svg",
+    "title": "AWS Entity Resolution",
+    "aliases": []
+  },
+  "aws:eventbridge": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_Amazon-EventBridge_48.svg",
+    "title": "Amazon EventBridge",
+    "aliases": []
+  },
+  "aws:express-workflows": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_AWS-Express-Workflows_48.svg",
+    "title": "AWS Express Workflows",
+    "aliases": []
+  },
+  "aws:fargate": {
+    "file": "aws-service:Arch_Containers/48/Arch_AWS-Fargate_48.svg",
+    "title": "AWS Fargate",
+    "aliases": []
+  },
+  "aws:fault-injection-service": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Fault-Injection-Service_48.svg",
+    "title": "AWS Fault Injection Service",
+    "aliases": []
+  },
+  "aws:file-cache": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-File-Cache_48.svg",
+    "title": "Amazon File Cache",
+    "aliases": []
+  },
+  "aws:finops-agent": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_AWS-FinOps-Agent_48.svg",
+    "title": "AWS FinOps Agent",
+    "aliases": []
+  },
+  "aws:finspace": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-FinSpace_48.svg",
+    "title": "Amazon FinSpace",
+    "aliases": []
+  },
+  "aws:firewall-manager": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Firewall-Manager_48.svg",
+    "title": "AWS Firewall Manager",
+    "aliases": []
+  },
+  "aws:forecast": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Forecast_48.svg",
+    "title": "Amazon Forecast",
+    "aliases": []
+  },
+  "aws:fraud-detector": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Fraud-Detector_48.svg",
+    "title": "Amazon Fraud Detector",
+    "aliases": []
+  },
+  "aws:freertos": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_FreeRTOS_48.svg",
+    "title": "FreeRTOS",
+    "aliases": []
+  },
+  "aws:fsx": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-FSx_48.svg",
+    "title": "Amazon FSx",
+    "aliases": []
+  },
+  "aws:fsx-for-lustre": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-FSx-for-Lustre_48.svg",
+    "title": "Amazon FSx for Lustre",
+    "aliases": []
+  },
+  "aws:fsx-for-netapp-ontap": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-FSx-for-NetApp-ONTAP_48.svg",
+    "title": "Amazon FSx for NetApp ONTAP",
+    "aliases": []
+  },
+  "aws:fsx-for-openzfs": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-FSx-for-OpenZFS_48.svg",
+    "title": "Amazon FSx for OpenZFS",
+    "aliases": []
+  },
+  "aws:fsx-for-wfs": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-FSx-for-WFS_48.svg",
+    "title": "Amazon FSx for WFS",
+    "aliases": []
+  },
+  "aws:gamelift-servers": {
+    "file": "aws-service:Arch_Games/48/Arch_Amazon-GameLift-Servers_48.svg",
+    "title": "Amazon GameLift Servers",
+    "aliases": []
+  },
+  "aws:gamelift-streams": {
+    "file": "aws-service:Arch_Games/48/Arch_Amazon-GameLift-Streams_48.svg",
+    "title": "Amazon GameLift Streams",
+    "aliases": []
+  },
+  "aws:global-accelerator": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Global-Accelerator_48.svg",
+    "title": "AWS Global Accelerator",
+    "aliases": []
+  },
+  "aws:glue": {
+    "file": "aws-service:Arch_Analytics/48/Arch_AWS-Glue_48.svg",
+    "title": "AWS Glue",
+    "aliases": []
+  },
+  "aws:glue-databrew": {
+    "file": "aws-service:Arch_Analytics/48/Arch_AWS-Glue-DataBrew_48.svg",
+    "title": "AWS Glue DataBrew",
+    "aliases": []
+  },
+  "aws:ground-station": {
+    "file": "aws-service:Arch_Satellite/48/Arch_AWS-Ground-Station_48.svg",
+    "title": "AWS Ground Station",
+    "aliases": []
+  },
+  "aws:guardduty": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-GuardDuty_48.svg",
+    "title": "Amazon GuardDuty",
+    "aliases": []
+  },
+  "aws:health-dashboard": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Health-Dashboard_48.svg",
+    "title": "AWS Health Dashboard",
+    "aliases": []
+  },
+  "aws:healthimaging": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-HealthImaging_48.svg",
+    "title": "AWS HealthImaging",
+    "aliases": []
+  },
+  "aws:healthlake": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-HealthLake_48.svg",
+    "title": "AWS HealthLake",
+    "aliases": []
+  },
+  "aws:healthomics": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-HealthOmics_48.svg",
+    "title": "AWS HealthOmics",
+    "aliases": []
+  },
+  "aws:healthscribe": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-HealthScribe_48.svg",
+    "title": "AWS HealthScribe",
+    "aliases": []
+  },
+  "aws:iam": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Identity-and-Access-Management_48.svg",
+    "title": "AWS Identity and Access Management",
+    "aliases": [
+      "identity-and-access-management",
+      "aws-iam"
+    ]
+  },
+  "aws:iam-identity-center": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-IAM-Identity-Center_48.svg",
+    "title": "AWS IAM Identity Center",
+    "aliases": []
+  },
+  "aws:infrastructure-composer": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Infrastructure-Composer_48.svg",
+    "title": "AWS Infrastructure Composer",
+    "aliases": []
+  },
+  "aws:inspector": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Inspector_48.svg",
+    "title": "Amazon Inspector",
+    "aliases": []
+  },
+  "aws:interactive-video-service": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_Amazon-Interactive-Video-Service_48.svg",
+    "title": "Amazon Interactive Video Service",
+    "aliases": []
+  },
+  "aws:interconnect": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Interconnect_48.svg",
+    "title": "AWS Interconnect",
+    "aliases": []
+  },
+  "aws:iot-core": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-Core_48.svg",
+    "title": "AWS IoT Core",
+    "aliases": []
+  },
+  "aws:iot-device-defender": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-Device-Defender_48.svg",
+    "title": "AWS IoT Device Defender",
+    "aliases": []
+  },
+  "aws:iot-device-management": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-Device-Management_48.svg",
+    "title": "AWS IoT Device Management",
+    "aliases": []
+  },
+  "aws:iot-events": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-Events_48.svg",
+    "title": "AWS IoT Events",
+    "aliases": []
+  },
+  "aws:iot-expresslink": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-ExpressLink_48.svg",
+    "title": "AWS IoT ExpressLink",
+    "aliases": []
+  },
+  "aws:iot-fleetwise": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-FleetWise_48.svg",
+    "title": "AWS IoT FleetWise",
+    "aliases": []
+  },
+  "aws:iot-greengrass": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-Greengrass_48.svg",
+    "title": "AWS IoT Greengrass",
+    "aliases": []
+  },
+  "aws:iot-greengrass-deployment": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/AWS-IoT-Greengrass-Deployment_32.svg",
+    "title": "AWS IoT Greengrass Deployment",
+    "aliases": []
+  },
+  "aws:iot-sitewise": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-SiteWise_48.svg",
+    "title": "AWS IoT SiteWise",
+    "aliases": []
+  },
+  "aws:iot-twinmaker": {
+    "file": "aws-service:Arch_Internet-of-Things/48/Arch_AWS-IoT-TwinMaker_48.svg",
+    "title": "AWS IoT TwinMaker",
+    "aliases": []
+  },
+  "aws:iq": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-IQ_48.svg",
+    "title": "AWS IQ",
+    "aliases": []
+  },
+  "aws:kendra": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Kendra_48.svg",
+    "title": "Amazon Kendra",
+    "aliases": []
+  },
+  "aws:keyspaces": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-Keyspaces_48.svg",
+    "title": "Amazon Keyspaces",
+    "aliases": []
+  },
+  "aws:kinesis": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Kinesis_48.svg",
+    "title": "Amazon Kinesis",
+    "aliases": []
+  },
+  "aws:kinesis-data-streams": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Kinesis-Data-Streams_48.svg",
+    "title": "Amazon Kinesis Data Streams",
+    "aliases": []
+  },
+  "aws:kinesis-video-streams": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Kinesis-Video-Streams_48.svg",
+    "title": "Amazon Kinesis Video Streams",
+    "aliases": []
+  },
+  "aws:kinesis-video-streams-media-services": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_Amazon-Kinesis-Video-Streams_48.svg",
+    "title": "Amazon Kinesis Video Streams",
+    "aliases": []
+  },
+  "aws:kms": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Key-Management-Service_48.svg",
+    "title": "AWS Key Management Service",
+    "aliases": [
+      "key-management-service",
+      "aws-kms"
+    ]
+  },
+  "aws:lake-formation": {
+    "file": "aws-service:Arch_Analytics/48/Arch_AWS-Lake-Formation_48.svg",
+    "title": "AWS Lake Formation",
+    "aliases": []
+  },
+  "aws:lambda": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Lambda_48.svg",
+    "title": "AWS Lambda",
+    "aliases": []
+  },
+  "aws:launch-wizard": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Launch-Wizard_48.svg",
+    "title": "AWS Launch Wizard",
+    "aliases": []
+  },
+  "aws:lex": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Lex_48.svg",
+    "title": "Amazon Lex",
+    "aliases": []
+  },
+  "aws:license-manager": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-License-Manager_48.svg",
+    "title": "AWS License Manager",
+    "aliases": []
+  },
+  "aws:lightsail": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-Lightsail_48.svg",
+    "title": "Amazon Lightsail",
+    "aliases": []
+  },
+  "aws:lightsail-for-research": {
+    "file": "aws-service:Arch_Compute/48/Arch_Amazon-Lightsail-for-Research_48.svg",
+    "title": "Amazon Lightsail for Research",
+    "aliases": []
+  },
+  "aws:local-zones": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Local-Zones_48.svg",
+    "title": "AWS Local Zones",
+    "aliases": []
+  },
+  "aws:location-service": {
+    "file": "aws-service:Arch_Front-End-Web-Mobile/48/Arch_Amazon-Location-Service_48.svg",
+    "title": "Amazon Location Service",
+    "aliases": []
+  },
+  "aws:lookout-for-equipment": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Lookout-for-Equipment_48.svg",
+    "title": "Amazon Lookout for Equipment",
+    "aliases": []
+  },
+  "aws:lookout-for-vision": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Lookout-for-Vision_48.svg",
+    "title": "Amazon Lookout for Vision",
+    "aliases": []
+  },
+  "aws:macie": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Macie_48.svg",
+    "title": "Amazon Macie",
+    "aliases": []
+  },
+  "aws:mainframe-modernization": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Mainframe-Modernization_48.svg",
+    "title": "AWS Mainframe Modernization",
+    "aliases": []
+  },
+  "aws:managed-blockchain": {
+    "file": "aws-service:Arch_Blockchain/48/Arch_Amazon-Managed-Blockchain_48.svg",
+    "title": "Amazon Managed Blockchain",
+    "aliases": []
+  },
+  "aws:managed-grafana": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_Amazon-Managed-Grafana_48.svg",
+    "title": "Amazon Managed Grafana",
+    "aliases": []
+  },
+  "aws:managed-service-for-apache-flink": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Managed-Service-for-Apache-Flink_48.svg",
+    "title": "Amazon Managed Service for Apache Flink",
+    "aliases": []
+  },
+  "aws:managed-service-for-prometheus": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_Amazon-Managed-Service-for-Prometheus_48.svg",
+    "title": "Amazon Managed Service for Prometheus",
+    "aliases": []
+  },
+  "aws:managed-services": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-Managed-Services_48.svg",
+    "title": "AWS Managed Services",
+    "aliases": []
+  },
+  "aws:management-console": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Management-Console_48.svg",
+    "title": "AWS Management Console",
+    "aliases": []
+  },
+  "aws:marketplace-dark": {
+    "file": "aws-service:Arch_General-Icons/48/Arch_AWS-Marketplace_Dark_48.svg",
+    "title": "AWS Marketplace (Dark)",
+    "aliases": []
+  },
+  "aws:marketplace-light": {
+    "file": "aws-service:Arch_General-Icons/48/Arch_AWS-Marketplace_Light_48.svg",
+    "title": "AWS Marketplace (Light)",
+    "aliases": []
+  },
+  "aws:memorydb": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-MemoryDB_48.svg",
+    "title": "Amazon MemoryDB",
+    "aliases": []
+  },
+  "aws:migration-evaluator": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Migration-Evaluator_48.svg",
+    "title": "AWS Migration Evaluator",
+    "aliases": []
+  },
+  "aws:monitron": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Monitron_48.svg",
+    "title": "Amazon Monitron",
+    "aliases": []
+  },
+  "aws:mq": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_Amazon-MQ_48.svg",
+    "title": "Amazon MQ",
+    "aliases": []
+  },
+  "aws:msk": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Managed-Streaming-for-Apache-Kafka_48.svg",
+    "title": "Amazon Managed Streaming for Apache Kafka",
+    "aliases": [
+      "managed-streaming-for-apache-kafka",
+      "amazon-msk"
+    ]
+  },
+  "aws:mwaa": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_Amazon-Managed-Workflows-for-Apache-Airflow_48.svg",
+    "title": "Amazon Managed Workflows for Apache Airflow",
+    "aliases": [
+      "managed-workflows-for-apache-airflow",
+      "amazon-mwaa"
+    ]
+  },
+  "aws:neptune": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-Neptune_48.svg",
+    "title": "Amazon Neptune",
+    "aliases": []
+  },
+  "aws:network-firewall": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Network-Firewall_48.svg",
+    "title": "AWS Network Firewall",
+    "aliases": []
+  },
+  "aws:neuron": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-Neuron_48.svg",
+    "title": "AWS Neuron",
+    "aliases": []
+  },
+  "aws:nitro-enclaves": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Nitro-Enclaves_48.svg",
+    "title": "AWS Nitro Enclaves",
+    "aliases": []
+  },
+  "aws:nova": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Nova_48.svg",
+    "title": "Amazon Nova",
+    "aliases": []
+  },
+  "aws:open-3d-engine": {
+    "file": "aws-service:Arch_Games/48/Arch_Open-3D-Engine_48.svg",
+    "title": "Open 3D Engine",
+    "aliases": []
+  },
+  "aws:opensearch": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-OpenSearch-Service_48.svg",
+    "title": "Amazon OpenSearch Service",
+    "aliases": [
+      "opensearch-service",
+      "amazon-opensearch"
+    ]
+  },
+  "aws:oracle-database-at-aws": {
+    "file": "aws-service:Arch_Databases/48/Arch_Oracle-Database-at-AWS_48.svg",
+    "title": "Oracle Database at AWS",
+    "aliases": []
+  },
+  "aws:organizations": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Organizations_48.svg",
+    "title": "AWS Organizations",
+    "aliases": []
+  },
+  "aws:outposts-family": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Outposts-family_48.svg",
+    "title": "AWS Outposts family",
+    "aliases": []
+  },
+  "aws:outposts-rack": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Outposts-rack_48.svg",
+    "title": "AWS Outposts rack",
+    "aliases": []
+  },
+  "aws:outposts-servers": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Outposts-servers_48.svg",
+    "title": "AWS Outposts servers",
+    "aliases": []
+  },
+  "aws:panorama": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_AWS-Panorama_48.svg",
+    "title": "AWS Panorama",
+    "aliases": []
+  },
+  "aws:parallel-cluster": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Parallel-Cluster_48.svg",
+    "title": "AWS Parallel Cluster",
+    "aliases": []
+  },
+  "aws:parallel-computing-service": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Parallel-Computing-Service_48.svg",
+    "title": "AWS Parallel Computing Service",
+    "aliases": []
+  },
+  "aws:partner-central": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Partner-Central_48.svg",
+    "title": "AWS Partner Central",
+    "aliases": []
+  },
+  "aws:payment-cryptography": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Payment-Cryptography_48.svg",
+    "title": "AWS Payment Cryptography",
+    "aliases": []
+  },
+  "aws:personalize": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Personalize_48.svg",
+    "title": "Amazon Personalize",
+    "aliases": []
+  },
+  "aws:pinpoint": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Pinpoint_48.svg",
+    "title": "Amazon Pinpoint",
+    "aliases": []
+  },
+  "aws:pinpoint-apis": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Pinpoint-APIs_48.svg",
+    "title": "Amazon Pinpoint APIs",
+    "aliases": []
+  },
+  "aws:polly": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Polly_48.svg",
+    "title": "Amazon Polly",
+    "aliases": []
+  },
+  "aws:private-certificate-authority": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Private-Certificate-Authority_48.svg",
+    "title": "AWS Private Certificate Authority",
+    "aliases": []
+  },
+  "aws:private-subnet": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Private-subnet_32.svg",
+    "title": "Private subnet",
+    "aliases": []
+  },
+  "aws:privatelink": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-PrivateLink_48.svg",
+    "title": "AWS PrivateLink",
+    "aliases": []
+  },
+  "aws:professional-services": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-Professional-Services_48.svg",
+    "title": "AWS Professional Services",
+    "aliases": []
+  },
+  "aws:proton": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Proton_48.svg",
+    "title": "AWS Proton",
+    "aliases": []
+  },
+  "aws:public-subnet": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Public-subnet_32.svg",
+    "title": "Public subnet",
+    "aliases": []
+  },
+  "aws:pytorch-on-aws": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_PyTorch-on-AWS_48.svg",
+    "title": "PyTorch on AWS",
+    "aliases": []
+  },
+  "aws:q": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Q_48.svg",
+    "title": "Amazon Q",
+    "aliases": []
+  },
+  "aws:quick": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Quick_48.svg",
+    "title": "Amazon Quick",
+    "aliases": []
+  },
+  "aws:rds": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-RDS_48.svg",
+    "title": "Amazon RDS",
+    "aliases": []
+  },
+  "aws:red-hat-openshift-service-on-aws": {
+    "file": "aws-service:Arch_Containers/48/Arch_Red-Hat-OpenShift-Service-on-AWS_48.svg",
+    "title": "Red Hat OpenShift Service on AWS",
+    "aliases": []
+  },
+  "aws:redshift": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-Redshift_48.svg",
+    "title": "Amazon Redshift",
+    "aliases": []
+  },
+  "aws:region": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Region_32.svg",
+    "title": "Region",
+    "aliases": []
+  },
+  "aws:rekognition": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Rekognition_48.svg",
+    "title": "Amazon Rekognition",
+    "aliases": []
+  },
+  "aws:repost": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-rePost_48.svg",
+    "title": "AWS rePost",
+    "aliases": []
+  },
+  "aws:repost-private": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-rePost-Private_48.svg",
+    "title": "AWS rePost Private",
+    "aliases": []
+  },
+  "aws:reserved-instance-reporting": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_Reserved-Instance-Reporting_48.svg",
+    "title": "Reserved Instance Reporting",
+    "aliases": []
+  },
+  "aws:resilience-hub": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Resilience-Hub_48.svg",
+    "title": "AWS Resilience Hub",
+    "aliases": []
+  },
+  "aws:resource-access-manager": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Resource-Access-Manager_48.svg",
+    "title": "AWS Resource Access Manager",
+    "aliases": []
+  },
+  "aws:resource-explorer": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Resource-Explorer_48.svg",
+    "title": "AWS Resource Explorer",
+    "aliases": []
+  },
+  "aws:route53": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Amazon-Route-53_48.svg",
+    "title": "Amazon Route 53",
+    "aliases": [
+      "route-53",
+      "amazon-route53"
+    ]
+  },
+  "aws:rtb-fabric": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-RTB-Fabric_48.svg",
+    "title": "AWS RTB Fabric",
+    "aliases": []
+  },
+  "aws:s3": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg",
+    "title": "Amazon Simple Storage Service",
+    "aliases": [
+      "simple-storage-service",
+      "amazon-s3"
+    ]
+  },
+  "aws:s3-glacier": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-Simple-Storage-Service-Glacier_48.svg",
+    "title": "Amazon Simple Storage Service Glacier",
+    "aliases": [
+      "simple-storage-service-glacier",
+      "amazon-s3-glacier"
+    ]
+  },
+  "aws:s3-on-outposts": {
+    "file": "aws-service:Arch_Storage/48/Arch_Amazon-S3-on-Outposts_48.svg",
+    "title": "Amazon S3 on Outposts",
+    "aliases": []
+  },
+  "aws:sagemaker": {
+    "file": "aws-service:Arch_Analytics/48/Arch_Amazon-SageMaker_48.svg",
+    "title": "Amazon SageMaker",
+    "aliases": []
+  },
+  "aws:sagemaker-ai": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-SageMaker-AI_48.svg",
+    "title": "Amazon SageMaker AI",
+    "aliases": []
+  },
+  "aws:sagemaker-ground-truth": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-SageMaker-Ground-Truth_48.svg",
+    "title": "Amazon SageMaker Ground Truth",
+    "aliases": []
+  },
+  "aws:sagemaker-studio-lab": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-SageMaker-Studio-Lab_48.svg",
+    "title": "Amazon SageMaker Studio Lab",
+    "aliases": []
+  },
+  "aws:savings-plans": {
+    "file": "aws-service:Arch_Cloud-Financial-Management/48/Arch_Savings-Plans_48.svg",
+    "title": "Savings Plans",
+    "aliases": []
+  },
+  "aws:secrets-manager": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Secrets-Manager_48.svg",
+    "title": "AWS Secrets Manager",
+    "aliases": []
+  },
+  "aws:security-agent": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Security-Agent_48.svg",
+    "title": "AWS Security Agent",
+    "aliases": []
+  },
+  "aws:security-hub": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Security-Hub_48.svg",
+    "title": "AWS Security Hub",
+    "aliases": []
+  },
+  "aws:security-incident-response": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Security-Incident-Response_48.svg",
+    "title": "AWS Security Incident Response",
+    "aliases": []
+  },
+  "aws:security-lake": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Security-Lake_48.svg",
+    "title": "Amazon Security Lake",
+    "aliases": []
+  },
+  "aws:server-contents": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Server-contents_32.svg",
+    "title": "Server contents",
+    "aliases": []
+  },
+  "aws:serverless-application-repository": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Serverless-Application-Repository_48.svg",
+    "title": "AWS Serverless Application Repository",
+    "aliases": []
+  },
+  "aws:service-catalog": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Service-Catalog_48.svg",
+    "title": "AWS Service Catalog",
+    "aliases": []
+  },
+  "aws:service-management-connector": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Service-Management-Connector_48.svg",
+    "title": "AWS Service Management Connector",
+    "aliases": []
+  },
+  "aws:ses": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-Simple-Email-Service_48.svg",
+    "title": "Amazon Simple Email Service",
+    "aliases": [
+      "simple-email-service",
+      "amazon-ses"
+    ]
+  },
+  "aws:shield": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Shield_48.svg",
+    "title": "AWS Shield",
+    "aliases": []
+  },
+  "aws:signer": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-Signer_48.svg",
+    "title": "AWS Signer",
+    "aliases": []
+  },
+  "aws:simspace-weaver": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-SimSpace-Weaver_48.svg",
+    "title": "AWS SimSpace Weaver",
+    "aliases": []
+  },
+  "aws:site-to-site-vpn": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Site-to-Site-VPN_48.svg",
+    "title": "AWS Site to Site VPN",
+    "aliases": []
+  },
+  "aws:snowball": {
+    "file": "aws-service:Arch_Storage/48/Arch_AWS-Snowball_48.svg",
+    "title": "AWS Snowball",
+    "aliases": []
+  },
+  "aws:snowball-edge": {
+    "file": "aws-service:Arch_Storage/48/Arch_AWS-Snowball-Edge_48.svg",
+    "title": "AWS Snowball Edge",
+    "aliases": []
+  },
+  "aws:sns": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_Amazon-Simple-Notification-Service_48.svg",
+    "title": "Amazon Simple Notification Service",
+    "aliases": [
+      "simple-notification-service",
+      "amazon-sns"
+    ]
+  },
+  "aws:spot-fleet": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Spot-Fleet_32.svg",
+    "title": "Spot Fleet",
+    "aliases": []
+  },
+  "aws:sqs": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_Amazon-Simple-Queue-Service_48.svg",
+    "title": "Amazon Simple Queue Service",
+    "aliases": [
+      "simple-queue-service",
+      "amazon-sqs"
+    ]
+  },
+  "aws:step-functions": {
+    "file": "aws-service:Arch_Application-Integration/48/Arch_AWS-Step-Functions_48.svg",
+    "title": "AWS Step Functions",
+    "aliases": []
+  },
+  "aws:storage-gateway": {
+    "file": "aws-service:Arch_Storage/48/Arch_AWS-Storage-Gateway_48.svg",
+    "title": "AWS Storage Gateway",
+    "aliases": []
+  },
+  "aws:supply-chain": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_AWS-Supply-Chain_48.svg",
+    "title": "AWS Supply Chain",
+    "aliases": []
+  },
+  "aws:support": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-Support_48.svg",
+    "title": "AWS Support",
+    "aliases": []
+  },
+  "aws:sustainability": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Sustainability_48.svg",
+    "title": "AWS Sustainability",
+    "aliases": []
+  },
+  "aws:systems-manager": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Systems-Manager_48.svg",
+    "title": "AWS Systems Manager",
+    "aliases": []
+  },
+  "aws:telco-network-builder": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Telco-Network-Builder_48.svg",
+    "title": "AWS Telco Network Builder",
+    "aliases": []
+  },
+  "aws:tensorflow-on-aws": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_TensorFlow-on-AWS_48.svg",
+    "title": "TensorFlow on AWS",
+    "aliases": []
+  },
+  "aws:textract": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Textract_48.svg",
+    "title": "Amazon Textract",
+    "aliases": []
+  },
+  "aws:thinkbox-deadline": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Thinkbox-Deadline_48.svg",
+    "title": "AWS Thinkbox Deadline",
+    "aliases": []
+  },
+  "aws:thinkbox-frost": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Thinkbox-Frost_48.svg",
+    "title": "AWS Thinkbox Frost",
+    "aliases": []
+  },
+  "aws:thinkbox-krakatoa": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Thinkbox-Krakatoa_48.svg",
+    "title": "AWS Thinkbox Krakatoa",
+    "aliases": []
+  },
+  "aws:thinkbox-stoke": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Thinkbox-Stoke_48.svg",
+    "title": "AWS Thinkbox Stoke",
+    "aliases": []
+  },
+  "aws:thinkbox-xmesh": {
+    "file": "aws-service:Arch_Media-Services/48/Arch_AWS-Thinkbox-XMesh_48.svg",
+    "title": "AWS Thinkbox XMesh",
+    "aliases": []
+  },
+  "aws:timestream": {
+    "file": "aws-service:Arch_Databases/48/Arch_Amazon-Timestream_48.svg",
+    "title": "Amazon Timestream",
+    "aliases": []
+  },
+  "aws:tools-and-sdks": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-Tools-and-SDKs_48.svg",
+    "title": "AWS Tools and SDKs",
+    "aliases": []
+  },
+  "aws:training-certification": {
+    "file": "aws-service:Arch_Customer-Enablement/48/Arch_AWS-Training-Certification_48.svg",
+    "title": "AWS Training Certification",
+    "aliases": []
+  },
+  "aws:transcribe": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Transcribe_48.svg",
+    "title": "Amazon Transcribe",
+    "aliases": []
+  },
+  "aws:transfer-family": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Transfer-Family_48.svg",
+    "title": "AWS Transfer Family",
+    "aliases": []
+  },
+  "aws:transform": {
+    "file": "aws-service:Arch_Migration-Modernization/48/Arch_AWS-Transform_48.svg",
+    "title": "AWS Transform",
+    "aliases": []
+  },
+  "aws:transit-gateway": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Transit-Gateway_48.svg",
+    "title": "AWS Transit Gateway",
+    "aliases": []
+  },
+  "aws:translate": {
+    "file": "aws-service:Arch_Artificial-Intelligence/48/Arch_Amazon-Translate_48.svg",
+    "title": "Amazon Translate",
+    "aliases": []
+  },
+  "aws:trusted-advisor": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Trusted-Advisor_48.svg",
+    "title": "AWS Trusted Advisor",
+    "aliases": []
+  },
+  "aws:user-notifications": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-User-Notifications_48.svg",
+    "title": "AWS User Notifications",
+    "aliases": []
+  },
+  "aws:verified-access": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_AWS-Verified-Access_48.svg",
+    "title": "AWS Verified Access",
+    "aliases": []
+  },
+  "aws:verified-permissions": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_Amazon-Verified-Permissions_48.svg",
+    "title": "Amazon Verified Permissions",
+    "aliases": []
+  },
+  "aws:virtual-private-cloud-vpc": {
+    "file": "aws-group:Architecture-Group-Icons_07312026/Virtual-private-cloud-VPC_32.svg",
+    "title": "Virtual private cloud VPC",
+    "aliases": []
+  },
+  "aws:vpc": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Amazon-Virtual-Private-Cloud_48.svg",
+    "title": "Amazon Virtual Private Cloud",
+    "aliases": [
+      "virtual-private-cloud",
+      "amazon-vpc"
+    ]
+  },
+  "aws:vpc-lattice": {
+    "file": "aws-service:Arch_Networking-Content-Delivery/48/Arch_Amazon-VPC-Lattice_48.svg",
+    "title": "Amazon VPC Lattice",
+    "aliases": []
+  },
+  "aws:waf": {
+    "file": "aws-service:Arch_Security-Identity/48/Arch_AWS-WAF_48.svg",
+    "title": "AWS WAF",
+    "aliases": []
+  },
+  "aws:wavelength": {
+    "file": "aws-service:Arch_Compute/48/Arch_AWS-Wavelength_48.svg",
+    "title": "AWS Wavelength",
+    "aliases": []
+  },
+  "aws:well-architected-tool": {
+    "file": "aws-service:Arch_Management-Tools/48/Arch_AWS-Well-Architected-Tool_48.svg",
+    "title": "AWS Well Architected Tool",
+    "aliases": []
+  },
+  "aws:wickr": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_AWS-Wickr_48.svg",
+    "title": "AWS Wickr",
+    "aliases": []
+  },
+  "aws:workdocs": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-WorkDocs_48.svg",
+    "title": "Amazon WorkDocs",
+    "aliases": []
+  },
+  "aws:workdocs-sdk": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-WorkDocs-SDK_48.svg",
+    "title": "Amazon WorkDocs SDK",
+    "aliases": []
+  },
+  "aws:workmail": {
+    "file": "aws-service:Arch_Business-Applications/48/Arch_Amazon-WorkMail_48.svg",
+    "title": "Amazon WorkMail",
+    "aliases": []
+  },
+  "aws:workspaces": {
+    "file": "aws-service:Arch_End-User-Computing/48/Arch_Amazon-WorkSpaces_48.svg",
+    "title": "Amazon WorkSpaces",
+    "aliases": []
+  },
+  "aws:xray": {
+    "file": "aws-service:Arch_Developer-Tools/48/Arch_AWS-X-Ray_48.svg",
+    "title": "AWS X Ray",
+    "aliases": [
+      "x-ray",
+      "aws-xray"
+    ]
+  },
+  "azure:030777508-icon-service-service-group-relationships": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/030777508 -icon-service-Service-Group-Relationships.svg",
+    "title": "030777508  icon service Service Group Relationships",
+    "aliases": []
+  },
+  "azure:a": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10018-icon-service-Azure-A.svg",
+    "title": "Azure A",
+    "aliases": []
+  },
+  "azure:abs-member": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/blockchain/10374-icon-service-ABS-Member.svg",
+    "title": "ABS Member",
+    "aliases": []
+  },
+  "azure:access-point": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/031193085-icon-service-Azure-Access-Point.svg",
+    "title": "Azure Access Point",
+    "aliases": []
+  },
+  "azure:aci": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10104-icon-service-Container-Instances.svg",
+    "title": "Container Instances",
+    "aliases": [
+      "container-instances"
+    ]
+  },
+  "azure:active-directory-connect-health": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10224-icon-service-Active-Directory-Connect-Health.svg",
+    "title": "Active Directory Connect Health",
+    "aliases": []
+  },
+  "azure:activity-log": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00007-icon-service-Activity-Log.svg",
+    "title": "Activity Log",
+    "aliases": []
+  },
+  "azure:ad-b2c": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10228-icon-service-Azure-AD-B2C.svg",
+    "title": "Azure AD B2C",
+    "aliases": []
+  },
+  "azure:administrative-units": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/00919-icon-service-Administrative-Units.svg",
+    "title": "Administrative Units",
+    "aliases": []
+  },
+  "azure:advisor": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00003-icon-service-Advisor.svg",
+    "title": "Advisor",
+    "aliases": []
+  },
+  "azure:agentic-web-apps": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/034296882-icon-service-Agentic-Web-Apps.svg",
+    "title": "Agentic Web Apps",
+    "aliases": []
+  },
+  "azure:ai-at-edge": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03687-icon-service-AI-at-Edge.svg",
+    "title": "AI at Edge",
+    "aliases": []
+  },
+  "azure:ai-foundry": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/035746832-icon-service-AI-Foundry.svg",
+    "title": "AI Foundry",
+    "aliases": []
+  },
+  "azure:ai-foundry-iq": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470497-icon-service-Azure-AI-Foundry-IQ.svg",
+    "title": "Azure AI Foundry IQ",
+    "aliases": []
+  },
+  "azure:ai-gateway": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/037838045-icon-service-AI-Gateway.svg",
+    "title": "AI Gateway",
+    "aliases": []
+  },
+  "azure:ai-studio": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03513-icon-service-AI-Studio.svg",
+    "title": "AI Studio",
+    "aliases": []
+  },
+  "azure:aks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10023-icon-service-Kubernetes-Services.svg",
+    "title": "Kubernetes Services",
+    "aliases": [
+      "kubernetes-services"
+    ]
+  },
+  "azure:aks-automatic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/03543-icon-service-AKS-Automatic.svg",
+    "title": "AKS Automatic",
+    "aliases": []
+  },
+  "azure:aks-istio": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03399-icon-service-AKS-Istio.svg",
+    "title": "AKS Istio",
+    "aliases": []
+  },
+  "azure:aks-network-policy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/containers/032487601-icon-service-AKS-Network-Policy.svg",
+    "title": "AKS Network Policy",
+    "aliases": []
+  },
+  "azure:alerts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00002-icon-service-Alerts.svg",
+    "title": "Alerts",
+    "aliases": []
+  },
+  "azure:all-resources": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10001-icon-service-All-Resources.svg",
+    "title": "All Resources",
+    "aliases": []
+  },
+  "azure:analysis-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10148-icon-service-Analysis-Services.svg",
+    "title": "Analysis Services",
+    "aliases": []
+  },
+  "azure:anomaly-detector": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00814-icon-service-Anomaly-Detector.svg",
+    "title": "Anomaly Detector",
+    "aliases": []
+  },
+  "azure:api-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/web/03291-icon-service-API-Center.svg",
+    "title": "API Center",
+    "aliases": []
+  },
+  "azure:api-connections": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/10048-icon-service-API-Connections.svg",
+    "title": "API Connections",
+    "aliases": []
+  },
+  "azure:api-for-fhir": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10212-icon-service-Azure-API-for-FHIR.svg",
+    "title": "Azure API for FHIR",
+    "aliases": []
+  },
+  "azure:api-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/10042-icon-service-API-Management-Services.svg",
+    "title": "API Management Services",
+    "aliases": [
+      "api-management-services"
+    ]
+  },
+  "azure:api-proxy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/02386-icon-service-API-Proxy.svg",
+    "title": "API Proxy",
+    "aliases": []
+  },
+  "azure:app-compliance-automation": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03071-icon-service-App-Compliance-Automation.svg",
+    "title": "App Compliance Automation",
+    "aliases": []
+  },
+  "azure:app-configuration": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10219-icon-service-App-Configuration.svg",
+    "title": "App Configuration",
+    "aliases": []
+  },
+  "azure:app-registrations": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10232-icon-service-App-Registrations.svg",
+    "title": "App Registrations",
+    "aliases": []
+  },
+  "azure:app-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/10035-icon-service-App-Services.svg",
+    "title": "App Services",
+    "aliases": [
+      "app-services"
+    ]
+  },
+  "azure:app-service-certificates": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/00049-icon-service-App-Service-Certificates.svg",
+    "title": "App Service Certificates",
+    "aliases": []
+  },
+  "azure:app-service-domains": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/00050-icon-service-App-Service-Domains.svg",
+    "title": "App Service Domains",
+    "aliases": []
+  },
+  "azure:app-service-environments": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/10047-icon-service-App-Service-Environments.svg",
+    "title": "App Service Environments",
+    "aliases": []
+  },
+  "azure:app-service-plans": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/00046-icon-service-App-Service-Plans.svg",
+    "title": "App Service Plans",
+    "aliases": []
+  },
+  "azure:app-space": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/web/03397-icon-service-App-Space.svg",
+    "title": "App Space",
+    "aliases": []
+  },
+  "azure:app-space-component": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/web/03595-icon-service-App-Space-Component.svg",
+    "title": "App Space Component",
+    "aliases": []
+  },
+  "azure:app-testing": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/developer tools/033805167-icon-service-Azure-App-Testing.svg",
+    "title": "Azure App Testing",
+    "aliases": []
+  },
+  "azure:applens": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/azure ecosystem/02354-icon-service-Applens.svg",
+    "title": "Applens",
+    "aliases": []
+  },
+  "azure:application-gateway-containers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03328-icon-service-Application-Gateway-Containers.svg",
+    "title": "Application Gateway Containers",
+    "aliases": []
+  },
+  "azure:application-gateways": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10076-icon-service-Application-Gateways.svg",
+    "title": "Application Gateways",
+    "aliases": []
+  },
+  "azure:application-group": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/00329-icon-service-Application-Group.svg",
+    "title": "Application Group",
+    "aliases": []
+  },
+  "azure:application-insights": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/00012-icon-service-Application-Insights.svg",
+    "title": "Application Insights",
+    "aliases": []
+  },
+  "azure:application-security-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/10244-icon-service-Application-Security-Groups.svg",
+    "title": "Application Security Groups",
+    "aliases": []
+  },
+  "azure:applied-ai-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/02749-icon-service-Azure-Applied-AI-Services.svg",
+    "title": "Azure Applied AI Services",
+    "aliases": []
+  },
+  "azure:aquila": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02625-icon-service-Aquila.svg",
+    "title": "Aquila",
+    "aliases": []
+  },
+  "azure:arc": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00756-icon-service-Azure-Arc.svg",
+    "title": "Azure Arc",
+    "aliases": []
+  },
+  "azure:arc-data-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02356-icon-service-Arc-Data-services.svg",
+    "title": "Arc Data services",
+    "aliases": []
+  },
+  "azure:arc-kubernetes": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/01088-icon-service-Arc-Kubernetes.svg",
+    "title": "Arc Kubernetes",
+    "aliases": []
+  },
+  "azure:arc-machines": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/01710-icon-service-Arc-Machines.svg",
+    "title": "Arc Machines",
+    "aliases": []
+  },
+  "azure:arc-postgresql": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01848-icon-service-Arc-PostgreSQL .svg",
+    "title": "Arc PostgreSQL",
+    "aliases": []
+  },
+  "azure:arc-sql-managed-instance": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01849-icon-service-Arc-SQL-Managed-Instance.svg",
+    "title": "Arc SQL Managed Instance",
+    "aliases": []
+  },
+  "azure:arc-sql-server": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01850-icon-service-Arc-SQL-Server.svg",
+    "title": "Arc SQL Server",
+    "aliases": []
+  },
+  "azure:atm-multistack": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03460-icon-service-ATM-Multistack.svg",
+    "title": "ATM Multistack",
+    "aliases": []
+  },
+  "azure:auto-scale": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/monitor/10832-icon-service-Auto-Scale.svg",
+    "title": "Auto Scale",
+    "aliases": []
+  },
+  "azure:automanaged-vm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/02112-icon-service-Automanaged-VM.svg",
+    "title": "Automanaged VM",
+    "aliases": []
+  },
+  "azure:automation-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00022-icon-service-Automation-Accounts.svg",
+    "title": "Automation Accounts",
+    "aliases": []
+  },
+  "azure:availability-sets": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10025-icon-service-Availability-Sets.svg",
+    "title": "Availability Sets",
+    "aliases": []
+  },
+  "azure:avs-vm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01846-icon-service-AVS-VM.svg",
+    "title": "AVS VM",
+    "aliases": []
+  },
+  "azure:azureattestation": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10422-icon-service-AzureAttestation.svg",
+    "title": "AzureAttestation",
+    "aliases": []
+  },
+  "azure:azurite": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02842-icon-service-Azurite.svg",
+    "title": "Azurite",
+    "aliases": []
+  },
+  "azure:backlog": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10853-icon-service-Backlog.svg",
+    "title": "Backlog",
+    "aliases": []
+  },
+  "azure:backup-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02360-icon-service-Azure-Backup-Center.svg",
+    "title": "Azure Backup Center",
+    "aliases": []
+  },
+  "azure:backup-vault": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02361-icon-service-Backup-Vault.svg",
+    "title": "Backup Vault",
+    "aliases": []
+  },
+  "azure:bare-metal-infrastructure": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02561-icon-service-Bare-Metal-Infrastructure.svg",
+    "title": "Bare Metal Infrastructure",
+    "aliases": []
+  },
+  "azure:bastions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02422-icon-service-Bastions.svg",
+    "title": "Bastions",
+    "aliases": []
+  },
+  "azure:batch-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10031-icon-service-Batch-Accounts.svg",
+    "title": "Batch Accounts",
+    "aliases": []
+  },
+  "azure:batch-ai": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00028-icon-service-Batch-AI.svg",
+    "title": "Batch AI",
+    "aliases": []
+  },
+  "azure:biz-talk": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10779-icon-service-Biz-Talk.svg",
+    "title": "Biz Talk",
+    "aliases": []
+  },
+  "azure:blob-block": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10780-icon-service-Blob-Block.svg",
+    "title": "Blob Block",
+    "aliases": []
+  },
+  "azure:blob-page": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10781-icon-service-Blob-Page.svg",
+    "title": "Blob Page",
+    "aliases": []
+  },
+  "azure:blockchain-applications": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/blockchain/10210-icon-service-Blockchain-Applications.svg",
+    "title": "Blockchain Applications",
+    "aliases": []
+  },
+  "azure:blockchain-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/blockchain/10366-icon-service-Azure-Blockchain-Service.svg",
+    "title": "Azure Blockchain Service",
+    "aliases": []
+  },
+  "azure:blueprints": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00006-icon-service-Blueprints.svg",
+    "title": "Blueprints",
+    "aliases": []
+  },
+  "azure:bonsai": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03337-icon-service-Bonsai.svg",
+    "title": "Bonsai",
+    "aliases": []
+  },
+  "azure:bot-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10165-icon-service-Bot-Services.svg",
+    "title": "Bot Services",
+    "aliases": []
+  },
+  "azure:branch": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10782-icon-service-Branch.svg",
+    "title": "Branch",
+    "aliases": []
+  },
+  "azure:breeze": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03633-icon-service-Breeze.svg",
+    "title": "Breeze",
+    "aliases": []
+  },
+  "azure:browser": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10783-icon-service-Browser.svg",
+    "title": "Browser",
+    "aliases": []
+  },
+  "azure:bug": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10784-icon-service-Bug.svg",
+    "title": "Bug",
+    "aliases": []
+  },
+  "azure:builds": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10785-icon-service-Builds.svg",
+    "title": "Builds",
+    "aliases": []
+  },
+  "azure:business-process-tracking": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/03637-icon-service-Business-Process-Tracking.svg",
+    "title": "Business Process Tracking",
+    "aliases": []
+  },
+  "azure:cache": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10786-icon-service-Cache.svg",
+    "title": "Cache",
+    "aliases": []
+  },
+  "azure:cache-redis": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10137-icon-service-Cache-Redis.svg",
+    "title": "Cache Redis",
+    "aliases": []
+  },
+  "azure:capacity-reservation-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02732-icon-service-Capacity-Reservation-Groups.svg",
+    "title": "Capacity Reservation Groups",
+    "aliases": []
+  },
+  "azure:cdn-profiles": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/00056-icon-service-CDN-Profiles.svg",
+    "title": "CDN Profiles",
+    "aliases": []
+  },
+  "azure:center-for-sap": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03090-icon-service-Azure-Center-for-SAP.svg",
+    "title": "Azure Center for SAP",
+    "aliases": []
+  },
+  "azure:central-service-instance-for-sap": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03092-icon-service-Central-Service-Instance-For-SAP.svg",
+    "title": "Central Service Instance For SAP",
+    "aliases": []
+  },
+  "azure:ceres": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02828-icon-service-Ceres.svg",
+    "title": "Ceres",
+    "aliases": []
+  },
+  "azure:change-analysis": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/00563-icon-service-Change-Analysis.svg",
+    "title": "Change Analysis",
+    "aliases": []
+  },
+  "azure:chaos-studio": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02223-icon-service-Azure-Chaos-Studio.svg",
+    "title": "Azure Chaos Studio",
+    "aliases": []
+  },
+  "azure:client-apps": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10331-icon-service-Client-Apps.svg",
+    "title": "Client Apps",
+    "aliases": []
+  },
+  "azure:cloud-services-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10030-icon-service-Cloud-Services-(Classic).svg",
+    "title": "Cloud Services (Classic)",
+    "aliases": []
+  },
+  "azure:cloud-services-extended-support": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02505-icon-service-Cloud-Services-(extended-support).svg",
+    "title": "Cloud Services (extended support)",
+    "aliases": []
+  },
+  "azure:cloud-shell": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00559-icon-service-Azure-Cloud-Shell.svg",
+    "title": "Azure Cloud Shell",
+    "aliases": []
+  },
+  "azure:cloudtest": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/02373-icon-service-CloudTest.svg",
+    "title": "CloudTest",
+    "aliases": []
+  },
+  "azure:code": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10787-icon-service-Code.svg",
+    "title": "Code",
+    "aliases": []
+  },
+  "azure:code-optimization": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/03455-icon-service-Code-Optimization.svg",
+    "title": "Code Optimization",
+    "aliases": []
+  },
+  "azure:cognitive-search": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10044-icon-service-Cognitive-Search.svg",
+    "title": "Cognitive Search",
+    "aliases": []
+  },
+  "azure:cognitive-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10162-icon-service-Cognitive-Services.svg",
+    "title": "Cognitive Services",
+    "aliases": []
+  },
+  "azure:cognitive-services-decisions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03173-icon-service-Cognitive-Services-Decisions.svg",
+    "title": "Cognitive Services Decisions",
+    "aliases": []
+  },
+  "azure:collaborative-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/azure ecosystem/01038-icon-service-Collaborative-Service.svg",
+    "title": "Collaborative Service",
+    "aliases": []
+  },
+  "azure:commit": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10788-icon-service-Commit.svg",
+    "title": "Commit",
+    "aliases": []
+  },
+  "azure:communication-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00968-icon-service-Azure-Communication-Services.svg",
+    "title": "Azure Communication Services",
+    "aliases": []
+  },
+  "azure:communications-gateway": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03311-icon-service-Azure-Communications-Gateway.svg",
+    "title": "Azure Communications Gateway",
+    "aliases": []
+  },
+  "azure:community-images": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02865-icon-service-Community-Images.svg",
+    "title": "Community Images",
+    "aliases": []
+  },
+  "azure:compliance": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00011-icon-service-Compliance.svg",
+    "title": "Compliance",
+    "aliases": []
+  },
+  "azure:compliance-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02931-icon-service-Compliance-Center.svg",
+    "title": "Compliance Center",
+    "aliases": []
+  },
+  "azure:compute-fleet": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/03487-icon-service-Compute-Fleet.svg",
+    "title": "Compute Fleet",
+    "aliases": []
+  },
+  "azure:compute-galleries": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/02864-icon-service-Azure-Compute-Galleries.svg",
+    "title": "Azure Compute Galleries",
+    "aliases": []
+  },
+  "azure:computer-vision": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00792-icon-service-Computer-Vision.svg",
+    "title": "Computer Vision",
+    "aliases": []
+  },
+  "azure:conditional-access": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/10233-icon-service-Conditional-Access.svg",
+    "title": "Conditional Access",
+    "aliases": []
+  },
+  "azure:confidential-ledgers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02668-icon-service-Confidential-Ledgers.svg",
+    "title": "Confidential Ledgers",
+    "aliases": []
+  },
+  "azure:connected-cache": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02509-icon-service-Connected-Cache.svg",
+    "title": "Connected Cache",
+    "aliases": []
+  },
+  "azure:connected-vehicle-platform": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02573-icon-service-Connected-Vehicle-Platform.svg",
+    "title": "Connected Vehicle Platform",
+    "aliases": []
+  },
+  "azure:connections": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10081-icon-service-Connections.svg",
+    "title": "Connections",
+    "aliases": []
+  },
+  "azure:consortium": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/blockchain/10375-icon-service-Consortium.svg",
+    "title": "Consortium",
+    "aliases": []
+  },
+  "azure:consumption-commitment": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03495-icon-service-Azure-Consumption-Commitment.svg",
+    "title": "Azure Consumption Commitment",
+    "aliases": []
+  },
+  "azure:container-apps-environments": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02989-icon-service-Container-Apps-Environments.svg",
+    "title": "Container Apps Environments",
+    "aliases": []
+  },
+  "azure:container-registries": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/containers/10105-icon-service-Container-Registries.svg",
+    "title": "Container Registries",
+    "aliases": []
+  },
+  "azure:container-services-deprecated": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10049-icon-service-Container-Services-(Deprecated).svg",
+    "title": "Container Services (Deprecated)",
+    "aliases": []
+  },
+  "azure:container-storage": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/containers/03401-icon-service-Azure-Container-Storage.svg",
+    "title": "Azure Container Storage",
+    "aliases": []
+  },
+  "azure:content-moderators": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00795-icon-service-Content-Moderators.svg",
+    "title": "Content Moderators",
+    "aliases": []
+  },
+  "azure:content-safety": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03390-icon-service-Content-Safety.svg",
+    "title": "Content Safety",
+    "aliases": []
+  },
+  "azure:controls": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10789-icon-service-Controls.svg",
+    "title": "Controls",
+    "aliases": []
+  },
+  "azure:controls-horizontal": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10790-icon-service-Controls-Horizontal.svg",
+    "title": "Controls Horizontal",
+    "aliases": []
+  },
+  "azure:cosmos-db": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10121-icon-service-Azure-Cosmos-DB.svg",
+    "title": "Azure Cosmos DB",
+    "aliases": []
+  },
+  "azure:cost-alerts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10791-icon-service-Cost-Alerts.svg",
+    "title": "Cost Alerts",
+    "aliases": []
+  },
+  "azure:cost-analysis": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10792-icon-service-Cost-Analysis.svg",
+    "title": "Cost Analysis",
+    "aliases": []
+  },
+  "azure:cost-budgets": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10793-icon-service-Cost-Budgets.svg",
+    "title": "Cost Budgets",
+    "aliases": []
+  },
+  "azure:cost-export": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00913-icon-service-Cost-Export.svg",
+    "title": "Cost Export",
+    "aliases": []
+  },
+  "azure:cost-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10019-icon-service-Cost-Management.svg",
+    "title": "Cost Management",
+    "aliases": []
+  },
+  "azure:cost-management-and-billing": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/00004-icon-service-Cost-Management-and-Billing.svg",
+    "title": "Cost Management and Billing",
+    "aliases": []
+  },
+  "azure:counter": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10794-icon-service-Counter.svg",
+    "title": "Counter",
+    "aliases": []
+  },
+  "azure:cubes": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10795-icon-service-Cubes.svg",
+    "title": "Cubes",
+    "aliases": []
+  },
+  "azure:custom-ip-prefix": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02654-icon-service-Custom-IP-Prefix.svg",
+    "title": "Custom IP Prefix",
+    "aliases": []
+  },
+  "azure:custom-vision": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00793-icon-service-Custom-Vision.svg",
+    "title": "Custom Vision",
+    "aliases": []
+  },
+  "azure:customer-lockbox-for-microsoft-azure": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10314-icon-service-Customer-Lockbox-for-Microsoft-Azure.svg",
+    "title": "Customer Lockbox for Microsoft Azure",
+    "aliases": []
+  },
+  "azure:dashboard": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10015-icon-service-Dashboard.svg",
+    "title": "Dashboard",
+    "aliases": []
+  },
+  "azure:dashboard-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01757-icon-service-Dashboard-Hub.svg",
+    "title": "Dashboard Hub",
+    "aliases": []
+  },
+  "azure:data-box": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/migrate/10094-icon-service-Data-Box.svg",
+    "title": "Data Box",
+    "aliases": []
+  },
+  "azure:data-catalog": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10216-icon-service-Azure-Data-Catalog.svg",
+    "title": "Azure Data Catalog",
+    "aliases": []
+  },
+  "azure:data-collection-rules": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01857-icon-service-Data-Collection-Rules.svg",
+    "title": "Data Collection Rules",
+    "aliases": []
+  },
+  "azure:data-explorer-clusters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10145-icon-service-Azure-Data-Explorer-Clusters.svg",
+    "title": "Azure Data Explorer Clusters",
+    "aliases": []
+  },
+  "azure:data-factories": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10126-icon-service-Data-Factories.svg",
+    "title": "Data Factories",
+    "aliases": []
+  },
+  "azure:data-lake-analytics": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10143-icon-service-Data-Lake-Analytics.svg",
+    "title": "Data Lake Analytics",
+    "aliases": []
+  },
+  "azure:data-lake-storage-gen1": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10090-icon-service-Data-Lake-Storage-Gen1.svg",
+    "title": "Data Lake Storage Gen1",
+    "aliases": []
+  },
+  "azure:data-lake-store-gen1": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10150-icon-service-Data-Lake-Store-Gen1.svg",
+    "title": "Data Lake Store Gen1",
+    "aliases": []
+  },
+  "azure:data-share-invitations": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10097-icon-service-Data-Share-Invitations.svg",
+    "title": "Data Share Invitations",
+    "aliases": []
+  },
+  "azure:data-shares": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10098-icon-service-Data-Shares.svg",
+    "title": "Data Shares",
+    "aliases": []
+  },
+  "azure:data-sharing": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/035824068-icon-service-Azure-Data-Sharing.svg",
+    "title": "Azure Data Sharing",
+    "aliases": []
+  },
+  "azure:data-transfer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/033740592-icon-service-Azure-Data-Transfer.svg",
+    "title": "Azure Data Transfer",
+    "aliases": []
+  },
+  "azure:data-virtualization": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/029203566-icon-service-Data-Virtualization.svg",
+    "title": "Data Virtualization",
+    "aliases": []
+  },
+  "azure:database-instance-for-sap": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03175-icon-service-Database-Instance-For-SAP.svg",
+    "title": "Database Instance For SAP",
+    "aliases": []
+  },
+  "azure:database-mariadb-server": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10123-icon-service-Azure-Database-MariaDB-Server.svg",
+    "title": "Azure Database MariaDB Server",
+    "aliases": []
+  },
+  "azure:database-migration-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10133-icon-service-Azure-Database-Migration-Services.svg",
+    "title": "Azure Database Migration Services",
+    "aliases": []
+  },
+  "azure:database-mysql-server": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10122-icon-service-Azure-Database-MySQL-Server.svg",
+    "title": "Azure Database MySQL Server",
+    "aliases": []
+  },
+  "azure:database-postgresql-server": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10131-icon-service-Azure-Database-PostgreSQL-Server.svg",
+    "title": "Azure Database PostgreSQL Server",
+    "aliases": []
+  },
+  "azure:database-postgresql-server-group": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/02827-icon-service-Azure-Database-PostgreSQL-Server-Group.svg",
+    "title": "Azure Database PostgreSQL Server Group",
+    "aliases": []
+  },
+  "azure:databox-gateway": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/00691-icon-service-Azure-Databox-Gateway.svg",
+    "title": "Azure Databox Gateway",
+    "aliases": []
+  },
+  "azure:databricks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10787-icon-service-Azure-Databricks.svg",
+    "title": "Azure Databricks",
+    "aliases": []
+  },
+  "azure:ddos-custom-policy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/035556610-icon-service-DDoS-Custom-Policy.svg",
+    "title": "DDoS Custom Policy",
+    "aliases": []
+  },
+  "azure:ddos-protection-plans": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10072-icon-service-DDoS-Protection-Plans.svg",
+    "title": "DDoS Protection Plans",
+    "aliases": []
+  },
+  "azure:dedicated-hsm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02322-icon-service-Dedicated-HSM.svg",
+    "title": "Dedicated HSM",
+    "aliases": []
+  },
+  "azure:defender-cm-local-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03402-icon-service-Defender-CM-Local-Manager.svg",
+    "title": "Defender CM Local Manager",
+    "aliases": []
+  },
+  "azure:defender-dcs-controller": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03412-icon-service-Defender-DCS-Controller.svg",
+    "title": "Defender DCS Controller",
+    "aliases": []
+  },
+  "azure:defender-distributer-control-system": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03413-icon-service-Defender-Distributer-Control-System.svg",
+    "title": "Defender Distributer Control System",
+    "aliases": []
+  },
+  "azure:defender-engineering-station": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03414-icon-service-Defender-Engineering-Station.svg",
+    "title": "Defender Engineering Station",
+    "aliases": []
+  },
+  "azure:defender-external-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03403-icon-service-Defender-External-Management.svg",
+    "title": "Defender External Management",
+    "aliases": []
+  },
+  "azure:defender-freezer-monitor": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03404-icon-service-Defender-Freezer-Monitor.svg",
+    "title": "Defender Freezer Monitor",
+    "aliases": []
+  },
+  "azure:defender-historian": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03405-icon-service-Defender-Historian.svg",
+    "title": "Defender Historian",
+    "aliases": []
+  },
+  "azure:defender-hmi": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03406-icon-service-Defender-HMI.svg",
+    "title": "Defender HMI",
+    "aliases": []
+  },
+  "azure:defender-industrial-packaging-system": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03415-icon-service-Defender-Industrial-Packaging-System.svg",
+    "title": "Defender Industrial Packaging System",
+    "aliases": []
+  },
+  "azure:defender-industrial-printer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03416-icon-service-Defender-Industrial-Printer.svg",
+    "title": "Defender Industrial Printer",
+    "aliases": []
+  },
+  "azure:defender-industrial-robot": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03418-icon-service-Defender-Industrial-Robot.svg",
+    "title": "Defender Industrial Robot",
+    "aliases": []
+  },
+  "azure:defender-industrial-scale-system": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03417-icon-service-Defender-Industrial-Scale-System.svg",
+    "title": "Defender Industrial Scale System",
+    "aliases": []
+  },
+  "azure:defender-marquee": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03407-icon-service-Defender-Marquee.svg",
+    "title": "Defender Marquee",
+    "aliases": []
+  },
+  "azure:defender-meter": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03419-icon-service-Defender-Meter.svg",
+    "title": "Defender Meter",
+    "aliases": []
+  },
+  "azure:defender-plc": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03420-icon-service-Defender-PLC.svg",
+    "title": "Defender PLC",
+    "aliases": []
+  },
+  "azure:defender-pneumatic-device": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03421-icon-service-Defender-Pneumatic-Device.svg",
+    "title": "Defender Pneumatic Device",
+    "aliases": []
+  },
+  "azure:defender-programable-board": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03422-icon-service-Defender-Programable-Board.svg",
+    "title": "Defender Programable Board",
+    "aliases": []
+  },
+  "azure:defender-relay": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03423-icon-service-Defender-Relay.svg",
+    "title": "Defender Relay",
+    "aliases": []
+  },
+  "azure:defender-robot-controller": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03408-icon-service-Defender-Robot-Controller.svg",
+    "title": "Defender Robot Controller",
+    "aliases": []
+  },
+  "azure:defender-rtu": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03424-icon-service-Defender-RTU.svg",
+    "title": "Defender RTU",
+    "aliases": []
+  },
+  "azure:defender-sensor": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03409-icon-service-Defender-Sensor.svg",
+    "title": "Defender Sensor",
+    "aliases": []
+  },
+  "azure:defender-slot": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03410-icon-service-Defender-Slot.svg",
+    "title": "Defender Slot",
+    "aliases": []
+  },
+  "azure:defender-web-guiding-system": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03411-icon-service-Defender-Web-Guiding-System.svg",
+    "title": "Defender Web Guiding System",
+    "aliases": []
+  },
+  "azure:deployment-environments": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03251-icon-service-Azure-Deployment-Environments.svg",
+    "title": "Azure Deployment Environments",
+    "aliases": []
+  },
+  "azure:detonation": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/00378-icon-service-Detonation.svg",
+    "title": "Detonation",
+    "aliases": []
+  },
+  "azure:dev-console": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10796-icon-service-Dev-Console.svg",
+    "title": "Dev Console",
+    "aliases": []
+  },
+  "azure:dev-tunnels": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03308-icon-service-Azure-Dev-Tunnels.svg",
+    "title": "Azure Dev Tunnels",
+    "aliases": []
+  },
+  "azure:device-compliance": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10333-icon-service-Device-Compliance.svg",
+    "title": "Device Compliance",
+    "aliases": []
+  },
+  "azure:device-configuration": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10338-icon-service-Device-Configuration.svg",
+    "title": "Device Configuration",
+    "aliases": []
+  },
+  "azure:device-enrollment": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10337-icon-service-Device-Enrollment.svg",
+    "title": "Device Enrollment",
+    "aliases": []
+  },
+  "azure:device-provisioning-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10369-icon-service-Device-Provisioning-Services.svg",
+    "title": "Device Provisioning Services",
+    "aliases": []
+  },
+  "azure:device-security-apple": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/00399-icon-service-Device-Security-Apple.svg",
+    "title": "Device Security Apple",
+    "aliases": []
+  },
+  "azure:device-security-google": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/00399-icon-service-Device-Security-Google.svg",
+    "title": "Device Security Google",
+    "aliases": []
+  },
+  "azure:device-security-windows": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/00399-icon-service-Device-Security-Windows.svg",
+    "title": "Device Security Windows",
+    "aliases": []
+  },
+  "azure:device-update-iot-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02475-icon-service-Device-Update-IoT-Hub.svg",
+    "title": "Device Update IoT Hub",
+    "aliases": []
+  },
+  "azure:devices": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10332-icon-service-Devices.svg",
+    "title": "Devices",
+    "aliases": []
+  },
+  "azure:devops": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/10261-icon-service-Azure-DevOps.svg",
+    "title": "Azure DevOps",
+    "aliases": []
+  },
+  "azure:devops-starter": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/03339-icon-service-DevOps-Starter.svg",
+    "title": "DevOps Starter",
+    "aliases": []
+  },
+  "azure:devtest-labs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/10264-icon-service-DevTest-Labs.svg",
+    "title": "DevTest Labs",
+    "aliases": []
+  },
+  "azure:diagnostics-settings": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00008-icon-service-Diagnostics-Settings.svg",
+    "title": "Diagnostics Settings",
+    "aliases": []
+  },
+  "azure:digital-twins": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/01030-icon-service-Digital-Twins.svg",
+    "title": "Digital Twins",
+    "aliases": []
+  },
+  "azure:disconnected-operations": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/035712231-icon-service-Disconnected-Operations.svg",
+    "title": "Disconnected Operations",
+    "aliases": []
+  },
+  "azure:disk-encryption-sets": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/00398-icon-service-Disk-Encryption-Sets.svg",
+    "title": "Disk Encryption Sets",
+    "aliases": []
+  },
+  "azure:disk-pool": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02560-icon-service-Disk-Pool.svg",
+    "title": "Disk Pool",
+    "aliases": []
+  },
+  "azure:disks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10032-icon-service-Disks.svg",
+    "title": "Disks",
+    "aliases": []
+  },
+  "azure:disks-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10041-icon-service-Disks-(Classic).svg",
+    "title": "Disks (Classic)",
+    "aliases": []
+  },
+  "azure:disks-snapshots": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10026-icon-service-Disks-Snapshots.svg",
+    "title": "Disks Snapshots",
+    "aliases": []
+  },
+  "azure:dns-multistack": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03459-icon-service-DNS-Multistack.svg",
+    "title": "DNS Multistack",
+    "aliases": []
+  },
+  "azure:dns-private-resolver": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02882-icon-service-DNS-Private-Resolver.svg",
+    "title": "DNS Private Resolver",
+    "aliases": []
+  },
+  "azure:dns-security-policy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03368-icon-service-DNS-Security-Policy.svg",
+    "title": "DNS Security Policy",
+    "aliases": []
+  },
+  "azure:dns-zones": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10064-icon-service-DNS-Zones.svg",
+    "title": "DNS Zones",
+    "aliases": []
+  },
+  "azure:documentdb": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/035656437-icon-service-Azure-DocumentDB.svg",
+    "title": "Azure DocumentDB",
+    "aliases": []
+  },
+  "azure:download": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10797-icon-service-Download.svg",
+    "title": "Download",
+    "aliases": []
+  },
+  "azure:ebooks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10330-icon-service-eBooks.svg",
+    "title": "eBooks",
+    "aliases": []
+  },
+  "azure:edge-actions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/029273094-icon-service-Edge-Actions.svg",
+    "title": "Edge Actions",
+    "aliases": []
+  },
+  "azure:edge-hardware-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02810-icon-service-Azure-Edge-Hardware-Center.svg",
+    "title": "Azure Edge Hardware Center",
+    "aliases": []
+  },
+  "azure:edge-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10117-icon-service-Edge-Management.svg",
+    "title": "Edge Management",
+    "aliases": []
+  },
+  "azure:edge-storage-accelerator": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03521-icon-service-Edge-Storage-Accelerator.svg",
+    "title": "Edge Storage Accelerator",
+    "aliases": []
+  },
+  "azure:education": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00026-icon-service-Education.svg",
+    "title": "Education",
+    "aliases": []
+  },
+  "azure:elastic-job-agents": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10128-icon-service-Elastic-Job-Agents.svg",
+    "title": "Elastic Job Agents",
+    "aliases": []
+  },
+  "azure:elastic-san": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03190-icon-service-Elastic-SAN.svg",
+    "title": "Elastic SAN",
+    "aliases": []
+  },
+  "azure:enclaves": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03394-icon-service-Azure-Enclaves.svg",
+    "title": "Azure Enclaves",
+    "aliases": []
+  },
+  "azure:endpoint-analytics": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/00562-icon-service-Endpoint-Analytics.svg",
+    "title": "Endpoint Analytics",
+    "aliases": []
+  },
+  "azure:engage-center-connect": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/029797391-icon-service-Engage-Center-Connect.svg",
+    "title": "Engage Center Connect",
+    "aliases": []
+  },
+  "azure:enterprise-applications": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10225-icon-service-Enterprise-Applications.svg",
+    "title": "Enterprise Applications",
+    "aliases": []
+  },
+  "azure:entra-connect": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/02854-icon-service-Entra-Connect.svg",
+    "title": "Entra Connect",
+    "aliases": []
+  },
+  "azure:entra-connect-health": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10224-icon-service-Entra-Connect-Health.svg",
+    "title": "Entra Connect Health",
+    "aliases": []
+  },
+  "azure:entra-connect-sync": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03533-icon-service-Entra-Connect-Sync.svg",
+    "title": "Entra Connect Sync",
+    "aliases": []
+  },
+  "azure:entra-domain-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10222-icon-service-Entra-Domain-Services.svg",
+    "title": "Entra Domain Services",
+    "aliases": []
+  },
+  "azure:entra-global-secure-access": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03309-icon-service-Entra-Global-Secure-Access.svg",
+    "title": "Entra Global Secure Access",
+    "aliases": []
+  },
+  "azure:entra-id-protection": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10231-icon-service-Entra-ID-Protection.svg",
+    "title": "Entra ID Protection",
+    "aliases": []
+  },
+  "azure:entra-identity-custom-roles": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/02680-icon-service-Entra-Identity-Custom-Roles.svg",
+    "title": "Entra Identity Custom Roles",
+    "aliases": []
+  },
+  "azure:entra-identity-licenses": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/02681-icon-service-Entra-Identity-Licenses.svg",
+    "title": "Entra Identity Licenses",
+    "aliases": []
+  },
+  "azure:entra-identity-risky-signins": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/03341-icon-service-Entra-Identity-Risky-Signins.svg",
+    "title": "Entra Identity Risky Signins",
+    "aliases": []
+  },
+  "azure:entra-identity-risky-users": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/03342-icon-service-Entra-Identity-Risky-Users.svg",
+    "title": "Entra Identity Risky Users",
+    "aliases": []
+  },
+  "azure:entra-identity-roles-and-administrators": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10340-icon-service-Entra-Identity-Roles-and-Administrators.svg",
+    "title": "Entra Identity Roles and Administrators",
+    "aliases": []
+  },
+  "azure:entra-internet-access": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03383-icon-service-Entra-Internet-Access.svg",
+    "title": "Entra Internet Access",
+    "aliases": []
+  },
+  "azure:entra-managed-identities": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10227-icon-service-Entra-Managed-Identities.svg",
+    "title": "Entra Managed Identities",
+    "aliases": []
+  },
+  "azure:entra-private-access": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03382-icon-service-Entra-Private-Access.svg",
+    "title": "Entra Private Access",
+    "aliases": []
+  },
+  "azure:entra-privleged-identity-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/02251-icon-service-Entra-Privleged-Identity-Management.svg",
+    "title": "Entra Privleged Identity Management",
+    "aliases": []
+  },
+  "azure:entra-verified-id": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03143-icon-service-Entra-Verified-ID.svg",
+    "title": "Entra Verified ID",
+    "aliases": []
+  },
+  "azure:error": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10798-icon-service-Error.svg",
+    "title": "Error",
+    "aliases": []
+  },
+  "azure:event-grid-domains": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10215-icon-service-Event-Grid-Domains.svg",
+    "title": "Event Grid Domains",
+    "aliases": []
+  },
+  "azure:event-grid-subscriptions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10221-icon-service-Event-Grid-Subscriptions.svg",
+    "title": "Event Grid Subscriptions",
+    "aliases": []
+  },
+  "azure:event-grid-topics": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10206-icon-service-Event-Grid-Topics.svg",
+    "title": "Event Grid Topics",
+    "aliases": []
+  },
+  "azure:event-hub-clusters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10149-icon-service-Event-Hub-Clusters.svg",
+    "title": "Event Hub Clusters",
+    "aliases": []
+  },
+  "azure:event-hubs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/00039-icon-service-Event-Hubs.svg",
+    "title": "Event Hubs",
+    "aliases": []
+  },
+  "azure:exchange-access": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10339-icon-service-Exchange-Access.svg",
+    "title": "Exchange Access",
+    "aliases": []
+  },
+  "azure:exchange-on-premises-access": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10334-icon-service-Exchange-On-Premises-Access.svg",
+    "title": "Exchange On Premises Access",
+    "aliases": []
+  },
+  "azure:experimentation-studio": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/01239-icon-service-Azure-Experimentation-Studio.svg",
+    "title": "Azure Experimentation Studio",
+    "aliases": []
+  },
+  "azure:express-route-traffic-collector": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03137-icon-service-Express-Route-Traffic-Collector.svg",
+    "title": "Express Route Traffic Collector",
+    "aliases": []
+  },
+  "azure:expressroute-circuits": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10079-icon-service-ExpressRoute-Circuits.svg",
+    "title": "ExpressRoute Circuits",
+    "aliases": []
+  },
+  "azure:expressroute-direct": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00903-icon-service-ExpressRoute-Direct.svg",
+    "title": "ExpressRoute Direct",
+    "aliases": []
+  },
+  "azure:extendedsecurityupdates": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/10572-icon-service-ExtendedSecurityUpdates.svg",
+    "title": "ExtendedSecurityUpdates",
+    "aliases": []
+  },
+  "azure:extensions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10799-icon-service-Extensions.svg",
+    "title": "Extensions",
+    "aliases": []
+  },
+  "azure:external-id": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03425-icon-service-external-id.svg",
+    "title": "external id",
+    "aliases": []
+  },
+  "azure:external-id-modified": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/034251-icon-service-external-id-modified.svg",
+    "title": "external id modified",
+    "aliases": []
+  },
+  "azure:external-identities": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03338-icon-service-External-Identities.svg",
+    "title": "External Identities",
+    "aliases": []
+  },
+  "azure:face-apis": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00794-icon-service-Face-APIs.svg",
+    "title": "Face APIs",
+    "aliases": []
+  },
+  "azure:feature-previews": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10827-icon-service-Feature-Previews.svg",
+    "title": "Feature Previews",
+    "aliases": []
+  },
+  "azure:fhir-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02658-icon-service-FHIR-Service.svg",
+    "title": "FHIR Service",
+    "aliases": []
+  },
+  "azure:fiji": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02486-icon-service-Fiji.svg",
+    "title": "Fiji",
+    "aliases": []
+  },
+  "azure:file": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10800-icon-service-File.svg",
+    "title": "File",
+    "aliases": []
+  },
+  "azure:files": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10801-icon-service-Files.svg",
+    "title": "Files",
+    "aliases": []
+  },
+  "azure:fileshares": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10400-icon-service-Azure-Fileshares.svg",
+    "title": "Azure Fileshares",
+    "aliases": []
+  },
+  "azure:firewall-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/00271-icon-service-Azure-Firewall-Manager.svg",
+    "title": "Azure Firewall Manager",
+    "aliases": []
+  },
+  "azure:firewall-policy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/00272-icon-service-Azure-Firewall-Policy.svg",
+    "title": "Azure Firewall Policy",
+    "aliases": []
+  },
+  "azure:firewalls": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10084-icon-service-Firewalls.svg",
+    "title": "Firewalls",
+    "aliases": []
+  },
+  "azure:folder-blank": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10802-icon-service-Folder-Blank.svg",
+    "title": "Folder Blank",
+    "aliases": []
+  },
+  "azure:folder-website": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10803-icon-service-Folder-Website.svg",
+    "title": "Folder Website",
+    "aliases": []
+  },
+  "azure:form-recognizers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00819-icon-service-Form-Recognizers.svg",
+    "title": "Form Recognizers",
+    "aliases": []
+  },
+  "azure:foundry-agent-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470523-icon-service-Foundry-Agent-Service.svg",
+    "title": "Foundry Agent Service",
+    "aliases": []
+  },
+  "azure:foundry-application": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/036509374-icon-service-Foundry-Application.svg",
+    "title": "Foundry Application",
+    "aliases": []
+  },
+  "azure:foundry-control-plane": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470534-icon-service-Foundry-Control-Plane.svg",
+    "title": "Foundry Control Plane",
+    "aliases": []
+  },
+  "azure:foundry-labs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470555-icon-service-Foundry-Labs.svg",
+    "title": "Foundry Labs",
+    "aliases": []
+  },
+  "azure:foundry-local": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470593-icon-service-Foundry-Local.svg",
+    "title": "Foundry Local",
+    "aliases": []
+  },
+  "azure:foundry-models": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470614-icon-service-Foundry-Models.svg",
+    "title": "Foundry Models",
+    "aliases": []
+  },
+  "azure:foundry-project": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/036509415-icon-service-Foundry-Project.svg",
+    "title": "Foundry Project",
+    "aliases": []
+  },
+  "azure:frd-qa": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/029455661-icon-service-FRD-QA.svg",
+    "title": "FRD QA",
+    "aliases": []
+  },
+  "azure:free-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10016-icon-service-Free-Services.svg",
+    "title": "Free Services",
+    "aliases": []
+  },
+  "azure:front-door-and-cdn-profiles": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10073-icon-service-Front-Door-and-CDN-Profiles.svg",
+    "title": "Front Door and CDN Profiles",
+    "aliases": []
+  },
+  "azure:ftp": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10804-icon-service-FTP.svg",
+    "title": "FTP",
+    "aliases": []
+  },
+  "azure:functions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10029-icon-service-Function-Apps.svg",
+    "title": "Function Apps",
+    "aliases": [
+      "function-apps"
+    ]
+  },
+  "azure:gear": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10805-icon-service-Gear.svg",
+    "title": "Gear",
+    "aliases": []
+  },
+  "azure:genomics": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00031-icon-service-Genomics.svg",
+    "title": "Genomics",
+    "aliases": []
+  },
+  "azure:genomics-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10164-icon-service-Genomics-Accounts.svg",
+    "title": "Genomics Accounts",
+    "aliases": []
+  },
+  "azure:globe-error": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10807-icon-service-Globe-Error.svg",
+    "title": "Globe Error",
+    "aliases": []
+  },
+  "azure:globe-success": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10808-icon-service-Globe-Success.svg",
+    "title": "Globe Success",
+    "aliases": []
+  },
+  "azure:globe-warning": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10809-icon-service-Globe-Warning.svg",
+    "title": "Globe Warning",
+    "aliases": []
+  },
+  "azure:groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10223-icon-service-Groups.svg",
+    "title": "Groups",
+    "aliases": []
+  },
+  "azure:guide": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10810-icon-service-Guide.svg",
+    "title": "Guide",
+    "aliases": []
+  },
+  "azure:hcp-cache": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/00776-icon-service-Azure-HCP-Cache.svg",
+    "title": "Azure HCP Cache",
+    "aliases": []
+  },
+  "azure:hd-insight-clusters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/10142-icon-service-HD-Insight-Clusters.svg",
+    "title": "HD Insight Clusters",
+    "aliases": []
+  },
+  "azure:hdi-aks-cluster": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03468-icon-service-HDI-AKS-Cluster.svg",
+    "title": "HDI AKS Cluster",
+    "aliases": []
+  },
+  "azure:heart": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10811-icon-service-Heart.svg",
+    "title": "Heart",
+    "aliases": []
+  },
+  "azure:help-and-support": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10013-icon-service-Help-and-Support.svg",
+    "title": "Help and Support",
+    "aliases": []
+  },
+  "azure:host-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10346-icon-service-Host-Groups.svg",
+    "title": "Host Groups",
+    "aliases": []
+  },
+  "azure:host-pools": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/00328-icon-service-Host-Pools.svg",
+    "title": "Host Pools",
+    "aliases": []
+  },
+  "azure:hosts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10347-icon-service-Hosts.svg",
+    "title": "Hosts",
+    "aliases": []
+  },
+  "azure:hpc-workbenches": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02518-icon-service-Azure-HPC-Workbenches.svg",
+    "title": "Azure HPC Workbenches",
+    "aliases": []
+  },
+  "azure:hybrid-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/azure ecosystem/02573-icon-service-Azure-Hybrid-Center.svg",
+    "title": "Azure Hybrid Center",
+    "aliases": []
+  },
+  "azure:hybrid-connectivity-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/03656-icon-service-Hybrid-Connectivity-Hub.svg",
+    "title": "Hybrid Connectivity Hub",
+    "aliases": []
+  },
+  "azure:icm-troubleshooting": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03361-icon-service-IcM-Troubleshooting.svg",
+    "title": "IcM Troubleshooting",
+    "aliases": []
+  },
+  "azure:identity-governance": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10235-icon-service-Identity-Governance.svg",
+    "title": "Identity Governance",
+    "aliases": []
+  },
+  "azure:identity-secure-score": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/03340-icon-service-Identity-Secure-Score.svg",
+    "title": "Identity Secure Score",
+    "aliases": []
+  },
+  "azure:image": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10812-icon-service-Image.svg",
+    "title": "Image",
+    "aliases": []
+  },
+  "azure:image-definitions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10037-icon-service-Image-Definitions.svg",
+    "title": "Image Definitions",
+    "aliases": []
+  },
+  "azure:image-templates": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/02634-icon-service-Image-Templates.svg",
+    "title": "Image Templates",
+    "aliases": []
+  },
+  "azure:image-versions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10038-icon-service-Image-Versions.svg",
+    "title": "Image Versions",
+    "aliases": []
+  },
+  "azure:images": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10033-icon-service-Images.svg",
+    "title": "Images",
+    "aliases": []
+  },
+  "azure:immersive-readers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00812-icon-service-Immersive-Readers.svg",
+    "title": "Immersive Readers",
+    "aliases": []
+  },
+  "azure:import-export-jobs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10100-icon-service-Import-Export-Jobs.svg",
+    "title": "Import Export Jobs",
+    "aliases": []
+  },
+  "azure:industrial-iot": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/02359-icon-service-Industrial-IoT.svg",
+    "title": "Industrial IoT",
+    "aliases": []
+  },
+  "azure:information": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10005-icon-service-Information.svg",
+    "title": "Information",
+    "aliases": []
+  },
+  "azure:information-protection": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10229-icon-service-Azure-Information-Protection.svg",
+    "title": "Azure Information Protection",
+    "aliases": []
+  },
+  "azure:input-output": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10813-icon-service-Input-Output.svg",
+    "title": "Input Output",
+    "aliases": []
+  },
+  "azure:instance-pools": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10139-icon-service-Instance-Pools.svg",
+    "title": "Instance Pools",
+    "aliases": []
+  },
+  "azure:integration-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10218-icon-service-Integration-Accounts.svg",
+    "title": "Integration Accounts",
+    "aliases": []
+  },
+  "azure:integration-environments": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/03345-icon-service-Integration-Environments.svg",
+    "title": "Integration Environments",
+    "aliases": []
+  },
+  "azure:integration-service-environments": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/00555-icon-service-Integration-Service-Environments.svg",
+    "title": "Integration Service Environments",
+    "aliases": []
+  },
+  "azure:internet-analyzer-profiles": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00469-icon-service-Internet-Analyzer-Profiles.svg",
+    "title": "Internet Analyzer Profiles",
+    "aliases": []
+  },
+  "azure:intune": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10329-icon-service-Intune.svg",
+    "title": "Intune",
+    "aliases": []
+  },
+  "azure:intune-app-protection": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10344-icon-service-Intune-App-Protection.svg",
+    "title": "Intune App Protection",
+    "aliases": []
+  },
+  "azure:intune-for-education": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10343-icon-service-Intune-For-Education.svg",
+    "title": "Intune For Education",
+    "aliases": []
+  },
+  "azure:intune-trends": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00408-icon-service-Intune-Trends.svg",
+    "title": "Intune Trends",
+    "aliases": []
+  },
+  "azure:iot-central-applications": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10184-icon-service-IoT-Central-Applications.svg",
+    "title": "IoT Central Applications",
+    "aliases": []
+  },
+  "azure:iot-edge": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10186-icon-service-IoT-Edge.svg",
+    "title": "IoT Edge",
+    "aliases": []
+  },
+  "azure:iot-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10182-icon-service-IoT-Hub.svg",
+    "title": "IoT Hub",
+    "aliases": []
+  },
+  "azure:iot-operations": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/03485-icon-service-Azure-IoT-Operations.svg",
+    "title": "Azure IoT Operations",
+    "aliases": []
+  },
+  "azure:ip-address-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03461-icon-service-IP-Address-manager.svg",
+    "title": "IP Address manager",
+    "aliases": []
+  },
+  "azure:ip-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/00701-icon-service-IP-Groups.svg",
+    "title": "IP Groups",
+    "aliases": []
+  },
+  "azure:journey-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10814-icon-service-Journey-Hub.svg",
+    "title": "Journey Hub",
+    "aliases": []
+  },
+  "azure:key-vault": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/10245-icon-service-Key-Vaults.svg",
+    "title": "Key Vaults",
+    "aliases": [
+      "key-vaults"
+    ]
+  },
+  "azure:keys": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/menu/00787-icon-service-Keys.svg",
+    "title": "Keys",
+    "aliases": []
+  },
+  "azure:kubernetes-fleet-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03134-icon-service-Kubernetes-Fleet-Manager.svg",
+    "title": "Kubernetes Fleet Manager",
+    "aliases": []
+  },
+  "azure:kubernetes-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/containers/033545113-icon-service-Kubernetes-Hub.svg",
+    "title": "Kubernetes Hub",
+    "aliases": []
+  },
+  "azure:lab-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/02761-icon-service-Lab-Accounts.svg",
+    "title": "Lab Accounts",
+    "aliases": []
+  },
+  "azure:lab-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/10265-icon-service-Lab-Services.svg",
+    "title": "Lab Services",
+    "aliases": []
+  },
+  "azure:landing-zone": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/029636048-icon-service-Landing-Zone.svg",
+    "title": "Landing Zone",
+    "aliases": []
+  },
+  "azure:language": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/02876-icon-service-Language.svg",
+    "title": "Language",
+    "aliases": []
+  },
+  "azure:language-understanding": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00801-icon-service-Language-Understanding.svg",
+    "title": "Language Understanding",
+    "aliases": []
+  },
+  "azure:launch-portal": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10815-icon-service-Launch-Portal.svg",
+    "title": "Launch Portal",
+    "aliases": []
+  },
+  "azure:learn": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10816-icon-service-Learn.svg",
+    "title": "Learn",
+    "aliases": []
+  },
+  "azure:lighthouse": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00471-icon-service-Azure-Lighthouse.svg",
+    "title": "Azure Lighthouse",
+    "aliases": []
+  },
+  "azure:linux": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/03645-icon-service-Azure-Linux.svg",
+    "title": "Azure Linux",
+    "aliases": []
+  },
+  "azure:load-balancer-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02302-icon-service-Load-Balancer-Hub.svg",
+    "title": "Load Balancer Hub",
+    "aliases": []
+  },
+  "azure:load-balancer-hub-networking": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/029029174-icon-service-Load-Balancer-Hub.svg",
+    "title": "Load Balancer Hub",
+    "aliases": []
+  },
+  "azure:load-balancers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10062-icon-service-Load-Balancers.svg",
+    "title": "Load Balancers",
+    "aliases": []
+  },
+  "azure:load-test": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10817-icon-service-Load-Test.svg",
+    "title": "Load Test",
+    "aliases": []
+  },
+  "azure:load-testing": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/02423-icon-service-Load-Testing.svg",
+    "title": "Load Testing",
+    "aliases": []
+  },
+  "azure:load-testing-other": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02944-icon-service-Azure-Load-Testing.svg",
+    "title": "Azure Load Testing",
+    "aliases": []
+  },
+  "azure:local": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/033745116-icon-service-Azure-Local.svg",
+    "title": "Azure Local",
+    "aliases": []
+  },
+  "azure:local-network-gateways": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10077-icon-service-Local-Network-Gateways.svg",
+    "title": "Local Network Gateways",
+    "aliases": []
+  },
+  "azure:location": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10818-icon-service-Location.svg",
+    "title": "Location",
+    "aliases": []
+  },
+  "azure:log-analytics-query-pack": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01085-icon-service-Log-Analytics-Query-Pack.svg",
+    "title": "Log Analytics Query Pack",
+    "aliases": []
+  },
+  "azure:log-analytics-workspaces": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/00009-icon-service-Log-Analytics-Workspaces.svg",
+    "title": "Log Analytics Workspaces",
+    "aliases": []
+  },
+  "azure:log-streaming": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10819-icon-service-Log-Streaming.svg",
+    "title": "Log Streaming",
+    "aliases": []
+  },
+  "azure:logic-apps": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/02631-icon-service-Logic-Apps.svg",
+    "title": "Logic Apps",
+    "aliases": []
+  },
+  "azure:logic-apps-custom-connector": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10363-icon-service-Logic-Apps-Custom-Connector.svg",
+    "title": "Logic Apps Custom Connector",
+    "aliases": []
+  },
+  "azure:logic-apps-template": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/032130874-icon-service-Logic-Apps-Template.svg",
+    "title": "Logic Apps Template",
+    "aliases": []
+  },
+  "azure:machine-learning": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/038470510-icon-service-Azure-Machine-Learning.svg",
+    "title": "Azure Machine Learning",
+    "aliases": []
+  },
+  "azure:machine-learning-ai-machine-learning": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10166-icon-service-Machine-Learning.svg",
+    "title": "Machine Learning",
+    "aliases": []
+  },
+  "azure:machine-learning-studio-classic-web-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00030-icon-service-Machine-Learning-Studio-(Classic)-Web-Services.svg",
+    "title": "Machine Learning Studio (Classic) Web Services",
+    "aliases": []
+  },
+  "azure:machine-learning-studio-web-service-plans": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10168-icon-service-Machine-Learning-Studio-Web-Service-Plans.svg",
+    "title": "Machine Learning Studio Web Service Plans",
+    "aliases": []
+  },
+  "azure:machine-learning-studio-workspaces": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/10167-icon-service-Machine-Learning-Studio-Workspaces.svg",
+    "title": "Machine Learning Studio Workspaces",
+    "aliases": []
+  },
+  "azure:machinesazurearc": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10450-icon-service-MachinesAzureArc.svg",
+    "title": "MachinesAzureArc",
+    "aliases": []
+  },
+  "azure:maintenance-configuration": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/00195-icon-service-Maintenance-Configuration.svg",
+    "title": "Maintenance Configuration",
+    "aliases": []
+  },
+  "azure:managed-applications-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10313-icon-service-Managed-Applications-Center.svg",
+    "title": "Managed Applications Center",
+    "aliases": []
+  },
+  "azure:managed-database": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10135-icon-service-Managed-Database.svg",
+    "title": "Managed Database",
+    "aliases": []
+  },
+  "azure:managed-desktop": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10311-icon-service-Managed-Desktop.svg",
+    "title": "Managed Desktop",
+    "aliases": []
+  },
+  "azure:managed-devops-pools": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/03393-icon-service-Managed-DevOps-Pools.svg",
+    "title": "Managed DevOps Pools",
+    "aliases": []
+  },
+  "azure:managed-file-shares": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/03549-icon-service-Managed-File-Shares.svg",
+    "title": "Managed File Shares",
+    "aliases": []
+  },
+  "azure:managed-grafana": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02905-icon-service-Azure-Managed-Grafana.svg",
+    "title": "Azure Managed Grafana",
+    "aliases": []
+  },
+  "azure:managed-identities": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10227-icon-service-Managed-Identities.svg",
+    "title": "Managed Identities",
+    "aliases": []
+  },
+  "azure:managed-instance-apache-cassandra": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02663-icon-service-Managed-Instance-Apache-Cassandra.svg",
+    "title": "Managed Instance Apache Cassandra",
+    "aliases": []
+  },
+  "azure:managed-redis": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/03675-icon-service-Azure-Managed-Redis.svg",
+    "title": "Azure Managed Redis",
+    "aliases": []
+  },
+  "azure:managed-service-fabric": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/02370-icon-service-Managed-Service-Fabric.svg",
+    "title": "Managed Service Fabric",
+    "aliases": []
+  },
+  "azure:management-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10011-icon-service-Management-Groups.svg",
+    "title": "Management Groups",
+    "aliases": []
+  },
+  "azure:management-portal": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10820-icon-service-Management-Portal.svg",
+    "title": "Management Portal",
+    "aliases": []
+  },
+  "azure:maps-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10185-icon-service-Azure-Maps-Accounts.svg",
+    "title": "Azure Maps Accounts",
+    "aliases": []
+  },
+  "azure:marketplace": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10008-icon-service-Marketplace.svg",
+    "title": "Marketplace",
+    "aliases": []
+  },
+  "azure:marketplace-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10112-icon-service-Marketplace-Management.svg",
+    "title": "Marketplace Management",
+    "aliases": []
+  },
+  "azure:media": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10854-icon-service-Media.svg",
+    "title": "Media",
+    "aliases": []
+  },
+  "azure:media-file": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10821-icon-service-Media-File.svg",
+    "title": "Media File",
+    "aliases": []
+  },
+  "azure:media-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/web/10309-icon-service-Azure-Media-Service.svg",
+    "title": "Azure Media Service",
+    "aliases": []
+  },
+  "azure:medtech-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02660-icon-service-MedTech-Service.svg",
+    "title": "MedTech Service",
+    "aliases": []
+  },
+  "azure:mesh-applications": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10024-icon-service-Mesh-Applications.svg",
+    "title": "Mesh Applications",
+    "aliases": []
+  },
+  "azure:metrics": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00020-icon-service-Metrics.svg",
+    "title": "Metrics",
+    "aliases": []
+  },
+  "azure:metrics-advisor": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/02409-icon-service-Metrics-Advisor.svg",
+    "title": "Metrics Advisor",
+    "aliases": []
+  },
+  "azure:microsoft-defender-easm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/03336-icon-service-Microsoft-Defender-EASM.svg",
+    "title": "Microsoft Defender EASM",
+    "aliases": []
+  },
+  "azure:microsoft-defender-for-cloud": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/10241-icon-service-Microsoft-Defender-for-Cloud.svg",
+    "title": "Microsoft Defender for Cloud",
+    "aliases": []
+  },
+  "azure:microsoft-defender-for-iot": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/02247-icon-service-Microsoft-Defender-for-IoT.svg",
+    "title": "Microsoft Defender for IoT",
+    "aliases": []
+  },
+  "azure:microsoft-dev-box": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03250-icon-service-Microsoft-Dev-Box.svg",
+    "title": "Microsoft Dev Box",
+    "aliases": []
+  },
+  "azure:microsoft-discovery": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/032869111-icon-service-Microsoft-Discovery.svg",
+    "title": "Microsoft Discovery",
+    "aliases": []
+  },
+  "azure:migrate": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/migrate/10281-icon-service-Azure-Migrate.svg",
+    "title": "Azure Migrate",
+    "aliases": []
+  },
+  "azure:mindaro": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10350-icon-service-Mindaro.svg",
+    "title": "Mindaro",
+    "aliases": []
+  },
+  "azure:mission-landing-zone": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02793-icon-service-Mission-Landing-Zone.svg",
+    "title": "Mission Landing Zone",
+    "aliases": []
+  },
+  "azure:mobile": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10822-icon-service-Mobile.svg",
+    "title": "Mobile",
+    "aliases": []
+  },
+  "azure:mobile-engagement": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10823-icon-service-Mobile-Engagement.svg",
+    "title": "Mobile Engagement",
+    "aliases": []
+  },
+  "azure:mobile-networks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02794-icon-service-Mobile-Networks.svg",
+    "title": "Mobile Networks",
+    "aliases": []
+  },
+  "azure:modular-data-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02323-icon-service-Modular-Data-Center.svg",
+    "title": "Modular Data Center",
+    "aliases": []
+  },
+  "azure:module": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10855-icon-service-Module.svg",
+    "title": "Module",
+    "aliases": []
+  },
+  "azure:monitor": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00001-icon-service-Monitor.svg",
+    "title": "Monitor",
+    "aliases": []
+  },
+  "azure:monitor-dashboard": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02488-icon-service-Azure-Monitor-Dashboard.svg",
+    "title": "Azure Monitor Dashboard",
+    "aliases": []
+  },
+  "azure:monitor-health-models": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03528-icon-service-Monitor-Health-Models.svg",
+    "title": "Monitor Health Models",
+    "aliases": []
+  },
+  "azure:monitor-pipeline": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03585-icon-service-Azure-Monitor-Pipeline.svg",
+    "title": "Azure Monitor Pipeline",
+    "aliases": []
+  },
+  "azure:monitors-for-sap-solutions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/monitor/00438-icon-service-Azure-Monitors-for-SAP-Solutions.svg",
+    "title": "Azure Monitors for SAP Solutions",
+    "aliases": []
+  },
+  "azure:multi-factor-authentication": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03256-icon-service-Multi-Factor-Authentication.svg",
+    "title": "Multi Factor Authentication",
+    "aliases": []
+  },
+  "azure:multi-tenancy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/00965-icon-service-Multi-Tenancy.svg",
+    "title": "Multi Tenancy",
+    "aliases": []
+  },
+  "azure:multifactor-authentication": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/03344-icon-service-Multifactor-Authentication.svg",
+    "title": "Multifactor Authentication",
+    "aliases": []
+  },
+  "azure:my-customers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00014-icon-service-My-Customers.svg",
+    "title": "My Customers",
+    "aliases": []
+  },
+  "azure:nat": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10310-icon-service-NAT.svg",
+    "title": "NAT",
+    "aliases": []
+  },
+  "azure:netapp-files": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10096-icon-service-Azure-NetApp-Files.svg",
+    "title": "Azure NetApp Files",
+    "aliases": []
+  },
+  "azure:network-foundation-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03643-icon-service-Network-Foundation-Hub.svg",
+    "title": "Network Foundation Hub",
+    "aliases": []
+  },
+  "azure:network-function-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02740-icon-service-Azure-Network-Function-Manager.svg",
+    "title": "Azure Network Function Manager",
+    "aliases": []
+  },
+  "azure:network-function-manager-functions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01001-icon-service-Azure-Network-Function-Manager-Functions.svg",
+    "title": "Azure Network Function Manager Functions",
+    "aliases": []
+  },
+  "azure:network-interfaces": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10080-icon-service-Network-Interfaces.svg",
+    "title": "Network Interfaces",
+    "aliases": []
+  },
+  "azure:network-managers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02237-icon-service-Network-Managers.svg",
+    "title": "Network Managers",
+    "aliases": []
+  },
+  "azure:network-security-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10067-icon-service-Network-Security-Groups.svg",
+    "title": "Network Security Groups",
+    "aliases": []
+  },
+  "azure:network-security-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03650-icon-service-Network-Security-Hub.svg",
+    "title": "Network Security Hub",
+    "aliases": []
+  },
+  "azure:network-security-perimeters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02939-icon-service-Network-Security-Perimeters.svg",
+    "title": "Network Security Perimeters",
+    "aliases": []
+  },
+  "azure:network-watcher": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/monitor/10066-icon-service-Network-Watcher.svg",
+    "title": "Network Watcher",
+    "aliases": []
+  },
+  "azure:notification-hub-namespaces": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10053-icon-service-Notification-Hub-Namespaces.svg",
+    "title": "Notification Hub Namespaces",
+    "aliases": []
+  },
+  "azure:notification-hubs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/app services/10045-icon-service-Notification-Hubs.svg",
+    "title": "Notification Hubs",
+    "aliases": []
+  },
+  "azure:object-understanding": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/01688-icon-service-Azure-Object-Understanding.svg",
+    "title": "Azure Object Understanding",
+    "aliases": []
+  },
+  "azure:on-premises-data-gateways": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10070-icon-service-On-Premises-Data-Gateways.svg",
+    "title": "On Premises Data Gateways",
+    "aliases": []
+  },
+  "azure:open-supply-chain-platform": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02602-icon-service-Open-Supply-Chain-Platform.svg",
+    "title": "Open Supply Chain Platform",
+    "aliases": []
+  },
+  "azure:openai": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03438-icon-service-Azure-OpenAI.svg",
+    "title": "Azure OpenAI",
+    "aliases": []
+  },
+  "azure:operation-log-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00024-icon-service-Operation-Log-(Classic).svg",
+    "title": "Operation Log (Classic)",
+    "aliases": []
+  },
+  "azure:operator-5g-core": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03248-icon-service-Azure-Operator-5G-Core.svg",
+    "title": "Azure Operator 5G Core",
+    "aliases": []
+  },
+  "azure:operator-insights": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03333-icon-service-Azure-Operator-Insights.svg",
+    "title": "Azure Operator Insights",
+    "aliases": []
+  },
+  "azure:operator-nexus": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03324-icon-service-Azure-Operator-Nexus.svg",
+    "title": "Azure Operator Nexus",
+    "aliases": []
+  },
+  "azure:operator-service-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03334-icon-service-Azure-Operator-Service-Manager.svg",
+    "title": "Azure Operator Service Manager",
+    "aliases": []
+  },
+  "azure:oracle-database": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/03490-icon-service-Oracle-Database.svg",
+    "title": "Oracle Database",
+    "aliases": []
+  },
+  "azure:orbital": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02697-icon-service-Azure-Orbital.svg",
+    "title": "Azure Orbital",
+    "aliases": []
+  },
+  "azure:os-images-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10027-icon-service-OS-Images-(Classic).svg",
+    "title": "OS Images (Classic)",
+    "aliases": []
+  },
+  "azure:osconfig": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03365-icon-service-OSConfig.svg",
+    "title": "OSConfig",
+    "aliases": []
+  },
+  "azure:outbound-connection": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/blockchain/10364-icon-service-Outbound-Connection.svg",
+    "title": "Outbound Connection",
+    "aliases": []
+  },
+  "azure:partner-namespace": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/02266-icon-service-Partner-Namespace.svg",
+    "title": "Partner Namespace",
+    "aliases": []
+  },
+  "azure:partner-registration": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/02265-icon-service-Partner-Registration.svg",
+    "title": "Partner Registration",
+    "aliases": []
+  },
+  "azure:partner-topic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/02072-icon-service-Partner-Topic.svg",
+    "title": "Partner Topic",
+    "aliases": []
+  },
+  "azure:peering-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00970-icon-service-Peering-Service.svg",
+    "title": "Peering Service",
+    "aliases": []
+  },
+  "azure:peerings": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01285-icon-service-Peerings.svg",
+    "title": "Peerings",
+    "aliases": []
+  },
+  "azure:personalizers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00796-icon-service-Personalizers.svg",
+    "title": "Personalizers",
+    "aliases": []
+  },
+  "azure:planetary-computer-pro": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03755-icon-service-Planetary-Computer-Pro.svg",
+    "title": "Planetary Computer Pro",
+    "aliases": []
+  },
+  "azure:policy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10316-icon-service-Policy.svg",
+    "title": "Policy",
+    "aliases": []
+  },
+  "azure:power": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10824-icon-service-Power.svg",
+    "title": "Power",
+    "aliases": []
+  },
+  "azure:power-bi-embedded": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/03332-icon-service-Power-BI-Embedded.svg",
+    "title": "Power BI Embedded",
+    "aliases": []
+  },
+  "azure:power-platform": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/03335-icon-service-Power-Platform.svg",
+    "title": "Power Platform",
+    "aliases": []
+  },
+  "azure:power-up": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10826-icon-service-Power-Up.svg",
+    "title": "Power Up",
+    "aliases": []
+  },
+  "azure:powershell": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10825-icon-service-Powershell.svg",
+    "title": "Powershell",
+    "aliases": []
+  },
+  "azure:preview-features": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/00456-icon-service-Preview-Features.svg",
+    "title": "Preview Features",
+    "aliases": []
+  },
+  "azure:private-endpoints": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02579-icon-service-Private-Endpoints.svg",
+    "title": "Private Endpoints",
+    "aliases": []
+  },
+  "azure:private-link": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/00427-icon-service-Private-Link.svg",
+    "title": "Private Link",
+    "aliases": []
+  },
+  "azure:private-link-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/01105-icon-service-Private-Link-Service.svg",
+    "title": "Private Link Service",
+    "aliases": []
+  },
+  "azure:private-link-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/02209-icon-service-Private-Link-Services.svg",
+    "title": "Private Link Services",
+    "aliases": []
+  },
+  "azure:process-explorer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10828-icon-service-Process-Explorer.svg",
+    "title": "Process Explorer",
+    "aliases": []
+  },
+  "azure:production-ready-database": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10829-icon-service-Production-Ready-Database.svg",
+    "title": "Production Ready Database",
+    "aliases": []
+  },
+  "azure:programmable-connectivity": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/03347-icon-service-Azure-Programmable-Connectivity.svg",
+    "title": "Azure Programmable Connectivity",
+    "aliases": []
+  },
+  "azure:promethus": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/033112809-icon-service-promethus.svg",
+    "title": "promethus",
+    "aliases": []
+  },
+  "azure:proximity-placement-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10365-icon-service-Proximity-Placement-Groups.svg",
+    "title": "Proximity Placement Groups",
+    "aliases": []
+  },
+  "azure:public-ip-addresses": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10069-icon-service-Public-IP-Addresses.svg",
+    "title": "Public IP Addresses",
+    "aliases": []
+  },
+  "azure:public-ip-addresses-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10068-icon-service-Public-IP-Addresses-(Classic).svg",
+    "title": "Public IP Addresses (Classic)",
+    "aliases": []
+  },
+  "azure:public-ip-prefixes": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10372-icon-service-Public-IP-Prefixes.svg",
+    "title": "Public IP Prefixes",
+    "aliases": []
+  },
+  "azure:pubsub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/02987-icon-service-pubsub.svg",
+    "title": "pubsub",
+    "aliases": []
+  },
+  "azure:qna-makers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00799-icon-service-QnA-Makers.svg",
+    "title": "QnA Makers",
+    "aliases": []
+  },
+  "azure:quickstart-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10010-icon-service-Quickstart-Center.svg",
+    "title": "Quickstart Center",
+    "aliases": []
+  },
+  "azure:quotas": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02951-icon-service-Azure-Quotas.svg",
+    "title": "Azure Quotas",
+    "aliases": []
+  },
+  "azure:recent": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10006-icon-service-Recent.svg",
+    "title": "Recent",
+    "aliases": []
+  },
+  "azure:recovery-services-vaults": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00017-icon-service-Recovery-Services-Vaults.svg",
+    "title": "Recovery Services Vaults",
+    "aliases": []
+  },
+  "azure:red-hat-openshift": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/containers/03331-icon-service-Azure-Red-Hat-OpenShift.svg",
+    "title": "Azure Red Hat OpenShift",
+    "aliases": []
+  },
+  "azure:region-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10116-icon-service-Region-Management.svg",
+    "title": "Region Management",
+    "aliases": []
+  },
+  "azure:relays": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10209-icon-service-Relays.svg",
+    "title": "Relays",
+    "aliases": []
+  },
+  "azure:remote-rendering": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/mixed reality/00698-icon-service-Remote-Rendering.svg",
+    "title": "Remote Rendering",
+    "aliases": []
+  },
+  "azure:reservations": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10003-icon-service-Reservations.svg",
+    "title": "Reservations",
+    "aliases": []
+  },
+  "azure:reserved-capacity": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02638-icon-service-Reserved-Capacity.svg",
+    "title": "Reserved Capacity",
+    "aliases": []
+  },
+  "azure:reserved-ip-addresses-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10371-icon-service-Reserved-IP-Addresses-(Classic).svg",
+    "title": "Reserved IP Addresses (Classic)",
+    "aliases": []
+  },
+  "azure:resiliency": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/034923704-icon-service-Resiliency.svg",
+    "title": "Resiliency",
+    "aliases": []
+  },
+  "azure:resource-explorer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10349-icon-service-Resource-Explorer.svg",
+    "title": "Resource Explorer",
+    "aliases": []
+  },
+  "azure:resource-graph-explorer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10318-icon-service-Resource-Graph-Explorer.svg",
+    "title": "Resource Graph Explorer",
+    "aliases": []
+  },
+  "azure:resource-group-list": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10830-icon-service-Resource-Group-List.svg",
+    "title": "Resource Group List",
+    "aliases": []
+  },
+  "azure:resource-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10007-icon-service-Resource-Groups.svg",
+    "title": "Resource Groups",
+    "aliases": []
+  },
+  "azure:resource-guard": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02819-icon-service-Resource-Guard.svg",
+    "title": "Resource Guard",
+    "aliases": []
+  },
+  "azure:resource-linked": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10831-icon-service-Resource-Linked.svg",
+    "title": "Resource Linked",
+    "aliases": []
+  },
+  "azure:resource-management-private-link": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02145-icon-service-Resource-Management-Private-Link.svg",
+    "title": "Resource Management Private Link",
+    "aliases": []
+  },
+  "azure:resource-mover": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02200-icon-service-Resource-Mover.svg",
+    "title": "Resource Mover",
+    "aliases": []
+  },
+  "azure:resources-provider": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/03366-icon-service-Resources-Provider.svg",
+    "title": "Resources Provider",
+    "aliases": []
+  },
+  "azure:restore-points": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/02817-icon-service-Restore-Points.svg",
+    "title": "Restore Points",
+    "aliases": []
+  },
+  "azure:restore-points-collections": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/02818-icon-service-Restore-Points-Collections.svg",
+    "title": "Restore Points Collections",
+    "aliases": []
+  },
+  "azure:route-filters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10071-icon-service-Route-Filters.svg",
+    "title": "Route Filters",
+    "aliases": []
+  },
+  "azure:route-tables": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10082-icon-service-Route-Tables.svg",
+    "title": "Route Tables",
+    "aliases": []
+  },
+  "azure:rtos": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10778-icon-service-RTOS.svg",
+    "title": "RTOS",
+    "aliases": []
+  },
+  "azure:savings-plans": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02880-icon-service-Savings-Plans.svg",
+    "title": "Savings Plans",
+    "aliases": []
+  },
+  "azure:scheduled-actions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/033049334-icon-service-Scheduled-Actions.svg",
+    "title": "Scheduled Actions",
+    "aliases": []
+  },
+  "azure:scheduler": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10833-icon-service-Scheduler.svg",
+    "title": "Scheduler",
+    "aliases": []
+  },
+  "azure:scheduler-job-collections": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00010-icon-service-Scheduler-Job-Collections.svg",
+    "title": "Scheduler Job Collections",
+    "aliases": []
+  },
+  "azure:scvmm-management-servers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02503-icon-service-SCVMM-Management-Servers.svg",
+    "title": "SCVMM Management Servers",
+    "aliases": []
+  },
+  "azure:search": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10834-icon-service-Search.svg",
+    "title": "Search",
+    "aliases": []
+  },
+  "azure:search-grid": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10856-icon-service-Search-Grid.svg",
+    "title": "Search Grid",
+    "aliases": []
+  },
+  "azure:security": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/00321-icon-service-Security.svg",
+    "title": "Security",
+    "aliases": []
+  },
+  "azure:security-baselines": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10336-icon-service-Security-Baselines.svg",
+    "title": "Security Baselines",
+    "aliases": []
+  },
+  "azure:sendgrid-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10220-icon-service-SendGrid-Accounts.svg",
+    "title": "SendGrid Accounts",
+    "aliases": []
+  },
+  "azure:sentinel": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/security/10248-icon-service-Azure-Sentinel.svg",
+    "title": "Azure Sentinel",
+    "aliases": []
+  },
+  "azure:server-farm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10835-icon-service-Server-Farm.svg",
+    "title": "Server Farm",
+    "aliases": []
+  },
+  "azure:serverless-search": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/03321-icon-service-Serverless-Search.svg",
+    "title": "Serverless Search",
+    "aliases": []
+  },
+  "azure:service-bus": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10836-icon-service-Azure-Service-Bus.svg",
+    "title": "Azure Service Bus",
+    "aliases": []
+  },
+  "azure:service-catalog-mad": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00027-icon-service-Service-Catalog-MAD.svg",
+    "title": "Service Catalog MAD",
+    "aliases": []
+  },
+  "azure:service-endpoint-policies": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10085-icon-service-Service-Endpoint-Policies.svg",
+    "title": "Service Endpoint Policies",
+    "aliases": []
+  },
+  "azure:service-fabric-clusters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10036-icon-service-Service-Fabric-Clusters.svg",
+    "title": "Service Fabric Clusters",
+    "aliases": []
+  },
+  "azure:service-group-relationships": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/030777508-icon-service-Service-Group-Relationships.svg",
+    "title": "Service Group Relationships",
+    "aliases": []
+  },
+  "azure:service-groups": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/containers/029637767-icon-service-Service-Groups.svg",
+    "title": "Service Groups",
+    "aliases": []
+  },
+  "azure:service-health": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10004-icon-service-Service-Health.svg",
+    "title": "Service Health",
+    "aliases": []
+  },
+  "azure:service-providers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00025-icon-service-Service-Providers.svg",
+    "title": "Service Providers",
+    "aliases": []
+  },
+  "azure:shared-image-galleries": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10039-icon-service-Shared-Image-Galleries.svg",
+    "title": "Shared Image Galleries",
+    "aliases": []
+  },
+  "azure:signalr": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/web/10052-icon-service-SignalR.svg",
+    "title": "SignalR",
+    "aliases": []
+  },
+  "azure:software-as-a-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10213-icon-service-Software-as-a-Service.svg",
+    "title": "Software as a Service",
+    "aliases": []
+  },
+  "azure:software-updates": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10335-icon-service-Software-Updates.svg",
+    "title": "Software Updates",
+    "aliases": []
+  },
+  "azure:solutions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00021-icon-service-Solutions.svg",
+    "title": "Solutions",
+    "aliases": []
+  },
+  "azure:sonic-dash": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02922-icon-service-Sonic-Dash.svg",
+    "title": "Sonic Dash",
+    "aliases": []
+  },
+  "azure:spatial-anchor-accounts": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/mixed reality/10352-icon-service-Spatial-Anchor-Accounts.svg",
+    "title": "Spatial Anchor Accounts",
+    "aliases": []
+  },
+  "azure:speech-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00797-icon-service-Speech-Services.svg",
+    "title": "Speech Services",
+    "aliases": []
+  },
+  "azure:sphere": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10190-icon-service-Azure-Sphere.svg",
+    "title": "Azure Sphere",
+    "aliases": []
+  },
+  "azure:spot-vm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02695-icon-service-Spot-VM.svg",
+    "title": "Spot VM",
+    "aliases": []
+  },
+  "azure:spot-vmss": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02692-icon-service-Spot-VMSS.svg",
+    "title": "Spot VMSS",
+    "aliases": []
+  },
+  "azure:spring-apps": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10370-icon-service-Azure-Spring-Apps.svg",
+    "title": "Azure Spring Apps",
+    "aliases": []
+  },
+  "azure:sql": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/02390-icon-service-Azure-SQL.svg",
+    "title": "Azure SQL",
+    "aliases": []
+  },
+  "azure:sql-data-warehouses": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/00036-icon-service-SQL-Data-Warehouses.svg",
+    "title": "SQL Data Warehouses",
+    "aliases": []
+  },
+  "azure:sql-database": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10130-icon-service-SQL-Database.svg",
+    "title": "SQL Database",
+    "aliases": []
+  },
+  "azure:sql-database-fleet-manager": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/03565-icon-service-SQL-Database-Fleet-Manager.svg",
+    "title": "SQL Database Fleet Manager",
+    "aliases": []
+  },
+  "azure:sql-edge": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/02750-icon-service-Azure-SQL-Edge.svg",
+    "title": "Azure SQL Edge",
+    "aliases": []
+  },
+  "azure:sql-elastic-pools": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10134-icon-service-SQL-Elastic-Pools.svg",
+    "title": "SQL Elastic Pools",
+    "aliases": []
+  },
+  "azure:sql-managed-instance": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10136-icon-service-SQL-Managed-Instance.svg",
+    "title": "SQL Managed Instance",
+    "aliases": []
+  },
+  "azure:sql-server": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10132-icon-service-SQL-Server.svg",
+    "title": "SQL Server",
+    "aliases": []
+  },
+  "azure:sql-server-registries": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10351-icon-service-SQL-Server-Registries.svg",
+    "title": "SQL Server Registries",
+    "aliases": []
+  },
+  "azure:sql-server-stretch-databases": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10137-icon-service-Azure-SQL-Server-Stretch-Databases.svg",
+    "title": "Azure SQL Server Stretch Databases",
+    "aliases": []
+  },
+  "azure:sql-vm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10124-icon-service-Azure-SQL-VM.svg",
+    "title": "Azure SQL VM",
+    "aliases": []
+  },
+  "azure:ssd": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10837-icon-service-SSD.svg",
+    "title": "SSD",
+    "aliases": []
+  },
+  "azure:ssh-keys": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00412-icon-service-SSH-Keys.svg",
+    "title": "SSH Keys",
+    "aliases": []
+  },
+  "azure:ssis-lift-and-shift-ir": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/02392-icon-service-SSIS-Lift-And-Shift-IR.svg",
+    "title": "SSIS Lift And Shift IR",
+    "aliases": []
+  },
+  "azure:stack-hci-premium": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/03466-icon-service-Stack-HCI-Premium.svg",
+    "title": "Stack HCI Premium",
+    "aliases": []
+  },
+  "azure:stack-hci-sizer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/03293-icon-service-Azure-Stack-HCI-Sizer.svg",
+    "title": "Azure Stack HCI Sizer",
+    "aliases": []
+  },
+  "azure:stage-maps": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/030868929-icon-service-Stage-Maps.svg",
+    "title": "Stage Maps",
+    "aliases": []
+  },
+  "azure:static-apps": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/web/01007-icon-service-Static-Apps.svg",
+    "title": "Static Apps",
+    "aliases": []
+  },
+  "azure:storage": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10086-icon-service-Storage-Accounts.svg",
+    "title": "Storage Accounts",
+    "aliases": [
+      "storage-accounts"
+    ]
+  },
+  "azure:storage-accounts-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10087-icon-service-Storage-Accounts-(Classic).svg",
+    "title": "Storage Accounts (Classic)",
+    "aliases": []
+  },
+  "azure:storage-actions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/03502-icon-service-Storage-Actions.svg",
+    "title": "Storage Actions",
+    "aliases": []
+  },
+  "azure:storage-azure-files": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10838-icon-service-Storage-Azure-Files.svg",
+    "title": "Storage Azure Files",
+    "aliases": []
+  },
+  "azure:storage-container": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10839-icon-service-Storage-Container.svg",
+    "title": "Storage Container",
+    "aliases": []
+  },
+  "azure:storage-explorer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10091-icon-service-Storage-Explorer.svg",
+    "title": "Storage Explorer",
+    "aliases": []
+  },
+  "azure:storage-functions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02909-icon-service-Storage-Functions.svg",
+    "title": "Storage Functions",
+    "aliases": []
+  },
+  "azure:storage-hubs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/030486388-icon-service-Storage-Hubs.svg",
+    "title": "Storage Hubs",
+    "aliases": []
+  },
+  "azure:storage-mover": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03091-icon-service-Azure-Storage-Mover.svg",
+    "title": "Azure Storage Mover",
+    "aliases": []
+  },
+  "azure:storage-queue": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10840-icon-service-Storage-Queue.svg",
+    "title": "Storage Queue",
+    "aliases": []
+  },
+  "azure:storage-sync-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10093-icon-service-Storage-Sync-Services.svg",
+    "title": "Storage Sync Services",
+    "aliases": []
+  },
+  "azure:storsimple-data-managers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/storage/10092-icon-service-StorSimple-Data-Managers.svg",
+    "title": "StorSimple Data Managers",
+    "aliases": []
+  },
+  "azure:storsimple-device-managers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/10089-icon-service-StorSimple-Device-Managers.svg",
+    "title": "StorSimple Device Managers",
+    "aliases": []
+  },
+  "azure:stream-analytics-jobs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/00042-icon-service-Stream-Analytics-Jobs.svg",
+    "title": "Stream Analytics Jobs",
+    "aliases": []
+  },
+  "azure:subnet": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02742-icon-service-Subnet.svg",
+    "title": "Subnet",
+    "aliases": []
+  },
+  "azure:subscriptions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10002-icon-service-Subscriptions.svg",
+    "title": "Subscriptions",
+    "aliases": []
+  },
+  "azure:support-center-blue": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02507-icon-service-Azure-Support-Center-Blue.svg",
+    "title": "Azure Support Center Blue",
+    "aliases": []
+  },
+  "azure:sustainability": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03314-icon-service-Azure-Sustainability.svg",
+    "title": "Azure Sustainability",
+    "aliases": []
+  },
+  "azure:synapse-analytics": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/00606-icon-service-Azure-Synapse-Analytics.svg",
+    "title": "Azure Synapse Analytics",
+    "aliases": []
+  },
+  "azure:system-topic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/integration/02073-icon-service-System-Topic.svg",
+    "title": "System Topic",
+    "aliases": []
+  },
+  "azure:table": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10841-icon-service-Table.svg",
+    "title": "Table",
+    "aliases": []
+  },
+  "azure:tag": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10014-icon-service-Tag.svg",
+    "title": "Tag",
+    "aliases": []
+  },
+  "azure:tags": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10842-icon-service-Tags.svg",
+    "title": "Tags",
+    "aliases": []
+  },
+  "azure:targets-management": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02908-icon-service-Targets-Management.svg",
+    "title": "Targets Management",
+    "aliases": []
+  },
+  "azure:template-specs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02340-icon-service-Template-Specs.svg",
+    "title": "Template Specs",
+    "aliases": []
+  },
+  "azure:templates": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10009-icon-service-Templates.svg",
+    "title": "Templates",
+    "aliases": []
+  },
+  "azure:tenant-properties": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/02679-icon-service-Tenant-Properties.svg",
+    "title": "Tenant Properties",
+    "aliases": []
+  },
+  "azure:tenant-status": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/intune/10342-icon-service-Tenant-Status.svg",
+    "title": "Tenant Status",
+    "aliases": []
+  },
+  "azure:test-base": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02691-icon-service-Test-Base.svg",
+    "title": "Test Base",
+    "aliases": []
+  },
+  "azure:tfs-vc-repository": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10843-icon-service-TFS-VC-Repository.svg",
+    "title": "TFS VC Repository",
+    "aliases": []
+  },
+  "azure:time-series-data-sets": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10198-icon-service-Time-Series-Data-Sets.svg",
+    "title": "Time Series Data Sets",
+    "aliases": []
+  },
+  "azure:time-series-insights-access-policies": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10192-icon-service-Time-Series-Insights-Access-Policies.svg",
+    "title": "Time Series Insights Access Policies",
+    "aliases": []
+  },
+  "azure:time-series-insights-environments": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10181-icon-service-Time-Series-Insights-Environments.svg",
+    "title": "Time Series Insights Environments",
+    "aliases": []
+  },
+  "azure:time-series-insights-event-sources": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10188-icon-service-Time-Series-Insights-Event-Sources.svg",
+    "title": "Time Series Insights Event Sources",
+    "aliases": []
+  },
+  "azure:token-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/blockchain/10367-icon-service-Azure-Token-Service.svg",
+    "title": "Azure Token Service",
+    "aliases": []
+  },
+  "azure:toolbox": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10844-icon-service-Toolbox.svg",
+    "title": "Toolbox",
+    "aliases": []
+  },
+  "azure:toolchain-orchestrator": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/new icons/029109619-icon-service-Toolchain-Orchestrator.svg",
+    "title": "Toolchain Orchestrator",
+    "aliases": []
+  },
+  "azure:traffic-manager-profiles": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10065-icon-service-Traffic-Manager-Profiles.svg",
+    "title": "Traffic Manager Profiles",
+    "aliases": []
+  },
+  "azure:translator-text": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/ai + machine learning/00800-icon-service-Translator-Text.svg",
+    "title": "Translator Text",
+    "aliases": []
+  },
+  "azure:troubleshoot": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10341-icon-service-Troubleshoot.svg",
+    "title": "Troubleshoot",
+    "aliases": []
+  },
+  "azure:universal-print": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/00571-icon-service-Universal-Print.svg",
+    "title": "Universal Print",
+    "aliases": []
+  },
+  "azure:update-management-center": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02846-icon-service-Update-Management-Center.svg",
+    "title": "Update Management Center",
+    "aliases": []
+  },
+  "azure:user-privacy": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/management + governance/10303-icon-service-User-Privacy.svg",
+    "title": "User Privacy",
+    "aliases": []
+  },
+  "azure:user-settings": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10433-icon-service-User-Settings.svg",
+    "title": "User Settings",
+    "aliases": []
+  },
+  "azure:user-subscriptions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10111-icon-service-User-Subscriptions.svg",
+    "title": "User Subscriptions",
+    "aliases": []
+  },
+  "azure:users": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/10230-icon-service-Users.svg",
+    "title": "Users",
+    "aliases": []
+  },
+  "azure:verifiable-credentials": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/01084-icon-service-Verifiable-Credentials.svg",
+    "title": "Verifiable Credentials",
+    "aliases": []
+  },
+  "azure:verification-as-a-service": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/identity/03225-icon-service-Verification-As-A-Service.svg",
+    "title": "Verification As A Service",
+    "aliases": []
+  },
+  "azure:versions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10845-icon-service-Versions.svg",
+    "title": "Versions",
+    "aliases": []
+  },
+  "azure:video-analyzers": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00712-icon-service-Video-Analyzers.svg",
+    "title": "Video Analyzers",
+    "aliases": []
+  },
+  "azure:video-indexer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01800-icon-service-Azure-Video-Indexer.svg",
+    "title": "Azure Video Indexer",
+    "aliases": []
+  },
+  "azure:virtual-clusters": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/databases/10127-icon-service-Virtual-Clusters.svg",
+    "title": "Virtual Clusters",
+    "aliases": []
+  },
+  "azure:virtual-desktop": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/00327-icon-service-Azure-Virtual-Desktop.svg",
+    "title": "Azure Virtual Desktop",
+    "aliases": []
+  },
+  "azure:virtual-instance-for-sap": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03089-icon-service-Virtual-Instance-for-SAP.svg",
+    "title": "Virtual Instance for SAP",
+    "aliases": []
+  },
+  "azure:virtual-machines-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10028-icon-service-Virtual-Machines-(Classic).svg",
+    "title": "Virtual Machines (Classic)",
+    "aliases": []
+  },
+  "azure:virtual-network-gateways": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10063-icon-service-Virtual-Network-Gateways.svg",
+    "title": "Virtual Network Gateways",
+    "aliases": []
+  },
+  "azure:virtual-networks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10061-icon-service-Virtual-Networks.svg",
+    "title": "Virtual Networks",
+    "aliases": []
+  },
+  "azure:virtual-networks-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10075-icon-service-Virtual-Networks-(Classic).svg",
+    "title": "Virtual Networks (Classic)",
+    "aliases": []
+  },
+  "azure:virtual-router": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/02496-icon-service-Virtual-Router.svg",
+    "title": "Virtual Router",
+    "aliases": []
+  },
+  "azure:virtual-visits-builder": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02949-icon-service-Virtual-Visits-Builder.svg",
+    "title": "Virtual Visits Builder",
+    "aliases": []
+  },
+  "azure:virtual-wan-hub": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/00860-icon-service-Virtual-WAN-Hub.svg",
+    "title": "Virtual WAN Hub",
+    "aliases": []
+  },
+  "azure:virtual-wans": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10353-icon-service-Virtual-WANs.svg",
+    "title": "Virtual WANs",
+    "aliases": []
+  },
+  "azure:vm": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10021-icon-service-Virtual-Machine.svg",
+    "title": "Virtual Machine",
+    "aliases": [
+      "virtual-machine"
+    ]
+  },
+  "azure:vm-app-definitions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02805-icon-service-VM-App-Definitions.svg",
+    "title": "VM App Definitions",
+    "aliases": []
+  },
+  "azure:vm-app-versions": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02806-icon-service-VM-App-Versions.svg",
+    "title": "VM App Versions",
+    "aliases": []
+  },
+  "azure:vm-image-version": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02866-icon-service-VM-Image-Version.svg",
+    "title": "VM Image Version",
+    "aliases": []
+  },
+  "azure:vm-images-classic": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10040-icon-service-VM-Images-(Classic).svg",
+    "title": "VM Images (Classic)",
+    "aliases": []
+  },
+  "azure:vm-scale-sets": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/10034-icon-service-VM-Scale-Sets.svg",
+    "title": "VM Scale Sets",
+    "aliases": []
+  },
+  "azure:vmware-solution": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/01219-icon-service-Azure-VMware-Solution.svg",
+    "title": "Azure VMware Solution",
+    "aliases": []
+  },
+  "azure:vnet-appliance": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/034412066-icon-service-VNet-Appliance.svg",
+    "title": "VNet Appliance",
+    "aliases": []
+  },
+  "azure:vpnclientwindows": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/03694-icon-service-VPNClientWindows.svg",
+    "title": "VPNClientWindows",
+    "aliases": []
+  },
+  "azure:wac": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10355-icon-service-WAC.svg",
+    "title": "WAC",
+    "aliases": []
+  },
+  "azure:wac-installer": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/03563-icon-service-WAC-Installer.svg",
+    "title": "WAC Installer",
+    "aliases": []
+  },
+  "azure:web-app-database": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02515-icon-service-Web-App-+-Database.svg",
+    "title": "Web App + Database",
+    "aliases": []
+  },
+  "azure:web-application-firewall-policies-waf": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/networking/10362-icon-service-Web-Application-Firewall-Policies(WAF).svg",
+    "title": "Web Application Firewall Policies(WAF)",
+    "aliases": []
+  },
+  "azure:web-jobs": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/10846-icon-service-Web-Jobs.svg",
+    "title": "Web Jobs",
+    "aliases": []
+  },
+  "azure:web-slots": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10849-icon-service-Web-Slots.svg",
+    "title": "Web Slots",
+    "aliases": []
+  },
+  "azure:web-test": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10850-icon-service-Web-Test.svg",
+    "title": "Web Test",
+    "aliases": []
+  },
+  "azure:website-power": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10847-icon-service-Website-Power.svg",
+    "title": "Website Power",
+    "aliases": []
+  },
+  "azure:website-staging": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10848-icon-service-Website-Staging.svg",
+    "title": "Website Staging",
+    "aliases": []
+  },
+  "azure:windows-notification-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02733-icon-service-Windows-Notification-Services.svg",
+    "title": "Windows Notification Services",
+    "aliases": []
+  },
+  "azure:windows10-core-services": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/iot/10203-icon-service-Windows10-Core-Services.svg",
+    "title": "Windows10 Core Services",
+    "aliases": []
+  },
+  "azure:workbooks": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/analytics/02189-icon-service-Azure-Workbooks.svg",
+    "title": "Azure Workbooks",
+    "aliases": []
+  },
+  "azure:workbooks-general": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10851-icon-service-Workbooks.svg",
+    "title": "Workbooks",
+    "aliases": []
+  },
+  "azure:worker-container-app": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/other/02884-icon-service-Worker-Container-App.svg",
+    "title": "Worker Container App",
+    "aliases": []
+  },
+  "azure:workflow": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/general/10852-icon-service-Workflow.svg",
+    "title": "Workflow",
+    "aliases": []
+  },
+  "azure:workload-orchestration": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/hybrid + multicloud/029109619-icon-service-Workload-Orchestration.svg",
+    "title": "Workload Orchestration",
+    "aliases": []
+  },
+  "azure:workspace-gateway": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/devops/03623-icon-service-Workspace-Gateway.svg",
+    "title": "Workspace Gateway",
+    "aliases": []
+  },
+  "azure:workspaces": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/00330-icon-service-Workspaces.svg",
+    "title": "Workspaces",
+    "aliases": []
+  },
+  "azure:workspaces-compute": {
+    "file": "azure:Azure_Public_Service_Icons/Icons/compute/00400-icon-service-Workspaces.svg",
+    "title": "Workspaces",
+    "aliases": []
+  },
+  "gcp:ai-hypercomputer": {
+    "file": "gcp-core:Unique Icons/AI Hypercomputer/SVG/AIHypercomputer-512-color.svg",
+    "title": "AI Hypercomputer",
+    "aliases": [
+      "aihypercomputer"
+    ]
+  },
+  "gcp:alloydb": {
+    "file": "gcp-core:Unique Icons/AlloyDB/SVG/AlloyDB-512-color.svg",
+    "title": "AlloyDB",
+    "aliases": []
+  },
+  "gcp:anthos": {
+    "file": "gcp-core:Unique Icons/Anthos/SVG/Anthos-512-color.svg",
+    "title": "Anthos",
+    "aliases": []
+  },
+  "gcp:apigee": {
+    "file": "gcp-core:Unique Icons/Apigee/SVG/Apigee-512-color-rgb.svg",
+    "title": "Apigee",
+    "aliases": []
+  },
+  "gcp:bigquery": {
+    "file": "gcp-core:Unique Icons/BigQuery/SVG/BigQuery-512-color.svg",
+    "title": "BigQuery",
+    "aliases": []
+  },
+  "gcp:cat-agents": {
+    "file": "gcp-cat:Category Icons/Agents/SVG/Agents-512-color.svg",
+    "title": "Agents",
+    "aliases": [
+      "agents"
+    ]
+  },
+  "gcp:cat-ai-machine-learning": {
+    "file": "gcp-cat:Category Icons/AI _ Machine Learning/SVG/AIMachineLearning-512-color.svg",
+    "title": "AI & Machine Learning",
+    "aliases": [
+      "aimachinelearning"
+    ]
+  },
+  "gcp:cat-business-intelligence": {
+    "file": "gcp-cat:Category Icons/Business Intelligence/SVG/BusinessIntelligence-512-color.svg",
+    "title": "Business Intelligence",
+    "aliases": [
+      "businessintelligence"
+    ]
+  },
+  "gcp:cat-collaboration": {
+    "file": "gcp-cat:Category Icons/Collaboration/SVG/Collaboration-512-color.svg",
+    "title": "Collaboration",
+    "aliases": [
+      "collaboration"
+    ]
+  },
+  "gcp:cat-compute": {
+    "file": "gcp-cat:Category Icons/Compute/SVG/Compute-512-color.svg",
+    "title": "Compute",
+    "aliases": [
+      "compute"
+    ]
+  },
+  "gcp:cat-containers": {
+    "file": "gcp-cat:Category Icons/Containers/SVG/Containers-512-color.svg",
+    "title": "Containers",
+    "aliases": [
+      "containers"
+    ]
+  },
+  "gcp:cat-data-analytics": {
+    "file": "gcp-cat:Category Icons/Data Analytics/SVG/DataAnalytics-512-color.svg",
+    "title": "Data Analytics",
+    "aliases": [
+      "dataanalytics"
+    ]
+  },
+  "gcp:cat-databases": {
+    "file": "gcp-cat:Category Icons/Databases/SVG/Databases-512-color.svg",
+    "title": "Databases",
+    "aliases": [
+      "databases"
+    ]
+  },
+  "gcp:cat-developer-tools": {
+    "file": "gcp-cat:Category Icons/Developer Tools/SVG/Developer_Tools-512-color.svg",
+    "title": "Developer Tools",
+    "aliases": [
+      "developertools"
+    ]
+  },
+  "gcp:cat-devops": {
+    "file": "gcp-cat:Category Icons/DevOps/SVG/DevOps-512-color.svg",
+    "title": "DevOps",
+    "aliases": [
+      "devops"
+    ]
+  },
+  "gcp:cat-hybrid-multicloud": {
+    "file": "gcp-cat:Category Icons/Hybrid & Multicloud/SVG/HybridMulticloud-512-color.svg",
+    "title": "Hybrid & Multicloud",
+    "aliases": [
+      "hybridmulticloud"
+    ]
+  },
+  "gcp:cat-integration-services": {
+    "file": "gcp-cat:Category Icons/Integration Services/SVG/IntegrationServices-512-color.svg",
+    "title": "Integration Services",
+    "aliases": [
+      "integrationservices"
+    ]
+  },
+  "gcp:cat-management-tools": {
+    "file": "gcp-cat:Category Icons/Management Tools/SVG/ManagementTools-512-color.svg",
+    "title": "Management Tools",
+    "aliases": [
+      "managementtools"
+    ]
+  },
+  "gcp:cat-maps-geospatial": {
+    "file": "gcp-cat:Category Icons/Maps & Geospatial/SVG/MapsGeospatial-512-color.svg",
+    "title": "Maps & Geospatial",
+    "aliases": [
+      "mapsgeospatial"
+    ]
+  },
+  "gcp:cat-marketplace": {
+    "file": "gcp-cat:Category Icons/Marketplace/SVG/Marketplace-512-color.svg",
+    "title": "Marketplace",
+    "aliases": [
+      "marketplace"
+    ]
+  },
+  "gcp:cat-media-services": {
+    "file": "gcp-cat:Category Icons/Media Services/SVG/MediaServices-512-color.svg",
+    "title": "Media Services",
+    "aliases": [
+      "mediaservices"
+    ]
+  },
+  "gcp:cat-migration": {
+    "file": "gcp-cat:Category Icons/Migration/SVG/Migration-512-color.svg",
+    "title": "Migration",
+    "aliases": [
+      "migration"
+    ]
+  },
+  "gcp:cat-mixed-reality": {
+    "file": "gcp-cat:Category Icons/Mixed Reality/SVG/MixedReality-512-color.svg",
+    "title": "Mixed Reality",
+    "aliases": [
+      "mixedreality"
+    ]
+  },
+  "gcp:cat-networking": {
+    "file": "gcp-cat:Category Icons/Networking/SVG/Networking-512-color-rgb.svg",
+    "title": "Networking",
+    "aliases": [
+      "networking"
+    ]
+  },
+  "gcp:cat-observability": {
+    "file": "gcp-cat:Category Icons/Observability/SVG/Observability-512-color.svg",
+    "title": "Observability",
+    "aliases": [
+      "observability"
+    ]
+  },
+  "gcp:cat-operations": {
+    "file": "gcp-cat:Category Icons/Operations/SVG/Operations-512-color.svg",
+    "title": "Operations",
+    "aliases": [
+      "operations"
+    ]
+  },
+  "gcp:cat-security-identity": {
+    "file": "gcp-cat:Category Icons/Security Identity/SVG/SecurityIdentity-512-color.svg",
+    "title": "Security Identity",
+    "aliases": [
+      "securityidentity"
+    ]
+  },
+  "gcp:cat-serverless-computing": {
+    "file": "gcp-cat:Category Icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg",
+    "title": "Serverless Computing",
+    "aliases": [
+      "serverlesscomputing"
+    ]
+  },
+  "gcp:cat-storage": {
+    "file": "gcp-cat:Category Icons/Storage/SVG/Storage-512-color.svg",
+    "title": "Storage",
+    "aliases": [
+      "storage"
+    ]
+  },
+  "gcp:cat-web-mobile": {
+    "file": "gcp-cat:Category Icons/Web & Mobile/SVG/WebMobile-512-color.svg",
+    "title": "Web & Mobile",
+    "aliases": [
+      "webmobile"
+    ]
+  },
+  "gcp:cat-web3": {
+    "file": "gcp-cat:Category Icons/Web3/SVG/Web3-512-color.svg",
+    "title": "Web3",
+    "aliases": [
+      "web3"
+    ]
+  },
+  "gcp:cloud-run": {
+    "file": "gcp-core:Unique Icons/Cloud Run/SVG/CloudRun-512-color-rgb.svg",
+    "title": "Cloud Run",
+    "aliases": [
+      "cloudrun"
+    ]
+  },
+  "gcp:cloud-spanner": {
+    "file": "gcp-core:Unique Icons/Cloud Spanner/SVG/CloudSpanner-512-color.svg",
+    "title": "Cloud Spanner",
+    "aliases": [
+      "cloudspanner"
+    ]
+  },
+  "gcp:cloud-sql": {
+    "file": "gcp-core:Unique Icons/Cloud SQL/SVG/CloudSQL-512-color.svg",
+    "title": "Cloud SQL",
+    "aliases": [
+      "cloudsql"
+    ]
+  },
+  "gcp:cloud-storage": {
+    "file": "gcp-core:Unique Icons/Cloud Storage/SVG/Cloud_Storage-512-color.svg",
+    "title": "Cloud Storage",
+    "aliases": [
+      "cloudstorage"
+    ]
+  },
+  "gcp:compute-engine": {
+    "file": "gcp-core:Unique Icons/Compute Engine/SVG/ComputeEngine-512-color-rgb.svg",
+    "title": "Compute Engine",
+    "aliases": [
+      "computeengine"
+    ]
+  },
+  "gcp:distributed-cloud": {
+    "file": "gcp-core:Unique Icons/Distributed Cloud/SVG/DistributedCloud-512-color.svg",
+    "title": "Distributed Cloud",
+    "aliases": [
+      "distributedcloud"
+    ]
+  },
+  "gcp:gke": {
+    "file": "gcp-core:Unique Icons/GKE/SVG/GKE-512-color.svg",
+    "title": "GKE",
+    "aliases": []
+  },
+  "gcp:hyperdisk": {
+    "file": "gcp-core:Unique Icons/Hyperdisk/SVG/Hyperdisk-512-color.svg",
+    "title": "Hyperdisk",
+    "aliases": []
+  },
+  "gcp:looker": {
+    "file": "gcp-core:Unique Icons/Looker/SVG/Looker-512-color.svg",
+    "title": "Looker",
+    "aliases": []
+  },
+  "gcp:mandiant": {
+    "file": "gcp-core:Unique Icons/Mandiant/SVG/Mandiant-512-color.svg",
+    "title": "Mandiant",
+    "aliases": []
+  },
+  "gcp:security-command-center": {
+    "file": "gcp-core:Unique Icons/Security Command Center/SVG/SecurityCommandCenter-512-color.svg",
+    "title": "Security Command Center",
+    "aliases": [
+      "securitycommandcenter"
+    ]
+  },
+  "gcp:security-operations": {
+    "file": "gcp-core:Unique Icons/Security Operations/SVG/SecOps-512-color-rgb.svg",
+    "title": "Security Operations",
+    "aliases": [
+      "secops"
+    ]
+  },
+  "gcp:threat-intelligence": {
+    "file": "gcp-core:Unique Icons/Threat Intelligence/SVG/ThreatIntelligence-512-color.svg",
+    "title": "Threat Intelligence",
+    "aliases": [
+      "threatintelligence"
+    ]
+  },
+  "gcp:vertex-ai": {
+    "file": "gcp-core:Unique Icons/Vertex AI/SVG/VertexAI-512-color.svg",
+    "title": "Vertex AI",
+    "aliases": [
+      "vertexai"
+    ]
+  }
+}

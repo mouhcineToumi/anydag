@@ -1,0 +1,44 @@
+# Every push to main and every pull request runs the fast tier (`scripts/checks.sh`: the
+# typechecks, the contract checks, parity and the unit suite).
+#
+# **Playwright does not run here.** Its screenshot baselines are compared against one pinned
+# Chromium, and a runner's fonts rasterise differently, so the browser suite runs locally
+# (`npm run e2e:local`, and `.githooks/pre-push`). A green tick means the types, the contracts and
+# the unit suite; it does not mean the app was opened in a browser.
+#
+# Releases are `.github/workflows/release.yml`, on a `v*` tag.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The fast one, and the one that fails first: typecheck, the four `check:*` contracts, and the
+  # unit suite. Nothing here needs a browser or a container.
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      # `tsc -p desktop` needs Electron's types, not its 100 MB binary.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # One step rather than seven, and `scripts/checks.sh` is why: the same list was written out
+      # here, in `scripts/gate.sh` and now in `.githooks/pre-commit`, and three copies is three
+      # chances for a check to be added to one of them. The script prints each step's name, so a
+      # red run still says which one went red.
+      - run: npm run checks

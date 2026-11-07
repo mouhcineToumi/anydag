@@ -1,0 +1,972 @@
+{
+  "//": "Canonical icon name -> upstream slugs. `color` is a gilbarbara/logos slug (CC0), `mono` a Simple Icons slug (CC0). Namespaced cloud names prefer a CC0 source; anything absent here falls through to icons/data/vendor.json, which carries vendor terms. Rebuild with `npm run icons:build`.",
+  "brands": {
+    "postgresql": {
+      "color": "postgresql",
+      "mono": "postgresql",
+      "aliases": [
+        "postgres",
+        "pg"
+      ]
+    },
+    "mysql": {
+      "color": "mysql",
+      "mono": "mysql"
+    },
+    "mariadb": {
+      "color": "mariadb",
+      "mono": "mariadb"
+    },
+    "sqlite": {
+      "color": "sqlite",
+      "mono": "sqlite"
+    },
+    "mongodb": {
+      "color": "mongodb",
+      "mono": "mongodb",
+      "aliases": [
+        "mongo"
+      ]
+    },
+    "redis": {
+      "color": "redis",
+      "mono": "redis"
+    },
+    "valkey": {
+      "color": "valkey"
+    },
+    "elasticsearch": {
+      "color": "elasticsearch",
+      "mono": "elasticsearch",
+      "aliases": [
+        "elastic"
+      ]
+    },
+    "opensearch": {
+      "color": "opensearch",
+      "mono": "opensearch"
+    },
+    "clickhouse": {
+      "mono": "clickhouse"
+    },
+    "cassandra": {
+      "color": "cassandra",
+      "mono": "apachecassandra"
+    },
+    "cockroachdb": {
+      "mono": "cockroachlabs"
+    },
+    "duckdb": {
+      "mono": "duckdb"
+    },
+    "neo4j": {
+      "color": "neo4j",
+      "mono": "neo4j"
+    },
+    "influxdb": {
+      "color": "influxdb",
+      "mono": "influxdb"
+    },
+    "surrealdb": {
+      "color": "surrealdb",
+      "mono": "surrealdb"
+    },
+    "supabase": {
+      "color": "supabase",
+      "mono": "supabase"
+    },
+    "planetscale": {
+      "color": "planetscale",
+      "mono": "planetscale"
+    },
+    "qdrant": {
+      "color": "qdrant",
+      "mono": "qdrant"
+    },
+    "pinecone": {
+      "color": "pinecone"
+    },
+    "chroma": {
+      "color": "chroma"
+    },
+    "milvus": {
+      "color": "milvus",
+      "mono": "milvus"
+    },
+    "dynamodb": {
+      "color": "aws-dynamodb",
+      "mono": "amazondynamodb"
+    },
+    "docker": {
+      "color": "docker",
+      "mono": "docker"
+    },
+    "kubernetes": {
+      "color": "kubernetes",
+      "mono": "kubernetes",
+      "aliases": [
+        "k8s"
+      ]
+    },
+    "helm": {
+      "color": "helm",
+      "mono": "helm"
+    },
+    "terraform": {
+      "color": "terraform",
+      "mono": "terraform"
+    },
+    "opentofu": {
+      "mono": "opentofu"
+    },
+    "pulumi": {
+      "color": "pulumi",
+      "mono": "pulumi"
+    },
+    "ansible": {
+      "color": "ansible",
+      "mono": "ansible"
+    },
+    "vagrant": {
+      "color": "vagrant",
+      "mono": "vagrant"
+    },
+    "packer": {
+      "color": "packer",
+      "mono": "packer"
+    },
+    "jenkins": {
+      "color": "jenkins",
+      "mono": "jenkins"
+    },
+    "github-actions": {
+      "color": "github-actions",
+      "mono": "githubactions"
+    },
+    "gitlab": {
+      "color": "gitlab",
+      "mono": "gitlab"
+    },
+    "circleci": {
+      "color": "circleci",
+      "mono": "circleci"
+    },
+    "argo": {
+      "color": "argo",
+      "mono": "argo",
+      "aliases": [
+        "argocd"
+      ]
+    },
+    "flux": {
+      "color": "flux",
+      "mono": "flux"
+    },
+    "tekton": {
+      "mono": "tekton"
+    },
+    "prometheus": {
+      "color": "prometheus",
+      "mono": "prometheus"
+    },
+    "grafana": {
+      "color": "grafana",
+      "mono": "grafana"
+    },
+    "jaeger": {
+      "mono": "jaeger"
+    },
+    "opentelemetry": {
+      "color": "opentelemetry",
+      "mono": "opentelemetry"
+    },
+    "datadog": {
+      "color": "datadog",
+      "mono": "datadog"
+    },
+    "sentry": {
+      "color": "sentry",
+      "mono": "sentry"
+    },
+    "kibana": {
+      "color": "kibana",
+      "mono": "kibana"
+    },
+    "logstash": {
+      "color": "logstash",
+      "mono": "logstash"
+    },
+    "nginx": {
+      "color": "nginx",
+      "mono": "nginx"
+    },
+    "traefik": {
+      "mono": "traefikproxy"
+    },
+    "caddy": {
+      "mono": "caddy"
+    },
+    "envoy": {
+      "color": "envoy",
+      "aliases": [
+        "envoyproxy"
+      ]
+    },
+    "istio": {
+      "mono": "istio"
+    },
+    "linkerd": {
+      "color": "linkerd",
+      "mono": "linkerd"
+    },
+    "consul": {
+      "color": "consul",
+      "mono": "consul"
+    },
+    "vault": {
+      "color": "vault",
+      "mono": "vault",
+      "aliases": [
+        "hashicorp-vault"
+      ]
+    },
+    "nomad": {
+      "color": "nomad",
+      "mono": "nomad"
+    },
+    "kafka": {
+      "color": "kafka-icon",
+      "mono": "apachekafka"
+    },
+    "rabbitmq": {
+      "color": "rabbitmq",
+      "mono": "rabbitmq"
+    },
+    "nats": {
+      "color": "nats"
+    },
+    "pulsar": {
+      "mono": "apachepulsar"
+    },
+    "celery": {
+      "mono": "celery"
+    },
+    "temporal": {
+      "mono": "temporal"
+    },
+    "airflow": {
+      "color": "airflow-icon",
+      "mono": "apacheairflow"
+    },
+    "dbt": {
+      "color": "dbt",
+      "mono": "dbt"
+    },
+    "snowflake": {
+      "color": "snowflake",
+      "mono": "snowflake"
+    },
+    "databricks": {
+      "color": "databricks",
+      "mono": "databricks"
+    },
+    "tableau": {
+      "color": "tableau",
+      "mono": "tableau"
+    },
+    "looker": {
+      "color": "looker",
+      "mono": "looker"
+    },
+    "powerbi": {
+      "mono": "powerbi",
+      "aliases": [
+        "power-bi"
+      ]
+    },
+    "metabase": {
+      "color": "metabase",
+      "mono": "metabase"
+    },
+    "superset": {
+      "mono": "apachesuperset",
+      "aliases": [
+        "apache-superset"
+      ]
+    },
+    "spark": {
+      "color": "spark",
+      "mono": "apachespark",
+      "aliases": [
+        "apache-spark"
+      ]
+    },
+    "flink": {
+      "mono": "apacheflink",
+      "aliases": [
+        "apache-flink"
+      ]
+    },
+    "hadoop": {
+      "color": "hadoop",
+      "mono": "apachehadoop",
+      "aliases": [
+        "apache-hadoop"
+      ]
+    },
+    "airbyte": {
+      "mono": "airbyte"
+    },
+    "prefect": {
+      "mono": "prefect"
+    },
+    "trino": {
+      "mono": "trino"
+    },
+    "presto": {
+      "color": "presto",
+      "mono": "presto"
+    },
+    "segment": {
+      "color": "segment"
+    },
+    "mixpanel": {
+      "color": "mixpanel",
+      "mono": "mixpanel"
+    },
+    "amplitude": {
+      "color": "amplitude"
+    },
+    "minio": {
+      "mono": "minio"
+    },
+    "etcd": {
+      "color": "etcd",
+      "mono": "etcd"
+    },
+    "python": {
+      "color": "python",
+      "mono": "python"
+    },
+    "nodejs": {
+      "color": "nodejs",
+      "aliases": [
+        "node"
+      ]
+    },
+    "deno": {
+      "color": "deno",
+      "mono": "deno"
+    },
+    "bun": {
+      "color": "bun",
+      "mono": "bun"
+    },
+    "go": {
+      "color": "go",
+      "mono": "go"
+    },
+    "rust": {
+      "color": "rust",
+      "mono": "rust"
+    },
+    "java": {
+      "color": "java"
+    },
+    "kotlin": {
+      "color": "kotlin",
+      "mono": "kotlin"
+    },
+    "scala": {
+      "color": "scala",
+      "mono": "scala"
+    },
+    "ruby": {
+      "color": "ruby",
+      "mono": "ruby"
+    },
+    "php": {
+      "color": "php",
+      "mono": "php"
+    },
+    "dotnet": {
+      "color": "dotnet",
+      "mono": "dotnet"
+    },
+    "typescript": {
+      "color": "typescript",
+      "mono": "typescript"
+    },
+    "javascript": {
+      "color": "javascript",
+      "mono": "javascript"
+    },
+    "react": {
+      "color": "react",
+      "mono": "react"
+    },
+    "vue": {
+      "color": "vue"
+    },
+    "svelte": {
+      "color": "svelte",
+      "mono": "svelte"
+    },
+    "angular": {
+      "color": "angular",
+      "mono": "angular"
+    },
+    "nextjs": {
+      "color": "nextjs-icon",
+      "mono": "nextdotjs"
+    },
+    "nuxt": {
+      "color": "nuxt-icon",
+      "mono": "nuxt"
+    },
+    "astro": {
+      "color": "astro",
+      "mono": "astro"
+    },
+    "vite": {
+      "color": "vite",
+      "mono": "vite"
+    },
+    "webpack": {
+      "color": "webpack",
+      "mono": "webpack"
+    },
+    "remix": {
+      "color": "remix",
+      "mono": "remix"
+    },
+    "htmx": {
+      "color": "htmx",
+      "mono": "htmx"
+    },
+    "tailwindcss": {
+      "color": "tailwindcss",
+      "mono": "tailwindcss",
+      "aliases": [
+        "tailwind"
+      ]
+    },
+    "fastapi": {
+      "color": "fastapi",
+      "mono": "fastapi"
+    },
+    "django": {
+      "color": "django",
+      "mono": "django"
+    },
+    "flask": {
+      "color": "flask",
+      "mono": "flask"
+    },
+    "spring": {
+      "color": "spring",
+      "mono": "spring"
+    },
+    "rails": {
+      "color": "rails",
+      "mono": "rubyonrails"
+    },
+    "laravel": {
+      "color": "laravel",
+      "mono": "laravel"
+    },
+    "express": {
+      "color": "express",
+      "mono": "express"
+    },
+    "nestjs": {
+      "color": "nestjs",
+      "mono": "nestjs"
+    },
+    "graphql": {
+      "color": "graphql",
+      "mono": "graphql"
+    },
+    "grpc": {
+      "color": "grpc"
+    },
+    "openapi": {
+      "color": "openapi",
+      "aliases": [
+        "swagger"
+      ]
+    },
+    "openai": {
+      "color": "openai",
+      "mono": "openai"
+    },
+    "anthropic": {
+      "color": "anthropic",
+      "mono": "anthropic",
+      "aliases": [
+        "claude"
+      ]
+    },
+    "mistral-ai": {
+      "color": "mistral-ai",
+      "mono": "mistralai",
+      "aliases": [
+        "mistral"
+      ]
+    },
+    "google-gemini": {
+      "color": "google-gemini",
+      "mono": "googlegemini",
+      "aliases": [
+        "gemini"
+      ]
+    },
+    "huggingface": {
+      "color": "hugging-face-icon",
+      "mono": "huggingface"
+    },
+    "ollama": {
+      "mono": "ollama"
+    },
+    "langchain": {
+      "mono": "langchain"
+    },
+    "perplexity": {
+      "color": "perplexity",
+      "mono": "perplexity"
+    },
+    "replicate": {
+      "mono": "replicate"
+    },
+    "deepseek": {
+      "color": "deepseek",
+      "mono": "deepseek"
+    },
+    "elevenlabs": {
+      "mono": "elevenlabs"
+    },
+    "aws": {
+      "color": "aws",
+      "mono": "amazonwebservices"
+    },
+    "google-cloud": {
+      "color": "google-cloud",
+      "mono": "googlecloud",
+      "aliases": [
+        "gcp"
+      ]
+    },
+    "microsoft-azure": {
+      "color": "microsoft-azure",
+      "mono": "microsoftazure",
+      "aliases": [
+        "azure"
+      ]
+    },
+    "cloudflare": {
+      "color": "cloudflare",
+      "mono": "cloudflare"
+    },
+    "vercel": {
+      "color": "vercel",
+      "mono": "vercel"
+    },
+    "netlify": {
+      "color": "netlify",
+      "mono": "netlify"
+    },
+    "heroku": {
+      "color": "heroku",
+      "mono": "heroku"
+    },
+    "digital-ocean": {
+      "color": "digital-ocean",
+      "mono": "digitalocean",
+      "aliases": [
+        "digitalocean",
+        "do"
+      ]
+    },
+    "fly": {
+      "color": "fly-icon"
+    },
+    "render": {
+      "mono": "render"
+    },
+    "railway": {
+      "mono": "railway"
+    },
+    "linode": {
+      "color": "linode"
+    },
+    "hetzner": {
+      "mono": "hetzner"
+    },
+    "scaleway": {
+      "mono": "scaleway"
+    },
+    "firebase": {
+      "color": "firebase",
+      "mono": "firebase"
+    },
+    "github": {
+      "color": "github",
+      "mono": "github"
+    },
+    "bitbucket": {
+      "color": "bitbucket",
+      "mono": "bitbucket"
+    },
+    "linear": {
+      "color": "linear",
+      "mono": "linear"
+    },
+    "jira": {
+      "color": "jira",
+      "mono": "jira"
+    },
+    "notion": {
+      "color": "notion",
+      "mono": "notion"
+    },
+    "slack": {
+      "color": "slack",
+      "mono": "slack"
+    },
+    "discord": {
+      "color": "discord",
+      "mono": "discord"
+    },
+    "figma": {
+      "color": "figma",
+      "mono": "figma"
+    },
+    "stripe": {
+      "color": "stripe",
+      "mono": "stripe"
+    },
+    "twilio": {
+      "color": "twilio",
+      "mono": "twilio"
+    },
+    "sendgrid": {
+      "color": "sendgrid",
+      "mono": "sendgrid"
+    },
+    "resend": {
+      "color": "resend",
+      "mono": "resend"
+    },
+    "auth0": {
+      "color": "auth0",
+      "mono": "auth0"
+    },
+    "clerk": {
+      "mono": "clerk"
+    },
+    "okta": {
+      "color": "okta",
+      "mono": "okta"
+    },
+    "keycloak": {
+      "mono": "keycloak"
+    },
+    "posthog": {
+      "color": "posthog",
+      "mono": "posthog"
+    },
+    "algolia": {
+      "color": "algolia",
+      "mono": "algolia"
+    },
+    "meilisearch": {
+      "color": "meilisearch",
+      "mono": "meilisearch"
+    },
+    "typesense": {
+      "color": "typesense"
+    },
+    "strapi": {
+      "color": "strapi",
+      "mono": "strapi"
+    },
+    "sanity": {
+      "color": "sanity",
+      "mono": "sanity"
+    },
+    "contentful": {
+      "color": "contentful",
+      "mono": "contentful"
+    },
+    "wordpress": {
+      "color": "wordpress",
+      "mono": "wordpress"
+    },
+    "shopify": {
+      "color": "shopify",
+      "mono": "shopify"
+    }
+  },
+  "cloud": {
+    "aws:amplify": {
+      "color": "aws-amplify",
+      "source": "logos"
+    },
+    "aws:api-gateway": {
+      "color": "aws-api-gateway",
+      "source": "logos"
+    },
+    "aws:app-mesh": {
+      "color": "aws-app-mesh",
+      "source": "logos"
+    },
+    "aws:appflow": {
+      "color": "aws-appflow",
+      "source": "logos"
+    },
+    "aws:appsync": {
+      "color": "aws-appsync",
+      "source": "logos"
+    },
+    "aws:athena": {
+      "color": "aws-athena",
+      "source": "logos"
+    },
+    "aws:aurora": {
+      "color": "aws-aurora",
+      "source": "logos"
+    },
+    "aws:backup": {
+      "color": "aws-backup",
+      "source": "logos"
+    },
+    "aws:batch": {
+      "color": "aws-batch",
+      "source": "logos"
+    },
+    "aws:certificate-manager": {
+      "color": "aws-certificate-manager",
+      "source": "logos"
+    },
+    "aws:cloudformation": {
+      "color": "aws-cloudformation",
+      "source": "logos"
+    },
+    "aws:cloudfront": {
+      "color": "aws-cloudfront",
+      "source": "logos"
+    },
+    "aws:cloudsearch": {
+      "color": "aws-cloudsearch",
+      "source": "logos"
+    },
+    "aws:cloudtrail": {
+      "color": "aws-cloudtrail",
+      "source": "logos"
+    },
+    "aws:cloudwatch": {
+      "color": "aws-cloudwatch",
+      "source": "logos"
+    },
+    "aws:codebuild": {
+      "color": "aws-codebuild",
+      "source": "logos"
+    },
+    "aws:codecommit": {
+      "color": "aws-codecommit",
+      "source": "logos"
+    },
+    "aws:codedeploy": {
+      "color": "aws-codedeploy",
+      "source": "logos"
+    },
+    "aws:codepipeline": {
+      "color": "aws-codepipeline",
+      "source": "logos"
+    },
+    "aws:codestar": {
+      "color": "aws-codestar",
+      "source": "logos"
+    },
+    "aws:cognito": {
+      "color": "aws-cognito",
+      "source": "logos"
+    },
+    "aws:config": {
+      "color": "aws-config",
+      "source": "logos"
+    },
+    "aws:documentdb": {
+      "color": "aws-documentdb",
+      "source": "logos"
+    },
+    "aws:dynamodb": {
+      "color": "aws-dynamodb",
+      "source": "logos"
+    },
+    "aws:ec2": {
+      "color": "aws-ec2",
+      "source": "logos"
+    },
+    "aws:ecs": {
+      "color": "aws-ecs",
+      "source": "logos"
+    },
+    "aws:eks": {
+      "color": "aws-eks",
+      "source": "logos"
+    },
+    "aws:elastic-beanstalk": {
+      "color": "aws-elastic-beanstalk",
+      "source": "logos"
+    },
+    "aws:elasticache": {
+      "color": "aws-elasticache",
+      "source": "logos"
+    },
+    "aws:elb": {
+      "color": "aws-elb",
+      "source": "logos"
+    },
+    "aws:eventbridge": {
+      "color": "aws-eventbridge",
+      "source": "logos"
+    },
+    "aws:fargate": {
+      "color": "aws-fargate",
+      "source": "logos"
+    },
+    "aws:glacier": {
+      "color": "aws-glacier",
+      "source": "logos"
+    },
+    "aws:glue": {
+      "color": "aws-glue",
+      "source": "logos"
+    },
+    "aws:iam": {
+      "color": "aws-iam",
+      "source": "logos"
+    },
+    "aws:keyspaces": {
+      "color": "aws-keyspaces",
+      "source": "logos"
+    },
+    "aws:kinesis": {
+      "color": "aws-kinesis",
+      "source": "logos"
+    },
+    "aws:kms": {
+      "color": "aws-kms",
+      "source": "logos"
+    },
+    "aws:lake-formation": {
+      "color": "aws-lake-formation",
+      "source": "logos"
+    },
+    "aws:lambda": {
+      "color": "aws-lambda",
+      "source": "logos"
+    },
+    "aws:lightsail": {
+      "color": "aws-lightsail",
+      "source": "logos"
+    },
+    "aws:mq": {
+      "color": "aws-mq",
+      "source": "logos"
+    },
+    "aws:msk": {
+      "color": "aws-msk",
+      "source": "logos"
+    },
+    "aws:neptune": {
+      "color": "aws-neptune",
+      "source": "logos"
+    },
+    "aws:opensearch": {
+      "color": "aws-open-search",
+      "source": "logos"
+    },
+    "aws:opsworks": {
+      "color": "aws-opsworks",
+      "source": "logos"
+    },
+    "aws:quicksight": {
+      "color": "aws-quicksight",
+      "source": "logos"
+    },
+    "aws:rds": {
+      "color": "aws-rds",
+      "source": "logos"
+    },
+    "aws:redshift": {
+      "color": "aws-redshift",
+      "source": "logos"
+    },
+    "aws:route53": {
+      "color": "aws-route53",
+      "source": "logos"
+    },
+    "aws:s3": {
+      "color": "aws-s3",
+      "source": "logos"
+    },
+    "aws:secrets-manager": {
+      "color": "aws-secrets-manager",
+      "source": "logos"
+    },
+    "aws:ses": {
+      "color": "aws-ses",
+      "source": "logos"
+    },
+    "aws:shield": {
+      "color": "aws-shield",
+      "source": "logos"
+    },
+    "aws:sns": {
+      "color": "aws-sns",
+      "source": "logos"
+    },
+    "aws:sqs": {
+      "color": "aws-sqs",
+      "source": "logos"
+    },
+    "aws:step-functions": {
+      "color": "aws-step-functions",
+      "source": "logos"
+    },
+    "aws:systems-manager": {
+      "color": "aws-systems-manager",
+      "source": "logos"
+    },
+    "aws:timestream": {
+      "color": "aws-timestream",
+      "source": "logos"
+    },
+    "aws:vpc": {
+      "color": "aws-vpc",
+      "source": "logos"
+    },
+    "aws:waf": {
+      "color": "aws-waf",
+      "source": "logos"
+    },
+    "aws:xray": {
+      "color": "aws-xray",
+      "source": "logos"
+    },
+    "gcp:cloud-functions": {
+      "color": "google-cloud-functions",
+      "source": "logos"
+    },
+    "gcp:cloud-run": {
+      "color": "google-cloud-run",
+      "source": "logos"
+    },
+    "gcp:google-cloud": {
+      "color": "google-cloud",
+      "source": "logos"
+    }
+  }
+}

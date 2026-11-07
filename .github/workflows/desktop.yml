@@ -1,0 +1,67 @@
+# The desktop app, built and opened on a pull request that touches what it is made of.
+#
+# The job builds the page, the server, the CLI and the shell, packages them with electron-builder
+# — an AppImage, unsigned — then opens the packaged app on a temp vault (`desktop/smoke.mjs`) and
+# passes only when the page reports `data-dag-ready`. The AppImage is kept as the run's artifact
+# for a week. A tagged release is `release.yml`, which runs the same steps and then publishes.
+#
+# **Linux only, for now.** Everything here is written for all three systems: adding
+# `windows-latest` and `macos-latest` to the matrix is the whole of turning them on, and
+# `check:case` keeps the tree buildable on their case-insensitive disks.
+name: desktop
+
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "server/**"
+      - "cli/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:build
+      - name: Package
+        run: npx electron-builder --config desktop/electron-builder.yml --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Open it (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node desktop/smoke.mjs
+      - name: Open it
+        if: runner.os != 'Linux'
+        run: node desktop/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anydag-${{ runner.os }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.dmg
+            release/*.zip
+            release/*.exe

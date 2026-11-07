@@ -1,0 +1,532 @@
+## grouped bar
+{
+ "kind": "chart",
+ "size": {
+  "w": 480,
+  "h": 254
+ },
+ "plot": {
+  "x": 40,
+  "y": 8,
+  "w": 368,
+  "h": 208
+ },
+ "nodes": {
+  "web": {
+   "x": 60,
+   "y": 28.8,
+   "w": 300,
+   "h": 187.2
+  },
+  "mob": {
+   "x": 88,
+   "y": 80.8,
+   "w": 300,
+   "h": 135.2
+  }
+ },
+ "bars": [
+  {
+   "x": 60,
+   "y": 91.2,
+   "w": 24,
+   "h": 124.8,
+   "id": "web",
+   "hue": "coral",
+   "cat": 0,
+   "value": 120,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 88,
+   "y": 174.4,
+   "w": 24,
+   "h": 41.6,
+   "id": "mob",
+   "hue": "magenta",
+   "cat": 0,
+   "value": 40,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 152,
+   "y": 70.4,
+   "w": 24,
+   "h": 145.6,
+   "id": "web",
+   "hue": "coral",
+   "cat": 1,
+   "value": 140,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 180,
+   "y": 153.6,
+   "w": 24,
+   "h": 62.4,
+   "id": "mob",
+   "hue": "magenta",
+   "cat": 1,
+   "value": 60,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 244,
+   "y": 49.6,
+   "w": 24,
+   "h": 166.4,
+   "id": "web",
+   "hue": "coral",
+   "cat": 2,
+   "value": 160,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 272,
+   "y": 122.4,
+   "w": 24,
+   "h": 93.6,
+   "id": "mob",
+   "hue": "magenta",
+   "cat": 2,
+   "value": 90,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 336,
+   "y": 28.8,
+   "w": 24,
+   "h": 187.2,
+   "id": "web",
+   "hue": "coral",
+   "cat": 3,
+   "value": 180,
+   "r": 4,
+   "round": "top"
+  },
+  {
+   "x": 364,
+   "y": 80.8,
+   "w": 24,
+   "h": 135.2,
+   "id": "mob",
+   "hue": "magenta",
+   "cat": 3,
+   "value": 130,
+   "r": 4,
+   "round": "top"
+  }
+ ],
+ "lines": [],
+ "slices": [],
+ "xAxis": {
+  "side": "bottom",
+  "kind": "category",
+  "x1": 40,
+  "y1": 216,
+  "x2": 408,
+  "y2": 216,
+  "ticks": [
+   {
+    "x": 86,
+    "label": "Q1",
+    "major": false,
+    "x1": 86,
+    "y1": 216,
+    "x2": 86,
+    "y2": 220
+   },
+   {
+    "x": 178,
+    "label": "Q2",
+    "major": false,
+    "x1": 178,
+    "y1": 216,
+    "x2": 178,
+    "y2": 220
+   },
+   {
+    "x": 270,
+    "label": "Q3",
+    "major": false,
+    "x1": 270,
+    "y1": 216,
+    "x2": 270,
+    "y2": 220
+   },
+   {
+    "x": 362,
+    "label": "Q4",
+    "major": false,
+    "x1": 362,
+    "y1": 216,
+    "x2": 362,
+    "y2": 220
+   }
+  ]
+ },
+ "yAxis": {
+  "side": "left",
+  "kind": "value",
+  "x1": 40,
+  "y1": 8,
+  "x2": 40,
+  "y2": 216,
+  "ticks": [
+   {
+    "x": 216,
+    "label": "0",
+    "major": true,
+    "x1": 36,
+    "y1": 216,
+    "x2": 40,
+    "y2": 216
+   },
+   {
+    "x": 164,
+    "label": "50",
+    "major": false,
+    "x1": 36,
+    "y1": 164,
+    "x2": 40,
+    "y2": 164
+   },
+   {
+    "x": 112,
+    "label": "100",
+    "major": false,
+    "x1": 36,
+    "y1": 112,
+    "x2": 40,
+    "y2": 112
+   },
+   {
+    "x": 60,
+    "label": "150",
+    "major": false,
+    "x1": 36,
+    "y1": 60,
+    "x2": 40,
+    "y2": 60
+   },
+   {
+    "x": 8,
+    "label": "200",
+    "major": false,
+    "x1": 36,
+    "y1": 8,
+    "x2": 40,
+    "y2": 8
+   }
+  ]
+ },
+ "grid": [
+  216,
+  164,
+  112,
+  60,
+  8
+ ],
+ "legend": {
+  "x": 416,
+  "y": 104,
+  "w": 55.44,
+  "h": 40,
+  "at": "right",
+  "rows": [
+   {
+    "id": "web",
+    "hue": "coral",
+    "swatch": {
+     "x": 416,
+     "y": 109,
+     "w": 10,
+     "h": 10
+    }
+   },
+   {
+    "id": "mob",
+    "hue": "magenta",
+    "swatch": {
+     "x": 416,
+     "y": 129,
+     "w": 10,
+     "h": 10
+    }
+   }
+  ]
+ },
+ "labels": [
+  {
+   "x": 30,
+   "y": 216,
+   "text": "0",
+   "anchor": "end",
+   "token": "tick"
+  },
+  {
+   "x": 30,
+   "y": 164,
+   "text": "50",
+   "anchor": "end",
+   "token": "tick"
+  },
+  {
+   "x": 30,
+   "y": 112,
+   "text": "100",
+   "anchor": "end",
+   "token": "tick"
+  },
+  {
+   "x": 30,
+   "y": 60,
+   "text": "150",
+   "anchor": "end",
+   "token": "tick"
+  },
+  {
+   "x": 30,
+   "y": 8,
+   "text": "200",
+   "anchor": "end",
+   "token": "tick"
+  },
+  {
+   "x": 86,
+   "y": 232,
+   "text": "Q1",
+   "anchor": "middle",
+   "token": "category"
+  },
+  {
+   "x": 178,
+   "y": 232,
+   "text": "Q2",
+   "anchor": "middle",
+   "token": "category"
+  },
+  {
+   "x": 270,
+   "y": 232,
+   "text": "Q3",
+   "anchor": "middle",
+   "token": "category"
+  },
+  {
+   "x": 362,
+   "y": 232,
+   "text": "Q4",
+   "anchor": "middle",
+   "token": "category"
+  },
+  {
+   "x": 434,
+   "y": 114,
+   "text": "Web",
+   "anchor": "start",
+   "token": "legend",
+   "of": "web"
+  },
+  {
+   "x": 434,
+   "y": 134,
+   "text": "Mobile",
+   "anchor": "start",
+   "token": "legend",
+   "of": "mob"
+  }
+ ],
+ "hues": {
+  "web": "coral",
+  "mob": "magenta"
+ }
+}
+
+## donut with a hero
+{
+ "kind": "chart",
+ "size": {
+  "w": 480,
+  "h": 254
+ },
+ "plot": {
+  "x": 8,
+  "y": 8,
+  "w": 400,
+  "h": 232
+ },
+ "nodes": {
+  "web": {
+   "x": 128.59,
+   "y": 8,
+   "w": 195.41,
+   "h": 232
+  },
+  "mob": {
+   "x": 92,
+   "y": 30.15,
+   "w": 73.73,
+   "h": 178.41
+  },
+  "oth": {
+   "x": 139.82,
+   "y": 8,
+   "w": 68.18,
+   "h": 57.82
+  }
+ },
+ "bars": [],
+ "lines": [],
+ "slices": [
+  {
+   "id": "web",
+   "hue": "coral",
+   "d": "M 209 8 A 116 116 0 1 1 129.32 209.24 L 159.22 176.85 A 71.92 71.92 0 1 0 208.62 52.08 Z",
+   "a0": -1.57,
+   "a1": 2.32,
+   "value": 62,
+   "pct": 0.62
+  },
+  {
+   "id": "mob",
+   "hue": "magenta",
+   "d": "M 127.87 207.87 A 116 116 0 0 1 139.01 30.75 L 165.23 66.18 A 71.92 71.92 0 0 0 158.32 176 Z",
+   "a0": 2.32,
+   "a1": 4.08,
+   "value": 28,
+   "pct": 0.28
+  },
+  {
+   "id": "oth",
+   "hue": "ochre",
+   "d": "M 140.63 29.57 A 116 116 0 0 1 207 8 L 207.38 52.08 A 71.92 71.92 0 0 0 166.23 65.45 Z",
+   "a0": 4.08,
+   "a1": 4.71,
+   "value": 10,
+   "pct": 0.1
+  }
+ ],
+ "grid": [],
+ "legend": {
+  "x": 416,
+  "y": 96,
+  "w": 55.44,
+  "h": 60,
+  "at": "right",
+  "rows": [
+   {
+    "id": "web",
+    "hue": "coral",
+    "swatch": {
+     "x": 416,
+     "y": 101,
+     "w": 10,
+     "h": 10
+    }
+   },
+   {
+    "id": "mob",
+    "hue": "magenta",
+    "swatch": {
+     "x": 416,
+     "y": 121,
+     "w": 10,
+     "h": 10
+    }
+   },
+   {
+    "id": "oth",
+    "hue": "ochre",
+    "swatch": {
+     "x": 416,
+     "y": 141,
+     "w": 10,
+     "h": 10
+    }
+   }
+  ]
+ },
+ "hero": {
+  "x": 208,
+  "y": 115,
+  "size": 48,
+  "labelSize": 12
+ },
+ "labels": [
+  {
+   "x": 434,
+   "y": 106,
+   "text": "Web",
+   "anchor": "start",
+   "token": "legend",
+   "of": "web"
+  },
+  {
+   "x": 434,
+   "y": 126,
+   "text": "Mobile",
+   "anchor": "start",
+   "token": "legend",
+   "of": "mob"
+  },
+  {
+   "x": 434,
+   "y": 146,
+   "text": "Other",
+   "anchor": "start",
+   "token": "legend",
+   "of": "oth"
+  },
+  {
+   "x": 208,
+   "y": 115,
+   "text": "1.2M",
+   "anchor": "middle",
+   "token": "hero",
+   "size": 48
+  },
+  {
+   "x": 208,
+   "y": 151,
+   "text": "users",
+   "anchor": "middle",
+   "token": "heroLabel"
+  },
+  {
+   "x": 295.36,
+   "y": 158.59,
+   "text": "62%",
+   "anchor": "middle",
+   "token": "value",
+   "of": "web"
+  },
+  {
+   "x": 114.23,
+   "y": 118.1,
+   "text": "28%",
+   "anchor": "middle",
+   "token": "value",
+   "of": "mob"
+  },
+  {
+   "x": 178.96,
+   "y": 34.64,
+   "text": "10%",
+   "anchor": "middle",
+   "token": "value",
+   "of": "oth"
+  }
+ ],
+ "hues": {
+  "web": "coral",
+  "mob": "magenta",
+  "oth": "ochre"
+ }
+}

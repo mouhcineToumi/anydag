@@ -1,0 +1,19 @@
+/* Board items that are not diagrams and not prose: a pasted or referenced image. */
+
+.dag-image { margin: 0; }
+.dag-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Unhued falls straight through to the plain outline every image has always had — see
+     `ImageItem.tsx`, which binds `--dag-h` on the `<figure>` only when the item actually has one. */
+  border: var(--dag-metric-line-hair) solid var(--dag-h, var(--dag-color-outline));
+  border-radius: var(--dag-metric-radius-card);
+  /* A plate behind the image, so a screenshot with a transparent ground reads as one object. */
+  background: var(--dag-color-card);
+}
+.dag-image figcaption {
+  margin-top: var(--dag-metric-item-captionGap);
+  font-size: var(--dag-type-legend);
+  color: var(--dag-h, var(--dag-color-slate));
+}

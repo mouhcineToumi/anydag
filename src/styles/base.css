@@ -1,0 +1,21 @@
+/* Resets and the page ground. Chrome is `chrome.css`; board content is `nodes.css`,
+   `markdown.css` and `items.css`, which `scripts/check-literals.mjs` holds to the theme. */
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--dag-font-sans);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dag-app { display: flex; flex-direction: column; height: 100%; }
+
+/* The window: the sidebar, then the page. `?snapshot=1` renders no shell at all, so a
+   picture of a board is the bare `.dag-app` above, exactly as it always was. */
+.dag-shell { position: relative; display: flex; height: 100%; }
+.dag-shell > .dag-app { flex: 1; min-width: 0; }

@@ -1,0 +1,52 @@
+{
+  "//": "What a document's `title:` is, read by `titleOf` in src/refs/extract.ts (test/titles.test.ts), which every surface imports. One list of cases, so the sidebar and every other surface cannot disagree about what a file is called.",
+  "read": [
+    { "why": "a plain title", "text": "---\ntitle: Plan\n---\n\nbody\n", "title": "Plan" },
+    { "why": "double-quoted, as newBoardText writes it", "text": "---\ntitle: \"Q3: the plan\"\n---\n", "title": "Q3: the plan" },
+    { "why": "single-quoted, with a doubled quote", "text": "---\ntitle: 'It''s here'\n---\n", "title": "It's here" },
+    { "why": "an escape in a double-quoted title", "text": "---\ntitle: \"caf\\u00e9\"\n---\n", "title": "café" },
+    { "why": "trimmed", "text": "---\ntitle: \"  spaced  \"\n---\n", "title": "spaced" },
+    { "why": "among other keys", "text": "---\ntheme: neutral\ntitle: Second\npages: [a, b]\n---\n", "title": "Second" },
+    { "why": "CRLF line ends", "text": "---\r\ntitle: Windows\r\n---\r\nbody", "title": "Windows" },
+    { "why": "a folded title over two lines", "text": "---\ntitle: >-\n  folded\n  title\n---\n", "title": "folded title" },
+    { "why": "yes is a word in YAML 1.2, not a boolean", "text": "---\ntitle: yes\n---\n", "title": "yes" },
+    { "why": "a date is text in YAML 1.2's core schema", "text": "---\ntitle: 2026-09-25\n---\n", "title": "2026-09-25" },
+    { "why": "sexagesimal is YAML 1.1 only", "text": "---\ntitle: 1:20\n---\n", "title": "1:20" },
+    { "why": "no frontmatter", "text": "# Heading\n", "title": null },
+    { "why": "no title key", "text": "---\ntheme: neutral\n---\n", "title": null },
+    { "why": "an empty title", "text": "---\ntitle:\n---\n", "title": null },
+    { "why": "blank after trimming", "text": "---\ntitle: \"   \"\n---\n", "title": null },
+    { "why": "a number is not a title", "text": "---\ntitle: 42\n---\n", "title": null },
+    { "why": "a boolean is not a title", "text": "---\ntitle: true\n---\n", "title": null },
+    { "why": "a list is not a title", "text": "---\ntitle: [a, b]\n---\n", "title": null },
+    { "why": "frontmatter that is not YAML", "text": "---\ntitle: [unclosed\n---\n", "title": null },
+    { "why": "a block that is not at the start", "text": "\n---\ntitle: Late\n---\n", "title": null }
+  ],
+  "//write": "How a title is written: `withTitle` in server/frontmatter.ts (test/titles.test.ts), which `/retitle` writes with, from the sidebar and from the title at the top of a note's page alike. The page reads every `out` back as its `title` and cleans what is typed with `cleanTitle` in src/note/format.ts (test/titles.test.ts), held to the `clean` cases.",
+  "write": [
+    { "why": "replaces the one line and keeps every other byte", "text": "---\n# a comment\ntheme: neutral\ntitle: Old\npages: [a, b]\n---\n\nbody\n", "title": "New", "kind": "board", "out": "---\n# a comment\ntheme: neutral\ntitle: New\npages: [a, b]\n---\n\nbody\n" },
+    { "why": "adds a line at the top of a block without one", "text": "---\ntheme: neutral\n---\nbody", "title": "Plan", "kind": "board", "out": "---\ntitle: Plan\ntheme: neutral\n---\nbody" },
+    { "why": "a board with no frontmatter grows one, and a blank line", "text": "```md {#a}\nx\n```\n", "title": "Plan", "kind": "board", "out": "---\ntitle: Plan\n---\n\n```md {#a}\nx\n```\n" },
+    { "why": "a note grows one with nothing between it and the body", "text": "# Idea\n", "title": "Idea", "kind": "note", "out": "---\ntitle: Idea\n---\n# Idea\n" },
+    { "why": "an empty note", "text": "", "title": "Untitled", "kind": "note", "out": "---\ntitle: Untitled\n---\n" },
+    { "why": "a note's frontmatter alone, as the page holds it", "text": "---\ntitle: Untitled\nstatus: todo\n---\n", "title": "Ship the pricing page", "kind": "note", "out": "---\ntitle: Ship the pricing page\nstatus: todo\n---\n" },
+    { "why": "a folded title goes whole", "text": "---\ntitle: >-\n  folded\n  title\ntheme: x\n---\n", "title": "One", "kind": "board", "out": "---\ntitle: One\ntheme: x\n---\n" },
+    { "why": "CRLF stays CRLF", "text": "---\r\ntitle: A\r\ntheme: x\r\n---\r\nbody", "title": "B", "kind": "board", "out": "---\r\ntitle: B\r\ntheme: x\r\n---\r\nbody" },
+    { "why": "the same title is no change", "text": "---\ntitle: Plan\n---\n", "title": "Plan", "kind": "board", "out": "---\ntitle: Plan\n---\n" },
+    { "why": "the same title written another way is no change either: its quoting is the author's", "text": "---\ntitle: 7 · Recursive queries\n---\n\n## Q {#a}\n", "title": "7 · Recursive queries", "kind": "quiz", "out": "---\ntitle: 7 · Recursive queries\n---\n\n## Q {#a}\n" },
+    { "why": "and a quoted one", "text": "---\ntitle: 'Q3: the plan'\n---\n", "title": "Q3: the plan", "kind": "board", "out": "---\ntitle: 'Q3: the plan'\n---\n" },
+    { "why": "punctuation YAML does not read stays bare", "text": "---\ntitle: A\n---\n", "title": "Q3 plan (draft)", "kind": "board", "out": "---\ntitle: Q3 plan (draft)\n---\n" },
+    { "why": "a colon is quoted", "text": "---\ntitle: A\n---\n", "title": "Q3: the plan", "kind": "board", "out": "---\ntitle: \"Q3: the plan\"\n---\n" },
+    { "why": "a word YAML reads as a boolean is quoted", "text": "---\ntitle: A\n---\n", "title": "yes", "kind": "board", "out": "---\ntitle: \"yes\"\n---\n" },
+    { "why": "a number is quoted", "text": "---\ntitle: A\n---\n", "title": "42", "kind": "board", "out": "---\ntitle: \"42\"\n---\n" },
+    { "why": "an accent is quoted, and kept", "text": "---\ntitle: A\n---\n", "title": "Été", "kind": "board", "out": "---\ntitle: \"Été\"\n---\n" },
+    { "why": "a quote inside is escaped", "text": "---\ntitle: A\n---\n", "title": "say \"hi\"", "kind": "board", "out": "---\ntitle: \"say \\\"hi\\\"\"\n---\n" },
+    { "why": "a hash is quoted", "text": "---\ntitle: A\n---\n", "title": "a # b", "kind": "board", "out": "---\ntitle: \"a # b\"\n---\n" }
+  ],
+  "clean": [
+    { "raw": "  two\nlines  ", "title": "two lines" },
+    { "raw": "   ", "title": null },
+    { "raw": "tab\tand  spaces", "title": "tab and spaces" },
+    { "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+  ]
+}

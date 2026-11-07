@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+#
+# `scripts/checks.sh` before every commit: both typechecks, the four `check:*` contracts and the
+# unit suite. About fourteen seconds on an eight-core machine, and a quarter of the CPU
+# it took, which is the whole argument for it being here rather than on `pre-push` — see the
+# header of that script.
+#
+# Installed by `npm run prepare`, which `npm install` and `npm ci` both run: `git config
+# core.hooksPath .githooks`. The path is **relative on purpose**. Git resolves a relative
+# `core.hooksPath` against the top of the working tree and runs the hook with the cwd already
+# there, so one setting in the shared config serves the main checkout and every worktree under
+# `.claude/worktrees/`, each finding its own copy. An absolute path would point every worktree at
+# the main checkout's hooks.
+#
+# **Four things it deliberately does not do.**
+#
+# It does not run Playwright. Those checks need a dev server, and two things make them wrong as
+# a commit gate even when it is up: every spec writes its fixture into `boards/` and reads it
+# back off disk, so the suite would dirty the working tree in the middle of a commit; and locally
+# the 45 visual baselines really are compared, where a first run against a cold dev server can
+# fail on a width measured before the webfont was serving. A gate
+# that is flaky by construction is one people stop reading.
+#
+# It does not stash. The usual pre-commit trick is to put the unstaged changes aside so the checks
+# see the index rather than the working tree, and in this repository that is unsafe: the stash
+# stack is shared with every worktree and with any other agent session open on it, so a hook that
+# pushes and pops could restore somebody else's work over yours. So **this checks the working tree,
+# not what is staged** — an imprecision stated rather than hidden. It matters less than it sounds:
+# `tsc` and `vitest` are whole-project questions and there is no staged-files version of either.
+#
+# It does not replace CI. `--no-verify` exists, machines are dirty, and nothing here runs the
+# slow tier or the packaging steps. What it buys is latency — nine seconds instead of finding out
+# from GitHub in minutes — and latency is the only thing it claims.
+#
+# It does not fail a checkout that has no dependencies. Cloning and committing before `npm ci` is
+# not an error, and a hook that refuses the commit for it is a hook somebody disables permanently.
+# Same argument `check-skill.mjs` makes about a missing skill and `gate.sh` about a missing venv.
+set -euo pipefail
+
+if [ -n "${ANYDAG_NO_HOOK:-}" ]; then
+  echo "pre-commit: skipped (ANYDAG_NO_HOOK)"
+  exit 0
+fi
+
+if [ ! -d node_modules ]; then
+  echo "pre-commit: skipping the checks — no node_modules; run: npm ci"
+  exit 0
+fi
+
+exec bash scripts/checks.sh

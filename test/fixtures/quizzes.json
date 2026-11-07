@@ -1,0 +1,270 @@
+{
+  "about": "Where a quiz's questions start and what they are called. parseQuiz (src/quiz/parse.ts) is held to this list by test/quiz-format.test.ts.",
+  "cases": [
+    {
+      "name": "two questions with ids",
+      "text": "## First? {#qa}\n\n- [x] a\n- [ ] b\n\n## Second? {#qb}\n\n- [ ] a\n- [x] b\n",
+      "questions": [
+        {
+          "id": "qa",
+          "line": 1
+        },
+        {
+          "id": "qb",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "name": "frontmatter counts toward the line",
+      "text": "---\ntitle: T\n---\n\nIntro.\n\n## One {#q1}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "q1",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "name": "a question with no id",
+      "text": "## No id here\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": null,
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "only ## delimits",
+      "text": "# Title\n\n## Real {#r}\n\n### Not a question\n#### Nor this\n\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "r",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "name": "a heading inside a backtick fence is code",
+      "text": "## Q {#a}\n\n```md\n## not a question\n```\n\n- [x] y\n- [ ] n\n\n## R {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "name": "a tilde fence closes only on tildes",
+      "text": "## Q {#a}\n\n~~~\n## inside\n```\n## still inside\n~~~\n\n- [x] y\n- [ ] n\n\n## After {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "name": "a longer closing fence closes",
+      "text": "## Q {#a}\n\n````\n## inside\n``````\n## After {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "name": "a shorter closing fence does not",
+      "text": "## Q {#a}\n\n````\n## inside\n```\n## still inside\n````\n## After {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "name": "a backtick info string with a backtick is not a fence",
+      "text": "## Q {#a}\n\n``` a`b\n## Real {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "name": "a closing sequence after the attributes",
+      "text": "## Title {#q1} ##\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "q1",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "attributes after a closing sequence",
+      "text": "## Title ## {#q2}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "q2",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "braces that are prompt text",
+      "text": "## Pick one of {a, b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": null,
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "an id beside multi",
+      "text": "## Which ones? {multi #q9}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "q9",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "three spaces in is a heading, four is code",
+      "text": "   ## Three {#t}\n- [x] y\n- [ ] n\n\n    ## Four {#f}\n",
+      "questions": [
+        {
+          "id": "t",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "## needs a space after it",
+      "text": "##Tight {#x}\n\n## Spaced {#s}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "s",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "name": "an empty heading is a question",
+      "text": "##\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": null,
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "CRLF line endings",
+      "text": "---\r\ntitle: T\r\n---\r\n## One {#c1}\r\n- [x] y\r\n- [ ] n\r\n\r\n## Two {#c2}\r\n- [x] y\r\n- [ ] n\r\n",
+      "questions": [
+        {
+          "id": "c1",
+          "line": 4
+        },
+        {
+          "id": "c2",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "name": "an unclosed fence swallows the rest",
+      "text": "## Q {#a}\n```\n## gone {#b}\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "a fence opened after the options is still a fence",
+      "text": "## Q {#a}\n- [x] one\n- [ ] two\n  ```\n  ## not a question\n  ```\n## Real {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "name": "no newline at the end",
+      "text": "## Last {#z}\n- [x] y\n- [ ] n",
+      "questions": [
+        {
+          "id": "z",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "frontmatter only",
+      "text": "---\ntitle: Empty\n---\n",
+      "questions": []
+    },
+    {
+      "name": "an option holding an indented code block",
+      "text": "## Which query? {#a}\n\n- [x] The right one\n  ```sql\n  ## a comment, not a question\n  select 1;\n  ```\n- [ ] Another\n\n## Next {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "name": "an option holding a code block indented four, blank line inside",
+      "text": "## Q {#a}\n- [x] Query\n    ```\n    ## not a heading either\n\n    select 2;\n    ```\n- [ ] Other\n## R {#b}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "a",
+          "line": 1
+        },
+        {
+          "id": "b",
+          "line": 9
+        }
+      ]
+    }
+  ]
+}

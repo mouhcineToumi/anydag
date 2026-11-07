@@ -1,0 +1,89 @@
+# The AnyDag desktop shell: an AppImage on Linux, a dmg and a zip
+# on macOS, an NSIS installer on Windows. Each is built on its own OS — `npm run desktop:dist` builds
+# the one it runs on, and `.github/workflows/desktop.yml` builds all three. None is signed yet.
+#
+# Two facts the files list encodes: the server and the CLI bundles are the two things an
+# Electron-as-Node child executes, so they (and their one native module, `@parcel/watcher`) are
+# unpacked from the asar onto the real filesystem; the page and the shell stay packed — the main
+# process reads its own asar, children read real files.
+#
+# `files` is the walk: everything listed is packed, everything else only side-skips. The walk above
+# (the configless run) reaches some repository source such as `boards/` that vanishes mid-walk.
+# Invoke with the config named — electron-builder looks at the repository root by default:
+#   electron-builder --config desktop/electron-builder.yml
+appId: io.github.mouhcinetoumi.anydag
+productName: AnyDag
+icon: desktop/icon.png
+directories:
+  output: release
+files:
+  - desktop/dist
+  - dist
+  - server/dist
+  - cli/dist
+  - package.json
+  # The one native module the server keeps out of its bundle, and — read off its runtime
+  # `require`s — exactly four dependencies that need no build: picomatch (no deps in 4.x),
+  # is-glob → is-extglob, and detect-libc. `node-addon-api` is build-time only.
+  - node_modules/@parcel/watcher*
+  - node_modules/picomatch
+  - node_modules/is-glob
+  - node_modules/is-extglob
+  - node_modules/detect-libc
+  - "!boards"
+  - "!e2e"
+  - "!src"
+  - "!test"
+  - "!docs"
+  - "!scripts"
+  - "!eval"
+  - "!icons"
+  - "!services"
+  - "!themes"
+  - "!skills"
+  - "!release"
+asarUnpack:
+  # What Electron-as-Node children execute or require. A real-file `require` cannot see inside the
+  # asar, so the watcher and everything it loads at runtime live beside it on the disk — with the
+  # bundles `server/dist` and `cli/dist` that own the only requires.
+  - node_modules/@parcel/watcher*
+  - node_modules/picomatch
+  - node_modules/is-glob
+  - node_modules/is-extglob
+  - node_modules/detect-libc
+  - server/dist/**
+  - cli/dist/**
+protocols:
+  - name: AnyDag
+    schemes:
+      - anydag
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Office
+  # The WM_CLASS a running window carries, so the shell associates it with this .desktop entry.
+  syncDesktopName: true
+  # The electron binary's name inside the squashfs — the shim in `desktop/main.ts` execs it by
+  # this exact name after `--appimage-mount` (or the extract fallback) finds it.
+  executableName: anydag
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.productivity
+  # Unsigned — there is no signing certificate yet: `null` stops electron-builder looking for an
+  # identity in the keychain and failing on a machine that has none.
+  identity: null
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+publish:
+  provider: github
+  owner: mouhcineToumi
+  repo: anydag

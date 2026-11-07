@@ -1,0 +1,941 @@
+{
+  "$comment": "The grammar's own answers (`server/handle.ts`), recorded, and held to the live handler by `test/dsl-service.test.ts` as a golden. A stamp's minted id is `qstub01`.",
+  "quiz": {
+    "body": {
+      "text": "---\ntitle: Drill\n---\n\nWhat it is about.\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n> Because.\n\n## Two? {#qb}\n\n- [ ] a\n- [x] b\n",
+      "stamp": false
+    },
+    "answer": {
+      "text": "---\ntitle: Drill\n---\n\nWhat it is about.\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n> Because.\n\n## Two? {#qb}\n\n- [ ] a\n- [x] b\n",
+      "changed": false,
+      "description": "What it is about.",
+      "shuffle": false,
+      "questions": [
+        {
+          "id": "qa",
+          "prompt": "One?",
+          "body": "",
+          "options": [
+            {
+              "text": "yes",
+              "correct": true,
+              "pinned": false
+            },
+            {
+              "text": "no",
+              "correct": false,
+              "pinned": false
+            }
+          ],
+          "why": "Because.",
+          "open": false,
+          "multi": false,
+          "line": 7
+        },
+        {
+          "id": "qb",
+          "prompt": "Two?",
+          "body": "",
+          "options": [
+            {
+              "text": "a",
+              "correct": false,
+              "pinned": false
+            },
+            {
+              "text": "b",
+              "correct": true,
+              "pinned": false
+            }
+          ],
+          "why": "",
+          "open": false,
+          "multi": false,
+          "line": 14
+        }
+      ],
+      "diagnostics": []
+    }
+  },
+  "quizStamp": {
+    "body": {
+      "text": "---\ntitle: Drill\n---\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n## Two?\n\n- [ ] a\n- [x] b\n",
+      "stamp": true
+    },
+    "answer": {
+      "text": "---\ntitle: Drill\n---\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n## Two? {#qstub01}\n\n- [ ] a\n- [x] b\n",
+      "changed": true,
+      "description": "",
+      "shuffle": false,
+      "questions": [
+        {
+          "id": "qa",
+          "prompt": "One?",
+          "body": "",
+          "options": [
+            {
+              "text": "yes",
+              "correct": true,
+              "pinned": false
+            },
+            {
+              "text": "no",
+              "correct": false,
+              "pinned": false
+            }
+          ],
+          "why": "",
+          "open": false,
+          "multi": false,
+          "line": 5
+        },
+        {
+          "id": "qstub01",
+          "prompt": "Two?",
+          "body": "",
+          "options": [
+            {
+              "text": "a",
+              "correct": false,
+              "pinned": false
+            },
+            {
+              "text": "b",
+              "correct": true,
+              "pinned": false
+            }
+          ],
+          "why": "",
+          "open": false,
+          "multi": false,
+          "line": 10
+        }
+      ],
+      "diagnostics": []
+    }
+  },
+  "quizDiagnose": {
+    "body": {
+      "text": "## One? {#qa}\n- [ ] y\n- [ ] n\n",
+      "kind": "quiz"
+    },
+    "answer": {
+      "questions": 1,
+      "diagnostics": [
+        {
+          "code": "EQ_NO_ANSWER",
+          "severity": "error",
+          "line": 2,
+          "col": 1,
+          "message": "No option is marked correct. Tick the right one with `- [x]`.",
+          "question": "qa"
+        }
+      ]
+    }
+  },
+  "corpus": {
+    "body": {
+      "texts": {
+        "plan": "---\ntitle: The plan\n---\n\n```md {#a}\nPayments settle overnight.\n```\n",
+        "notes/n.note.md": "---\ntitle: A note\n---\nNothing about money here.\n"
+      }
+    },
+    "answer": {
+      "docs": {
+        "plan": {
+          "title": "The plan",
+          "units": [
+            {
+              "what": "title",
+              "text": "The plan"
+            },
+            {
+              "part": "a",
+              "what": "md",
+              "text": "Payments settle overnight."
+            }
+          ]
+        },
+        "notes/n.note.md": {
+          "title": "A note",
+          "units": [
+            {
+              "what": "title",
+              "text": "A note"
+            },
+            {
+              "part": "L4",
+              "what": "paragraph",
+              "text": "Nothing about money here."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "search": {
+    "body": {
+      "docs": [
+        {
+          "id": "0123456789",
+          "name": "plan",
+          "kind": "board",
+          "title": "The plan",
+          "units": [
+            {
+              "what": "title",
+              "text": "The plan"
+            },
+            {
+              "part": "a",
+              "what": "md",
+              "text": "Payments settle overnight."
+            }
+          ]
+        },
+        {
+          "id": "abcdefghjk",
+          "name": "notes/n",
+          "kind": "note",
+          "title": "A note",
+          "units": [
+            {
+              "what": "title",
+              "text": "A note"
+            },
+            {
+              "part": "L4",
+              "what": "paragraph",
+              "text": "Nothing about money here."
+            }
+          ]
+        }
+      ],
+      "q": "pay sett"
+    },
+    "answer": {
+      "query": "pay sett",
+      "hits": [
+        {
+          "id": "0123456789",
+          "name": "plan",
+          "kind": "board",
+          "title": "The plan",
+          "part": "a",
+          "what": "md",
+          "score": 2.3188950191456117,
+          "terms": [
+            "payments",
+            "settle"
+          ],
+          "snippet": "**Payments** **settle** overnight.",
+          "runs": [
+            {
+              "text": "Payments",
+              "hit": true
+            },
+            {
+              "text": " ",
+              "hit": false
+            },
+            {
+              "text": "settle",
+              "hit": true
+            },
+            {
+              "text": " overnight.",
+              "hit": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "table": {
+    "body": {
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 800 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} |\n| --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) |\n",
+      "stamp": false,
+      "view": false
+    },
+    "answer": {
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 800 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} |\n| --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) |\n",
+      "changed": false,
+      "table": {
+        "title": "Pipeline",
+        "description": "The deals.",
+        "tabs": [
+          {
+            "id": "deals",
+            "name": "Deals",
+            "line": 7,
+            "sort": [
+              {
+                "column": "amount",
+                "desc": true
+              }
+            ],
+            "filter": [],
+            "columns": [
+              {
+                "id": "name",
+                "name": "Name",
+                "type": "text",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "amount",
+                "name": "Amount",
+                "type": "number",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "won",
+                "name": "Won",
+                "type": "checkbox",
+                "options": null,
+                "w": null
+              }
+            ],
+            "total": 3,
+            "rows": [
+              {
+                "id": "racme",
+                "line": 11,
+                "h": null,
+                "cells": {
+                  "name": "Acme",
+                  "amount": "1200",
+                  "won": "[x]"
+                },
+                "values": {
+                  "name": "Acme",
+                  "amount": 1200,
+                  "won": true
+                },
+                "unread": []
+              },
+              {
+                "id": "rglo",
+                "line": 12,
+                "h": null,
+                "cells": {
+                  "name": "Globex",
+                  "amount": "800",
+                  "won": "[ ]"
+                },
+                "values": {
+                  "name": "Globex",
+                  "amount": 800,
+                  "won": false
+                },
+                "unread": []
+              },
+              {
+                "id": "rini",
+                "line": 13,
+                "h": null,
+                "cells": {
+                  "name": "Initech",
+                  "amount": "lots",
+                  "won": ""
+                },
+                "values": {
+                  "name": "Initech",
+                  "amount": null,
+                  "won": false
+                },
+                "unread": [
+                  "amount"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "people",
+            "name": "People",
+            "line": 15,
+            "sort": [],
+            "filter": [],
+            "columns": [
+              {
+                "id": "name",
+                "name": "Name",
+                "type": "text",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "site",
+                "name": "Site",
+                "type": "link",
+                "options": null,
+                "w": null
+              }
+            ],
+            "total": 1,
+            "rows": [
+              {
+                "id": "rada",
+                "line": 19,
+                "h": null,
+                "cells": {
+                  "name": "Ada",
+                  "site": "[Plan](dag:0123456789)"
+                },
+                "values": {
+                  "name": "Ada",
+                  "site": {
+                    "text": "Plan",
+                    "url": "dag:0123456789",
+                    "ref": {
+                      "id": "0123456789"
+                    }
+                  }
+                },
+                "unread": []
+              }
+            ]
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "WT_CELL",
+            "severity": "warning",
+            "line": 13,
+            "col": 20,
+            "message": "`lots` is not a number, such as `1200` or `-3.5`, which the column `Amount` holds.",
+            "tab": "deals"
+          }
+        ]
+      }
+    }
+  },
+  "tableView": {
+    "body": {
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 800 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} |\n| --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) |\n",
+      "stamp": false,
+      "view": true,
+      "tab": "deals"
+    },
+    "answer": {
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 800 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} |\n| --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) |\n",
+      "changed": false,
+      "table": {
+        "title": "Pipeline",
+        "description": "The deals.",
+        "tabs": [
+          {
+            "id": "deals",
+            "name": "Deals",
+            "line": 7,
+            "sort": [
+              {
+                "column": "amount",
+                "desc": true
+              }
+            ],
+            "filter": [],
+            "columns": [
+              {
+                "id": "name",
+                "name": "Name",
+                "type": "text",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "amount",
+                "name": "Amount",
+                "type": "number",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "won",
+                "name": "Won",
+                "type": "checkbox",
+                "options": null,
+                "w": null
+              }
+            ],
+            "total": 3,
+            "rows": [
+              {
+                "id": "racme",
+                "line": 11,
+                "h": null,
+                "cells": {
+                  "name": "Acme",
+                  "amount": "1200",
+                  "won": "[x]"
+                },
+                "values": {
+                  "name": "Acme",
+                  "amount": 1200,
+                  "won": true
+                },
+                "unread": []
+              },
+              {
+                "id": "rglo",
+                "line": 12,
+                "h": null,
+                "cells": {
+                  "name": "Globex",
+                  "amount": "800",
+                  "won": "[ ]"
+                },
+                "values": {
+                  "name": "Globex",
+                  "amount": 800,
+                  "won": false
+                },
+                "unread": []
+              },
+              {
+                "id": "rini",
+                "line": 13,
+                "h": null,
+                "cells": {
+                  "name": "Initech",
+                  "amount": "lots",
+                  "won": ""
+                },
+                "values": {
+                  "name": "Initech",
+                  "amount": null,
+                  "won": false
+                },
+                "unread": [
+                  "amount"
+                ]
+              }
+            ]
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "WT_CELL",
+            "severity": "warning",
+            "line": 13,
+            "col": 20,
+            "message": "`lots` is not a number, such as `1200` or `-3.5`, which the column `Amount` holds.",
+            "tab": "deals"
+          }
+        ]
+      }
+    }
+  },
+  "tableStamp": {
+    "body": {
+      "text": "---\ntitle: Pipeline\n---\n\n## Deals\n\n| Name | Amount {number} |\n| --- | ---: |\n| Acme {#racme} | 1200 |\n",
+      "stamp": true,
+      "view": false
+    },
+    "answer": {
+      "text": "---\ntitle: Pipeline\n---\n\n## Deals {#deals}\n\n| Name {#name} | Amount {#amount number} |\n| --- | ---: |\n| Acme {#racme} | 1200 |\n",
+      "changed": true,
+      "table": {
+        "title": "Pipeline",
+        "description": "",
+        "tabs": [
+          {
+            "id": "deals",
+            "name": "Deals",
+            "line": 5,
+            "sort": [],
+            "filter": [],
+            "columns": [
+              {
+                "id": "name",
+                "name": "Name",
+                "type": "text",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "amount",
+                "name": "Amount",
+                "type": "number",
+                "options": null,
+                "w": null
+              }
+            ],
+            "total": 1,
+            "rows": [
+              {
+                "id": "racme",
+                "line": 9,
+                "h": null,
+                "cells": {
+                  "name": "Acme",
+                  "amount": "1200"
+                },
+                "values": {
+                  "name": "Acme",
+                  "amount": 1200
+                },
+                "unread": []
+              }
+            ]
+          }
+        ],
+        "diagnostics": []
+      }
+    }
+  },
+  "tableOps": {
+    "body": {
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 800 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} |\n| --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) |\n",
+      "stamp": false,
+      "view": false,
+      "ops": [
+        {
+          "op": "cell",
+          "tab": "deals",
+          "row": "rglo",
+          "column": "amount",
+          "value": "950"
+        },
+        {
+          "op": "addRow",
+          "tab": "people",
+          "id": "rbob",
+          "values": {
+            "name": "Bob"
+          }
+        },
+        {
+          "op": "addColumn",
+          "tab": "people",
+          "name": "Email",
+          "type": "link"
+        }
+      ]
+    },
+    "answer": {
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 950 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} | Email {#email link} |\n| --- | --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) | |\n| Bob {#rbob} | | |\n",
+      "changed": true,
+      "minted": {
+        "tabs": [],
+        "columns": [
+          "email"
+        ],
+        "rows": [
+          "rbob"
+        ]
+      },
+      "table": {
+        "title": "Pipeline",
+        "description": "The deals.",
+        "tabs": [
+          {
+            "id": "deals",
+            "name": "Deals",
+            "line": 7,
+            "sort": [
+              {
+                "column": "amount",
+                "desc": true
+              }
+            ],
+            "filter": [],
+            "columns": [
+              {
+                "id": "name",
+                "name": "Name",
+                "type": "text",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "amount",
+                "name": "Amount",
+                "type": "number",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "won",
+                "name": "Won",
+                "type": "checkbox",
+                "options": null,
+                "w": null
+              }
+            ],
+            "total": 3,
+            "rows": [
+              {
+                "id": "racme",
+                "line": 11,
+                "h": null,
+                "cells": {
+                  "name": "Acme",
+                  "amount": "1200",
+                  "won": "[x]"
+                },
+                "values": {
+                  "name": "Acme",
+                  "amount": 1200,
+                  "won": true
+                },
+                "unread": []
+              },
+              {
+                "id": "rglo",
+                "line": 12,
+                "h": null,
+                "cells": {
+                  "name": "Globex",
+                  "amount": "950",
+                  "won": "[ ]"
+                },
+                "values": {
+                  "name": "Globex",
+                  "amount": 950,
+                  "won": false
+                },
+                "unread": []
+              },
+              {
+                "id": "rini",
+                "line": 13,
+                "h": null,
+                "cells": {
+                  "name": "Initech",
+                  "amount": "lots",
+                  "won": ""
+                },
+                "values": {
+                  "name": "Initech",
+                  "amount": null,
+                  "won": false
+                },
+                "unread": [
+                  "amount"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "people",
+            "name": "People",
+            "line": 15,
+            "sort": [],
+            "filter": [],
+            "columns": [
+              {
+                "id": "name",
+                "name": "Name",
+                "type": "text",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "site",
+                "name": "Site",
+                "type": "link",
+                "options": null,
+                "w": null
+              },
+              {
+                "id": "email",
+                "name": "Email",
+                "type": "link",
+                "options": null,
+                "w": null
+              }
+            ],
+            "total": 2,
+            "rows": [
+              {
+                "id": "rada",
+                "line": 19,
+                "h": null,
+                "cells": {
+                  "name": "Ada",
+                  "site": "[Plan](dag:0123456789)",
+                  "email": ""
+                },
+                "values": {
+                  "name": "Ada",
+                  "site": {
+                    "text": "Plan",
+                    "url": "dag:0123456789",
+                    "ref": {
+                      "id": "0123456789"
+                    }
+                  },
+                  "email": null
+                },
+                "unread": []
+              },
+              {
+                "id": "rbob",
+                "line": 20,
+                "h": null,
+                "cells": {
+                  "name": "Bob",
+                  "site": "",
+                  "email": ""
+                },
+                "values": {
+                  "name": "Bob",
+                  "site": null,
+                  "email": null
+                },
+                "unread": []
+              }
+            ]
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "WT_CELL",
+            "severity": "warning",
+            "line": 13,
+            "col": 20,
+            "message": "`lots` is not a number, such as `1200` or `-3.5`, which the column `Amount` holds.",
+            "tab": "deals"
+          }
+        ]
+      }
+    }
+  },
+  "tableDiagnose": {
+    "body": {
+      "name": "pipeline",
+      "text": "---\ntitle: Pipeline\n---\n\nThe deals.\n\n## Deals {#deals sort=\"amount:desc\"}\n\n| Name {#name} | Amount {#amount number} | Won {#won checkbox} |\n| --- | ---: | --- |\n| Acme {#racme} | 1200 | [x] |\n| Globex {#rglo} | 800 | [ ] |\n| Initech {#rini} | lots | |\n\n## People {#people}\n\n| Name {#name} | Site {#site link} |\n| --- | --- |\n| Ada {#rada} | [Plan](dag:0123456789) |\n",
+      "kind": "table"
+    },
+    "answer": {
+      "tabs": 2,
+      "rows": 4,
+      "diagnostics": [
+        {
+          "code": "WT_CELL",
+          "severity": "warning",
+          "line": 13,
+          "col": 20,
+          "message": "`lots` is not a number, such as `1200` or `-3.5`, which the column `Amount` holds.",
+          "tab": "deals"
+        }
+      ]
+    }
+  },
+  "patchInsert": {
+    "body": {
+      "text": "---\ntitle: t\n---\n\n```md {#one}\nhi\n```\n",
+      "ops": [
+        {
+          "insert": "```md {#kintro x=0 y=0 page=k3s}\n## With k3s\nText.\n```",
+          "after": "one"
+        }
+      ]
+    },
+    "answer": {
+      "text": "---\ntitle: t\n---\n\n```md {#one}\nhi\n```\n\n```md {#kintro x=0 y=0 page=k3s}\n## With k3s\nText.\n```\n",
+      "changed": true
+    }
+  },
+  "patchRefused": {
+    "body": {
+      "text": "---\ntitle: t\n---\n\n```md {#one}\nhi\n```\n",
+      "ops": [
+        {
+          "insert": "```mermaid\ngraph LR\n```",
+          "after": "one"
+        }
+      ]
+    },
+    "status": 400,
+    "answer": {
+      "error": "op 0: unknown item type `mermaid`"
+    }
+  },
+  "quizOps": {
+    "body": {
+      "text": "---\ntitle: Drill\n---\n\nWhat it is about.\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n> Because.\n\n## Two? {#qb}\n\n- [ ] a\n- [x] b\n",
+      "stamp": false,
+      "ops": [
+        {
+          "op": "set",
+          "markdown": "## Two, again? {#qb}\n\n- [x] a\n- [ ] b\n",
+          "before": "qa"
+        }
+      ]
+    },
+    "answer": {
+      "text": "---\ntitle: Drill\n---\n\nWhat it is about.\n\n## Two, again? {#qb}\n\n- [x] a\n- [ ] b\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n> Because.\n",
+      "changed": true,
+      "ids": [
+        "qb"
+      ],
+      "description": "What it is about.",
+      "shuffle": false,
+      "questions": [
+        {
+          "id": "qb",
+          "prompt": "Two, again?",
+          "body": "",
+          "options": [
+            {
+              "text": "a",
+              "correct": true,
+              "pinned": false
+            },
+            {
+              "text": "b",
+              "correct": false,
+              "pinned": false
+            }
+          ],
+          "why": "",
+          "open": false,
+          "multi": false,
+          "line": 7
+        },
+        {
+          "id": "qa",
+          "prompt": "One?",
+          "body": "",
+          "options": [
+            {
+              "text": "yes",
+              "correct": true,
+              "pinned": false
+            },
+            {
+              "text": "no",
+              "correct": false,
+              "pinned": false
+            }
+          ],
+          "why": "Because.",
+          "open": false,
+          "multi": false,
+          "line": 12
+        }
+      ],
+      "diagnostics": []
+    }
+  },
+  "quizOpsRefused": {
+    "body": {
+      "text": "---\ntitle: Drill\n---\n\nWhat it is about.\n\n## One? {#qa}\n\n- [x] yes\n- [ ] no\n\n> Because.\n\n## Two? {#qb}\n\n- [ ] a\n- [x] b\n",
+      "stamp": false,
+      "ops": [
+        {
+          "op": "remove",
+          "id": "nope"
+        }
+      ]
+    },
+    "answer": {
+      "error": "no question `nope` in this quiz"
+    },
+    "status": 404
+  }
+}

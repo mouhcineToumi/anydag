@@ -1,0 +1,1045 @@
+{
+  "$comment": "The feature surface, once. Every route in server/routes, every `anydag` command and every MCP tool is named here, and test/parity.test.ts fails on one that is not — or on a name here that no longer exists. An interface is a list of names (done), {\"via\": [...], \"why\"} (covered by something more general), or {\"refused\"} (not offered, and why). docs/PARITY.md is generated from this: `npm run parity`.",
+  "features": [
+    {
+      "id": "account.me",
+      "area": "Account",
+      "what": "The time zone times are read and written in (and the app's one local \"account\")",
+      "rest": ["GET /api/auth/me"],
+      "cli": ["event ls", "event new", "event set"],
+      "mcp": ["whoami"]
+    },
+    {
+      "id": "server.health",
+      "area": "Account",
+      "what": "What is answering: its version, the vault it serves, and whether it is the app or this process",
+      "rest": ["GET /api/health"],
+      "cli": ["whoami"],
+      "mcp": ["whoami"]
+    },
+    {
+      "id": "account.settings",
+      "area": "Account",
+      "what": "The app's preferences — how the window is laid out",
+      "rest": ["GET /api/settings", "PUT /api/settings"],
+      "cli": ["settings"],
+      "mcp": ["settings"]
+    },
+    {
+      "id": "vault.list",
+      "area": "Vaults",
+      "what": "Which vaults there are — the recent list, and which are being served",
+      "rest": ["GET /api/vaults"],
+      "cli": ["vault ls"],
+      "mcp": ["vault_list"]
+    },
+    {
+      "id": "vault.open",
+      "area": "Vaults",
+      "what": "Serve a folder as a vault, making it the default",
+      "rest": ["POST /api/vaults/open"],
+      "cli": ["vault open"],
+      "mcp": ["vault_open"]
+    },
+    {
+      "id": "vault.create",
+      "area": "Vaults",
+      "what": "Make a folder and open it as a vault",
+      "rest": ["POST /api/vaults/create"],
+      "cli": ["vault create"],
+      "mcp": ["vault_create"]
+    },
+    {
+      "id": "vault.close",
+      "area": "Vaults",
+      "what": "Stop serving a vault, or forget it — never its folder",
+      "rest": ["POST /api/vaults/close"],
+      "cli": ["vault close"],
+      "mcp": ["vault_close"]
+    },
+    {
+      "id": "vault.mcp",
+      "area": "Vaults",
+      "what": "Run the MCP server over stdio for a vault — what Claude Code and Claude Desktop connect to",
+      "rest": {"refused": "A process that speaks MCP on its own stdin and stdout; it calls the routes, it is not one."},
+      "cli": ["mcp"],
+      "mcp": {"refused": "It is the MCP server itself."}
+    },
+    {
+      "id": "vault.serve",
+      "area": "Vaults",
+      "what": "Serve a vault and the page to a browser on this machine, behind a token printed once",
+      "rest": {"refused": "It is the server the routes are answered by."},
+      "cli": ["serve"],
+      "mcp": {"refused": "An agent is already connected to a server; starting another is the person's."}
+    },
+    {
+      "id": "vault.settings",
+      "area": "Vaults",
+      "what": "A vault's preferences — the settings card, the theme, the favourites",
+      "rest": ["GET /api/vault/settings", "PUT /api/vault/settings"],
+      "cli": ["settings"],
+      "mcp": ["settings"]
+    },
+    {
+      "id": "vault.transfer",
+      "area": "Vaults",
+      "what": "Move a file, or a folder whole, to another open vault",
+      "rest": ["POST /__board/transfer"],
+      "cli": ["vault transfer"],
+      "mcp": ["board_transfer"]
+    },
+    {
+      "id": "files.list",
+      "area": "Files",
+      "what": "Every board, note, quiz, table, attachment and folder, with titles, ids, tasks and projects",
+      "rest": ["GET /__board/list"],
+      "cli": ["ls"],
+      "mcp": ["board_list", "note_list", "quiz_list", "table_list"]
+    },
+    {
+      "id": "files.watch",
+      "area": "Files",
+      "what": "Hear each change as it happens",
+      "rest": ["GET /__board/events"],
+      "cli": ["watch"],
+      "mcp": {"refused": "A change feed is a stream a page holds open, and a stateless tool call answers once. The `base` every read returns is how an agent knows a document moved."}
+    },
+    {
+      "id": "files.resolve",
+      "area": "Files",
+      "what": "What a permanent id names",
+      "rest": ["GET /__board/resolve"],
+      "cli": ["resolve", "open"],
+      "mcp": ["resolve"]
+    },
+    {
+      "id": "files.refs",
+      "area": "Files",
+      "what": "What refers to what: references and backlinks",
+      "rest": ["GET /__board/index", "GET /__board/refs"],
+      "cli": ["index", "board refs", "note refs", "quiz refs", "table refs", "file refs"],
+      "mcp": ["refs"]
+    },
+    {
+      "id": "files.search",
+      "area": "Files",
+      "what": "Every place some words appear, ranked",
+      "rest": ["GET /__board/search", "GET /__board/corpus"],
+      "cli": ["search", "corpus"],
+      "mcp": ["search"]
+    },
+    {
+      "id": "board.read",
+      "area": "Boards",
+      "what": "A board's text and its base",
+      "rest": ["GET /__board/get"],
+      "cli": ["board cat"],
+      "mcp": ["board_read"]
+    },
+    {
+      "id": "board.create",
+      "area": "Boards",
+      "what": "Make a board",
+      "rest": ["POST /__board/create"],
+      "cli": ["board new"],
+      "mcp": ["board_create"]
+    },
+    {
+      "id": "board.write",
+      "area": "Boards",
+      "what": "Replace a board's whole text",
+      "rest": ["POST /__board/put"],
+      "cli": ["board write", "board edit"],
+      "mcp": ["board_write"]
+    },
+    {
+      "id": "board.patch",
+      "area": "Boards",
+      "what": "Change one item and leave the rest of the file alone",
+      "rest": ["POST /__board/patch"],
+      "cli": ["item set", "item body", "item rm", "item add"],
+      "mcp": ["board_patch"]
+    },
+    {
+      "id": "board.rename",
+      "area": "Boards",
+      "what": "Rename or move a board",
+      "rest": ["POST /__board/rename"],
+      "cli": ["board mv"],
+      "mcp": ["board_rename"]
+    },
+    {
+      "id": "board.duplicate",
+      "area": "Boards",
+      "what": "Copy a board",
+      "rest": ["POST /__board/duplicate"],
+      "cli": ["board cp"],
+      "mcp": ["board_duplicate"]
+    },
+    {
+      "id": "board.delete",
+      "area": "Boards",
+      "what": "Move a board to the trash",
+      "rest": ["POST /__board/delete"],
+      "cli": ["board rm"],
+      "mcp": ["board_delete"]
+    },
+    {
+      "id": "board.title",
+      "area": "Boards",
+      "what": "Call a board something, and let its name follow",
+      "rest": ["POST /__board/retitle"],
+      "cli": ["board title"],
+      "mcp": ["board_title"]
+    },
+    {
+      "id": "board.diagnose",
+      "area": "Boards",
+      "what": "What is wrong with a board's text — or a draft's — as codes",
+      "rest": ["GET /__board/diagnostics", "POST /__board/diagnostics"],
+      "cli": ["board diagnose"],
+      "mcp": ["board_diagnose"]
+    },
+    {
+      "id": "board.fences",
+      "area": "Boards",
+      "what": "What items are on a board, without its whole text",
+      "rest": ["GET /__board/fences"],
+      "cli": ["item ls"],
+      "mcp": ["board_fences"]
+    },
+    {
+      "id": "board.import",
+      "area": "Boards",
+      "what": "Bring a `.board.md` file in as a new board",
+      "rest": ["POST /__board/create", "POST /__board/asset"],
+      "cli": ["board import"],
+      "mcp": {"via": ["board_create", "image_add"], "why": "Importing is reading a file off the disk the CLI runs on; an agent hands the text to `board_create` and each picture to `image_add`."}
+    },
+    {
+      "id": "note.read",
+      "area": "Notes",
+      "what": "A note's text and its base",
+      "rest": ["GET /__board/get"],
+      "cli": ["note cat"],
+      "mcp": ["note_read"]
+    },
+    {
+      "id": "note.create",
+      "area": "Notes",
+      "what": "Make a note",
+      "rest": ["POST /__board/create"],
+      "cli": ["note new"],
+      "mcp": ["note_create"]
+    },
+    {
+      "id": "note.write",
+      "area": "Notes",
+      "what": "Replace a note's whole text",
+      "rest": ["POST /__board/put"],
+      "cli": ["note write", "note edit"],
+      "mcp": ["note_write"]
+    },
+    {
+      "id": "note.rename",
+      "area": "Notes",
+      "what": "Rename or move a note",
+      "rest": ["POST /__board/rename"],
+      "cli": ["note mv"],
+      "mcp": ["note_rename"]
+    },
+    {
+      "id": "note.duplicate",
+      "area": "Notes",
+      "what": "Copy a note",
+      "rest": ["POST /__board/duplicate"],
+      "cli": ["note cp"],
+      "mcp": ["note_duplicate"]
+    },
+    {
+      "id": "note.delete",
+      "area": "Notes",
+      "what": "Move a note to the trash",
+      "rest": ["POST /__board/delete"],
+      "cli": ["note rm"],
+      "mcp": ["note_delete"]
+    },
+    {
+      "id": "note.title",
+      "area": "Notes",
+      "what": "Call a note something, and let its name follow",
+      "rest": ["POST /__board/retitle"],
+      "cli": ["note title"],
+      "mcp": ["note_title"]
+    },
+    {
+      "id": "task.list",
+      "area": "Tasks",
+      "what": "Every task, with its status, due date and project",
+      "rest": ["GET /__board/list"],
+      "cli": ["task ls"],
+      "mcp": ["task_list"]
+    },
+    {
+      "id": "task.create",
+      "area": "Tasks",
+      "what": "Make a task",
+      "rest": ["POST /__board/create"],
+      "cli": ["task new"],
+      "mcp": ["task_create"]
+    },
+    {
+      "id": "task.set",
+      "area": "Tasks",
+      "what": "Change a task's status, due date or start date, or make a note a task and back",
+      "rest": ["POST /__board/task"],
+      "cli": ["task set", "task done"],
+      "mcp": ["task_set"]
+    },
+    {
+      "id": "event.list",
+      "area": "Events",
+      "what": "Every event, with when it starts and ends, soonest first",
+      "rest": ["GET /__board/list"],
+      "cli": ["event ls"],
+      "mcp": ["event_list"]
+    },
+    {
+      "id": "event.create",
+      "area": "Events",
+      "what": "Make an event: a note with a start and an end",
+      "rest": ["POST /__board/create"],
+      "cli": ["event new"],
+      "mcp": ["event_create"]
+    },
+    {
+      "id": "event.set",
+      "area": "Events",
+      "what": "Move an event, or make a note an event and back",
+      "rest": ["POST /__board/event"],
+      "cli": ["event set"],
+      "mcp": ["event_set"]
+    },
+    {
+      "id": "project.list",
+      "area": "Projects",
+      "what": "Every project, with its status, colour and task counts",
+      "rest": ["GET /__board/list"],
+      "cli": ["project ls"],
+      "mcp": ["project_list"]
+    },
+    {
+      "id": "project.create",
+      "area": "Projects",
+      "what": "Make a folder a project",
+      "rest": ["GET /__board/list", "POST /__board/create"],
+      "cli": ["project new"],
+      "mcp": ["project_create"]
+    },
+    {
+      "id": "project.set",
+      "area": "Projects",
+      "what": "Change a project's status or colour, or make it a plain folder",
+      "rest": ["POST /__board/project"],
+      "cli": ["project set"],
+      "mcp": ["project_set"]
+    },
+    {
+      "id": "quiz.list",
+      "area": "Quizzes",
+      "what": "Every quiz, with how many questions each asks",
+      "rest": ["GET /__board/list"],
+      "cli": ["quiz ls"],
+      "mcp": ["quiz_list"]
+    },
+    {
+      "id": "quiz.read",
+      "area": "Quizzes",
+      "what": "A quiz's text and its base",
+      "rest": ["GET /__board/get"],
+      "cli": ["quiz cat"],
+      "mcp": ["quiz_read"]
+    },
+    {
+      "id": "quiz.create",
+      "area": "Quizzes",
+      "what": "Make a quiz",
+      "rest": ["POST /__board/create"],
+      "cli": ["quiz new"],
+      "mcp": ["quiz_create"]
+    },
+    {
+      "id": "quiz.write",
+      "area": "Quizzes",
+      "what": "Replace a quiz's whole text",
+      "rest": ["POST /__board/put"],
+      "cli": ["quiz write", "quiz edit"],
+      "mcp": ["quiz_write"]
+    },
+    {
+      "id": "quiz.question",
+      "area": "Quizzes",
+      "what": "Write, remove or move one question by its id, and no other byte of the quiz",
+      "rest": ["POST /__board/quiz"],
+      "cli": ["quiz question set", "quiz question rm", "quiz question mv"],
+      "mcp": ["quiz_question_set", "quiz_question_remove", "quiz_question_move"]
+    },
+    {
+      "id": "quiz.rename",
+      "area": "Quizzes",
+      "what": "Rename or move a quiz",
+      "rest": ["POST /__board/rename"],
+      "cli": ["quiz mv"],
+      "mcp": ["quiz_rename"]
+    },
+    {
+      "id": "quiz.duplicate",
+      "area": "Quizzes",
+      "what": "Copy a quiz",
+      "rest": ["POST /__board/duplicate"],
+      "cli": ["quiz cp"],
+      "mcp": ["quiz_duplicate"]
+    },
+    {
+      "id": "quiz.delete",
+      "area": "Quizzes",
+      "what": "Move a quiz to the trash",
+      "rest": ["POST /__board/delete"],
+      "cli": ["quiz rm"],
+      "mcp": ["quiz_delete"]
+    },
+    {
+      "id": "quiz.title",
+      "area": "Quizzes",
+      "what": "Call a quiz something, and let its name follow",
+      "rest": ["POST /__board/retitle"],
+      "cli": ["quiz title"],
+      "mcp": ["quiz_title"]
+    },
+    {
+      "id": "quiz.check",
+      "area": "Quizzes",
+      "what": "What is wrong with a quiz — or a draft — as codes",
+      "rest": ["GET /__board/diagnostics", "POST /__board/diagnostics"],
+      "cli": ["quiz check"],
+      "mcp": ["quiz_check"]
+    },
+    {
+      "id": "quiz.run",
+      "area": "Quizzes",
+      "what": "Run a quiz a question at a time, and record the answers",
+      "rest": ["GET /__board/get", "POST /api/practice"],
+      "cli": ["quiz practice"],
+      "mcp": ["quiz_questions", "quiz_answer"]
+    },
+    {
+      "id": "quiz.mistakes",
+      "area": "Quizzes",
+      "what": "Every question still in Mistakes",
+      "rest": ["GET /api/practice"],
+      "cli": ["quiz mistakes"],
+      "mcp": ["quiz_mistakes"]
+    },
+    {
+      "id": "quiz.threshold",
+      "area": "Quizzes",
+      "what": "How many right in a row take a question out of Mistakes",
+      "rest": ["GET /api/practice", "PUT /api/practice"],
+      "cli": ["quiz threshold"],
+      "mcp": ["quiz_threshold"]
+    },
+    {
+      "id": "table.list",
+      "area": "Tables",
+      "what": "Every table, with its title and id",
+      "rest": ["GET /__board/list"],
+      "cli": ["table ls"],
+      "mcp": ["table_list"]
+    },
+    {
+      "id": "table.read",
+      "area": "Tables",
+      "what": "A table's text and its base",
+      "rest": ["GET /__board/get"],
+      "cli": ["table cat"],
+      "mcp": ["table_read"]
+    },
+    {
+      "id": "table.create",
+      "area": "Tables",
+      "what": "Make a table",
+      "rest": ["POST /__board/create"],
+      "cli": ["table new"],
+      "mcp": ["table_create"]
+    },
+    {
+      "id": "table.write",
+      "area": "Tables",
+      "what": "Replace a table's whole text",
+      "rest": ["POST /__board/put"],
+      "cli": ["table write", "table edit"],
+      "mcp": ["table_write"]
+    },
+    {
+      "id": "table.rename",
+      "area": "Tables",
+      "what": "Rename or move a table",
+      "rest": ["POST /__board/rename"],
+      "cli": ["table mv"],
+      "mcp": ["table_rename"]
+    },
+    {
+      "id": "table.duplicate",
+      "area": "Tables",
+      "what": "Copy a table",
+      "rest": ["POST /__board/duplicate"],
+      "cli": ["table cp"],
+      "mcp": ["table_duplicate"]
+    },
+    {
+      "id": "table.delete",
+      "area": "Tables",
+      "what": "Move a table to the trash",
+      "rest": ["POST /__board/delete"],
+      "cli": ["table rm"],
+      "mcp": ["table_delete"]
+    },
+    {
+      "id": "table.title",
+      "area": "Tables",
+      "what": "Call a table something, and let its name follow",
+      "rest": ["POST /__board/retitle"],
+      "cli": ["table title"],
+      "mcp": ["table_title"]
+    },
+    {
+      "id": "table.check",
+      "area": "Tables",
+      "what": "What is wrong with a table — or a draft — as codes",
+      "rest": ["GET /__board/diagnostics", "POST /__board/diagnostics"],
+      "cli": ["table check"],
+      "mcp": ["table_check"]
+    },
+    {
+      "id": "table.get",
+      "area": "Tables",
+      "what": "A table's tabs, columns and rows as data, each addressed by id",
+      "rest": ["GET /__board/table"],
+      "cli": ["table show"],
+      "mcp": ["table_get"]
+    },
+    {
+      "id": "table.edit",
+      "area": "Tables",
+      "what": "Set cells; add, remove, move and size rows and columns; add, rename, sort, filter, remove and move tabs",
+      "rest": ["POST /__board/table"],
+      "cli": ["table set", "table row add", "table row rm", "table row mv", "table row height", "table col add", "table col set", "table col rm", "table col mv", "table tab add", "table tab set", "table tab rm", "table tab mv"],
+      "mcp": ["table_edit"]
+    },
+    {
+      "id": "table.import",
+      "area": "Tables",
+      "what": "A CSV as a new table, or as a new tab of one",
+      "rest": ["POST /__board/create", "POST /__board/table"],
+      "cli": ["table import"],
+      "mcp": {"via": ["table_create", "table_edit"], "why": "Importing is reading a file off the disk the CLI runs on; an agent hands the CSV's text to `table_edit`'s `importCsv` op, on a table `table_create` made or one that exists."}
+    },
+    {
+      "id": "table.export",
+      "area": "Tables",
+      "what": "A tab as CSV",
+      "rest": ["GET /__board/get"],
+      "cli": ["table export"],
+      "mcp": {"via": ["table_get"], "why": "CSV is a file for a spreadsheet on somebody's disk; `table_get` answers every row and cell as data, which is what an agent reads and writes out in whatever shape it needs."}
+    },
+    {
+      "id": "folder.create",
+      "area": "Folders",
+      "what": "Make a folder",
+      "rest": ["POST /__board/mkdir"],
+      "cli": ["folder new"],
+      "mcp": ["board_mkdir"]
+    },
+    {
+      "id": "folder.delete",
+      "area": "Folders",
+      "what": "Move a folder to the trash, emptied or with everything in it",
+      "rest": ["POST /__board/rmdir"],
+      "cli": ["folder rm"],
+      "mcp": ["board_rmdir"]
+    },
+    {
+      "id": "folder.move",
+      "area": "Folders",
+      "what": "Rename or move a folder with everything in it",
+      "rest": ["POST /__board/mvdir"],
+      "cli": ["folder mv"],
+      "mcp": ["board_mvdir"]
+    },
+    {
+      "id": "trash.list",
+      "area": "Trash",
+      "what": "What is in the trash, and how many days a thing stays before it is gone for good",
+      "rest": ["GET /__board/trash"],
+      "cli": ["trash ls"],
+      "mcp": ["trash_list"]
+    },
+    {
+      "id": "trash.restore",
+      "area": "Trash",
+      "what": "Put something back from the trash, with its id",
+      "rest": ["POST /__board/trash/restore"],
+      "cli": ["trash restore"],
+      "mcp": ["trash_restore"]
+    },
+    {
+      "id": "trash.delete",
+      "area": "Trash",
+      "what": "Delete one thing in the trash for good",
+      "rest": ["POST /__board/trash/delete"],
+      "cli": ["trash rm"],
+      "mcp": ["trash_delete"]
+    },
+    {
+      "id": "trash.empty",
+      "area": "Trash",
+      "what": "Empty the trash",
+      "rest": ["POST /__board/trash/empty"],
+      "cli": ["trash empty"],
+      "mcp": ["trash_empty"]
+    },
+    {
+      "id": "sync.status",
+      "area": "Sync",
+      "what": "Whether a vault syncs to a sync server, and how it is going",
+      "rest": ["GET /api/sync"],
+      "cli": ["sync status"],
+      "mcp": ["sync_status"]
+    },
+    {
+      "id": "sync.pair",
+      "area": "Sync",
+      "what": "Pair a vault with a sync server, with a one-time code",
+      "rest": ["POST /api/sync/pair"],
+      "cli": ["sync pair"],
+      "mcp": {"refused": "A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either."}
+    },
+    {
+      "id": "sync.remotes",
+      "area": "Sync",
+      "what": "The remote vaults the paired account holds",
+      "rest": ["GET /api/sync/remotes"],
+      "cli": ["sync remotes"],
+      "mcp": {"refused": "It is the list a link chooses from, and linking is the person's: a passphrase is the person's."}
+    },
+    {
+      "id": "sync.link",
+      "area": "Sync",
+      "what": "Link a vault: upload it as a new remote, download a remote into an empty vault, or merge the two",
+      "rest": ["POST /api/sync/link"],
+      "cli": ["sync link"],
+      "mcp": {"refused": "A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either."}
+    },
+    {
+      "id": "sync.unlink",
+      "area": "Sync",
+      "what": "Stop syncing a vault, keeping its files and the remote",
+      "rest": ["POST /api/sync/unlink"],
+      "cli": ["sync unlink"],
+      "mcp": {"refused": "Undoing a link is the person's, as making one is: a passphrase is the person's, and so is the decision to stop using it."}
+    },
+    {
+      "id": "sync.now",
+      "area": "Sync",
+      "what": "Pull and push now",
+      "rest": ["POST /api/sync/now"],
+      "cli": ["sync now"],
+      "mcp": ["sync_now"]
+    },
+    {
+      "id": "sync.devices",
+      "area": "Sync",
+      "what": "The devices paired into the sync account",
+      "rest": ["GET /api/sync/devices"],
+      "cli": ["sync devices"],
+      "mcp": {"refused": "The account's devices are the person's to manage, beside the passphrase that is theirs."}
+    },
+    {
+      "id": "sync.revoke",
+      "area": "Sync",
+      "what": "Sign a device out of the sync account",
+      "rest": ["POST /api/sync/devices/revoke"],
+      "cli": ["sync devices revoke"],
+      "mcp": {"refused": "Signing a device out is the person's, beside the passphrase that is theirs."}
+    },
+    {
+      "id": "item.show",
+      "area": "Inside a board",
+      "what": "One item's fence line and body",
+      "rest": ["GET /__board/get"],
+      "cli": ["item show"],
+      "mcp": ["board_read"]
+    },
+    {
+      "id": "item.edit",
+      "area": "Inside a board",
+      "what": "Duplicate, restack, group, rename, convert or re-lay-out items",
+      "rest": ["POST /__board/patch", "POST /__board/put"],
+      "cli": ["item dup", "item front", "item back", "item rename", "item group", "item ungroup", "item convert", "item relayout"],
+      "mcp": {"via": ["board_patch", "board_write"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
+    },
+    {
+      "id": "page.edit",
+      "area": "Inside a board",
+      "what": "A board's pages: list, add, rename, remove, reorder",
+      "rest": ["GET /__board/get", "POST /__board/patch"],
+      "cli": ["page ls", "page add", "page rename", "page rm", "page move"],
+      "mcp": {"via": ["board_patch"], "why": "Pages are the frontmatter's `pages:` and each item's `page=`: `board_patch`'s `{meta}` op and `{id, attrs}` op write them."}
+    },
+    {
+      "id": "link.edit",
+      "area": "Inside a board",
+      "what": "Lines between items: list, add, change, remove",
+      "rest": ["GET /__board/get", "POST /__board/patch"],
+      "cli": ["link ls", "link add", "link set", "link rm"],
+      "mcp": {"via": ["board_patch"], "why": "A link is a line of a page's `edges` fence: `board_patch` rewrites that fence's body, or inserts one."}
+    },
+    {
+      "id": "node.edit",
+      "area": "Inside a board",
+      "what": "The cards inside one diagram",
+      "rest": ["GET /__board/get", "POST /__board/patch"],
+      "cli": ["node ls", "node add", "node set", "node rm", "node rename", "node dup", "node move"],
+      "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
+    },
+    {
+      "id": "edge.edit",
+      "area": "Inside a board",
+      "what": "The edges inside one diagram",
+      "rest": ["POST /__board/patch"],
+      "cli": ["edge add", "edge set", "edge rm"],
+      "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
+    },
+    {
+      "id": "row.edit",
+      "area": "Inside a board",
+      "what": "A card's rows: columns, members",
+      "rest": ["GET /__board/get", "POST /__board/patch"],
+      "cli": ["row ls", "row add", "row set", "row rm"],
+      "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
+    },
+    {
+      "id": "chart.edit",
+      "area": "Inside a board",
+      "what": "A chart's own statements: form, legend, scale, categories",
+      "rest": ["POST /__board/patch"],
+      "cli": ["chart set"],
+      "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
+    },
+    {
+      "id": "image.add",
+      "area": "Images",
+      "what": "Keep a picture beside a board, a note or a quiz — its bytes, or over MCP an https URL the server fetches",
+      "rest": ["POST /__board/asset", "POST /__board/upload"],
+      "cli": ["image add"],
+      "mcp": ["image_add"]
+    },
+    {
+      "id": "image.get",
+      "area": "Images",
+      "what": "A picture a document keeps",
+      "rest": ["GET /__board/assets/{path:path}"],
+      "cli": ["image get"],
+      "mcp": ["image_get"]
+    },
+    {
+      "id": "image.unused",
+      "area": "Images",
+      "what": "Pictures beside a board that no board names",
+      "rest": ["GET /__board/assets/unused"],
+      "cli": ["image unused"],
+      "mcp": ["image_unused"]
+    },
+    {
+      "id": "image.sweep",
+      "area": "Images",
+      "what": "Remove those pictures",
+      "rest": ["POST /__board/assets/sweep"],
+      "cli": ["image sweep"],
+      "mcp": ["image_sweep"]
+    },
+    {
+      "id": "file.upload",
+      "area": "Attachments",
+      "what": "Keep any file as an attachment — a PDF, a picture, a sheet — within the deployment's limits: its bytes, or over MCP an https URL the server fetches",
+      "rest": ["POST /__board/file"],
+      "cli": ["file upload"],
+      "mcp": ["file_upload"]
+    },
+    {
+      "id": "file.list",
+      "area": "Attachments",
+      "what": "Every attachment, its size, and what the deployment accepts",
+      "rest": ["GET /__board/files"],
+      "cli": ["file ls"],
+      "mcp": ["file_list"]
+    },
+    {
+      "id": "file.get",
+      "area": "Attachments",
+      "what": "An attachment's bytes, by name or id — drawn, or saved",
+      "rest": ["GET /__board/file"],
+      "cli": ["file get"],
+      "mcp": ["file_get"]
+    },
+    {
+      "id": "file.rename",
+      "area": "Attachments",
+      "what": "Rename or move an attachment; its extension stays its own",
+      "rest": ["POST /__board/rename"],
+      "cli": ["file mv"],
+      "mcp": ["file_rename"]
+    },
+    {
+      "id": "file.duplicate",
+      "area": "Attachments",
+      "what": "Copy an attachment",
+      "rest": ["POST /__board/duplicate"],
+      "cli": ["file cp"],
+      "mcp": ["file_duplicate"]
+    },
+    {
+      "id": "file.title",
+      "area": "Attachments",
+      "what": "Call an attachment something, and let its name follow",
+      "rest": ["POST /__board/retitle"],
+      "cli": ["file title"],
+      "mcp": ["file_title"]
+    },
+    {
+      "id": "file.delete",
+      "area": "Attachments",
+      "what": "Move an attachment to the trash, saying what uses it",
+      "rest": ["GET /__board/refs", "POST /__board/delete"],
+      "cli": ["file rm"],
+      "mcp": ["file_delete"]
+    },
+    {
+      "id": "component.list",
+      "area": "Components",
+      "what": "The person's saved components",
+      "rest": ["GET /__board/components"],
+      "cli": ["component ls"],
+      "mcp": ["library"]
+    },
+    {
+      "id": "component.keep",
+      "area": "Components",
+      "what": "Keep items as a component",
+      "rest": ["POST /__board/create"],
+      "cli": ["component keep"],
+      "mcp": {"via": ["board_create"], "why": "A component is a board under `components/`: `board_create` with that name keeps one, with the text of the items to keep."}
+    },
+    {
+      "id": "component.place",
+      "area": "Components",
+      "what": "Put a saved component on a board",
+      "rest": ["GET /__board/components", "POST /__board/patch"],
+      "cli": ["component place"],
+      "mcp": {"via": ["library", "board_patch"], "why": "`library` answers every saved component's text, and `board_patch`'s `{insert}` places it."}
+    },
+    {
+      "id": "component.delete",
+      "area": "Components",
+      "what": "Delete a saved component",
+      "rest": ["POST /__board/components/delete"],
+      "cli": ["component rm"],
+      "mcp": ["component_delete"]
+    },
+    {
+      "id": "grammar.dsl",
+      "area": "Grammar",
+      "what": "The cheat sheets",
+      "rest": ["GET /__board/dsl"],
+      "cli": ["dsl"],
+      "mcp": ["dsl_reference"]
+    },
+    {
+      "id": "grammar.library",
+      "area": "Grammar",
+      "what": "Ready-made pieces, rendered",
+      "rest": ["GET /__board/library"],
+      "cli": ["library"],
+      "mcp": ["library"]
+    },
+    {
+      "id": "grammar.icons",
+      "area": "Grammar",
+      "what": "What `icon=` may say",
+      "rest": ["GET /__board/icons"],
+      "cli": ["icons"],
+      "mcp": ["icons"]
+    },
+    {
+      "id": "models.list",
+      "area": "Models",
+      "what": "Which model providers could answer",
+      "rest": ["GET /__board/llm"],
+      "cli": ["llm"],
+      "mcp": ["llm"]
+    },
+    {
+      "id": "models.generate",
+      "area": "Models",
+      "what": "Ask a model to draw a diagram",
+      "rest": ["POST /__board/generate"],
+      "cli": ["generate"],
+      "mcp": ["generate"]
+    },
+    {
+      "id": "models.prompt",
+      "area": "Models",
+      "what": "Run a prompt card on a board",
+      "rest": ["POST /__board/generate", "POST /__board/patch"],
+      "cli": ["prompt run"],
+      "mcp": {"via": ["generate", "board_patch"], "why": "`generate` answers the draft and `board_patch` puts it where the card was: `{insert}` after it, `{remove}` on it."}
+    },
+    {
+      "id": "models.rewrite",
+      "area": "Models",
+      "what": "Ask a model to rewrite one diagram",
+      "rest": ["POST /__board/generate", "POST /__board/patch"],
+      "cli": ["rewrite"],
+      "mcp": {"via": ["generate", "board_patch"], "why": "`generate` with `source` answers the rewritten body, and `board_patch`'s `{id, body}` lands it on the item."}
+    },
+    {
+      "id": "picture.snapshot",
+      "area": "Pictures",
+      "what": "A picture of a board, with what is wrong with the drawing",
+      "rest": {"refused": "Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright."},
+      "cli": ["snapshot"],
+      "mcp": {"refused": "A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead."}
+    },
+    {
+      "id": "picture.tidy",
+      "area": "Pictures",
+      "what": "Tidy a board's layout",
+      "rest": {"refused": "Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright."},
+      "cli": ["tidy"],
+      "mcp": {"refused": "A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead."}
+    },
+    {
+      "id": "picture.export",
+      "area": "Pictures",
+      "what": "A board as SVG or PNG, a note as PDF",
+      "rest": {"refused": "Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright."},
+      "cli": ["board export", "note export"],
+      "mcp": {"refused": "A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead."}
+    },
+    {
+      "id": "chat.list",
+      "area": "Assistant",
+      "what": "The chats in a vault, newest first",
+      "rest": ["GET /__board/chats"],
+      "cli": ["chat ls"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.models",
+      "area": "Assistant",
+      "what": "The providers, models and effort levels a chat can run on",
+      "rest": ["GET /__board/chat/models"],
+      "cli": ["chat models"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.create",
+      "area": "Assistant",
+      "what": "Start a chat",
+      "rest": ["POST /__board/chat"],
+      "cli": ["chat new"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.read",
+      "area": "Assistant",
+      "what": "A chat read whole: its turns, steps, changes and undo history",
+      "rest": ["GET /__board/chat"],
+      "cli": ["chat cat"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.turn",
+      "area": "Assistant",
+      "what": "Send a turn and follow the answer as it is written",
+      "rest": ["POST /__board/chat/turn", "GET /__board/chat/events"],
+      "cli": ["chat say"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.stop",
+      "area": "Assistant",
+      "what": "Stop the turn that is answering",
+      "rest": ["POST /__board/chat/stop"],
+      "cli": ["chat stop"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.approve",
+      "area": "Assistant",
+      "what": "Answer a write or a vault request the assistant is waiting on",
+      "rest": ["POST /__board/chat/approve"],
+      "cli": ["chat approve"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.grant",
+      "area": "Assistant",
+      "what": "Let a chat reach another vault, or take the grant back",
+      "rest": ["POST /__board/chat/grant"],
+      "cli": ["chat grant"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.undo",
+      "area": "Assistant",
+      "what": "Take back, or put back, one block of changes a turn made",
+      "rest": ["POST /__board/chat/undo", "POST /__board/chat/redo"],
+      "cli": ["chat undo", "chat redo"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.rename",
+      "area": "Assistant",
+      "what": "Give a chat a title",
+      "rest": ["POST /__board/chat/rename"],
+      "cli": ["chat rename"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.delete",
+      "area": "Assistant",
+      "what": "Delete a chat and its turns",
+      "rest": ["POST /__board/chat/delete"],
+      "cli": ["chat rm"],
+      "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
+    },
+    {
+      "id": "chat.block",
+      "area": "Assistant",
+      "what": "The chat's own recorder: group the writes that follow into one undoable block",
+      "rest": ["POST /__board/chat/block"],
+      "cli": {"refused": "Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: nothing outside a running turn has a block to start."},
+      "mcp": {"refused": "Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `change_block` (server/mcp/chat.ts), which is not one of this server's tools."}
+    },
+    {
+      "id": "chat.access",
+      "area": "Assistant",
+      "what": "The chat's own request to reach another vault, put to the person",
+      "rest": ["POST /__board/chat/access"],
+      "cli": {"refused": "Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: the person answers it with `chat approve`, and grants a vault up front with `chat grant`."},
+      "mcp": {"refused": "Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `vault_request` (server/mcp/chat.ts), which is not one of this server's tools."}
+    }
+  ]
+}

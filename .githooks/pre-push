@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# The Playwright suite, before anything leaves this machine. CI stopped running them — the header
+# of `.github/workflows/ci.yml` says why — so this is the only thing between a browser and `main`,
+# and it is worth knowing that it is one `--no-verify` deep.
+#
+# It is the dev suite against `npm run dev`, at low priority (`scripts/e2e-local.sh`) — the only
+# run that compares the 45 visual baselines and that can fire the dev size assertion.
+#
+# **A deleted branch is not something to test.** Git writes an all-zero local sha for one, and
+# running five minutes of browser checks to delete a remote branch is the kind of thing that
+# makes somebody reach for `--no-verify` once and never put it back.
+#
+# `ANYDAG_NO_HOOK=1` is the escape hatch beside `--no-verify`, and a checkout with no
+# `node_modules` is skipped with a word rather than refused — the same argument
+# `.githooks/pre-commit` and `check-skill.mjs` make.
+set -euo pipefail
+
+if [ -n "${ANYDAG_NO_HOOK:-}" ]; then
+  echo "pre-push: skipped (ANYDAG_NO_HOOK)"
+  exit 0
+fi
+
+if [ ! -d node_modules ]; then
+  echo "pre-push: skipping the suites — no node_modules; run: npm ci"
+  exit 0
+fi
+
+zero="0000000000000000000000000000000000000000"
+anything=
+
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  anything=yes
+done
+
+if [ -z "$anything" ]; then
+  echo "pre-push: nothing being pushed"
+  exit 0
+fi
+
+echo "pre-push: the Playwright suite against the dev server"
+exec bash scripts/e2e-local.sh

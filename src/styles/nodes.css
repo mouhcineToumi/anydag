@@ -1,0 +1,991 @@
+/* Diagrams. Every value comes from the theme — `scripts/check-literals.mjs` is what makes that true
+   rather than aspirational. */
+
+.dag-frame {
+  box-sizing: border-box;
+  background: var(--dag-color-paper);
+  border-radius: var(--dag-metric-radius-group);
+}
+
+/*
+ * A component: one node standing on the paper, drawn without the head or the rule.
+ *
+ * There is nothing to override — `Frame` renders no `__head` and no `__rule` when it is bare, so
+ * those selectors cannot reach it and writing them out as resets would be dead CSS. What is left is
+ * the surface, and a bare frame must not be one: `.dag-frame`'s `paper` is the colour of the viewport
+ * itself, so it reads as nothing today, but a component dropped over an exported board's paper rect
+ * or over anything a later milestone puts under it would come with a plate around it that means
+ * nothing. Transparent says what it is — padding, and the card is the object.
+ *
+ * The radius goes with it, for the same reason: `radius-group` belongs to a box that is drawn, and
+ * the only corner a reader sees here is the card's own.
+ */
+.dag-frame--bare {
+  background: transparent;
+  border-radius: 0;
+}
+
+.dag-frame__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--dag-metric-frame-headGap); }
+.dag-frame__title {
+  margin: 0;
+  font-size: var(--dag-type-title);
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  line-height: 1.2;
+  color: var(--dag-color-ink);
+}
+.dag-frame__sub {
+  margin: var(--dag-metric-frame-subGap) 0 0;
+  font-size: var(--dag-type-subtitle);
+  color: var(--dag-color-slate);
+}
+.dag-frame__chip {
+  flex: none;
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-chip);
+  font-weight: 500;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-metric-radius-pill);
+  padding: var(--dag-metric-frame-chipPadY) var(--dag-metric-frame-chipPadX);
+}
+.dag-frame__rule {
+  height: var(--dag-metric-line-hair);
+  background: var(--dag-color-outlineSoft);
+  margin: var(--dag-metric-frame-ruleGapTop) 0 var(--dag-metric-frame-ruleGapBottom);
+}
+
+.dag-diagram { position: relative; }
+.dag-diagram--pending { min-height: var(--dag-metric-frame-pendingMinH); }
+
+.dag-edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+/*
+ * A label paints the surface out from under itself before it draws.
+ *
+ * `paint-order: stroke` puts the stroke behind the fill, so a halo the colour of whatever is under
+ * the label keeps it readable where it crosses its own line or another. Which surface that is comes
+ * from the router, which has recorded it on every label since M1 — this is the first consumer.
+ */
+.dag-edge-label {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-edgeLabel);
+  font-weight: 600;
+  fill: var(--dag-color-slate);
+  paint-order: stroke;
+  stroke: var(--dag-color-paper);
+  stroke-width: var(--dag-metric-edge-labelHalo);
+  stroke-linejoin: round;
+}
+.dag-edge-label--on-group { stroke: var(--dag-color-paper100); }
+
+/*
+ * SVG text is laid out at one size, whatever the zoom.
+ *
+ * Chromium lays SVG text out again, hinted to the screen, every time the scale above it changes —
+ * and inside `.dag-layer`, whose transform the zoom writes, that new layout is often never painted:
+ * after a fit the label kept its box and drew no ink, while the line beside it drew. A production
+ * build lost most labels that way after any refit, `anydag snapshot` among them, which refits once
+ * it has sized its window; the dev server lost fewer, for no reason worth relying on.
+ * `geometricPrecision` lays the text out once, unhinted, which is also the width `measureText` gave
+ * the layout. Every `<text>` on the surface: an edge's label, a chart's, a timeline's axis.
+ */
+.dag-edge-label,
+.dag-chart text,
+.dag-axis text { text-rendering: geometricPrecision; }
+.dag-edge-label__tech { font-weight: 400; }
+
+/*
+ * ---- hue ----
+ *
+ * A hued element carries `--dag-h` (the hue) and `--dag-t` (its tint), bound by `hueVars()` and bound
+ * only when the element actually has a hue. Everything below falls back to the theme's default
+ * hue, which is why no component has to know one. See `src/render/hue.ts` for why the absence
+ * matters more than the value.
+ */
+
+.dag-group__dot { background: var(--dag-h, var(--dag-h-default)); }
+.dag-group__label,
+.dag-strip__label,
+.dag-band__label { color: var(--dag-h, var(--dag-h-default)); }
+.dag-strip__rule { background: var(--dag-h, var(--dag-h-default)); }
+.dag-key--fk { color: var(--dag-h, var(--dag-h-default)); }
+.dag-node--decision { border-color: var(--dag-h, var(--dag-h-default)); }
+
+.dag-tile { background: var(--dag-t, var(--dag-t-default)); color: var(--dag-color-ink); }
+/* A node we do not own gets no hue at all: the dashed border and the flat tile say "not ours". */
+.dag-node--external .dag-tile { background: var(--dag-color-paper100); color: var(--dag-color-slate); }
+
+.dag-topic { border-color: var(--dag-h, var(--dag-h-default)); background: var(--dag-color-card); }
+.dag-topic--root { background: var(--dag-t, var(--dag-t-default)); }
+
+.dag-activation { fill: var(--dag-color-paper200); stroke: var(--dag-color-slate); }
+.dag-activation--hued { fill: var(--dag-t); stroke: var(--dag-h); }
+
+/* ---- groups ---- */
+
+.dag-group {
+  position: absolute;
+  border-radius: var(--dag-metric-radius-group);
+  background: var(--dag-color-groupFills-0);
+}
+/* Deeper nesting reads as further in without a second border weight to invent. `Group` clamps the
+   level to the last fill the theme defines, so there is never a level with no rule. */
+.dag-group[data-level="1"] { background: var(--dag-color-groupFills-1); }
+.dag-group__label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-group-labelGap);
+  font-size: var(--dag-type-groupLabel);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dag-group__dot {
+  width: var(--dag-metric-group-dot);
+  height: var(--dag-metric-group-dot);
+  border-radius: var(--dag-metric-radius-pill);
+  flex: none;
+}
+.dag-group__sub {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-groupSub);
+  font-weight: 400;
+  color: var(--dag-color-slate);
+}
+
+/* ---- nodes ---- */
+
+.dag-node {
+  position: absolute;
+  box-sizing: border-box;
+  background: var(--dag-color-card);
+  border: var(--dag-metric-line-hair) solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-card);
+  overflow: hidden;
+}
+
+/* A brand logo arrives in its own colours — the one colour in a diagram the theme does not choose.
+   So its tile drops the tint and the hue moves to the border: the hue still has to say which group
+   a node belongs to, and two colour systems inside one 36px square read as noise rather than as two
+   facts.
+
+   `:where()` is load-bearing, not decoration. An attribute selector would make this rule (0,2,0)
+   and every status modifier below is (0,1,0) — so the hue quietly beat them, and a node marked
+   `wait` drew its group's teal instead of amber. Zeroing the specificity and placing the rule first
+   restores the order the diagram language depends on: what a node *is doing* outranks what group it
+   is in, and `external` — "not ours" — outranks both. */
+.dag-node:where([data-dag-icon="brand"]) { border-color: var(--dag-h, var(--dag-h-default)); }
+
+/* `brandTile` is a light surface in *every* theme, dark ones included, and that is not an oversight.
+   A brand mark is drawn for a light background and many are black on transparent — on the dark
+   theme's own `paper100`, Express disappeared completely and Vercel's triangle was a shape you had
+   to hunt for. The theme can still tune the exact light, which is why this is a token and not a
+   literal, but it may not make it dark without losing the logos it is there to show. */
+.dag-tile--brand { background: var(--dag-color-brandTile); }
+
+/* The glyph is markup we generated, dropped into the tile's flex box; it only has to not stretch. */
+.dag-glyph { display: flex; align-items: center; justify-content: center; }
+
+.dag-node--external { border-style: dashed; border-color: var(--dag-color-externalBorder); }
+
+/*
+ * The one accent, and the only ring in the system — now spent on the card under the pointer
+ * rather than on one the author picked. `border-color` and `box-shadow` are the whole treatment on
+ * purpose: neither changes the box, so the dev size assertion in `DiagramItem` still measures what
+ * the layout promised while a node is hovered.
+ */
+[data-dag-node]:hover {
+  border-color: var(--dag-color-accent);
+  box-shadow: 0 0 0 var(--dag-metric-node-hoverRing) var(--dag-color-accentSoft);
+}
+.dag-node--done { background: var(--dag-color-successSoft); border-color: var(--dag-color-successBorder); }
+.dag-node--wait { border-width: var(--dag-metric-line-rule); border-color: var(--dag-color-warning); }
+.dag-node--stop { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-dangerBorder); }
+.dag-node--muted { background: var(--dag-color-paper100); border-color: var(--dag-color-mutedBorder); }
+.dag-node--muted .dag-node__title { color: var(--dag-color-slate); }
+
+.dag-node__head {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-node-gap);
+  padding: 0 var(--dag-metric-node-padX);
+  height: 100%;
+  box-sizing: border-box;
+}
+/* With rows, the header is a band with a divider; without, it fills the card. */
+.dag-node__rows ~ .dag-node__head,
+.dag-node:has(.dag-node__rows) .dag-node__head {
+  height: var(--dag-metric-node-headerArch);
+  border-bottom: var(--dag-metric-line-hair) solid var(--dag-color-outlineSoft);
+}
+
+.dag-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dag-metric-tile-size);
+  height: var(--dag-metric-tile-size);
+  border-radius: var(--dag-metric-radius-tile);
+  flex: none;
+}
+/* A client or a person is round: the shape says "not a machine" before the glyph does. */
+.dag-node[data-dag-kind="client"] .dag-tile,
+.dag-node[data-dag-kind="person"] .dag-tile,
+.dag-node[data-dag-kind="actor"] .dag-tile { border-radius: var(--dag-metric-radius-pill); }
+
+.dag-node__text { display: flex; flex-direction: column; gap: var(--dag-metric-node-textGap); min-width: 0; }
+.dag-node__title {
+  font-size: var(--dag-type-nodeTitle);
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  color: var(--dag-color-ink);
+  white-space: nowrap;
+}
+.dag-node__meta {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-nodeMeta);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
+.dag-pill {
+  flex: none;
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  font-weight: 600;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper);
+  border: var(--dag-metric-line-hair) dashed var(--dag-color-externalBorder);
+  border-radius: var(--dag-metric-radius-pill);
+  padding: var(--dag-metric-node-pillPadY) var(--dag-metric-node-pillPadX);
+}
+
+.dag-node__rows { padding: var(--dag-metric-node-rowPad) 0; }
+.dag-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-node-gap);
+  padding: 0 var(--dag-metric-node-padX);
+  box-sizing: border-box;
+}
+.dag-row__name {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowName);
+  font-weight: 500;
+  color: var(--dag-color-ink);
+  flex: 1;
+  white-space: nowrap;
+}
+.dag-row__detail {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowDetail);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
+/* ---- legend ---- */
+
+.dag-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--dag-metric-legend-gap);
+  height: var(--dag-metric-frame-legendH);
+  padding-top: var(--dag-metric-legend-padTop);
+  box-sizing: border-box;
+}
+.dag-legend__item { display: flex; align-items: center; gap: var(--dag-metric-legend-itemGap); }
+.dag-legend__text { font-size: var(--dag-type-legend); color: var(--dag-color-slate); }
+.dag-legend__swatch {
+  display: inline-block;
+  width: var(--dag-metric-legend-swatchW);
+  height: var(--dag-metric-legend-swatchH);
+  border-radius: var(--dag-metric-radius-small);
+  background: var(--dag-color-card);
+  border: var(--dag-metric-line-hair) solid var(--dag-color-outline);
+}
+.dag-legend__swatch--external { border-style: dashed; border-color: var(--dag-color-externalBorder); }
+.dag-legend__swatch--done { background: var(--dag-color-successSoft); border-color: var(--dag-color-successBorder); }
+.dag-legend__swatch--wait { border-width: var(--dag-metric-line-rule); border-color: var(--dag-color-warning); }
+.dag-legend__swatch--stop { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-dangerBorder); }
+.dag-legend__port {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowDetail);
+  font-weight: 500;
+  color: var(--dag-color-ink);
+}
+
+/* ---- entity (erd) ---- */
+
+.dag-node__head--entity {
+  border-bottom: var(--dag-metric-line-hair) solid var(--dag-color-outlineSoft);
+  padding: 0 var(--dag-metric-node-padXEntity);
+}
+.dag-entity__name {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-entityName);
+  font-weight: 600;
+  color: var(--dag-color-ink);
+}
+.dag-row--entity { padding: 0 var(--dag-metric-node-padXEntity); gap: var(--dag-metric-node-entityGap); }
+.dag-row__field {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowName);
+  font-weight: 500;
+  color: var(--dag-color-ink);
+  flex: 1;
+  white-space: nowrap;
+}
+.dag-row__type {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowDetail);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+.dag-row__more { font-size: var(--dag-type-rowMore); color: var(--dag-color-muted); flex: 1; }
+.dag-key {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  font-weight: 600;
+  border-radius: var(--dag-metric-radius-pill);
+  flex: none;
+}
+.dag-key--pk {
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper200);
+  padding: var(--dag-metric-node-keyPadY) var(--dag-metric-node-keyPadX);
+}
+/* The fk pill borrows its target domain's hue: a glance at the column says where it reaches. */
+.dag-key--fk {
+  border: var(--dag-metric-line-hair) solid currentColor;
+  padding: var(--dag-metric-node-fkPadY) var(--dag-metric-node-fkPadX);
+}
+
+/* ---- class ---- */
+
+.dag-class__head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--dag-metric-node-textGap);
+  padding: 0 var(--dag-metric-node-padX);
+}
+.dag-class__stereo {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-classStereo);
+  font-weight: 600;
+  color: var(--dag-color-slate);
+}
+.dag-class__comp {
+  padding: var(--dag-metric-node-rowPad) 0;
+  border-top: var(--dag-metric-line-hair) solid var(--dag-color-outlineSoft);
+}
+.dag-row--class { gap: var(--dag-metric-node-classGap); }
+.dag-vis {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-classVis);
+  font-weight: 600;
+  color: var(--dag-color-muted);
+  width: var(--dag-metric-node-visW);
+  flex: none;
+}
+.dag-row__member {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowName);
+  font-weight: 500;
+  color: var(--dag-color-ink);
+  white-space: nowrap;
+}
+
+/* ---- state ---- */
+
+.dag-node--state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--dag-metric-node-stateGap);
+  padding: 0 var(--dag-metric-node-statePadX);
+}
+.dag-state__value {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-nodeMeta);
+  color: var(--dag-color-slate);
+}
+.dag-node--done .dag-state__value { color: var(--dag-color-successText); }
+
+/* ---- flow ---- */
+
+.dag-node--step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dag-metric-node-stepGap);
+  padding: var(--dag-metric-node-stepPadY) var(--dag-metric-node-stepPadX);
+}
+.dag-step__idrow { display: flex; align-items: center; gap: var(--dag-metric-node-stepRowGap); }
+.dag-step__id {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-stepId);
+  font-weight: 600;
+  color: var(--dag-color-slate);
+}
+.dag-node--stop .dag-step__id { color: var(--dag-color-dangerText); }
+.dag-node--wait .dag-step__id { color: var(--dag-color-warningText); }
+.dag-node--done .dag-step__id { color: var(--dag-color-successText); }
+.dag-step__title {
+  font-size: var(--dag-type-stepTitle);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--dag-color-ink);
+}
+.dag-step__foot { display: flex; align-items: center; gap: var(--dag-metric-node-stepRowGap); margin-top: auto; }
+.dag-step__meta {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-nodeMeta);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+.dag-node--stop .dag-step__meta { color: var(--dag-color-dangerText); }
+.dag-node--wait .dag-step__meta { color: var(--dag-color-warningText); }
+.dag-node--done .dag-step__meta { color: var(--dag-color-successText); }
+
+.dag-node--decision {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dag-metric-node-decisionGap);
+  padding: 0 var(--dag-metric-node-decisionPadX);
+  border-width: var(--dag-metric-line-rule);
+  border-radius: var(--dag-metric-radius-pill);
+  text-align: center;
+}
+.dag-decision__title {
+  font-size: var(--dag-type-decision);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.004em;
+  color: var(--dag-color-ink);
+}
+
+/* ---- use case ---- */
+
+.dag-node--usecase {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-node-gap);
+  padding: 0 var(--dag-metric-node-ucPadX);
+  border-radius: var(--dag-metric-radius-pill);
+}
+.dag-uc__id {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-ucId);
+  font-weight: 600;
+  color: var(--dag-color-muted);
+  flex: none;
+}
+.dag-uc__title { font-size: var(--dag-type-ucTitle); font-weight: 600; letter-spacing: -0.005em; }
+
+/* ---- c4 ---- */
+
+.dag-node--c4 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dag-metric-node-c4Gap);
+  padding: var(--dag-metric-node-c4Pad) var(--dag-metric-node-c4PadX);
+}
+.dag-c4__head { display: flex; align-items: center; gap: var(--dag-metric-node-c4HeadGap); }
+.dag-tile--c4 { width: var(--dag-metric-tile-sizeC4); height: var(--dag-metric-tile-sizeC4); border-radius: var(--dag-metric-radius-tileC4); }
+.dag-tile--round { border-radius: var(--dag-metric-radius-pill); }
+.dag-c4__name { font-size: var(--dag-type-c4Name); font-weight: 600; letter-spacing: -0.008em; }
+.dag-c4__type { font-family: var(--dag-font-mono); font-size: var(--dag-type-c4Type); font-weight: 500; color: var(--dag-color-slate); }
+.dag-c4__desc { font-size: var(--dag-type-c4Desc); line-height: var(--dag-type-c4DescLeading); color: var(--dag-color-slate); }
+
+/* ---- notation: ink, never a hue ---- */
+
+.dag-pseudo { position: absolute; overflow: visible; }
+.dag-bar { position: absolute; background: var(--dag-color-ink); border-radius: var(--dag-metric-radius-bar); }
+
+/* ---- lanes ---- */
+
+.dag-band { position: absolute; background: var(--dag-color-paper100); border-radius: var(--dag-metric-radius-group); }
+.dag-band__label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--dag-metric-lane-labelGap);
+  height: var(--dag-metric-lane-labelH);
+  font-size: var(--dag-type-groupLabel);
+  font-weight: 600;
+}
+
+/* ---- mindmap ---- */
+
+.dag-topic {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--dag-metric-node-topicPadX);
+  border-width: var(--dag-metric-line-rule);
+  border-style: solid;
+  border-radius: var(--dag-metric-radius-pill);
+  font-size: var(--dag-type-stepTitle);
+  font-weight: 600;
+  color: var(--dag-color-ink);
+  text-align: center;
+}
+.dag-topic--root { font-size: var(--dag-type-nodeTitle); }
+
+/* ---- sequence ---- */
+
+.dag-frag-tab {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-seq-tabGap);
+  transform: translateY(-50%);
+  padding: 0 var(--dag-metric-seq-tabPadX);
+  background: var(--dag-color-paper);
+  white-space: nowrap;
+}
+.dag-frag-tab__kind {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-seqTab);
+  font-weight: 600;
+  color: var(--dag-color-ink);
+}
+.dag-frag-tab__cond { font-size: var(--dag-type-legend); color: var(--dag-color-slate); }
+
+/* ---- timeline axis ---- */
+
+.dag-axis { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.dag-axis__label {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  fill: var(--dag-color-muted);
+}
+.dag-axis__label--major { fill: var(--dag-color-slate); font-weight: 600; }
+
+/* ---- git graph ---- */
+
+.dag-node[data-dag-kind="commit"] { border-radius: var(--dag-metric-radius-pill); }
+/* A sequence message written in prose rather than backticks reads as prose. */
+.dag-edge-label--prose {
+  font-family: var(--dag-font-sans);
+  font-size: var(--dag-type-seqLabel);
+  font-weight: 400;
+  fill: var(--dag-color-ink);
+}
+
+/* A timeline section: a rule over the stretch of time it covers, labelled above it. */
+.dag-strip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--dag-metric-strip-gap);
+}
+.dag-strip__label {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-group-labelGap);
+  font-size: var(--dag-type-groupLabel);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dag-strip__rule {
+  height: var(--dag-metric-strip-ruleH);
+  border-radius: var(--dag-metric-radius-pill);
+  opacity: var(--dag-color-opacity-stripRule);
+}
+/* An offset layer for content that reaches above the diagram's origin. */
+.dag-diagram__layer { position: absolute; left: 0; width: 100%; }
+
+.dag-node--commit {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-metric-node-gap);
+  padding: 0 var(--dag-metric-node-padX);
+  border-radius: var(--dag-metric-radius-pill);
+}
+.dag-commit__label { font-size: var(--dag-type-stepTitle); font-weight: 600; white-space: nowrap; }
+.dag-commit__tag {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  font-weight: 600;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-metric-radius-pill);
+  padding: var(--dag-metric-node-keyPadY) var(--dag-metric-node-keyPadX);
+  white-space: nowrap;
+}
+
+/* ---- sketch: the free canvas ---- */
+
+/*
+ * A wireframe's parts, in the theme's own greys.
+ *
+ * `.dag-sketch` deliberately does not extend `.dag-node`. A card is a *thing in a system* — a fill
+ * that reads as a card, a border that says so, a hue that says which group it belongs to — and a
+ * box on a sketch is none of that. Sharing the class would have meant unsetting most of it on
+ * every shape, and the next `.dag-node` rule anyone writes would leak into the one drawing that is
+ * supposed to have no opinions.
+ *
+ * What it does share is the outer contract: `position: absolute`, `box-sizing: border-box` and
+ * `overflow: hidden`, so the box the layout computed is the box that renders however long the
+ * label turns out to be — which is what keeps the dev size assertion quiet. `[data-dag-node]:hover`
+ * above still finds these, so a shape rings under the pointer like every other node, and it wins
+ * on specificity over the border colours below.
+ */
+.dag-sketch {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+.dag-sketch--muted { opacity: var(--dag-color-opacity-edgeQuiet); }
+
+.dag-sketch__text { display: flex; flex-direction: column; gap: var(--dag-metric-node-textGap); min-width: 0; }
+.dag-sketch__title {
+  font-size: var(--dag-type-nodeTitle);
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  color: var(--dag-color-ink);
+  white-space: nowrap;
+}
+.dag-sketch__meta {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-nodeMeta);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
+/* A rectangle. The hue falls back to the theme's *outline* rather than to `--dag-h-default`,
+   because grey is what a wireframe is: a hue here is something the author asked for. */
+.dag-sketch--box {
+  background: var(--dag-color-card);
+  border: var(--dag-metric-line-hair) solid var(--dag-h, var(--dag-color-outline));
+  border-radius: var(--dag-metric-radius-card);
+  padding: var(--dag-metric-sketch-padY) var(--dag-metric-sketch-padX);
+}
+
+/* No chrome at all: a line of text standing on the paper. */
+.dag-sketch--text { padding: 0 var(--dag-metric-sketch-textPad); }
+
+.dag-sketch--button {
+  justify-content: center;
+  background: var(--dag-h, var(--dag-color-ink));
+  border-radius: var(--dag-metric-radius-pill);
+  padding: 0 var(--dag-metric-sketch-buttonPadX);
+}
+.dag-sketch__label {
+  font-size: var(--dag-type-nodeTitle);
+  font-weight: 600;
+  color: var(--dag-color-card);
+  white-space: nowrap;
+}
+
+.dag-sketch--input {
+  background: var(--dag-color-card);
+  border: var(--dag-metric-line-hair) solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-card);
+  padding: 0 var(--dag-metric-sketch-inputPadX);
+}
+.dag-sketch__placeholder {
+  font-size: var(--dag-type-nodeTitle);
+  color: var(--dag-color-muted);
+  white-space: nowrap;
+}
+
+/* A picture that is not there yet. The cross is drawn at 100% of the element, so the SVG needs no
+   number out of the layout and the two cannot disagree. */
+.dag-sketch--img {
+  background: var(--dag-color-paper200);
+  border: var(--dag-metric-line-hair) solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-card);
+}
+.dag-sketch__cross { position: absolute; left: 0; top: 0; }
+/* The cross is the whole of what says "a picture goes here", so it draws in `outline` at the
+   rule weight rather than in the hairline the box's own border uses. In `outlineSoft` on
+   `paper200` it was, at 1px, a mark you had to be told was there. */
+.dag-sketch__cross line { stroke: var(--dag-color-outline); stroke-width: var(--dag-metric-line-rule); }
+.dag-sketch__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--dag-metric-sketch-imgCaptionH);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--dag-type-legend);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/*
+ * The geometric shapes. The outline is an `<svg>` path at the box's own pixels, and the box is what
+ * the layout computed — so the `div` keeps the whole contract and only its *painting* changes.
+ *
+ * Unhued, a shape is the wireframe's card-on-outline like a `box`. Hued, it fills with the hue's
+ * tint and edges in the hue, the sticky's rule: a coloured circle on a whiteboard is a coloured
+ * circle, not a white one with a coloured rim. `--dag-t` is bound only when the node has a hue, so the
+ * fallback is what an unhued shape gets.
+ *
+ * The rectangular hover ring and pick outline every other node wears would square off a circle, so
+ * a shape wears them on its outline instead — the same accent, drawn where the shape is.
+ */
+.dag-sketch--shape {
+  overflow: visible;
+  align-items: stretch;
+}
+.dag-sketch__outline { position: absolute; left: 0; top: 0; overflow: visible; }
+.dag-sketch__fill {
+  fill: var(--dag-t, var(--dag-color-card));
+  stroke: var(--dag-h, var(--dag-color-outline));
+  stroke-width: var(--dag-metric-line-rule);
+  stroke-linejoin: round;
+}
+.dag-sketch__rim {
+  fill: none;
+  stroke: var(--dag-h, var(--dag-color-outline));
+  stroke-width: var(--dag-metric-line-rule);
+}
+.dag-sketch__inside {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dag-metric-node-textGap);
+  text-align: center;
+  overflow: hidden;
+}
+.dag-sketch--shape .dag-sketch__title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: var(--dag-type-mdLeading);
+}
+.dag-sketch--shape .dag-sketch__meta { white-space: normal; overflow-wrap: anywhere; }
+.dag-sketch--shape[data-dag-node]:hover { box-shadow: none; }
+.dag-sketch--shape:hover .dag-sketch__fill,
+.dag-sketch--shape:hover .dag-sketch__rim { stroke: var(--dag-color-accent); }
+
+/*
+ * The pen's stroke. There is no fill, no border and no text — a `path` wearing the node's hue is
+ * the whole drawing — so `fill: none` keeps the curve a curve, and the hover ring and pick outline
+ * every other node wears would be a rectangle drawn around a squiggle. The stroke colour *is* the
+ * feedback: hover and pick take the accent the shape's own paths take, and nothing changes size.
+ */
+.dag-sketch--ink { overflow: visible; }
+.dag-sketch__stroke {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  fill: none;
+  stroke: var(--dag-h, var(--dag-color-ink));
+  stroke-width: var(--dag-metric-sketch-inkW);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dag-sketch--ink[data-dag-node]:hover { box-shadow: none; }
+.dag-sketch--ink:hover .dag-sketch__stroke { stroke: var(--dag-color-accent); }
+/* Picked, same answer as hover. The generic `[data-dag-node][data-dag-picked]` outline is chrome's,
+   and a rectangle round a squiggle is the defect CLAUDE.md records for `outline` on an SVG mark —
+   the mark carries its own ring. These load after chrome.css, so at equal specificity they win. */
+.dag-sketch--ink[data-dag-picked] { outline: none; }
+.dag-sketch--ink[data-dag-picked] .dag-sketch__stroke { stroke: var(--dag-color-accent); }
+
+/*
+ * A picture with a caption under it. No fill and no border — a picture on a whiteboard is
+ * the picture — so the hover ring and the pick outline are what say it is one thing, and the radius
+ * is only there so that ring is not a hard rectangle round a house. Every part is placed by
+ * `layout/figure.ts` through inline boxes; this sheet only paints them.
+ *
+ * The picture's colour is the hue or the ink: a Lucide glyph and a `mono:` silhouette draw in
+ * `currentColor` and take it, and colour art (an emoji, a logo) carries its own and ignores it —
+ * the rule a brand tile already follows on a card.
+ */
+.dag-sketch--figure {
+  display: block;
+  border-radius: var(--dag-metric-radius-card);
+}
+.dag-figure__pic {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dag-h, var(--dag-color-ink));
+}
+/* The padding is the inset `layout/figure.ts` wrapped the caption without — the slack a glyph
+   painted a hair wide at a scaled zoom lands in, rather than being clipped. */
+.dag-figure__caption {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0 var(--dag-metric-sketch-textPad);
+  overflow: hidden;
+  text-align: center;
+  font-size: var(--dag-type-figureCaption);
+  font-weight: 600;
+  line-height: var(--dag-metric-sketch-figureLineH);
+  color: var(--dag-color-ink);
+  overflow-wrap: break-word;
+}
+.dag-figure__meta {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0 var(--dag-metric-sketch-textPad);
+  overflow: hidden;
+  text-align: center;
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-nodeMeta);
+  line-height: var(--dag-metric-sketch-figureLineH);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Paper, not a card: a square in the hue's tint with a firmer edge in the hue itself. That hue is
+   bound by the *parser* (`sketch.finish()` writes `ochre` onto an unhued sticky), so nothing here
+   has to reach for a colour it was not given. */
+.dag-sketch--sticky {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--dag-metric-node-textGap);
+  background: var(--dag-t, var(--dag-t-default));
+  border: var(--dag-metric-line-hair) solid var(--dag-h, var(--dag-h-default));
+  border-radius: var(--dag-metric-radius-card);
+  padding: var(--dag-metric-sketch-stickyPad);
+}
+.dag-sketch__note {
+  font-size: var(--dag-type-nodeTitle);
+  line-height: var(--dag-type-mdLeading);
+  color: var(--dag-color-ink);
+}
+.dag-sketch__hand {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  color: var(--dag-color-slate);
+  margin-top: auto;
+}
+
+/* A container here is a phone frame or a browser window: an outline, not a tint field. Two class
+   names deep so it outranks `.dag-group[data-level="1"]`, which would otherwise fill a nested one.
+   `sketch` assigns no automatic hue, so the label draws in slate rather than in a colour nobody
+   chose, and the dot that would have carried that colour is not drawn. */
+.dag-group.dag-group--sketch {
+  background: var(--dag-color-card);
+  border: var(--dag-metric-line-rule) solid var(--dag-color-outline);
+}
+.dag-group--sketch > .dag-group__label { color: var(--dag-color-slate); }
+.dag-group--sketch > .dag-group__label > .dag-group__dot { display: none; }
+
+/* ---- charts ----
+ *
+ * Every mark is a class rather than a presentation attribute, which is what keeps the colour out of
+ * `ChartView.tsx` entirely: the hue is bound on the group that owns a series' marks by `hueVars()`
+ * and read back here, so a series past the end of `color.chartHues` binds nothing and
+ * `dag-chart--other` hands it the theme's `muted`. Text never wears the series colour — a tick is
+ * `muted`, a category and a legend row `slate`, a value and the hero `ink`.
+ */
+
+/* `display: block` and not the inline default: an inline `<svg>` sits on a text baseline, which
+   gives the wrapper four more pixels than the layout said and fires the size assertion. */
+.dag-chart { display: block; overflow: visible; }
+
+.dag-chart__grid path {
+  fill: none;
+  stroke: var(--dag-color-outlineSoft);
+  stroke-width: var(--dag-metric-chart-gridW);
+}
+.dag-chart__axis path {
+  fill: none;
+  stroke: var(--dag-color-outline);
+  stroke-width: var(--dag-metric-line-hair);
+}
+
+.dag-chart__bar { fill: var(--dag-h, var(--dag-h-default)); }
+.dag-chart__wedge { fill: var(--dag-h, var(--dag-h-default)); }
+.dag-chart__swatch { fill: var(--dag-h, var(--dag-h-default)); }
+.dag-chart__line {
+  fill: none;
+  stroke: var(--dag-h, var(--dag-h-default));
+  stroke-width: var(--dag-metric-chart-lineW);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+/* The ring is the surface painted back out around the dot, so two markers that touch still read as
+   two. A border would be a second colour; this is the paper the chart is drawn on. */
+.dag-chart__marker {
+  fill: var(--dag-h, var(--dag-h-default));
+  stroke: var(--dag-color-paper);
+  stroke-width: var(--dag-metric-chart-markerRing);
+}
+.dag-chart__leader {
+  fill: none;
+  stroke: var(--dag-color-muted);
+  stroke-width: var(--dag-metric-line-hair);
+}
+
+/* Past the end of the palette. Bound as the hue itself so every rule above resolves unchanged —
+   the alternative is a `--other` variant of each one. */
+.dag-chart--other { --dag-h: var(--dag-color-muted); --dag-t: var(--dag-color-muted); }
+
+.dag-chart__text {
+  font-family: var(--dag-font-sans);
+  font-weight: 400;
+  /* `ChartLabel.y` is the centre of the line, never its baseline — a centre is what the layout can
+     reason about, and this is the same claim spelled in CSS. */
+  dominant-baseline: central;
+}
+.dag-chart__text--tick { font-size: var(--dag-type-chartTick); fill: var(--dag-color-muted); }
+.dag-chart__text--category { font-size: var(--dag-type-chartLabel); fill: var(--dag-color-slate); }
+.dag-chart__text--legend { font-size: var(--dag-type-chartLegend); fill: var(--dag-color-slate); }
+.dag-chart__text--value {
+  font-size: var(--dag-type-chartValue);
+  font-weight: 500;
+  fill: var(--dag-color-ink);
+}
+/* A share drawn *inside* its own wedge is the one label that sits on a fill, so it carries the halo
+   an edge label has carried since M6 — the surface painted out from under the text rather than a
+   second colour invented for the occasion, which is the only answer that holds on a dark theme too
+   (its hues are light and its ink is light, so nothing about a fixed colour works on both). Its own
+   width, because `edge.labelHalo` is tuned for a 600-weight mono label and at eleven pixels swallows
+   the glyph. A value on the paper wears none. */
+.dag-chart__text--on-mark {
+  paint-order: stroke;
+  stroke: var(--dag-color-paper);
+  stroke-width: var(--dag-metric-chart-labelHalo);
+  stroke-linejoin: round;
+}
+.dag-chart__text--hero { font-weight: 600; fill: var(--dag-color-ink); }
+.dag-chart__text--heroLabel { font-size: var(--dag-type-chartHeroLabel); fill: var(--dag-color-slate); }
+
+/* A label that *names* something is hit anywhere in its box, not only where the ink is. SVG's
+   default is `visiblePainted`, so the gap between two glyphs is not the label as far as the pointer
+   is concerned — the same argument `.dag-edge-hit` makes for a hairline. This is what lets a click on
+   a legend row pick its series and a double-click retype it. */
+.dag-chart__text[data-dag-title-of] { pointer-events: all; }
+
+/*
+ * `bold` / `italic` on a node statement reach here as `data-dag-em` on the title span — one pair
+ * for all eleven title elements, and `~=` is the whitespace-list match, so "bold italic" turns
+ * both on at once. Keyed on the attribute rather than on a class for the same reason the pair is
+ * keyed on anything: every kind's title span already carries `data-dag-title`, and eleven title
+ * classes would be eleven chances to forget one.
+ *
+ * Last in the file on purpose. It shares its specificity (0,1,0) with every `font-weight: 600`
+ * a title class above sets — `.dag-entity__name`, `.dag-commit__label`, the sketch titles — and
+ * cascade order is the only thing that decides between equals. Higher in the file, a bold title
+ * would lose to its own class and draw regular; higher *specificity* would need a class prefix
+ * per kind, which is the eleven copies this exists to avoid. No px, no colour — the weight is
+ * the theme's token, the slant is what the face does.
+ */
+[data-dag-em~="bold"] { font-weight: var(--dag-type-weightBold); }
+[data-dag-em~="italic"] { font-style: italic; }

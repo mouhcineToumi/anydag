@@ -1,0 +1,89 @@
+NOTICE — third-party icon artwork
+=================================
+
+This directory redistributes icon artwork from the sources below. The artwork is not covered by the
+repository's own licence. Trademarks remain the property of their respective owners in every case,
+including where the copyright licence is CC0: a waiver of copyright is not a grant of trademark.
+
+The icons are used nominatively — to identify a technology in a technical diagram, which is what
+each of these sets exists for. Nothing here implies endorsement by, or affiliation with, any of the
+companies named.
+
+
+1. Simple Icons
+   https://github.com/simple-icons/simple-icons
+   Licence: CC0-1.0 Universal (public domain dedication)
+   Used for: the monochrome brand silhouettes in data/icons.json ("mono" mode).
+   Obligation: none. Note the dedication's own reservation — "No trademark or patent rights held by
+   Affirmer are waived, abandoned, surrendered, licensed or otherwise affected by this document."
+
+2. SVG Logos (Gil Barbara)
+   https://github.com/gilbarbara/logos
+   Licence: CC0-1.0 Universal
+   Used for: the full-colour brand marks in data/icons.json ("brand" mode), including 63 individual
+   AWS service icons and the AI-provider marks.
+   Obligation: none.
+
+3. AWS Architecture Icons
+   https://aws.amazon.com/architecture/icons/
+   Redistributed by AWS at https://github.com/awslabs/aws-icons-for-plantuml under CC-BY-ND 2.0.
+   Used for: AWS services in data/vendor.json that source 2 does not cover.
+   Obligation: attribution, AND no derivative works. The artwork is stored and drawn unmodified.
+   "Amazon Web Services", "AWS" and the service names are trademarks of Amazon.com, Inc. or its
+   affiliates.
+
+4. Microsoft Azure Architecture Icons
+   https://learn.microsoft.com/en-us/azure/architecture/icons/
+   Licence: Microsoft's icon terms, quoted in full because they are narrow —
+     "Microsoft permits the use of these icons in architectural diagrams, training materials, or
+      documentation. You can copy, distribute, and display the icons only for the permitted use
+      unless granted explicit permission by Microsoft. Microsoft reserves all other rights."
+   And, from the same page: "Don't crop, flip, or rotate icons. Don't distort or change icon shape
+   in any way." "Don't use Microsoft product icons to represent your product or service."
+   Used for: Azure services in data/vendor.json.
+   Obligation: permitted use only; the artwork is stored and drawn unmodified.
+   "Microsoft" and "Azure" are trademarks of Microsoft Corporation.
+
+5. Google Cloud product and category icons
+   https://cloud.google.com/icons
+   Used for: the 19 core-product and 26 category icons in data/vendor.json.
+   Google permits use of these logos to accurately reference Google's technology and tools, for
+   instance in architecture diagrams. Google has published no open-source licence for them, so this
+   is permission to reference, not a licence grant: the artwork is stored and drawn unmodified.
+   "Google Cloud" and the product names are trademarks of Google LLC.
+
+6. Fluent Emoji (Flat, and High Contrast)
+   https://github.com/microsoft/fluentui-emoji
+   via @iconify-json/fluent-emoji-flat and @iconify-json/fluent-emoji-high-contrast
+   Licence: MIT
+   Used for: data/emoji-color.json (Flat, `icon=emoji:<name>`) and data/emoji-mono.json (High
+   Contrast, `icon=mono:emoji:<name>`), 1,593 subjects each, skin-tone variants left out.
+   Obligation: the notice below, kept with the artwork.
+
+     MIT License
+
+     Copyright (c) Microsoft Corporation.
+
+     Permission is hereby granted, free of charge, to any person obtaining a copy
+     of this software and associated documentation files (the "Software"), to deal
+     in the Software without restriction, including without limitation the rights
+     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+     copies of the Software, and to permit persons to whom the Software is
+     furnished to do so, subject to the following conditions:
+
+     The above copyright notice and this permission notice shall be included in all
+     copies or substantial portions of the Software.
+
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+     SOFTWARE.
+
+
+Sources 3, 4 and 5 may not be modified. `scripts/icons/build.mjs` never recolours or reshapes
+anything from data/vendor.json, and the renderer draws those icons on a neutral tile rather than
+tinting them — see "The constraint that shapes the code" in README.md. Do not add a step that
+changes this without re-reading the terms above.

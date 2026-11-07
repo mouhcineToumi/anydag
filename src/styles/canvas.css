@@ -1,0 +1,80 @@
+/* The infinite plane and the wrapper every board item sits in. Structure, not style. */
+
+.dag-viewport {
+  position: relative;
+  flex: 1;
+  /* A flex item's `min-width` is `auto`, and this one shares its row with the board list. */
+  min-width: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+  background: var(--dag-color-paper);
+}
+
+/*
+ * The two navigation states, painted onto the box by `Viewport` rather than rendered.
+ *
+ * Both reach into the descendants, because the point of holding space is that an item stops being
+ * an item, and the cursor has to say so over a diagram and over a markdown note — each of which
+ * sets one of its own. The export chip keeps its pointer, and its press keeps going to the button:
+ * it appears only on hover and it is there to be clicked.
+ */
+.dag-viewport[data-pan],
+.dag-viewport[data-pan] * { cursor: grab; }
+.dag-viewport[data-panning],
+.dag-viewport[data-panning] * { cursor: grabbing; }
+
+/*
+ * Navigating is not reading, so nothing selects while the paper is being moved.
+ *
+ * `html[data-dag-dragging]` already says this for an item drag, and it was not enough: that
+ * attribute goes on once `DRAG_SLOP` is beaten, which is several pixels *after* the press that
+ * anchored the selection. A caret dropped into a markdown item on the way past then stretched a
+ * highlight across everything the pan crossed. Here the state is true before any pointer goes
+ * down — `data-pan` the moment the modifier is held, `data-tool` for as long as the hand is up —
+ * so there is no window to lose. `data-panning` covers the middle-drag, whose press is the first
+ * anyone knows of it.
+ *
+ * Into the descendants for the same reason the cursor is: holding space means an item stops
+ * being an item, and the prose inside one is the whole of what there is to select.
+ */
+.dag-viewport[data-pan],
+.dag-viewport[data-pan] *,
+.dag-viewport[data-panning],
+.dag-viewport[data-panning] *,
+.dag-viewport[data-tool="hand"],
+.dag-viewport[data-tool="hand"] * { user-select: none; }
+
+.dag-layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/*
+ * The links between items: one layer for the whole board, positioned at the origin `routeLinks`
+ * chose. It is emitted before the items, so DOM order alone puts the lines under the cards.
+ *
+ * No `content-visibility` here. It brings paint containment, and a curve bowing off its chord or a
+ * marker sitting past its anchor is exactly the drawing outside its own box that containment cuts.
+ */
+.dag-board-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.dag-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Off-screen items cost nothing to keep mounted; a board is mostly off-screen. The size below is
+     a rendering hint for the browser's skipped-content heuristic, not a style: it is the rough box
+     of a typical item, and being wrong costs a scroll-height correction, nothing visible. */
+  content-visibility: auto;
+  contain-intrinsic-size: 520px 320px;
+}

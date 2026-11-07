@@ -1,0 +1,36 @@
+{
+  "//": "What makes a note a project, read and written by `projectOf`/`withProject` in src/note/project.ts (test/projects.test.ts), which the server, the page and the CLI all import. One list of cases, so the sidebar and the Tasks page cannot disagree about which folders are projects. `hues` is HUE_ORDER, which both sides are held to.",
+  "hues": ["indigo", "teal", "coral", "spruce", "ochre", "violet", "magenta", "moss", "crimson", "bronze"],
+  "read": [
+    { "why": "an active project", "text": "---\ntitle: Pricing\nproject: active\n---\nwhy\n", "project": { "status": "active" } },
+    { "why": "paused", "text": "---\nproject: paused\n---\n", "project": { "status": "paused" } },
+    { "why": "done", "text": "---\nproject: done\n---\n", "project": { "status": "done" } },
+    { "why": "with a colour", "text": "---\ntitle: P\nproject: active\nhue: coral\n---\n", "project": { "status": "active", "hue": "coral" } },
+    { "why": "case and blanks do not matter", "text": "---\nproject: \"  Active \"\nhue: TEAL\n---\n", "project": { "status": "active", "hue": "teal" } },
+    { "why": "a colour the theme does not own is none", "text": "---\nproject: active\nhue: purple\n---\n", "project": { "status": "active" } },
+    { "why": "a colour that is not a word is none", "text": "---\nproject: active\nhue: 3\n---\n", "project": { "status": "active" } },
+    { "why": "yes is not a status", "text": "---\nproject: yes\n---\n", "project": null },
+    { "why": "a boolean is not a status", "text": "---\nproject: true\n---\n", "project": null },
+    { "why": "a task's status is not a project's", "text": "---\nproject: todo\n---\n", "project": null },
+    { "why": "an empty project", "text": "---\nproject:\n---\n", "project": null },
+    { "why": "a colour alone is not a project", "text": "---\ntitle: P\nhue: coral\n---\n", "project": null },
+    { "why": "a status alone makes a task, not a project", "text": "---\nstatus: todo\n---\n", "project": null },
+    { "why": "a project that is a task as well", "text": "---\nstatus: todo\nproject: active\n---\n", "project": { "status": "active" } },
+    { "why": "no frontmatter", "text": "project: active\n", "project": null },
+    { "why": "a frontmatter that is not YAML", "text": "---\nproject: [\n---\n", "project": null },
+    { "why": "a frontmatter that is a list", "text": "---\n- project\n---\n", "project": null },
+    { "why": "CRLF line ends", "text": "---\r\nproject: done\r\nhue: moss\r\n---\r\nbody", "project": { "status": "done", "hue": "moss" } }
+  ],
+  "write": [
+    { "why": "made a project after the title", "text": "---\ntitle: Pricing\n---\nwhy\n", "set": { "project": "active" }, "out": "---\ntitle: Pricing\nproject: active\n---\nwhy\n" },
+    { "why": "a status changed where it is", "text": "---\nproject: active\ntitle: P\n---\n", "set": { "project": "done" }, "out": "---\nproject: done\ntitle: P\n---\n" },
+    { "why": "a colour added at the end", "text": "---\ntitle: P\nproject: active\n---\n", "set": { "hue": "coral" }, "out": "---\ntitle: P\nproject: active\nhue: coral\n---\n" },
+    { "why": "a colour changed and the status left alone", "text": "---\nproject: paused\nhue: teal\n---\n", "set": { "hue": "violet" }, "out": "---\nproject: paused\nhue: violet\n---\n" },
+    { "why": "a colour taken off", "text": "---\ntitle: P\nproject: active\nhue: coral\n---\n", "set": { "hue": null }, "out": "---\ntitle: P\nproject: active\n---\n" },
+    { "why": "not a project any more, the title kept", "text": "---\ntitle: P\nproject: active\nhue: coral\n---\nbody\n", "set": { "project": null, "hue": null }, "out": "---\ntitle: P\n---\nbody\n" },
+    { "why": "a block left empty goes altogether", "text": "---\nproject: done\n---\nbody\n", "set": { "project": null, "hue": null }, "out": "body\n" },
+    { "why": "no frontmatter grows one", "text": "body\n", "set": { "project": "active" }, "out": "---\nproject: active\n---\nbody\n" },
+    { "why": "a task's lines are not touched", "text": "---\nstatus: todo\ndue: 2026-10-03\n---\n", "set": { "project": "active", "hue": "moss" }, "out": "---\nstatus: todo\ndue: 2026-10-03\nproject: active\nhue: moss\n---\n" },
+    { "why": "CRLF kept", "text": "---\r\ntitle: P\r\nproject: active\r\n---\r\nbody", "set": { "project": "paused" }, "out": "---\r\ntitle: P\r\nproject: paused\r\n---\r\nbody" }
+  ]
+}

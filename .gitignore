@@ -1,0 +1,39 @@
+node_modules/
+dist/
+*.local
+test-results/
+playwright-report/
+
+# Playwright's blob report and browser cache
+blob-report/
+playwright/.cache/
+
+# Claude Code's per-machine settings hold credentials; the shared half is settings.json.
+.claude/settings.local.json
+
+.DS_Store
+
+# The vendor icon zips: large, and licensed for use rather than redistribution.
+# `icons/data/vendor.json` is the committed output. URLs in icons/README.md.
+icons/.packs/
+snapshots/
+
+# Claude Code's per-agent worktrees.
+.claude/worktrees/
+.env
+
+# The storage state the Playwright suite seeds — its preferences, and the record of which
+# board directory the fixtures go in. `e2e/global-setup.ts` writes both on every run.
+e2e/.auth/
+
+# The desktop shell's bundles and the packaged apps `npm run desktop:dist` writes.
+desktop/dist/
+release/
+
+# Python's byte-code cache, wherever a script leaves it.
+__pycache__/
+
+# The local server in development: its home (the SQLite index, settings, server.json), and each
+# vault's own folder of app state (`.anydag/`).
+.dev-home/
+boards/*/.anydag/

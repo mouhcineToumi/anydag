@@ -1,0 +1,88 @@
+# A release: push a tag `vX.Y.Z` (or `vX.Y.Z-beta.N`) and this builds, checks and publishes it.
+#
+#   1. The tag must equal `VERSION` and `package.json` (`scripts/check-version.mjs`), so a release
+#      can never be built from a tree that says another number.
+#   2. The fast tier runs (`npm run checks`).
+#   3. The desktop app is packaged — an AppImage, unsigned — and opened on a temp vault
+#      (`desktop/smoke.mjs`), passing only when the page reports it is drawn.
+#   4. A GitHub Release is created for the tag with the AppImage and `latest-linux.yml`, which the
+#      app's updater reads. A tag with a `-` in it (`v0.2.0-beta.1`) is published as a pre-release.
+#      The notes are generated from the merged pull requests; edit them on GitHub afterwards.
+#
+# **Linux only, for now.** Windows and macOS are a `matrix` away (see `desktop.yml`), plus their
+# file patterns below; the release job waits for every build in the matrix.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: The tag is the version
+        run: node scripts/check-version.mjs "${{ github.ref_name }}"
+      - run: npm ci
+      - run: npm run checks
+      - run: npm run desktop:build
+      - name: Package
+        run: npx electron-builder --config desktop/electron-builder.yml --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Open it (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node desktop/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.yml
+            release/*.blockmap
+            !release/builder-debug.yml
+            !release/builder-effective-config.yaml
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -la out
+          pre=""
+          case "$TAG" in *-*) pre="--prerelease" ;; esac
+          gh release create "$TAG" out/* \
+            --repo "${{ github.repository }}" \
+            --title "AnyDag ${TAG#v}" \
+            --generate-notes \
+            --verify-tag \
+            $pre
