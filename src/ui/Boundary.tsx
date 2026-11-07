@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
 
+import { fail, flush } from "@/telemetry/client";
+
 interface Props {
   children: ReactNode;
 }
@@ -18,6 +20,12 @@ export class Boundary extends Component<Props, State> {
 
   static getDerivedStateFromError(): State {
     return { broken: true };
+  }
+
+  /** Logged when somebody said yes (`telemetry/client.ts`), and sent now: the page is not coming back. */
+  override componentDidCatch(error: unknown): void {
+    fail("render", error);
+    flush(true);
   }
 
   override render(): ReactNode {

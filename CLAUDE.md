@@ -70,6 +70,10 @@ And **one server serves several vaults**: the page names one in its address as `
 switcher holds the recent ones, *Open folder…* and *Create vault*, and *Close vault* never deletes a
 folder. A file moves between vaults with its id. See *Vaults*.
 
+And **it sends nothing about anyone until they say so**: the first page of the app asks once
+whether it may send anonymous logs — errors, which features are used, how fast pages draw — and
+Settings → Privacy changes the answer. They go to a sync server's `POST /v1/logs`. See *Logs*.
+
 **Three ways to run it.** The desktop app (`desktop/`, Electron) spawns the server and loads the page
 through its own `anydag://` scheme, adding the token from the main process. `anydag serve <folder>`
 (`node server/dist/anydag-server.mjs <folder>`) serves the page to a browser on this machine. And
@@ -115,6 +119,7 @@ full Chromium asks for one; an icon that 404s would fail the gate.
 | `server/` | the local server: the token and `Host` gate, the vault store, the app's home and its SQLite index, every route, the MCP tools | React, the DOM; the page's state — it answers routes and writes files |
 | `desktop/` | the Electron shell: spawning the server, the `anydag://` scheme and the token on every request, windows, the folder dialog, deep links, the `anydag` shim, `safeStorage`, updates | the vault's format: it is a browser and a process manager around the server |
 | `sync/` | the sync server, a separate self-hostable process: `protocol/` (the wire and the cryptography, shared with the client), `server/` (Hono, Postgres or PGlite, blobs on disk, quotas, the usage ledger, `/metrics`, the admin CLI) | a path, a byte of plaintext, the app: everything it stores is sealed by the client |
+| `src/telemetry/` | the page's half of logs: the answer as the server last said it, the events this page holds, the first-run question | what a log may hold — `sync/protocol/logs.ts` decides that, and every hop runs it |
 | `server/sync/` | the app's sync client: `SyncEngine`, its state and bases in the app's home, the loop per linked vault, linking | the server's storage; the page — it says a `SyncStatus` and nothing else |
 
 `src/edit/` is the layer that grew to reach inside a diagram, and it split along one line:
@@ -2854,6 +2859,7 @@ sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and t
 |---|---|---|
 | Account | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
+| | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs* |
 | | About | the build's `VERSION` and the server's |
 | *the vault's name* | Preferences | the theme, problems, pasted images, and the quiz threshold (the person's, and says so) |
 | | Vault | where it is, where its attachments go, whether a rename updates the `[[wikilinks]]` to it, the open board's unused images, and Close vault — never deleting the folder |
@@ -4617,7 +4623,8 @@ Seven things are load-bearing:
   the vault, `.git/ .stversions/ *.sync-conflict-* *.icloud .trash/` ignored, the sha1 base, the 409 and
   `merge3` kept, and opening never writes.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
-  there is no sign-in, no session, no share link, no feedback card and no crash reporter.
+  there is no sign-in, no session, no share link and no feedback card. Logs are sent only once the
+  person says yes — see *Logs*.
 - **Generation is the person's key** (`plugins/generate/`): the prompt card's providers
   read it from the environment or `.env.local` in development and, in the desktop app, from the OS
   keychain through `safeStorage`.
@@ -4939,6 +4946,71 @@ the setting `assistant`, the leader binding `space A`, and the query key `chat`.
 loop nobody asked for); attaching a file or a picture to a message; a chat written on two machines at
 once (both turns land and interleave by id, with no lock, which the file model cannot give); and
 running a turn while the app is closed.
+
+## Logs
+
+Anonymous logs from installs whose person said yes, and from no other. Off
+until answered; asked once per install, on the first page anybody opens; changed in Settings →
+Privacy or with `anydag telemetry on|off|ask`.
+
+| Where | Owns |
+|---|---|
+| `sync/protocol/logs.ts` | what a log may hold: `EVENTS`, each prop a count, a duration, a boolean or one word of a list; `scrub`; `cleanEvent` and `cleanBatch`, which every hop runs |
+| `src/telemetry/client.ts` | the page's half: the answer (`useTelemetry`), `track`, `fail`, the error listeners, a post every 30 s and on `pagehide` |
+| `src/telemetry/Prompt.tsx` · `what.ts` | the first-run question, drawn by `Shell` · the two lists it and the Privacy tab both say |
+| `server/telemetry.ts` · `server/routes/telemetry.ts` | the answer in the home's `kv`, the install id, what is held, the route summary, where it goes, the send |
+| `sync/server/routes/logs.ts` | `POST /v1/logs`: open, rate-limited, one JSONL file a day in `<data>/logs/` |
+
+| Route | Does |
+|---|---|
+| `GET /api/telemetry` | `{consent, destination}`; `consent` is `null` until answered, `destination` a host or `null` |
+| `PUT /api/telemetry` `{enabled}` | `true`, `false`, or `null` to be asked again — not on the Assistant's list, so a chat cannot answer it |
+| `POST /api/telemetry/events` `{events}` | the page's events; `{accepted}`, `0` unless the answer is yes |
+| `POST /v1/logs` (the sync server) | a batch `{v, env, events}`; `202 {accepted}` always, `0` for what is over a rate or not describable |
+
+What a batch holds: errors and crashes (page and server — message and stack, scrubbed), `app.open`
+and `page.ready` (which *kind* of page, and in how many milliseconds), `board.open` (how many items,
+pages and of each diagram type), `feature.use` (export, generate, tidy — one word of `FEATURES`),
+`route.timing` (each route template's count, 5xx count, mean and max, summed per minute), and an
+`env` of the version, desktop or browser, the system, the arch, the language, and a random install id.
+
+Eight things are load-bearing:
+
+- **No prop can hold a person's words.** Every prop is a number, a boolean, a route *template* or
+  one word from a list in `logs.ts`; an unknown event or prop is dropped, not kept. The two free-text
+  props are an error's `message` and `stack`, and `scrub` takes out every quoted run (the app quotes
+  what it reports), every URL and path but a script's own file name and line, every email, every
+  file name and every long token with a digit in it. `test/logs.test.ts` holds the cases.
+- **Every hop cleans again.** The page runs `cleanEvent` before it holds anything, the app's server
+  before it keeps anything, the sync server before it writes anything — so a hop that forgot, or a
+  sender somebody wrote by hand, cannot put more on disk than the vocabulary allows.
+- **The answer is the install's, in the app's home** (`telemetry.consent` in `kv`), not a browser's
+  and not a vault's: one question per machine, read by the page, the CLI and Settings alike. A no
+  deletes the install id and drops everything held; a yes makes a new one. Nothing is measured
+  before a yes — `record`, `routeDone`, `fail`, `track` all return first.
+- **Never under `?snapshot=1` or `?view=1`.** `startTelemetry` does nothing there: no request, no
+  question, no listener. `telemetry.spec.ts` asserts the page makes no `/api/telemetry` request at all.
+- **Where it goes**: `ANYDAG_LOGS_URL` (an address, or `off`), else `ANYDAG_LOGS_BUILD_URL` baked in
+  by `server/build.mjs`, else the sync server of the first vault paired on this machine, else
+  nowhere — and nowhere means nothing is kept for later. Only a server that stays up sends (`start`
+  in `server/main.ts`); the CLI's in-process one never does.
+- **The question is a modal the board cannot hear behind.** `useEditor`'s capture-phase key handler
+  runs before any card can stop a key, so it skips targets inside `[data-dag-telemetry-ask]` as it
+  skips `[data-dag-settings]`; Escape is *No*.
+- **`/v1/logs` is open, and stands in for a token with limits**: 256 KB a batch, 30 a minute an
+  address, 3000 a minute in all, and what is over is `{accepted: 0}` rather than an error a client
+  would retry. Nothing about the request — no address, no header — is written. `ANYDAG_SYNC_LOGS=off`
+  makes it a 404; `ANYDAG_SYNC_LOGS_DAYS` (30) is how long a day file stays.
+- **The suite answers no.** `e2e/global-setup.ts` answers the dev home's question once, or a card
+  over every page would take every click; `telemetry.spec.ts` stands in its own answer with
+  `page.route`.
+
+Names claimed, grepped first: `dag-telemetry*`, `data-dag-telemetry*`, `data-dag-setting-telemetry*`,
+the Settings tab `privacy`, and the event `dag:telemetry` (in `test/prefs.test.ts`'s list).
+
+**Out, and why:** a third-party SDK (a vendor, and a second place deciding what is sent); session
+recordings, clicks, or anything with a coordinate; and a per-vault or per-browser answer — a person
+says it once.
 
 ## Problems
 

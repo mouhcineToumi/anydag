@@ -45,6 +45,7 @@ import { Gate } from "./auth/Gate";
 import { warmLayout } from "./layout/elk";
 import { watchZone } from "./calendar/usePrefs";
 import { pull } from "./settings/sync";
+import { startTelemetry } from "./telemetry/client";
 import { loadVaults } from "./vault/api";
 import { settleVault, watchVault } from "./vault/current";
 import "./styles/base.css";
@@ -133,6 +134,9 @@ async function start(): Promise<void> {
     if (id) await pull();
     /* The account's time zone is read before anything draws a time. */
     watchZone();
+    /* Whether this install sends logs, asked once; the first page asks the person when nobody has
+       answered (`telemetry/Prompt.tsx`). Not awaited: nothing on the page waits on it. */
+    if (id) void startTelemetry();
   }
 
   createRoot(document.getElementById("root")!).render(

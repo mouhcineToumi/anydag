@@ -820,6 +820,27 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-purge .dag-purge__go:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: 0 0 0 2px var(--dag-color-dangerSoft); }
 .dag-purge .dag-purge__go:disabled:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: none; }
 .dag-purge button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+/* The one question about logs, asked once per install (`src/telemetry/Prompt.tsx`): the
+   Settings card's shape over the whole window, above the Settings modal (50) because it may be up
+   when somebody opens that. Two classes deep for the purge card's reason. Names grepped first:
+   `dag-telemetry*` and `data-dag-telemetry*` were nobody's. */
+.dag-settings__scrim.dag-telemetry-ask__scrim {
+  position: fixed;
+  z-index: 70;
+  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+}
+.dag-telemetry-ask { width: 480px; }
+.dag-telemetry-ask__mark { flex: none; color: var(--dag-color-accent); }
+.dag-telemetry-ask__lead { margin: 8px 0 12px; font-size: 13px; line-height: 1.5; color: var(--dag-color-ink); }
+.dag-telemetry-ask__label { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
+.dag-telemetry-ask__list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-telemetry-ask__hint { margin: 12px 0 0; font-size: 12px; color: var(--dag-color-slate); }
+.dag-telemetry-ask__failed { margin: 8px 0 0; font-size: 12px; color: var(--dag-color-dangerText); }
+.dag-telemetry-ask__foot { gap: 8px; }
+.dag-telemetry-ask .dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-telemetry-ask .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); opacity: 0.9; }
+/* The Privacy tab's two lists. */
+.dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); }
 .dag-sidebar__menu-who {
   margin: 0;
   padding: 6px 8px;

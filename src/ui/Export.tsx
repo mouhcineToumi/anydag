@@ -2,6 +2,7 @@ import { Download, FileCode, FileDown, FileImage, FileSpreadsheet, FileText, typ
 import { useEffect, useRef, useState, type KeyboardEvent as KeyEvent } from "react";
 
 import type { MoreItem } from "./PageMore";
+import { track } from "@/telemetry/client";
 
 /**
  * Export, at the end of the top bar.
@@ -151,6 +152,8 @@ export function ExportButton<V extends string>({
     setBusy(true);
     try {
       await onExport(value);
+      /* The format's word, which the log's own list holds: a value it does not name is dropped. */
+      track("feature.use", { what: `export.${String(value)}` });
     } catch (e) {
       setFailed(e instanceof Error ? e.message : String(e));
     } finally {

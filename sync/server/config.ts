@@ -39,6 +39,10 @@ export interface Config {
   publicUrl: string;
   /** The largest blob upload this server reads at all, whatever the plan allows. */
   maxBodyBytes: number;
+  /** Whether `POST /v1/logs` keeps what it is sent; off, it answers `ES_NOT_FOUND`. */
+  logs: boolean;
+  /** How many days of logs are kept on disk, in `<data>/logs/`. */
+  logsDays: number;
 }
 
 export class ConfigError extends Error {}
@@ -84,5 +88,10 @@ export function configFrom(env: Record<string, string | undefined> = process.env
 
   const maxBodyMb = int(env, "ANYDAG_SYNC_MAX_BODY_MB", 512, 1, 1024 * 1024);
 
-  return { mode, databaseUrl, data, port, host, adminToken, historyDays, poke, publicUrl, maxBodyBytes: maxBodyMb * 1024 * 1024 };
+  const logsRaw = (text(env, "ANYDAG_SYNC_LOGS") ?? "on").toLowerCase();
+  if (!["on", "off", "1", "0", "true", "false"].includes(logsRaw)) throw new ConfigError(`ANYDAG_SYNC_LOGS must be on or off, not ${JSON.stringify(env.ANYDAG_SYNC_LOGS)}`);
+  const logs = logsRaw === "on" || logsRaw === "1" || logsRaw === "true";
+  const logsDays = int(env, "ANYDAG_SYNC_LOGS_DAYS", 30, 1, 3650);
+
+  return { mode, databaseUrl, data, port, host, adminToken, historyDays, poke, publicUrl, maxBodyBytes: maxBodyMb * 1024 * 1024, logs, logsDays };
 }

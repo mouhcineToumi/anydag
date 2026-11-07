@@ -5,7 +5,7 @@
  * `app.request(…)`, and `main.ts` over a real Postgres and a socket, with no difference between.
  *
  * Load-bearing:
- * - **Who may ask is decided by path, in one place**: `/v1/health` and `/v1/pair` are open,
+ * - **Who may ask is decided by path, in one place**: `/v1/health`, `/v1/pair` and `/v1/logs` are open,
  *   `/v1/admin/*` and `/metrics` take the admin token, every other `/v1/*` a device token, and
  *   `/v1/vaults/{v}/*` also a vault of that device's account. A route added under `/v1/` is behind
  *   a device token by default; forgetting is never a hole.
@@ -32,6 +32,7 @@ import { blobRoutes } from "./routes/blobs";
 import { changeRoutes } from "./routes/changes";
 import { commitRoutes } from "./routes/commit";
 import { HttpError, type Deps, type Vars } from "./routes/http";
+import { logRoutes } from "./routes/logs";
 import { pairRoutes } from "./routes/pair";
 import { PokeHub, pokeRoutes } from "./routes/poke";
 import { vaultRoutes } from "./routes/vaults";
@@ -54,7 +55,7 @@ export interface AppOptions {
   ageOf?: (vault: string, id: string) => Promise<number | null>;
 }
 
-const OPEN = new Set(["/v1/health", "/v1/pair"]);
+const OPEN = new Set(["/v1/health", "/v1/pair", "/v1/logs"]);
 
 export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps: Deps } {
   const now = opts.now ?? (() => new Date());
@@ -95,7 +96,7 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   app.use("/v1/admin/*", asAdmin);
   app.use("/metrics", asAdmin);
 
-  for (const sub of [pairRoutes(deps), vaultRoutes(deps), blobRoutes(deps), commitRoutes(deps), changeRoutes(deps), pokeRoutes(deps)]) app.route("/", sub);
+  for (const sub of [pairRoutes(deps), logRoutes(deps), vaultRoutes(deps), blobRoutes(deps), commitRoutes(deps), changeRoutes(deps), pokeRoutes(deps)]) app.route("/", sub);
   app.route("/", adminRoutes(deps) as unknown as Hono<{ Variables: Vars }>);
 
   app.notFound((c) => c.json({ code: "ES_NOT_FOUND", message: `no route ${c.req.method} ${c.req.path}` }, 404));

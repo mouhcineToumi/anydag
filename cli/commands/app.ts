@@ -96,6 +96,33 @@ const THEMES = ["paper", "paper-dark", "neutral"];
 
 export const APP: Command[] = [
   {
+    name: ["telemetry"],
+    group: "app",
+    args: "[on|off|ask]",
+    summary: "whether this install sends anonymous logs, and where — or turn it on, off, or back to asking",
+    help:
+      "Off until somebody says yes: the app asks once, on the first page it opens. Logs hold errors with every " +
+      "name, path and quoted text taken out, which features are used, how fast pages draw, and the app's version " +
+      "and system — never a document, a title, a file name or anything that names a person. `ask` puts it back to " +
+      "never answered, so the app asks again. They go to ANYDAG_LOGS_URL, else the sync server a vault is paired with.",
+    routes: ["GET /api/telemetry", "PUT /api/telemetry"],
+    async run(ctx, p) {
+      type Status = { consent: boolean | null; destination: string | null };
+      const said = p.pos[0];
+      const asked: Record<string, boolean | null> = { on: true, off: false, ask: null };
+      let status: Status;
+      if (said === undefined) status = await ctx.api.get<Status>("/api/telemetry");
+      else {
+        if (!(said in asked)) throw new UsageError(`\`${said}\` is not on, off or ask`);
+        status = await ctx.api.put<Status>("/api/telemetry", { enabled: asked[said] });
+      }
+      emit(ctx, status, () => {
+        ctx.io.out(status.consent === null ? "not asked yet" : status.consent ? "on" : "off");
+        ctx.io.err(status.destination ? `logs go to ${status.destination}` : "no destination: no sync server is paired and ANYDAG_LOGS_URL is not set");
+      });
+    },
+  },
+  {
     name: ["settings"],
     group: "app",
     args: "[<key=value>...]",

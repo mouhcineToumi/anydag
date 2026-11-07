@@ -26,6 +26,22 @@
       "mcp": ["settings"]
     },
     {
+      "id": "account.telemetry",
+      "area": "Account",
+      "what": "Whether this install sends anonymous logs, and where they go — off until the person says yes",
+      "rest": ["GET /api/telemetry", "PUT /api/telemetry"],
+      "cli": ["telemetry"],
+      "mcp": {"refused": "Consent is the person's to give: an agent turning the logs on would be answering a question that was asked of somebody else."}
+    },
+    {
+      "id": "account.telemetry.events",
+      "area": "Account",
+      "what": "The page's own log events — errors, the features used, how fast a page drew",
+      "rest": ["POST /api/telemetry/events"],
+      "cli": {"refused": "Events are what the page observes about itself; a command that posted them would be logs nobody's use made."},
+      "mcp": {"refused": "Events are what the page observes about itself; an agent posting them would be inventing usage."}
+    },
+    {
       "id": "vault.list",
       "area": "Vaults",
       "what": "Which vaults there are — the recent list, and which are being served",
