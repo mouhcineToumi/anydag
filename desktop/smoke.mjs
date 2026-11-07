@@ -68,10 +68,12 @@ const hear = (chunk) => {
 };
 child.stdout.on("data", hear);
 child.stderr.on("data", hear);
+/* The app waits up to 90 s for the page once it is up; a cold x64 build under Rosetta takes about a
+   minute to get that far. */
 const timer = setTimeout(() => {
-  console.error("smoke: no answer in 120 s");
+  console.error("smoke: no answer in 240 s");
   child.kill();
-}, 120_000);
+}, 240_000);
 child.on("exit", (code) => {
   clearTimeout(timer);
   const ok = /smoke: loaded \S+\?board=Smoke ready=1/.test(said);

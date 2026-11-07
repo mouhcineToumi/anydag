@@ -777,7 +777,9 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     if (board === null) say(`no board file in \`${launchFolder}\` — the bare page is what is waited on`);
   }
   const url = appUrl(board === null ? "" : `?board=${encodeURIComponent(board)}`);
-  const deadline = Date.now() + 25_000;
+  /* Generous: a cold x64 build under Rosetta spends most of a minute being translated. A healthy
+     run leaves the moment the page says it is drawn. */
+  const deadline = Date.now() + 90_000;
   let ready: string | null = null;
   try {
     await win.loadURL(url);
@@ -879,9 +881,11 @@ async function whenReady(): Promise<void> {
   ipcMain.handle("keys:names", (): string[] => Object.keys(readKeys().keys).filter((name) => PROVIDER_KEY_ENVS.includes(name)).sort());
 
   launchFolder = folderArgOf(process.argv);
-  await startServer(launchFolder);
-  /* The server starts while Electron does; a window and the scheme's handler want Electron done. */
+  /* Ready first: the server's spawn reads the stored keys and the home secret through
+     `safeStorage`, which throws before ready — and `storeKey` then fell back to writing the home
+     secret merely encoded, on every first launch. Windows and the scheme's handler need it too. */
   await app.whenReady();
+  await startServer(launchFolder);
 
   protocol.handle(SCHEME, handleProtocol);
 
