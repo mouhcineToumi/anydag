@@ -169,7 +169,7 @@ function quizReport(ctx: Ctx, text: string): number {
 }
 
 /**
- * What the parser says about a file in the account, or with `--file` about a draft that is not
+ * What the parser says about a file in the vault, or with `--file` about a draft that is not
  *: the same route either way, so the two answers are one answer. A name beside `--file`
  * only labels it.
  */
@@ -531,7 +531,7 @@ export const DOCS: Command[] = [
     args: "[<name>]",
     summary: "the pieces a search is made over: every board item, note block, quiz question and table row, with its words",
     help:
-      "What `/__board/corpus` cuts the account's texts into — the units `search` matches and a result opens onto. " +
+      "What `/__board/corpus` cuts the vault's texts into — the units `search` matches and a result opens onto. " +
       "One line per unit, `<name>#<part>  <what>  <words>`; name a document to see only its own. --json is the " +
       "route's answer.",
     routes: ["GET /__board/corpus"],
@@ -553,7 +553,7 @@ export const DOCS: Command[] = [
     name: ["watch"],
     group: "files",
     args: "[<name>]",
-    summary: "print each change to this account's boards, notes, quizzes and tables as it happens",
+    summary: "print each change to this vault's boards, notes, quizzes and tables as it happens",
     help:
       "The change feed the page listens to — one line per write, `board <name> <sha1>`, `note <name> <sha1>` (and " +
       "`quiz …`, `table …`), or " +
@@ -598,8 +598,8 @@ export const DOCS: Command[] = [
     help:
       "`E_*` stops a diagram drawing and `W_*` does not; `EB_*` is the board file rather than the DSL in it. Branch " +
       "on the code — the message is for a person. What is wrong with the drawing rather than the text needs the " +
-      "laid-out page: `anydag snapshot`. --file checks a draft that is not in the account, writing nothing.",
-    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the account; `-` is stdin" }],
+      "laid-out page: `anydag snapshot`. --file checks a draft that is not in the vault, writing nothing.",
+    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
     async run(ctx, p) {
       const d = await checked<Diagnosed>(ctx, p, "board");

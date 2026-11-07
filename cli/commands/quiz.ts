@@ -70,8 +70,8 @@ export const QUIZ: Command[] = [
     help:
       "Every problem with its line and its code — EQ_ for a question a run cannot ask, WQ_ for one that still " +
       "works — read with the page's own parser. `quiz write` and `quiz edit` print the same after writing. " +
-      "--file checks a draft that is not in the account, writing nothing.",
-    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the account; `-` is stdin" }],
+      "--file checks a draft that is not in the vault, writing nothing.",
+    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
     async run(ctx, p) {
       /* The route's answer, which is the page's parser run by the grammar service — so this,

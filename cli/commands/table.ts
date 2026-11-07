@@ -161,8 +161,8 @@ export const TABLE: Command[] = [
     help:
       "Every problem with its line and its code — ET_ for two things claiming one id, WT_ for everything that " +
       "still works: a cell its column cannot read, a row with no id yet, a sort naming a column that went. " +
-      "--file checks a draft that is not in the account, writing nothing.",
-    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the account; `-` is stdin" }],
+      "--file checks a draft that is not in the vault, writing nothing.",
+    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
     async run(ctx, p) {
       const got = await checked<{ tabs: number; rows: number; diagnostics: TableDiagnostic[] }>(ctx, p, "table");
