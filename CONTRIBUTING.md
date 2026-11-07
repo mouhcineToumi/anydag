@@ -81,8 +81,9 @@ nobody wants to spend it.
    going quiet; `status: blocked` is a normal state.
 
 **CI enforces this.** A PR into `develop` must say `Closes #N` for a `status: ready` issue. The only
-exceptions are PRs by the maintainer and by bots. Small things that need no discussion — a typo, a
-broken link — are still issues; they are quick to triage.
+exceptions are PRs by the maintainer, by bots, and PRs the maintainer has labelled `no-issue`. Small
+things that need no discussion — a typo, a broken link — are still issues; they are quick to triage,
+or the maintainer may label the PR `no-issue` instead.
 
 Labels, in case you want to filter: `status: …`, `type: bug|feature|docs|chore`, `area: …` (canvas,
 dsl, notes, tables, quizzes, tasks-calendar, sync, desktop, cli-mcp, assistant, ci) and
@@ -181,7 +182,7 @@ Examples: `feat/231-table-csv-export`, `fix/142-note-title-focus`, `docs/contrib
 <type>(<scope>): <what changed, in the imperative, lower case>
 ```
 
-Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `perf`, `build`. The scope is optional and
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. The scope is optional and
 follows the `area:` labels: `canvas`, `dsl`, `notes`, `tables`, `quizzes`, `tasks-calendar`, `sync`,
 `desktop`, `cli-mcp`, `assistant`. Examples: `feat(notes): add a table of contents block`,
 `fix(canvas): keep the pick when a card is resized`, `docs: describe the nightly channel`. A breaking

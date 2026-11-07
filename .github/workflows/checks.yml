@@ -63,6 +63,26 @@ jobs:
       # so a red run still says which one went red.
       - run: npm run checks
 
+  # typescript-eslint's three promise rules (`eslint.config.mjs`) over one program that includes
+  # `e2e/` and `desktop/`, which no `tsc` step checks. About 40 s, so it is a job of its own beside the
+  # fast tier rather than a step in it, and not in the commit hook.
+  promises:
+    name: promises
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:promises
+
   # The sync server is a separate process with its own wire and its own suites, and these are the
   # slow ones: a hundred seeded schedules of two or three devices editing, renaming and going offline
   # (`sync/test/converge.test.ts`), and the metadata, route and collector suites on a real Postgres.

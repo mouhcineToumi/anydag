@@ -5,8 +5,8 @@
 #                 the release notes read it.
 #   PR target     `main` takes a pull request only from `release/*` or `hotfix/*` of this repository.
 #   Linked issue  a pull request into `develop` must close an issue labelled `status: ready` — the
-#                 maintainers have agreed it is wanted before anybody writes it. The maintainer and
-#                 bots are exempt.
+#                 maintainers have agreed it is wanted before anybody writes it. The maintainer,
+#                 bots and a PR a maintainer labelled `no-issue` are exempt.
 #
 # Its own workflow, and cheap: it runs again when a title or a body is edited or a label changes,
 # and a required check that reads stale text is a red tick nobody can explain. Each job always
@@ -111,6 +111,12 @@ jobs:
             const exempt = process.env.EXEMPT.split(",").map((s) => s.trim().toLowerCase());
             if (pr.user.type === "Bot" || author.endsWith("[bot]") || exempt.includes(author.toLowerCase())) {
               core.info(`${author} does not need a linked issue.`);
+              return;
+            }
+            // A maintainer can wave the rule through for a change nobody needs to agree to first (a typo,
+            // a dependency bump by hand). Only somebody with write access can add a label.
+            if (pr.labels.some((l) => l.name === "no-issue")) {
+              core.info("Labelled `no-issue` by a maintainer — no issue is required.");
               return;
             }
 
