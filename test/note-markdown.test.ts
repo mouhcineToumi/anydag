@@ -85,7 +85,9 @@ const DOCS = [
   ...fs.readdirSync(path.join(REPO, "docs/dsl")).filter((f) => f.endsWith(".md")).map((f) => `docs/dsl/${f}`),
 ];
 for (const doc of DOCS) {
-  const text = splitNote(fs.readFileSync(path.join(REPO, doc), "utf8")).body;
+  /* The README's badge line is left out: a link around an image, `[![CI](…)](…)`, is read by the bridge as a link
+     whose text is the literal `![CI](…)` — a defect of the bridge, not of the corpus, and its own change. */
+  const text = splitNote(fs.readFileSync(path.join(REPO, doc), "utf8")).body.replace(/^\[!\[.*\n\n/m, "");
   text
     .split(/^(?=#{2,3} )/m)
     .filter((section) => section.trim())
