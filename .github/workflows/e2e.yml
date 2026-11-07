@@ -118,6 +118,10 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.65.0-noble
       # Chromium's shared memory, as Playwright's own documentation asks of a container.
       options: --ipc=host
+    # A container job's default shell is `sh` (dash), which has no arrays.
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -179,7 +183,10 @@ jobs:
       - name: Merge the shards into one HTML report
         env:
           PLAYWRIGHT_HTML_OPEN: never
-        run: npx --yes -p @playwright/test@1.65.0 playwright merge-reports --reporter=html ./all-blob-reports
+        run: |
+          # A shard that died before Playwright started uploaded no blob, and there is nothing to merge.
+          if [ ! -d all-blob-reports ]; then echo "no shard left a report"; exit 0; fi
+          npx --yes -p @playwright/test@1.65.0 playwright merge-reports --reporter=html ./all-blob-reports
       - uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ needs.plan.outputs.scope }}
