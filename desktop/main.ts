@@ -32,6 +32,13 @@ const APP_HOST = "app";
 declare const __ANYDAG_VERSION__: string;
 const VERSION: string = typeof __ANYDAG_VERSION__ === "string" ? __ANYDAG_VERSION__ : "dev";
 
+/** Whether this build was signed with a real identity (`ANYDAG_SIGNED=1` at `desktop/build.mjs`
+ *  time, which the release workflow sets only when a certificate was there). An unsigned macOS app
+ *  cannot update itself — Squirrel.Mac refuses an update whose signature does not match a designated
+ *  requirement an ad-hoc signature does not have — so it does not download one to fail on. */
+declare const __ANYDAG_SIGNED__: boolean;
+const SIGNED: boolean = typeof __ANYDAG_SIGNED__ === "boolean" ? __ANYDAG_SIGNED__ : false;
+
 /** Where the built page (`dist/`) is. `__dirname` is `desktop/dist` in dev and
  *  `<app.asar>/desktop/dist` packaged, so two levels up is the app's root in both — a real folder
  *  in dev, a path inside the asar packaged, and the main process reads its own asar. */
@@ -114,7 +121,10 @@ async function startServer(folder: string | null): Promise<void> {
   }
   const secret = homeSecret();
   if (secret) env.ANYDAG_HOME_SECRET = secret;
-  child = spawn(process.execPath, args, { env, stdio: ["ignore", "pipe", "pipe"] });
+  /* The IPC channel is how the server is asked to stop: Windows has no SIGTERM to send — `kill()`
+     there is TerminateProcess, which leaves `server.json` behind and the index mid-write — and a
+     channel that closes because this process died takes the server with it on every system. */
+  child = spawn(process.execPath, args, { env, stdio: ["ignore", "pipe", "pipe", "ipc"], windowsHide: true });
   child.stderr?.setEncoding("utf8");
   child.stderr?.on("data", (chunk: string) => console.error(`anydag-server: ${chunk}`));
   child.on("error", (e) => {
@@ -226,7 +236,11 @@ async function stopServer(): Promise<void> {
   const said = child;
   child = null;
   if (!said) return;
-  said.kill("SIGTERM");
+  if (said.exitCode !== null || said.signalCode !== null) return;
+  /* Closing the channel is the server's own `quit` (`server/main.ts`) on every system; SIGTERM is
+     the same on the two that have one, for a server started before it listened to the channel. */
+  if (said.connected) said.disconnect();
+  if (process.platform !== "win32") said.kill("SIGTERM");
   await new Promise<void>((resolve) => {
     const timer = setTimeout(() => {
       try {
@@ -656,7 +670,8 @@ function writeShim(): void {
   const file = shimPath();
   let ours = false;
   try {
-    ours = fs.readFileSync(file, "utf8").includes("# anydag shim");
+    /* `# anydag shim` in the sh shim, `rem anydag shim` in the cmd one. */
+    ours = fs.readFileSync(file, "utf8").includes("anydag shim —");
   } catch {
     /* absent */
   }
@@ -664,11 +679,20 @@ function writeShim(): void {
     say(`\`${file}\` is somebody else's already — not touching it.`);
     return;
   }
+  /* A macOS app run from the disk image, or from a quarantined download that Gatekeeper moved to a
+     random read-only path (App Translocation), is not where it will live: a shim written now would
+     name a path that is gone next launch. The launch from /Applications writes it. */
+  if (process.platform === "darwin" && (process.execPath.startsWith("/Volumes/") || process.execPath.includes("/AppTranslocation/"))) {
+    say(`running from \`${path.dirname(process.execPath)}\` — move AnyDag to Applications for the \`anydag\` command.`);
+    return;
+  }
   if (process.platform === "win32") {
     /* `cmd` quoting: a path in double quotes, and `%*` for the arguments as they were typed. */
     const lines = [
       "@echo off",
       "rem anydag shim — written by the AnyDag app; safe to delete.",
+      /* A `set` in a batch file outlives it in the shell that ran it; `setlocal` keeps it here. */
+      "setlocal",
       "set ELECTRON_RUN_AS_NODE=1",
       `"${process.execPath}" "${cliBundle()}" %*`,
     ];
@@ -753,7 +777,9 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     if (board === null) say(`no board file in \`${launchFolder}\` — the bare page is what is waited on`);
   }
   const url = appUrl(board === null ? "" : `?board=${encodeURIComponent(board)}`);
-  const deadline = Date.now() + 25_000;
+  /* Generous: a cold x64 build under Rosetta spends most of a minute being translated. A healthy
+     run leaves the moment the page says it is drawn. */
+  const deadline = Date.now() + 90_000;
   let ready: string | null = null;
   try {
     await win.loadURL(url);
@@ -782,10 +808,13 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 app.on("second-instance", (_event, argv) => {
   if (serverPort > 0) handleInvocation(argv);
 });
-/* macOS gives a cold deep link as an event, not an argv. */
+/* macOS gives a deep link as an event, never an argv — and a cold one arrives before the server
+   has said its port, so it is kept for `whenReady` rather than dropped. */
+let coldLink: string | null = null;
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  handleInvocation([url]);
+  if (serverPort > 0) handleInvocation([url]);
+  else coldLink = url;
 });
 
 app.on("window-all-closed", () => {
@@ -852,17 +881,23 @@ async function whenReady(): Promise<void> {
   ipcMain.handle("keys:names", (): string[] => Object.keys(readKeys().keys).filter((name) => PROVIDER_KEY_ENVS.includes(name)).sort());
 
   launchFolder = folderArgOf(process.argv);
+  /* Ready first: the server's spawn reads the stored keys and the home secret through
+     `safeStorage`, which throws before ready — and `storeKey` then fell back to writing the home
+     secret merely encoded, on every first launch. Windows and the scheme's handler need it too. */
+  await app.whenReady();
   await startServer(launchFolder);
 
   protocol.handle(SCHEME, handleProtocol);
 
   if (!SMOKE) {
-    /* A deep link has to be registered by something that outlives the process: the Windows
-       installer (the `protocols` key above) or `setAsDefaultProtocolClient` — but only where the
-       running path is durable. A dev run would write `node_modules` into the OS, and an AppImage
-       runs out of a mounted squashfs that is gone the moment it stops; AppImageKit's own
-       `appimaged` (or the .desktop it ships) is what owns the association there. */
-    if (app.isPackaged && !process.env.APPIMAGE && process.platform !== "win32") app.setAsDefaultProtocolClient(SCHEME);
+    /* A deep link has to be registered by something that outlives the process — the app bundle's
+       Info.plist on macOS (the `protocols` key in electron-builder.yml), and on Windows the
+       per-user registry key `setAsDefaultProtocolClient` writes, naming the installed exe (the NSIS
+       installer registers no scheme of its own) — but only where the running path is durable. A
+       dev run would write `node_modules` into the OS, and an AppImage runs out of a mounted
+       squashfs that is gone the moment it stops; AppImageKit's own `appimaged` (or the .desktop it
+       ships) is what owns the association there. */
+    if (app.isPackaged && !process.env.APPIMAGE) app.setAsDefaultProtocolClient(SCHEME);
     /* The shim points at a durable place — the AppImage file (`$APPIMAGE` even in extract-and-run)
        or the installed binary — so a late run of the CLI fights no moving target. */
     writeShim();
@@ -874,7 +909,7 @@ async function whenReady(): Promise<void> {
     await runSmoke(win);
     return;
   }
-  const link = process.argv.find((a) => typeof a === "string" && a.startsWith(`${SCHEME}://`));
+  const link = coldLink ?? process.argv.find((a) => typeof a === "string" && a.startsWith(`${SCHEME}://`));
   const target = link ? deepTargetOf(link) : null;
   if (target) openTarget(target);
   else if (launchFolder) {
@@ -886,7 +921,7 @@ async function whenReady(): Promise<void> {
 
   say(`${VERSION} ready — ${serverPort}`);
 
-  if (app.isPackaged) {
+  if (app.isPackaged && (process.platform !== "darwin" || SIGNED)) {
     autoUpdater.checkForUpdatesAndNotify().catch((e) => say(`update check failed: ${(e as Error).message ?? e}`));
   }
 }

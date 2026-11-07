@@ -32,7 +32,10 @@ function packaged() {
   if (process.platform === "linux") found.push(path.join(release, "linux-unpacked", "anydag"));
   if (process.platform === "win32") found.push(path.join(release, "win-unpacked", "AnyDag.exe"));
   if (process.platform === "darwin") {
-    for (const dir of ["mac", "mac-arm64", "mac-universal", "mac-x64"]) found.push(path.join(release, dir, "AnyDag.app", "Contents", "MacOS", "AnyDag"));
+    /* electron-builder names the x64 build `mac` and the others by their arch; this machine's own
+       arch first, so the default run is a native one (`--app` names the other). */
+    const dirs = process.arch === "arm64" ? ["mac-arm64", "mac-universal", "mac", "mac-x64"] : ["mac", "mac-x64", "mac-universal", "mac-arm64"];
+    for (const dir of dirs) found.push(path.join(release, dir, "AnyDag.app", "Contents", "MacOS", "AnyDag"));
   }
   return found.find((f) => fs.existsSync(f));
 }
@@ -51,8 +54,12 @@ const vault = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-smoke-vault-"));
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-smoke-home-"));
 fs.writeFileSync(path.join(vault, "Smoke.board.md"), "---\ntitle: Smoke\n---\n\n```md\nIt opens.\n```\n");
 
-/* Linux CI has no GPU and an unprivileged sandbox the runner may refuse; neither is what is tested. */
-const extra = process.platform === "linux" ? ["--no-sandbox", "--disable-gpu"] : [];
+/* Linux CI has no GPU and an unprivileged sandbox the runner may refuse; neither is what is tested.
+   On macOS `safeStorage` is the login keychain, which the smoke has no business writing — and an
+   item one build made is a modal "allow access?" to the next build signed differently (the x64 app
+   after the arm64 one, each signed ad hoc), which blocks the main thread with nobody to answer it.
+   Chromium's mock keychain keeps it in the process. */
+const extra = process.platform === "linux" ? ["--no-sandbox", "--disable-gpu"] : process.platform === "darwin" ? ["--use-mock-keychain"] : [];
 console.log(`smoke: ${command} ${[...lead, vault].join(" ")}`);
 const child = spawn(command, [...lead, vault, ...extra], {
   env: { ...process.env, ANYDAG_DESKTOP_SMOKE: "1", ANYDAG_HOME: home, ELECTRON_ENABLE_LOGGING: "1" },
@@ -65,10 +72,14 @@ const hear = (chunk) => {
 };
 child.stdout.on("data", hear);
 child.stderr.on("data", hear);
+/* The app waits up to 90 s for the page once it is up; a cold x64 build under Rosetta takes about a
+   minute to get that far. */
 const timer = setTimeout(() => {
-  console.error("smoke: no answer in 120 s");
+  console.error("smoke: no answer in 240 s");
   child.kill();
-}, 120_000);
+  /* A main thread that is stuck never runs its SIGTERM handler. */
+  setTimeout(() => child.kill("SIGKILL"), 10_000).unref();
+}, 240_000);
 child.on("exit", (code) => {
   clearTimeout(timer);
   const ok = /smoke: loaded \S+\?board=Smoke ready=1/.test(said);

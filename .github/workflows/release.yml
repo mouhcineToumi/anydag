@@ -2,15 +2,23 @@
 #
 #   1. The tag must equal `VERSION` and `package.json` (`scripts/check-version.mjs`), so a release
 #      can never be built from a tree that says another number.
-#   2. The fast tier runs (`npm run checks`).
-#   3. The desktop app is packaged — an AppImage, unsigned — and opened on a temp vault
-#      (`desktop/smoke.mjs`), passing only when the page reports it is drawn.
-#   4. A GitHub Release is created for the tag with the AppImage and `latest-linux.yml`, which the
-#      app's updater reads. A tag with a `-` in it (`v0.2.0-beta.1`) is published as a pre-release.
-#      The notes are generated from the merged pull requests; edit them on GitHub afterwards.
+#   2. The fast tier runs (`npm run checks`), once, on Linux.
+#   3. The desktop app is packaged on each system (`desktop/package.mjs`) — an AppImage for x64
+#      Linux, an NSIS installer for x64 Windows, a dmg and a zip each for arm64 and x64 macOS — and
+#      opened on a temp vault (`desktop/smoke.mjs`), passing only when the page reports it is drawn.
+#   4. A GitHub Release is created for the tag with every installer, their blockmaps, and the three
+#      files the app's updater reads: `latest-linux.yml`, `latest.yml` (Windows) and
+#      `latest-mac.yml`. The release is not made unless all three are there. A tag with a `-` in it
+#      (`v0.2.0-beta.1`) is published as a pre-release. The notes are generated from the merged pull
+#      requests; edit them on GitHub afterwards.
 #
-# **Linux only, for now.** Windows and macOS are a `matrix` away (see `desktop.yml`), plus their
-# file patterns below; the release job waits for every build in the matrix.
+# **Signing switches on with the secrets, and is skipped cleanly without them.**
+#   - macOS: `CSC_LINK` (a Developer ID Application .p12, base64) and `CSC_KEY_PASSWORD` sign;
+#     `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` notarise. Without a certificate
+#     the app is signed ad hoc: it installs, Gatekeeper asks once, and it does not update itself.
+#   - Windows: `WIN_CSC_LINK` (a code-signing .pfx, base64) and `WIN_CSC_KEY_PASSWORD`. Without
+#     them the installer is unsigned and SmartScreen asks once.
+#   `desktop/package.mjs` reads them; an absent secret arrives as an empty string and counts as none.
 name: release
 
 on:
@@ -25,13 +33,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: build (${{ matrix.os }})
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+  checks:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
@@ -42,14 +45,58 @@ jobs:
         run: node scripts/check-version.mjs "${{ github.ref_name }}"
       - run: npm ci
       - run: npm run checks
+
+  build:
+    name: build (${{ matrix.os }})
+    needs: checks
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: The tag is the version
+        run: node scripts/check-version.mjs "${{ github.ref_name }}"
+      - run: npm ci
       - run: npm run desktop:build
       - name: Package
-        run: npx electron-builder --config desktop/electron-builder.yml --publish never
+        run: node desktop/package.mjs
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
       - name: Open it (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a node desktop/smoke.mjs
+      - name: Open it
+        if: runner.os != 'Linux'
+        run: node desktop/smoke.mjs
+      - name: Open the x64 build too (macOS, under Rosetta)
+        if: runner.os == 'macOS'
+        run: |
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            # The arm64 run's keychain item belongs to a differently signed app, and reading it
+            # would be an "allow access?" prompt nobody answers. The runner is thrown away after.
+            perl -e 'alarm 20; exec @ARGV' security delete-generic-password -s "AnyDag Safe Storage" >/dev/null 2>&1 || true
+            node desktop/smoke.mjs --app release/mac/AnyDag.app/Contents/MacOS/AnyDag
+          else
+            echo "::warning::no Rosetta on this runner — the x64 build was packaged but not opened"
+          fi
+      - name: What was built
+        run: ls -la release
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ runner.os }}
@@ -57,10 +104,11 @@ jobs:
           if-no-files-found: error
           path: |
             release/*.AppImage
-            release/*.yml
+            release/*.exe
+            release/*.dmg
+            release/*.zip
             release/*.blockmap
-            !release/builder-debug.yml
-            !release/builder-effective-config.yaml
+            release/latest*.yml
 
   publish:
     needs: build
@@ -72,12 +120,17 @@ jobs:
         with:
           path: out
           merge-multiple: true
+      - name: Every updater file is there
+        run: |
+          ls -la out
+          for f in latest-linux.yml latest.yml latest-mac.yml; do
+            test -f "out/$f" || { echo "::error::$f is missing — the updater on that system would find no release"; exit 1; }
+          done
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          ls -la out
           pre=""
           case "$TAG" in *-*) pre="--prerelease" ;; esac
           gh release create "$TAG" out/* \

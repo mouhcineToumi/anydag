@@ -1,14 +1,17 @@
-# The AnyDag desktop shell: an AppImage on Linux, a dmg and a zip
-# on macOS, an NSIS installer on Windows. Each is built on its own OS — `npm run desktop:dist` builds
-# the one it runs on, and `.github/workflows/desktop.yml` builds all three. None is signed yet.
+# The AnyDag desktop shell: an AppImage on Linux (x64), a dmg and a zip per architecture on macOS
+# (arm64 and x64), an NSIS installer on Windows (x64). Each is built on its own OS —
+# `npm run desktop:dist` builds the one it runs on, and `.github/workflows/desktop.yml` builds all
+# three. Signing is the workflow's: it signs when a certificate is in its secrets, and otherwise
+# the macOS app is signed ad hoc (`-c.mac.identity=-`) and the Windows installer is not signed.
 #
 # Two facts the files list encodes: the server and the CLI bundles are the two things an
 # Electron-as-Node child executes, so they (and their one native module, `@parcel/watcher`) are
 # unpacked from the asar onto the real filesystem; the page and the shell stay packed — the main
 # process reads its own asar, children read real files.
 #
-# `files` is the walk: everything listed is packed, everything else only side-skips. The walk above
-# (the configless run) reaches some repository source such as `boards/` that vanishes mid-walk.
+# `files` is the walk. **electron-builder packs every production dependency whatever `files` says**
+# — the page and the server are bundles, so that was 238 MB of `node_modules` nothing reads — and
+# `!node_modules/**/*` then the five modules by name is what keeps it to the ones a child requires.
 # Invoke with the config named — electron-builder looks at the repository root by default:
 #   electron-builder --config desktop/electron-builder.yml
 appId: io.github.mouhcinetoumi.anydag
@@ -16,20 +19,27 @@ productName: AnyDag
 icon: desktop/icon.png
 directories:
   output: release
+# The one native module, `@parcel/watcher`, is N-API and prebuilt per platform; there is nothing to
+# rebuild for Electron, and a rebuild from its `binding.gyp` fails outright when one machine packages
+# a second architecture (the macOS job builds x64 on arm64).
+npmRebuild: false
 files:
   - desktop/dist
   - dist
   - server/dist
   - cli/dist
   - package.json
-  # The one native module the server keeps out of its bundle, and — read off its runtime
-  # `require`s — exactly four dependencies that need no build: picomatch (no deps in 4.x),
-  # is-glob → is-extglob, and detect-libc. `node-addon-api` is build-time only.
-  - node_modules/@parcel/watcher*
-  - node_modules/picomatch
-  - node_modules/is-glob
-  - node_modules/is-extglob
-  - node_modules/detect-libc
+  # The one native module the server keeps out of its bundle, its prebuilt binary — whichever
+  # `@parcel/watcher-<os>-<arch>` is installed; the macOS job installs the second architecture's
+  # beside the first — and, read off its runtime `require`s, exactly four dependencies that need no
+  # build: picomatch (no deps in 4.x), is-glob → is-extglob, and detect-libc.
+  - "!node_modules/**/*"
+  - node_modules/@parcel/watcher/**/*
+  - node_modules/@parcel/watcher-*/**/*
+  - node_modules/picomatch/**/*
+  - node_modules/is-glob/**/*
+  - node_modules/is-extglob/**/*
+  - node_modules/detect-libc/**/*
   - "!boards"
   - "!e2e"
   - "!src"
@@ -46,11 +56,12 @@ asarUnpack:
   # What Electron-as-Node children execute or require. A real-file `require` cannot see inside the
   # asar, so the watcher and everything it loads at runtime live beside it on the disk — with the
   # bundles `server/dist` and `cli/dist` that own the only requires.
-  - node_modules/@parcel/watcher*
-  - node_modules/picomatch
-  - node_modules/is-glob
-  - node_modules/is-extglob
-  - node_modules/detect-libc
+  - node_modules/@parcel/watcher/**
+  - node_modules/@parcel/watcher-*/**
+  - node_modules/picomatch/**
+  - node_modules/is-glob/**
+  - node_modules/is-extglob/**
+  - node_modules/detect-libc/**
   - server/dist/**
   - cli/dist/**
 protocols:
@@ -69,20 +80,31 @@ linux:
   # this exact name after `--appimage-mount` (or the extract fallback) finds it.
   executableName: anydag
 mac:
+  # One build per architecture rather than a universal one: a universal app is both Electrons in
+  # one bundle, twice the download for everybody, and the updater picks the right zip by its name.
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
   category: public.app-category.productivity
-  # Unsigned — there is no signing certificate yet: `null` stops electron-builder looking for an
-  # identity in the keychain and failing on a machine that has none.
-  identity: null
+  # No spaces, and the arch always said: the release's file names are the updater's URLs.
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # Hardened runtime with electron-builder's default entitlements (JIT, unsigned executable memory,
+  # library validation off — the last is what lets the ad-hoc-signed watcher load). Notarisation
+  # runs when APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID are in the environment.
+  hardenedRuntime: true
 win:
   target:
-    - nsis
+    - target: nsis
+      arch: [x64]
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  # `AnyDag Setup 0.2.0.exe` by default: GitHub turns the spaces into dots on upload and
+  # `latest.yml` would then name a file the release does not have.
+  artifactName: ${productName}-Setup-${version}.${ext}
 publish:
   provider: github
   owner: mouhcineToumi

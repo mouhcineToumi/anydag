@@ -39,20 +39,48 @@ api.content --> db
 
 ## Status
 
-**0.1.0, Linux first.** Releases are an AppImage for x64 Linux, unsigned. The code is written for
-macOS and Windows too, and their builds will be released once their pipelines are in place.
+**0.1.0 shipped for Linux only; the next release ships for Linux, Windows and macOS.** Each release
+has an AppImage for x64 Linux, an installer for x64 Windows, and a disk image (and a zip) for macOS
+on Apple Silicon (`arm64`) and on Intel (`x64`). **None of them is signed with a certificate yet**,
+so Windows and macOS each ask once before they open the app — the steps are below. The Linux and
+Windows builds update themselves; an unsigned macOS build cannot (macOS refuses to install an
+update to an app without a developer signature), so on a Mac you download the next release yourself.
 
 ## Install
 
-Download the AppImage from [Releases](https://github.com/mouhcineToumi/anydag/releases), then:
+Download the file for your system from [Releases](https://github.com/mouhcineToumi/anydag/releases).
+
+**Linux** — `AnyDag-<version>.AppImage`:
 
 ```bash
 chmod +x AnyDag-*.AppImage
 ./AnyDag-*.AppImage
 ```
 
-On first launch it puts an `anydag` command in `~/.local/bin`, so the CLI and the MCP server below
-work from any terminal.
+**Windows** — `AnyDag-Setup-<version>.exe`. Run it. Because the installer is not signed, Windows
+SmartScreen says *Windows protected your PC*: click **More info**, then **Run anyway**. It installs
+for your user only, with no administrator prompt.
+
+**macOS** — `AnyDag-<version>-arm64.dmg` on an Apple Silicon Mac (M1 and later),
+`AnyDag-<version>-x64.dmg` on an Intel one. Open the disk image and drag AnyDag to Applications.
+Because the app is not signed by an Apple developer, macOS will not open it with a double-click the
+first time. Either:
+
+- **right-click** (or control-click) AnyDag in Applications, choose **Open**, then **Open** again —
+  on macOS 15 and later, if there is no Open button, go to **System Settings → Privacy & Security**,
+  scroll down to the message about AnyDag and click **Open Anyway**; or
+- in Terminal, take the download's quarantine flag off, then open it normally:
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/AnyDag.app
+  ```
+
+Run it from Applications rather than from the disk image, or the `anydag` command below is not
+written.
+
+On first launch it puts an `anydag` command on your machine — `~/.local/bin/anydag` on Linux and
+macOS, `%APPDATA%\AnyDag\bin\anydag.cmd` on Windows — so the CLI and the MCP server below work from
+a terminal. Settings → AI and agents shows its exact path, for a folder that is not on your `PATH`.
 
 ## Use it from a terminal or an agent
 

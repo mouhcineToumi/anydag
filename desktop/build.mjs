@@ -30,7 +30,9 @@ export async function build() {
     entryNames: "[name]",
     /* The repository is `"type": "module"`, so a `.js` here would be ESM; Electron wants CJS. */
     outExtension: { ".js": ".cjs" },
-    define: { __ANYDAG_VERSION__: JSON.stringify(version) },
+    /* `ANYDAG_SIGNED=1` is set by the release workflow when a signing certificate is there; the
+       shell reads it to know whether a macOS build can update itself. */
+    define: { __ANYDAG_VERSION__: JSON.stringify(version), __ANYDAG_SIGNED__: JSON.stringify(process.env.ANYDAG_SIGNED === "1") },
     logLevel: "warning",
   });
 }

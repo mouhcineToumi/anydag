@@ -4661,12 +4661,13 @@ git — and which nothing here may break.
 
 `desktop/`. Electron around the one server and the built page:
 `npm run desktop:dev` runs it on a checkout, `npm run desktop:dist` packages it for the
-platform it runs on — an AppImage on Linux, a `.dmg` and a `.zip` on macOS, an NSIS installer on
-Windows, all unsigned — and `npm run desktop:smoke` opens the packaged app on a fresh vault, waits
-for `data-dag-ready` (`ANYDAG_DESKTOP_SMOKE=1`) and passes on one printed line; `-- --dev` runs it
-on `desktop/dist/` instead. `.github/workflows/desktop.yml` builds and smokes all three on a pull
-request that touches the app, and keeps what it built for a week — on Linux only for now: putting
-`windows-latest` and `macos-latest` back in its matrix turns them on again.
+platform it runs on (`desktop/package.mjs`) — an AppImage for x64 Linux, an NSIS installer for x64
+Windows, a `.dmg` and a `.zip` each for arm64 and x64 macOS — and `npm run desktop:smoke` opens the
+packaged app on a fresh vault, waits for `data-dag-ready` (`ANYDAG_DESKTOP_SMOKE=1`) and passes on
+one printed line; `-- --dev` runs it on `desktop/dist/` instead, `-- --app <exe>` names another
+build. `.github/workflows/desktop.yml` builds and smokes all three systems on a pull request that
+touches the app — on macOS both architectures, the x64 one under Rosetta — and keeps what it built
+for a week.
 `check:case`, in the fast tier, refuses two tracked files that are one file on their case-insensitive
 disks — `src/ui/trash.ts` beside `Trash.tsx` was, and an import of `./Trash` built Linux clean and
 failed on both.
@@ -4676,15 +4677,40 @@ failed on both.
 | `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, updates |
 | `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
+| `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Eight things are load-bearing:
+Eleven things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
   the asar: a child cannot `dlopen` out of one. The child's death ends the app, and the app's quit
-  stops the child first.
+  stops the child first — **by closing the IPC channel it was spawned with**, which the server
+  answers with its own `quit` (`server/main.ts`). Windows has no SIGTERM: `kill()` there is
+  TerminateProcess, which left `server.json` behind. A channel that closes because the app died
+  takes the server with it on every system.
+- **electron-builder packs every production dependency, whatever `files` lists.** The page and the
+  server are bundles, so that was 238 MB of `node_modules` in the asar that nothing read, and the
+  watcher's own package was packed rather than unpacked — it resolved only because a from-source
+  rebuild happened to mark it native. `!node_modules/**/*` and then the five runtime modules by name
+  is the list now (19 MB), and `npmRebuild: false`: the watcher is N-API and prebuilt, and a
+  rebuild from its `binding.gyp` cannot cross-compile, which is what the macOS job does.
+- **Each macOS architecture is its own build, from one job.** Not universal: that is both Electrons
+  in one bundle for everybody. One job, so there is one `latest-mac.yml` naming both zips, and
+  `electron-updater` picks the one whose name says its arch. `npm ci` installs only the runner's
+  `@parcel/watcher-darwin-*`, so `package.mjs` fetches the other at the lockfile's version and
+  checks it against the lockfile's integrity; `files` packs whichever are on the disk.
+- **Signing is the environment's.** `package.mjs` signs macOS with `CSC_LINK` (notarising with
+  `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) and Windows with `WIN_CSC_LINK`,
+  hands each OS only its own, and treats an empty variable as absent. Without a certificate,
+  `CSC_IDENTITY_AUTO_DISCOVERY=false`, Windows is unsigned and macOS is signed **ad hoc**
+  (`-c.mac.identity=-`) — an Apple Silicon Mac runs nothing unsigned, and the hardened runtime's
+  default entitlements turn library validation off so the watcher loads. The shell is rebuilt with
+  `ANYDAG_SIGNED`, because an ad-hoc macOS app cannot update itself (Squirrel.Mac checks the new
+  version against a designated requirement an ad-hoc signature does not have), so it does not try.
+  electron-builder skips signing on a pull request, ad hoc included, so `CSC_FOR_PULL_REQUEST` is
+  set when there is no certificate to protect. `desktop.yml` is handed no secrets at all.
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to
@@ -4705,22 +4731,32 @@ Eight things are load-bearing:
   in `PROVIDER_KEY_ENVS` are accepted. The page can store one and ask which are stored; it never
   reads one back. The server reads keys at spawn, so storing one **restarts the server**, reopening
   every vault it had open (each keeps its id, which is in the folder). A machine with no keyring
-  gets the value encoded, not encrypted, and the console says so.
+  gets the value encoded, not encrypted, and the console says so. **The server is spawned after
+  `ready`**: its spawn reads the keys and the home secret, `safeStorage` throws before `ready`, and
+  that throw read as "no keyring" — every first launch stored the home secret merely encoded. The
+  macOS smoke log is what showed it.
 - **A load always names `index.html`.** `anydag://app/?x` canonicalises to a pathname of `//`, and
   the page's own `history.replaceState` then resolves to an address with no host, which Chromium
   refuses as another origin — the smoke run's `ready=never` before it was found.
 - **A deep link is `anydag://open?vault=<id>&board=…`** and a window is a vault: the link lands in
   that vault's window, or opens one. The single-instance lock hands a second launch's argv — a link
-  or a folder — to the first. A tool's `url` is such a link.
+  or a folder — to the first. A tool's `url` is such a link. macOS hands a link over as `open-url`,
+  never in argv, and a cold one arrives before the server has its port: it is kept (`coldLink`) for
+  `whenReady`. The scheme is registered by the bundle's Info.plist on macOS and by
+  `setAsDefaultProtocolClient` on Windows — the NSIS installer registers none of its own.
 - **The `anydag` shim is `~/.local/bin/anydag`**, written on launch unless a file that is not ours is
   there — `anydag.cmd` under the app's home on Windows. From an AppImage it mounts the image
   (`--appimage-mount`, extracting when that fails) and runs the CLI inside it with the image's own
-  Electron as Node; anywhere else it is one `exec`. `~/.local/bin` is not on a Mac's PATH and
+  Electron as Node; anywhere else it is one `exec`. The cmd shim is recognised as ours by the same
+  `anydag shim —` the sh one carries, and says `setlocal`, or its `set` would outlive it in the
+  shell that ran it. A Mac app running from its disk image or a translocated quarantine path writes
+  none: that path is gone next launch. `~/.local/bin` is not on a Mac's PATH and
   Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → AI
   and agents writes the MCP lines with that absolute path.
 
-**Not yet, and why:** signed and notarised builds (which need signing certificates), so
-`electron-updater`'s check is wired but cannot honestly install anything; a `.deb`; and registering
+**Not yet, and why:** signing certificates, so the builds are unsigned and an unsigned Mac updates
+by hand (the release workflow signs and notarises the moment the secrets exist); Windows on arm64
+and Linux on arm64; a `.deb`; and registering
 the `anydag://` scheme from an AppImage, which `appimaged` or the `.desktop` file it ships owns
 rather than the app.
 
@@ -4978,15 +5014,17 @@ shell through `desktop/build.mjs`, the page's `<meta name="version">` and Settin
 
 **A release is a tag.** Bump `VERSION` and `package.json` together in one commit on `main`, then push
 `v<version>`: `.github/workflows/release.yml` checks the tag against both files
-(`node scripts/check-version.mjs v0.2.0`), runs the fast tier, packages the AppImage, opens it on a
-temp vault, and creates the GitHub Release with the AppImage and `latest-linux.yml` — which is what
-the app's updater reads. A tag with a `-` in it is a pre-release. The notes are generated from the
-merged pull requests and can be edited on GitHub afterwards.
+(`node scripts/check-version.mjs v0.2.0`), runs the fast tier once, packages the app on Linux,
+Windows and macOS (signing where the secrets allow — see *The desktop app*), opens each on a temp
+vault, and creates the GitHub Release with every installer, its blockmap and the three files the
+app's updater reads: `latest-linux.yml`, `latest.yml` (Windows) and `latest-mac.yml`. The release is
+not created unless all three are there. A tag with a `-` in it is a pre-release. The notes are
+generated from the merged pull requests and can be edited on GitHub afterwards.
 
-**Linux only, for now.** The desktop code is written for all three systems; Windows and macOS are a
-`matrix` entry in `release.yml` and `desktop.yml` plus their file patterns, once their pipelines
-(signing, notarisation) are in place. `check:case` keeps the tree buildable on their
-case-insensitive disks meanwhile.
+**The file names are the updater's URLs**, so none has a space: `AnyDag-<v>.AppImage`,
+`AnyDag-Setup-<v>.exe`, `AnyDag-<v>-<arm64|x64>.dmg` and `.zip`. electron-builder's default
+Windows name has spaces, which GitHub turns into dots on upload, and `latest.yml` would then name a
+file the release does not have.
 
 ## Gate
 
@@ -5000,8 +5038,10 @@ everywhere. It needs no browser and no network and takes seconds, which is what 
 commit hook: `tsc` is incremental (its build info under `node_modules/.cache/tsc/`) and the unit
 suite shares modules between the files each worker runs. `.githooks/pre-commit` is the hook, and
 `npm run prepare` installs it with `git config core.hooksPath .githooks` — relative on purpose, so one
-setting serves every worktree. `prepare` is guarded with `command -v git`, because `npm ci` runs it
-where there may be no repository. `ANYDAG_NO_HOOK=1` skips the hooks.
+setting serves every worktree. `prepare` is `scripts/hooks.mjs`, which does nothing without git or a
+repository, because `npm ci` runs it where there may be neither — and is Node, because npm runs a
+script line with `cmd.exe` on Windows, where `command -v` and `true` are not commands and the shell
+form failed `npm ci` there. `ANYDAG_NO_HOOK=1` skips the hooks.
 
 **CI runs the fast tier and no Playwright.** The screenshot baselines are compared against one pinned
 Chromium, and a runner's fonts rasterise differently, so a green tick on GitHub does not mean the app
