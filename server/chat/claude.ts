@@ -22,7 +22,15 @@ import path from "node:path";
 
 import { lines, tail, terminate } from "../../plugins/generate/cli";
 import { claudeEnv, findClaude } from "../../plugins/generate/providers";
-import { bareTool, type Harness, type HarnessEvent, type McpCommand, type RunEnd, type RunOptions, type Running } from "./harness";
+import {
+  bareTool,
+  type Harness,
+  type HarnessEvent,
+  type McpCommand,
+  type RunEnd,
+  type RunOptions,
+  type Running,
+} from "./harness";
 import type { Usage } from "./types";
 
 /** `MCP_TOOL_TIMEOUT`: above chat mode's five-minute approval, which a write tool blocks on. */
@@ -148,7 +156,12 @@ function assistantEvents(d: Obj, st: ClaudeState): HarnessEvent[] {
   for (const b of content) {
     const block = obj(b);
     if (block?.type === "text" && typeof block.text === "string" && block.text) out.push({ kind: "text", text: block.text });
-    else if (block?.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string" && !st.tools.has(block.id)) {
+    else if (
+      block?.type === "tool_use" &&
+      typeof block.id === "string" &&
+      typeof block.name === "string" &&
+      !st.tools.has(block.id)
+    ) {
       st.tools.add(block.id);
       out.push({ kind: "tool", id: block.id, name: bareTool(block.name), input: block.input ?? {} });
     }

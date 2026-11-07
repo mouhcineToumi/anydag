@@ -108,7 +108,7 @@ exit 0 done · 3 not tidy (--check) · 5 not ready · 6 no server`);
     process.exit(6);
   }
 
-  const { chromium } = require("playwright");
+  const { chromium } = require("@playwright/test");
   const browser = await launch(chromium);
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1200 },
@@ -136,7 +136,9 @@ exit 0 done · 3 not tidy (--check) · 5 not ready · 6 no server`);
     console.log(`tidy  ${board}  already tidy (${result.of} item${result.of === 1 ? "" : "s"})`);
     process.exit(0);
   }
-  console.log(`tidy  ${board}  ${check ? "would move" : "moved"} ${result.moved} of ${result.of} item${result.of === 1 ? "" : "s"}`);
+  console.log(
+    `tidy  ${board}  ${check ? "would move" : "moved"} ${result.moved} of ${result.of} item${result.of === 1 ? "" : "s"}`,
+  );
   for (const id of result.ids ?? []) {
     const a = before[id];
     const b = after[id];

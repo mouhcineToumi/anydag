@@ -39,7 +39,8 @@ async function listed(ctx: Ctx): Promise<{ vaults: Vault[]; home: string }> {
 /** A vault named by id, by its folder, or by its name — whichever the person has to hand. */
 function find(all: Vault[], what: string): Vault {
   const abs = path.resolve(what);
-  const found = all.find((v) => v.id === what) ?? all.find((v) => path.resolve(v.path) === abs) ?? all.filter((v) => v.name === what).at(0);
+  const found =
+    all.find((v) => v.id === what) ?? all.find((v) => path.resolve(v.path) === abs) ?? all.filter((v) => v.name === what).at(0);
   if (!found) throw new UsageError(`no vault \`${what}\` — \`anydag vault ls\` lists them`);
   return found;
 }
@@ -86,7 +87,9 @@ async function runServer(what: string, argv: readonly string[]): Promise<number>
       const root = path.resolve(here, "..", "..");
       bin = await (await import(/* @vite-ignore */ path.join(root, "server", "build.mjs"))).build();
     } catch (e) {
-      process.stderr.write(`anydag ${what}: the server is not built (${e instanceof Error ? e.message : String(e)}) — run \`node server/build.mjs\`\n`);
+      process.stderr.write(
+        `anydag ${what}: the server is not built (${e instanceof Error ? e.message : String(e)}) — run \`node server/build.mjs\`\n`,
+      );
       return 2;
     }
   }
@@ -133,12 +136,16 @@ export const VAULT: Command[] = [
   {
     name: ["vault", "ls"],
     args: "",
-    summary: "every vault on the recent list — `*` marks the one served by default, `o` one being served, `!` a folder that is gone",
+    summary:
+      "every vault on the recent list — `*` marks the one served by default, `o` one being served, `!` a folder that is gone",
     routes: ["GET /api/vaults"],
     async run(ctx) {
       const { vaults, home } = await listed(ctx);
       emit(ctx, { vaults, home }, () => {
-        for (const line of table(vaults.map((v) => [v.default ? "*" : v.open ? "o" : v.missing ? "!" : " ", v.id, v.name, v.path]))) ctx.io.out(line);
+        for (const line of table(
+          vaults.map((v) => [v.default ? "*" : v.open ? "o" : v.missing ? "!" : " ", v.id, v.name, v.path]),
+        ))
+          ctx.io.out(line);
       });
     },
   },
@@ -153,7 +160,9 @@ export const VAULT: Command[] = [
       "running it opens there; with none, the vault is opened for this command alone and is on the recent list after.",
     routes: ["POST /api/vaults/open"],
     async run(ctx, p) {
-      const done = await ctx.api.post<{ vault: { id: string; name: string; path: string } }>("/api/vaults/open", { path: p.pos.join(" ") });
+      const done = await ctx.api.post<{ vault: { id: string; name: string; path: string } }>("/api/vaults/open", {
+        path: p.pos.join(" "),
+      });
       emit(ctx, done, () => ctx.io.out(done.vault.id));
     },
   },
@@ -165,7 +174,10 @@ export const VAULT: Command[] = [
     help: "Refused when something is already at that path, so nothing existing is ever adopted by accident — use `vault open` for that.",
     routes: ["POST /api/vaults/create"],
     async run(ctx, p) {
-      const done = await ctx.api.post<{ vault: { id: string; name: string; path: string } }>("/api/vaults/create", { parent: p.pos[0], name: p.pos.slice(1).join(" ") });
+      const done = await ctx.api.post<{ vault: { id: string; name: string; path: string } }>("/api/vaults/create", {
+        parent: p.pos[0],
+        name: p.pos.slice(1).join(" "),
+      });
       emit(ctx, done, () => ctx.io.out(done.vault.id));
     },
   },
@@ -223,8 +235,11 @@ export const VAULT: Command[] = [
       const name = p.pos[0];
       if (!name) throw new UsageError("usage: anydag vault transfer <name> --to <id|path> [--kind board|note|quiz|table|file]");
       const kind = typeof p.flags.kind === "string" ? p.flags.kind : "board";
-      if (!["board", "note", "quiz", "table", "file"].includes(kind)) throw new UsageError("--kind is board, note, quiz, table or file");
-      const done = await ctx.api.post<{ name: string; kind: string }>("/__board/transfer", { name, kind, to: to.id }, at).finally(restore);
+      if (!["board", "note", "quiz", "table", "file"].includes(kind))
+        throw new UsageError("--kind is board, note, quiz, table or file");
+      const done = await ctx.api
+        .post<{ name: string; kind: string }>("/__board/transfer", { name, kind, to: to.id }, at)
+        .finally(restore);
       emit(ctx, done, () => ctx.io.out(done.name));
     },
   },

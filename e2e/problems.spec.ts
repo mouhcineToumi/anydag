@@ -35,7 +35,7 @@ stack.api --> other
 `;
 
 /** A diagram whose own body does not parse: a word that is not a kind. */
-const BROKEN = GOOD.replace("api --> db", "api --> db\ndatabase cache2 \"Redis\"");
+const BROKEN = GOOD.replace("api --> db", 'api --> db\ndatabase cache2 "Redis"');
 
 let name = "";
 let file = "";
@@ -55,7 +55,7 @@ async function open(page: Page, text: string) {
 const toast = (page: Page) => page.locator("[data-dag-problems-toast]");
 const pill = (page: Page) => page.locator("[data-dag-problems-pill]");
 
-test("a board error is a notification, never a card on the canvas", async ({ page }) => {
+test("a board error is a notification, never a card on the canvas", { tag: "@smoke" }, async ({ page }) => {
   await open(page, STRAY);
   await expect(page.locator(".dag-viewport .dag-error, .dag-viewport [data-dag-error]")).toHaveCount(0);
   await expect(toast(page)).toHaveAttribute("data-dag-problems-toast", "EB_LINK_SYNTAX");
@@ -129,7 +129,7 @@ test("opened broken, a diagram is a small placeholder", async ({ page }) => {
 });
 
 test("a warning is counted but never pops up", async ({ page }) => {
-  await open(page, GOOD.replace('icon=server', 'icon=server hue=purple'));
+  await open(page, GOOD.replace("icon=server", "icon=server hue=purple"));
   await expect(pill(page)).toHaveText(/1 warning/);
   await page.waitForTimeout(1500);
   await expect(toast(page)).toHaveCount(0);

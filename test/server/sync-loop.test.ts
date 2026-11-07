@@ -114,7 +114,12 @@ describe("linking two vaults through /api/sync", () => {
     expect(p).toEqual({ server: url, account: "alice", device: "dev-0" });
     const pairFile = path.join(A.env.homeDir, "sync", A.env.vault.id, "pair.json");
     expect(fs.statSync(pairFile).mode & 0o777).toBe(0o600);
-    expect((await A.call("GET", "/api/sync")).json).toMatchObject({ linked: false, state: "unlinked", server: url, device: "dev-0" });
+    expect((await A.call("GET", "/api/sync")).json).toMatchObject({
+      linked: false,
+      state: "unlinked",
+      server: url,
+      device: "dev-0",
+    });
 
     expect((await A.call("POST", "/api/sync/link", { mode: "upload", passphrase: "short" })).status).toBe(400);
 
@@ -159,11 +164,17 @@ describe("linking two vaults through /api/sync", () => {
     expect((await B.call("GET", "/api/sync")).json).toMatchObject({ linked: true, state: "idle", remote });
   });
 
-  it("refuses a download into a vault that holds documents, and opens the key with the recovery code", { timeout: 30_000 }, async () => {
+  it("refuses a download into a vault that holds documents, and opens the key with the recovery code", {
+    timeout: 30_000,
+  }, async () => {
     const C = app();
     write(C.env.root, "mine.md", NOTE);
     await paired(C);
-    const mistyped = await C.call("POST", "/api/sync/link", { mode: "download", remote, recovery: recovery.replace(/^..../, "ZZZZ") });
+    const mistyped = await C.call("POST", "/api/sync/link", {
+      mode: "download",
+      remote,
+      recovery: recovery.replace(/^..../, "ZZZZ"),
+    });
     expect(mistyped.status).toBe(400);
     const refused = await C.call("POST", "/api/sync/link", { mode: "download", remote, recovery });
     expect(refused.status).toBe(409);
@@ -210,7 +221,10 @@ describe("linking two vaults through /api/sync", () => {
     });
     write(B.env.root, "from-b.md", "---\ntitle: From B\n---\nWritten in B.\n");
     await until("B to see the change", () => said.some((s) => s.pending > 0));
-    await until("B to push it", () => said.some((s) => s.state === "syncing") && said.at(-1)!.state === "idle" && said.at(-1)!.pending === 0);
+    await until(
+      "B to push it",
+      () => said.some((s) => s.state === "syncing") && said.at(-1)!.state === "idle" && said.at(-1)!.pending === 0,
+    );
     await A.call("POST", "/api/sync/now");
     expect(readText(A.env.root, "from-b.md")).toContain("Written in B.");
     off();
@@ -285,7 +299,10 @@ describe("what a process that is not the app does with a linked vault", () => {
     const F = app();
     await paired(F);
     await F.s.closeAll();
-    fs.writeFileSync(path.join(F.env.homeDir, "keys.json"), JSON.stringify({ keys: { ANYDAG_HOME_SECRET: { scheme: "safeStorage", value: "AAAA" } } }));
+    fs.writeFileSync(
+      path.join(F.env.homeDir, "keys.json"),
+      JSON.stringify({ keys: { ANYDAG_HOME_SECRET: { scheme: "safeStorage", value: "AAAA" } } }),
+    );
     const s = new Session(new Home(F.env.homeDir), null, "test");
     s.sync.tune = TUNED;
     s.openFolder(F.env.root);

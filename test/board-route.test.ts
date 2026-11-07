@@ -208,7 +208,12 @@ describe("routeLinks", () => {
  */
 describe("routeLinks, to a group", () => {
   const G = { x: 0, y: 0, w: 200, h: 120 };
-  const scene = boxes({ "group-a": G, m1: { x: 0, y: 0, w: 90, h: 120 }, m2: { x: 110, y: 0, w: 90, h: 120 }, far: { x: 500, y: 20, w: 120, h: 80 } });
+  const scene = boxes({
+    "group-a": G,
+    m1: { x: 0, y: 0, w: 90, h: 120 },
+    m2: { x: 110, y: 0, w: 90, h: 120 },
+    far: { x: 500, y: 20, w: 120, h: 80 },
+  });
 
   it("anchors on the union box filed under the group's name", () => {
     const { edges, origin } = routeLinks({

@@ -89,8 +89,18 @@ test("the type select writes `as=` on the card", async ({ page }) => {
   await expect.poll(read).toContain("```prompt {#ask x=80 y=240 w=420 as=erd}");
 });
 
-test("Generate puts the diagram exactly where the card was, and one ctrl+Z brings the card back", async ({ page }) => {
-  const asked = await answer(page, 200, { ok: true, draft: DRAFT, diagnostics: [], attempts: 1, provider: "gemini", model: "gemini-3.8-flash", ms: 900 });
+test("Generate puts the diagram exactly where the card was, and one ctrl+Z brings the card back", { tag: "@smoke" }, async ({
+  page,
+}) => {
+  const asked = await answer(page, 200, {
+    ok: true,
+    draft: DRAFT,
+    diagnostics: [],
+    attempts: 1,
+    provider: "gemini",
+    model: "gemini-3.8-flash",
+    ms: 900,
+  });
   await open(page);
   await page.locator("[data-dag-prompt-go]").click();
 

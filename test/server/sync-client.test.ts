@@ -184,7 +184,9 @@ describe("merge.ts", () => {
 
   it("names a conflict copy after the device and the minute, numbered when taken", () => {
     const taken = new Set<string>();
-    expect(conflictName("work/Plan.md", "Mou's laptop", AT, (r) => taken.has(r))).toBe("work/Plan (conflict Mou's laptop 2026-11-06 14.30).md");
+    expect(conflictName("work/Plan.md", "Mou's laptop", AT, (r) => taken.has(r))).toBe(
+      "work/Plan (conflict Mou's laptop 2026-11-06 14.30).md",
+    );
     expect(conflictName("b.board.md", "A/B:C", AT, () => false)).toBe("b (conflict ABC 2026-11-06 14.30).board.md");
     expect(conflictName("pic.png", "A", AT, () => false)).toBe("pic (conflict A 2026-11-06 14.30).png");
     taken.add("x (conflict A 2026-11-06 14.30).quiz.md");
@@ -246,7 +248,10 @@ describe("state, bases and keys", () => {
 
   it("makes no second secret once the desktop app keeps one, and reads one it adopted", () => {
     const home = tmpDir();
-    fs.writeFileSync(path.join(home, "keys.json"), JSON.stringify({ keys: { ANYDAG_HOME_SECRET: { scheme: "safeStorage", value: "AAAA" } } }));
+    fs.writeFileSync(
+      path.join(home, "keys.json"),
+      JSON.stringify({ keys: { ANYDAG_HOME_SECRET: { scheme: "safeStorage", value: "AAAA" } } }),
+    );
     expect(() => homeSecret(home, {})).toThrow(SecretElsewhere);
     expect(fs.existsSync(path.join(home, "home.secret"))).toBe(false);
     // Handed over by the app, it is that one.
@@ -257,7 +262,10 @@ describe("state, bases and keys", () => {
     expect(homeSecret(home, {})).toEqual(given);
     // Another key in keys.json is not the secret.
     const other = tmpDir();
-    fs.writeFileSync(path.join(other, "keys.json"), JSON.stringify({ keys: { GEMINI_API_KEY: { scheme: "base64", value: "eA" } } }));
+    fs.writeFileSync(
+      path.join(other, "keys.json"),
+      JSON.stringify({ keys: { GEMINI_API_KEY: { scheme: "base64", value: "eA" } } }),
+    );
     expect(homeSecret(other, {})).toHaveLength(32);
   });
 });
@@ -267,8 +275,11 @@ describe("HttpSyncApi", () => {
     const seen: string[] = [];
     const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
       const u = String(url);
-      seen.push(`${init?.method} ${u.replace("https://s.example", "")} ${(init?.headers as Record<string, string>).authorization ?? ""}`);
-      if (u.endsWith("/commit")) return new Response(JSON.stringify({ code: "ES_STALE", message: "stale", conflicts: [] }), { status: 409 });
+      seen.push(
+        `${init?.method} ${u.replace("https://s.example", "")} ${(init?.headers as Record<string, string> | undefined)?.authorization ?? ""}`,
+      );
+      if (u.endsWith("/commit"))
+        return new Response(JSON.stringify({ code: "ES_STALE", message: "stale", conflicts: [] }), { status: 409 });
       if (init?.method === "HEAD") return new Response(null, { status: 404 });
       if (u.includes("/changes")) return new Response(JSON.stringify({ changes: [], next: 7, more: false, head: 7, horizon: 1 }));
       if (u.includes("/key")) return new Response(JSON.stringify({ code: "ES_NOT_FOUND", message: "no key" }), { status: 404 });
@@ -555,7 +566,16 @@ describe("the engine", () => {
   it("carries a chat between machines: both turns land, and a rename and a grant both survive", async () => {
     const { server, devs } = world(2);
     const [a, b] = devs as [Device, Device];
-    const meta = { v: 1, id: CHAT, title: "Plan", created: "2026-11-06T00:00:00.000Z", home: "v", provider: "claude", model: "sonnet", mode: "ask" };
+    const meta = {
+      v: 1,
+      id: CHAT,
+      title: "Plan",
+      created: "2026-11-06T00:00:00.000Z",
+      home: "v",
+      provider: "claude",
+      model: "sonnet",
+      mode: "ask",
+    };
     const put = (d: Device, m: object) => d.fs.write(`.anydag/chats/${CHAT}/chat.json`, `${JSON.stringify(m, null, 1)}\n`);
     put(a, meta);
     await settle(server, devs);
@@ -565,7 +585,11 @@ describe("the engine", () => {
     b.fs.write(`.anydag/chats/${CHAT}/t000000002bbbb0001.json`, '{"from":"b"}\n');
     await settle(server, devs);
     const snap = await same(devs);
-    expect(Object.keys(snap).filter((k) => k.endsWith(".json")).sort()).toEqual([
+    expect(
+      Object.keys(snap)
+        .filter((k) => k.endsWith(".json"))
+        .sort(),
+    ).toEqual([
       `.anydag/chats/${CHAT}/chat.json`,
       `.anydag/chats/${CHAT}/t000000001aaaa0001.json`,
       `.anydag/chats/${CHAT}/t000000002bbbb0001.json`,

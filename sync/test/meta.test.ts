@@ -73,7 +73,7 @@ const pgSuite = async (url: string): Promise<Suite> => {
   } catch (cause) {
     await root.close().catch(() => {});
     throw new Error(
-      `ANYDAG_SYNC_TEST_PG=${url} did not answer — is the compose database up? (docker compose -f sync/compose.yaml up -d --wait db)`,
+      `ANYDAG_SYNC_TEST_PG=${url} did not answer (${cause instanceof Error ? cause.message : String(cause)}) — is the compose database up? (docker compose -f sync/compose.yaml up -d --wait db)`,
     );
   }
   const schema = `t_${Math.random().toString(36).slice(2, 12)}`;
@@ -390,7 +390,10 @@ function contract(label: string, make: () => Promise<Suite>): void {
       seqsOf(await meta.commit(v.id, d, [{ key: k, parent: null, blob: bA, meta: "m" }], day(D1))); // 1: create
       seqsOf(await meta.commit(v.id, d, [{ key: k, parent: 1, blob: null, meta: "m" }], day(D2))); // 2: delete
       // a delete's head is a head: null over it is stale, its seq is the parent
-      expect(await meta.commit(v.id, d, [{ key: k, parent: null, blob: bB, meta: "m" }], day(D3))).toEqual({ ok: false, stale: [{ key: k, head: 2, blob: null }] });
+      expect(await meta.commit(v.id, d, [{ key: k, parent: null, blob: bB, meta: "m" }], day(D3))).toEqual({
+        ok: false,
+        stale: [{ key: k, head: 2, blob: null }],
+      });
       seqsOf(await meta.commit(v.id, d, [{ key: k, parent: 2, blob: bB, meta: "m" }], day(D3))); // 3: re-created
       seqsOf(await meta.commit(v.id, d, [{ key: k, parent: 3, blob: null, meta: "m" }], day(D3))); // 4: delete again
       seqsOf(await meta.commit(v.id, d, [{ key: k, parent: 4, blob: bA, meta: "m" }], day(D3))); // 5: by its seq

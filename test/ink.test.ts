@@ -206,9 +206,7 @@ describe("the `ink` statement", () => {
   });
 
   it("is silent inside a fixed fence", () => {
-    expect(parseDiagram("arch", 'service api "API" pts="0,0 10,10"', undefined, undefined, "fixed")!.diagnostics).toEqual(
-      [],
-    );
+    expect(parseDiagram("arch", 'service api "API" pts="0,0 10,10"', undefined, undefined, "fixed")!.diagnostics).toEqual([]);
   });
 
   it("reports a malformed list as an error naming the key", () => {
@@ -283,12 +281,32 @@ describe("inkStatement — the pen's release", () => {
     expect(inkStatement(stroke([[240, 120]]), 1, 8, "ink-d4")).toBeNull();
     expect(inkStatement([], 1, 8, "ink-d4")).toBeNull();
     /* Two samples at one place: a click that was counted twice, still a click. */
-    expect(inkStatement(stroke([[240, 120], [240, 120]]), 1, 8, "ink-d4")).toBeNull();
+    expect(
+      inkStatement(
+        stroke([
+          [240, 120],
+          [240, 120],
+        ]),
+        1,
+        8,
+        "ink-d4",
+      ),
+    ).toBeNull();
   });
 
   it("refuses a stroke that degenerates once whole numbers are written", () => {
     /* Half a pixel apart: distinct samples, one point after rounding. */
-    expect(inkStatement(stroke([[240, 120], [240.4, 120.4]]), 1, 8, "ink-e5")).toBeNull();
+    expect(
+      inkStatement(
+        stroke([
+          [240, 120],
+          [240.4, 120.4],
+        ]),
+        1,
+        8,
+        "ink-e5",
+      ),
+    ).toBeNull();
   });
 
   it("keeps a flat stroke — a line is a stroke, not a defect", () => {

@@ -111,7 +111,7 @@ describe("W_UNKNOWN_ICON suggests", () => {
   it("stays silent when nothing is close — no suggestion is better than a wrong one", () => {
     const w = arch(`service a "A" icon=zookeeper`).diagnostics.find((d) => d.code === CODES.W_UNKNOWN_ICON)!;
     expect(w.message).not.toContain("Did you mean");
-    expect(w.message).toContain("no icon named \"zookeeper\"");
+    expect(w.message).toContain('no icon named "zookeeper"');
   });
 });
 

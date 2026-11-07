@@ -27,14 +27,14 @@ import { body, HttpError, str, type Deps, type Vars } from "./http";
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /** The canonical form of a typed code, or `null` when it cannot be one. */
-export function canonicalCode(typed: string): string | null {
+function canonicalCode(typed: string): string | null {
   const clean = typed.toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
   if (clean.length !== 10) return null;
   for (const ch of clean) if (!B32.includes(ch)) return null;
   return clean;
 }
 
-export const codeHash = (canonical: string): string => sha256(`anydag-sync/pair:${canonical}`);
+const codeHash = (canonical: string): string => sha256(`anydag-sync/pair:${canonical}`);
 
 /** A fresh code for `account`, remembered by its hash. */
 export async function mintPairCode(meta: Meta, account: string, now: Date): Promise<{ code: string; expires: string }> {
@@ -64,7 +64,8 @@ export function pairRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const b = await body(c);
     const typed = str(b.code, "code", 64);
     const dev = b.device;
-    if (typeof dev !== "object" || dev === null || Array.isArray(dev)) throw new HttpError("ES_BAD_REQUEST", "device must be {name, platform}");
+    if (typeof dev !== "object" || dev === null || Array.isArray(dev))
+      throw new HttpError("ES_BAD_REQUEST", "device must be {name, platform}");
     const name = str((dev as Record<string, unknown>).name, "device.name", 200);
     const platform = str((dev as Record<string, unknown>).platform, "device.platform", 100);
     const canonical = canonicalCode(typed);
@@ -75,7 +76,10 @@ export function pairRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     if (!account) throw new HttpError("ES_PAIR", "that pairing code's account is gone");
     const plan = await deps.meta.plan(account.plan);
     if (plan.devices !== null && live(await deps.meta.devices(account.id)) >= plan.devices) {
-      throw new HttpError("ES_QUOTA", `this account's plan allows ${plan.devices} device${plan.devices === 1 ? "" : "s"}: revoke one first`);
+      throw new HttpError(
+        "ES_QUOTA",
+        `this account's plan allows ${plan.devices} device${plan.devices === 1 ? "" : "s"}: revoke one first`,
+      );
     }
     const token = randomBytes(32).toString("base64url");
     const row = await deps.meta.addDevice(account.id, name, platform, sha256(token));

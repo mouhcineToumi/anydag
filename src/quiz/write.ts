@@ -42,7 +42,11 @@ export function mintQuestionId(taken: ReadonlySet<string> = new Set()): string {
 const oneLine = (s: string): string => s.replace(/\s*\r?\n\s*/g, " ").trim();
 
 /** Blank lines off both ends, nothing else — an author's indentation inside is theirs. */
-const trimBlank = (s: string): string => s.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/(?:\r?\n[ \t]*)+$/, "").replace(/^[ \t]+$/, "");
+const trimBlank = (s: string): string =>
+  s
+    .replace(/^(?:[ \t]*\r?\n)+/, "")
+    .replace(/(?:\r?\n[ \t]*)+$/, "")
+    .replace(/^[ \t]+$/, "");
 
 /** A first line that opens a block: written on a line of its own, or it would be the task's words. */
 const OPENS_BLOCK = /^(?:`{3,}|~{3,}|[-*+][ \t]|\d+[.)][ \t]|>|#{1,6}(?:[ \t]|$)|\|)/;
@@ -74,7 +78,13 @@ export function renderQuestion(q: QuestionInput): string {
   if (body) parts.push(body);
   if (q.options.length) parts.push(q.options.map(renderOption).join("\n"));
   const why = trimBlank(q.why ?? "");
-  if (why) parts.push(why.split(/\r?\n/).map((l) => (l.trim() ? `> ${l}` : ">")).join("\n"));
+  if (why)
+    parts.push(
+      why
+        .split(/\r?\n/)
+        .map((l) => (l.trim() ? `> ${l}` : ">"))
+        .join("\n"),
+    );
   return parts.join("\n\n") + "\n";
 }
 
@@ -101,7 +111,10 @@ export function sameQuestion(q: Question, input: QuestionInput): boolean {
     q.multi === (!!input.multi || correct > 1) &&
     q.options.length === input.options.length &&
     q.options.every(
-      (o, i) => o.text === optionMarkdown(input.options[i]!.text) && o.correct === input.options[i]!.correct && o.pin === !!input.options[i]!.pin,
+      (o, i) =>
+        o.text === optionMarkdown(input.options[i]!.text) &&
+        o.correct === input.options[i]!.correct &&
+        o.pin === !!input.options[i]!.pin,
     )
   );
 }
@@ -184,7 +197,10 @@ export function moveQuestion(text: string, id: string, to: number): string {
  * the ids minted, in file order. The heading is rewritten in the house form because that is the only
  * way to be sure the id lands inside the `{…}` a reader will find — a closing `##` would hide it.
  */
-export function stampIds(text: string, mint: (taken: ReadonlySet<string>) => string = mintQuestionId): { text: string; minted: string[] } {
+export function stampIds(
+  text: string,
+  mint: (taken: ReadonlySet<string>) => string = mintQuestionId,
+): { text: string; minted: string[] } {
   const quiz = parseQuiz(text);
   const taken = new Set(quiz.questions.flatMap((q) => (q.id ? [q.id] : [])));
   const minted: string[] = [];

@@ -46,7 +46,7 @@ export class TableError extends Error {}
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 
 /** A fresh row id: `r` and five characters, none of `taken`. */
-export function mintRowId(taken: ReadonlySet<string> = new Set()): string {
+function mintRowId(taken: ReadonlySet<string> = new Set()): string {
   for (;;) {
     const bytes = new Uint8Array(5);
     globalThis.crypto.getRandomValues(bytes);
@@ -69,7 +69,7 @@ export function slug(name: string, fallback = "col"): string {
 }
 
 /** `wanted`, or `wanted-2`, `-3` … whichever `taken` does not hold. */
-export function freeId(wanted: string, taken: ReadonlySet<string>): string {
+function freeId(wanted: string, taken: ReadonlySet<string>): string {
   if (!taken.has(wanted)) return wanted;
   let n = 2;
   while (taken.has(`${wanted}-${n}`)) n++;
@@ -139,7 +139,7 @@ export interface ColumnInput {
 const NO_ATTRS: Attrs = { map: {}, order: [] };
 
 /** One header cell's content: the name and its `{…}`. */
-export function headerCell(c: ColumnInput): string {
+function headerCell(c: ColumnInput): string {
   const type = c.type && c.type !== "text" ? c.type : undefined;
   const a = attrs(
     [
@@ -164,7 +164,7 @@ export interface RowInput {
 }
 
 /** A row's line in the house form, without its newline. */
-export function rowLine(r: RowInput, width: number): string {
+function rowLine(r: RowInput, width: number): string {
   const a = attrs(
     [
       ["id", r.id],
@@ -180,7 +180,7 @@ export function rowLine(r: RowInput, width: number): string {
 }
 
 /** A tab's heading line in the house form, without its newline. */
-export function headingLine(t: { id?: string; name: string; sort?: string; filter?: string; extra?: Attrs }): string {
+function headingLine(t: { id?: string; name: string; sort?: string; filter?: string; extra?: Attrs }): string {
   const a = attrs(
     [
       ["id", t.id],
@@ -248,7 +248,12 @@ export function setCell(text: string, tabId: string, rowId: string, columnId: st
   if (!seg) {
     const cells = [...row.cells];
     cells[index] = next;
-    return splice(text, row.span.start, row.span.end, rowLine({ ...rowInput(row), cells }, tab.columns.length) + lineEnd(text, row));
+    return splice(
+      text,
+      row.span.start,
+      row.span.end,
+      rowLine({ ...rowInput(row), cells }, tab.columns.length) + lineEnd(text, row),
+    );
   }
   let content = cellSource(next);
   if (index === 0) {
@@ -268,13 +273,6 @@ export function setCell(text: string, tabId: string, rowId: string, columnId: st
 function lineEnd(text: string, row: Row): string {
   const s = text.slice(row.span.start, row.span.end);
   return s.endsWith("\r\n") ? "\r\n" : s.endsWith("\n") ? "\n" : "";
-}
-
-/** Several cells of one row at once, by column id — what a paste, an agent's row and an import write. */
-export function setCells(text: string, tabId: string, rowId: string, values: Readonly<Record<string, string>>): string {
-  let out = text;
-  for (const [column, value] of Object.entries(values)) out = setCell(out, tabId, rowId, column, value);
-  return out;
 }
 
 // -- rows ---------------------------------------------------------------------------------------
@@ -352,7 +350,13 @@ export function setRowHeight(text: string, tabId: string, rowId: string, h: numb
     row.extra,
   );
   const content = `${cellSource(row.cells[0] ?? "")}${braces(a)}`.trim();
-  if (!seg) return splice(text, row.span.start, row.span.end, rowLine({ ...rowInput(row), h: want }, tab.columns.length) + lineEnd(text, row));
+  if (!seg)
+    return splice(
+      text,
+      row.span.start,
+      row.span.end,
+      rowLine({ ...rowInput(row), h: want }, tab.columns.length) + lineEnd(text, row),
+    );
   return splice(text, seg.start, seg.end, ` ${content} `);
 }
 
@@ -379,7 +383,11 @@ export function addColumn(
   const id = c.id && /^[A-Za-z0-9_-]+$/.test(c.id) && !taken.has(c.id) ? c.id : freeId(slug(c.name), taken);
   const columns = tab.columns.map(columnInput);
   const at =
-    c.after !== undefined ? columnOf(tab, c.after).index + 1 : c.before !== undefined ? columnOf(tab, c.before).index : columns.length;
+    c.after !== undefined
+      ? columnOf(tab, c.after).index + 1
+      : c.before !== undefined
+        ? columnOf(tab, c.before).index
+        : columns.length;
   const col: ColumnInput = {
     id,
     name: c.name,
@@ -450,7 +458,12 @@ export function setColumn(
   if (change.type !== undefined && change.type !== column.type && delim[index]) {
     const d = delim[index]!;
     const now = text.slice(d.start, d.end).trim();
-    const want = change.type === "number" ? delimiterCell("number") : now.endsWith(":") && !now.startsWith(":") ? delimiterCell(undefined) : now;
+    const want =
+      change.type === "number"
+        ? delimiterCell("number")
+        : now.endsWith(":") && !now.startsWith(":")
+          ? delimiterCell(undefined)
+          : now;
     if (now !== want) out = splice(out, d.start, d.end, ` ${want} `);
   }
   if (was === cell) return out;
@@ -532,7 +545,13 @@ export function setTab(
 ): string {
   const tab = tabOf(parseTable(text), tabId);
   const sort =
-    change.sort === undefined ? tab.sortText : change.sort === null ? undefined : typeof change.sort === "string" ? change.sort : writeSort(change.sort);
+    change.sort === undefined
+      ? tab.sortText
+      : change.sort === null
+        ? undefined
+        : typeof change.sort === "string"
+          ? change.sort
+          : writeSort(change.sort);
   const filter =
     change.filter === undefined
       ? tab.filterText
@@ -625,7 +644,15 @@ export function stampTable(text: string): string {
           const id = mintRowId(rows);
           rows.add(id);
           const seg = r.segments[0];
-          const content = `${cellSource(r.cells[0] ?? "")}${braces(attrs([["id", id], ["h", r.h]], r.extra))}`.trim();
+          const content = `${cellSource(r.cells[0] ?? "")}${braces(
+            attrs(
+              [
+                ["id", id],
+                ["h", r.h],
+              ],
+              r.extra,
+            ),
+          )}`.trim();
           if (seg) edits.push({ start: seg.start, end: seg.end, by: ` ${content} ` });
         }
       }
@@ -636,7 +663,13 @@ export function stampTable(text: string): string {
         edits.push({
           start: tab.heading.start,
           end: tab.heading.start + was.length,
-          by: headingLine({ id, name: tab.name, ...(tab.sortText ? { sort: tab.sortText } : {}), ...(tab.filterText ? { filter: tab.filterText } : {}), extra: tab.extra }),
+          by: headingLine({
+            id,
+            name: tab.name,
+            ...(tab.sortText ? { sort: tab.sortText } : {}),
+            ...(tab.filterText ? { filter: tab.filterText } : {}),
+            extra: tab.extra,
+          }),
         });
       }
     }

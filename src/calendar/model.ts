@@ -178,7 +178,13 @@ const RANK: Readonly<Record<CalKind, number>> = { event: 0, task: 1, note: 2 };
  * `last` — in the order a day reads them: what starts earlier, then what lasts longer, then events
  * before tasks before notes, then by time, then by title.
  */
-export function itemsOf(listing: Listing, show: ReadonlySet<CalKind>, first: string, last: string, keep: (name: string) => boolean = () => true): CalItem[] {
+export function itemsOf(
+  listing: Listing,
+  show: ReadonlySet<CalKind>,
+  first: string,
+  last: string,
+  keep: (name: string) => boolean = () => true,
+): CalItem[] {
   const title = (name: string) => listing.titles?.[name] ?? name.slice(name.lastIndexOf("/") + 1);
   const out: CalItem[] = [];
   const add = (item: CalItem) => {
@@ -290,7 +296,8 @@ export function blocks(items: readonly CalItem[], day: string): Block[] {
   let reach = -Infinity;
   const flush = () => {
     const of = Math.max(1, ...group.map((b) => b.col + 1));
-    for (const b of group) out.push({ item: b.item, top: b.top, length: b.length, col: b.col, of, before: b.before, after: b.after });
+    for (const b of group)
+      out.push({ item: b.item, top: b.top, length: b.length, col: b.col, of, before: b.before, after: b.after });
     group = [];
   };
   for (const c of cut) {
@@ -320,13 +327,23 @@ export function blocks(items: readonly CalItem[], day: string): Block[] {
 const clocks = new Map<string, Intl.DateTimeFormat>();
 /* A day is a calendar square (`calendarDate`), so its words are read in UTC whatever zone is "here". */
 const DAY_WORDS = new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
-const DAY_YEAR = new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const DAY_YEAR = new Intl.DateTimeFormat("en", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 /** A moment's time of day here — `09:00`. */
 export function clock(at: number | Date): string {
   const zone = currentZone();
   let f = clocks.get(zone);
-  if (!f) clocks.set(zone, (f = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zone })));
+  if (!f)
+    clocks.set(
+      zone,
+      (f = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zone })),
+    );
   return f.format(at);
 }
 
@@ -341,7 +358,10 @@ export function dayWords(day: string, thisYear: string = dayOf(new Date()).slice
  */
 export function whenWords(event: NoteEvent, thisYear?: string): string {
   const at = placeEvent(event);
-  if (!at.at) return at.first === at.last ? dayWords(at.first, thisYear) : `${dayWords(at.first, thisYear)} – ${dayWords(at.last, thisYear)}`;
+  if (!at.at)
+    return at.first === at.last
+      ? dayWords(at.first, thisYear)
+      : `${dayWords(at.first, thisYear)} – ${dayWords(at.last, thisYear)}`;
   const start = `${dayWords(at.first, thisYear)}, ${clock(at.at.start)}`;
   const endDay = dayOf(new Date(at.at.end));
   if (endDay === at.first || (at.last === at.first && clock(at.at.end) === "00:00")) return `${start} – ${clock(at.at.end)}`;
@@ -374,7 +394,15 @@ export function fieldsOf(event: NoteEvent): EventFields {
 /** A day and a time of day, here, as a moment. */
 export function momentAt(day: string, time: string): Date {
   const [h, m] = time.split(":").map(Number) as [number, number];
-  return new Date(instantOf({ year: Number(day.slice(0, 4)), month: Number(day.slice(5, 7)), day: Number(day.slice(8, 10)), hour: h || 0, minute: m || 0 }));
+  return new Date(
+    instantOf({
+      year: Number(day.slice(0, 4)),
+      month: Number(day.slice(5, 7)),
+      day: Number(day.slice(8, 10)),
+      hour: h || 0,
+      minute: m || 0,
+    }),
+  );
 }
 
 /**
@@ -397,8 +425,19 @@ export function eventFrom(f: EventFields): { start: string; end: string | null }
 export function withAllDay(event: NoteEvent, on: boolean): { start: string; end: string | null } {
   const f = fieldsOf(event);
   if (on === f.allDay) return eventFrom(f);
-  if (on) return eventFrom({ ...f, allDay: true, endDay: f.endDay > f.startDay && f.endTime === "00:00" ? addDays(f.endDay, -1) : f.endDay });
-  return eventFrom({ ...f, allDay: false, startTime: "09:00", endDay: f.endDay, endTime: f.endDay > f.startDay ? "17:00" : "10:00" });
+  if (on)
+    return eventFrom({
+      ...f,
+      allDay: true,
+      endDay: f.endDay > f.startDay && f.endTime === "00:00" ? addDays(f.endDay, -1) : f.endDay,
+    });
+  return eventFrom({
+    ...f,
+    allDay: false,
+    startTime: "09:00",
+    endDay: f.endDay,
+    endTime: f.endDay > f.startDay ? "17:00" : "10:00",
+  });
 }
 
 /**
@@ -445,7 +484,11 @@ export function shiftEvent(event: NoteEvent, days: number, minutes = 0, snap = 0
     if (snap > 0) at = Math.round(at / snap) * snap;
     const over = Math.floor(at / 1440);
     at -= over * 1440;
-    moved = withStart(event, addDays(f.startDay, days + over), `${String(Math.floor(at / 60)).padStart(2, "0")}:${String(at % 60).padStart(2, "0")}`);
+    moved = withStart(
+      event,
+      addDays(f.startDay, days + over),
+      `${String(Math.floor(at / 60)).padStart(2, "0")}:${String(at % 60).padStart(2, "0")}`,
+    );
   }
   return event.end ? moved : { start: moved.start, end: null };
 }
@@ -463,7 +506,13 @@ export function shiftTask(task: Task, days: number): { start?: string; due?: str
  * the hour grid, `time` — and the other edge left where it is. An edge is never pulled past the
  * other: an all-day event is at least its one day, and a timed one at least `min` minutes.
  */
-export function withEdge(event: NoteEvent, edge: "start" | "end", day: string, time?: string, min = 15): { start: string; end: string | null } {
+export function withEdge(
+  event: NoteEvent,
+  edge: "start" | "end",
+  day: string,
+  time?: string,
+  min = 15,
+): { start: string; end: string | null } {
   const f = fieldsOf(event);
   if (f.allDay) {
     if (edge === "end") return eventFrom({ ...f, endDay: day < f.startDay ? f.startDay : day });
@@ -472,8 +521,12 @@ export function withEdge(event: NoteEvent, edge: "start" | "end", day: string, t
   const start = momentAt(f.startDay, f.startTime).getTime();
   const end = momentAt(f.endDay, f.endTime).getTime();
   const gap = min * 60_000;
-  if (edge === "end") return { start: event.start, end: timeOf(new Date(Math.max(momentAt(day, time ?? f.endTime).getTime(), start + gap))) };
-  return { start: timeOf(new Date(Math.min(momentAt(day, time ?? f.startTime).getTime(), end - gap))), end: timeOf(new Date(end)) };
+  if (edge === "end")
+    return { start: event.start, end: timeOf(new Date(Math.max(momentAt(day, time ?? f.endTime).getTime(), start + gap))) };
+  return {
+    start: timeOf(new Date(Math.min(momentAt(day, time ?? f.startTime).getTime(), end - gap))),
+    end: timeOf(new Date(end)),
+  };
 }
 
 /**

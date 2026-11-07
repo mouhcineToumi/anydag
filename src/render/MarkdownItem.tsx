@@ -45,7 +45,10 @@ export const MarkdownItem = memo(function MarkdownItem({ item }: { item: BoardIt
   if (item.note) classes.push("dag-md--note");
   else if (item.hue) classes.push("dag-md--hued");
   return (
-    <div className={classes.join(" ")} style={{ ...hueVars(item.hue), ...(item.h !== undefined ? { minHeight: item.h } : undefined) }}>
+    <div
+      className={classes.join(" ")}
+      style={{ ...hueVars(item.hue), ...(item.h !== undefined ? { minHeight: item.h } : undefined) }}
+    >
       <ReactMarkdown remarkPlugins={PLUGINS} components={REFS()} urlTransform={urlTransform}>
         {item.body}
       </ReactMarkdown>

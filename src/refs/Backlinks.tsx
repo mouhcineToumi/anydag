@@ -6,7 +6,13 @@ import type { FileKind } from "@/board/useBoard";
 import { backlinksOf, hrefFor, titleOf, useIndex } from "./useIndex";
 
 /* Each kind's mark, keyed on the kind so a quiz is never drawn as a board. */
-const KIND_ICON = { board: LayoutDashboard, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<FileKind, LucideIcon>;
+const KIND_ICON = {
+  board: LayoutDashboard,
+  note: FileText,
+  quiz: GraduationCap,
+  table: Table2,
+  file: FileGlyph,
+} satisfies Record<FileKind, LucideIcon>;
 
 /**
  * What links here — the backlinks panel, on every note and board.

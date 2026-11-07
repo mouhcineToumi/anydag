@@ -76,10 +76,22 @@ export default function PdfViewer({ url, title, onReady }: { url: string; title:
       </p>
     );
   return (
-    <div className="dag-pdf" data-dag-pdf={doc ? doc.numPages : "loading"} data-dag-pdf-pages={doc?.numPages} data-dag-pdf-drawn={drawn}>
+    <div
+      className="dag-pdf"
+      data-dag-pdf={doc ? doc.numPages : "loading"}
+      data-dag-pdf-pages={doc?.numPages}
+      data-dag-pdf-drawn={drawn}
+    >
       <div className="dag-pdf__bar" role="toolbar" aria-label={`${title}: zoom`}>
         <span className="dag-pdf__count">{doc ? `${doc.numPages} ${doc.numPages === 1 ? "page" : "pages"}` : "Opening…"}</span>
-        <button type="button" className="dag-icon" aria-label="Zoom out" title="Zoom out" disabled={zoom === 0} onClick={() => setZoom((z) => Math.max(0, z - 1))}>
+        <button
+          type="button"
+          className="dag-icon"
+          aria-label="Zoom out"
+          title="Zoom out"
+          disabled={zoom === 0}
+          onClick={() => setZoom((z) => Math.max(0, z - 1))}
+        >
           <Minus size={14} strokeWidth={2} aria-hidden="true" />
         </button>
         <span className="dag-pdf__zoom" data-dag-pdf-zoom={Math.round(scale * 100)}>
@@ -165,5 +177,14 @@ function Page({ doc, n, width, onDrawn }: { doc: PDFDocumentProxy; n: number; wi
   }, [doc, n, width, near, ratio]);
 
   const height = ratio ? Math.round(width * ratio) : Math.round(width * 1.294);
-  return <canvas ref={canvas} className="dag-pdf__page" data-dag-pdf-page={n} style={{ width, height }} aria-label={`Page ${n}`} role="img" />;
+  return (
+    <canvas
+      ref={canvas}
+      className="dag-pdf__page"
+      data-dag-pdf-page={n}
+      style={{ width, height }}
+      aria-label={`Page ${n}`}
+      role="img"
+    />
+  );
 }

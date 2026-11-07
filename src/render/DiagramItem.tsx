@@ -37,7 +37,10 @@ import { NodeView } from "./nodes";
  */
 function cutsOf(model: Model | null, theme: Theme): ArtCut[] {
   if (!model || model.kind === "chart") return [];
-  const refs = model.kind === "sequence" ? model.participants.map((p) => iconFor(p.kind, theme, p.icon)) : model.nodes.map((n) => iconFor(n.kind, theme, n.icon));
+  const refs =
+    model.kind === "sequence"
+      ? model.participants.map((p) => iconFor(p.kind, theme, p.icon))
+      : model.nodes.map((n) => iconFor(n.kind, theme, n.icon));
   return [...new Set(refs.map(artOf))];
 }
 
@@ -199,8 +202,8 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
     if (placed.kind === "sequence") for (const [id, b] of Object.entries(placed.participants)) put(id, b);
     /* A chart's `nodes` are the bounding box of each series' marks and of each wedge — the same
        contract every other model keeps, so a board link into `chart.web` lands on the thing it
-       names rather than on the frame around it. */
-    else if (placed.kind === "chart") for (const [id, b] of Object.entries(placed.nodes)) put(id, b);
+       names rather than on the frame around it. */ else if (placed.kind === "chart")
+      for (const [id, b] of Object.entries(placed.nodes)) put(id, b);
     else {
       /* Groups as well as nodes, because a link may end on one: `resolveLinks` accepts a group id
          as an endpoint. They are marked, because a boundary is scenery to the router and a card is
@@ -215,8 +218,8 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
           if (!b) continue;
           if (isShape(n.kind)) b.shape = n.kind;
           /* And a figure is met on its picture and caption — the same arithmetic the
-             renderer placed them by, so a link cannot stop short of what is drawn. */
-          else if (n.kind === "figure") b.hull = figureHull(figureParts(n, b, theme), b);
+             renderer placed them by, so a link cannot stop short of what is drawn. */ else if (n.kind === "figure")
+            b.hull = figureHull(figureParts(n, b, theme), b);
         }
     }
 
@@ -335,11 +338,7 @@ function Failed({ onSize, children }: { onSize: DiagramProps["onSize"]; children
  * the canvas zoom, and shout when it disagrees. The Playwright run fails on a dirty console, so it
  * is a real gate rather than a note.
  */
-function useSizeAssertion(
-  ref: React.RefObject<HTMLDivElement>,
-  placed: Extract<Layout, { kind: "graph" }>,
-  id: string,
-): void {
+function useSizeAssertion(ref: React.RefObject<HTMLDivElement>, placed: Extract<Layout, { kind: "graph" }>, id: string): void {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const root = ref.current;
@@ -354,7 +353,8 @@ function useSizeAssertion(
      * reported every card as 0×0. The check waits for the state to change instead of guessing.
      */
     const item = root.closest<HTMLElement>(".dag-item");
-    const skipped = () => !root.isConnected || (root.checkVisibility ? !root.checkVisibility({ contentVisibilityAuto: true }) : false);
+    const skipped = () =>
+      !root.isConnected || (root.checkVisibility ? !root.checkVisibility({ contentVisibilityAuto: true }) : false);
 
     const check = () => {
       if (skipped()) return;
@@ -442,10 +442,7 @@ function useQualityReport(
  * in the *item's* coordinates, with the frame's padding and the header already folded in, and a
  * conversion has to write the layout's own numbers or the drawing shifts as it lands.
  */
-function usePublishedLayout(
-  ref: React.RefObject<HTMLDivElement>,
-  placed: Extract<Layout, { kind: "graph" | "chart" }>,
-): void {
+function usePublishedLayout(ref: React.RefObject<HTMLDivElement>, placed: Extract<Layout, { kind: "graph" | "chart" }>): void {
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
@@ -550,22 +547,22 @@ function GraphBody({
   return (
     <div ref={ref} className="dag-diagram" style={{ width: placed.size.w, height: placed.size.h + overhang }}>
       <div className="dag-diagram__layer" style={{ top: overhang }}>
-      {placed.lanes.map((band) => (
-        <Lane key={band.id} lane={lanesById.get(band.id)} box={band} theme={theme} />
-      ))}
-      {placed.groups.map((g) => {
-        const def = groupsById.get(g.id);
-        return def ? <Group key={g.id} group={def} box={g} theme={theme} type={graph.type} /> : null;
-      })}
+        {placed.lanes.map((band) => (
+          <Lane key={band.id} lane={lanesById.get(band.id)} box={band} theme={theme} />
+        ))}
+        {placed.groups.map((g) => {
+          const def = groupsById.get(g.id);
+          return def ? <Group key={g.id} group={def} box={g} theme={theme} type={graph.type} /> : null;
+        })}
 
-      {placed.axis ? <Axis axis={placed.axis} width={placed.size.w} theme={theme} /> : null}
+        {placed.axis ? <Axis axis={placed.axis} width={placed.size.w} theme={theme} /> : null}
 
-      <Edges edges={placed.edges} width={placed.size.w} height={placed.size.h} theme={theme} onPick={onPickEdge} />
+        <Edges edges={placed.edges} width={placed.size.w} height={placed.size.h} theme={theme} onPick={onPickEdge} />
 
-      {Object.entries(placed.nodes).map(([id, box]) => {
-        const node = byId.get(id);
-        return node ? <NodeView key={id} node={node} box={box} theme={theme} type={graph.type} /> : null;
-      })}
+        {Object.entries(placed.nodes).map(([id, box]) => {
+          const node = byId.get(id);
+          return node ? <NodeView key={id} node={node} box={box} theme={theme} type={graph.type} /> : null;
+        })}
       </div>
     </div>
   );

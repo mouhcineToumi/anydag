@@ -62,7 +62,8 @@ export function codeBlock(): Spec {
 
     view.dom.prepend(head);
     view.dom.append(slot);
-    const ours = (target: EventTarget | Node | null) => target instanceof Node && (head.contains(target) || slot.contains(target));
+    const ours = (target: EventTarget | Node | null) =>
+      target instanceof Node && (head.contains(target) || slot.contains(target));
     /* Not a literal in the `return`: `stopEvent` is ProseMirror's and BlockNote's type does not list
        it, though it hands the object to ProseMirror as it is. */
     const out = {

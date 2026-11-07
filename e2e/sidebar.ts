@@ -46,7 +46,11 @@ export async function settingsTab(page: Page, tab: SettingsTab): Promise<void> {
  * with the hook its own row had (`data-dag-sidebar-new-board` and the rest). `top` presses the menu's
  * *Top level* first, for a check that must not depend on which folder the open file is in.
  */
-export async function newFile(page: Page, kind: "board" | "note" | "task" | "event" | "quiz" | "table", { top = false } = {}): Promise<void> {
+export async function newFile(
+  page: Page,
+  kind: "board" | "note" | "task" | "event" | "quiz" | "table",
+  { top = false } = {},
+): Promise<void> {
   await openSidebar(page);
   await expect(async () => {
     if (!(await page.locator("[data-dag-sidebar-new-menu]").isVisible())) {
@@ -54,7 +58,8 @@ export async function newFile(page: Page, kind: "board" | "note" | "task" | "eve
       await expect(page.locator("[data-dag-sidebar-new-menu]")).toBeVisible({ timeout: 1_000 });
     }
     const where = page.locator("[data-dag-sidebar-new-where]");
-    if (top && (await where.getAttribute("data-dag-sidebar-new-where")) !== "") await page.locator("[data-dag-sidebar-new-top]").click({ timeout: 1_000 });
+    if (top && (await where.getAttribute("data-dag-sidebar-new-where")) !== "")
+      await page.locator("[data-dag-sidebar-new-top]").click({ timeout: 1_000 });
     await page.locator(`[data-dag-sidebar-new-${kind}]`).click({ timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
 }

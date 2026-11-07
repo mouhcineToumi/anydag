@@ -73,11 +73,22 @@ export type Reach = typeof Connect;
 /** The real one, loaded when a command needs a server: `help` and `--json` help never open the home's database. */
 const connect: Reach = async (o) => (await import("../server/connect")).connect(o);
 
-export async function main(argv: readonly string[], io: Io = nodeIo(), env: NodeJS.ProcessEnv = process.env, reach: Reach = connect): Promise<number> {
+export async function main(
+  argv: readonly string[],
+  io: Io = nodeIo(),
+  env: NodeJS.ProcessEnv = process.env,
+  reach: Reach = connect,
+): Promise<number> {
   if (argv[0] === "help" && argv.includes("--json")) {
     /* The command table as data — what `check-skill.mjs` holds the skill against, and how an agent
        learns the whole surface in one call rather than one `--help` at a time. */
-    io.out(JSON.stringify(COMMANDS.map(({ run: _run, ...c }) => ({ ...c, name: c.name.join(" "), flags: [...(c.flags ?? []), ...GLOBAL_FLAGS] })), null, 2));
+    io.out(
+      JSON.stringify(
+        COMMANDS.map(({ run: _run, ...c }) => ({ ...c, name: c.name.join(" "), flags: [...(c.flags ?? []), ...GLOBAL_FLAGS] })),
+        null,
+        2,
+      ),
+    );
     return EXIT.ok;
   }
   if (argv.length === 0 || argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h") {
@@ -95,7 +106,12 @@ export async function main(argv: readonly string[], io: Io = nodeIo(), env: Node
 
   const found = find(argv);
   if (!found) {
-    io.err(`anydag: no command \`${argv.filter((a) => !a.startsWith("-")).slice(0, 2).join(" ")}\` — \`anydag help\` lists them`);
+    io.err(
+      `anydag: no command \`${argv
+        .filter((a) => !a.startsWith("-"))
+        .slice(0, 2)
+        .join(" ")}\` — \`anydag help\` lists them`,
+    );
     return EXIT.usage;
   }
   if ("group" in found) {

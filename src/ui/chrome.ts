@@ -6,7 +6,7 @@ import type { SettingsTab } from "@/settings/tabs";
  * ask with a document event, the way `dag:tidy` reaches the page from a script.
  *
  * `dag:chrome` and not `dag:settings`, which is the settings-changed event: one name meaning two
- * things is the hazard `CLAUDE.md` records. A request for Settings may name the tab to open on
+ * things is the hazard `docs/architecture/things-that-will-bite.md` records. A request for Settings may name the tab to open on
  * — the switcher's *Vault settings…* opens on the vault's own — and one that names
  * none opens where the last one left off.
  */

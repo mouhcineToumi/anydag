@@ -17,7 +17,7 @@ const PLUGINS = [remarkGfm];
 const MD = refComponents({ boards: false, placed: true });
 
 /** The agent's words, as Markdown, with `dag:` citations drawn as the references they are. */
-export const Said = memo(function Said({ text }: { text: string }) {
+const Said = memo(function Said({ text }: { text: string }) {
   return (
     <div className="dag-md dag-chat-md" data-dag-chat-said="">
       <ReactMarkdown remarkPlugins={PLUGINS} urlTransform={urlTransform} components={MD}>
@@ -43,7 +43,7 @@ export interface Actions {
 }
 
 /** The newest undo or redo record of a block, which is what says whether it is undone and why not whole. */
-export function latestUndo(undos: readonly UndoRecord[], block: string): UndoRecord | undefined {
+function latestUndo(undos: readonly UndoRecord[], block: string): UndoRecord | undefined {
   let last: UndoRecord | undefined;
   for (const u of undos) if (u.block === block && (!last || u.id > last.id)) last = u;
   return last;
@@ -54,13 +54,21 @@ function ToolStep({ step, done }: { step: Extract<Step, { kind: "tool" }>; done:
   const target = targetOf(step.input);
   const running = !done && step.output === undefined;
   return (
-    <details className="dag-chat-tool" data-dag-chat-tool={step.name} data-dag-chat-tool-state={step.error ? "error" : running ? "running" : "done"}>
+    <details
+      className="dag-chat-tool"
+      data-dag-chat-tool={step.name}
+      data-dag-chat-tool-state={step.error ? "error" : running ? "running" : "done"}
+    >
       <summary title={oneLine(step.output)}>
         <ChevronRight className="dag-chat-tool__chev" {...ICON} aria-hidden="true" />
         <Wrench {...ICON} aria-hidden="true" />
         <span className="dag-chat-tool__verb">{verbOf(step.name, step.input)}</span>
         {target ? <span className="dag-chat-tool__target">{target}</span> : null}
-        {step.error ? <span className="dag-chat-tool__flag">failed</span> : running ? <span className="dag-chat-tool__flag">working…</span> : null}
+        {step.error ? (
+          <span className="dag-chat-tool__flag">failed</span>
+        ) : running ? (
+          <span className="dag-chat-tool__flag">working…</span>
+        ) : null}
       </summary>
       <div className="dag-chat-tool__body">
         <span className="dag-chat-tool__label">Input</span>
@@ -83,7 +91,13 @@ const GRANTED = { yes: "Granted", no: "Not now", expired: "Expired — nothing w
 function ApprovalCard({ step, live, a }: { step: Extract<Step, { kind: "approval" }>; live: boolean; a: Actions }) {
   const answer = step.answer ?? (live ? null : "expired");
   return (
-    <div className="dag-chat-card dag-chat-card--ask" role="group" aria-label="Approval needed" data-dag-chat-approval={step.id} data-dag-chat-answer={answer ?? "waiting"}>
+    <div
+      className="dag-chat-card dag-chat-card--ask"
+      role="group"
+      aria-label="Approval needed"
+      data-dag-chat-approval={step.id}
+      data-dag-chat-answer={answer ?? "waiting"}
+    >
       <Shield {...ICON} aria-hidden="true" />
       <div className="dag-chat-card__text">
         <strong>{step.what}</strong>
@@ -91,7 +105,12 @@ function ApprovalCard({ step, live, a }: { step: Extract<Step, { kind: "approval
       </div>
       {answer === null ? (
         <div className="dag-chat-card__buttons">
-          <button type="button" className="dag-button dag-button--primary" data-dag-chat-allow="" onClick={() => a.answer(step.id, true)}>
+          <button
+            type="button"
+            className="dag-button dag-button--primary"
+            data-dag-chat-allow=""
+            onClick={() => a.answer(step.id, true)}
+          >
             Allow
           </button>
           <button type="button" className="dag-button" data-dag-chat-deny="" onClick={() => a.answer(step.id, false)}>
@@ -109,7 +128,13 @@ function ApprovalCard({ step, live, a }: { step: Extract<Step, { kind: "approval
 function AccessCard({ step, live, a }: { step: Extract<Step, { kind: "access" }>; live: boolean; a: Actions }) {
   const answer = step.answer ?? (live ? null : "expired");
   return (
-    <div className="dag-chat-card dag-chat-card--ask" role="group" aria-label="Vault access requested" data-dag-chat-access={step.id} data-dag-chat-answer={answer ?? "waiting"}>
+    <div
+      className="dag-chat-card dag-chat-card--ask"
+      role="group"
+      aria-label="Vault access requested"
+      data-dag-chat-access={step.id}
+      data-dag-chat-answer={answer ?? "waiting"}
+    >
       <Shield {...ICON} aria-hidden="true" />
       <div className="dag-chat-card__text">
         <strong>
@@ -119,7 +144,12 @@ function AccessCard({ step, live, a }: { step: Extract<Step, { kind: "access" }>
       </div>
       {answer === null ? (
         <div className="dag-chat-card__buttons">
-          <button type="button" className="dag-button dag-button--primary" data-dag-chat-grant="" onClick={() => a.answer(step.id, true)}>
+          <button
+            type="button"
+            className="dag-button dag-button--primary"
+            data-dag-chat-grant=""
+            onClick={() => a.answer(step.id, true)}
+          >
             Grant
           </button>
           <button type="button" className="dag-button" data-dag-chat-notnow="" onClick={() => a.answer(step.id, false)}>
@@ -134,7 +164,15 @@ function AccessCard({ step, live, a }: { step: Extract<Step, { kind: "access" }>
 }
 
 /** The files a block touched, each a link when it is a document the app opens. */
-export function Files({ block, open, max = 5 }: { block: Block; open(kind: "board" | "note" | "quiz" | "table", name: string): void; max?: number }) {
+function Files({
+  block,
+  open,
+  max = 5,
+}: {
+  block: Block;
+  open(kind: "board" | "note" | "quiz" | "table", name: string): void;
+  max?: number;
+}) {
   const all = touched(block);
   const shown = all.slice(0, max);
   return (
@@ -145,7 +183,13 @@ export function Files({ block, open, max = 5 }: { block: Block; open(kind: "boar
           <li key={rel}>
             <FileText {...ICON} aria-hidden="true" />
             {to ? (
-              <button type="button" className="dag-chat-files__open" data-dag-chat-file={rel} onClick={() => open(to.kind, to.name)} title={`Open ${to.name}`}>
+              <button
+                type="button"
+                className="dag-chat-files__open"
+                data-dag-chat-file={rel}
+                onClick={() => open(to.kind, to.name)}
+                title={`Open ${to.name}`}
+              >
                 {rel}
               </button>
             ) : (
@@ -166,13 +210,30 @@ export function Files({ block, open, max = 5 }: { block: Block; open(kind: "boar
  * `hook` says where it is drawn, since the thread and the Changes column both draw every block and a
  * button reached by one name would be two buttons.
  */
-export function BlockCard({ turn, block, undos, a, hook }: { turn: string; block: Block; undos: readonly UndoRecord[]; a: Actions; hook: "block" | "change" }) {
+export function BlockCard({
+  turn,
+  block,
+  undos,
+  a,
+  hook,
+}: {
+  turn: string;
+  block: Block;
+  undos: readonly UndoRecord[];
+  a: Actions;
+  hook: "block" | "change";
+}) {
   const undone = blockUndone(undos, block.id);
   const last = latestUndo(undos, block.id);
   const conflicts = last ? conflictLines(last) : [];
   const can = undoable(block);
   return (
-    <div className="dag-chat-card dag-chat-card--block" data-dag-chat-block={block.id} data-dag-chat-block-state={undone ? "undone" : "done"} data-dag-chat-hook={hook}>
+    <div
+      className="dag-chat-card dag-chat-card--block"
+      data-dag-chat-block={block.id}
+      data-dag-chat-block-state={undone ? "undone" : "done"}
+      data-dag-chat-hook={hook}
+    >
       <div className="dag-chat-card__text">
         <strong>{block.title || "Changes"}</strong>
         <Files block={block} open={a.open} />
@@ -211,7 +272,7 @@ export function BlockCard({ turn, block, undos, a, hook }: { turn: string; block
 }
 
 /** One turn: what was asked, who answered, what it did, what it said, and what it changed. */
-export const TurnView = memo(function TurnView({
+const TurnView = memo(function TurnView({
   turn,
   live,
   typing,
@@ -253,7 +314,12 @@ export const TurnView = memo(function TurnView({
   const asking = live && turn.steps.some(waiting);
   const effort = turn.effort ? ` · ${turn.effort}` : "";
   return (
-    <section className="dag-chat-turn" data-dag-chat-turn={turn.id} data-dag-chat-status={live ? "running" : turn.status} data-dag-chat-elsewhere={elsewhere ? "" : undefined}>
+    <section
+      className="dag-chat-turn"
+      data-dag-chat-turn={turn.id}
+      data-dag-chat-status={live ? "running" : turn.status}
+      data-dag-chat-elsewhere={elsewhere ? "" : undefined}
+    >
       <div className="dag-chat-asked" data-dag-chat-asked="">
         <p>{turn.text}</p>
       </div>
@@ -266,7 +332,11 @@ export const TurnView = memo(function TurnView({
           {turn.mode === "edit" ? "Edit" : "Ask"}
         </span>
         <time dateTime={turn.at}>{clock(turn.at)}</time>
-        {elsewhere ? <span title="Written on another of your devices" className="dag-chat-model__elsewhere">another device</span> : null}
+        {elsewhere ? (
+          <span title="Written on another of your devices" className="dag-chat-model__elsewhere">
+            another device
+          </span>
+        ) : null}
       </header>
       <div className="dag-chat-steps">
         {body}
@@ -286,17 +356,41 @@ export const TurnView = memo(function TurnView({
         <BlockCard key={b.id} turn={turn.id} block={b} undos={undos} a={a} hook="block" />
       ))}
       {!live && turn.status === "stopped" ? <p className="dag-chat-note">Stopped. What it wrote stays, and is above.</p> : null}
-      {!live && turn.status === "failed" && !turn.steps.some((s) => s.kind === "error") ? <p className="dag-chat-note">That turn failed.</p> : null}
+      {!live && turn.status === "failed" && !turn.steps.some((s) => s.kind === "error") ? (
+        <p className="dag-chat-note">That turn failed.</p>
+      ) : null}
     </section>
   );
 });
 
 /** Every turn of a chat, in order, then the one running. */
-export function Turns({ turns, live, typing, undos, device, a }: { turns: readonly Turn[]; live: Turn | null; typing: string; undos: readonly UndoRecord[]; device: string; a: Actions }) {
+export function Turns({
+  turns,
+  live,
+  typing,
+  undos,
+  device,
+  a,
+}: {
+  turns: readonly Turn[];
+  live: Turn | null;
+  typing: string;
+  undos: readonly UndoRecord[];
+  device: string;
+  a: Actions;
+}) {
   return (
     <div className="dag-chat-turns" data-dag-chat-turns="">
       {turns.map((t, i) => (
-        <TurnView key={t.id} turn={t} live={false} typing="" undos={undos} elsewhere={!!device && t.device !== device && i > 0 && turns.slice(0, i).some((p) => p.device === device)} a={a} />
+        <TurnView
+          key={t.id}
+          turn={t}
+          live={false}
+          typing=""
+          undos={undos}
+          elsewhere={!!device && t.device !== device && i > 0 && turns.slice(0, i).some((p) => p.device === device)}
+          a={a}
+        />
       ))}
       {live ? <TurnView key={live.id} turn={live} live typing={typing} undos={undos} elsewhere={false} a={a} /> : null}
     </div>
@@ -308,7 +402,11 @@ export function Empty({ mode }: { mode: Mode }) {
   return (
     <div className="dag-chat-empty" data-dag-chat-empty="">
       <Check {...ICON} aria-hidden="true" />
-      <p>{mode === "edit" ? "Ask for a change, or a question. It can write in this vault, and every change can be undone." : "Ask a question about this vault. In Ask it reads and answers, and changes nothing."}</p>
+      <p>
+        {mode === "edit"
+          ? "Ask for a change, or a question. It can write in this vault, and every change can be undone."
+          : "Ask a question about this vault. In Ask it reads and answers, and changes nothing."}
+      </p>
     </div>
   );
 }

@@ -23,7 +23,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { deriveKek, fromRecoveryCode, keysOf, newParams, randomKey, recoveryCode, sealText, Unsealed, unwrapKey, wrapKey } from "../../sync/protocol/crypto";
+import {
+  deriveKek,
+  fromRecoveryCode,
+  keysOf,
+  newParams,
+  randomKey,
+  recoveryCode,
+  sealText,
+  Unsealed,
+  unwrapKey,
+  wrapKey,
+} from "../../sync/protocol/crypto";
 import type { VaultKey } from "../../sync/protocol/wire";
 import { err } from "../http";
 import type { Vault } from "../vault";
@@ -39,7 +50,7 @@ export interface Rekeys {
   rekeyVault(oldId: string, newId: string): Promise<Vault>;
 }
 
-export const MIN_PASSPHRASE = 8;
+const MIN_PASSPHRASE = 8;
 
 export class SyncLinks {
   /** The loop's timers and `fetch`; a test sets it before a vault opens. */
@@ -208,7 +219,8 @@ export class SyncLinks {
       vault: vault.id,
       linked: true,
       state: "idle",
-      reason: "Not syncing from this process: AnyDag syncs this vault while it is open, and `anydag sync now` syncs it from here.",
+      reason:
+        "Not syncing from this process: AnyDag syncs this vault while it is open, and `anydag sync now` syncs it from here.",
       server: p.server,
       remote,
       device: p.device.name,
@@ -222,18 +234,23 @@ export class SyncLinks {
   api(id: string): { api: HttpSyncApi; pairing: Pairing } {
     const pairing = this.pairing(id);
     if (!pairing) throw err(409, "This vault is not paired with a sync server: pair it first.", { code: "unpaired" });
-    return { api: new HttpSyncApi({ url: pairing.server, token: pairing.token, fetch: this.tune.fetch, retries: this.tune.retries }), pairing };
+    return {
+      api: new HttpSyncApi({ url: pairing.server, token: pairing.token, fetch: this.tune.fetch, retries: this.tune.retries }),
+      pairing,
+    };
   }
 }
 
 // -- what the routes do ------------------------------------------------------------------------------
 
 /** A sync server's refusal as the app's own failure, its `ES_*` kept in `code`. */
-export function refusal(e: unknown, server: string | null): never {
+function refusal(e: unknown, server: string | null): never {
   if (isSyncError(e)) {
-    if (e.code === "ES_NETWORK") throw err(502, `The sync server${server ? ` at ${server}` : ""} did not answer.`, { code: "ES_NETWORK" });
+    if (e.code === "ES_NETWORK")
+      throw err(502, `The sync server${server ? ` at ${server}` : ""} did not answer.`, { code: "ES_NETWORK" });
     // A 401 here would be read by the page as its own token gone; it is the sync server's word.
-    if (e.code === "ES_AUTH") throw err(403, "The sync server no longer accepts this device: pair it again.", { code: "ES_AUTH" });
+    if (e.code === "ES_AUTH")
+      throw err(403, "The sync server no longer accepts this device: pair it again.", { code: "ES_AUTH" });
     throw err(e.status >= 400 && e.status < 600 ? e.status : 502, e.message, { code: e.code });
   }
   throw e;
@@ -247,7 +264,8 @@ function serverUrl(raw: unknown): string {
   } catch {
     throw err(400, "Give the sync server's address, such as https://sync.example.com.");
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw err(400, "A sync server's address starts with https:// (or http:// on this machine).");
+  if (url.protocol !== "https:" && url.protocol !== "http:")
+    throw err(400, "A sync server's address starts with https:// (or http:// on this machine).");
   return url.toString().replace(/\/+$/, "");
 }
 
@@ -264,7 +282,12 @@ export async function pair(links: SyncLinks, vault: Vault, req: Partial<SyncPair
   } catch (e) {
     refusal(e, server);
   }
-  links.savePairing(vault.id, { server, token: got.token, account: got.account, device: { id: got.device.id, name: got.device.name } });
+  links.savePairing(vault.id, {
+    server,
+    token: got.token,
+    account: got.account,
+    device: { id: got.device.id, name: got.device.name },
+  });
   vault.emit({ type: "sync", status: links.status(vault) });
   return { server, account: got.account.name, device: got.device.name };
 }
@@ -284,7 +307,8 @@ export async function remotes(links: SyncLinks, vault: Vault): Promise<SyncRemot
 function openKey(key: VaultKey, passphrase: unknown, recovery: unknown): Uint8Array {
   if (typeof recovery === "string" && recovery.trim()) {
     const rk = fromRecoveryCode(recovery);
-    if (!rk) throw err(400, "That recovery code is mistyped: it is fourteen groups of four letters and digits.", { code: "recovery" });
+    if (!rk)
+      throw err(400, "That recovery code is mistyped: it is fourteen groups of four letters and digits.", { code: "recovery" });
     try {
       return unwrapKey(rk, key.recovery);
     } catch (e) {
@@ -320,7 +344,12 @@ function keep(links: SyncLinks, id: string, pairing: Pairing, remote: string, vk
   }
 }
 
-export async function link(links: SyncLinks, s: Rekeys, vault: Vault, req: Partial<SyncLinkRequest> & Record<string, unknown>): Promise<SyncLinked> {
+export async function link(
+  links: SyncLinks,
+  s: Rekeys,
+  vault: Vault,
+  req: Partial<SyncLinkRequest> & Record<string, unknown>,
+): Promise<SyncLinked> {
   if (links.linked(vault.id)) throw err(409, "This vault is already linked: unlink it first.", { code: "linked" });
   /* Before the server is asked anything: a link this process could not keep the key of would
      create a remote and leave it unkeyed. */
@@ -336,12 +365,16 @@ export async function link(links: SyncLinks, s: Rekeys, vault: Vault, req: Parti
 
   if (mode === "upload") {
     const passphrase = typeof req.passphrase === "string" ? req.passphrase : "";
-    if (passphrase.length < MIN_PASSPHRASE) throw err(400, `A passphrase is at least ${MIN_PASSPHRASE} characters.`, { code: "passphrase" });
+    if (passphrase.length < MIN_PASSPHRASE)
+      throw err(400, `A passphrase is at least ${MIN_PASSPHRASE} characters.`, { code: "passphrase" });
     const vk = randomKey();
     const rk = randomKey();
     let remote: string;
     try {
-      const made = await api.createVault({ name: sealText(keysOf(vk).enc, "vault-name", path.basename(vault.root)), id: vault.id });
+      const made = await api.createVault({
+        name: sealText(keysOf(vk).enc, "vault-name", path.basename(vault.root)),
+        id: vault.id,
+      });
       const params = newParams();
       await api.putKey(made.id, { wrapped: wrapKey(deriveKek(passphrase, params), vk), recovery: wrapKey(rk, vk), params });
       remote = made.id;
@@ -373,10 +406,15 @@ export async function link(links: SyncLinks, s: Rekeys, vault: Vault, req: Parti
   if (mode === "download") {
     const files = (await vaultFs(vault).scan()).filter((e) => e.kind === "file" && !e.rel.startsWith(".anydag/"));
     if (files.length) {
-      throw err(409, `This vault holds ${files.length} file${files.length === 1 ? "" : "s"}: a download goes into an empty vault. Merge instead, or open an empty folder.`, { code: "not-empty" });
+      throw err(
+        409,
+        `This vault holds ${files.length} file${files.length === 1 ? "" : "s"}: a download goes into an empty vault. Merge instead, or open an empty folder.`,
+        { code: "not-empty" },
+      );
     }
   }
-  if (links.get(want) || (want !== vault.id && links.linked(want))) throw err(409, `Vault \`${want}\` is already linked on this machine.`, { code: "linked" });
+  if (links.get(want) || (want !== vault.id && links.linked(want)))
+    throw err(409, `Vault \`${want}\` is already linked on this machine.`, { code: "linked" });
   const v = want === vault.id ? vault : await s.rekeyVault(vault.id, want);
   keep(links, v.id, pairing, want, vk);
   const loop = await links.start(v, mode === "download" ? "resync" : "merge");
@@ -399,7 +437,15 @@ export async function now(links: SyncLinks, vault: Vault): Promise<SyncStatus> {
 
 type WireDevices = Awaited<ReturnType<HttpSyncApi["devices"]>>;
 const devicesOf = (got: WireDevices, me: string): SyncDevices => ({
-  devices: got.devices.map((d) => ({ id: d.id, name: d.name, platform: d.platform, created: d.created, seen: d.seen, revoked: d.revoked, me: d.current ?? d.id === me })),
+  devices: got.devices.map((d) => ({
+    id: d.id,
+    name: d.name,
+    platform: d.platform,
+    created: d.created,
+    seen: d.seen,
+    revoked: d.revoked,
+    me: d.current ?? d.id === me,
+  })),
 });
 
 export async function devices(links: SyncLinks, vault: Vault): Promise<SyncDevices> {
@@ -416,7 +462,8 @@ export async function revoke(links: SyncLinks, vault: Vault, id: unknown): Promi
   const { api, pairing } = links.api(vault.id);
   try {
     const before = devicesOf(await api.devices(), pairing.device.id);
-    if (!before.devices.some((d) => d.id === id)) throw err(404, `The sync account has no device \`${id}\`.`, { code: "ES_NOT_FOUND" });
+    if (!before.devices.some((d) => d.id === id))
+      throw err(404, `The sync account has no device \`${id}\`.`, { code: "ES_NOT_FOUND" });
     await api.revokeDevice(id);
     try {
       return devicesOf(await api.devices(), pairing.device.id);

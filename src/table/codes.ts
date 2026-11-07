@@ -12,7 +12,7 @@
  *
  * Codes are append-only. Retiring one is fine; reusing a retired one for something else is not.
  */
-export const TABLE_CODES = {
+const TABLE_CODES = {
   /** Two tabs, or two columns or two rows in one tab, claiming one `{#id}`. */
   ET_DUPLICATE_ID: "ET_DUPLICATE_ID",
   /** A tab, a column or a row with no `{#id}` yet. It works; it is given one the first time anything writes. */

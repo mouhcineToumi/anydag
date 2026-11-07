@@ -87,7 +87,10 @@ describe("titles", () => {
   });
 
   it("sorts by what a row says, and by name among files called the same", () => {
-    const t = tree([T("a-plan", "Zebra"), T("untitled-2", "Untitled"), T("z-last", "Apple"), T("untitled", "Untitled"), T("bare")], []);
+    const t = tree(
+      [T("a-plan", "Zebra"), T("untitled-2", "Untitled"), T("z-last", "Apple"), T("untitled", "Untitled"), T("bare")],
+      [],
+    );
     expect(t.files.map(labelOf)).toEqual(["Apple", "bare", "Untitled", "Untitled", "Zebra"]);
     expect(t.files.map((e) => e.name)).toEqual(["z-last", "bare", "untitled", "untitled-2", "a-plan"]);
   });
@@ -153,7 +156,11 @@ describe("contents", () => {
 
   it("is everything under a folder however deep, and not the folder itself", () => {
     const c = contents(t, "work")!;
-    expect(c.files.map((e) => `${e.kind}:${e.name}`).sort()).toEqual(["board:work/deep/arch", "board:work/plan", "note:work/idea"]);
+    expect(c.files.map((e) => `${e.kind}:${e.name}`).sort()).toEqual([
+      "board:work/deep/arch",
+      "board:work/plan",
+      "note:work/idea",
+    ]);
     expect(c.folders.sort()).toEqual(["work/deep", "work/empty"]);
   });
 
@@ -202,7 +209,8 @@ describe("names", () => {
 
 describe("rows", () => {
   const t = tree(B("clients/acme/arch", "clients/kickoff", "scratch"), ["clients/archive"]);
-  const line = (r: Row) => `${"  ".repeat(r.depth)}${r.type === "folder" ? `${r.name}/${r.open ? "" : " (shut)"}` : leaf(r.entry.name)}`;
+  const line = (r: Row) =>
+    `${"  ".repeat(r.depth)}${r.type === "folder" ? `${r.name}/${r.open ? "" : " (shut)"}` : leaf(r.entry.name)}`;
 
   it("leaves a shut folder's contents out", () => {
     expect(rows(t, new Set()).map(line)).toEqual(["clients/ (shut)", "scratch"]);
@@ -289,21 +297,50 @@ describe("a third kind", () => {
 
   it("follows a favourite quiz through a rename, and never mistakes it for a board of the same name", () => {
     const favs = ["quiz:work/postgres", "board:work/postgres-notes"];
-    expect(follow(favs, { kind: "file", file: "quiz", from: "work/postgres", to: "work/pg" })).toEqual(["quiz:work/pg", "board:work/postgres-notes"]);
+    expect(follow(favs, { kind: "file", file: "quiz", from: "work/postgres", to: "work/pg" })).toEqual([
+      "quiz:work/pg",
+      "board:work/postgres-notes",
+    ]);
     expect(follow(favs, { kind: "file", file: "board", from: "work/postgres", to: "x" })).toEqual(favs);
-    expect(follow(favs, { kind: "folder", from: "work", to: "archive" })).toEqual(["quiz:archive/postgres", "board:archive/postgres-notes"]);
+    expect(follow(favs, { kind: "folder", from: "work", to: "archive" })).toEqual([
+      "quiz:archive/postgres",
+      "board:archive/postgres-notes",
+    ]);
   });
 });
 
 describe("what a folder holds", () => {
   it("counts every kind on its own, and calls a quiz a quiz", () => {
-    expect(tally([...B("a", "b"), ...N("c"), ...Q("d", "e", "f"), ...T("g")])).toEqual({ board: 2, note: 1, quiz: 3, table: 1, file: 0 });
+    expect(tally([...B("a", "b"), ...N("c"), ...Q("d", "e", "f"), ...T("g")])).toEqual({
+      board: 2,
+      note: 1,
+      quiz: 3,
+      table: 1,
+      file: 0,
+    });
     expect(tally([])).toEqual({ board: 0, note: 0, quiz: 0, table: 0, file: 0 });
     /* And an attachment, counted apart from the kinds that have a text. */
-    expect(tally([...B("a"), { kind: "file" as const, name: "q3.pdf" }])).toEqual({ board: 1, note: 0, quiz: 0, table: 0, file: 1 });
-    expect(holds(contents(tree([{ kind: "file" as const, name: "x/q3.pdf" }, { kind: "file" as const, name: "x/deck.pptx" }], []), "x")!)).toEqual([
-      "2 files",
-    ]);
+    expect(tally([...B("a"), { kind: "file" as const, name: "q3.pdf" }])).toEqual({
+      board: 1,
+      note: 0,
+      quiz: 0,
+      table: 0,
+      file: 1,
+    });
+    expect(
+      holds(
+        contents(
+          tree(
+            [
+              { kind: "file" as const, name: "x/q3.pdf" },
+              { kind: "file" as const, name: "x/deck.pptx" },
+            ],
+            [],
+          ),
+          "x",
+        )!,
+      ),
+    ).toEqual(["2 files"]);
   });
 
   it("says each kind it holds, boards first, then the folders, and nothing it holds none of", () => {
@@ -330,14 +367,21 @@ describe("a selection", () => {
   const root = tree(entries, ["work", "work/deep", "work-2", "empty"]);
 
   it("drops what is inside a folder that is picked too, and keys that name nothing", () => {
-    const p = picked(["board:plan", "note:work/brief", "folder:work", "folder:work/deep", "quiz:work-2/check", "board:gone"], entries);
+    const p = picked(
+      ["board:plan", "note:work/brief", "folder:work", "folder:work/deep", "quiz:work-2/check", "board:gone"],
+      entries,
+    );
     expect(p.folders).toEqual(["work"]);
     expect(p.files.map(keyOf)).toEqual(["board:plan", "quiz:work-2/check"]);
     expect(pickedCount(p)).toBe(3);
   });
 
   it("offers every folder but the picked ones and what is under them, the top level first", () => {
-    expect(moveTargets(["work", "work/deep", "work-2", "empty"], picked(["folder:work", "board:plan"], entries))).toEqual(["", "empty", "work-2"]);
+    expect(moveTargets(["work", "work/deep", "work-2", "empty"], picked(["folder:work", "board:plan"], entries))).toEqual([
+      "",
+      "empty",
+      "work-2",
+    ]);
     expect(moveTargets(["b", "a"], picked(["board:plan"], entries))).toEqual(["", "a", "b"]);
   });
 

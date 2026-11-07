@@ -39,7 +39,8 @@ test.beforeEach(({}, info) => {
   fs.writeFileSync(path.join(DIR, parent, "plan.assets", "shot.txt"), "asset");
 });
 test.afterEach(() => {
-  for (const p of [parent, `${loose}.board.md`, `${loose}.assets`]) fs.rmSync(path.join(DIR, p), { recursive: true, force: true });
+  for (const p of [parent, `${loose}.board.md`, `${loose}.assets`])
+    fs.rmSync(path.join(DIR, p), { recursive: true, force: true });
 });
 
 const at = (...p: string[]) => path.join(DIR, ...p);
@@ -157,7 +158,7 @@ test("a board moved to the folder it is already in is left alone", async ({ page
   expect(there(parent, "b", "plan-2.board.md")).toBe(false);
 });
 
-test("a folder goes to the trash at once, empty or full, and the notice says what went", async ({ page }) => {
+test("a folder goes to the trash at once, empty or full, and the notice says what went", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   const notice = page.locator("[data-dag-trash-notice]");
   /* `b` is empty: nothing is asked, in the row or anywhere. */
@@ -200,7 +201,9 @@ test("a folder that could not go to the trash says so, keeps everything, and lea
   await open(page);
   /* The one answer worse than a question is a failure kept quiet: the person would believe a folder
      was gone that is still there. */
-  await page.route("**/__board/rmdir*", (r) => r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"boom"}' }));
+  await page.route("**/__board/rmdir*", (r) =>
+    r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"boom"}' }),
+  );
   await menu(page, folderRow(parent), parent, "delete");
   await expect(page.locator("[data-dag-sidebar-bulk-problem]")).toContainText(`“${parent}” could not be moved to the trash.`);
   await expect(page.locator("[data-dag-trash-notice]")).toHaveCount(0);
@@ -342,7 +345,9 @@ test("a folder move the server refuses says why under the tree, and nothing move
   /* A refusal, in the words the store gives for a folder too heavy for one commit — stubbed:
      what is under test is that the page says the server's sentence, whatever it is. */
   const why = `${parent}/c is too big to move in one go: 9.1 MB across 1200 files, and a move carries at most 8 MB. Move some of its subfolders first.`;
-  await page.route("**/__board/mvdir*", (route) => route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: why }) }));
+  await page.route("**/__board/mvdir*", (route) =>
+    route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: why }) }),
+  );
   await open(page);
   await drag(page, folderRow(`${parent}/c`), folderRow(`${parent}/b`));
   await expect(page.locator("[data-dag-sidebar-bulk-problem]")).toHaveText(why);

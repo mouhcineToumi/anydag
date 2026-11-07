@@ -92,7 +92,11 @@ describe("views", () => {
 
 describe("placing", () => {
   it("puts an all-day event on its days, inclusive, and an end before the start nowhere", () => {
-    expect(placeEvent({ start: "2026-10-12", end: "2026-10-14" })).toEqual({ first: "2026-10-12", last: "2026-10-14", allDay: true });
+    expect(placeEvent({ start: "2026-10-12", end: "2026-10-14" })).toEqual({
+      first: "2026-10-12",
+      last: "2026-10-14",
+      allDay: true,
+    });
     expect(placeEvent({ start: "2026-10-12" })).toEqual({ first: "2026-10-12", last: "2026-10-12", allDay: true });
     expect(placeEvent({ start: "2026-10-12", end: "2026-10-10" })).toMatchObject({ first: "2026-10-12", last: "2026-10-12" });
   });
@@ -104,9 +108,19 @@ describe("placing", () => {
     /* An end before the start is no end. */
     expect(placeEvent({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 8) }).at!.end - one.at!.start).toBe(HOUR);
     /* Midnight to midnight is one day, not two. */
-    expect(placeEvent({ start: at(2026, 10, 3, 22), end: at(2026, 10, 4, 0) })).toMatchObject({ first: "2026-10-03", last: "2026-10-03" });
-    expect(placeEvent({ start: at(2026, 10, 3, 22), end: at(2026, 10, 4, 1) })).toMatchObject({ first: "2026-10-03", last: "2026-10-04", allDay: false });
-    expect(placeEvent({ start: at(2026, 10, 3, 9), end: at(2026, 10, 5, 9) })).toMatchObject({ allDay: true, last: "2026-10-05" });
+    expect(placeEvent({ start: at(2026, 10, 3, 22), end: at(2026, 10, 4, 0) })).toMatchObject({
+      first: "2026-10-03",
+      last: "2026-10-03",
+    });
+    expect(placeEvent({ start: at(2026, 10, 3, 22), end: at(2026, 10, 4, 1) })).toMatchObject({
+      first: "2026-10-03",
+      last: "2026-10-04",
+      allDay: false,
+    });
+    expect(placeEvent({ start: at(2026, 10, 3, 9), end: at(2026, 10, 5, 9) })).toMatchObject({
+      allDay: true,
+      last: "2026-10-05",
+    });
   });
 
   it("reads a time in the zone it was written in and places it in this one", () => {
@@ -115,11 +129,17 @@ describe("placing", () => {
   });
 
   it("puts a task from its start to its due date, or on the one it has", () => {
-    expect(placeTask({ status: "todo", start: "2026-09-28", due: "2026-10-03" })).toEqual({ first: "2026-09-28", last: "2026-10-03" });
+    expect(placeTask({ status: "todo", start: "2026-09-28", due: "2026-10-03" })).toEqual({
+      first: "2026-09-28",
+      last: "2026-10-03",
+    });
     expect(placeTask({ status: "todo", due: "2026-10-03" })).toEqual({ first: "2026-10-03", last: "2026-10-03" });
     expect(placeTask({ status: "todo", start: "2026-09-28" })).toEqual({ first: "2026-09-28", last: "2026-09-28" });
     /* A start after the due date is the due date. */
-    expect(placeTask({ status: "todo", start: "2026-10-05", due: "2026-10-03" })).toEqual({ first: "2026-10-03", last: "2026-10-03" });
+    expect(placeTask({ status: "todo", start: "2026-10-05", due: "2026-10-03" })).toEqual({
+      first: "2026-10-03",
+      last: "2026-10-03",
+    });
     expect(placeTask({ status: "todo" })).toBeUndefined();
   });
 });
@@ -128,7 +148,10 @@ describe("items", () => {
   const listing = {
     notes: ["task", "event", "note", "project/note", "plain-task", "old"],
     titles: { task: "Ship", event: "Offsite", note: "Idea" },
-    tasks: { task: { status: "todo" as const, start: "2026-10-01", due: "2026-10-03" }, "plain-task": { status: "done" as const } },
+    tasks: {
+      task: { status: "todo" as const, start: "2026-10-01", due: "2026-10-03" },
+      "plain-task": { status: "done" as const },
+    },
     events: { event: { start: "2026-10-02" } },
     created: {
       task: "2026-01-01T00:00:00Z",
@@ -152,19 +175,37 @@ describe("items", () => {
   });
 
   it("switches a kind off, keeps a scope, and leaves out what the range does not touch", () => {
-    expect(itemsOf(listing, new Set(["event", "note"] as const), "2026-09-28", "2026-10-04").map((i) => i.name)).toEqual(["event", "note", "project/note"]);
-    expect(itemsOf(listing, ALL, "2026-09-28", "2026-10-04", (n) => n.startsWith("project/")).map((i) => i.name)).toEqual(["project/note"]);
+    expect(itemsOf(listing, new Set(["event", "note"] as const), "2026-09-28", "2026-10-04").map((i) => i.name)).toEqual([
+      "event",
+      "note",
+      "project/note",
+    ]);
+    expect(itemsOf(listing, ALL, "2026-09-28", "2026-10-04", (n) => n.startsWith("project/")).map((i) => i.name)).toEqual([
+      "project/note",
+    ]);
     expect(itemsOf(listing, ALL, "2026-10-03", "2026-10-31").map((i) => i.name)).toEqual(["task"]);
   });
 });
 
 describe("lanes", () => {
-  const item = (name: string, first: string, last: string): CalItem => ({ kind: "event", name, title: name, first, last, allDay: true });
+  const item = (name: string, first: string, last: string): CalItem => ({
+    kind: "event",
+    name,
+    title: name,
+    first,
+    last,
+    allDay: true,
+  });
   const week = daysFrom("2026-09-28", "2026-10-04");
 
   it("packs bars into the lowest lane free, and says where one runs off either end", () => {
     const bars = lanes(
-      [item("long", "2026-09-20", "2026-09-30"), item("a", "2026-09-29", "2026-10-01"), item("b", "2026-10-01", "2026-10-02"), item("c", "2026-10-03", "2026-10-09")],
+      [
+        item("long", "2026-09-20", "2026-09-30"),
+        item("a", "2026-09-29", "2026-10-01"),
+        item("b", "2026-10-01", "2026-10-02"),
+        item("c", "2026-10-03", "2026-10-09"),
+      ],
       week,
     );
     expect(bars.map((b) => [b.item.name, b.col, b.span, b.lane, b.before, b.after])).toEqual([
@@ -177,7 +218,12 @@ describe("lanes", () => {
 });
 
 describe("the hour grid", () => {
-  const timed = (name: string, start: string, end: string): CalItem => ({ kind: "event", name, title: name, ...placeEvent({ start, end }) });
+  const timed = (name: string, start: string, end: string): CalItem => ({
+    kind: "event",
+    name,
+    title: name,
+    ...placeEvent({ start, end }),
+  });
 
   it("cuts an event to the day and splits the width where events overlap", () => {
     const day = "2026-10-03";
@@ -210,7 +256,10 @@ describe("the hour grid", () => {
       [2026, 10, 25],
     ] as const) {
       const day = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const got = blocks([timed("talk", at(y, m, d, 9), at(y, m, d, 10)), timed("late", at(y, m, d, 23), at(y, m, d + 1, 1))], day);
+      const got = blocks(
+        [timed("talk", at(y, m, d, 9), at(y, m, d, 10)), timed("late", at(y, m, d, 23), at(y, m, d + 1, 1))],
+        day,
+      );
       expect(got.map((b) => [b.item.name, b.top, b.length])).toEqual([
         ["talk", 540, 60],
         ["late", 1380, 60],
@@ -224,13 +273,21 @@ describe("words", () => {
     expect(whenWords({ start: "2026-10-12", end: "2026-10-14" }, "2026")).toBe("Mon, Oct 12 – Wed, Oct 14");
     expect(whenWords({ start: "2026-10-12" }, "2027")).toBe("Mon, Oct 12, 2026");
     expect(whenWords({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 17, 30) }, "2026")).toBe("Sat, Oct 3, 09:00 – 17:30");
-    expect(whenWords({ start: at(2026, 10, 3, 22), end: at(2026, 10, 4, 1) }, "2026")).toBe("Sat, Oct 3, 22:00 – Sun, Oct 4, 01:00");
+    expect(whenWords({ start: at(2026, 10, 3, 22), end: at(2026, 10, 4, 1) }, "2026")).toBe(
+      "Sat, Oct 3, 22:00 – Sun, Oct 4, 01:00",
+    );
   });
 });
 
 describe("changing one", () => {
   it("reads an event into the bar's fields, here", () => {
-    expect(fieldsOf({ start: "2026-10-12", end: "2026-10-14" })).toEqual({ allDay: true, startDay: "2026-10-12", startTime: "", endDay: "2026-10-14", endTime: "" });
+    expect(fieldsOf({ start: "2026-10-12", end: "2026-10-14" })).toEqual({
+      allDay: true,
+      startDay: "2026-10-12",
+      startTime: "",
+      endDay: "2026-10-14",
+      endTime: "",
+    });
     expect(fieldsOf({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 17, 30) })).toEqual({
       allDay: false,
       startDay: "2026-10-03",
@@ -243,19 +300,33 @@ describe("changing one", () => {
   });
 
   it("writes every time with its offset, and an end that is not after the start an hour on", () => {
-    expect(eventFrom({ allDay: false, startDay: "2026-10-03", startTime: "09:00", endDay: "2026-10-03", endTime: "08:00" })).toEqual({
+    expect(
+      eventFrom({ allDay: false, startDay: "2026-10-03", startTime: "09:00", endDay: "2026-10-03", endTime: "08:00" }),
+    ).toEqual({
       start: at(2026, 10, 3, 9),
       end: at(2026, 10, 3, 10),
     });
-    expect(eventFrom({ allDay: true, startDay: "2026-10-03", startTime: "", endDay: "2026-10-03", endTime: "" })).toEqual({ start: "2026-10-03", end: null });
-    expect(eventFrom({ allDay: true, startDay: "2026-10-03", startTime: "", endDay: "2026-10-01", endTime: "" })).toEqual({ start: "2026-10-03", end: null });
+    expect(eventFrom({ allDay: true, startDay: "2026-10-03", startTime: "", endDay: "2026-10-03", endTime: "" })).toEqual({
+      start: "2026-10-03",
+      end: null,
+    });
+    expect(eventFrom({ allDay: true, startDay: "2026-10-03", startTime: "", endDay: "2026-10-01", endTime: "" })).toEqual({
+      start: "2026-10-03",
+      end: null,
+    });
   });
 
   it("switches between all day and a time", () => {
     expect(withAllDay({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 17) }, true)).toEqual({ start: "2026-10-03", end: null });
-    expect(withAllDay({ start: at(2026, 10, 3, 22), end: at(2026, 10, 5, 0) }, true)).toEqual({ start: "2026-10-03", end: "2026-10-04" });
+    expect(withAllDay({ start: at(2026, 10, 3, 22), end: at(2026, 10, 5, 0) }, true)).toEqual({
+      start: "2026-10-03",
+      end: "2026-10-04",
+    });
     expect(withAllDay({ start: "2026-10-03" }, false)).toEqual({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 10) });
-    expect(withAllDay({ start: "2026-10-03", end: "2026-10-05" }, false)).toEqual({ start: at(2026, 10, 3, 9), end: at(2026, 10, 5, 17) });
+    expect(withAllDay({ start: "2026-10-03", end: "2026-10-05" }, false)).toEqual({
+      start: at(2026, 10, 3, 9),
+      end: at(2026, 10, 5, 17),
+    });
   });
 
   it("moves the start and keeps how long it is", () => {
@@ -263,8 +334,14 @@ describe("changing one", () => {
       start: at(2026, 10, 5, 14),
       end: at(2026, 10, 5, 15, 30),
     });
-    expect(withStart({ start: "2026-10-12", end: "2026-10-14" }, "2026-10-20")).toEqual({ start: "2026-10-20", end: "2026-10-22" });
-    expect(withEnd({ start: at(2026, 10, 3, 9) }, "2026-10-03", "12:00")).toEqual({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 12) });
+    expect(withStart({ start: "2026-10-12", end: "2026-10-14" }, "2026-10-20")).toEqual({
+      start: "2026-10-20",
+      end: "2026-10-22",
+    });
+    expect(withEnd({ start: at(2026, 10, 3, 9) }, "2026-10-03", "12:00")).toEqual({
+      start: at(2026, 10, 3, 9),
+      end: at(2026, 10, 3, 12),
+    });
   });
 
   it("moves an event by a drag: by days, by quarter hours, across midnight, keeping its length", () => {
@@ -282,7 +359,10 @@ describe("changing one", () => {
   });
 
   it("moves a task's start and due date together, and only the ones it has", () => {
-    expect(shiftTask({ status: "todo", start: "2026-10-01", due: "2026-10-03" }, 5)).toEqual({ start: "2026-10-06", due: "2026-10-08" });
+    expect(shiftTask({ status: "todo", start: "2026-10-01", due: "2026-10-03" }, 5)).toEqual({
+      start: "2026-10-06",
+      due: "2026-10-08",
+    });
     expect(shiftTask({ status: "done", due: "2026-10-31" }, 1)).toEqual({ due: "2026-11-01" });
     expect(shiftTask({ status: "todo", start: "2026-10-01" }, -1)).toEqual({ start: "2026-09-30" });
   });
@@ -291,9 +371,18 @@ describe("changing one", () => {
     const meeting = { start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 10) };
     expect(withEdge(meeting, "end", "2026-10-03", "11:30")).toEqual({ start: meeting.start, end: at(2026, 10, 3, 11, 30) });
     expect(withEdge(meeting, "end", "2026-10-03", "08:00")).toEqual({ start: meeting.start, end: at(2026, 10, 3, 9, 15) });
-    expect(withEdge(meeting, "start", "2026-10-03", "08:15")).toEqual({ start: at(2026, 10, 3, 8, 15), end: at(2026, 10, 3, 10) });
-    expect(withEdge(meeting, "start", "2026-10-03", "12:00")).toEqual({ start: at(2026, 10, 3, 9, 45), end: at(2026, 10, 3, 10) });
-    expect(withEdge({ start: at(2026, 10, 3, 9) }, "end", "2026-10-04", "10:00")).toEqual({ start: at(2026, 10, 3, 9), end: at(2026, 10, 4, 10) });
+    expect(withEdge(meeting, "start", "2026-10-03", "08:15")).toEqual({
+      start: at(2026, 10, 3, 8, 15),
+      end: at(2026, 10, 3, 10),
+    });
+    expect(withEdge(meeting, "start", "2026-10-03", "12:00")).toEqual({
+      start: at(2026, 10, 3, 9, 45),
+      end: at(2026, 10, 3, 10),
+    });
+    expect(withEdge({ start: at(2026, 10, 3, 9) }, "end", "2026-10-04", "10:00")).toEqual({
+      start: at(2026, 10, 3, 9),
+      end: at(2026, 10, 4, 10),
+    });
     const trip = { start: "2026-10-12", end: "2026-10-14" };
     expect(withEdge(trip, "end", "2026-10-16")).toEqual({ start: "2026-10-12", end: "2026-10-16" });
     expect(withEdge(trip, "end", "2026-10-01")).toEqual({ start: "2026-10-12", end: null });
@@ -312,10 +401,22 @@ describe("changing one", () => {
   });
 
   it("turns an event all day where it is dropped, over the days it touched, or timed at the hour it is dropped at", () => {
-    expect(asAllDay({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 10) }, "2026-10-05")).toEqual({ start: "2026-10-05", end: null });
-    expect(asAllDay({ start: at(2026, 10, 3, 22), end: at(2026, 10, 5, 2) }, "2026-10-10")).toEqual({ start: "2026-10-10", end: "2026-10-12" });
-    expect(asTimed({ start: "2026-10-12", end: "2026-10-14" }, "2026-10-13", "14:00")).toEqual({ start: at(2026, 10, 13, 14), end: at(2026, 10, 13, 15) });
-    expect(asTimed({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 10, 30) }, "2026-10-04", "16:00")).toEqual({ start: at(2026, 10, 4, 16), end: at(2026, 10, 4, 17, 30) });
+    expect(asAllDay({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 10) }, "2026-10-05")).toEqual({
+      start: "2026-10-05",
+      end: null,
+    });
+    expect(asAllDay({ start: at(2026, 10, 3, 22), end: at(2026, 10, 5, 2) }, "2026-10-10")).toEqual({
+      start: "2026-10-10",
+      end: "2026-10-12",
+    });
+    expect(asTimed({ start: "2026-10-12", end: "2026-10-14" }, "2026-10-13", "14:00")).toEqual({
+      start: at(2026, 10, 13, 14),
+      end: at(2026, 10, 13, 15),
+    });
+    expect(asTimed({ start: at(2026, 10, 3, 9), end: at(2026, 10, 3, 10, 30) }, "2026-10-04", "16:00")).toEqual({
+      start: at(2026, 10, 4, 16),
+      end: at(2026, 10, 4, 17, 30),
+    });
     expect(asTimed({ start: at(2026, 10, 3, 9) }, "2026-10-04", "16:00")).toEqual({ start: at(2026, 10, 4, 16), end: null });
   });
 });

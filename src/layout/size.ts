@@ -229,9 +229,7 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
       /* The tag is a pill *beside* the label, in mono, with its own padding — so the width is the
          sum of the two, not the longer. Taking the longer left every tagged commit overflowing by
          the shorter of them, and \`v1.2.0-rc1\` read as \`v1 rc\`. */
-      const tag = node.meta
-        ? m.node.gap + w(node.meta, fontOf(theme, t.pill, 600, true)) + m.node.keyPadX * 2
-        : 0;
+      const tag = node.meta ? m.node.gap + w(node.meta, fontOf(theme, t.pill, 600, true)) + m.node.keyPadX * 2 : 0;
       /* A dot and a label, so the width is the text plus the dot plus padding — no icon tile. */
       return {
         w: node.w ?? Math.max(120, label + tag + m.group.dot + m.node.gap + m.node.padX * 2),
@@ -246,13 +244,7 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
       const width = node.w ?? m.node.c4W;
       const inner = width - m.node.c4PadX * 2;
       const descLines = measure.lines(node.desc ?? "", fontOf(theme, t.c4Desc), inner);
-      const h =
-        m.node.c4Pad * 2 +
-        m.tile.sizeC4 +
-        7 +
-        t.c4Type +
-        7 +
-        descLines * Math.round(t.c4Desc * t.c4DescLeading);
+      const h = m.node.c4Pad * 2 + m.tile.sizeC4 + 7 + t.c4Type + 7 + descLines * Math.round(t.c4Desc * t.c4DescLeading);
       return { w: width, h: Math.round(h), rowY };
     }
 
@@ -262,8 +254,7 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
         const width = node.w ?? m.node.c4W;
         const inner = width - m.node.c4PadX * 2;
         const descLines = measure.lines(node.desc, fontOf(theme, t.c4Desc), inner);
-        const h =
-          m.node.c4Pad * 2 + m.tile.sizeC4 + 7 + t.c4Type + 7 + descLines * Math.round(t.c4Desc * t.c4DescLeading);
+        const h = m.node.c4Pad * 2 + m.tile.sizeC4 + 7 + t.c4Type + 7 + descLines * Math.round(t.c4Desc * t.c4DescLeading);
         return { w: width, h: Math.round(h), rowY };
       }
       break;
@@ -317,10 +308,7 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
 
   let widest = 0;
   for (const row of node.rows) {
-    widest = Math.max(
-      widest,
-      measure.width(row.name, rowNameFont) + m.node.gap + measure.width(row.detail ?? "", rowDetailFont),
-    );
+    widest = Math.max(widest, measure.width(row.name, rowNameFont) + m.node.gap + measure.width(row.detail ?? "", rowDetailFont));
   }
   width = node.w ?? Math.min(m.node.plainMaxW, Math.max(width, widest + m.node.padX * 2));
 

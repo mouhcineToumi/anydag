@@ -33,7 +33,11 @@ describe("/v1/logs", () => {
   it("takes a batch with no token and keeps each event cleaned, with nothing about the request", async () => {
     h = await harness();
     const res = await call(h, "POST", "/v1/logs", {
-      json: batch([tidy, { name: "feature.use", at: tidy.at, props: { what: "Secret board" } }, { name: "error", at: tidy.at, props: { where: "page", message: "no note `Diary` at /home/me/x" } }]),
+      json: batch([
+        tidy,
+        { name: "feature.use", at: tidy.at, props: { what: "Secret board" } },
+        { name: "error", at: tidy.at, props: { where: "page", message: "no note `Diary` at /home/me/x" } },
+      ]),
       headers: { "x-forwarded-for": "203.0.113.9" },
     });
     expect(res.status).toBe(202);
@@ -48,10 +52,13 @@ describe("/v1/logs", () => {
 
   it("drops what it cannot describe, and what a sender sends past its rate", async () => {
     h = await harness();
-    expect(await (await call(h, "POST", "/v1/logs", { json: { v: 1, env: { ...env, install: "x" }, events: [tidy] } })).json()).toEqual({ accepted: 0 });
+    expect(
+      await (await call(h, "POST", "/v1/logs", { json: { v: 1, env: { ...env, install: "x" }, events: [tidy] } })).json(),
+    ).toEqual({ accepted: 0 });
     expect((await call(h, "POST", "/v1/logs", { bytes: new TextEncoder().encode("{") })).status).toBe(400);
     let accepted = 0;
-    for (let i = 0; i < 40; i++) accepted += ((await (await call(h, "POST", "/v1/logs", { json: batch([tidy]) })).json()) as { accepted: number }).accepted;
+    for (let i = 0; i < 40; i++)
+      accepted += ((await (await call(h, "POST", "/v1/logs", { json: batch([tidy]) })).json()) as { accepted: number }).accepted;
     /* Thirty a minute from one sender, the two refused above among them. */
     expect(accepted).toBe(28);
     h.clock.advance(60_000);

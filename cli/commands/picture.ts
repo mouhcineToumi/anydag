@@ -2,19 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { importKind, openId, sealId } from "../../src/board/envelope";
+import { sealId } from "../../src/board/envelope";
 
 import { ApiError, EXIT } from "../api";
 import { UsageError, bool, list, num, str } from "../args";
 import { diagnosticLines, type Diagnosed } from "../board";
-import { emit, readText, type Command, type Ctx } from "../context";
-import { ITEMS } from "./items";
-import { ASSETS } from "./assets";
+import { emit, type Command, type Ctx } from "../context";
 import { exportZip } from "./files";
 
 /**
  * The three things only a laid-out page can answer — what a board looks like, whether it is tidy,
- * and what its export is — and the two ways a file comes in.
+ * and what its export is.
  *
  * The first three open the page in Playwright against the server this command reaches (the
  * running app's, or one this process listens with), carrying its token — which is what closes the
@@ -52,11 +50,14 @@ type Box = { x: number; y: number; width: number; height: number };
 async function launch(ctx: Ctx): Promise<Browser> {
   let chromium: { launch(o: Record<string, unknown>): Promise<Browser> };
   try {
-    const mod = (await import("playwright")) as unknown as { chromium: typeof chromium; default?: { chromium: typeof chromium } };
+    const mod = (await import("@playwright/test")) as unknown as {
+      chromium: typeof chromium;
+      default?: { chromium: typeof chromium };
+    };
     chromium = mod.chromium ?? mod.default!.chromium;
   } catch {
     throw new ApiError(
-      "this needs Playwright and a browser, which an AnyDag checkout has after `npm install` — everything else works without it; `anydag open` shows the board in yours",
+      "this needs Playwright and a browser, which an AnyDag checkout has after `npm install` — everything else works without it; open it in the app to see it",
       EXIT.failed,
     );
   }
@@ -69,7 +70,10 @@ async function launch(ctx: Ctx): Promise<Browser> {
       last = e;
     }
   }
-  throw new ApiError(`no browser would start: ${last instanceof Error ? last.message.split("\n")[0] : String(last)}`, EXIT.failed);
+  throw new ApiError(
+    `no browser would start: ${last instanceof Error ? last.message.split("\n")[0] : String(last)}`,
+    EXIT.failed,
+  );
 }
 
 /** A page on this board, signed in as this terminal, ready — or the exit code for why not. */
@@ -89,7 +93,11 @@ async function openBoard(
 }
 
 /** A note's page, the same way: asked of the api first, then opened under `?snapshot=1` and waited for. */
-async function openNote(ctx: Ctx, note: string, q: { theme?: string }): Promise<{ browser: Browser; page: Page; problems: string[] } | number> {
+async function openNote(
+  ctx: Ctx,
+  note: string,
+  q: { theme?: string },
+): Promise<{ browser: Browser; page: Page; problems: string[] } | number> {
   await ctx.api.get("/__board/get", { name: note, kind: "note" });
   const params = new URLSearchParams({ note, snapshot: "1" });
   if (q.theme) params.set("theme", q.theme);
@@ -131,7 +139,9 @@ async function openPage(
     await page.evaluate("document.fonts.ready");
   } catch {
     await browser.close();
-    ctx.io.err(`${label} never became ready — the page did not report every item's size (is ${web} the web app, not only the api?)`);
+    ctx.io.err(
+      `${label} never became ready — the page did not report every item's size (is ${web} the web app, not only the api?)`,
+    );
     return EXIT.notReady;
   }
   return { browser, page, problems };
@@ -144,7 +154,9 @@ async function tidyIn(page: Page, dry: boolean): Promise<{ moved: number; of: nu
     document.dispatchEvent(new CustomEvent("dag:tidy", { detail: { dry: d } }));
   }, dry);
   await page.waitForFunction("document.documentElement.dataset.dagTidy !== undefined", null, { timeout: 30_000 });
-  const out = await page.evaluate<{ moved: number; of: number; ids?: string[] }>("JSON.parse(document.documentElement.dataset.dagTidy ?? '{}')");
+  const out = await page.evaluate<{ moved: number; of: number; ids?: string[] }>(
+    "JSON.parse(document.documentElement.dataset.dagTidy ?? '{}')",
+  );
   await page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))");
   return out;
 }
@@ -193,7 +205,11 @@ export const PICTURE: Command[] = [
       try {
         if (bool(p, "tidy")) {
           const t = await tidyIn(page, false);
-          ctx.io.err(t.moved === 0 ? `tidy  already tidy (${t.of} items)` : `tidy  moved ${t.moved} of ${t.of}: ${(t.ids ?? []).join(", ")}`);
+          ctx.io.err(
+            t.moved === 0
+              ? `tidy  already tidy (${t.of} items)`
+              : `tidy  moved ${t.moved} of ${t.of}: ${(t.ids ?? []).join(", ")}`,
+          );
         }
         const pad = 48;
         if (item) {
@@ -205,19 +221,30 @@ export const PICTURE: Command[] = [
             return { x: m.e, y: m.f, w: el.offsetWidth, h: el.offsetHeight };
           }, item);
           if (!r) throw new UsageError(`no item \`${item}\` on ${board}`);
-          await page.setViewportSize({ width: Math.max(400, Math.min(4000, Math.ceil(r.w + pad * 2))), height: Math.max(300, Math.min(4000, Math.ceil(r.h + pad * 2))) });
+          await page.setViewportSize({
+            width: Math.max(400, Math.min(4000, Math.ceil(r.w + pad * 2))),
+            height: Math.max(300, Math.min(4000, Math.ceil(r.h + pad * 2))),
+          });
           await page.waitForTimeout(200);
-          await page.evaluate<void, number[]>(([x, y, d]) => {
-            const l = document.querySelector<HTMLElement>(".dag-layer")!;
-            l.style.transformOrigin = "0 0";
-            l.style.transform = `translate(${d! - x!}px, ${d! - y!}px)`;
-            l.style.width = l.style.height = "100%";
-          }, [r.x, r.y, pad]);
+          await page.evaluate<void, number[]>(
+            ([x, y, d]) => {
+              const l = document.querySelector<HTMLElement>(".dag-layer")!;
+              l.style.transformOrigin = "0 0";
+              l.style.transform = `translate(${d! - x!}px, ${d! - y!}px)`;
+              l.style.width = l.style.height = "100%";
+            },
+            [r.x, r.y, pad],
+          );
           await page.waitForTimeout(150);
         } else {
-          const bounds = await page.evaluate<{ w: number; h: number } | null>("JSON.parse(document.documentElement.dataset.dagBounds || 'null')");
+          const bounds = await page.evaluate<{ w: number; h: number } | null>(
+            "JSON.parse(document.documentElement.dataset.dagBounds || 'null')",
+          );
           if (bounds && bounds.w > 0 && bounds.h > 0) {
-            await page.setViewportSize({ width: Math.max(400, Math.min(4000, Math.ceil(bounds.w + pad * 2))), height: Math.max(300, Math.min(4000, Math.ceil(bounds.h + pad * 2))) });
+            await page.setViewportSize({
+              width: Math.max(400, Math.min(4000, Math.ceil(bounds.w + pad * 2))),
+              height: Math.max(300, Math.min(4000, Math.ceil(bounds.h + pad * 2))),
+            });
             await page.keyboard.press("f");
             await page.waitForTimeout(150);
           }
@@ -230,15 +257,26 @@ export const PICTURE: Command[] = [
         fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
         await page.screenshot({
           path: out,
-          clip: { x, y, width: Math.min(view.width - x, (box?.width ?? view.width) + edge * 2), height: Math.min(view.height - y, (box?.height ?? view.height) + edge * 2) },
+          clip: {
+            x,
+            y,
+            width: Math.min(view.width - x, (box?.width ?? view.width) + edge * 2),
+            height: Math.min(view.height - y, (box?.height ?? view.height) + edge * 2),
+          },
         });
-        const quality = await page.evaluate<{ item: string; totals?: Record<string, number>; findings?: { code: string; ids?: string[] }[] }[]>(QUALITY);
+        const quality =
+          await page.evaluate<{ item: string; totals?: Record<string, number>; findings?: { code: string; ids?: string[] }[] }[]>(
+            QUALITY,
+          );
         const diag = await ctx.api.get<Diagnosed>("/__board/diagnostics", { name: board });
         emit(ctx, { out, diagnostics: diag, quality, console: problems }, () => {
           ctx.io.out(out);
           for (const line of diagnosticLines(diag)) ctx.io.out(line);
           for (const q of quality) {
-            const t = Object.entries(q.totals ?? {}).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(" ");
+            const t = Object.entries(q.totals ?? {})
+              .filter(([, v]) => v > 0)
+              .map(([k, v]) => `${k}=${v}`)
+              .join(" ");
             const n = (q.findings ?? []).length;
             ctx.io.out(`quality  ${q.item}  ${t || (n > 0 ? `${n} finding(s)` : "clean")}`);
             for (const f of q.findings ?? []) ctx.io.out(`${f.code}  ${q.item}  ${(f.ids ?? []).join(", ")}`);
@@ -298,14 +336,21 @@ export const PICTURE: Command[] = [
     flags: [
       { name: "format", type: "string", value: "<md|zip|svg|png>", help: "default: from --out's extension, else md" },
       { name: "item", type: "list", value: "<id>", help: "export these items only; repeatable" },
-      { name: "out", short: "o", type: "string", value: "<file>", help: "where to write it (default: stdout for md, ./<board>.<ext>)" },
+      {
+        name: "out",
+        short: "o",
+        type: "string",
+        value: "<file>",
+        help: "where to write it (default: stdout for md, ./<board>.<ext>)",
+      },
     ],
     routes: ["GET /__board/get", "GET /__board/index", "GET /__board/file", "GET /__board/assets/{path:path}"],
     async run(ctx, p) {
       const board = p.pos[0]!;
       const out = str(p, "out");
       const format = str(p, "format") ?? (out ? path.extname(out).slice(1) : "md");
-      if (format !== "md" && format !== "zip" && format !== "svg" && format !== "png") throw new UsageError("--format is md, zip, svg or png");
+      if (format !== "md" && format !== "zip" && format !== "svg" && format !== "png")
+        throw new UsageError("--format is md, zip, svg or png");
       if (format === "md" || format === "zip") {
         const got = await ctx.api.get<{ text: string; id?: string }>("/__board/get", { name: board });
         const text = got.id ? sealId(got.text, got.id) : got.text;
@@ -325,15 +370,24 @@ export const PICTURE: Command[] = [
             new Promise((resolve) => {
               document.dispatchEvent(
                 new CustomEvent("dag:export", {
-                  detail: { kind: d.kind, ids: d.ids, reply: (value: string) => resolve({ ok: true, value }), fail: (value: string) => resolve({ ok: false, value }) },
+                  detail: {
+                    kind: d.kind,
+                    ids: d.ids,
+                    reply: (value: string) => resolve({ ok: true, value }),
+                    fail: (value: string) => resolve({ ok: false, value }),
+                  },
                 }),
               );
-              setTimeout(() => resolve({ ok: false, value: "the page did not answer — is this app older than `dag:export`?" }), 60_000);
+              setTimeout(
+                () => resolve({ ok: false, value: "the page did not answer — is this app older than `dag:export`?" }),
+                60_000,
+              );
             }),
           { kind: format, ids },
         );
         if (!result.ok) throw new ApiError(`could not export: ${result.value}`, EXIT.failed);
-        const bytes = format === "svg" ? Buffer.from(result.value, "utf8") : Buffer.from(result.value.replace(/^data:[^,]*,/, ""), "base64");
+        const bytes =
+          format === "svg" ? Buffer.from(result.value, "utf8") : Buffer.from(result.value.replace(/^data:[^,]*,/, ""), "base64");
         const file = out ?? `${fileStem(board)}${ids?.length === 1 ? `-${fileStem(ids[0]!)}` : ""}.${format}`;
         fs.writeFileSync(file, bytes);
         emit(ctx, { out: file, bytes: bytes.length }, () => ctx.io.out(file));
@@ -355,7 +409,13 @@ export const PICTURE: Command[] = [
     flags: [
       { name: "format", type: "string", value: "<md|zip|pdf>", help: "default: from --out's extension, else md" },
       { name: "theme", type: "string", value: "<name>", help: "the theme the page opens in; a dark one prints in the default" },
-      { name: "out", short: "o", type: "string", value: "<file>", help: "where to write it (default: stdout for md, ./<note>.pdf)" },
+      {
+        name: "out",
+        short: "o",
+        type: "string",
+        value: "<file>",
+        help: "where to write it (default: stdout for md, ./<note>.pdf)",
+      },
     ],
     routes: ["GET /__board/get", "GET /__board/index", "GET /__board/file", "GET /__board/assets/{path:path}"],
     async run(ctx, p) {
@@ -382,10 +442,17 @@ export const PICTURE: Command[] = [
             new Promise((resolve) => {
               document.dispatchEvent(
                 new CustomEvent("dag:export", {
-                  detail: { kind: "pdf", reply: (value: string) => resolve({ ok: true, value }), fail: (value: string) => resolve({ ok: false, value }) },
+                  detail: {
+                    kind: "pdf",
+                    reply: (value: string) => resolve({ ok: true, value }),
+                    fail: (value: string) => resolve({ ok: false, value }),
+                  },
                 }),
               );
-              setTimeout(() => resolve({ ok: false, value: "the page did not answer — is this app older than a note's PDF export?" }), 60_000);
+              setTimeout(
+                () => resolve({ ok: false, value: "the page did not answer — is this app older than a note's PDF export?" }),
+                60_000,
+              );
             }),
         );
         if (!result.ok) throw new ApiError(`could not export: ${result.value}`, EXIT.failed);
@@ -397,53 +464,4 @@ export const PICTURE: Command[] = [
       }
     },
   },
-  {
-    name: ["board", "import"],
-    args: "<file>",
-    min: 1,
-    summary: "bring a file in: a .board.md becomes a board, an image or text lands on --into",
-    help:
-      "A .board.md becomes a new board, keeping the permanent id its export carried when that id is free — so the " +
-      "references to it keep working — and named after the file unless --name says otherwise. An image or a text " +
-      "file needs a board to land on: --into, with --at for where.",
-    flags: [
-      { name: "name", type: "string", value: "<name>", help: "the new board's name" },
-      { name: "into", type: "string", value: "<board>", help: "the board an image or text lands on" },
-      { name: "at", type: "string", value: "<x,y>", help: "where it lands" },
-    ],
-    routes: ["POST /__board/create", "POST /__board/asset", "POST /__board/patch"],
-    async run(ctx, p) {
-      const file = p.pos[0]!;
-      const ext = path.extname(file).toLowerCase();
-      const into = str(p, "into");
-      if (/\.(png|jpe?g|gif|webp|svg)$/.test(ext)) {
-        if (!into) throw new UsageError("an image lands on a board: --into <board>");
-        const add = ASSETS.find((c) => c.name.join(" ") === "image add")!;
-        return add.run(ctx, { pos: [into, file], flags: { ...p.flags } });
-      }
-      const text = await readText(ctx, file);
-      /* The kind its name says, the canvas's own rule (`importKind`): a `.note.md` is a note and a
-         `.quiz.md` a quiz and a `.table.md` a table, where this used to take any frontmatter for a board. */
-      const kind = importKind(file, text);
-      if (kind && !into) {
-        const opened = openId(text);
-        const name = str(p, "name") ?? path.basename(file).replace(/\.(?:board|note|quiz|table)\.md$|\.md$/i, "");
-        const made = await ctx.api.post<{ name: string; id: string }>("/__board/create", {
-          name,
-          text: opened.text,
-          id: opened.id,
-          ...(kind === "board" ? {} : { kind }),
-        });
-        emit(ctx, made, () => {
-          ctx.io.out(made.name);
-          ctx.io.err(`imported ${file} as ${kind} ${made.name}${opened.id && made.id === opened.id ? `, keeping its id ${made.id}` : ""}`);
-        });
-        return;
-      }
-      if (!into) throw new UsageError("text lands on a board as notes: --into <board>");
-      const add = ITEMS.find((c) => c.name.join(" ") === "item add")!;
-      return add.run(ctx, { pos: [into], flags: { file, ...(str(p, "at") ? { at: str(p, "at") } : {}) } });
-    },
-  },
 ];
-

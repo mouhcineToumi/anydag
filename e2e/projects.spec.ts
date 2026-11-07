@@ -126,7 +126,10 @@ test("Open tasks shows only the project's tasks, and one typed in there is made 
   /* Every project: a row names its project with a chip, and one outside every project has none. */
   await page.locator("[data-dag-tasks-project]").selectOption("");
   await page.locator("[data-dag-tasks-filter]").fill(folder);
-  await expect(page.locator(`[data-dag-task-row="${inside}"] [data-dag-project-chip]`)).toHaveAttribute("data-dag-project-chip", "Launch");
+  await expect(page.locator(`[data-dag-task-row="${inside}"] [data-dag-project-chip]`)).toHaveAttribute(
+    "data-dag-project-chip",
+    "Launch",
+  );
   await expect(page.locator(`[data-dag-task-row="${outside}"] [data-dag-project-chip]`)).toHaveCount(0);
 });
 
@@ -148,7 +151,10 @@ test("Not a project takes the two lines out, and the folder is a plain folder ag
 test("a project's card on a board says so, and its read-only page draws its status", async ({ page }) => {
   const project = write("launch", "Launch", ["project: paused"]);
   const id = await idOf(page, project);
-  fs.writeFileSync(path.join(dir, "board.board.md"), `---\ntitle: Launch board\n---\n\n\`\`\`md {#p1 x=0 y=0 w=360}\n![Launch](dag:${id})\n\`\`\`\n`);
+  fs.writeFileSync(
+    path.join(dir, "board.board.md"),
+    `---\ntitle: Launch board\n---\n\n\`\`\`md {#p1 x=0 y=0 w=360}\n![Launch](dag:${id})\n\`\`\`\n`,
+  );
   await page.goto(`/?board=${folder}/board`);
   await ready(page);
   const card = page.locator(`[data-dag-embed="${id}"][data-dag-embed-kind="project"]`);

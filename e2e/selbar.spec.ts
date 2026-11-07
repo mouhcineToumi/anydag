@@ -136,7 +136,9 @@ const SELECT: Record<string, (page: Page) => Promise<void>> = {
 const TARGET: Record<string, string> = { "an item": "svc", "a group": "g1", "a picked card": "pair" };
 for (const notches of [-3, 0, 4]) {
   for (const what of Object.keys(SELECT)) {
-    test(`no handle of ${what} is under the toolbar (zoom ${notches > 0 ? "in" : notches < 0 ? "out" : "100%"})`, async ({ page }) => {
+    test(`no handle of ${what} is under the toolbar (zoom ${notches > 0 ? "in" : notches < 0 ? "out" : "100%"})`, async ({
+      page,
+    }) => {
       await open(page);
       await zoomAt(page, TARGET[what]!, notches);
       await SELECT[what]!(page);
@@ -154,9 +156,7 @@ test("the toolbar goes below when the selection is at the top of the canvas, sti
   const item = (await page.locator('[data-dag-item="svc"]').boundingBox())!;
   await page.mouse.move(vp.x + vp.width / 2, vp.y + vp.height / 2);
   await page.mouse.wheel(0, item.y - vp.y - 30);
-  await expect
-    .poll(async () => (await page.locator('[data-dag-item="svc"]').boundingBox())!.y - vp.y)
-    .toBeLessThan(60);
+  await expect.poll(async () => (await page.locator('[data-dag-item="svc"]').boundingBox())!.y - vp.y).toBeLessThan(60);
 
   const south = (await page.locator('[data-dag-item="svc"] [data-dag-connect="s"]').boundingBox())!;
   await expect.poll(async () => (await page.locator(".dag-selbar").boundingBox())!.y).toBeGreaterThan(south.y + south.height);
@@ -189,7 +189,9 @@ test("the toolbar is the same size at every zoom — it is chrome, not part of t
   await clickItem(page, "svc");
   const at1 = (await page.locator(".dag-selbar").boundingBox())!;
   await zoomAt(page, "svc", 4);
-  await expect.poll(async () => Math.round((await page.locator(".dag-selbar").boundingBox())!.height)).toBe(Math.round(at1.height));
+  await expect
+    .poll(async () => Math.round((await page.locator(".dag-selbar").boundingBox())!.height))
+    .toBe(Math.round(at1.height));
   expect(Math.round((await page.locator(".dag-selbar").boundingBox())!.width)).toBe(Math.round(at1.width));
 });
 

@@ -4,7 +4,7 @@
  *
  * `check-theme.mjs` proves every `--dag-*` the code reads exists in every theme. That is only half
  * the layer rule: it says nothing about a value written straight into the stylesheet, which is
- * invisible to a theme by construction. `CLAUDE.md` claimed this file's job
+ * invisible to a theme by construction. `docs/architecture/layers.md` claimed this file's job
  * was already being done — it was not, and 99 px literals had accumulated on the diagram surface,
  * including two font sizes bypassing the type ramp entirely and a legend drawing the wrong stroke
  * under `neutral`.
@@ -44,7 +44,7 @@ const ALL_DIRS = ["src"];
  */
 function strip(text, ext) {
   let out = text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-  if (ext !== ".css") out = out.replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + " ");
+  if (ext !== ".css") out = out.replace(/(^|[^:])\/\/[^\n]*/g, (_m, p) => p + " ");
   return out;
 }
 
@@ -82,7 +82,8 @@ for (const file of STYLES) {
 /* 3. SVG presentation attributes are style, and a diagram is mostly SVG. An `opacity="0.72"` in a
       component is the same failure as one in a stylesheet — it is how `Legend.tsx` came to draw a
       line that does not match the edges it explains. Expressions are fine; literals are not. */
-const SVG_ATTR = /\b(strokeWidth|strokeDasharray|strokeOpacity|fillOpacity|opacity|r|rx|ry|cx|cy|x1|x2|y1|y2|width|height)=(?:"[^"]*"|\{\s*-?\d+(?:\.\d+)?\s*\})/g;
+const SVG_ATTR =
+  /\b(strokeWidth|strokeDasharray|strokeOpacity|fillOpacity|opacity|r|rx|ry|cx|cy|x1|x2|y1|y2|width|height)=(?:"[^"]*"|\{\s*-?\d+(?:\.\d+)?\s*\})/g;
 for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))) {
   const text = strip(fs.readFileSync(path.join(root, file), "utf8"), ".tsx");
   for (const m of text.matchAll(SVG_ATTR)) {

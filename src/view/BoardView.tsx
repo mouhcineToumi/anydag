@@ -54,7 +54,7 @@ export function BoardView({
   /** Drawn over the board inside the viewport's layer — nothing uses it yet but a caller's overlay. */
   children?: ReactNode;
 }) {
-  const shown = page && board.pages.some((p) => p.id === page) ? page : board.pages[0]?.id ?? "page-1";
+  const shown = page && board.pages.some((p) => p.id === page) ? page : (board.pages[0]?.id ?? "page-1");
   const { sizes, nodeBoxes, onMeasure } = useMeasures();
   const places = useMemo(() => placeItems(board, shown, sizes), [board, shown, sizes]);
   const bounds = useMemo(() => contentBounds(places), [places]);

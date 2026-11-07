@@ -45,7 +45,12 @@ export function ChatSurface({
   const ensure = useCallback(
     async (c: Choice): Promise<string> => {
       if (idRef.current) return idRef.current;
-      const meta = await makeChat({ provider: c.provider, model: c.model, ...(c.effort ? { effort: c.effort } : {}), mode: c.mode });
+      const meta = await makeChat({
+        provider: c.provider,
+        model: c.model,
+        ...(c.effort ? { effort: c.effort } : {}),
+        mode: c.mode,
+      });
       idRef.current = meta.id;
       onId(meta.id);
       return meta.id;
@@ -125,7 +130,9 @@ export function ChatSurface({
   const meta = chat.meta;
   const empty = chat.turns.length === 0 && !chat.live;
   /* Newest first: what was just done is what somebody has come to undo. */
-  const blocks = [...chat.turns, ...(chat.live ? [chat.live] : [])].flatMap((t) => t.blocks.map((block) => ({ turn: t.id, block }))).reverse();
+  const blocks = [...chat.turns, ...(chat.live ? [chat.live] : [])]
+    .flatMap((t) => t.blocks.map((block) => ({ turn: t.id, block })))
+    .reverse();
   const column = (
     <div className="dag-chat" data-dag-chat={id ?? "new"} data-dag-chat-running={running ? "" : undefined}>
       <div
@@ -137,14 +144,26 @@ export function ChatSurface({
           pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
-        {empty ? <Empty mode={meta?.mode ?? "ask"} /> : <Turns turns={chat.turns} live={chat.live} typing={chat.typing} undos={chat.undos} device={chat.device} a={actions} />}
+        {empty ? (
+          <Empty mode={meta?.mode ?? "ask"} />
+        ) : (
+          <Turns turns={chat.turns} live={chat.live} typing={chat.typing} undos={chat.undos} device={chat.device} a={actions} />
+        )}
       </div>
       {notice ? (
         <p className="dag-chat-error dag-chat-error--inline" role="alert" data-dag-chat-notice="">
           {notice}
         </p>
       ) : null}
-      <Composer meta={meta} models={models} running={running} autofocus={autofocus} onSend={(t, c) => void send(t, c)} onStop={() => id && void stopTurn(id).catch(say)} onGrant={(c, v, m) => void grant(c, v, m)} />
+      <Composer
+        meta={meta}
+        models={models}
+        running={running}
+        autofocus={autofocus}
+        onSend={(t, c) => void send(t, c)}
+        onStop={() => id && void stopTurn(id).catch(say)}
+        onGrant={(c, v, m) => void grant(c, v, m)}
+      />
     </div>
   );
   if (!changes) return column;
@@ -154,7 +173,9 @@ export function ChatSurface({
       <aside className="dag-chat-changes" aria-label="Changes" data-dag-chat-changes="">
         <h2>Changes</h2>
         {blocks.length ? (
-          blocks.map(({ turn, block }) => <BlockCard key={block.id} turn={turn} block={block} undos={chat.undos} a={actions} hook="change" />)
+          blocks.map(({ turn, block }) => (
+            <BlockCard key={block.id} turn={turn} block={block} undos={chat.undos} a={actions} hook="change" />
+          ))
         ) : (
           <p className="dag-chat-changes__none" data-dag-chat-changes-none="">
             Nothing changed yet. Each change the Assistant makes is listed here, and can be undone.

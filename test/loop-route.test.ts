@@ -36,7 +36,9 @@ state evaluating "Evaluating"      "check clarity & essence"`;
 
 beforeAll(() => setMeasurer(new TableMeasurer()));
 
-async function lay(dir: "TB" | "LR"): Promise<{ graph: Graph; placed: Placed; labels: Record<string, { w: number; h: number }> }> {
+async function lay(
+  dir: "TB" | "LR",
+): Promise<{ graph: Graph; placed: Placed; labels: Record<string, { w: number; h: number }> }> {
   const graph = parseDiagram("state", BODY, dir) as Graph;
   const labels = sizeLabels(graph, T);
   const placed = (await layoutGraph(graph, sizeGraph(graph, T), labels, T.metric)) as Placed;
@@ -110,7 +112,9 @@ describe("a loop between two stacked cards", () => {
     expect(out.from.y).toBeCloseTo(out.to.y, 0);
     expect(back.from.y).toBeCloseTo(back.to.y, 0);
     const [top, bottom] =
-      out.from.y < back.from.y ? [byLabel(placed, "draft explanation"), byLabel(placed, "can reduce further")] : [byLabel(placed, "can reduce further"), byLabel(placed, "draft explanation")];
+      out.from.y < back.from.y
+        ? [byLabel(placed, "draft explanation"), byLabel(placed, "can reduce further")]
+        : [byLabel(placed, "can reduce further"), byLabel(placed, "draft explanation")];
     expect(top.label!.y).toBeLessThan(ends(top).from.y);
     expect(bottom.label!.y).toBeGreaterThan(ends(bottom).from.y);
     expect(scoreGraph(graph, placed, labels, T).totals).toMatchObject({ crossings: 0, labelOverlaps: 0 });

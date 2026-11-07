@@ -27,7 +27,7 @@
  */
 import { math as mathSyntax } from "micromark-extension-math";
 import { mathFromMarkdown, mathToMarkdown } from "mdast-util-math";
-import type { InlineMath, Math } from "mdast-util-math";
+import type { InlineMath, Math as MathBlock } from "mdast-util-math";
 import type { CompileContext, Extension as FromMarkdownExtension } from "mdast-util-from-markdown";
 import type { Options as ToMarkdownOptions } from "mdast-util-to-markdown";
 import type { Code, Construct, Event, Previous, Resolver, State, Token, TokenizeContext, Tokenizer } from "micromark-util-types";
@@ -237,7 +237,11 @@ export function inlineMathNode(tex: string, display: boolean): InlineMath {
   return {
     type: "inlineMath",
     value: tex,
-    data: { hName: "code", hProperties: { className: display ? DISPLAY_CLASSES : ["language-math", "math-inline"] }, hChildren: [] },
+    data: {
+      hName: "code",
+      hProperties: { className: display ? DISPLAY_CLASSES : ["language-math", "math-inline"] },
+      hChildren: [],
+    },
   };
 }
 
@@ -254,7 +258,10 @@ export function inlineTex(tex: string): string {
 
 /** A display equation's TeX: no blank line at either end, which the `$$` lines would read back without. */
 export function blockTex(tex: string): string {
-  return tex.replace(/^(?:[ \t]*\n)+/, "").replace(/(?:\n[ \t]*)+$/, "").replace(/\s+$/, "");
+  return tex
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .replace(/(?:\n[ \t]*)+$/, "")
+    .replace(/\s+$/, "");
 }
 
 function inlineMath(node: InlineMath): string {
@@ -263,7 +270,7 @@ function inlineMath(node: InlineMath): string {
 }
 inlineMath.peek = () => "$";
 
-function math(node: Math): string {
+function math(node: MathBlock): string {
   let fence = "$$";
   while (node.value.includes(fence)) fence += "$";
   return `${fence}\n${node.value ? `${node.value}\n` : ""}${fence}`;

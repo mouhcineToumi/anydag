@@ -69,7 +69,13 @@ export function Hint({ children, ...rest }: { children: ReactNode } & Record<`da
 export function Reset({ what, onReset }: { what: string; onReset(): void }) {
   return (
     <footer className="dag-settings__foot">
-      <button type="button" className="dag-settings__reset" data-dag-setting-reset="" onClick={onReset} title={`Put ${what} back as they were`}>
+      <button
+        type="button"
+        className="dag-settings__reset"
+        data-dag-setting-reset=""
+        onClick={onReset}
+        title={`Put ${what} back as they were`}
+      >
         <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
         <span>Reset to defaults</span>
       </button>

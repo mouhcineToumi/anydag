@@ -14,7 +14,7 @@ export interface Migration {
 }
 
 /** Where the migration files are — the environment's word if it has one, else beside the source. */
-export const migrationsDir = (): string => {
+const migrationsDir = (): string => {
   const given = process.env.ANYDAG_SYNC_MIGRATIONS;
   if (given !== undefined && given !== "") return given.startsWith("file://") ? fileURLToPath(given) : given;
   return fileURLToPath(new URL("./migrations/", import.meta.url));

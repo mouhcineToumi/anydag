@@ -180,7 +180,9 @@ describe("rename", () => {
   it("an edit rides on the rename: the new name holds the edited text and keeps the id", async () => {
     await env.vault.create("untitled", "board", BOARD);
     const ident = await env.vault.ident("untitled");
-    const moved = await env.vault.rename("untitled", "board", "Q3 plan", { edit: (t) => t.replace("title: t", "title: Q3 plan") });
+    const moved = await env.vault.rename("untitled", "board", "Q3 plan", {
+      edit: (t) => t.replace("title: t", "title: Q3 plan"),
+    });
     expect(moved).toBe("Q3 plan");
     expect((await env.vault.read("Q3 plan"))!.text).toContain("title: Q3 plan");
     expect(await env.vault.read("untitled")).toBeNull();
@@ -218,7 +220,8 @@ describe("folders", () => {
   });
 
   it("the directories that are not folders are refused", async () => {
-    for (const name of ["plan.assets", ".obsidian", ".anydag", "node_modules", ""]) await expect(env.vault.mkdir(name), name).rejects.toBeInstanceOf(Refused);
+    for (const name of ["plan.assets", ".obsidian", ".anydag", "node_modules", ""])
+      await expect(env.vault.mkdir(name), name).rejects.toBeInstanceOf(Refused);
   });
 
   it("a folder with something in it is not removed", async () => {
@@ -363,7 +366,12 @@ describe("folders", () => {
 
   it("the ends that are not folders are refused", async () => {
     await env.vault.create("work/plan", "board", BOARD);
-    for (const [src, dst] of [["", "x"], ["work", ""], ["work", ".anydag"], ["work", "plan.assets"]] as const)
+    for (const [src, dst] of [
+      ["", "x"],
+      ["work", ""],
+      ["work", ".anydag"],
+      ["work", "plan.assets"],
+    ] as const)
       await expect(env.vault.moveFolder(src, dst), `${src}->${dst}`).rejects.toBeInstanceOf(Refused);
   });
 
@@ -626,7 +634,12 @@ describe("titles", () => {
     await env.vault.create("work/n", "note", NOTE);
     await env.vault.create("bare", "board", "```md {#a}\nx\n```\n");
     await env.vault.create("Meeting notes", "note", "no frontmatter\n");
-    expect((await env.vault.tree()).titles).toEqual({ plan: "t", "work/n": "Onboarding", bare: "bare", "Meeting notes": "Meeting notes" });
+    expect((await env.vault.tree()).titles).toEqual({
+      plan: "t",
+      "work/n": "Onboarding",
+      bare: "bare",
+      "Meeting notes": "Meeting notes",
+    });
   });
 
   it("a new title is listed after the write that made it", async () => {
@@ -650,7 +663,10 @@ describe("tasks, projects and events", () => {
     await env.vault.create("work/done", "note", "---\nstatus: Done\n---\n");
     await env.vault.create("plain", "note", NOTE);
     await env.vault.create("plan", "board", "---\ntitle: t\nstatus: todo\n---\n\n```md {#a}\nx\n```\n");
-    expect((await env.vault.tree()).tasks).toEqual({ todo: { status: "todo", due: "2026-10-03" }, "work/done": { status: "done" } });
+    expect((await env.vault.tree()).tasks).toEqual({
+      todo: { status: "todo", due: "2026-10-03" },
+      "work/done": { status: "done" },
+    });
   });
 
   it("a status written is listed and one taken out is not", async () => {
@@ -673,7 +689,10 @@ describe("tasks, projects and events", () => {
     await env.vault.create("work/q/q", "note", "---\nproject: Done\n---\n");
     await env.vault.create("work/p/plain", "note", NOTE);
     await env.vault.create("plan", "board", "---\ntitle: t\nproject: active\n---\n\n```md {#a}\nx\n```\n");
-    expect((await env.vault.tree()).projects).toEqual({ "work/p/p": { status: "active", hue: "coral" }, "work/q/q": { status: "done" } });
+    expect((await env.vault.tree()).projects).toEqual({
+      "work/p/p": { status: "active", hue: "coral" },
+      "work/q/q": { status: "done" },
+    });
   });
 
   it("a project written is listed, one taken out is not, and it follows its folder", async () => {
@@ -692,7 +711,10 @@ describe("tasks, projects and events", () => {
     await env.vault.create("chore", "note", "---\nstatus: todo\nstart: 2026-10-12\n---\n");
     await env.vault.create("plan", "board", "---\ntitle: t\nstart: 2026-10-12\n---\n\n```md {#a}\nx\n```\n");
     const tree = await env.vault.tree();
-    expect(tree.events).toEqual({ offsite: { start: "2026-10-03T09:00+02:00" }, "work/conf": { start: "2026-10-12", end: "2026-10-14" } });
+    expect(tree.events).toEqual({
+      offsite: { start: "2026-10-03T09:00+02:00" },
+      "work/conf": { start: "2026-10-12", end: "2026-10-14" },
+    });
     expect(tree.tasks).toEqual({ chore: { status: "todo", start: "2026-10-12" } });
   });
 
@@ -762,9 +784,14 @@ describe("attachments", () => {
   });
 
   it("two uploads of one name at once each keep their own", async () => {
-    const [a, b] = await Promise.all([env.vault.putFile("report.pdf", Buffer.from("%PDF one"), null), env.vault.putFile("report.pdf", Buffer.from("%PDF two"), null)]);
+    const [a, b] = await Promise.all([
+      env.vault.putFile("report.pdf", Buffer.from("%PDF one"), null),
+      env.vault.putFile("report.pdf", Buffer.from("%PDF two"), null),
+    ]);
     expect(new Set([a, b])).toEqual(new Set(["report.pdf", "report 2.pdf"]));
-    expect(new Set([(await env.vault.getFile(a))!.toString(), (await env.vault.getFile(b))!.toString()])).toEqual(new Set(["%PDF one", "%PDF two"]));
+    expect(new Set([(await env.vault.getFile(a))!.toString(), (await env.vault.getFile(b))!.toString()])).toEqual(
+      new Set(["%PDF one", "%PDF two"]),
+    );
     const tree = await env.vault.tree();
     expect(tree.ids[a]).not.toBe(tree.ids[b]);
   });

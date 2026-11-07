@@ -55,22 +55,39 @@ export class Metrics {
 
   async text(meta: Meta, now: Date, version: string): Promise<string> {
     const out: string[] = [];
-    out.push("# HELP anydag_sync_info The server's version.", "# TYPE anydag_sync_info gauge", `anydag_sync_info{version="${esc(version)}"} 1`);
+    out.push(
+      "# HELP anydag_sync_info The server's version.",
+      "# TYPE anydag_sync_info gauge",
+      `anydag_sync_info{version="${esc(version)}"} 1`,
+    );
 
-    out.push("# HELP anydag_sync_requests_total Requests answered, by route template, method and status.", "# TYPE anydag_sync_requests_total counter");
+    out.push(
+      "# HELP anydag_sync_requests_total Requests answered, by route template, method and status.",
+      "# TYPE anydag_sync_requests_total counter",
+    );
     for (const [labels, n] of [...this.requests].sort()) out.push(`anydag_sync_requests_total{${labels}} ${n}`);
 
-    out.push("# HELP anydag_sync_request_duration_seconds Time to the response's headers, by route template.", "# TYPE anydag_sync_request_duration_seconds summary");
+    out.push(
+      "# HELP anydag_sync_request_duration_seconds Time to the response's headers, by route template.",
+      "# TYPE anydag_sync_request_duration_seconds summary",
+    );
     for (const [labels, s] of [...this.latency].sort(([a], [b]) => a.localeCompare(b))) {
       const sorted = [...s.recent].sort((a, b) => a - b);
       for (const q of QUANTILES) {
         const v = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]! : 0;
         out.push(`anydag_sync_request_duration_seconds{${labels},quantile="${q}"} ${v}`);
       }
-      out.push(`anydag_sync_request_duration_seconds_sum{${labels}} ${s.sum}`, `anydag_sync_request_duration_seconds_count{${labels}} ${s.count}`);
+      out.push(
+        `anydag_sync_request_duration_seconds_sum{${labels}} ${s.sum}`,
+        `anydag_sync_request_duration_seconds_count{${labels}} ${s.count}`,
+      );
     }
 
-    out.push("# HELP anydag_sync_poke_streams Poke streams open now.", "# TYPE anydag_sync_poke_streams gauge", `anydag_sync_poke_streams ${this.pokes()}`);
+    out.push(
+      "# HELP anydag_sync_poke_streams Poke streams open now.",
+      "# TYPE anydag_sync_poke_streams gauge",
+      `anydag_sync_poke_streams ${this.pokes()}`,
+    );
 
     /* The ledger for today, every account and vault folded together: the account-wide rows
      * (`vault` null) and the per-vault ones are separate figures, so a metric that has both is

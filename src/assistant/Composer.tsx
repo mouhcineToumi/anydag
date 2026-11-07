@@ -24,7 +24,10 @@ export interface Choice {
  * What a chat that has none starts with: the Settings default when that provider can answer, else the
  * first provider that can, else Claude Code's — which the picker then shows as unavailable and says why.
  */
-export function defaultChoice(models: readonly ProviderModels[] | null, pref: { provider: string | null; model: string | null; mode: Mode }): Choice {
+function defaultChoice(
+  models: readonly ProviderModels[] | null,
+  pref: { provider: string | null; model: string | null; mode: Mode },
+): Choice {
   const usable = models?.filter((m) => m.available) ?? [];
   const wanted = models?.find((m) => m.provider === pref.provider && m.available);
   const at = wanted ?? usable[0] ?? models?.[0];
@@ -49,7 +52,10 @@ export interface ComposerProps {
 export function Composer({ meta, models, running, onSend, onStop, onGrant, autofocus }: ComposerProps) {
   const pref = useSettings().assistant;
   const base = useMemo<Choice>(
-    () => (meta ? { provider: meta.provider, model: meta.model, effort: meta.effort ?? "", mode: meta.mode } : defaultChoice(models, pref)),
+    () =>
+      meta
+        ? { provider: meta.provider, model: meta.model, effort: meta.effort ?? "", mode: meta.mode }
+        : defaultChoice(models, pref),
     [meta, models, pref],
   );
   /* What was picked since the chat last said what it was on: the chat's own record wins again the
@@ -133,7 +139,10 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
           }}
         >
           {(models ?? []).map((p) => {
-            const list = p.models.some((m) => m.id === choice.model) || p.provider !== choice.provider ? p.models : [{ id: choice.model, label: choice.model }, ...p.models];
+            const list =
+              p.models.some((m) => m.id === choice.model) || p.provider !== choice.provider
+                ? p.models
+                : [{ id: choice.model, label: choice.model }, ...p.models];
             return (
               <optgroup key={p.provider} label={p.available ? p.label : `${p.label} (unavailable)`} disabled={!p.available}>
                 {list.map((m) => (
@@ -164,11 +173,26 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
           ))}
         </select>
         {running ? (
-          <button type="button" className="dag-chat-send dag-chat-send--stop" data-dag-chat-stop="" aria-label="Stop" title="Stop" onClick={onStop}>
+          <button
+            type="button"
+            className="dag-chat-send dag-chat-send--stop"
+            data-dag-chat-stop=""
+            aria-label="Stop"
+            title="Stop"
+            onClick={onStop}
+          >
             <Square {...ICON} fill="currentColor" aria-hidden="true" />
           </button>
         ) : (
-          <button type="button" className="dag-chat-send" data-dag-chat-send="" aria-label="Send" title="Send (Enter)" disabled={!can} onClick={send}>
+          <button
+            type="button"
+            className="dag-chat-send"
+            data-dag-chat-send=""
+            aria-label="Send"
+            title="Send (Enter)"
+            disabled={!can}
+            onClick={send}
+          >
             <ArrowUp {...ICON} aria-hidden="true" />
           </button>
         )}
@@ -213,7 +237,15 @@ function Scope({ meta, onGrant }: { meta: ChatMeta | null; onGrant(vault: string
   const others = (vaults ?? []).filter((v) => v.open && !here(v) && !granted[v.id]);
   return (
     <div className="dag-chat-scope" ref={wrap}>
-      <button type="button" className="dag-chat-scope__chip" data-dag-chat-scope="" aria-expanded={open} aria-haspopup="true" title="The vaults this chat can reach" onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className="dag-chat-scope__chip"
+        data-dag-chat-scope=""
+        aria-expanded={open}
+        aria-haspopup="true"
+        title="The vaults this chat can reach"
+        onClick={() => setOpen((v) => !v)}
+      >
         <Layers {...ICON} aria-hidden="true" />
         <span>{home}</span>
         {extra ? <span className="dag-chat-scope__more">+{extra}</span> : null}
@@ -239,10 +271,22 @@ function Scope({ meta, onGrant }: { meta: ChatMeta | null; onGrant(vault: string
             others.map((v) => (
               <p className="dag-chat-scope__line" key={v.id}>
                 <strong>{v.name}</strong>
-                <button type="button" className="dag-button" data-dag-chat-grant-vault={v.id} data-dag-chat-grant-mode="ask" onClick={() => onGrant(v.id, "ask")}>
+                <button
+                  type="button"
+                  className="dag-button"
+                  data-dag-chat-grant-vault={v.id}
+                  data-dag-chat-grant-mode="ask"
+                  onClick={() => onGrant(v.id, "ask")}
+                >
                   Read
                 </button>
-                <button type="button" className="dag-button" data-dag-chat-grant-vault={v.id} data-dag-chat-grant-mode="edit" onClick={() => onGrant(v.id, "edit")}>
+                <button
+                  type="button"
+                  className="dag-button"
+                  data-dag-chat-grant-vault={v.id}
+                  data-dag-chat-grant-mode="edit"
+                  onClick={() => onGrant(v.id, "edit")}
+                >
                   Read and change
                 </button>
               </p>

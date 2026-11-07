@@ -3,7 +3,7 @@
  *
  * Every block and mark here round-trips through `markdown.ts`, and nothing BlockNote ships that
  * does not is in it — underline has no Markdown, toggles and files and audio have none, and a text
- * or background colour is a colour the theme does not own (the refusal `CLAUDE.md` already makes
+ * or background colour is a colour the theme does not own (the refusal `docs/architecture/design-and-layout.md` already makes
  * as *A custom colour*). Leaving a block out of the schema is what takes it out of the slash menu
  * and the block-type select, so the menus cannot offer something the file cannot keep.
  *

@@ -67,7 +67,10 @@ async function ready(page: Page) {
 
 const notice = (page: Page) => page.locator("[data-dag-readonly-notice]");
 
-test("the top bar's switch and ctrl+shift+L lock and unlock, every tab of the browser hears it, and a reload keeps it", async ({ page, context }) => {
+test("the top bar's switch and ctrl+shift+L lock and unlock, every tab of the browser hears it, and a reload keeps it", async ({
+  page,
+  context,
+}) => {
   /* Two tabs and a reload are three boards drawn: more than one page's worth of time. */
   test.setTimeout(60_000);
   const { name } = board();
@@ -109,7 +112,9 @@ test("the top bar's switch and ctrl+shift+L lock and unlock, every tab of the br
   await other.close();
 });
 
-test("a locked board is selected and panned, never moved, deleted, pasted onto or typed into", async ({ page }) => {
+test("a locked board is selected and panned, never moved, deleted, pasted onto or typed into", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const { name, file } = board();
   const before = fs.readFileSync(file, "utf8");
   await lockFirst(page);
@@ -192,7 +197,8 @@ test("the sidebar opens and selects while locked, and makes, renames and deletes
   const row = page.locator(`[data-dag-sidebar-row][data-dag-sidebar-key="board:${name}"]`);
   await row.click({ button: "right" });
   await expect(page.locator("[data-dag-sidebar-menu-locked]")).toBeVisible();
-  for (const what of ["rename", "duplicate", "move", "delete"]) await expect(page.locator(`[data-dag-sidebar-menu-item="${what}"]`)).toHaveCount(0);
+  for (const what of ["rename", "duplicate", "move", "delete"])
+    await expect(page.locator(`[data-dag-sidebar-menu-item="${what}"]`)).toHaveCount(0);
   await expect(page.locator('[data-dag-sidebar-menu-item="favourite"]')).toBeVisible();
   await page.keyboard.press("Escape");
 
@@ -206,7 +212,8 @@ test("the sidebar opens and selects while locked, and makes, renames and deletes
 
 test("a locked table is read, and its grid answers a keystroke with the notice", async ({ page }) => {
   const file = path.join(dir, "costs.table.md");
-  const text = "---\ntitle: Costs\n---\n\n## Costs {#costs}\n\n| Item {#item} | Amount {#amount number} |\n| --- | ---: |\n| Hosting {#r1aaaa} | 120 |\n";
+  const text =
+    "---\ntitle: Costs\n---\n\n## Costs {#costs}\n\n| Item {#item} | Amount {#amount number} |\n| --- | ---: |\n| Hosting {#r1aaaa} | 120 |\n";
   fs.writeFileSync(file, text);
   await lockFirst(page);
   await page.goto(`/?table=${folder}/costs`);

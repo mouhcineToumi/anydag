@@ -14,7 +14,7 @@ const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  * key in the tooltip, which is the only place a key is written down.
  *
  * The class names are `dag-readonly*` rather than `dag-lock*`: `dag-lockup` is the logo's, and a name
- * one suffix from another is the namespace hazard `CLAUDE.md` has recorded five times.
+ * one suffix from another is the namespace hazard `docs/architecture/things-that-will-bite.md` has recorded five times.
  */
 export function LockButton() {
   const locked = useLocked();
@@ -25,7 +25,11 @@ export function LockButton() {
       data-dag-readonly={locked ? "on" : "off"}
       aria-pressed={locked}
       aria-label={locked ? "Read only: unlock to edit" : "Lock: read only"}
-      title={locked ? `Read only: nothing here can be changed. Unlock (${LOCK_KEYS})` : `Lock: browse without changing anything (${LOCK_KEYS})`}
+      title={
+        locked
+          ? `Read only: nothing here can be changed. Unlock (${LOCK_KEYS})`
+          : `Lock: browse without changing anything (${LOCK_KEYS})`
+      }
       /* A mouse press takes no focus, so the board's keys stay the board's — the sidebar toggle's
          rule. */
       onMouseDown={(e) => e.preventDefault()}
@@ -73,13 +77,23 @@ export function LockNotice() {
 
   if (!said) return null;
   const text =
-    said === "unlocked" ? "Unlocked: you can edit again." : said === "locked" ? "Read only: nothing here changes until you unlock." : "Read only: unlock to change this.";
+    said === "unlocked"
+      ? "Unlocked: you can edit again."
+      : said === "locked"
+        ? "Read only: nothing here changes until you unlock."
+        : "Read only: unlock to change this.";
   return (
     <div className="dag-readonly-notice" data-dag-readonly-notice={said} role="status">
       {said === "unlocked" ? <LockOpen {...ICON} /> : <Lock {...ICON} />}
       <span>{text}</span>
       {locked ? (
-        <button type="button" className="dag-readonly-notice__unlock" data-dag-readonly-unlock="" onMouseDown={(e) => e.preventDefault()} onClick={() => setLocked(false)}>
+        <button
+          type="button"
+          className="dag-readonly-notice__unlock"
+          data-dag-readonly-unlock=""
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setLocked(false)}
+        >
           Unlock
         </button>
       ) : null}

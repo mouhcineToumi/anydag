@@ -43,7 +43,12 @@ function target(route: string, query: CallOptions["query"]): string {
   return s ? `${route}${route.includes("?") ? "&" : "?"}${s}` : route;
 }
 
-function init(method: string, token: string, opts: CallOptions, extra: Record<string, string> = {}): RequestInit & { headers: Record<string, string> } {
+function init(
+  method: string,
+  token: string,
+  opts: CallOptions,
+  extra: Record<string, string> = {},
+): RequestInit & { headers: Record<string, string> } {
   const headers: Record<string, string> = { "x-anydag-token": token, ...extra };
   let body: BodyInit | undefined;
   if (opts.bytes) {

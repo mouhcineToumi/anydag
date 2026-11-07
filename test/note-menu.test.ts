@@ -59,7 +59,13 @@ describe("the slash menu", () => {
     quote: { type: "quote", content: [{ type: "text", text: "q", styles: {} }] },
     codeBlock: { type: "codeBlock", props: { language: "ts" }, content: "x" },
     divider: { type: "divider" },
-    table: { type: "table", content: { type: "tableContent", rows: [{ cells: [[{ type: "text", text: "a", styles: {} }]] }, { cells: [[{ type: "text", text: "1", styles: {} }]] }] } },
+    table: {
+      type: "table",
+      content: {
+        type: "tableContent",
+        rows: [{ cells: [[{ type: "text", text: "a", styles: {} }]] }, { cells: [[{ type: "text", text: "1", styles: {} }]] }],
+      },
+    },
     image: { type: "image", props: { url: "n.assets/p.png", name: "p" } },
     embed: { type: "embed", props: { href: "dag:0123456789", title: "The plan" } },
     equation: { type: "equation", props: { tex: "x^2", fenced: false } },

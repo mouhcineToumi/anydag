@@ -13,7 +13,10 @@ import type { LRParser } from "@lezer/lr";
 import type { CodeProblem, CodeRead, CodeToken, Reader } from "./syntax";
 
 const highlighter = tagHighlighter([
-  { tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword, t.operatorKeyword, t.modifier, t.self], class: "dag-tok-keyword" },
+  {
+    tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword, t.operatorKeyword, t.modifier, t.self],
+    class: "dag-tok-keyword",
+  },
   { tag: [t.string, t.special(t.string), t.character, t.docString, t.attributeValue], class: "dag-tok-string" },
   { tag: [t.regexp, t.escape, t.special(t.brace)], class: "dag-tok-regexp" },
   { tag: [t.number, t.integer, t.float, t.bool, t.null, t.atom, t.unit, t.color], class: "dag-tok-number" },
@@ -125,7 +128,9 @@ const SQL_WORDS = new Set(
 );
 
 const SHELL_WORDS = new Set(
-  "if then else elif fi for while until do done case esac in function return export local readonly set unset shift exit source alias sudo".split(" "),
+  "if then else elif fi for while until do done case esac in function return export local readonly set unset shift exit source alias sudo".split(
+    " ",
+  ),
 );
 
 type Rule = [RegExp, string | null];

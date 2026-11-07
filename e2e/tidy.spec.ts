@@ -97,8 +97,7 @@ test("a tidy board is a fixed point, and the page says so without writing", asyn
      before that tidies *stale* boxes, moves things a second time, and `moved` is never 0 — which
      is what timed out here about one run in three under load. `a` and `b` sharing a rendered top
      edge is the page saying it has caught up. */
-  const topOf = async (id: string) =>
-    Math.round((await page.locator(`[data-dag-item="${id}"]`).boundingBox())!.y);
+  const topOf = async (id: string) => Math.round((await page.locator(`[data-dag-item="${id}"]`).boundingBox())!.y);
   await expect.poll(async () => (await topOf("a")) === (await topOf("b")), { timeout: 5_000 }).toBe(true);
   const once = read();
   const stat = fs.statSync(file).mtimeMs;
@@ -186,7 +185,12 @@ const viaEvent = (page: Page, dry: boolean) =>
     for (let i = 0; i < 100 && document.documentElement.dataset.dagTidy === undefined; i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
-    return JSON.parse(document.documentElement.dataset.dagTidy ?? "{}") as { moved: number; of: number; ids: string[]; dry: boolean };
+    return JSON.parse(document.documentElement.dataset.dagTidy ?? "{}") as {
+      moved: number;
+      of: number;
+      ids: string[];
+      dry: boolean;
+    };
   }, dry);
 
 test("the dag:tidy event tidies everything under ?snapshot=1, and publishes what it did", async ({ page }) => {

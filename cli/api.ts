@@ -14,14 +14,16 @@
  */
 
 /** The query key a request names its vault with. */
-export const VAULT_PARAM = "vault";
+const VAULT_PARAM = "vault";
 
 /** Routes about the app rather than one vault — `server/app.ts`'s `UNSCOPED`. */
 const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me"];
 
 /** Whether a route is about one vault: the document routes, and `/api/` but the app's own. */
-export function scoped(path: string): boolean {
-  return path.startsWith("/__board") || (path.startsWith("/api/") && !UNSCOPED.some((u) => path === u || path.startsWith(`${u}/`)));
+function scoped(path: string): boolean {
+  return (
+    path.startsWith("/__board") || (path.startsWith("/api/") && !UNSCOPED.some((u) => path === u || path.startsWith(`${u}/`)))
+  );
 }
 
 export const EXIT = {
@@ -53,7 +55,7 @@ export class ApiError extends Error {
 }
 
 /** A 409 from a write: the text the board has now, and the base a retry must carry. */
-export class Conflict extends ApiError {
+class Conflict extends ApiError {
   constructor(
     readonly base: string,
     readonly text: string,

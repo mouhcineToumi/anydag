@@ -104,7 +104,10 @@ export function buildEmoji(root) {
       ` * The artwork is in \`icons/data/emoji-*.json\` and is loaded only when a board names one.\n */\n` +
       `export const EMOJI_CATEGORIES: readonly { name: string; icons: readonly string[] }[] = [\n` +
       categories
-        .map((c) => `  {\n    name: ${JSON.stringify(c.name)},\n    icons: [\n${c.icons.map((n) => `      ${JSON.stringify(n)},`).join("\n")}\n    ],\n  },`)
+        .map(
+          (c) =>
+            `  {\n    name: ${JSON.stringify(c.name)},\n    icons: [\n${c.icons.map((n) => `      ${JSON.stringify(n)},`).join("\n")}\n    ],\n  },`,
+        )
         .join("\n") +
       `\n];\n`,
   );

@@ -65,7 +65,9 @@ export async function openStore(config: Config): Promise<Store> {
     try {
       const held = Number(fs.readFileSync(lock, "utf8").trim());
       if (held && held !== process.pid && alive(held)) {
-        throw new StoreBusy(`the PGlite database in ${dir} is open in process ${held}: stop it first, or use the admin routes of the running server`);
+        throw new StoreBusy(
+          `the PGlite database in ${dir} is open in process ${held}: stop it first, or use the admin routes of the running server`,
+        );
       }
     } catch (e) {
       if (e instanceof StoreBusy) throw e;
@@ -124,7 +126,9 @@ export async function serve(config: Config = configFrom()): Promise<() => Promis
   const first = await bootstrap(store.meta, config, new Date());
   const server = listen({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
     console.log(`anydag-sync ${VERSION}: ${config.mode} mode, listening on ${config.host}:${info.port}`);
-    console.log(`  database: ${config.databaseUrl ? config.databaseUrl.replace(/\/\/[^@/]*@/, "//…@") : `PGlite in ${path.join(config.data, "pg")}`}`);
+    console.log(
+      `  database: ${config.databaseUrl ? config.databaseUrl.replace(/\/\/[^@/]*@/, "//…@") : `PGlite in ${path.join(config.data, "pg")}`}`,
+    );
     console.log(`  blobs: ${store.blobRoot}`);
     if (first?.code) {
       console.log(`  pair a device with this code (valid 15 minutes, once):`);

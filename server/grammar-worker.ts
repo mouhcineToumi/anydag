@@ -20,6 +20,8 @@ interface Ask {
   body: unknown;
 }
 
+/* The body is one try/catch whose handler only posts a string, so this listener cannot reject. */
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
 parentPort?.on("message", async ({ id, method, route, query, body }: Ask) => {
   try {
     const answer = await handle({ method, route, query: new URLSearchParams(query), body });

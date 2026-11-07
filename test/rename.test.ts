@@ -57,7 +57,7 @@ describe("renameItemId", () => {
   });
 
   it("renames only the item half of an item.node reference, keeping the node", () => {
-    const text = "```md {#a x=0 y=0}\nA\n```\n\n```arch {#b x=0 y=0}\nservice x \"X\"\n```\n\n```edges {#l}\na.node --> b\n```\n";
+    const text = '```md {#a x=0 y=0}\nA\n```\n\n```arch {#b x=0 y=0}\nservice x "X"\n```\n\n```edges {#l}\na.node --> b\n```\n';
     const out = renameItemId(text, "a", "actor");
     expect(out.ok).toBe(true);
     if (!out.ok) return;

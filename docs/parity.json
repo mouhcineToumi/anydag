@@ -1,12 +1,12 @@
 {
-  "$comment": "The feature surface, once. Every route in server/routes, every `anydag` command and every MCP tool is named here, and test/parity.test.ts fails on one that is not — or on a name here that no longer exists. An interface is a list of names (done), {\"via\": [...], \"why\"} (covered by something more general), or {\"refused\"} (not offered, and why). docs/PARITY.md is generated from this: `npm run parity`.",
+  "$comment": "The feature surface, once. Every route in server/routes, every `anydag` command and every MCP tool is named here, and test/parity.test.ts fails on one that is not — or on a name here that no longer exists. An interface is a list of names (done), {\"via\": [...], \"why\"} (covered by something more general), or {\"refused\"} (not offered, and why). REST and MCP are complete; the CLI is an admin tool, so a feature it does not carry says {\"admin\": false} there — valid for the CLI column alone. docs/PARITY.md is generated from this: `npm run parity`.",
   "features": [
     {
       "id": "account.me",
       "area": "Account",
       "what": "The time zone times are read and written in (and the app's one local \"account\")",
       "rest": ["GET /api/auth/me"],
-      "cli": ["event ls", "event new", "event set"],
+      "cli": {"admin": false},
       "mcp": ["whoami"]
     },
     {
@@ -118,7 +118,7 @@
       "area": "Files",
       "what": "Hear each change as it happens",
       "rest": ["GET /__board/events"],
-      "cli": ["watch"],
+      "cli": {"admin": false},
       "mcp": {"refused": "A change feed is a stream a page holds open, and a stateless tool call answers once. The `base` every read returns is how an agent knows a document moved."}
     },
     {
@@ -126,7 +126,7 @@
       "area": "Files",
       "what": "What a permanent id names",
       "rest": ["GET /__board/resolve"],
-      "cli": ["resolve", "open"],
+      "cli": {"admin": false},
       "mcp": ["resolve"]
     },
     {
@@ -134,7 +134,7 @@
       "area": "Files",
       "what": "What refers to what: references and backlinks",
       "rest": ["GET /__board/index", "GET /__board/refs"],
-      "cli": ["index", "board refs", "note refs", "quiz refs", "table refs", "file refs"],
+      "cli": {"admin": false},
       "mcp": ["refs"]
     },
     {
@@ -142,7 +142,7 @@
       "area": "Files",
       "what": "Every place some words appear, ranked",
       "rest": ["GET /__board/search", "GET /__board/corpus"],
-      "cli": ["search", "corpus"],
+      "cli": {"admin": false},
       "mcp": ["search"]
     },
     {
@@ -166,7 +166,7 @@
       "area": "Boards",
       "what": "Replace a board's whole text",
       "rest": ["POST /__board/put"],
-      "cli": ["board write", "board edit"],
+      "cli": ["board write"],
       "mcp": ["board_write"]
     },
     {
@@ -174,7 +174,7 @@
       "area": "Boards",
       "what": "Change one item and leave the rest of the file alone",
       "rest": ["POST /__board/patch"],
-      "cli": ["item set", "item body", "item rm", "item add"],
+      "cli": {"admin": false},
       "mcp": ["board_patch"]
     },
     {
@@ -190,7 +190,7 @@
       "area": "Boards",
       "what": "Copy a board",
       "rest": ["POST /__board/duplicate"],
-      "cli": ["board cp"],
+      "cli": {"admin": false},
       "mcp": ["board_duplicate"]
     },
     {
@@ -206,7 +206,7 @@
       "area": "Boards",
       "what": "Call a board something, and let its name follow",
       "rest": ["POST /__board/retitle"],
-      "cli": ["board title"],
+      "cli": {"admin": false},
       "mcp": ["board_title"]
     },
     {
@@ -222,7 +222,7 @@
       "area": "Boards",
       "what": "What items are on a board, without its whole text",
       "rest": ["GET /__board/fences"],
-      "cli": ["item ls"],
+      "cli": {"admin": false},
       "mcp": ["board_fences"]
     },
     {
@@ -230,7 +230,7 @@
       "area": "Boards",
       "what": "Bring a `.board.md` file in as a new board",
       "rest": ["POST /__board/create", "POST /__board/asset"],
-      "cli": ["board import"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_create", "image_add"], "why": "Importing is reading a file off the disk the CLI runs on; an agent hands the text to `board_create` and each picture to `image_add`."}
     },
     {
@@ -254,7 +254,7 @@
       "area": "Notes",
       "what": "Replace a note's whole text",
       "rest": ["POST /__board/put"],
-      "cli": ["note write", "note edit"],
+      "cli": ["note write"],
       "mcp": ["note_write"]
     },
     {
@@ -270,7 +270,7 @@
       "area": "Notes",
       "what": "Copy a note",
       "rest": ["POST /__board/duplicate"],
-      "cli": ["note cp"],
+      "cli": {"admin": false},
       "mcp": ["note_duplicate"]
     },
     {
@@ -286,7 +286,7 @@
       "area": "Notes",
       "what": "Call a note something, and let its name follow",
       "rest": ["POST /__board/retitle"],
-      "cli": ["note title"],
+      "cli": {"admin": false},
       "mcp": ["note_title"]
     },
     {
@@ -294,7 +294,7 @@
       "area": "Tasks",
       "what": "Every task, with its status, due date and project",
       "rest": ["GET /__board/list"],
-      "cli": ["task ls"],
+      "cli": {"admin": false},
       "mcp": ["task_list"]
     },
     {
@@ -302,7 +302,7 @@
       "area": "Tasks",
       "what": "Make a task",
       "rest": ["POST /__board/create"],
-      "cli": ["task new"],
+      "cli": {"admin": false},
       "mcp": ["task_create"]
     },
     {
@@ -310,7 +310,7 @@
       "area": "Tasks",
       "what": "Change a task's status, due date or start date, or make a note a task and back",
       "rest": ["POST /__board/task"],
-      "cli": ["task set", "task done"],
+      "cli": {"admin": false},
       "mcp": ["task_set"]
     },
     {
@@ -318,7 +318,7 @@
       "area": "Events",
       "what": "Every event, with when it starts and ends, soonest first",
       "rest": ["GET /__board/list"],
-      "cli": ["event ls"],
+      "cli": {"admin": false},
       "mcp": ["event_list"]
     },
     {
@@ -326,7 +326,7 @@
       "area": "Events",
       "what": "Make an event: a note with a start and an end",
       "rest": ["POST /__board/create"],
-      "cli": ["event new"],
+      "cli": {"admin": false},
       "mcp": ["event_create"]
     },
     {
@@ -334,7 +334,7 @@
       "area": "Events",
       "what": "Move an event, or make a note an event and back",
       "rest": ["POST /__board/event"],
-      "cli": ["event set"],
+      "cli": {"admin": false},
       "mcp": ["event_set"]
     },
     {
@@ -342,7 +342,7 @@
       "area": "Projects",
       "what": "Every project, with its status, colour and task counts",
       "rest": ["GET /__board/list"],
-      "cli": ["project ls"],
+      "cli": {"admin": false},
       "mcp": ["project_list"]
     },
     {
@@ -350,7 +350,7 @@
       "area": "Projects",
       "what": "Make a folder a project",
       "rest": ["GET /__board/list", "POST /__board/create"],
-      "cli": ["project new"],
+      "cli": {"admin": false},
       "mcp": ["project_create"]
     },
     {
@@ -358,7 +358,7 @@
       "area": "Projects",
       "what": "Change a project's status or colour, or make it a plain folder",
       "rest": ["POST /__board/project"],
-      "cli": ["project set"],
+      "cli": {"admin": false},
       "mcp": ["project_set"]
     },
     {
@@ -366,7 +366,7 @@
       "area": "Quizzes",
       "what": "Every quiz, with how many questions each asks",
       "rest": ["GET /__board/list"],
-      "cli": ["quiz ls"],
+      "cli": {"admin": false},
       "mcp": ["quiz_list"]
     },
     {
@@ -390,7 +390,7 @@
       "area": "Quizzes",
       "what": "Replace a quiz's whole text",
       "rest": ["POST /__board/put"],
-      "cli": ["quiz write", "quiz edit"],
+      "cli": ["quiz write"],
       "mcp": ["quiz_write"]
     },
     {
@@ -398,7 +398,7 @@
       "area": "Quizzes",
       "what": "Write, remove or move one question by its id, and no other byte of the quiz",
       "rest": ["POST /__board/quiz"],
-      "cli": ["quiz question set", "quiz question rm", "quiz question mv"],
+      "cli": {"admin": false},
       "mcp": ["quiz_question_set", "quiz_question_remove", "quiz_question_move"]
     },
     {
@@ -414,7 +414,7 @@
       "area": "Quizzes",
       "what": "Copy a quiz",
       "rest": ["POST /__board/duplicate"],
-      "cli": ["quiz cp"],
+      "cli": {"admin": false},
       "mcp": ["quiz_duplicate"]
     },
     {
@@ -430,7 +430,7 @@
       "area": "Quizzes",
       "what": "Call a quiz something, and let its name follow",
       "rest": ["POST /__board/retitle"],
-      "cli": ["quiz title"],
+      "cli": {"admin": false},
       "mcp": ["quiz_title"]
     },
     {
@@ -446,7 +446,7 @@
       "area": "Quizzes",
       "what": "Run a quiz a question at a time, and record the answers",
       "rest": ["GET /__board/get", "POST /api/practice"],
-      "cli": ["quiz practice"],
+      "cli": {"admin": false},
       "mcp": ["quiz_questions", "quiz_answer"]
     },
     {
@@ -454,7 +454,7 @@
       "area": "Quizzes",
       "what": "Every question still in Mistakes",
       "rest": ["GET /api/practice"],
-      "cli": ["quiz mistakes"],
+      "cli": {"admin": false},
       "mcp": ["quiz_mistakes"]
     },
     {
@@ -462,7 +462,7 @@
       "area": "Quizzes",
       "what": "How many right in a row take a question out of Mistakes",
       "rest": ["GET /api/practice", "PUT /api/practice"],
-      "cli": ["quiz threshold"],
+      "cli": {"admin": false},
       "mcp": ["quiz_threshold"]
     },
     {
@@ -470,7 +470,7 @@
       "area": "Tables",
       "what": "Every table, with its title and id",
       "rest": ["GET /__board/list"],
-      "cli": ["table ls"],
+      "cli": {"admin": false},
       "mcp": ["table_list"]
     },
     {
@@ -494,7 +494,7 @@
       "area": "Tables",
       "what": "Replace a table's whole text",
       "rest": ["POST /__board/put"],
-      "cli": ["table write", "table edit"],
+      "cli": ["table write"],
       "mcp": ["table_write"]
     },
     {
@@ -510,7 +510,7 @@
       "area": "Tables",
       "what": "Copy a table",
       "rest": ["POST /__board/duplicate"],
-      "cli": ["table cp"],
+      "cli": {"admin": false},
       "mcp": ["table_duplicate"]
     },
     {
@@ -526,7 +526,7 @@
       "area": "Tables",
       "what": "Call a table something, and let its name follow",
       "rest": ["POST /__board/retitle"],
-      "cli": ["table title"],
+      "cli": {"admin": false},
       "mcp": ["table_title"]
     },
     {
@@ -542,7 +542,7 @@
       "area": "Tables",
       "what": "A table's tabs, columns and rows as data, each addressed by id",
       "rest": ["GET /__board/table"],
-      "cli": ["table show"],
+      "cli": {"admin": false},
       "mcp": ["table_get"]
     },
     {
@@ -550,7 +550,7 @@
       "area": "Tables",
       "what": "Set cells; add, remove, move and size rows and columns; add, rename, sort, filter, remove and move tabs",
       "rest": ["POST /__board/table"],
-      "cli": ["table set", "table row add", "table row rm", "table row mv", "table row height", "table col add", "table col set", "table col rm", "table col mv", "table tab add", "table tab set", "table tab rm", "table tab mv"],
+      "cli": {"admin": false},
       "mcp": ["table_edit"]
     },
     {
@@ -558,7 +558,7 @@
       "area": "Tables",
       "what": "A CSV as a new table, or as a new tab of one",
       "rest": ["POST /__board/create", "POST /__board/table"],
-      "cli": ["table import"],
+      "cli": {"admin": false},
       "mcp": {"via": ["table_create", "table_edit"], "why": "Importing is reading a file off the disk the CLI runs on; an agent hands the CSV's text to `table_edit`'s `importCsv` op, on a table `table_create` made or one that exists."}
     },
     {
@@ -566,7 +566,7 @@
       "area": "Tables",
       "what": "A tab as CSV",
       "rest": ["GET /__board/get"],
-      "cli": ["table export"],
+      "cli": {"admin": false},
       "mcp": {"via": ["table_get"], "why": "CSV is a file for a spreadsheet on somebody's disk; `table_get` answers every row and cell as data, which is what an agent reads and writes out in whatever shape it needs."}
     },
     {
@@ -694,7 +694,7 @@
       "area": "Inside a board",
       "what": "One item's fence line and body",
       "rest": ["GET /__board/get"],
-      "cli": ["item show"],
+      "cli": {"admin": false},
       "mcp": ["board_read"]
     },
     {
@@ -702,7 +702,7 @@
       "area": "Inside a board",
       "what": "Duplicate, restack, group, rename, convert or re-lay-out items",
       "rest": ["POST /__board/patch", "POST /__board/put"],
-      "cli": ["item dup", "item front", "item back", "item rename", "item group", "item ungroup", "item convert", "item relayout"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch", "board_write"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
     },
     {
@@ -710,7 +710,7 @@
       "area": "Inside a board",
       "what": "A board's pages: list, add, rename, remove, reorder",
       "rest": ["GET /__board/get", "POST /__board/patch"],
-      "cli": ["page ls", "page add", "page rename", "page rm", "page move"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch"], "why": "Pages are the frontmatter's `pages:` and each item's `page=`: `board_patch`'s `{meta}` op and `{id, attrs}` op write them."}
     },
     {
@@ -718,7 +718,7 @@
       "area": "Inside a board",
       "what": "Lines between items: list, add, change, remove",
       "rest": ["GET /__board/get", "POST /__board/patch"],
-      "cli": ["link ls", "link add", "link set", "link rm"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch"], "why": "A link is a line of a page's `edges` fence: `board_patch` rewrites that fence's body, or inserts one."}
     },
     {
@@ -726,7 +726,7 @@
       "area": "Inside a board",
       "what": "The cards inside one diagram",
       "rest": ["GET /__board/get", "POST /__board/patch"],
-      "cli": ["node ls", "node add", "node set", "node rm", "node rename", "node dup", "node move"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
     },
     {
@@ -734,7 +734,7 @@
       "area": "Inside a board",
       "what": "The edges inside one diagram",
       "rest": ["POST /__board/patch"],
-      "cli": ["edge add", "edge set", "edge rm"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
     },
     {
@@ -742,7 +742,7 @@
       "area": "Inside a board",
       "what": "A card's rows: columns, members",
       "rest": ["GET /__board/get", "POST /__board/patch"],
-      "cli": ["row ls", "row add", "row set", "row rm"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
     },
     {
@@ -750,7 +750,7 @@
       "area": "Inside a board",
       "what": "A chart's own statements: form, legend, scale, categories",
       "rest": ["POST /__board/patch"],
-      "cli": ["chart set"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_patch"], "why": "An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal."}
     },
     {
@@ -758,7 +758,7 @@
       "area": "Images",
       "what": "Keep a picture beside a board, a note or a quiz — its bytes, or over MCP an https URL the server fetches",
       "rest": ["POST /__board/asset", "POST /__board/upload"],
-      "cli": ["image add"],
+      "cli": {"admin": false},
       "mcp": ["image_add"]
     },
     {
@@ -766,7 +766,7 @@
       "area": "Images",
       "what": "A picture a document keeps",
       "rest": ["GET /__board/assets/{path:path}"],
-      "cli": ["image get"],
+      "cli": {"admin": false},
       "mcp": ["image_get"]
     },
     {
@@ -774,7 +774,7 @@
       "area": "Images",
       "what": "Pictures beside a board that no board names",
       "rest": ["GET /__board/assets/unused"],
-      "cli": ["image unused"],
+      "cli": {"admin": false},
       "mcp": ["image_unused"]
     },
     {
@@ -782,7 +782,7 @@
       "area": "Images",
       "what": "Remove those pictures",
       "rest": ["POST /__board/assets/sweep"],
-      "cli": ["image sweep"],
+      "cli": {"admin": false},
       "mcp": ["image_sweep"]
     },
     {
@@ -822,7 +822,7 @@
       "area": "Attachments",
       "what": "Copy an attachment",
       "rest": ["POST /__board/duplicate"],
-      "cli": ["file cp"],
+      "cli": {"admin": false},
       "mcp": ["file_duplicate"]
     },
     {
@@ -830,7 +830,7 @@
       "area": "Attachments",
       "what": "Call an attachment something, and let its name follow",
       "rest": ["POST /__board/retitle"],
-      "cli": ["file title"],
+      "cli": {"admin": false},
       "mcp": ["file_title"]
     },
     {
@@ -846,7 +846,7 @@
       "area": "Components",
       "what": "The person's saved components",
       "rest": ["GET /__board/components"],
-      "cli": ["component ls"],
+      "cli": {"admin": false},
       "mcp": ["library"]
     },
     {
@@ -854,7 +854,7 @@
       "area": "Components",
       "what": "Keep items as a component",
       "rest": ["POST /__board/create"],
-      "cli": ["component keep"],
+      "cli": {"admin": false},
       "mcp": {"via": ["board_create"], "why": "A component is a board under `components/`: `board_create` with that name keeps one, with the text of the items to keep."}
     },
     {
@@ -862,7 +862,7 @@
       "area": "Components",
       "what": "Put a saved component on a board",
       "rest": ["GET /__board/components", "POST /__board/patch"],
-      "cli": ["component place"],
+      "cli": {"admin": false},
       "mcp": {"via": ["library", "board_patch"], "why": "`library` answers every saved component's text, and `board_patch`'s `{insert}` places it."}
     },
     {
@@ -870,7 +870,7 @@
       "area": "Components",
       "what": "Delete a saved component",
       "rest": ["POST /__board/components/delete"],
-      "cli": ["component rm"],
+      "cli": {"admin": false},
       "mcp": ["component_delete"]
     },
     {
@@ -878,7 +878,7 @@
       "area": "Grammar",
       "what": "The cheat sheets",
       "rest": ["GET /__board/dsl"],
-      "cli": ["dsl"],
+      "cli": {"admin": false},
       "mcp": ["dsl_reference"]
     },
     {
@@ -886,7 +886,7 @@
       "area": "Grammar",
       "what": "Ready-made pieces, rendered",
       "rest": ["GET /__board/library"],
-      "cli": ["library"],
+      "cli": {"admin": false},
       "mcp": ["library"]
     },
     {
@@ -894,7 +894,7 @@
       "area": "Grammar",
       "what": "What `icon=` may say",
       "rest": ["GET /__board/icons"],
-      "cli": ["icons"],
+      "cli": {"admin": false},
       "mcp": ["icons"]
     },
     {
@@ -902,7 +902,7 @@
       "area": "Models",
       "what": "Which model providers could answer",
       "rest": ["GET /__board/llm"],
-      "cli": ["llm"],
+      "cli": {"admin": false},
       "mcp": ["llm"]
     },
     {
@@ -910,7 +910,7 @@
       "area": "Models",
       "what": "Ask a model to draw a diagram",
       "rest": ["POST /__board/generate"],
-      "cli": ["generate"],
+      "cli": {"admin": false},
       "mcp": ["generate"]
     },
     {
@@ -918,7 +918,7 @@
       "area": "Models",
       "what": "Run a prompt card on a board",
       "rest": ["POST /__board/generate", "POST /__board/patch"],
-      "cli": ["prompt run"],
+      "cli": {"admin": false},
       "mcp": {"via": ["generate", "board_patch"], "why": "`generate` answers the draft and `board_patch` puts it where the card was: `{insert}` after it, `{remove}` on it."}
     },
     {
@@ -926,7 +926,7 @@
       "area": "Models",
       "what": "Ask a model to rewrite one diagram",
       "rest": ["POST /__board/generate", "POST /__board/patch"],
-      "cli": ["rewrite"],
+      "cli": {"admin": false},
       "mcp": {"via": ["generate", "board_patch"], "why": "`generate` with `source` answers the rewritten body, and `board_patch`'s `{id, body}` lands it on the item."}
     },
     {
@@ -958,7 +958,7 @@
       "area": "Assistant",
       "what": "The chats in a vault, newest first",
       "rest": ["GET /__board/chats"],
-      "cli": ["chat ls"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -966,7 +966,7 @@
       "area": "Assistant",
       "what": "The providers, models and effort levels a chat can run on",
       "rest": ["GET /__board/chat/models"],
-      "cli": ["chat models"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -974,7 +974,7 @@
       "area": "Assistant",
       "what": "Start a chat",
       "rest": ["POST /__board/chat"],
-      "cli": ["chat new"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -982,7 +982,7 @@
       "area": "Assistant",
       "what": "A chat read whole: its turns, steps, changes and undo history",
       "rest": ["GET /__board/chat"],
-      "cli": ["chat cat"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -990,7 +990,7 @@
       "area": "Assistant",
       "what": "Send a turn and follow the answer as it is written",
       "rest": ["POST /__board/chat/turn", "GET /__board/chat/events"],
-      "cli": ["chat say"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -998,7 +998,7 @@
       "area": "Assistant",
       "what": "Stop the turn that is answering",
       "rest": ["POST /__board/chat/stop"],
-      "cli": ["chat stop"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -1006,7 +1006,7 @@
       "area": "Assistant",
       "what": "Answer a write or a vault request the assistant is waiting on",
       "rest": ["POST /__board/chat/approve"],
-      "cli": ["chat approve"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -1014,7 +1014,7 @@
       "area": "Assistant",
       "what": "Let a chat reach another vault, or take the grant back",
       "rest": ["POST /__board/chat/grant"],
-      "cli": ["chat grant"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -1022,7 +1022,7 @@
       "area": "Assistant",
       "what": "Take back, or put back, one block of changes a turn made",
       "rest": ["POST /__board/chat/undo", "POST /__board/chat/redo"],
-      "cli": ["chat undo", "chat redo"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -1030,7 +1030,7 @@
       "area": "Assistant",
       "what": "Give a chat a title",
       "rest": ["POST /__board/chat/rename"],
-      "cli": ["chat rename"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {
@@ -1038,7 +1038,7 @@
       "area": "Assistant",
       "what": "Delete a chat and its turns",
       "rest": ["POST /__board/chat/delete"],
-      "cli": ["chat rm"],
+      "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
     },
     {

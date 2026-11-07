@@ -22,7 +22,7 @@ const BOARD = [
   'service db "DB"',
   "```",
   "",
-  '```arch {#svc}',
+  "```arch {#svc}",
   'service api "API"',
   "```",
   "",
@@ -88,16 +88,23 @@ describe("rewriteOps", () => {
     expect(done.ok).toBe(true);
     if (!done.ok) return;
     const next = parseBoard("t", done.text);
-    expect(next.items.find((it) => it.id === "x")).toMatchObject({ type: "flow", x: 40, y: 80, page: "page-1", group: "g1", title: "Before" });
+    expect(next.items.find((it) => it.id === "x")).toMatchObject({
+      type: "flow",
+      x: 40,
+      y: 80,
+      page: "page-1",
+      group: "g1",
+      title: "Before",
+    });
     expect(next.links.map((l) => `${l.from.item}.${l.from.node} -> ${l.to.item}`)).toEqual(["x.db -> svc"]);
   });
 
   it("takes off what only the old type meant: layout=fixed, and a chart's size on a graph", () => {
-    const fixed = parseBoard("t", "```arch {#f layout=fixed w=400}\nservice a \"A\" x=0 y=0\n```").items[0]!;
+    const fixed = parseBoard("t", '```arch {#f layout=fixed w=400}\nservice a "A" x=0 y=0\n```').items[0]!;
     const toState = asSet(rewriteOps(fixed, { type: "state", attrs: {}, body: 'state a "A"' })[0]!);
     expect(toState.attrs).toEqual({ layout: null, w: null });
 
-    const chart = parseBoard("t", "```chart {#c w=600 h=320}\nbar\nseries a \"A\" 1\n```").items[0]!;
+    const chart = parseBoard("t", '```chart {#c w=600 h=320}\nbar\nseries a "A" 1\n```').items[0]!;
     expect(asSet(rewriteOps(chart, { type: "arch", attrs: {}, body: 'service a "A"' })[0]!).attrs).toEqual({ w: null, h: null });
     /* Chart to sketch keeps the box: both are sized by their author. */
     expect(asSet(rewriteOps(chart, { type: "sketch", attrs: {}, body: 'box a "A"' })[0]!).attrs).toBeUndefined();
@@ -142,11 +149,11 @@ describe("rewriteOps", () => {
 
 describe("proposedItem", () => {
   it("draws the draft in the type it came back in, without what Accept would take off", () => {
-    const chart = parseBoard("t", "```chart {#c w=600 h=320}\nbar\nseries a \"A\" 1\n```").items[0]!;
+    const chart = parseBoard("t", '```chart {#c w=600 h=320}\nbar\nseries a "A" 1\n```').items[0]!;
     const shown = proposedItem(chart, { type: "arch", attrs: {}, body: 'service a "A"' });
     expect(shown).toMatchObject({ id: "c", type: "arch", body: 'service a "A"', w: undefined, h: undefined });
     /* The layout cache is keyed on the hash, and a stale one hands back the chart. */
-    expect(shown.hash).toBe(parseBoard("t", "```arch {#c}\nservice a \"A\"\n```").items[0]!.hash);
+    expect(shown.hash).toBe(parseBoard("t", '```arch {#c}\nservice a "A"\n```').items[0]!.hash);
   });
 
   it("is only the body when the type stays", () => {
@@ -174,7 +181,7 @@ describe("rewriteContext", () => {
   });
 
   it("never names a link that only names the item itself", () => {
-    const b = parseBoard("t", "```arch {#x}\nservice db \"DB\"\n```\n\n```edges {#l}\nx --> x.db\n```\n");
+    const b = parseBoard("t", '```arch {#x}\nservice db "DB"\n```\n\n```edges {#l}\nx --> x.db\n```\n');
     expect(rewriteContext(b, new Set(["x"]))).toBe("Keep the ids other items link into unchanged: db.");
   });
 });

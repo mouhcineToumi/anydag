@@ -99,6 +99,10 @@ export function zipBundle(mdPath: string, b: Bundle): Uint8Array {
   const entries: Record<string, [Uint8Array, { level: 0 | 6 }]> = {
     [mdPath]: [new TextEncoder().encode(b.text), { level: 6 }],
   };
-  for (const f of b.files) entries[f.path] = [f.data, { level: /\.(png|jpe?g|gif|webp|avif|pdf|zip|gz|tgz|7z|rar|mp3|mp4|m4a|mov|webm|docx|xlsx|pptx)$/i.test(f.path) ? 0 : 6 }];
+  for (const f of b.files)
+    entries[f.path] = [
+      f.data,
+      { level: /\.(png|jpe?g|gif|webp|avif|pdf|zip|gz|tgz|7z|rar|mp3|mp4|m4a|mov|webm|docx|xlsx|pptx)$/i.test(f.path) ? 0 : 6 },
+    ];
   return zipSync(entries);
 }

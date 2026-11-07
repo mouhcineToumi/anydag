@@ -54,8 +54,16 @@ export function CalendarPane() {
   return (
     <>
       <Group title="Time">
-        <Field label="Time zone" hint="Events keep the moment they name, so changing this moves where they show, not when they are.">
-          <select className="dag-select dag-select--wide" data-dag-setting-time-zone="" value={zone ?? ""} onChange={(e) => setZoneChoice(e.target.value || null)}>
+        <Field
+          label="Time zone"
+          hint="Events keep the moment they name, so changing this moves where they show, not when they are."
+        >
+          <select
+            className="dag-select dag-select--wide"
+            data-dag-setting-time-zone=""
+            value={zone ?? ""}
+            onChange={(e) => setZoneChoice(e.target.value || null)}
+          >
             <option value="">Automatic ({here.replace(/_/g, " ")})</option>
             {names.map((z) => (
               <option key={z} value={z}>
@@ -65,7 +73,12 @@ export function CalendarPane() {
           </select>
         </Field>
         <Field label="Weeks start on">
-          <select className="dag-select" data-dag-setting-week-start="" value={weekStart} onChange={(e) => setWeekStart(Number(e.target.value))}>
+          <select
+            className="dag-select"
+            data-dag-setting-week-start=""
+            value={weekStart}
+            onChange={(e) => setWeekStart(Number(e.target.value))}
+          >
             {WEEK_STARTS.map(([d, label]) => (
               <option key={d} value={d}>
                 {label}
@@ -78,7 +91,11 @@ export function CalendarPane() {
       <Group title="Show on the calendar">
         {CAL_KINDS.map((k) => (
           <Field key={k} label={CAL_LABEL[k]}>
-            <Switch data-dag-setting-calendar-kind={k} checked={!hidden.has(k)} onChange={(e) => setHidden(k, !e.target.checked)} />
+            <Switch
+              data-dag-setting-calendar-kind={k}
+              checked={!hidden.has(k)}
+              onChange={(e) => setHidden(k, !e.target.checked)}
+            />
           </Field>
         ))}
       </Group>

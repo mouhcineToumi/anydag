@@ -31,7 +31,7 @@ import { parseAttrs, type AttrError, type Attrs } from "../board/attrs";
 import type { TableCode, TableDiagnostic } from "./codes";
 
 /** A range of the text, `[start, end)`, in string offsets. */
-export interface Span {
+interface Span {
   start: number;
   end: number;
 }
@@ -41,7 +41,8 @@ export type ColumnType = "text" | "number" | "date" | "checkbox" | "select" | "l
 
 export const COLUMN_TYPES: readonly ColumnType[] = ["text", "number", "date", "checkbox", "select", "link"];
 
-export const isColumnType = (s: unknown): s is ColumnType => typeof s === "string" && (COLUMN_TYPES as readonly string[]).includes(s);
+export const isColumnType = (s: unknown): s is ColumnType =>
+  typeof s === "string" && (COLUMN_TYPES as readonly string[]).includes(s);
 
 export interface Column {
   /** `{#…}` on the header cell; absent until something mints one (`WT_NO_ID`). */
@@ -94,7 +95,7 @@ export interface FilterRule {
 }
 
 /** Where a tab's grid sits: the header line, the delimiter line, and the end of its last row. */
-export interface Grid {
+interface Grid {
   header: Span;
   delimiter: Span;
   /** After the last row's newline — where a row appended at the end goes. */
@@ -294,7 +295,8 @@ export function readSort(text: string): { keys: SortKey[]; bad: string[] } {
 }
 
 /** `sort` written back: what `readSort` reads. */
-export const writeSort = (keys: readonly SortKey[]): string => keys.map((k) => (k.desc ? `${k.column}:desc` : k.column)).join(", ");
+export const writeSort = (keys: readonly SortKey[]): string =>
+  keys.map((k) => (k.desc ? `${k.column}:desc` : k.column)).join(", ");
 
 /** `filter="stage!=Lost; amount>=1000"` read. Longest operator first, so `>=` is never `>` and `=1000`. */
 export function readFilter(text: string): { rules: FilterRule[]; bad: string[] } {
@@ -315,7 +317,14 @@ export const writeFilter = (rules: readonly FilterRule[]): string =>
   rules.map((r) => `${r.column}${r.op}${r.value.replace(/;/g, ",").trim()}`).join("; ");
 
 /** Split a comma list of a select's options, trimmed, empty ones dropped, first of each kept. */
-export const readOptions = (text: string): string[] => [...new Set(text.split(",").map((s) => s.trim()).filter(Boolean))];
+const readOptions = (text: string): string[] => [
+  ...new Set(
+    text
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  ),
+];
 
 interface HeadingRead {
   name: string;
@@ -377,7 +386,8 @@ export function parseTable(text: string): Table {
       const type = (types[0] ?? "text") as ColumnType;
       const options = typeof attrs.map.options === "string" ? readOptions(attrs.map.options) : undefined;
       const w = posInt(attrs.map.w);
-      const id = typeof attrs.map.id === "string" ? attrs.map.id : typeof attrs.map.id === "number" ? String(attrs.map.id) : undefined;
+      const id =
+        typeof attrs.map.id === "string" ? attrs.map.id : typeof attrs.map.id === "number" ? String(attrs.map.id) : undefined;
       const known = ["id", "options", "w", ...(types[0] ? [types[0]] : [])];
       const extra = without(attrs, known);
       for (const k of extra.order)
@@ -458,7 +468,13 @@ export function parseTable(text: string): Table {
       const filterText = typeof a.map.filter === "string" ? a.map.filter : undefined;
       const extra = without(a, ["id", "sort", "filter"]);
       for (const k of extra.order)
-        say("WT_UNKNOWN_ATTR", line.n, 1, `\`${k}\` means nothing on a tab. A tab's heading takes \`{#id sort="…" filter="…"}\`.`, id);
+        say(
+          "WT_UNKNOWN_ATTR",
+          line.n,
+          1,
+          `\`${k}\` means nothing on a tab. A tab's heading takes \`{#id sort="…" filter="…"}\`.`,
+          id,
+        );
       cur = {
         tab: {
           ...(id !== undefined ? { id } : {}),
@@ -486,7 +502,12 @@ export function parseTable(text: string): Table {
     if (!cur) {
       if (!opens && !loose && tableAt(i)) {
         loose = true;
-        say("WT_LOOSE_TABLE", line.n, 1, "This table is above the first tab, so it is part of the description. Put a `## Tab name` heading over it.");
+        say(
+          "WT_LOOSE_TABLE",
+          line.n,
+          1,
+          "This table is above the first tab, so it is part of the description. Put a `## Tab name` heading over it.",
+        );
       }
       description.push(line);
       if (opens) fence = { ...opens, line };
@@ -513,7 +534,11 @@ export function parseTable(text: string): Table {
       if (found) {
         const next = lines[i + 1]!;
         c.tab.columns = readColumns(found.header, line, c.tab.id);
-        c.tab.grid = { header: { start: line.start, end: line.end }, delimiter: { start: next.start, end: next.end }, end: next.end };
+        c.tab.grid = {
+          header: { start: line.start, end: line.end },
+          delimiter: { start: next.start, end: next.end },
+          end: next.end,
+        };
         c.last = next;
         c.phase = "grid";
         i++;
@@ -544,8 +569,10 @@ export function parseTable(text: string): Table {
   /* Ids, sort and filter: read once every tab and its columns are known. */
   const tabIds = new Set<string>();
   for (const tab of tabs) {
-    if (tab.id === undefined) say("WT_NO_ID", tab.line, 1, "This tab has no id yet. It is given one, `{#…}`, the first time the table is written.");
-    else if (tabIds.has(tab.id)) say("ET_DUPLICATE_ID", tab.line, 1, `Another tab already has the id \`${tab.id}\`. Give this one its own.`, tab.id);
+    if (tab.id === undefined)
+      say("WT_NO_ID", tab.line, 1, "This tab has no id yet. It is given one, `{#…}`, the first time the table is written.");
+    else if (tabIds.has(tab.id))
+      say("ET_DUPLICATE_ID", tab.line, 1, `Another tab already has the id \`${tab.id}\`. Give this one its own.`, tab.id);
     else tabIds.add(tab.id);
 
     const cols = new Set<string>();
@@ -553,17 +580,30 @@ export function parseTable(text: string): Table {
     for (const col of tab.columns) {
       if (col.id === undefined) unnamedColumn = true;
       else if (cols.has(col.id))
-        say("ET_DUPLICATE_ID", tab.grid ? lineOf(text, tab.grid.header.start) : tab.line, 1, `Two columns of this tab have the id \`${col.id}\`.`, tab.id);
+        say(
+          "ET_DUPLICATE_ID",
+          tab.grid ? lineOf(text, tab.grid.header.start) : tab.line,
+          1,
+          `Two columns of this tab have the id \`${col.id}\`.`,
+          tab.id,
+        );
       else cols.add(col.id);
     }
     if (unnamedColumn && tab.grid)
-      say("WT_NO_ID", lineOf(text, tab.grid.header.start), 1, "A column here has no id yet. It is given one, `{#…}`, the first time the table is written.", tab.id);
+      say(
+        "WT_NO_ID",
+        lineOf(text, tab.grid.header.start),
+        1,
+        "A column here has no id yet. It is given one, `{#…}`, the first time the table is written.",
+        tab.id,
+      );
 
     const rows = new Set<string>();
     let unnamedRows = 0;
     for (const row of tab.rows) {
       if (row.id === undefined) unnamedRows++;
-      else if (rows.has(row.id)) say("ET_DUPLICATE_ID", row.line, 1, `Another row of this tab already has the id \`${row.id}\`.`, tab.id);
+      else if (rows.has(row.id))
+        say("ET_DUPLICATE_ID", row.line, 1, `Another row of this tab already has the id \`${row.id}\`.`, tab.id);
       else rows.add(row.id);
     }
     if (unnamedRows)
@@ -577,7 +617,8 @@ export function parseTable(text: string): Table {
 
     if (tab.sortText !== undefined) {
       const { keys, bad } = readSort(tab.sortText);
-      for (const b of bad) say("WT_BAD_SORT", tab.line, 1, `\`${b}\` is not a sort key. Write a column's id, then \`:asc\` or \`:desc\`.`, tab.id);
+      for (const b of bad)
+        say("WT_BAD_SORT", tab.line, 1, `\`${b}\` is not a sort key. Write a column's id, then \`:asc\` or \`:desc\`.`, tab.id);
       for (const k of keys) {
         if (cols.has(k.column)) tab.sort.push(k);
         else say("WT_BAD_SORT", tab.line, 1, `This tab has no column \`${k.column}\` to sort by.`, tab.id);
@@ -586,14 +627,21 @@ export function parseTable(text: string): Table {
     if (tab.filterText !== undefined) {
       const { rules, bad } = readFilter(tab.filterText);
       for (const b of bad)
-        say("WT_BAD_FILTER", tab.line, 1, `\`${b}\` is not a filter rule. Write a column's id, an operator (${FILTER_OPS.join(" ")}), and a value.`, tab.id);
+        say(
+          "WT_BAD_FILTER",
+          tab.line,
+          1,
+          `\`${b}\` is not a filter rule. Write a column's id, an operator (${FILTER_OPS.join(" ")}), and a value.`,
+          tab.id,
+        );
       for (const r of rules) {
         if (cols.has(r.column)) tab.filter.push(r);
         else say("WT_BAD_FILTER", tab.line, 1, `This tab has no column \`${r.column}\` to filter on.`, tab.id);
       }
     }
   }
-  if (tabs.length === 0) say("WT_EMPTY", firstLine, 1, "This table has no tabs yet. A tab starts at a `##` heading, with a table under it.");
+  if (tabs.length === 0)
+    say("WT_EMPTY", firstLine, 1, "This table has no tabs yet. A tab starts at a `##` heading, with a table under it.");
 
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   const descStart = front.length;
@@ -607,7 +655,7 @@ export function parseTable(text: string): Table {
 }
 
 /** The 1-based line an offset is on. */
-export function lineOf(text: string, offset: number): number {
+function lineOf(text: string, offset: number): number {
   let n = 1;
   for (let i = 0; i < offset && i < text.length; i++) if (text.charCodeAt(i) === 10) n++;
   return n;
@@ -620,8 +668,3 @@ const trimBlank = (lines: string[]): string[] => {
   while (b > a && lines[b - 1]!.trim() === "") b--;
   return lines.slice(a, b);
 };
-
-/** A tab by its id. */
-export function findTab(table: Table, id: string): Tab | undefined {
-  return table.tabs.find((t) => t.id === id);
-}

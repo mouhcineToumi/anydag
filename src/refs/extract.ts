@@ -66,7 +66,7 @@ export function refsInMarkdown(md: string): Ref[] {
   const walk = (n: Nodes) => {
     if (n.type === "code" || n.type === "inlineCode") return;
     if (n.type === "link" || n.type === "image") {
-      const text = n.type === "image" ? n.alt ?? "" : textOf(n);
+      const text = n.type === "image" ? (n.alt ?? "") : textOf(n);
       const type = n.type === "image" ? "embed" : "link";
       const hit = parseDagUrl(n.url);
       if (hit) out.push({ ...hit, type, text });

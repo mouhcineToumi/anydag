@@ -20,7 +20,7 @@ function Mark({ name }: { name: string }) {
 const sayOf = (error: unknown): string => (error instanceof Error ? error.message : "That did not work.");
 
 /** Go to a vault from the recent list: open it first when it is only remembered. */
-export async function enterVault(v: Pick<Vault, "id" | "path" | "open">): Promise<void> {
+async function enterVault(v: Pick<Vault, "id" | "path" | "open">): Promise<void> {
   if (!v.open) await openVault(v.path);
   switchVault(v.id);
 }
@@ -62,7 +62,12 @@ export function OpenFolderForm({ onCancel }: { onCancel?(): void }) {
   }
 
   return (
-    <form className="dag-vault__form" data-dag-vault-open-form="" onSubmit={(e) => void go(e)} onKeyDown={(e) => stopKeys(e, onCancel)}>
+    <form
+      className="dag-vault__form"
+      data-dag-vault-open-form=""
+      onSubmit={(e) => void go(e)}
+      onKeyDown={(e) => stopKeys(e, onCancel)}
+    >
       <label>
         <span>Folder to open</span>
         <input
@@ -124,7 +129,12 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
   }
 
   return (
-    <form className="dag-vault__form" data-dag-vault-create-form="" onSubmit={(e) => void go(e)} onKeyDown={(e) => stopKeys(e, onCancel)}>
+    <form
+      className="dag-vault__form"
+      data-dag-vault-create-form=""
+      onSubmit={(e) => void go(e)}
+      onKeyDown={(e) => stopKeys(e, onCancel)}
+    >
       <label>
         <span>Name</span>
         <input
@@ -172,7 +182,12 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
             <span>Cancel</span>
           </button>
         ) : null}
-        <button type="submit" className="dag-icon dag-icon--wide" data-dag-vault-create-go="" disabled={busy || !name.trim() || !where.trim()}>
+        <button
+          type="submit"
+          className="dag-icon dag-icon--wide"
+          data-dag-vault-create-go=""
+          disabled={busy || !name.trim() || !where.trim()}
+        >
           <span>{busy ? "Creating…" : "Create"}</span>
         </button>
       </div>
@@ -274,7 +289,8 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
   }, [open]);
 
   useEffect(() => {
-    if (open && !asking) menu.current?.querySelector<HTMLElement>("[role=menuitemradio][aria-checked=true],[role=menuitem]")?.focus();
+    if (open && !asking)
+      menu.current?.querySelector<HTMLElement>("[role=menuitemradio][aria-checked=true],[role=menuitem]")?.focus();
   }, [open, asking]);
 
   function close() {
@@ -319,7 +335,9 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
       return;
     }
     if (!open || asking || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
-    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>("[role=menuitem],[role=menuitemradio]:not(:disabled)") ?? []);
+    const items = Array.from(
+      menu.current?.querySelectorAll<HTMLElement>("[role=menuitem],[role=menuitemradio]:not(:disabled)") ?? [],
+    );
     const i = items.indexOf(document.activeElement as HTMLElement);
     e.preventDefault();
     items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
@@ -385,7 +403,13 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
           {asking === "open" ? (
             <OpenFolderForm onCancel={() => setAsking(null)} />
           ) : (
-            <button type="button" role="menuitem" className="dag-more__item" data-dag-vault-open="" onClick={() => void openFolder()}>
+            <button
+              type="button"
+              role="menuitem"
+              className="dag-more__item"
+              data-dag-vault-open=""
+              onClick={() => void openFolder()}
+            >
               <FolderOpen {...ICON} aria-hidden="true" />
               <span>Open folder…</span>
             </button>
@@ -393,13 +417,25 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
           {asking === "create" ? (
             <CreateVaultForm onCancel={() => setAsking(null)} />
           ) : (
-            <button type="button" role="menuitem" className="dag-more__item" data-dag-vault-create="" onClick={() => setAsking("create")}>
+            <button
+              type="button"
+              role="menuitem"
+              className="dag-more__item"
+              data-dag-vault-create=""
+              onClick={() => setAsking("create")}
+            >
               <FolderPlus {...ICON} aria-hidden="true" />
               <span>Create vault…</span>
             </button>
           )}
           <hr className="dag-vault__rule" />
-          <button type="button" role="menuitem" className="dag-more__item" data-dag-vault-close="" onClick={() => void closeThis()}>
+          <button
+            type="button"
+            role="menuitem"
+            className="dag-more__item"
+            data-dag-vault-close=""
+            onClick={() => void closeThis()}
+          >
             <Power {...ICON} aria-hidden="true" />
             <span>Close vault</span>
           </button>

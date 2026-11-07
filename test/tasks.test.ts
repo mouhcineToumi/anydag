@@ -4,7 +4,19 @@ import { describe, expect, it } from "vitest";
 
 import { splitNote } from "@/note/format";
 import { indexTexts } from "@/refs/extract";
-import { compareTasks, dueOf, nextStatus, overdue, STATUSES, statusOf, taskOf, titleStem, today, withTask, type TaskChange } from "@/note/task";
+import {
+  compareTasks,
+  dueOf,
+  nextStatus,
+  overdue,
+  STATUSES,
+  statusOf,
+  taskOf,
+  titleStem,
+  today,
+  withTask,
+  type TaskChange,
+} from "@/note/task";
 
 /**
  * What makes a note a task.

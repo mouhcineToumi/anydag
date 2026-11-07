@@ -280,10 +280,16 @@ export function App() {
   const openCalendar = useCallback(() => setQuery({ ...pageQuery("board", null), calendar: "1" }), [setQuery]);
   const openTrash = useCallback(() => setQuery({ ...pageQuery("board", null), trash: "1" }), [setQuery]);
   /* The Assistant page, on a chat; `1` is the newest one the vault has. */
-  const openAssistantPage = useCallback((chat?: string | null) => setQuery({ ...pageQuery("board", null), chat: chat ?? "1" }), [setQuery]);
+  const openAssistantPage = useCallback(
+    (chat?: string | null) => setQuery({ ...pageQuery("board", null), chat: chat ?? "1" }),
+    [setQuery],
+  );
   /* The Quizzes page, or — with `run: "mistakes"` — the Mistakes run it starts, or with `folder:<path>`
      every quiz in a folder as one run. */
-  const openQuizzes = useCallback((run?: QuizzesRun) => setQuery({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }), [setQuery]);
+  const openQuizzes = useCallback(
+    (run?: QuizzesRun) => setQuery({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
+    [setQuery],
+  );
   const ref = query.get("ref");
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
@@ -383,7 +389,7 @@ export function App() {
  * The cards stay rendered by the page because the page is what knows the theme and the board; the
  * sidebar is above both pages and knows neither. So it asks with a document event, the way
  * `dag:tidy` reaches the page from a script. `dag:chrome` and not `dag:settings`, which is the
- * settings-changed event: one name meaning two things is the hazard `CLAUDE.md` records.
+ * settings-changed event: one name meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  */
 function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void }) {
   const ref = useRef(on);
@@ -562,7 +568,8 @@ function TasksApp({
     return name ? { kind: "project", name } : { kind: "all" };
   }, [wanted, list.ids]);
   const chooseScope = useCallback(
-    (next: ProjectFilter) => setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
+    (next: ProjectFilter) =>
+      setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
     [setQuery, list.ids],
   );
 
@@ -573,7 +580,14 @@ function TasksApp({
           <LayoutToggle layout={layout} onLayout={chooseLayout} />
         </Toolbar>
       )}
-      <TasksView list={list} layout={layout} onOpen={(name) => open("note", name)} scope={scope} onScope={chooseScope} locked={locked} />
+      <TasksView
+        list={list}
+        layout={layout}
+        onOpen={(name) => open("note", name)}
+        scope={scope}
+        onScope={chooseScope}
+        locked={locked}
+      />
       {cards}
     </div>
   );
@@ -651,7 +665,7 @@ function readCalendarView(): { view: CalView; days: number } {
  * the view (`month`, `week`, `days`; `1` is this browser's last), with the day and the count beside
  * it (`date=`, `days=`) so a reload and a link land where they were, and `project=` the Tasks page's
  * filter, by the project note's id. **Not `view=`**, which is the read-only page's key: one name
- * meaning two things is the hazard `CLAUDE.md` records.
+ * meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  *
  * A page without a canvas, for the Tasks page's reason. **What it shows and where a week starts are
  * the account's** (`CALENDAR_HIDE`, `WEEK_START`), read through `usePref` so the
@@ -705,7 +719,8 @@ function CalendarApp({
     return name ? { kind: "project", name } : { kind: "all" };
   }, [wanted, list.ids]);
   const chooseScope = useCallback(
-    (next: ProjectFilter) => setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
+    (next: ProjectFilter) =>
+      setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
     [setQuery, list.ids],
   );
 
@@ -767,12 +782,23 @@ function QuizzesApp({
   return (
     <div className="dag-app dag-app--quizzes" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
-        <Toolbar boardName={null} title={running ? "Mistakes" : folder !== null ? folderLabel(folder) : "Quizzes"} onBoards={openBrowser} />
+        <Toolbar
+          boardName={null}
+          title={running ? "Mistakes" : folder !== null ? folderLabel(folder) : "Quizzes"}
+          onBoards={openBrowser}
+        />
       )}
       {running ? (
         <MistakesRun list={list} onExit={() => openQuizzes()} />
       ) : folder !== null ? (
-        <FolderRun key={folder} folder={folder} list={list} locked={locked} onExit={() => openQuizzes()} onMistakes={() => openQuizzes("mistakes")} />
+        <FolderRun
+          key={folder}
+          folder={folder}
+          list={list}
+          locked={locked}
+          onExit={() => openQuizzes()}
+          onMistakes={() => openQuizzes("mistakes")}
+        />
       ) : (
         <QuizzesView
           list={list}
@@ -820,7 +846,10 @@ function MistakesRun({ list, onExit }: { list: BoardTree; onExit(): void }) {
       /* The list not in yet: wait for it, rather than decide every question's quiz has gone. */
       if (Object.keys(byId).length === 0) return;
       const wanted = [...new Set(p.pool.map((e) => e.quiz))].filter((id) => byId[id]);
-      const quizzes = new Map<string, { name: string; description: string; shuffle: boolean; questions: Map<string, Question> }>();
+      const quizzes = new Map<
+        string,
+        { name: string; description: string; shuffle: boolean; questions: Map<string, Question> }
+      >();
       await Promise.all(
         wanted.map(async (id) => {
           const name = byId[id]!;
@@ -842,7 +871,16 @@ function MistakesRun({ list, onExit }: { list: BoardTree; onExit(): void }) {
           const question = quiz?.questions.get(e.question);
           if (!quiz || !question || !askable(question)) return [];
           return [
-            { quiz: { name: quiz.name, title: titles.current[quiz.name], id: e.quiz, description: quiz.description, shuffle: quiz.shuffle }, question },
+            {
+              quiz: {
+                name: quiz.name,
+                title: titles.current[quiz.name],
+                id: e.quiz,
+                description: quiz.description,
+                shuffle: quiz.shuffle,
+              },
+              question,
+            },
           ];
         }),
       );
@@ -862,7 +900,9 @@ function MistakesRun({ list, onExit }: { list: BoardTree; onExit(): void }) {
       questions={questions}
       title="Mistakes"
       showSource
-      record={(q, correct) => q.quiz.id && q.question.id && answer({ quiz: q.quiz.id, question: q.question.id, correct, run: "mistakes" })}
+      record={(q, correct) =>
+        q.quiz.id && q.question.id && answer({ quiz: q.quiz.id, question: q.question.id, correct, run: "mistakes" })
+      }
       /* Back to loading first, so the last run's score is not what shows while the pool is asked again. */
       onAgain={() => setQuestions(null)}
       onExit={onExit}
@@ -949,7 +989,9 @@ function FolderRun({
       questions={questions}
       title={folderLabel(folder)}
       showSource
-      record={(q, correct) => q.quiz.id && q.question.id && answer({ quiz: q.quiz.id, question: q.question.id, correct, run: "quiz" })}
+      record={(q, correct) =>
+        q.quiz.id && q.question.id && answer({ quiz: q.quiz.id, question: q.question.id, correct, run: "quiz" })
+      }
       onMistakes={() => void flushAnswers().then(onMistakes)}
       onExit={onExit}
       exitLabel="Back to the quizzes"
@@ -958,7 +1000,9 @@ function FolderRun({
           ? "No quiz in this folder has a question that can be asked yet. Each needs a prompt and options, one of them ticked, or a model answer."
           : "There is no quiz in this folder."
       }
-      after={(wrong) => (wrong ? `${wrong} ${wrong === 1 ? "question" : "questions"} went into Mistakes.` : "Nothing went into Mistakes.")}
+      after={(wrong) =>
+        wrong ? `${wrong} ${wrong === 1 ? "question" : "questions"} went into Mistakes.` : "Nothing went into Mistakes."
+      }
     />
   );
 }
@@ -1074,7 +1118,10 @@ function QuizApp({
   else
     body = (
       <QuizEditor text={file.text} onChange={file.change} target={target} onTargetShown={clearTarget}>
-        <span className="dag-quiz__status" data-dag-quiz-saving={file.state.status === "ready" && file.state.saving ? "" : undefined}>
+        <span
+          className="dag-quiz__status"
+          data-dag-quiz-saving={file.state.status === "ready" && file.state.saving ? "" : undefined}
+        >
           {file.state.status === "ready" && file.state.failed
             ? "Not saved yet. Trying again."
             : askableCount < quiz.questions.length
@@ -1087,7 +1134,13 @@ function QuizApp({
   return (
     <div className="dag-app dag-app--quiz" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
-        <Toolbar boardName={name} title={title} kind="quiz" onBoards={openBrowser} more={id ? exportRows(QUIZ_EXPORTS, exportQuiz) : []}>
+        <Toolbar
+          boardName={name}
+          title={title}
+          kind="quiz"
+          onBoards={openBrowser}
+          more={id ? exportRows(QUIZ_EXPORTS, exportQuiz) : []}
+        >
           <Backlinks id={id} />
           {file.state.status === "ready" ? (
             running ? (
@@ -1101,7 +1154,11 @@ function QuizApp({
                 className="dag-toolbar__practice"
                 data-dag-quiz-practice=""
                 disabled={askableCount === 0}
-                title={askableCount === 0 ? "Add a question with a prompt and a correct option first" : "Answer the questions, one at a time"}
+                title={
+                  askableCount === 0
+                    ? "Add a question with a prompt and a correct option first"
+                    : "Answer the questions, one at a time"
+                }
                 onClick={() => void practise()}
               >
                 <Play size={14} strokeWidth={2} aria-hidden="true" />
@@ -1223,7 +1280,16 @@ function TableApp({
   const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open, table: name });
   const onTab = useCallback((tab: string | null) => setQuery("tab", tab), [setQuery]);
   return (
-    <TablePage key={name} name={name} list={list} tab={query.get("tab")} onTab={onTab} onBrowse={openBrowser} onOpenTables={openBrowser} snapshot={snapshot}>
+    <TablePage
+      key={name}
+      name={name}
+      list={list}
+      tab={query.get("tab")}
+      onTab={onTab}
+      onBrowse={openBrowser}
+      onOpenTables={openBrowser}
+      snapshot={snapshot}
+    >
       {cards}
     </TablePage>
   );
@@ -1306,7 +1372,14 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
    * this page; hand the page back to whoever asked, for `dag:export` below.
    */
   const noteHandle = useRef<NoteHandle | null>(null);
-  const [printing, setPrinting] = useState<{ title?: string; task?: Task; project?: Project; event?: NoteEvent; body: string; ready(): void } | null>(null);
+  const [printing, setPrinting] = useState<{
+    title?: string;
+    task?: Task;
+    project?: Project;
+    event?: NoteEvent;
+    body: string;
+    ready(): void;
+  } | null>(null);
   const noteText = useCallback(async () => {
     const text = await noteHandle.current?.text();
     if (text == null) throw new Error("the note has not loaded yet");
@@ -1352,7 +1425,14 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
       noteText().then(
         (text) => {
           const { title: heading, body } = splitNote(text);
-          setPrinting({ title: heading, task: taskOf(text), project: projectOf(text), event: eventOf(text), body, ready: () => reply(heading ?? leaf(name)) });
+          setPrinting({
+            title: heading,
+            task: taskOf(text),
+            project: projectOf(text),
+            event: eventOf(text),
+            body,
+            ready: () => reply(heading ?? leaf(name)),
+          });
         },
         (why: unknown) => fail?.(why instanceof Error ? why.message : String(why)),
       );
@@ -1414,13 +1494,40 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
                   /* And the way back from each: a row in the properties list said *Not a task* in
                      the colour of a value, beside the values. */
                   ...(task
-                    ? [writes({ key: "untask", label: "Not a task", icon: CircleSlash, hook: "data-dag-taskbar-untask", split: true, onSelect: () => noteHandle.current?.task({ status: null, due: null, start: null }) })]
+                    ? [
+                        writes({
+                          key: "untask",
+                          label: "Not a task",
+                          icon: CircleSlash,
+                          hook: "data-dag-taskbar-untask",
+                          split: true,
+                          onSelect: () => noteHandle.current?.task({ status: null, due: null, start: null }),
+                        }),
+                      ]
                     : []),
                   ...(event
-                    ? [writes({ key: "unevent", label: "Not an event", icon: CalendarX2, hook: "data-dag-eventbar-unevent", split: true, onSelect: () => noteHandle.current?.event({ start: null, end: null }) })]
+                    ? [
+                        writes({
+                          key: "unevent",
+                          label: "Not an event",
+                          icon: CalendarX2,
+                          hook: "data-dag-eventbar-unevent",
+                          split: true,
+                          onSelect: () => noteHandle.current?.event({ start: null, end: null }),
+                        }),
+                      ]
                     : []),
                   ...(project
-                    ? [writes({ key: "unproject", label: "Not a project", icon: CircleSlash, hook: "data-dag-projectbar-unproject", split: true, onSelect: () => noteHandle.current?.project({ project: null, hue: null }) })]
+                    ? [
+                        writes({
+                          key: "unproject",
+                          label: "Not a project",
+                          icon: CircleSlash,
+                          hook: "data-dag-projectbar-unproject",
+                          split: true,
+                          onSelect: () => noteHandle.current?.project({ project: null, hue: null }),
+                        }),
+                      ]
                     : []),
                   ...exportRows(NOTE_EXPORTS, exportNote),
                 ]
@@ -1587,7 +1694,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      trip where the query has moved on and `board` is still the previous file. Falling back to the
      first page is what both of those want, and it is what the tabs already draw as selected. */
   const asked = query.get("page");
-  const page = asked && board?.pages.some((p) => p.id === asked) ? asked : board?.pages[0]?.id ?? "page-1";
+  const page = asked && board?.pages.some((p) => p.id === asked) ? asked : (board?.pages[0]?.id ?? "page-1");
   const viewport = useRef<ViewportHandle>(null);
   const body = useRef<HTMLDivElement>(null);
 
@@ -1595,10 +1702,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      `src/view/drawing.ts`, which the read-only view shares. */
   const { sizes, nodeBoxes, onMeasure } = useMeasures();
 
-  const laidOut = useMemo(
-    () => (board ? placeItems(board, page, sizes) : new Map()),
-    [board, page, sizes],
-  );
+  const laidOut = useMemo(() => (board ? placeItems(board, page, sizes) : new Map()), [board, page, sizes]);
 
   /* Selection, gestures, the clipboard, undo: everything a person does to the items. `places` is
      the flow's answer with the gesture in progress on top, until the file agrees. */
@@ -1648,7 +1752,8 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
       const card = async (f: { kind: FileKind; name: string }): Promise<Component | null> => {
         const id = known.ids[f.name];
         if (!id || (f.kind === "board" && f.name === boardName)) return null;
-        if (f.kind !== "file") return noteCard({ id, name: f.name, title: known.titles[f.name], task: known.tasks[f.name], kind: f.kind });
+        if (f.kind !== "file")
+          return noteCard({ id, name: f.name, title: known.titles[f.name], task: known.tasks[f.name], kind: f.kind });
         const land = (w?: number) => fileCard({ id, name: f.name, title: known.titles[f.name] }, w);
         if (!isPicture(f.name)) return land();
         const img = new Image();
@@ -1713,9 +1818,14 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         .rewrite(ids, text, cancel.signal)
         .then((out) => {
           if (cancel.signal.aborted) return;
-          if (out.reason === "multi") return setRefusal({ message: "A rewrite takes one diagram at a time. Select just the one to change." });
-          if (out.reason === "not-diagram") return setRefusal({ message: "This item has no diagram DSL to rewrite: notes, images and links are not diagrams." });
-          if (out.reason === "missing") return setRefusal({ message: "That item is gone. It was deleted, or the board changed while the model was thinking." });
+          if (out.reason === "multi")
+            return setRefusal({ message: "A rewrite takes one diagram at a time. Select just the one to change." });
+          if (out.reason === "not-diagram")
+            return setRefusal({ message: "This item has no diagram DSL to rewrite: notes, images and links are not diagrams." });
+          if (out.reason === "missing")
+            return setRefusal({
+              message: "That item is gone. It was deleted, or the board changed while the model was thinking.",
+            });
           if (!out.ok || !out.draft) {
             return setRefusal({
               message: out.error ?? "The model's answer still has problems.",
@@ -1972,7 +2082,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const onPrompt = () => editor.add("prompt", viewport.current?.center());
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
-  const editingItem = editing && !snapshot && !locked ? board?.items.find((it) => it.id === editing) ?? null : null;
+  const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
 
   /*
    * Everything wrong with the board, for the dock at the bottom and the panel beside it.
@@ -1983,7 +2093,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
    * the agent reads the same answer from `/__board/diagnostics`, which asks `diagnoseBoard` too.
    */
   const problems = useMemo(() => (board && !snapshot ? listProblems(board) : []), [board, snapshot]);
-  const { problems: { show: problemsShow }, export: { scale: exportScale } } = useSettings();
+  const {
+    problems: { show: problemsShow },
+    export: { scale: exportScale },
+  } = useSettings();
   const editingProblems = useMemo(
     () => (editingItem ? problems.filter((p) => p.item === editingItem.id) : []),
     [problems, editingItem],
@@ -2116,7 +2229,15 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                   /* A one-page board draws no tab strip, so a second page is made from here; once
                      there are two, the strip's own `+` does it. */
                   ...(board.pages.length === 1 && editor.enabled && !locked
-                    ? [{ key: "add-page", label: "Add a page", icon: FilePlus2, hook: "data-dag-page-add", onSelect: () => editor.pages.add() }]
+                    ? [
+                        {
+                          key: "add-page",
+                          label: "Add a page",
+                          icon: FilePlus2,
+                          hook: "data-dag-page-add",
+                          onSelect: () => editor.pages.add(),
+                        },
+                      ]
                     : []),
                   ...exportRows(boardExports(exportScale), async (kind) => {
                     await editor.exportAs(kind);
@@ -2140,7 +2261,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         </Toolbar>
       )}
       <div className="dag-body" ref={body}>
-
         <Viewport
           content={bounds}
           handleRef={viewport}
@@ -2393,19 +2513,23 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             /* The sidebar's own way to begin a file — made, opened, and named where it is drawn —
                so the welcome card and New board are one gesture rather than two that drift. */
             onCreate={() =>
-              locked ? refuseLocked() : sidebar ? sidebar.create("board") : void createBoard("untitled", blankBoardText()).then((made) => made && openBoard(made))
+              locked
+                ? refuseLocked()
+                : sidebar
+                  ? sidebar.create("board")
+                  : void createBoard("untitled", blankBoardText()).then((made) => made && openBoard(made))
             }
             onWrite={() =>
               locked
                 ? refuseLocked()
                 : sidebar
-                ? sidebar.create("note")
-                : void createNote("untitled", blankNoteText()).then((made) => {
-                    if (!made) return;
-                    /* Named in its own title, as one made from the sidebar is. */
-                    nameWhenOpened(made);
-                    openNote(made);
-                  })
+                  ? sidebar.create("note")
+                  : void createNote("untitled", blankNoteText()).then((made) => {
+                      if (!made) return;
+                      /* Named in its own title, as one made from the sidebar is. */
+                      nameWhenOpened(made);
+                      openNote(made);
+                    })
             }
             onOpen={openBrowser}
           />
@@ -2434,7 +2558,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             problems={editingProblems}
           />
         ) : null}
-        {library && board && !snapshot && !locked ? <Library editor={editor} saved={savedComponents} onClose={() => showLibrary(false)} /> : null}
+        {library && board && !snapshot && !locked ? (
+          <Library editor={editor} saved={savedComponents} onClose={() => showLibrary(false)} />
+        ) : null}
       </div>
 
       {/* Under the whole body — the board list and the inspector included — the way a spreadsheet

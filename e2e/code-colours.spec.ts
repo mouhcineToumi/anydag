@@ -54,7 +54,9 @@ async function ready(page: Page, url: string) {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
-test("a note read-only colours each block by its language and counts what Python cannot read", async ({ page }) => {
+test("a note read-only colours each block by its language and counts what Python cannot read", { tag: "@smoke" }, async ({
+  page,
+}) => {
   await ready(page, `/?note=${note}&view=1`);
   const blocks = page.locator(".dag-code");
   await expect(blocks).toHaveCount(3);
@@ -77,7 +79,9 @@ test("in the editor a fix typed into the block takes the error away, and the fil
   await expect(blocks).toHaveCount(3);
   const broken = blocks.nth(1);
   await expect(broken.locator("[data-dag-code-error]").first()).toBeVisible();
-  await expect.poll(() => broken.evaluate((b) => getComputedStyle(b).getPropertyValue("--code-problems"))).toBe('"1 syntax error"');
+  await expect
+    .poll(() => broken.evaluate((b) => getComputedStyle(b).getPropertyValue("--code-problems")))
+    .toBe('"1 syntax error"');
 
   /* The caret onto the line missing its colon, at its end. */
   const box = (await broken.locator("code").boundingBox())!;

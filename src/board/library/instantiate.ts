@@ -117,8 +117,7 @@ export function instantiate(bp: Blueprint, find: Find, existing = "", props: Rec
 
   const fill = (text: string, node: Node): string =>
     text.replace(HOLE, (whole, optional: string, name: string) => {
-      const value =
-        name === "self" ? node.id : name === "parent" ? node.parentId : (node.props[name] ?? scope.get(name));
+      const value = name === "self" ? node.id : name === "parent" ? node.parentId : (node.props[name] ?? scope.get(name));
       if (value === undefined) return whole;
       if (!optional) return value;
       return value ? ` ${value}` : "";

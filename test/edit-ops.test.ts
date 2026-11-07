@@ -64,7 +64,9 @@ describe("locateItems", () => {
 
   it("spans exactly the block, fences included", () => {
     const infra = locateItems(BOARD, isItemType).items.find((it) => it.id === "infra")!;
-    expect(BOARD.slice(infra.start, infra.end)).toBe('```arch {#infra x=40 y=80 title="What runs where"}\nservice api "API"\n```');
+    expect(BOARD.slice(infra.start, infra.end)).toBe(
+      '```arch {#infra x=40 y=80 title="What runs where"}\nservice api "API"\n```',
+    );
     const prose = locateItems(BOARD, isItemType).items.find((it) => it.id === "md-3")!;
     expect(BOARD.slice(prose.start, prose.end)).toBe("A closing paragraph.");
   });
@@ -88,7 +90,9 @@ describe("applyPatch — body", () => {
     const out = applyPatch(BOARD, [{ id: "infra", body: 'service api "API"\nstore db "DB"\napi --> db' }]);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.text).toContain('```arch {#infra x=40 y=80 title="What runs where"}\nservice api "API"\nstore db "DB"\napi --> db\n```');
+    expect(out.text).toContain(
+      '```arch {#infra x=40 y=80 title="What runs where"}\nservice api "API"\nstore db "DB"\napi --> db\n```',
+    );
     expect(out.text.split("\n").length).toBe(BOARD.split("\n").length + 2);
     expect(parseBoard("t", out.text).items.map((it) => it.id)).toEqual(["md-1", "intro", "infra", "md-2", "md-3"]);
   });
@@ -206,7 +210,10 @@ infra --> task hue=teal
 \`\`\`
 `;
   const removed = (ids: string[]) => {
-    const out = applyPatch(LINKED, ids.map((id) => ({ id, remove: true as const })));
+    const out = applyPatch(
+      LINKED,
+      ids.map((id) => ({ id, remove: true as const })),
+    );
     expect(out.ok).toBe(true);
     return out.ok ? out.text : "";
   };
@@ -271,7 +278,11 @@ describe("applyPatch — insert", () => {
     ]);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(parseBoard("t", out.text).items.slice(-3).map((it) => it.id)).toEqual(["a", "b", "c"]);
+    expect(
+      parseBoard("t", out.text)
+        .items.slice(-3)
+        .map((it) => it.id),
+    ).toEqual(["a", "b", "c"]);
   });
 
   it("appends to an empty file", () => {
@@ -354,11 +365,9 @@ describe("applyPatch — z-order (MoveOp)", () => {
   });
 
   it("only reorders within the mover's own page", () => {
-    const text = [
-      "```md {#a x=0 y=0}\nA\n```",
-      "```md {#b x=0 y=0 page=page-2}\nB\n```",
-      "```md {#c x=0 y=0}\nC\n```",
-    ].join("\n\n");
+    const text = ["```md {#a x=0 y=0}\nA\n```", "```md {#b x=0 y=0 page=page-2}\nB\n```", "```md {#c x=0 y=0}\nC\n```"].join(
+      "\n\n",
+    );
     const out = applyPatch(text, [{ id: "a", move: "front" }]);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
@@ -376,11 +385,7 @@ describe("applyPatch — z-order (MoveOp)", () => {
   });
 
   it("carries several moves and a page all at once, one commit's worth", () => {
-    const out = applyPatch(BOARD, [
-      { id: "intro", move: "front" },
-      { id: "md-1", move: "back" },
-      { meta: { title: "Renamed" } },
-    ]);
+    const out = applyPatch(BOARD, [{ id: "intro", move: "front" }, { id: "md-1", move: "back" }, { meta: { title: "Renamed" } }]);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     const board = parseBoard("t", out.text);
@@ -394,7 +399,10 @@ describe("groups on the fence line", () => {
     const text = "```md {#a x=0 y=0 group=g1}\nA\n```\n\n```md {#b group=g1}\nB\n```\n";
     const board = parseBoard("t", text);
     expect(board.items.map((it) => it.group)).toEqual(["g1", "g1"]);
-    const out = applyPatch(text, [{ id: "a", attrs: { x: 8, y: 8 } }, { id: "b", attrs: { group: null } }]);
+    const out = applyPatch(text, [
+      { id: "a", attrs: { x: 8, y: 8 } },
+      { id: "b", attrs: { group: null } },
+    ]);
     expect(out.ok && out.text).toBe("```md {#a x=8 y=8 group=g1}\nA\n```\n\n```md {#b}\nB\n```\n");
   });
 });

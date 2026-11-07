@@ -37,7 +37,15 @@ interface Meta {
 /** The frontmatter a saved component carries, so the panel has something to show. */
 export function componentFrontmatter(title: string, description: string, icon: string): string {
   const quote = (s: string) => JSON.stringify(s);
-  return ["---", `title: ${quote(title)}`, "component:", `  description: ${quote(description)}`, `  icon: ${icon}`, "---", ""].join("\n");
+  return [
+    "---",
+    `title: ${quote(title)}`,
+    "component:",
+    `  description: ${quote(description)}`,
+    `  icon: ${icon}`,
+    "---",
+    "",
+  ].join("\n");
 }
 
 export function toBlueprint(saved: SavedComponent): Blueprint {

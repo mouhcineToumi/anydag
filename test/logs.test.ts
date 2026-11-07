@@ -47,7 +47,9 @@ describe("scrub", () => {
   });
 
   it("keeps a message that names nothing as it is", () => {
-    expect(scrub("Cannot read properties of undefined (reading 'x')", 300)).toBe('Cannot read properties of undefined (reading "…")');
+    expect(scrub("Cannot read properties of undefined (reading 'x')", 300)).toBe(
+      'Cannot read properties of undefined (reading "…")',
+    );
     expect(scrub("the board changed underneath this edit", 300)).toBe("the board changed underneath this edit");
   });
 
@@ -81,10 +83,24 @@ describe("cleanEvent", () => {
     const e = cleanEvent({
       name: "error",
       at,
-      props: { where: "server", kind: "route", message: "no note `Diary`", stack: "at /home/x/y.ts:1:2", route: "POST /__board/patch" },
+      props: {
+        where: "server",
+        kind: "route",
+        message: "no note `Diary`",
+        stack: "at /home/x/y.ts:1:2",
+        route: "POST /__board/patch",
+      },
     });
-    expect(e?.props).toEqual({ where: "server", kind: "route", message: 'no note "…"', stack: "at y.ts:1:2", route: "POST /__board/patch" });
-    expect(cleanEvent({ name: "error", at, props: { where: "page", route: "GET /__board/get?name=Diary" } })?.props).toEqual({ where: "page" });
+    expect(e?.props).toEqual({
+      where: "server",
+      kind: "route",
+      message: 'no note "…"',
+      stack: "at y.ts:1:2",
+      route: "POST /__board/patch",
+    });
+    expect(cleanEvent({ name: "error", at, props: { where: "page", route: "GET /__board/get?name=Diary" } })?.props).toEqual({
+      where: "page",
+    });
   });
 
   it("rounds a duration", () => {
@@ -102,7 +118,11 @@ describe("cleanBatch", () => {
   });
 
   it("keeps a locale to a language and a region, and a hostname nowhere", () => {
-    const b = cleanBatch({ v: 1, env: { ...env, locale: "fr-FR.UTF-8@home", host: "mouhcine-laptop" }, events: [{ name: "feature.use", at, props: { what: "search" } }] });
+    const b = cleanBatch({
+      v: 1,
+      env: { ...env, locale: "fr-FR.UTF-8@home", host: "mouhcine-laptop" },
+      events: [{ name: "feature.use", at, props: { what: "search" } }],
+    });
     expect(b?.env).toEqual({ ...env, locale: "und" });
     expect(localeOf("fr_fr.UTF-8")).toBe("fr-FR");
   });
@@ -114,7 +134,11 @@ describe("the vocabulary", () => {
   });
 
   it("has no free-text prop but an error's message and stack", () => {
-    const text = Object.entries(EVENTS).flatMap(([name, props]) => Object.entries(props).filter(([, spec]) => spec === "text").map(([k]) => `${name}.${k}`));
+    const text = Object.entries(EVENTS).flatMap(([name, props]) =>
+      Object.entries(props)
+        .filter(([, spec]) => spec === "text")
+        .map(([k]) => `${name}.${k}`),
+    );
     expect(text).toEqual(["error.message", "error.stack"]);
   });
 });

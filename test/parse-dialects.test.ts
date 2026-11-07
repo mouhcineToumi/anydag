@@ -27,12 +27,18 @@ describe("every reference board parses clean", () => {
         if (!hasGraph(item.type)) {
           if (item.type === "chart") {
             const chart = parseChart(item.body);
-            expect(chart.diagnostics.filter((d) => d.severity === "error"), `${file} · ${item.id}`).toEqual([]);
+            expect(
+              chart.diagnostics.filter((d) => d.severity === "error"),
+              `${file} · ${item.id}`,
+            ).toEqual([]);
             expect(chart.series.length + chart.slices.length).toBeGreaterThan(0);
             continue;
           }
           const seq = parseSequence(item.body);
-          expect(seq.diagnostics.filter((d) => d.severity === "error"), `${file} · ${item.id}`).toEqual([]);
+          expect(
+            seq.diagnostics.filter((d) => d.severity === "error"),
+            `${file} · ${item.id}`,
+          ).toEqual([]);
           expect(seq.participants.length).toBeGreaterThan(0);
           expect(seq.events.length).toBeGreaterThan(0);
           continue;
@@ -49,11 +55,14 @@ describe("every reference board parses clean", () => {
 });
 
 describe("erd", () => {
-  const g = parseDiagram("erd", `
+  const g = parseDiagram(
+    "erd",
+    `
 group t "Tenancy" hue=indigo { entity workspace { id uuid pk; slug text; +4 } }
 group i "Intake" hue=coral { entity candidate { id uuid pk; workspace_id fk=t; anon_ref int } }
 workspace ||--o{ i "workspace_id" quiet
-`)!;
+`,
+  )!;
 
   it("reads pk, typed columns and the elision row", () => {
     const rows = g.nodes.find((n) => n.id === "workspace")!.rows;
@@ -78,7 +87,9 @@ workspace ||--o{ i "workspace_id" quiet
 });
 
 describe("state", () => {
-  const g = parseDiagram("state", `
+  const g = parseDiagram(
+    "state",
+    `
 state new "New" "stage = \\"new\\""
 state hired "Hired" "stage = \\"hired\\"" done
 [*] --> new
@@ -86,7 +97,8 @@ new --> new "retry"
 new & hired --> gone "leave" quiet
 state gone "Gone" muted
 gone --> [*]
-`)!;
+`,
+  )!;
 
   it("makes a pseudostate per occurrence, not per diagram", () => {
     expect(g.nodes.filter((n) => n.kind === "start")).toHaveLength(1);
@@ -105,11 +117,14 @@ gone --> [*]
 });
 
 describe("class", () => {
-  const g = parseDiagram("class", `
+  const g = parseDiagram(
+    "class",
+    `
 class A { -store: DocumentStore; +ingest(upload) Candidate }
 interface B { +extract(doc) list[Page] }
 A ..|> B
-`)!;
+`,
+  )!;
 
   it("splits attributes from methods", () => {
     const a = g.nodes.find((n) => n.id === "A")!;
@@ -126,11 +141,14 @@ A ..|> B
 });
 
 describe("c4", () => {
-  const g = parseDiagram("c4", `
+  const g = parseDiagram(
+    "c4",
+    `
 person p "Learner" "Studies for a certification."
 system s "Larkspur" "software system" { container api "API" "FastAPI" "Serves everything." }
 p --> api "Uses" "HTTPS"
-`)!;
+`,
+  )!;
 
   it("moves a person's second string to the description", () => {
     const p = g.nodes.find((n) => n.id === "p")!;
@@ -149,23 +167,29 @@ p --> api "Uses" "HTTPS"
 });
 
 describe("usecase", () => {
-  const g = parseDiagram("usecase", `
+  const g = parseDiagram(
+    "usecase",
+    `
 actor r "Recruiter"
 system s "HunterOS" { usecase UC-01 "Upload a CV" }
 r --- UC-01
-`)!;
+`,
+  )!;
   it("draws an association with no arrowhead at either end", () => {
     expect([g.edges[0]!.head, g.edges[0]!.tail]).toEqual(["none", "none"]);
   });
 });
 
 describe("mindmap", () => {
-  const g = parseDiagram("mindmap", `
+  const g = parseDiagram(
+    "mindmap",
+    `
 root AnyDag
   Structure
     Data model
   Behaviour
-`)!;
+`,
+  )!;
   it("builds a tree from indentation", () => {
     expect(g.nodes.map((n) => n.title)).toEqual(["AnyDag", "Structure", "Data model", "Behaviour"]);
     expect(g.edges).toHaveLength(3);

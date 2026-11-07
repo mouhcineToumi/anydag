@@ -142,11 +142,7 @@ describe("detach", () => {
   service api "The API"
 }`;
     const g = clean("arch", body);
-    const out = detach(
-      g,
-      laid({ api: { x: 116, y: 148, w: 160, h: 64 } }, { gcp: { x: 100, y: 100, w: 200, h: 160 } }),
-      body,
-    );
+    const out = detach(g, laid({ api: { x: 116, y: 148, w: 160, h: 64 } }, { gcp: { x: 100, y: 100, w: 200, h: 160 } }), body);
     expect(out).toContain('group gcp "Google Cloud" x=100 y=100 w=200 h=160 {');
     expect(out).toContain('  service api "The API" x=16 y=48');
     clean("arch", out);
@@ -297,7 +293,10 @@ box b "Two" x=400 w=240`);
     const g = clean("sketch", body);
     const out = scaleFixed(
       g,
-      laid({ a: { x: 156, y: 156, w: 80, h: 32 } }, { outer: { x: 100, y: 100, w: 400, h: 300 }, inner: { x: 140, y: 140, w: 200, h: 120 } }),
+      laid(
+        { a: { x: 156, y: 156, w: 80, h: 32 } },
+        { outer: { x: 100, y: 100, w: 400, h: 300 }, inner: { x: 140, y: 140, w: 200, h: 120 } },
+      ),
       body,
       2,
       2,
@@ -315,14 +314,7 @@ box b "Wide" x=100 y=0 w=200 h=48`;
     const g = clean("sketch", body);
     /* 0.25 would take the smallest shape to 4px, under one grid step: the factor rises to what
        keeps it at 8, and both boxes come down by that same factor — an even drawing stays even. */
-    const out = scaleFixed(
-      g,
-      laid({ a: { x: 0, y: 0, w: 16, h: 16 }, b: { x: 100, y: 0, w: 200, h: 48 } }),
-      body,
-      0.25,
-      0.25,
-      8,
-    );
+    const out = scaleFixed(g, laid({ a: { x: 0, y: 0, w: 16, h: 16 }, b: { x: 100, y: 0, w: 200, h: 48 } }), body, 0.25, 0.25, 8);
     expect(out).toBe(`box a "Small" x=0 y=0 w=8 h=8
 box b "Wide" x=50 y=0 w=100 h=24`);
     clean("sketch", out);
@@ -353,7 +345,7 @@ describe("soleCard", () => {
     expect(soleCard(item("sketch", 'cylinder c "Database" w=200 h=184'))).toBe(true);
     expect(soleCard(item("arch", 'service svc1 "Service" "what runs it" icon=server'))).toBe(true);
     expect(soleCard(item("sequence", "participant a"))).toBe(true);
-    expect(soleCard(item("chart", "bar\nx Q1 Q2\nseries web \"Web\" 1 2"))).toBe(true);
+    expect(soleCard(item("chart", 'bar\nx Q1 Q2\nseries web "Web" 1 2'))).toBe(true);
   });
 
   it("is false for anything a drop could say something about", () => {
@@ -432,7 +424,11 @@ describe("pinUnplaced", () => {
   it("writes the drawn coordinate on every line that has none, and touches nothing else", () => {
     const body = 'cylinder c "Database" w=200 h=184\nbox b "B" x=400 y=0';
     const graph = parseDiagram("sketch", body)!;
-    const laid: LaidOut = { nodes: { c: { x: 0, y: 72, w: 200, h: 184 }, b: { x: 400, y: 0, w: 80, h: 40 } }, groups: {}, origin: { x: 0, y: 0 } };
+    const laid: LaidOut = {
+      nodes: { c: { x: 0, y: 72, w: 200, h: 184 }, b: { x: 400, y: 0, w: 80, h: 40 } },
+      groups: {},
+      origin: { x: 0, y: 0 },
+    };
     const next = pinUnplaced(graph, laid, body);
     expect(next.split("\n")[0]).toBe('cylinder c "Database" w=200 h=184 x=0 y=72');
     expect(next.split("\n")[1]).toBe(body.split("\n")[1]);

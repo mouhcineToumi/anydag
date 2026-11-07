@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { UsageError, pairs, parseArgs, point, type FlagSpec } from "../cli/args";
+import { UsageError, pairs, parseArgs, type FlagSpec } from "../cli/args";
 
 const SPECS: FlagSpec[] = [
   { name: "at", type: "string", help: "where" },
@@ -47,10 +47,5 @@ describe("key=value, the way a fence line writes it", () => {
 
   it("refuses a pair with no key", () => {
     expect(() => pairs(["=3"])).toThrow(UsageError);
-  });
-
-  it("reads a point, and nothing that is not one", () => {
-    expect(point("-40, 80.4")).toEqual({ x: -40, y: 80 });
-    expect(() => point("40")).toThrow(/x,y/);
   });
 });

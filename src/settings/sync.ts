@@ -29,7 +29,7 @@ import { EVENT, STORE, normalise, readSettings } from "./store";
 async function fetchSettings(): Promise<Record<string, unknown> | null> {
   const response = await fetch("/api/settings");
   if (!response.ok) throw new Error(`settings ${response.status}`);
-  return (((await response.json()) as { settings?: Record<string, unknown> | null }).settings ?? null);
+  return ((await response.json()) as { settings?: Record<string, unknown> | null }).settings ?? null;
 }
 
 async function saveSettings(settings: Record<string, unknown>): Promise<void> {

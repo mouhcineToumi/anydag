@@ -6,7 +6,7 @@
  * Load-bearing:
  * - **Nothing is stubbed**: the routes are tested through the same `Meta` adapter the server ships,
  *   so a stub cannot agree with a route about a shape the database never returns (the rule
- *   CLAUDE.md states about the hosted api's stubs).
+ *   docs/architecture/things-that-will-bite.md states about the hosted api's stubs).
  * - **The Postgres backend is skipped with a word when no server is named**, and when one is, every
  *   run gets a fresh schema (`search_path` through `pgDb`'s `schema`), dropped at the end, so runs
  *   never see each other's rows.
@@ -68,7 +68,12 @@ async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<v
 
 export async function harness(backend: Backend = "pglite", env: Record<string, string> = {}): Promise<Harness> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-sync-test-"));
-  const config = configFrom({ ANYDAG_SYNC_DATA: root, ANYDAG_SYNC_ADMIN_TOKEN: ADMIN, ANYDAG_SYNC_PUBLIC_URL: "http://sync.test", ...env });
+  const config = configFrom({
+    ANYDAG_SYNC_DATA: root,
+    ANYDAG_SYNC_ADMIN_TOKEN: ADMIN,
+    ANYDAG_SYNC_PUBLIC_URL: "http://sync.test",
+    ...env,
+  });
   const { db, drop } = await openDb(backend);
   const meta = new PgMeta(db);
   await meta.migrate();

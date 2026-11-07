@@ -1,0 +1,202 @@
+# The nightly: `develop`, built and published every night as a GitHub pre-release.
+#
+#   1. **prepare** — skipped when nothing is new: the newest `nightly/*` branch's commit already has
+#      `develop`'s head as its parent. Otherwise it stamps a version into a commit of its own,
+#      `X.Y.Z-nightly.YYYYMMDDHHmm` (`X.Y.Z` is `develop`'s `VERSION`, the next release; the stamp is
+#      one number so that semver accepts it before 10:00 and the clock orders it), and pushes
+#      the branch `nightly/<version>` and the tag `v<version>` at that commit. **Each nightly gets its
+#      own branch, and nothing here ever deletes one.** `develop` itself is never touched.
+#   2. **checks, e2e, desktop** — everything, against that tag: the fast tier and the sync server's
+#      suites, the full Playwright run (`e2e.yml`), and the desktop app on all three systems.
+#   3. **publish** — a pre-release with every installer and the nightly update files
+#      (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`), and only if every one is there.
+#
+# **Why this publishes itself.** A push made with `GITHUB_TOKEN` starts no other workflow, so the tag
+# below does not start `release.yml` — which would refuse it anyway, because a nightly is not a release.
+#
+# **Who gets it.** The update channel is the version's own word (`nightly`): a build installed from
+# one asks for `nightly*.yml` and follows nightlies, and a stable or beta build never sees a nightly,
+# because a pre-release is not GitHub's "latest" and a beta only follows `beta`. `desktop/main.ts` says how.
+#
+# `e2e.yml` runs at this workflow's own commit, `develop`'s head — the stamped commit's parent, and the
+# same code but for three version lines.
+#
+# Needs: Actions allowed to write to the repository, branches matching `nightly/*` and tags `v*-nightly.*`
+# open to `github-actions[bot]` in any ruleset; the signing secrets are optional (`release.yml`).
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Build even though develop has not moved since the last nightly."
+        type: boolean
+        default: false
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+      version: ${{ steps.stamp.outputs.version }}
+      tag: ${{ steps.stamp.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Is there anything new?
+        id: decide
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          head=$(git rev-parse HEAD)
+          # The newest nightly by its stamp (`…-nightly.<YYYYMMDDHHmm>`), not by name: `0.10.0` sorts
+          # before `0.9.0`.
+          newest=$(git ls-remote --heads origin 'refs/heads/nightly/*' \
+            | while read -r _ ref; do b=${ref#refs/heads/}; s=${b##*-nightly.}; case "$s" in ''|*[!0-9]*) continue ;; esac; echo "$s $b"; done \
+            | sort -n | tail -n 1 | cut -d' ' -f2)
+          if [ -z "$newest" ]; then
+            echo "No nightly yet."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --quiet --depth=2 origin "refs/heads/$newest:refs/remotes/origin/$newest"
+          parent=$(git rev-parse "origin/$newest^")
+          if [ "$parent" = "$head" ] && [ "$FORCE" != "true" ]; then
+            echo "::notice::develop is at $head, which $newest was already built from — nothing new."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "develop is at $head; $newest was built from $parent."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Stamp the version, push the branch and the tag
+        id: stamp
+        if: steps.decide.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          core=$(tr -d '[:space:]' < VERSION)
+          core=${core%%-*}
+          stamp=$(date -u +%Y%m%d%H%M)
+          version="$core-nightly.$stamp"
+          git switch -c "nightly/$version"
+          node scripts/set-version.mjs "$version"
+          node scripts/check-version.mjs "v$version"
+          git add VERSION package.json package-lock.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "chore(release): nightly $version"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            tag -a "v$version" -m "AnyDag nightly $stamp"
+          git push origin "nightly/$version"
+          git push origin "refs/tags/v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Pushed nightly/$version and v$version at $(git rev-parse HEAD)."
+
+  checks:
+    name: checks
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.prepare.outputs.tag }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      sync: true
+
+  e2e:
+    name: e2e
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    uses: ./.github/workflows/e2e.yml
+    permissions:
+      contents: read
+    with:
+      scope: full
+
+  desktop:
+    name: desktop
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    uses: ./.github/workflows/desktop-build.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.prepare.outputs.tag }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      sign: true
+      artifact: nightly
+      retention-days: 14
+    secrets: inherit
+
+  publish:
+    name: publish
+    needs: [prepare, checks, e2e, desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      # Keep this under ten. electron-updater reads GitHub's releases feed, which lists the ten
+      # newest releases, and a beta build finds its next version there: ten nightlies in a row
+      # would push the last beta and the last stable out of it. Only the releases are deleted — the
+      # branches and the tags stay.
+      NIGHTLY_KEEP: "7"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          pattern: nightly-*
+          merge-multiple: true
+      - name: Every installer and every updater file is there
+        run: |
+          ls -la out
+          node scripts/check-release-assets.mjs out "$VERSION"
+      - name: Create the pre-release
+        run: |
+          # Notes: what was merged since the previous nightly.
+          prev=$(git tag --list 'v*-nightly.*' | while read -r t; do echo "${t##*-nightly.} $t"; done | sort -n | awk -v self="$TAG" '$2 != self {t=$2} END {print t}')
+          notes=()
+          [ -n "$prev" ] && notes=(--notes-start-tag "$prev")
+          gh release create "$TAG" out/* \
+            --repo "${{ github.repository }}" \
+            --title "AnyDag nightly ${VERSION##*-nightly.}" \
+            --generate-notes "${notes[@]}" \
+            --verify-tag \
+            --prerelease \
+            --latest=false
+      - name: Prune old nightlies
+        run: |
+          gh release list --repo "${{ github.repository }}" --limit 200 --json tagName --jq '.[].tagName' \
+            | grep -- '-nightly\.' \
+            | while read -r t; do echo "${t##*-nightly.} $t"; done \
+            | sort -rn | tail -n +"$((NIGHTLY_KEEP + 1))" | cut -d' ' -f2 \
+            | while read -r t; do
+                echo "Deleting the release of $t (its tag and branch stay)"
+                gh release delete "$t" --repo "${{ github.repository }}" --yes
+              done

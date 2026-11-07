@@ -30,28 +30,170 @@ import {
  * *made up* are shapes neither stream produced: a failed `result`, and a tool call still running.
  */
 
-const INIT = { type: "system", subtype: "init", session_id: "53901487-be01-4a2e-8bd4-b73691ca3143", mcp_servers: [{ name: "anydag", status: "connected", source: "dynamic" }], model: "claude-opus-5-5" };
-const TEXT_DELTA = { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "The vault has two notes." } }, session_id: "53901487-be01-4a2e-8bd4-b73691ca3143", parent_tool_use_id: null };
-const JSON_DELTA = { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"name": "Meeting-' } }, parent_tool_use_id: null };
-const ASSISTANT_TOOL = { type: "assistant", message: { model: "claude-opus-5-5", id: "msg_011CgnVS6Jhhc5dbmYgMrgWi", role: "assistant", content: [{ type: "tool_use", id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1", name: "mcp__anydag__note_read", input: { name: "Meeting-notes" }, caller: { type: "direct" } }] }, parent_tool_use_id: null };
-const USER_RESULT = { type: "user", message: { role: "user", content: [{ tool_use_id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1", type: "tool_result", content: [{ type: "text", text: '{\n  "name": "Meeting-notes",\n  "id": "dm4rzbqm0g"' }] }] } };
-const USER_STRING_ERR = { type: "user", message: { role: "user", content: [{ type: "tool_result", content: "Connection closed", is_error: true, tool_use_id: "toolu_01MXC25TRtHrjt2RFJZrdRs9" }] } };
-const ASSISTANT_TEXT = { type: "assistant", message: { content: [{ type: "text", text: "The vault has two notes. Neither one is a task, project or event.\n\n1. **Meeting notes** (`Meeting-notes`)" }] } };
+const INIT = {
+  type: "system",
+  subtype: "init",
+  session_id: "53901487-be01-4a2e-8bd4-b73691ca3143",
+  mcp_servers: [{ name: "anydag", status: "connected", source: "dynamic" }],
+  model: "claude-opus-5-5",
+};
+const TEXT_DELTA = {
+  type: "stream_event",
+  event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "The vault has two notes." } },
+  session_id: "53901487-be01-4a2e-8bd4-b73691ca3143",
+  parent_tool_use_id: null,
+};
+const JSON_DELTA = {
+  type: "stream_event",
+  event: { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"name": "Meeting-' } },
+  parent_tool_use_id: null,
+};
+const ASSISTANT_TOOL = {
+  type: "assistant",
+  message: {
+    model: "claude-opus-5-5",
+    id: "msg_011CgnVS6Jhhc5dbmYgMrgWi",
+    role: "assistant",
+    content: [
+      {
+        type: "tool_use",
+        id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1",
+        name: "mcp__anydag__note_read",
+        input: { name: "Meeting-notes" },
+        caller: { type: "direct" },
+      },
+    ],
+  },
+  parent_tool_use_id: null,
+};
+const USER_RESULT = {
+  type: "user",
+  message: {
+    role: "user",
+    content: [
+      {
+        tool_use_id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1",
+        type: "tool_result",
+        content: [{ type: "text", text: '{\n  "name": "Meeting-notes",\n  "id": "dm4rzbqm0g"' }],
+      },
+    ],
+  },
+};
+const USER_STRING_ERR = {
+  type: "user",
+  message: {
+    role: "user",
+    content: [
+      { type: "tool_result", content: "Connection closed", is_error: true, tool_use_id: "toolu_01MXC25TRtHrjt2RFJZrdRs9" },
+    ],
+  },
+};
+const ASSISTANT_TEXT = {
+  type: "assistant",
+  message: {
+    content: [
+      {
+        type: "text",
+        text: "The vault has two notes. Neither one is a task, project or event.\n\n1. **Meeting notes** (`Meeting-notes`)",
+      },
+    ],
+  },
+};
 const ASSISTANT_THINKING = { type: "assistant", message: { content: [{ type: "thinking", thinking: "", signature: "x" }] } };
-const RESULT = { type: "result", subtype: "success", is_error: false, result: "The vault has two notes.", session_id: "53901487-be01-4a2e-8bd4-b73691ca3143", total_cost_usd: 0.2528235, usage: { input_tokens: 6, cache_creation_input_tokens: 29462, cache_read_input_tokens: 58188, output_tokens: 267 } };
+const RESULT = {
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  result: "The vault has two notes.",
+  session_id: "53901487-be01-4a2e-8bd4-b73691ca3143",
+  total_cost_usd: 0.2528235,
+  usage: { input_tokens: 6, cache_creation_input_tokens: 29462, cache_read_input_tokens: 58188, output_tokens: 267 },
+};
 /** Made up: the shape `is_error` has on a `result`, which no real stream held. */
-const RESULT_ERROR = { type: "result", subtype: "error_during_execution", is_error: true, result: "API Error: 529 overloaded", usage: { input_tokens: 2, output_tokens: 0 } };
+const RESULT_ERROR = {
+  type: "result",
+  subtype: "error_during_execution",
+  is_error: true,
+  result: "API Error: 529 overloaded",
+  usage: { input_tokens: 2, output_tokens: 0 },
+};
 
-const OC_STEP_START = { type: "step_start", timestamp: 1794005969217, sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD", part: { id: "prt_1b316a941001TJPONQAoTKVK5P", type: "step-start" } };
-const OC_TOOL = { type: "tool_use", timestamp: 1794005969442, sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD", part: { partID: "prt_1b316a9b1002pAZjCkoQRWNJtD", type: "tool", id: "chatcmpl-tool-86207df1a487d872", tool: "anydag_note_list", state: { status: "completed", input: {}, output: '{\n  "notes": [\n    "Meeting-notes"', time: { start: 1794005969329, end: 1794005969442 } } } };
-const OC_STEP_FINISH_TOOLS = { type: "step_finish", sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD", part: { type: "step-finish", reason: "tool-calls", cost: 0, tokens: { input: 19950, output: 8, reasoning: 11, cache: { read: 0, write: 0 } } } };
-const OC_TEXT = { type: "text", sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD", part: { id: "prt_1b316bfd7001HDM4tOCbEGi3ED_text-0", type: "text", text: 'Done — created the note **"Spike test OC"** with one paragraph.' } };
-const OC_STEP_FINISH_STOP = { type: "step_finish", sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD", part: { type: "step-finish", reason: "stop", cost: 0, tokens: { input: 1050, output: 69, reasoning: 0, cache: { read: 19584, write: 0 } } } };
+const OC_STEP_START = {
+  type: "step_start",
+  timestamp: 1794005969217,
+  sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD",
+  part: { id: "prt_1b316a941001TJPONQAoTKVK5P", type: "step-start" },
+};
+const OC_TOOL = {
+  type: "tool_use",
+  timestamp: 1794005969442,
+  sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD",
+  part: {
+    partID: "prt_1b316a9b1002pAZjCkoQRWNJtD",
+    type: "tool",
+    id: "chatcmpl-tool-86207df1a487d872",
+    tool: "anydag_note_list",
+    state: {
+      status: "completed",
+      input: {},
+      output: '{\n  "notes": [\n    "Meeting-notes"',
+      time: { start: 1794005969329, end: 1794005969442 },
+    },
+  },
+};
+const OC_STEP_FINISH_TOOLS = {
+  type: "step_finish",
+  sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD",
+  part: {
+    type: "step-finish",
+    reason: "tool-calls",
+    cost: 0,
+    tokens: { input: 19950, output: 8, reasoning: 11, cache: { read: 0, write: 0 } },
+  },
+};
+const OC_TEXT = {
+  type: "text",
+  sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD",
+  part: {
+    id: "prt_1b316bfd7001HDM4tOCbEGi3ED_text-0",
+    type: "text",
+    text: 'Done — created the note **"Spike test OC"** with one paragraph.',
+  },
+};
+const OC_STEP_FINISH_STOP = {
+  type: "step_finish",
+  sessionID: "ses_e4ce95bc4ffeIB1FWrHM56YMPD",
+  part: {
+    type: "step-finish",
+    reason: "stop",
+    cost: 0,
+    tokens: { input: 1050, output: 69, reasoning: 0, cache: { read: 19584, write: 0 } },
+  },
+};
 /** The model reached for `skill`, the one tool a run that started before the MCP server attached has. */
-const OC_SKILL = { type: "tool_use", sessionID: "ses_e4ce2ce47ffe2zTQoW41hLNLs0", part: { partID: "prt_1b31d4143001WIMsD1np7dJrQB", type: "tool", id: "chatcmpl-tool-877d9f995cc3d1a6", tool: "skill", state: { status: "error", input: { id: "slow_approve_and_write" }, error: "Unable to load skill slow_approve_and_write" } } };
-const OC_ERROR = { type: "error", timestamp: 1794006438629, sessionID: "ses_e4ce23b9fffewRHlnT42ZA4dO5", error: { type: "unknown", message: "Transport: ECONNRESET: The socket connection was closed unexpectedly." } };
+const OC_SKILL = {
+  type: "tool_use",
+  sessionID: "ses_e4ce2ce47ffe2zTQoW41hLNLs0",
+  part: {
+    partID: "prt_1b31d4143001WIMsD1np7dJrQB",
+    type: "tool",
+    id: "chatcmpl-tool-877d9f995cc3d1a6",
+    tool: "skill",
+    state: { status: "error", input: { id: "slow_approve_and_write" }, error: "Unable to load skill slow_approve_and_write" },
+  },
+};
+const OC_ERROR = {
+  type: "error",
+  timestamp: 1794006438629,
+  sessionID: "ses_e4ce23b9fffewRHlnT42ZA4dO5",
+  error: { type: "unknown", message: "Transport: ECONNRESET: The socket connection was closed unexpectedly." },
+};
 /** Made up: a call that has started and not finished, which 2.2.5 does not send. */
-const OC_RUNNING = { type: "tool_use", sessionID: "ses_x", part: { id: "t1", type: "tool", tool: "anydag_note_read", state: { status: "running", input: {} } } };
+const OC_RUNNING = {
+  type: "tool_use",
+  sessionID: "ses_x",
+  part: { id: "t1", type: "tool", tool: "anydag_note_read", state: { status: "running", input: {} } },
+};
 
 const line = (o: unknown) => JSON.stringify(o);
 const claudeEvents = (...ls: unknown[]) => {
@@ -75,7 +217,9 @@ describe("Claude Code's stream", () => {
 
   it("names a tool call once it is whole, without the server's prefix", () => {
     const { events, st } = claudeEvents(ASSISTANT_TOOL);
-    expect(events).toEqual([{ kind: "tool", id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1", name: "note_read", input: { name: "Meeting-notes" } }]);
+    expect(events).toEqual([
+      { kind: "tool", id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1", name: "note_read", input: { name: "Meeting-notes" } },
+    ]);
     expect(st.tools.has("toolu_01Tpc4G5y4nqmnQacJxnjuv1")).toBe(true);
     /* a message that repeats a block cannot call it twice */
     expect(parseClaudeLine(line(ASSISTANT_TOOL), st)).toEqual([]);
@@ -88,9 +232,16 @@ describe("Claude Code's stream", () => {
 
   it("reads a tool result as an array of parts or as a string, and carries is_error", () => {
     expect(claudeEvents(USER_RESULT).events).toEqual([
-      { kind: "result", id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1", output: '{\n  "name": "Meeting-notes",\n  "id": "dm4rzbqm0g"', error: false },
+      {
+        kind: "result",
+        id: "toolu_01Tpc4G5y4nqmnQacJxnjuv1",
+        output: '{\n  "name": "Meeting-notes",\n  "id": "dm4rzbqm0g"',
+        error: false,
+      },
     ]);
-    expect(claudeEvents(USER_STRING_ERR).events).toEqual([{ kind: "result", id: "toolu_01MXC25TRtHrjt2RFJZrdRs9", output: "Connection closed", error: true }]);
+    expect(claudeEvents(USER_STRING_ERR).events).toEqual([
+      { kind: "result", id: "toolu_01MXC25TRtHrjt2RFJZrdRs9", output: "Connection closed", error: true },
+    ]);
     expect(resultText([{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }])).toBe("ab");
   });
 
@@ -112,17 +263,41 @@ describe("Claude Code's stream", () => {
 });
 
 describe("Claude Code's flags", () => {
-  const base: RunOptions = { chat: "c", model: "claude-haiku-5-5", system: "s", prompt: "p", mcp: { command: "node", args: ["cli.mjs", "mcp", "--chat", "c"], env: { A: "1" } }, scratch: "/tmp/x" };
+  const base: RunOptions = {
+    chat: "c",
+    model: "claude-haiku-5-5",
+    system: "s",
+    prompt: "p",
+    mcp: { command: "node", args: ["cli.mjs", "mcp", "--chat", "c"], env: { A: "1" } },
+    scratch: "/tmp/x",
+  };
   const files = { system: "/tmp/x/system.md", mcp: "/tmp/x/mcp.json" };
 
   it("gives a new session the argv it is meant to run with", () => {
     expect(claudeRunArgs({ ...base, fresh: "uuid-1" }, files)).toEqual([
-      "-p", "--model", "claude-haiku-5-5", "--session-id", "uuid-1",
-      "--strict-mcp-config", "--mcp-config", "/tmp/x/mcp.json",
-      "--tools", "", "--allowedTools", "mcp__anydag__*",
-      "--setting-sources", "", "--disable-slash-commands",
-      "--system-prompt-file", "/tmp/x/system.md", "--system-prompt-snapshot", "off",
-      "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+      "-p",
+      "--model",
+      "claude-haiku-5-5",
+      "--session-id",
+      "uuid-1",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "/tmp/x/mcp.json",
+      "--tools",
+      "",
+      "--allowedTools",
+      "mcp__anydag__*",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--system-prompt-file",
+      "/tmp/x/system.md",
+      "--system-prompt-snapshot",
+      "off",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--include-partial-messages",
     ]);
   });
 
@@ -142,7 +317,9 @@ describe("Claude Code's flags", () => {
   });
 
   it("writes the one server in the shape --mcp-config reads", () => {
-    expect(claudeMcpConfig(base.mcp)).toEqual({ mcpServers: { anydag: { type: "stdio", command: "node", args: ["cli.mjs", "mcp", "--chat", "c"], env: { A: "1" } } } });
+    expect(claudeMcpConfig(base.mcp)).toEqual({
+      mcpServers: { anydag: { type: "stdio", command: "node", args: ["cli.mjs", "mcp", "--chat", "c"], env: { A: "1" } } },
+    });
   });
 });
 
@@ -188,7 +365,8 @@ const fakeSpawn = (script: (s: Spawned) => void) => {
   }) as never;
   return { impl, calls };
 };
-const emit = (c: FakeChild, ...ls: unknown[]) => c.stdout.write(ls.map((l) => (typeof l === "string" ? l : line(l)) + "\n").join(""));
+const emit = (c: FakeChild, ...ls: unknown[]) =>
+  c.stdout.write(ls.map((l) => (typeof l === "string" ? l : line(l)) + "\n").join(""));
 
 let tmp: string;
 beforeEach(() => {
@@ -234,7 +412,11 @@ describe("the Claude harness", () => {
       child.end(0);
     });
     const events: HarnessEvent[] = [];
-    const h = claudeHarness({ bin: "claude", env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-no", CLAUDECODE: "1" }, spawnImpl: sp.impl });
+    const h = claudeHarness({
+      bin: "claude",
+      env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-no", CLAUDECODE: "1" },
+      spawnImpl: sp.impl,
+    });
     const r = runOptions({ effort: "low" });
     const end = await h.run(r, (e) => events.push(e)).done;
 
@@ -351,7 +533,12 @@ describe("OpenCode's stream", () => {
     const { events } = ocEvents(OC_SKILL, OC_RUNNING);
     expect(events.filter((e) => e.kind !== "session")).toEqual([
       { kind: "tool", id: "chatcmpl-tool-877d9f995cc3d1a6", name: "skill", input: { id: "slow_approve_and_write" } },
-      { kind: "result", id: "chatcmpl-tool-877d9f995cc3d1a6", output: "Unable to load skill slow_approve_and_write", error: true },
+      {
+        kind: "result",
+        id: "chatcmpl-tool-877d9f995cc3d1a6",
+        output: "Unable to load skill slow_approve_and_write",
+        error: true,
+      },
     ]);
   });
 
@@ -366,7 +553,10 @@ describe("OpenCode's stream", () => {
 
   it("reports an error event in both of the shapes OpenCode has used", () => {
     const a = ocEvents(OC_ERROR);
-    expect(a.events.at(-1)).toEqual({ kind: "error", text: "Transport: ECONNRESET: The socket connection was closed unexpectedly." });
+    expect(a.events.at(-1)).toEqual({
+      kind: "error",
+      text: "Transport: ECONNRESET: The socket connection was closed unexpectedly.",
+    });
     expect(a.st.error).toContain("ECONNRESET");
     expect(ocEvents({ type: "error", error: { data: { message: "no login" } } }).st.error).toBe("no login");
     expect(ocEvents({ type: "error", error: { name: "ProviderAuthError" } }).st.error).toBe("ProviderAuthError");
@@ -392,15 +582,40 @@ describe("OpenCode's config and flags", () => {
     const c = opencodeRunConfig(mcp, "/tmp/s/system.md") as Record<string, any>;
     expect(c).toEqual({
       autoupdate: false,
-      mcp: { anydag: { type: "local", command: ["node", "cli.mjs", "mcp", "--chat", "c1"], environment: { ANYDAG_HOME: "/h" }, codemode: false, timeout: 600000, enabled: true } },
-      agent: { "dag-assistant": { mode: "primary", prompt: "{file:/tmp/s/system.md}", permission: { "*": "deny", skill: "deny", "anydag_*": "allow" } } },
+      mcp: {
+        anydag: {
+          type: "local",
+          command: ["node", "cli.mjs", "mcp", "--chat", "c1"],
+          environment: { ANYDAG_HOME: "/h" },
+          codemode: false,
+          timeout: 600000,
+          enabled: true,
+        },
+      },
+      agent: {
+        "dag-assistant": {
+          mode: "primary",
+          prompt: "{file:/tmp/s/system.md}",
+          permission: { "*": "deny", skill: "deny", "anydag_*": "allow" },
+        },
+      },
     });
     expect(Object.keys(c.agent["dag-assistant"].permission)).toEqual(["*", "skill", "anydag_*"]);
   });
 
   it("puts the effort after a # and never writes --variant or --dir", () => {
     const a = opencodeRunArgs({ url: "http://127.0.0.1:4000", model: "opencode-go/glm-5.3-flash", effort: "max" });
-    expect(a).toEqual(["run", "--server", "http://127.0.0.1:4000", "-m", "opencode-go/glm-5.3-flash#max", "--agent", "dag-assistant", "--format", "json"]);
+    expect(a).toEqual([
+      "run",
+      "--server",
+      "http://127.0.0.1:4000",
+      "-m",
+      "opencode-go/glm-5.3-flash#max",
+      "--agent",
+      "dag-assistant",
+      "--format",
+      "json",
+    ]);
     expect(a).not.toContain("--variant");
     expect(a).not.toContain("--dir");
     expect(opencodeRunArgs({ url: "u", model: "m", resume: "ses_1" }).slice(-2)).toEqual(["--session", "ses_1"]);
@@ -450,7 +665,13 @@ function opencodeWorld(turns: unknown[][], opts: { onRun?: (s: Spawned) => void 
 describe("the OpenCode harness", () => {
   it("starts a serve for the chat, waits for the MCP server, warms it, and then runs the turn through it", async () => {
     const w = opencodeWorld([turnLines("ses_real", OC_TOOL)]);
-    const h = opencodeHarness({ bin: "opencode", env: { PATH: "/usr/bin", OPENCODE_CONFIG_CONTENT: "{}" }, spawnImpl: w.sp.impl, fetchImpl: w.fetchImpl, tmpRoot: tmp });
+    const h = opencodeHarness({
+      bin: "opencode",
+      env: { PATH: "/usr/bin", OPENCODE_CONFIG_CONTENT: "{}" },
+      spawnImpl: w.sp.impl,
+      fetchImpl: w.fetchImpl,
+      tmpRoot: tmp,
+    });
     const events: HarnessEvent[] = [];
     const r = runOptions({ model: "opencode-go/glm-5.3-flash", effort: "max" });
     const end = await h.run(r, (e) => events.push(e)).done;
@@ -501,13 +722,21 @@ describe("the OpenCode harness", () => {
   it("keeps one serve per chat", async () => {
     const w = opencodeWorld([]);
     const h = opencodeHarness({ bin: "opencode", env: {}, spawnImpl: w.sp.impl, fetchImpl: w.fetchImpl, tmpRoot: tmp });
-    await Promise.all([h.run(runOptions({ chat: "a" }), () => undefined).done, h.run(runOptions({ chat: "b" }), () => undefined).done]);
+    await Promise.all([
+      h.run(runOptions({ chat: "a" }), () => undefined).done,
+      h.run(runOptions({ chat: "b" }), () => undefined).done,
+    ]);
     expect(w.serves).toHaveLength(2);
     await h.close();
   });
 
   it("drops a first step that found no vault tools, deletes its session, and runs the turn again", async () => {
-    const lost = [{ ...OC_STEP_START, sessionID: "ses_lost" }, { ...OC_SKILL, sessionID: "ses_lost" }, { ...OC_STEP_FINISH_TOOLS, sessionID: "ses_lost" }, { ...OC_TEXT, sessionID: "ses_lost", part: { ...OC_TEXT.part, text: "I have no tools." } }];
+    const lost = [
+      { ...OC_STEP_START, sessionID: "ses_lost" },
+      { ...OC_SKILL, sessionID: "ses_lost" },
+      { ...OC_STEP_FINISH_TOOLS, sessionID: "ses_lost" },
+      { ...OC_TEXT, sessionID: "ses_lost", part: { ...OC_TEXT.part, text: "I have no tools." } },
+    ];
     const w = opencodeWorld([lost, turnLines("ses_good", OC_TOOL)]);
     const h = opencodeHarness({ bin: "opencode", env: {}, spawnImpl: w.sp.impl, fetchImpl: w.fetchImpl, tmpRoot: tmp });
     const events: HarnessEvent[] = [];
@@ -537,7 +766,13 @@ describe("the OpenCode harness", () => {
       s.child.stderr.write("Error: port in use\n");
       s.child.end(1);
     });
-    const h = opencodeHarness({ bin: "opencode", env: {}, spawnImpl: sp.impl, fetchImpl: (async () => ({ json: async () => ({}) })) as never, tmpRoot: tmp });
+    const h = opencodeHarness({
+      bin: "opencode",
+      env: {},
+      spawnImpl: sp.impl,
+      fetchImpl: (async () => ({ json: async () => ({}) })) as never,
+      tmpRoot: tmp,
+    });
     const events: HarnessEvent[] = [];
     const end = await h.run(runOptions(), (e) => events.push(e)).done;
     expect(end.error).toBe("opencode serve exited 1: Error: port in use");
@@ -573,7 +808,9 @@ describe("the OpenCode harness", () => {
     while (!events.some((e) => e.kind === "session")) await new Promise((r) => setTimeout(r, 10));
     await run.stop();
     expect(await run.done).toEqual({});
-    expect(w.fetched.some((f) => f.method === "POST" && f.url === "http://127.0.0.1:4101/api/session/ses_live/interrupt")).toBe(true);
+    expect(w.fetched.some((f) => f.method === "POST" && f.url === "http://127.0.0.1:4101/api/session/ses_live/interrupt")).toBe(
+      true,
+    );
     expect(live.client!.child.signals).toEqual([]);
     expect(events.some((e) => e.kind === "error")).toBe(false);
     await h.close();
@@ -591,7 +828,14 @@ describe("the OpenCode harness", () => {
 
   it("stops a chat's serve after it has been idle, and not before", async () => {
     const w = opencodeWorld([turnLines("ses_1")]);
-    const h = opencodeHarness({ bin: "opencode", env: {}, spawnImpl: w.sp.impl, fetchImpl: w.fetchImpl, tmpRoot: tmp, idleMs: 60 });
+    const h = opencodeHarness({
+      bin: "opencode",
+      env: {},
+      spawnImpl: w.sp.impl,
+      fetchImpl: w.fetchImpl,
+      tmpRoot: tmp,
+      idleMs: 60,
+    });
     await h.run(runOptions(), () => undefined).done;
     expect(w.serves[0]!.child.signals).toEqual([]);
     await new Promise((r) => setTimeout(r, 200));

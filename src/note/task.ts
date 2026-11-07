@@ -48,7 +48,10 @@ const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
  */
 export function statusOf(raw: unknown): TaskStatus | undefined {
   if (typeof raw !== "string") return undefined;
-  const s = raw.trim().toLowerCase().replace(/[\s_]+/g, "-");
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
   if (s === "to-do") return "todo";
   return (STATUSES as readonly string[]).includes(s) ? (s as TaskStatus) : undefined;
 }

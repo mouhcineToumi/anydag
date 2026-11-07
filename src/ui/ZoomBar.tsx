@@ -15,7 +15,7 @@ import { Maximize2, Minus, Plus } from "lucide-react";
  * boxes on `dag:links-preview` and a tidy reports on `dag:tidy`, and only this component re-renders.
  *
  * Reading `data-zoom` off the viewport instead would have been the other tempting shortcut, and it
- * is the one `CLAUDE.md` warns about twice: that attribute is *painted*, in the same statement as
+ * is the one `docs/architecture/things-that-will-bite.md` warns about twice: that attribute is *painted*, in the same statement as
  * the transform it describes, precisely because as rendered state it is a frame stale.
  */
 

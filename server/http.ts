@@ -23,7 +23,8 @@ export class Http extends Error {
   }
 }
 
-export const err = (status: number, message: string, extra: Record<string, unknown> = {}): Http => new Http(status, message, extra);
+export const err = (status: number, message: string, extra: Record<string, unknown> = {}): Http =>
+  new Http(status, message, extra);
 
 /** The response for anything a route threw: its own `Http`, or the store's three errors. */
 export function failure(c: Context, e: unknown): Response {

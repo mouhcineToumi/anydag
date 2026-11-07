@@ -67,7 +67,7 @@ async function fresh(page: Page, url = `/?board=${board()}`): Promise<void> {
   if (url.includes("board=")) await ready(page);
 }
 
-test("it is open by default, and one key puts it away and remembers", async ({ page }) => {
+test("it is open by default, and one key puts it away and remembers", { tag: "@smoke" }, async ({ page }) => {
   await fresh(page);
   await expect(docked(page)).toBeVisible();
   /* The mark is in the sidebar's header while it is docked, and never in two places. */
@@ -284,7 +284,6 @@ test("Settings is reached from a note, which had no way to", async ({ page }) =>
   await expect(page.locator("[data-dag-settings]")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
-
 });
 
 test("its width is dragged, remembered, and put back by a double-click", async ({ page }) => {
@@ -404,10 +403,14 @@ test("a file is called its title — Untitled until somebody names it — and it
   await expect.poll(() => new URL(page.url()).searchParams.get("board"), { timeout: 10_000 }).toBe(named);
   await expect(fileRow(page, named)).toHaveText("Q3: the plan");
   expect(fs.existsSync(path.join(BOARDS, folder, "Untitled.board.md"))).toBe(false);
-  expect(fs.readFileSync(path.join(BOARDS, `${named}.board.md`), "utf8")).toMatch(/^---\ntitle: "Q3: the plan"\n(id: [0-9a-z]{10}\n)?---\n/);
+  expect(fs.readFileSync(path.join(BOARDS, `${named}.board.md`), "utf8")).toMatch(
+    /^---\ntitle: "Q3: the plan"\n(id: [0-9a-z]{10}\n)?---\n/,
+  );
   await expect(page.locator(".dag-toolbar__title")).toHaveText("Q3: the plan");
   /* Rows go by what they say: idea, Other, then the plan — not by the names under them. */
-  const titles = await page.locator(`[data-dag-sidebar-file^="${folder}/"]:not([data-dag-sidebar-file^="${folder}/inner/"]) .dag-sidebar__name`).allTextContents();
+  const titles = await page
+    .locator(`[data-dag-sidebar-file^="${folder}/"]:not([data-dag-sidebar-file^="${folder}/inner/"]) .dag-sidebar__name`)
+    .allTextContents();
   expect(titles).toEqual(["idea", "Other", "Q3: the plan"]);
 });
 
@@ -420,7 +423,10 @@ test("a snapshot draws no sidebar and no shell around the page", async ({ page }
   await expect(page.locator(".dag-shell")).toHaveCount(0);
 });
 
-test("a list not heard yet is said to be loading, and the next page draws the one this browser kept", async ({ page, context }) => {
+test("a list not heard yet is said to be loading, and the next page draws the one this browser kept", async ({
+  page,
+  context,
+}) => {
   /* The listing held back, as one of nine hundred notes on the document store was: the column says
      it is on its way, never that the account is empty. */
   let release!: () => void;
@@ -435,7 +441,18 @@ test("a list not heard yet is said to be loading, and the next page draws the on
   release();
   await expect(folderRow(page, folder)).toBeVisible();
   await expect(page.locator("[data-dag-sidebar-loading]")).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k === "dag:file-list" || k.startsWith("dag:file-list@")).map((k) => localStorage.getItem(k)).join("")), { timeout: 5_000 }).toContain(folder);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Object.keys(localStorage)
+            .filter((k) => k === "dag:file-list" || k.startsWith("dag:file-list@"))
+            .map((k) => localStorage.getItem(k))
+            .join(""),
+        ),
+      { timeout: 5_000 },
+    )
+    .toContain(folder);
 
   /* A second page in this browser draws what the first one kept, while its own listing is held. */
   const later = await context.newPage();

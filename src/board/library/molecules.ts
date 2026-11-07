@@ -107,6 +107,7 @@ export const MOLECULES: Blueprint[] = [
     name: "Alternative",
     description: "sequence · an if / else fragment.",
     icon: "Split",
+    // biome-ignore lint/suspicious/noThenProperty: a props bag the allocator reads by key; it is never awaited or returned from async code.
     props: { from: "a", to: "b", when: "when this holds", then: "this", otherwise: "otherwise", orelse: "that" },
     parts: [
       'alt "${when}"',

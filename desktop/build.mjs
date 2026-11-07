@@ -20,7 +20,10 @@ export async function build() {
   const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
   await esbuild({
     absWorkingDir: root,
-    entryPoints: [{ in: "desktop/main.ts", out: "main" }, { in: "desktop/preload.ts", out: "preload" }],
+    entryPoints: [
+      { in: "desktop/main.ts", out: "main" },
+      { in: "desktop/preload.ts", out: "preload" },
+    ],
     bundle: true,
     platform: "node",
     external: ["electron"],

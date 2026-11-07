@@ -38,13 +38,25 @@ function sideSpan(b: Box, side: Side): [{ x: number; y: number }, { x: number; y
   const bot = b.y + b.h;
   switch (side) {
     case "right":
-      return [{ x: r, y: b.y }, { x: r, y: bot }];
+      return [
+        { x: r, y: b.y },
+        { x: r, y: bot },
+      ];
     case "bottom":
-      return [{ x: r, y: bot }, { x: b.x, y: bot }];
+      return [
+        { x: r, y: bot },
+        { x: b.x, y: bot },
+      ];
     case "left":
-      return [{ x: b.x, y: bot }, { x: b.x, y: b.y }];
+      return [
+        { x: b.x, y: bot },
+        { x: b.x, y: b.y },
+      ];
     case "top":
-      return [{ x: b.x, y: b.y }, { x: r, y: b.y }];
+      return [
+        { x: b.x, y: b.y },
+        { x: r, y: b.y },
+      ];
   }
 }
 
@@ -169,11 +181,7 @@ export interface RouteInput {
  * are unreadable in a way a slightly-misplaced one is not. One pass, greedy, in edge order: later
  * labels move, earlier ones stay, so the result is stable rather than oscillating.
  */
-function separateLabels(
-  edges: RoutedEdge[],
-  labels: Record<string, { w: number; h: number }>,
-  fallback: number,
-): void {
+function separateLabels(edges: RoutedEdge[], labels: Record<string, { w: number; h: number }>, fallback: number): void {
   const placed: { x: number; y: number; w: number; h: number }[] = [];
   const overlaps = (a: (typeof placed)[number], b: (typeof placed)[number]) =>
     Math.abs(a.x - b.x) * 2 < a.w + b.w && Math.abs(a.y - b.y) * 2 < a.h + b.h;
@@ -317,7 +325,7 @@ function detour(
     for (const o of [blocker, ...obstacles]) {
       for (const cy of [o.y - clear, o.y + o.h + clear]) {
         const k = Math.round(cy);
-        if (!seen.has(k)) (seen.add(k), cands.push(k));
+        if (!seen.has(k)) seen.add(k), cands.push(k);
       }
     }
     const mid = blocker.y + blocker.h / 2;
@@ -436,8 +444,7 @@ function bowClear(
      it. Where one arc cannot get past, the answer is not a cleverer curve but a different side to
      leave from, and choosing sides against obstacles is a candidates-and-cost model
      deliberately not built yet. */
-  const away =
-    (blocker.x + blocker.w / 2 - mid.x) * nx + (blocker.y + blocker.h / 2 - mid.y) * ny > 0 ? -1 : 1;
+  const away = (blocker.x + blocker.w / 2 - mid.x) * nx + (blocker.y + blocker.h / 2 - mid.y) * ny > 0 ? -1 : 1;
 
   /* How far to try. A cubic with both arms pushed by `p` moves its middle by 0.75·p, and the
      blocker is at least the chord's distance from one of its edges — so a fixed dozen steps
@@ -465,11 +472,7 @@ function bowClear(
 }
 
 /** The first box the curve passes through, sampled finely enough that no card is stepped over. */
-function firstHit(
-  spine: Extract<Spine, { kind: "cubic" }>,
-  obstacles: RouteNode[],
-  margin = 0,
-): RouteNode | undefined {
+function firstHit(spine: Extract<Spine, { kind: "cubic" }>, obstacles: RouteNode[], margin = 0): RouteNode | undefined {
   const { p0, p1, p2, p3 } = spine;
   const rough = Math.hypot(p3.x - p0.x, p3.y - p0.y) + Math.hypot(p1.x - p0.x, p1.y - p0.y);
   const steps = Math.max(24, Math.ceil(rough / 8));
@@ -601,7 +604,11 @@ export function routeReach(edges: RoutedEdge[]): { left: number; top: number; ri
   for (const e of edges) {
     let cur = { x: 0, y: 0 };
     for (const m of e.d.matchAll(/([MLCQ])([^MLCQ]*)/g)) {
-      const n = m[2]!.trim().split(/[\s,]+/).filter(Boolean).map(Number);
+      const n = m[2]!
+        .trim()
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map(Number);
       const end = { x: n[n.length - 2]!, y: n[n.length - 1]! };
       if (m[1] === "C" || m[1] === "Q") {
         const ps = [cur];
@@ -610,7 +617,8 @@ export function routeReach(edges: RoutedEdge[]): { left: number; top: number; ri
           /* De Casteljau, which is the same arithmetic for a quadratic and a cubic. */
           let pts = ps;
           const t = s / STEPS;
-          while (pts.length > 1) pts = pts.slice(1).map((p, i) => ({ x: pts[i]!.x + (p.x - pts[i]!.x) * t, y: pts[i]!.y + (p.y - pts[i]!.y) * t }));
+          while (pts.length > 1)
+            pts = pts.slice(1).map((p, i) => ({ x: pts[i]!.x + (p.x - pts[i]!.x) * t, y: pts[i]!.y + (p.y - pts[i]!.y) * t }));
           take(pts[0]!.x, pts[0]!.y);
         }
       }
@@ -977,12 +985,7 @@ type Spine = { kind: "cubic"; p0: Point; p1: Point; p2: Point; p3: Point } | { k
 function pathOf(spine: Spine, corner: number): string {
   if (spine.kind === "polyline") return roundedPolyline(spine.points, corner);
   const { p0, p1, p2, p3 } = spine;
-  return (
-    `M${r1(p0.x)},${r1(p0.y)} ` +
-    `C${r1(p1.x)},${r1(p1.y)} ` +
-    `${r1(p2.x)},${r1(p2.y)} ` +
-    `${r1(p3.x)},${r1(p3.y)}`
-  );
+  return `M${r1(p0.x)},${r1(p0.y)} ` + `C${r1(p1.x)},${r1(p1.y)} ` + `${r1(p2.x)},${r1(p2.y)} ` + `${r1(p3.x)},${r1(p3.y)}`;
 }
 
 /** Where the curve is halfway along, and which way it is heading there. */
@@ -1082,8 +1085,7 @@ function labelFor(
   const clear = (l: { x: number; y: number; anchor: "start" | "middle" | "end" }) =>
     !obstacles.some(
       (o) =>
-        Math.abs(centreX(l) - (o.x + o.w / 2)) * 2 < size.w + o.w &&
-        Math.abs(l.y - lift - (o.y + o.h / 2)) * 2 < size.h + o.h,
+        Math.abs(centreX(l) - (o.x + o.w / 2)) * 2 < size.w + o.w && Math.abs(l.y - lift - (o.y + o.h / 2)) * 2 < size.h + o.h,
     );
 
   const middle = place(0.5);
@@ -1105,7 +1107,8 @@ function roundedPolyline(raw: { x: number; y: number }[], radius: number): strin
      then draws nothing and logs an error naming no edge. A dogleg whose target row sits exactly
      on its clearance row produces one; so would any two coincident points. */
   const points = raw.filter((p, i) => i === 0 || Math.abs(p.x - raw[i - 1]!.x) > 1e-6 || Math.abs(p.y - raw[i - 1]!.y) > 1e-6);
-  if (points.length < 3) return `M${r1(points[0]!.x)},${r1(points[0]!.y)} L${r1(points[points.length - 1]!.x)},${r1(points[points.length - 1]!.y)}`;
+  if (points.length < 3)
+    return `M${r1(points[0]!.x)},${r1(points[0]!.y)} L${r1(points[points.length - 1]!.x)},${r1(points[points.length - 1]!.y)}`;
   let d = `M${r1(points[0]!.x)},${r1(points[0]!.y)}`;
   for (let i = 1; i < points.length - 1; i++) {
     const prev = points[i - 1]!;

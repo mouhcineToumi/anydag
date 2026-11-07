@@ -32,14 +32,27 @@ export const MESSAGE_MAX = 300;
 export const STACK_MAX = 1500;
 
 /** Which page of the app something happened on — a kind of page, never which document. */
-export const PAGES = ["board", "note", "quiz", "table", "file", "tasks", "calendar", "quizzes", "trash", "chat", "home", "other"] as const;
+export const PAGES = [
+  "board",
+  "note",
+  "quiz",
+  "table",
+  "file",
+  "tasks",
+  "calendar",
+  "quizzes",
+  "trash",
+  "chat",
+  "home",
+  "other",
+] as const;
 
 /** What is running the page. */
-export const SHELLS = ["desktop", "browser"] as const;
+const SHELLS = ["desktop", "browser"] as const;
 
-export const OSES = ["linux", "darwin", "win32", "other"] as const;
+const OSES = ["linux", "darwin", "win32", "other"] as const;
 
-export const ARCHES = ["x64", "arm64", "other"] as const;
+const ARCHES = ["x64", "arm64", "other"] as const;
 
 /** The fourteen diagram types — held to `DIAGRAM_TYPES` by `test/logs.test.ts`. */
 export const DIAGRAM_KINDS = [
@@ -60,7 +73,7 @@ export const DIAGRAM_KINDS = [
 ] as const;
 
 /** A thing somebody did, by the feature's name: what is used, never on what. */
-export const FEATURES = [
+const FEATURES = [
   "export.svg",
   "export.png",
   "export.pdf",
@@ -79,8 +92,8 @@ export const FEATURES = [
   "upload",
 ] as const;
 
-export const ERROR_WHERE = ["page", "server"] as const;
-export const ERROR_KINDS = ["error", "rejection", "render", "route"] as const;
+const ERROR_WHERE = ["page", "server"] as const;
+const ERROR_KINDS = ["error", "rejection", "render", "route"] as const;
 
 /**
  * What a prop may hold. `count` is a whole number ≥ 0, `ms` a duration rounded to a millisecond,
@@ -192,7 +205,7 @@ function propOf(spec: Spec, v: unknown, key: string): number | boolean | string 
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-export const isEventName = (v: unknown): v is EventName => typeof v === "string" && Object.prototype.hasOwnProperty.call(EVENTS, v);
+const isEventName = (v: unknown): v is EventName => typeof v === "string" && Object.prototype.hasOwnProperty.call(EVENTS, v);
 
 /** One event as this file describes it, or `null`: an unknown name, a bad time, no prop left. */
 export function cleanEvent(raw: unknown): LogEvent | null {
@@ -210,10 +223,11 @@ export function cleanEvent(raw: unknown): LogEvent | null {
   return { name: raw.name, at: at.toISOString().replace(/\.\d{3}Z$/, "Z"), props };
 }
 
-const oneOf = <T extends string>(list: readonly T[], v: unknown, fallback: T): T => (typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : fallback);
+const oneOf = <T extends string>(list: readonly T[], v: unknown, fallback: T): T =>
+  typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : fallback;
 
 /** Who sent it, or `null` when it does not say enough to be counted. */
-export function cleanEnv(raw: unknown): LogEnv | null {
+function cleanEnv(raw: unknown): LogEnv | null {
   if (!isObject(raw)) return null;
   if (typeof raw.install !== "string" || !INSTALL.test(raw.install)) return null;
   if (typeof raw.version !== "string" || !VERSION.test(raw.version)) return null;
@@ -232,7 +246,10 @@ export function cleanBatch(raw: unknown): LogBatch | null {
   if (!isObject(raw) || raw.v !== LOGS_VERSION || !Array.isArray(raw.events)) return null;
   const env = cleanEnv(raw.env);
   if (!env) return null;
-  const events = raw.events.slice(0, MAX_EVENTS).map(cleanEvent).filter((e): e is LogEvent => e !== null);
+  const events = raw.events
+    .slice(0, MAX_EVENTS)
+    .map(cleanEvent)
+    .filter((e): e is LogEvent => e !== null);
   return events.length ? { v: LOGS_VERSION, env, events } : null;
 }
 

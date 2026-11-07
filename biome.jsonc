@@ -1,0 +1,109 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  // Biome is the formatter and the linter. Type-aware promise checks are `eslint.config.mjs`
+  // (`npm run lint:promises`), the one thing Biome cannot do well; see that file for why.
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      // JavaScript and TypeScript only. Biome also formats CSS, JSON and Markdown; the CSS is hand
+      // laid out, `CLAUDE.md` is prose, and none of them is what a formatter is for here.
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.mts",
+      "**/*.cts",
+      "**/*.mjs",
+      "**/*.cjs",
+      "**/*.js",
+      // Generated, vendored or somebody's output.
+      "!icons/data",
+      "!src/dsl/icon-names.ts",
+      "!src/dsl/emoji-names.ts",
+      "!src/render/icon-index.ts",
+      "!**/dist",
+      "!release",
+      "!boards",
+      "!test-results",
+      "!.dev-home",
+      "!node_modules",
+      "!test/fixtures",
+      "!test/__golden__",
+      "!e2e/**/*-snapshots"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    // The code was written by hand: comments wrap near 100 columns and code wraps anywhere up to 130.
+    // Lines the formatter would change, over all 651 files: 100 → 37,000, 110 → 26,000, 120 → 18,000,
+    // 130 → 13,000, 140 → 10,000. 130 is the top of the range the code actually keeps to.
+    "lineWidth": 130,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always",
+      "bracketSpacing": true
+    }
+  },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none",
+      "correctness": {
+        "preset": "recommended",
+        // Effects with no dependency list are deliberate here (CLAUDE.md, *Things that will bite*),
+        // so this rule is wrong for the codebase rather than strict about it.
+        "useExhaustiveDependencies": "off",
+        // `[^]` is JavaScript's "any character", and four files use it on purpose.
+        "noEmptyCharacterClassInRegex": "off"
+      },
+      "suspicious": {
+        "preset": "recommended",
+        // `while ((m = re.exec(s)))` is how the code walks matches.
+        "noAssignInExpressions": "off",
+        // The regexes that sanitise file names and log text are about control characters.
+        "noControlCharactersInRegex": "off",
+        // The code already writes `Object.prototype.hasOwnProperty.call`; `Object.hasOwn` is
+        // ES2022 and tsconfig's `lib` is ES2020.
+        "noPrototypeBuiltins": "off",
+        // `Promise<number | void>` and `Response | void` are what `run()` and Hono middleware return.
+        "noConfusingVoidType": "off",
+        // `forEach((x) => out.push(x))` is the house form, and the one flagged `map` is an
+        // exhaustive switch `tsc` checks.
+        "useIterableCallbackReturn": "off",
+        // `let x;` is typed by control flow under `strict`; `tsc` rejects one left unresolved.
+        "noImplicitAnyLet": "off",
+        // A loop label named like a local is legal; the one hit is deliberate.
+        "noLabelVar": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // Playwright fixtures must be destructured: `async ({}, use) => …`.
+      "includes": ["e2e/**"],
+      "linter": { "rules": { "correctness": { "noEmptyPattern": "off" } } }
+    },
+    {
+      // `${slot}` in a plain string is the library's hole syntax (CLAUDE.md, *Composition*).
+      "includes": ["src/board/library/**"],
+      "linter": { "rules": { "suspicious": { "noTemplateCurlyInString": "off" } } }
+    },
+    {
+      // Route answers are untyped JSON at the MCP boundary, test doubles are loose, and BlockNote's
+      // generic parameters are `any`.
+      "includes": ["server/mcp/**", "server/chat/**", "test/**", "src/blocks/**"],
+      "linter": { "rules": { "suspicious": { "noExplicitAny": "off" } } }
+    },
+    {
+      // `point` is unused. e2e/ was outside this change; drop this override with the function.
+      "includes": ["e2e/hover.ts"],
+      "linter": { "rules": { "correctness": { "noUnusedVariables": "off" } } }
+    }
+  ]
+}

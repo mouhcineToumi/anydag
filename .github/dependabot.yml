@@ -1,0 +1,32 @@
+# Dependency updates, weekly, into `develop` — the branch every change goes through.
+#
+# The npm updates are grouped, minor and patch together, so a week is one pull request rather than
+# thirty; a major version is its own. Titles are Conventional Commits (`pr-policy.yml` requires it)
+# and the pull requests are exempt from the linked-issue rule as a bot's.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]

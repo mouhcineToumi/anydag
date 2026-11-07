@@ -22,7 +22,9 @@ describe("GET /__board/index", () => {
     const app = createApp({ session: new Session(env.home, env.vault, "test"), token: "t", page: null });
     const res = await app.request("http://127.0.0.1/__board/index", { headers: { "x-anydag-token": "t", host: "127.0.0.1" } });
     expect(res.status).toBe(200);
-    const { docs } = (await res.json()) as { docs: { id: string; name: string; refs: { id: string; wiki?: string; type: string }[] }[] };
+    const { docs } = (await res.json()) as {
+      docs: { id: string; name: string; refs: { id: string; wiki?: string; type: string }[] }[];
+    };
     const plan = docs.find((d) => d.name === "Projects/Plan")!;
     const notes = docs.find((d) => d.name === "Meeting notes")!;
     expect(notes.refs).toEqual([
@@ -31,7 +33,9 @@ describe("GET /__board/index", () => {
       { id: "", wiki: "Nowhere", type: "link", text: "Nowhere" },
     ]);
     // Followed by name, never rewritten: the body is what was written.
-    expect((await env.vault.read("Meeting notes", "note"))!.text.endsWith("\nSee [[Plan|the plan]], ![[Plan]] and [[Nowhere]].\n")).toBe(true);
+    expect(
+      (await env.vault.read("Meeting notes", "note"))!.text.endsWith("\nSee [[Plan|the plan]], ![[Plan]] and [[Nowhere]].\n"),
+    ).toBe(true);
   });
 });
 
@@ -46,9 +50,16 @@ describe("GET /__board/refs", () => {
     await env.vault.create("Meeting notes", "note", "See [[Plan|the plan]] and [[Nowhere]].\n");
     const res = await get("name=Meeting%20notes&kind=note");
     expect(res.status).toBe(200);
-    const me = (await res.json()) as { name: string; refs: { wiki?: string; target: { name: string } | null }[]; backlinks: unknown[] };
+    const me = (await res.json()) as {
+      name: string;
+      refs: { wiki?: string; target: { name: string } | null }[];
+      backlinks: unknown[];
+    };
     expect(me.name).toBe("Meeting notes");
-    expect(me.refs.map((r) => [r.wiki, r.target?.name ?? null])).toEqual([["Plan", "Projects/Plan"], ["Nowhere", null]]);
+    expect(me.refs.map((r) => [r.wiki, r.target?.name ?? null])).toEqual([
+      ["Plan", "Projects/Plan"],
+      ["Nowhere", null],
+    ]);
     expect(me.backlinks).toEqual([]);
 
     const plan = (await (await get("name=Projects/Plan&kind=note")).json()) as { backlinks: { name: string; type: string }[] };

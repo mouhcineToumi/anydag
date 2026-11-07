@@ -1,6 +1,6 @@
 # The AnyDag desktop shell: an AppImage on Linux (x64), a dmg and a zip per architecture on macOS
 # (arm64 and x64), an NSIS installer on Windows (x64). Each is built on its own OS —
-# `npm run desktop:dist` builds the one it runs on, and `.github/workflows/desktop.yml` builds all
+# `npm run desktop:dist` builds the one it runs on, and `.github/workflows/desktop-build.yml` builds all
 # three. Signing is the workflow's: it signs when a certificate is in its secrets, and otherwise
 # the macOS app is signed ad hoc (`-c.mac.identity=-`) and the Windows installer is not signed.
 #
@@ -105,6 +105,12 @@ nsis:
   # `AnyDag Setup 0.2.0.exe` by default: GitHub turns the spaces into dots on upload and
   # `latest.yml` would then name a file the release does not have.
   artifactName: ${productName}-Setup-${version}.${ext}
+# The update channel is not configured here, on purpose: electron-builder reads it off the version
+# (`detectUpdateChannel`, on by default) — `0.2.0` is `latest`, `0.2.0-beta.1` is `beta`,
+# `0.2.0-nightly.202611070230` is `nightly` — and names the files the updater reads after it
+# (`latest.yml`, `beta-linux.yml`, `nightly-mac.yml`…); the app reads the same word back off its own
+# version (`desktop/main.ts`). `desktop/package.mjs` checks the files really are the channel's, and
+# `scripts/check-release-assets.mjs` that a release holds them.
 publish:
   provider: github
   owner: mouhcineToumi

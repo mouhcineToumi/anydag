@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/mouhcineToumi/anydag/security/policy
+    about: Please do not open a public issue for a vulnerability. Read the policy and report it privately.
+  - name: Ask a question or share an idea
+    url: https://github.com/mouhcineToumi/anydag/discussions
+    about: Questions, how-tos and half-formed ideas belong in Discussions. A feature request needs a clear scope, so start there if you are not sure yet.

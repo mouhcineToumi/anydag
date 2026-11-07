@@ -85,7 +85,15 @@ function draw(k: KatexModule, tex: string, display: boolean): Drawn {
   let got = drawn.get(key);
   if (got) return got;
   try {
-    got = { html: k.renderToString(tex, { displayMode: display, throwOnError: true, strict: "ignore", trust: false, output: "htmlAndMathml" }) };
+    got = {
+      html: k.renderToString(tex, {
+        displayMode: display,
+        throwOnError: true,
+        strict: "ignore",
+        trust: false,
+        output: "htmlAndMathml",
+      }),
+    };
   } catch (e) {
     got = { error: e instanceof Error ? e.message : String(e) };
   }

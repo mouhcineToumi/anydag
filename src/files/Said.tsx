@@ -9,7 +9,15 @@ export function Said({ text }: { text: string }) {
   const parts = text.split(/`([^`]+)`/);
   return (
     <>
-      {parts.map((part, i) => (i % 2 ? <code key={i} className="dag-said__code">{part}</code> : <Fragment key={i}>{part}</Fragment>))}
+      {parts.map((part, i) =>
+        i % 2 ? (
+          <code key={i} className="dag-said__code">
+            {part}
+          </code>
+        ) : (
+          <Fragment key={i}>{part}</Fragment>
+        ),
+      )}
     </>
   );
 }

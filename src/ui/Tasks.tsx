@@ -1,5 +1,13 @@
 import { ChevronDown, List, Plus, SquareKanban } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { createNote, setTask, type BoardTree } from "@/board/useBoard";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
@@ -113,13 +121,18 @@ export function TasksView({
       [...owners.values()]
         .map((name) => ({ name, project: list.projects[name]!, title: list.titles[name] ?? leaf(name) }))
         /* What is being worked on first, and done last, as the tasks are read. */
-        .sort((a, b) => Number(a.project.status === "done") - Number(b.project.status === "done") || a.title.localeCompare(b.title, undefined, { numeric: true })),
+        .sort(
+          (a, b) =>
+            Number(a.project.status === "done") - Number(b.project.status === "done") ||
+            a.title.localeCompare(b.title, undefined, { numeric: true }),
+        ),
     [owners, list.projects, list.titles],
   );
   /* The folder the page is scoped to: `undefined` for every task, `null` for the tasks in no project. */
   const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
   const inScope = useCallback(
-    (name: string) => (scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped)),
+    (name: string) =>
+      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
     [scoped, owners],
   );
 
@@ -130,32 +143,40 @@ export function TasksView({
       .filter(([name]) => listed.has(name) && inScope(name))
       .map(([name, task]): Row => {
         const owner = projectFor(name, owners);
-        const project = owner && list.projects[owner] ? { name: owner, project: list.projects[owner]!, title: list.titles[owner] ?? leaf(owner) } : undefined;
+        const project =
+          owner && list.projects[owner]
+            ? { name: owner, project: list.projects[owner]!, title: list.titles[owner] ?? leaf(owner) }
+            : undefined;
         return { name, task, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project };
       })
       .filter((r) => words.every((w) => `${r.title} ${r.folder} ${r.project?.title ?? ""}`.toLowerCase().includes(w)))
       .sort(compareTasks);
   }, [list.notes, list.tasks, list.titles, list.projects, owners, inScope, pending, filter]);
 
-  const change = useCallback(
-    async (row: Row, next: TaskChange) => {
-      /* Built rather than spread: a `due: null` in the change is a task with no date, and an object
+  const change = useCallback(async (row: Row, next: TaskChange) => {
+    /* Built rather than spread: a `due: null` in the change is a task with no date, and an object
          holding `null` would never compare equal to the list's and never be let go of. */
-      const status = next.status ?? row.task.status;
-      const due = next.due === undefined ? row.task.due : (next.due ?? undefined);
-      /* And a start date, which nothing here changes and nothing here may drop. */
-      const want: Task = { status, ...(due ? { due } : {}), ...(row.task.start ? { start: row.task.start } : {}) };
-      setPending((had) => ({ ...had, [row.name]: want }));
-      const got = await setTask(row.name, next);
-      setPending((had) => {
-        const out = { ...had };
-        /* Refused: what the list says is what is true. Accepted: what the server wrote, until the list says so too. */
-        if (got) out[row.name] = got;
-        else delete out[row.name];
-        return out;
-      });
+    const status = next.status ?? row.task.status;
+    const due = next.due === undefined ? row.task.due : (next.due ?? undefined);
+    /* And a start date, which nothing here changes and nothing here may drop. */
+    const want: Task = { status, ...(due ? { due } : {}), ...(row.task.start ? { start: row.task.start } : {}) };
+    setPending((had) => ({ ...had, [row.name]: want }));
+    const got = await setTask(row.name, next);
+    setPending((had) => {
+      const out = { ...had };
+      /* Refused: what the list says is what is true. Accepted: what the server wrote, until the list says so too. */
+      if (got) out[row.name] = got;
+      else delete out[row.name];
+      return out;
+    });
+  }, []);
+  /* The columns and the groups take a handler that returns nothing; the status button's answer
+     arrives through `pending`. */
+  const onChange = useCallback(
+    (row: Row, next: TaskChange) => {
+      void change(row, next);
     },
-    [],
+    [change],
   );
 
   const total = Object.keys(list.tasks).length;
@@ -194,7 +215,11 @@ export function TasksView({
             <option value="">All projects</option>
             {projects.map((p) => (
               <option key={p.name} value={p.name}>
-                {p.project.status === "done" ? `${p.title} (done)` : p.project.status === "paused" ? `${p.title} (paused)` : p.title}
+                {p.project.status === "done"
+                  ? `${p.title} (done)`
+                  : p.project.status === "paused"
+                    ? `${p.title} (paused)`
+                    : p.title}
               </option>
             ))}
             <option value={NO_PROJECT}>No project</option>
@@ -210,11 +235,19 @@ export function TasksView({
         </p>
       ) : null}
       {layout === "board" ? (
-        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : change} chip={chip} into={into} />
+        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} />
       ) : (
         <div className="dag-tasks__groups">
           {LIST_ORDER.map((status) => (
-            <Group key={status} status={status} rows={by(status)} onOpen={onOpen} onChange={locked ? undefined : change} chip={chip} into={into} />
+            <Group
+              key={status}
+              status={status}
+              rows={by(status)}
+              onOpen={onOpen}
+              onChange={locked ? undefined : onChange}
+              chip={chip}
+              into={into}
+            />
           ))}
         </div>
       )}
@@ -243,7 +276,13 @@ function Group({
   return (
     <section className="dag-tasks__group" data-dag-tasks-group={status}>
       <h2 className="dag-tasks__head">
-        <button type="button" className="dag-tasks__twisty" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-dag-tasks-twisty={status}>
+        <button
+          type="button"
+          className="dag-tasks__twisty"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          data-dag-tasks-twisty={status}
+        >
           <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
           <TaskGlyph status={status} />
           <span>{STATUS_LABEL[status]}</span>
@@ -317,7 +356,7 @@ function QuickAdd({ status, into }: { status: TaskStatus; into: string }) {
  *
  * The card is the ghost, moved by `translate` and made `pointer-events: none` for the length of the
  * drag, so `elementFromPoint` finds the column under it rather than the card in the hand — the rule
- * `CLAUDE.md` records for the page tabs. A press that never moves far enough is a click, and opens.
+ * `docs/architecture/things-that-will-bite.md` records for the page tabs. A press that never moves far enough is a click, and opens.
  */
 function Columns({
   by,
@@ -341,7 +380,8 @@ function Columns({
     const sy = e.clientY;
     let to: TaskStatus | null = null;
     const clear = () => {
-      for (const el of board.current?.querySelectorAll<HTMLElement>("[data-dag-tasks-over]") ?? []) delete el.dataset.dagTasksOver;
+      for (const el of board.current?.querySelectorAll<HTMLElement>("[data-dag-tasks-over]") ?? [])
+        delete el.dataset.dagTasksOver;
     };
     startDrag(e, {
       onMove(ev, first) {
@@ -396,7 +436,10 @@ function Columns({
                   }}
                 >
                   <div className="dag-tasks__card-top">
-                    <StatusButton status={r.task.status} onStatus={onChange ? (next) => onChange(r, { status: next }) : undefined} />
+                    <StatusButton
+                      status={r.task.status}
+                      onStatus={onChange ? (next) => onChange(r, { status: next }) : undefined}
+                    />
                     <span className="dag-tasks__card-title">{r.title}</span>
                   </div>
                   {r.folder || r.task.due || chip(r) ? (

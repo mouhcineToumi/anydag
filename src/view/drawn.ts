@@ -37,14 +37,16 @@ export async function drawn(el: HTMLElement, { index = true }: { index?: boolean
   await frame();
   await frame();
   /* An embed says when it is finished (`Ref.tsx`); one inside another note is a card, which never waits. */
-  await until(() => Array.from(el.querySelectorAll("[data-dag-embed-kind]")).every((e) => e.hasAttribute("data-dag-embed-ready")));
+  await until(() =>
+    Array.from(el.querySelectorAll("[data-dag-embed-kind]")).every((e) => e.hasAttribute("data-dag-embed-ready")),
+  );
   /* Equations, its own and its embeds': KaTeX loaded, what it drew laid out, its faces in. */
   await drawnSettled();
   /* Images last, since an embed's own come with it. `complete` covers a broken one too: it has finished. */
   await Promise.all(
     Array.from(el.querySelectorAll("img")).map((img) =>
       img.complete
-        ? undefined
+        ? Promise.resolve()
         : new Promise<void>((r) => {
             img.addEventListener("load", () => r(), { once: true });
             img.addEventListener("error", () => r(), { once: true });
@@ -60,7 +62,11 @@ export async function drawn(el: HTMLElement, { index = true }: { index?: boolean
  * `data-dag-ready` on the document once what `root` holds is drawn, for as long as `key` stands —
  * what a snapshot of a quiz waits on. Off again when `key` changes, or it unmounts.
  */
-export function usePublishDrawn(root: RefObject<HTMLElement | null>, key: unknown, { index = true, enabled = true }: { index?: boolean; enabled?: boolean } = {}): void {
+export function usePublishDrawn(
+  root: RefObject<HTMLElement | null>,
+  key: unknown,
+  { index = true, enabled = true }: { index?: boolean; enabled?: boolean } = {},
+): void {
   useEffect(() => {
     const el = root.current;
     if (!enabled || !el) return;

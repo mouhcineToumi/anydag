@@ -38,8 +38,6 @@ import { PokeHub, pokeRoutes } from "./routes/poke";
 import { vaultRoutes } from "./routes/vaults";
 import { Usage } from "./usage";
 
-export { HttpError } from "./routes/http";
-
 declare const __ANYDAG_SYNC_VERSION__: string;
 export const VERSION = typeof __ANYDAG_SYNC_VERSION__ === "string" ? __ANYDAG_SYNC_VERSION__ : "dev";
 
@@ -96,7 +94,16 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   app.use("/v1/admin/*", asAdmin);
   app.use("/metrics", asAdmin);
 
-  for (const sub of [pairRoutes(deps), logRoutes(deps), vaultRoutes(deps), blobRoutes(deps), commitRoutes(deps), changeRoutes(deps), pokeRoutes(deps)]) app.route("/", sub);
+  for (const sub of [
+    pairRoutes(deps),
+    logRoutes(deps),
+    vaultRoutes(deps),
+    blobRoutes(deps),
+    commitRoutes(deps),
+    changeRoutes(deps),
+    pokeRoutes(deps),
+  ])
+    app.route("/", sub);
   app.route("/", adminRoutes(deps) as unknown as Hono<{ Variables: Vars }>);
 
   app.notFound((c) => c.json({ code: "ES_NOT_FOUND", message: `no route ${c.req.method} ${c.req.path}` }, 404));

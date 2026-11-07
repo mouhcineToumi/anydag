@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import type { Placement } from "@/board/flow";
 import { resizeOfItem, type BoardItem } from "@/board/types";

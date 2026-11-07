@@ -20,12 +20,14 @@ beforeAll(() => setMeasurer(new TableMeasurer()));
 
 function graphsOf(file: string): { id: string; graph: Graph }[] {
   const board = parseBoard(file, fs.readFileSync(path.join(DIR, file), "utf8"));
-  return board.items
-    /* The two models that are not a `Graph` have their own invariants — `sequence.test.ts` and
+  return (
+    board.items
+      /* The two models that are not a `Graph` have their own invariants — `sequence.test.ts` and
        `chart.test.ts` — and `hasGraph()` is the closed set rather than a literal per type. */
-    .filter((it) => isDiagramType(it.type) && hasGraph(it.type))
-    .map((it) => ({ id: it.id, graph: parseDiagram(it.type, it.body, it.dir)! }))
-    .filter((x) => x.graph !== null);
+      .filter((it) => isDiagramType(it.type) && hasGraph(it.type))
+      .map((it) => ({ id: it.id, graph: parseDiagram(it.type, it.body, it.dir)! }))
+      .filter((x) => x.graph !== null)
+  );
 }
 
 const run = (g: Graph): Promise<Placed> => layoutGraph(g, sizeGraph(g, T), sizeLabels(g, T), T.metric);
@@ -141,8 +143,7 @@ fix --> retry --> check
  * `route-quality` totals over the reference boards are the evidence for.
  */
 describe("col=", () => {
-  const chain = (extra = "") =>
-    ['service a "A"', 'service b "B"', `service c "C"${extra}`, "", "a --> b --> c"].join("\n");
+  const chain = (extra = "") => ['service a "A"', 'service b "B"', `service c "C"${extra}`, "", "a --> b --> c"].join("\n");
 
   /*
    * **The number is a rank, not an index**, and this is where that was found out.
@@ -173,14 +174,7 @@ describe("col=", () => {
   });
 
   it("reaches a card inside a group under `separate`, where the group runs its own pass", async () => {
-    const src2 = [
-      'group d "Domain" {',
-      '  entity a "A"',
-      '  entity b "B"',
-      '  entity c "C" col=0',
-      "}",
-      "a --> b",
-    ].join("\n");
+    const src2 = ['group d "Domain" {', '  entity a "A"', '  entity b "B"', '  entity c "C" col=0', "}", "a --> b"].join("\n");
     const placed = await run(parseDiagram("erd", src2, undefined)!);
     /* An ERD's groups run DOWN, so a layer is a row: `col=0` puts `c` level with or above `a`. */
     expect(placed.nodes["c"]!.y).toBeLessThanOrEqual(placed.nodes["a"]!.y);

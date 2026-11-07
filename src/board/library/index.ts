@@ -119,7 +119,13 @@ export function noteCard(note: { id: string; name: string; title?: string; task?
     name: title,
     /* A task is a note too, and lands the same way, as the same card with its status on it;
        a quiz lands as its own card, with a way into its run. All three are one width. */
-    description: quiz ? `a quiz — ${note.name}` : table ? `a table — ${note.name}` : note.task ? `a task — ${note.name}` : note.name,
+    description: quiz
+      ? `a quiz — ${note.name}`
+      : table
+        ? `a table — ${note.name}`
+        : note.task
+          ? `a task — ${note.name}`
+          : note.name,
     icon: quiz ? "GraduationCap" : table ? "Table2" : note.task ? "SquareCheckBig" : "FileText",
     layer: 3,
     type: "md",
@@ -280,7 +286,5 @@ export function matches(b: Blueprint, query: string): boolean {
 
 /** The fourteen starting diagrams, by the type they draw — the source `TEMPLATES` is built from. */
 export const TEMPLATE_BY_TYPE = new Map(
-  [...TEMPLATE_IDS, ...SKETCH_TEMPLATE_IDS, ...CHART_TEMPLATE_IDS]
-    .map((id) => BY_ID.get(id)!)
-    .map((b) => [b.type, b] as const),
+  [...TEMPLATE_IDS, ...SKETCH_TEMPLATE_IDS, ...CHART_TEMPLATE_IDS].map((id) => BY_ID.get(id)!).map((b) => [b.type, b] as const),
 );

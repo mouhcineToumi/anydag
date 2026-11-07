@@ -23,15 +23,15 @@
 import { askable, parseQuiz, type Quiz } from "./parse";
 import { mintQuestionId, moveQuestion, removeQuestion } from "./write";
 
-export type QuizOp =
+type QuizOp =
   | { op: "set"; markdown: string; id?: string; before?: string; after?: string }
   | { op: "remove"; id: string }
   | { op: "move"; id: string; before?: string; after?: string };
 
-export const QUIZ_OPS = ["set", "remove", "move"] as const;
+const QUIZ_OPS = ["set", "remove", "move"] as const;
 
 export type QuizApplied =
-  | { ok: true; text: string; /** The question each op was about, a new one's minted id included. */ ids: string[] }
+  | { ok: true; text: string /** The question each op was about, a new one's minted id included. */; ids: string[] }
   | { ok: false; status: number; error: string };
 
 class Refused extends Error {
@@ -78,7 +78,11 @@ function indexOf(quiz: Quiz, id: string): number {
 const openEnd = (text: string): string => (text.trim() ? `${text.replace(/\s+$/, "")}\n\n` : "");
 
 /** Blank lines off both ends, and one newline after. */
-const asBlock = (md: string): string => `${md.replace(/\r\n?/g, "\n").replace(/^(?:[ \t]*\n)+/, "").replace(/\s+$/, "")}\n`;
+const asBlock = (md: string): string =>
+  `${md
+    .replace(/\r\n?/g, "\n")
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .replace(/\s+$/, "")}\n`;
 
 /**
  * The question `markdown` says, checked: exactly one question and nothing around it, askable, and
@@ -101,7 +105,10 @@ function questionOf(markdown: string, id: string | undefined, taken: ReadonlySet
   const errors = quiz.diagnostics.filter((d) => d.severity === "error");
   if (errors.length || !askable(q)) {
     const said = errors.map((d) => `${d.code}: ${d.message}`).join(" ");
-    throw new Refused(400, `that question cannot be asked: ${said || "it needs a prompt, and options one of them right, or a model answer"}`);
+    throw new Refused(
+      400,
+      `that question cannot be asked: ${said || "it needs a prompt, and options one of them right, or a model answer"}`,
+    );
   }
   if (q.id && id && q.id !== id) throw new Refused(400, `the heading says \`{#${q.id}}\` and \`id\` says \`${id}\`: give one`);
   const wanted = q.id ?? id ?? mintQuestionId(taken);

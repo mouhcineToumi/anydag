@@ -85,7 +85,7 @@ const found = (page: Page) =>
     return h ? [...h].map((r) => r.toString()).join(" ") : "";
   });
 
-test("one list holds matches from boards and notes, each where the words are", async ({ page }) => {
+test("one list holds matches from boards and notes, each where the words are", { tag: "@smoke" }, async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await ready(page);
   await searchFor(page, word);
@@ -98,7 +98,7 @@ test("one list holds matches from boards and notes, each where the words are", a
   await expect(page.locator(".dag-panel__count")).toContainText("3 in the text");
 });
 
-test("a board result opens the board centred on the matching item, selected", async ({ page }) => {
+test("a board result opens the board centred on the matching item, selected", { tag: "@smoke" }, async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await ready(page);
   await searchFor(page, word);
@@ -189,6 +189,9 @@ test("the list follows an edit made while the card is open", async ({ page }) =>
   await expect(page.locator("[data-dag-hits-empty]")).toContainText("matches");
   /* Written by the other writer, with the card still up: the change feed says so, and the index
      asks again. */
-  fs.writeFileSync(path.join(BOARDS, `${board()}.board.md`), `${BOARD(word)}\n\`\`\`md {#late x=0 y=400}\nAdded ${word}later on.\n\`\`\`\n`);
+  fs.writeFileSync(
+    path.join(BOARDS, `${board()}.board.md`),
+    `${BOARD(word)}\n\`\`\`md {#late x=0 y=400}\nAdded ${word}later on.\n\`\`\`\n`,
+  );
   await expect(hit(page, board(), "late")).toBeVisible({ timeout: 10_000 });
 });

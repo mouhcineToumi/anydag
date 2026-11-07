@@ -143,7 +143,11 @@ const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
  * generated `.ts` file has neither problem. It holds names and nothing else, so the colour and
  * length rules `check-literals.mjs` enforces over `src/` are untouched.
  */
-const kebab = (pascal) => pascal.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([A-Z])([A-Z][a-z])/g, "$1-$2").toLowerCase();
+const kebab = (pascal) =>
+  pascal
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
 const lucide = Object.keys(await import("lucide-react"))
   .filter((k) => /^[A-Z]/.test(k) && !k.startsWith("Lucide") && !k.endsWith("Icon"))
   .map(kebab);
@@ -153,7 +157,13 @@ const lucide = Object.keys(await import("lucide-react"))
    redraw every board that wrote it. `emoji:house` is a new name, so nothing old changes meaning. */
 const emoji = buildEmoji(root);
 const every = [
-  ...new Set([...lucide, ...Object.keys(mono), ...Object.keys(color), ...Object.keys(aliases), ...emoji.names.map((n) => `emoji:${n}`)]),
+  ...new Set([
+    ...lucide,
+    ...Object.keys(mono),
+    ...Object.keys(color),
+    ...Object.keys(aliases),
+    ...emoji.names.map((n) => `emoji:${n}`),
+  ]),
 ].sort();
 writeFileSync(
   at("src/dsl/icon-names.ts"),
@@ -171,7 +181,9 @@ const index = await writeIconIndex();
 console.log(`src/render/icon-index.ts ${kb(index.length)}`);
 console.log(`icons/data/icons.json  ${kb(readFileSync(out).byteLength)}`);
 console.log(`  mono    ${bundle.counts.mono.toString().padStart(4)}  (simple-icons, currentColor)`);
-console.log(`  color   ${bundle.counts.color.toString().padStart(4)}  (logos: ${bundle.counts.color - vendorAdded}, vendor packs: ${vendorAdded})`);
+console.log(
+  `  color   ${bundle.counts.color.toString().padStart(4)}  (logos: ${bundle.counts.color - vendorAdded}, vendor packs: ${vendorAdded})`,
+);
 console.log(`  aliases ${bundle.counts.aliases.toString().padStart(4)}`);
 console.log(`  ${wordmarksSwapped} wordmark(s) swapped for their \`-icon\` sibling`);
 console.log(

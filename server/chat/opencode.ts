@@ -32,7 +32,15 @@ import path from "node:path";
 import { forgetOpencode, lines, tail, terminate } from "../../plugins/generate/cli";
 import { findOpencode, opencodeEnv } from "../../plugins/generate/providers";
 import { opencodeModel } from "../../plugins/generate/llm";
-import { bareTool, type Harness, type HarnessEvent, type McpCommand, type RunEnd, type RunOptions, type Running } from "./harness";
+import {
+  bareTool,
+  type Harness,
+  type HarnessEvent,
+  type McpCommand,
+  type RunEnd,
+  type RunOptions,
+  type Running,
+} from "./harness";
 import type { Usage } from "./types";
 
 const AGENT = "dag-assistant";
@@ -109,7 +117,9 @@ const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v 
 /** An `error` event's words: 2.2.5 sends `error.message`, older ones `error.data.message`. */
 function errorText(e: unknown): string {
   const o = obj(e);
-  return str(o?.message) ?? str(obj(o?.data)?.message) ?? str(o?.name) ?? (e === undefined ? "OpenCode failed" : JSON.stringify(e));
+  return (
+    str(o?.message) ?? str(obj(o?.data)?.message) ?? str(o?.name) ?? (e === undefined ? "OpenCode failed" : JSON.stringify(e))
+  );
 }
 
 function addUsage(st: OpencodeState, part: Obj) {
@@ -171,7 +181,8 @@ export function parseOpencodeLine(line: string, st: OpencodeState): HarnessEvent
  * tool a run that started before the MCP server attached is left with. Nothing else in the stream
  * says what was offered, so a model that simply answered "I have no tools" in words is not caught.
  */
-export const offeredNoTools = (st: OpencodeState): boolean => st.first.tools.includes("skill") && !st.first.tools.some((t) => t.startsWith("anydag_"));
+export const offeredNoTools = (st: OpencodeState): boolean =>
+  st.first.tools.includes("skill") && !st.first.tools.some((t) => t.startsWith("anydag_"));
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const sha = (...parts: string[]): string => createHash("sha1").update(parts.join("\0")).digest("hex");
@@ -223,7 +234,11 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
 
   async function api(s: Serve, method: string, route: string): Promise<Response> {
     const auth = Buffer.from(`opencode:${s.password}`).toString("base64");
-    return doFetch(`${s.url}${route}`, { method, headers: { Authorization: `Basic ${auth}` }, signal: AbortSignal.timeout(5_000) });
+    return doFetch(`${s.url}${route}`, {
+      method,
+      headers: { Authorization: `Basic ${auth}` },
+      signal: AbortSignal.timeout(5_000),
+    });
   }
 
   const interrupt = (s: Serve, session: string) => api(s, "POST", `/api/session/${encodeURIComponent(session)}/interrupt`);
@@ -233,7 +248,9 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
     const until = Date.now() + ATTACH_TIMEOUT_MS;
     while (Date.now() < until && s.child.exitCode === null) {
       try {
-        const body = (await (await api(s, "GET", "/api/mcp")).json()) as { data?: { name?: string; status?: { status?: string } }[] };
+        const body = (await (await api(s, "GET", "/api/mcp")).json()) as {
+          data?: { name?: string; status?: { status?: string } }[];
+        };
         if (body.data?.some((m) => m.name === "anydag" && m.status?.status === "connected")) return;
       } catch {
         /* not answering yet */
@@ -252,8 +269,16 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
     fs.mkdirSync(cwd);
     const system = path.join(dir, "system.md");
     fs.writeFileSync(system, r.system);
-    const env = { ...opencodeEnv(baseEnv()), XDG_CONFIG_HOME: xdg, OPENCODE_CONFIG_CONTENT: JSON.stringify(opencodeRunConfig(r.mcp, system)) } as NodeJS.ProcessEnv;
-    const child = spawn(binFor(env), ["serve", "--port", "0", "--hostname", "127.0.0.1"], { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+    const env = {
+      ...opencodeEnv(baseEnv()),
+      XDG_CONFIG_HOME: xdg,
+      OPENCODE_CONFIG_CONTENT: JSON.stringify(opencodeRunConfig(r.mcp, system)),
+    } as NodeJS.ProcessEnv;
+    const child = spawn(binFor(env), ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     const exited = new Promise<void>((resolve) => child.once("close", () => resolve()));
     const clean = () => fs.rmSync(dir, { recursive: true, force: true });
 
@@ -268,7 +293,10 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
         void exited.then(clean);
         reject(new Error(why));
       };
-      const timer = setTimeout(() => fail(`OpenCode did not start in ${START_TIMEOUT_MS / 1000} s: ${tail(out)}`), START_TIMEOUT_MS);
+      const timer = setTimeout(
+        () => fail(`OpenCode did not start in ${START_TIMEOUT_MS / 1000} s: ${tail(out)}`),
+        START_TIMEOUT_MS,
+      );
       const heard = (b: Buffer | string) => {
         out += b.toString();
         const url = /server listening on (http:\/\/\S+)/.exec(out)?.[1];
@@ -360,7 +388,10 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
       await warm(s, r);
       return s;
     });
-    gates.set(r.chat, next.catch(() => undefined));
+    gates.set(
+      r.chat,
+      next.catch(() => undefined),
+    );
     return next;
   }
 
@@ -374,7 +405,14 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
   }
 
   /** One client run. The first step is held back until it ends, so a run that found no tools can be dropped unseen. */
-  function attempt(s: Serve, r: RunOptions, on: (e: HarnessEvent) => void, canRetry: boolean, stopping: { value: boolean }, current: { stop?: () => Promise<void> }): Promise<Attempt> {
+  function attempt(
+    s: Serve,
+    r: RunOptions,
+    on: (e: HarnessEvent) => void,
+    canRetry: boolean,
+    stopping: { value: boolean },
+    current: { stop?: () => Promise<void> },
+  ): Promise<Attempt> {
     const st = newOpencodeState();
     let held: HarnessEvent[] | null = canRetry ? [] : null;
     let dropped = false;
@@ -450,7 +488,8 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
           const res = await attempt(leased, r, on, n === 0, stopping, current);
           if (!res.retry || stopping.value) return res.end;
           /* The abandoned attempt's session: a fresh one is the retry's to make again, so this one goes. */
-          if (res.session && !r.resume) await api(leased, "DELETE", `/api/session/${encodeURIComponent(res.session)}`).catch(() => undefined);
+          if (res.session && !r.resume)
+            await api(leased, "DELETE", `/api/session/${encodeURIComponent(res.session)}`).catch(() => undefined);
         }
       } catch (e) {
         const text = e instanceof Error ? e.message : String(e);

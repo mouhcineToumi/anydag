@@ -132,7 +132,7 @@ const isOp = (o: unknown): o is PatchOp => {
  */
 export const OPS_SHAPE =
   "expected `ops: [{ id, attrs?, body?, type? } | { id, remove: true } | { id, move } | " +
-  "{ insert: \"<fenced item text>\" | { type, attrs, body }, after? } | { meta }]`";
+  '{ insert: "<fenced item text>" | { type, attrs, body }, after? } | { meta }]`';
 
 /**
  * Warnings the generator should spend another round trip on — the plugin's set, by reference rather

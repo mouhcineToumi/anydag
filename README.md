@@ -1,5 +1,7 @@
 # AnyDag
 
+[![CI](https://github.com/mouhcineToumi/anydag/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/mouhcineToumi/anydag/actions/workflows/ci.yml) [![e2e](https://github.com/mouhcineToumi/anydag/actions/workflows/e2e.yml/badge.svg?branch=develop)](https://github.com/mouhcineToumi/anydag/actions/workflows/e2e.yml) [![Latest release](https://img.shields.io/github/v/release/mouhcineToumi/anydag)](https://github.com/mouhcineToumi/anydag/releases/latest) [![License: MIT](https://img.shields.io/github/license/mouhcineToumi/anydag)](LICENSE)
+
 A local desktop app for notes, boards, quizzes, tables, tasks and attachments, with no account and
 no cloud. Open a folder — a **vault** — and everything in it is a plain file: AnyDag lists it,
 edits it, links it and searches it, and keeps only rebuildable indexes outside it.
@@ -48,7 +50,9 @@ update to an app without a developer signature), so on a Mac you download the ne
 
 ## Install
 
-Download the file for your system from [Releases](https://github.com/mouhcineToumi/anydag/releases).
+Download the file for your system from [Releases](https://github.com/mouhcineToumi/anydag/releases): the
+latest release is the stable one, and pre-releases named `X.Y.Z-nightly.YYYYMMDDHHmm` are nightly builds of
+`develop` — newer, and possibly broken.
 
 **Linux** — `AnyDag-<version>.AppImage`:
 
@@ -111,8 +115,10 @@ npm run dev                 # Vite + the local server on boards/local/:  http://
 npm run desktop:dev         # the Electron app on the same code
 npm run desktop:dist        # package it for the system you are on, into release/
 
-npm run checks              # typechecks, the check:* scripts, the unit suite — what every commit runs
-npm run gate                # the same, then the Playwright suite
+npm run checks              # lint, knip, typechecks, the check:* scripts, the unit suite — what every commit runs
+npm run e2e:smoke           # the browser suite's smoke tier, in the Playwright Docker image
+npm run e2e:docker          # the whole browser suite there, screenshots compared
+npm run gate                # checks, then the whole browser suite
 
 npm link                    # puts `anydag` on the PATH from this checkout
 ```
@@ -121,7 +127,9 @@ npm link                    # puts `anydag` on the PATH from this checkout
 
 | Path | For |
 |---|---|
-| `CLAUDE.md` (also `AGENTS.md`) | the contributor guide: layer boundaries, rules, and the things that will bite |
+| `CONTRIBUTING.md` | how to set up, the branch model, the issue workflow, and what a PR needs |
+| `CLAUDE.md`, `AGENTS.md` | the short map of the code for agents and people; `AGENTS.md` is the contributor workflow for agents |
+| `docs/architecture/` | the long-form architecture, one file per area: layers, rules, and the things that will bite |
 | `server/` | the one Node process: the vault store, every route, the MCP tools |
 | `desktop/` | the Electron shell around it |
 | `cli/` | `anydag`, the command line |
@@ -134,15 +142,23 @@ npm link                    # puts `anydag` on the PATH from this checkout
 
 ## Contributing
 
-Issues and pull requests are welcome. `npm install` sets up the git hooks: `npm run checks` runs
-before every commit, and the Playwright suite before every push (`npm run e2e:local`). A new route,
-CLI command or MCP tool needs a line in `docs/parity.json` — the checks say so if it is missing.
-`CLAUDE.md` is long; read the section for the part you are changing.
+Issues and pull requests are welcome. Open an issue first and wait for it to be marked
+`status: ready`; a pull request goes into `develop` and closes that issue. `npm ci` sets up the git
+hooks, and `npm run checks` runs before every commit.
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — set-up, branches, the issue workflow, Definition of Ready and of Done.
+- [AGENTS.md](AGENTS.md) — the same, for AI coding agents (Claude Code reads [CLAUDE.md](CLAUDE.md)).
+- [SECURITY.md](SECURITY.md) — report a vulnerability privately, not in an issue.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — how we treat each other.
+
+A new route, CLI command or MCP tool needs a line in `docs/parity.json`; the checks say so if it is missing.
+The code is explained in [`docs/architecture/`](docs/architecture/README.md); read the file for the part
+you are changing.
 
 ## Releases
 
-A release is a tag: bump `VERSION` and `package.json` together, merge, and push `v<version>`.
-`.github/workflows/release.yml` checks, builds, smoke-tests and publishes it.
+Stable releases are cut from `release/X.Y.Z` branches and merged to `main`; nightlies are built from
+`develop`. See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Licence
 

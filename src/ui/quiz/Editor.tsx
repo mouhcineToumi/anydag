@@ -55,7 +55,18 @@ interface FieldProps {
   attrs?: Record<string, string>;
 }
 
-function Field({ value, onCommit, multiline = false, minRows = 2, placeholder, label, readOnly, autoFocus, className, attrs }: FieldProps) {
+function Field({
+  value,
+  onCommit,
+  multiline = false,
+  minRows = 2,
+  placeholder,
+  label,
+  readOnly,
+  autoFocus,
+  className,
+  attrs,
+}: FieldProps) {
   const [draft, setDraft] = useState(value);
   const focused = useRef(false);
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
@@ -85,7 +96,11 @@ function Field({ value, onCommit, multiline = false, minRows = 2, placeholder, l
     },
     ...attrs,
   };
-  return multiline ? <textarea rows={Math.min(12, Math.max(minRows, draft.split("\n").length))} {...common} /> : <input type="text" {...common} />;
+  return multiline ? (
+    <textarea rows={Math.min(12, Math.max(minRows, draft.split("\n").length))} {...common} />
+  ) : (
+    <input type="text" {...common} />
+  );
 }
 
 /**
@@ -150,7 +165,14 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
       <header className="dag-quiz__card-head">
         <span className="dag-quiz__card-number">Question {index + 1}</span>
         <span className="dag-quiz__card-tools">
-          <button type="button" className="dag-icon" title="Move up" aria-label="Move up" disabled={index === 0} onClick={() => onMove(index - 1)}>
+          <button
+            type="button"
+            className="dag-icon"
+            title="Move up"
+            aria-label="Move up"
+            disabled={index === 0}
+            onClick={() => onMove(index - 1)}
+          >
             <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
           </button>
           <button
@@ -174,7 +196,14 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
               </button>
             </span>
           ) : (
-            <button type="button" className="dag-icon" title="Delete question" aria-label="Delete question" data-dag-quiz-delete="" onClick={() => setAsking(true)}>
+            <button
+              type="button"
+              className="dag-icon"
+              title="Delete question"
+              aria-label="Delete question"
+              data-dag-quiz-delete=""
+              onClick={() => setAsking(true)}
+            >
               <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
             </button>
           )}
@@ -202,13 +231,19 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
       />
       {open ? (
         <p className="dag-quiz__note" data-dag-quiz-open="">
-          Answered in words: the person writes an answer, sees the model answer below, and says whether they had it.
-          Add an option to make it multiple choice.
+          Answered in words: the person writes an answer, sees the model answer below, and says whether they had it. Add an option
+          to make it multiple choice.
         </p>
       ) : null}
       <div className="dag-quiz__options" role="list" aria-label="Options">
         {q.options.map((o, i) => (
-          <div key={i} className="dag-quiz__option" role="listitem" data-dag-quiz-option={i} data-dag-quiz-correct={o.correct ? "" : undefined}>
+          <div
+            key={i}
+            className="dag-quiz__option"
+            role="listitem"
+            data-dag-quiz-option={i}
+            data-dag-quiz-correct={o.correct ? "" : undefined}
+          >
             <input
               type="checkbox"
               className="dag-check"
@@ -386,7 +421,14 @@ export function QuizEditor({
       <div className="dag-quiz__bar">
         <div className="dag-quiz__mode" role="radiogroup" aria-label="Edit as">
           {(["questions", "source"] as const).map((m) => (
-            <button key={m} type="button" role="radio" aria-checked={mode === m} data-dag-quiz-mode={m} onClick={() => chooseMode(m)}>
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              data-dag-quiz-mode={m}
+              onClick={() => chooseMode(m)}
+            >
               {m === "questions" ? "Questions" : "Source"}
             </button>
           ))}
@@ -395,7 +437,14 @@ export function QuizEditor({
       </div>
       {mode === "source" ? (
         <div className="dag-quiz__source">
-          <Field label="Source" multiline value={text} className="dag-quiz__source-text" attrs={{ "data-dag-quiz-source": "" }} onCommit={onChange} />
+          <Field
+            label="Source"
+            multiline
+            value={text}
+            className="dag-quiz__source-text"
+            attrs={{ "data-dag-quiz-source": "" }}
+            onCommit={onChange}
+          />
           <Problems list={quiz.diagnostics} lines />
         </div>
       ) : (
@@ -409,7 +458,13 @@ export function QuizEditor({
             onCommit={(md) => onChange(setDescription(text, md))}
           />
           <label className="dag-quiz__check dag-quiz__shuffle">
-            <input type="checkbox" className="dag-check" checked={quiz.shuffle} data-dag-quiz-shuffle="" onChange={(e) => onChange(setShuffle(text, e.target.checked))} />
+            <input
+              type="checkbox"
+              className="dag-check"
+              checked={quiz.shuffle}
+              data-dag-quiz-shuffle=""
+              onChange={(e) => onChange(setShuffle(text, e.target.checked))}
+            />
             Shuffle the options in each run
             <span className="dag-quiz__hint"> — a pinned option, and one that begins “All of the above”, keeps its place</span>
           </label>

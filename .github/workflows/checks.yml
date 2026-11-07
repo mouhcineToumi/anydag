@@ -1,0 +1,125 @@
+# The fast tier, and — for a release or a nightly — the sync server's own tests.
+#
+# One definition for `ci.yml`, `nightly.yml` and `release.yml`. The fast tier is `npm run checks`
+# (`scripts/checks.sh`: typecheck, lint, the `check:*` contracts, parity and the unit suite): no
+# browser, no network, about a minute.
+#
+# **`tsc` is incremental** and keeps its build info under `node_modules/.cache/tsc/`, which `npm ci`
+# deletes. It is restored after the install, keyed on what decides whether it is valid (the
+# lockfile and the tsconfigs) and then on the commit: a run starts from the newest one a branch or
+# `develop` saved, so it checks what changed. Pull requests read the caches `develop` saves.
+name: checks
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "The commit or tag to check. Empty is the caller's own."
+        type: string
+        default: ""
+      tag:
+        description: "When set, the version in the tree must be this tag."
+        type: string
+        default: ""
+      sync:
+        description: "Also run the sync server's convergence harness and its Postgres suites."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  fast:
+    name: fast tier
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # `tsc -p desktop` needs Electron's types, not its 100 MB binary.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: The tag is the version
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: node scripts/check-version.mjs "$TAG"
+      - run: npm ci
+      - name: tsc's incremental build info
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/tsc
+          key: tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}-
+      # One step rather than a list, and `scripts/checks.sh` is why: the same list was written out in
+      # CI, in `scripts/gate.sh` and in `.githooks/pre-commit`. The script prints each step's name,
+      # so a red run still says which one went red.
+      - run: npm run checks
+
+  # typescript-eslint's three promise rules (`eslint.config.mjs`) over one program that includes
+  # `e2e/` and `desktop/`, which no `tsc` step checks. About 40 s, so it is a job of its own beside the
+  # fast tier rather than a step in it, and not in the commit hook.
+  promises:
+    name: promises
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:promises
+
+  # The sync server is a separate process with its own wire and its own suites, and these are the
+  # slow ones: a hundred seeded schedules of two or three devices editing, renaming and going offline
+  # (`sync/test/converge.test.ts`), and the metadata, route and collector suites on a real Postgres.
+  sync:
+    name: sync server
+    if: inputs.sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      # `npm run sync:test:pg` reads this; the default is `sync/compose.yaml`'s port on a laptop.
+      ANYDAG_SYNC_TEST_PG: postgres://anydag:anydag@127.0.0.1:5432/anydag_sync
+    services:
+      postgres:
+        # The image `sync/compose.yaml` runs, with the same credentials.
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: anydag
+          POSTGRES_PASSWORD: anydag
+          POSTGRES_DB: anydag_sync
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U anydag -d anydag_sync"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Convergence (a hundred seeds)
+        run: npm run sync:converge
+      - name: Meta, routes and the collector on Postgres
+        run: npm run sync:test:pg

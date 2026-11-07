@@ -113,14 +113,10 @@ export function check(d: Draft): DraftDiagnostic[] {
 type Found = { draft: Draft } | { none: string };
 
 /** A body with its trailing whitespace gone — per line, then the whole — the form two bodies are compared in. */
-export const normalizedBody = (body: string): string =>
-  body
-    .replace(/[ \t]+$/gm, "")
-    .replace(/\s+$/, "");
+export const normalizedBody = (body: string): string => body.replace(/[ \t]+$/gm, "").replace(/\s+$/, "");
 
 /** True when a draft's body says exactly what the source says — the model has echoed, not rewritten. */
-export const echoesSource = (body: string, source: string): boolean =>
-  normalizedBody(body) === normalizedBody(source);
+export const echoesSource = (body: string, source: string): boolean => normalizedBody(body) === normalizedBody(source);
 
 /**
  * The diagram fence in a reply, whatever the model wrapped around it.
@@ -149,7 +145,9 @@ export function extract(reply: string, as?: DiagramType, source?: string): Found
     return { draft };
   }
   const foreign = board.errors.find((e) => e.code === CODES.EB_UNKNOWN_TYPE);
-  const said = foreign ? ` Your reply opened a fence with ${foreign.message.replace(/^unknown item type /, "")}, which is not one of them.` : "";
+  const said = foreign
+    ? ` Your reply opened a fence with ${foreign.message.replace(/^unknown item type /, "")}, which is not one of them.`
+    : "";
   return {
     none: `I could not find a diagram in your reply.${said} Answer with exactly one fenced block whose info word is ${as ? `\`${as}\`` : `one of ${DIAGRAM_TYPES.map((t) => `\`${t}\``).join(", ")}`}.`,
   };
@@ -160,8 +158,7 @@ const fixableIn = (ds: DraftDiagnostic[]) => ds.filter((d) => d.severity === "wa
 const warningsIn = (ds: DraftDiagnostic[]) => ds.filter((d) => d.severity === "warn").length;
 
 /** Fewer errors wins, then fewer warnings. */
-const better = (a: DraftDiagnostic[], b: DraftDiagnostic[]) =>
-  errorsIn(a) - errorsIn(b) || warningsIn(a) - warningsIn(b);
+const better = (a: DraftDiagnostic[], b: DraftDiagnostic[]) => errorsIn(a) - errorsIn(b) || warningsIn(a) - warningsIn(b);
 
 /** What the model is told about its last answer: every problem, one line each, with its code. */
 export function feedback(ds: DraftDiagnostic[], wrongType?: { want: DiagramType; got: DiagramType }): string {
@@ -200,7 +197,10 @@ export async function generate(o: GenerateOptions): Promise<GenerateResult> {
   const max = Math.max(1, o.attempts ?? 3);
   const messages: Message[] = [
     { role: "system", content: o.system },
-    { role: "user", content: o.source === undefined ? request(o.prompt, o.as) : rewriteRequest(o.prompt, o.source, o.as, o.from) },
+    {
+      role: "user",
+      content: o.source === undefined ? request(o.prompt, o.as) : rewriteRequest(o.prompt, o.source, o.as, o.from),
+    },
   ];
 
   let best: { draft: Draft; diagnostics: DraftDiagnostic[] } | undefined;
@@ -224,12 +224,21 @@ export async function generate(o: GenerateOptions): Promise<GenerateResult> {
     /* A diagram of the wrong type is still a diagram, and may be the best one there is; it just
        counts as an error, so it never wins over a draft that is what was asked for. */
     const scored = wrongType
-      ? [{ line: 0, code: CODES.EG_WRONG_TYPE, message: `asked for \`${o.as}\`, drew \`${found.draft.type}\``, severity: "error" as const }, ...diagnostics]
+      ? [
+          {
+            line: 0,
+            code: CODES.EG_WRONG_TYPE,
+            message: `asked for \`${o.as}\`, drew \`${found.draft.type}\``,
+            severity: "error" as const,
+          },
+          ...diagnostics,
+        ]
       : diagnostics;
 
     if (!best || better(scored, best.diagnostics) < 0) best = { draft: found.draft, diagnostics: scored };
     if (errorsIn(scored) === 0 && fixableIn(scored) === 0) break;
-    if (n < max) messages.push({ role: "assistant", content: reply }, { role: "user", content: feedback(diagnostics, wrongType) });
+    if (n < max)
+      messages.push({ role: "assistant", content: reply }, { role: "user", content: feedback(diagnostics, wrongType) });
   }
 
   if (!best) return { ok: false, diagnostics: [], attempts: used, error: lastNone || "the model gave no answer" };

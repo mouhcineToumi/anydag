@@ -59,12 +59,14 @@ export class PracticeRefused extends Error {}
 /** `{events: [{quiz, question, correct, run}]}`'s list, checked. */
 export function answersOf(raw: unknown): Answer[] {
   if (!Array.isArray(raw)) throw new PracticeRefused("`events` is a list of answers");
-  if (raw.length > MAX_EVENTS) throw new PracticeRefused(`${raw.length} answers in one request; the limit is ${MAX_EVENTS}. Send them as they happen.`);
+  if (raw.length > MAX_EVENTS)
+    throw new PracticeRefused(`${raw.length} answers in one request; the limit is ${MAX_EVENTS}. Send them as they happen.`);
   return raw.map((e, i) => {
     if (!e || typeof e !== "object" || Array.isArray(e)) throw new PracticeRefused(`answer ${i} is not an object`);
     const { quiz, question, correct, run } = e as Record<string, unknown>;
     if (!validId(quiz)) throw new PracticeRefused(`answer ${i}: \`quiz\` is a quiz's id`);
-    if (typeof question !== "string" || !QUESTION_ID.test(question)) throw new PracticeRefused(`answer ${i}: \`question\` is a question's id`);
+    if (typeof question !== "string" || !QUESTION_ID.test(question))
+      throw new PracticeRefused(`answer ${i}: \`question\` is a question's id`);
     if (typeof correct !== "boolean") throw new PracticeRefused(`answer ${i}: \`correct\` is true or false`);
     if (!RUNS.includes(run as Run)) throw new PracticeRefused(`answer ${i}: \`run\` is one of ${RUNS.join(", ")}`);
     return { quiz, question, correct, run: run as Run };
@@ -87,7 +89,8 @@ export function pool(records: Records, graduate: number, alive: Map<string, Set<
   for (const [quiz, questions] of Object.entries(records)) {
     const there = alive.get(quiz);
     if (!there) continue;
-    for (const [question, s] of Object.entries(questions)) if (there.has(question) && inPool(s, graduate)) out.push({ quiz, question, ...s });
+    for (const [question, s] of Object.entries(questions))
+      if (there.has(question) && inPool(s, graduate)) out.push({ quiz, question, ...s });
   }
   const cmp = (a: string | number, b: string | number) => (a < b ? -1 : a > b ? 1 : 0);
   return out.sort((a, b) => cmp(a.streak, b.streak) || cmp(a.at, b.at) || cmp(a.quiz, b.quiz) || cmp(a.question, b.question));
@@ -131,11 +134,11 @@ export class Practice {
   }
 
   records(quiz?: string): Records {
-    const rows = (
-      quiz === undefined
-        ? this.home.sql("select quiz, question, record from practice where vault = ?").all(this.vault)
-        : this.home.sql("select quiz, question, record from practice where vault = ? and quiz = ?").all(this.vault, quiz)
-    ) as unknown as { quiz: string; question: string; record: string }[];
+    const rows = (quiz === undefined
+      ? this.home.sql("select quiz, question, record from practice where vault = ?").all(this.vault)
+      : this.home
+          .sql("select quiz, question, record from practice where vault = ? and quiz = ?")
+          .all(this.vault, quiz)) as unknown as { quiz: string; question: string; record: string }[];
     const out: Records = {};
     for (const r of rows) {
       let parsed: unknown = null;

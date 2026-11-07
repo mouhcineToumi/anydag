@@ -37,7 +37,12 @@ describe("writes", () => {
     await env.vault.write("plan", "board", BOARD + "more\n", null);
     await env.vault.putFile("a.pdf", PDF, null);
     await env.vault.rename("plan", "board", "work/plan");
-    expect(fs.readdirSync(env.root, { recursive: true }).map(String).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+    expect(
+      fs
+        .readdirSync(env.root, { recursive: true })
+        .map(String)
+        .filter((f) => f.endsWith(".tmp")),
+    ).toEqual([]);
   });
 
   it("is one vault, one folder: nothing leaks to a sibling folder and no owner directory is made", async () => {

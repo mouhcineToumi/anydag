@@ -15,7 +15,7 @@ const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const PLAIN = /^[A-Za-z][A-Za-z0-9 _.,()'&+-]*$/;
 const WORDS = new Set(["true", "false", "null", "yes", "no", "on", "off", "y", "n"]);
 
-export function scalar(title: string): string {
+function scalar(title: string): string {
   if (PLAIN.test(title) && !WORDS.has(title.toLowerCase()) && !title.endsWith(" ")) return title;
   return JSON.stringify(title);
 }

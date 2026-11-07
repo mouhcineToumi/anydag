@@ -33,7 +33,11 @@ export default async function globalSetup(): Promise<void> {
   try {
     const asked = (await (await fetch(`${ORIGIN}/api/telemetry`)).json()) as { consent: boolean | null };
     if (asked.consent === null) {
-      await fetch(`${ORIGIN}/api/telemetry`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) });
+      await fetch(`${ORIGIN}/api/telemetry`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      });
     }
   } catch {
     /* A server too old to ask: there is no card to answer either. */

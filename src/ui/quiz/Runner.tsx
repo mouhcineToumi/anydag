@@ -146,7 +146,14 @@ function OpenAnswer({
         if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !shown) {
           e.preventDefault();
           onReveal();
-        } else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && text === "" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        } else if (
+          (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+          text === "" &&
+          !e.shiftKey &&
+          !e.altKey &&
+          !e.ctrlKey &&
+          !e.metaKey
+        ) {
           e.preventDefault();
           onStep(e.key === "ArrowLeft" ? -1 : 1);
         }
@@ -227,10 +234,7 @@ export function Runner({
     (box ?? root.current)?.focus({ preventScroll: true });
   }, [at, round, done]);
 
-  const toggle = useCallback(
-    (i: number) => setState((r) => pickIn(r, i, asked[r.at]?.question.multi ?? false)),
-    [asked],
-  );
+  const toggle = useCallback((i: number) => setState((r) => pickIn(r, i, asked[r.at]?.question.multi ?? false)), [asked]);
 
   const check = useCallback(() => {
     if (!current || checked || picked.length === 0) return;
@@ -383,7 +387,7 @@ export function Runner({
   const last = at + 1 >= asked.length;
   const answered = state.verdicts.filter((v) => v !== undefined).length;
   const about = current!.quiz.description?.trim() ?? "";
-  const aboutTitle = showSource ? current!.quiz.title ?? name : "About this quiz";
+  const aboutTitle = showSource ? (current!.quiz.title ?? name) : "About this quiz";
   const aside = about !== "" && aboutOpen;
   return (
     <div
@@ -406,7 +410,12 @@ export function Runner({
               <span className="dag-run__progress-bar" style={{ width: `${(answered / asked.length) * 100}%` }} />
             </span>
             {about !== "" && !aboutOpen ? (
-              <button type="button" className="dag-icon dag-icon--wide dag-run__about-show" data-dag-run-about-show="" onClick={() => showAbout(true)}>
+              <button
+                type="button"
+                className="dag-icon dag-icon--wide dag-run__about-show"
+                data-dag-run-about-show=""
+                onClick={() => showAbout(true)}
+              >
                 <Info size={14} strokeWidth={2} aria-hidden="true" />
                 About this quiz
               </button>
@@ -443,38 +452,42 @@ export function Runner({
               onStep={(by) => (by < 0 ? previous() : next())}
             />
           ) : (
-          <div className="dag-run__options" role={multi ? "group" : "radiogroup"} aria-label="Options">
-            {order.map((i, place) => {
-              const o = q.options[i]!;
-              const on = picked.includes(i);
-              const mark = checked ? (o.correct ? "right" : on ? "wrong" : undefined) : undefined;
-              const block = isBlock(o.text);
-              return (
-                <label
-                  key={i}
-                  className={block ? "dag-run__option dag-run__option--block" : "dag-run__option"}
-                  data-dag-run-option={i}
-                  data-dag-run-place={place}
-                  data-dag-run-picked={on ? "" : undefined}
-                  data-dag-run-mark={mark}
-                >
-                  <input
-                    type={multi ? "checkbox" : "radio"}
-                    name={`dag-run-${round}-${at}`}
-                    checked={on}
-                    disabled={checked}
-                    onChange={() => toggle(i)}
-                  />
-                  <span className="dag-run__key" aria-hidden="true">
-                    {place < 9 ? place + 1 : ""}
-                  </span>
-                  <OptionText name={name} md={o.text} block={block} />
-                  {mark === "right" ? <Check className="dag-run__mark" size={16} strokeWidth={2.5} aria-label="Correct" /> : null}
-                  {mark === "wrong" ? <X className="dag-run__mark" size={16} strokeWidth={2.5} aria-label="Not correct" /> : null}
-                </label>
-              );
-            })}
-          </div>
+            <div className="dag-run__options" role={multi ? "group" : "radiogroup"} aria-label="Options">
+              {order.map((i, place) => {
+                const o = q.options[i]!;
+                const on = picked.includes(i);
+                const mark = checked ? (o.correct ? "right" : on ? "wrong" : undefined) : undefined;
+                const block = isBlock(o.text);
+                return (
+                  <label
+                    key={i}
+                    className={block ? "dag-run__option dag-run__option--block" : "dag-run__option"}
+                    data-dag-run-option={i}
+                    data-dag-run-place={place}
+                    data-dag-run-picked={on ? "" : undefined}
+                    data-dag-run-mark={mark}
+                  >
+                    <input
+                      type={multi ? "checkbox" : "radio"}
+                      name={`dag-run-${round}-${at}`}
+                      checked={on}
+                      disabled={checked}
+                      onChange={() => toggle(i)}
+                    />
+                    <span className="dag-run__key" aria-hidden="true">
+                      {place < 9 ? place + 1 : ""}
+                    </span>
+                    <OptionText name={name} md={o.text} block={block} />
+                    {mark === "right" ? (
+                      <Check className="dag-run__mark" size={16} strokeWidth={2.5} aria-label="Correct" />
+                    ) : null}
+                    {mark === "wrong" ? (
+                      <X className="dag-run__mark" size={16} strokeWidth={2.5} aria-label="Not correct" />
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
           )}
           {q.open && shown ? (
             <div className="dag-run__verdict" data-dag-run-verdict={checked ? (right ? "right" : "wrong") : "open"}>
@@ -592,7 +605,17 @@ export function Runner({
  * Every question with its answers showing — what `?snapshot=1` draws for a quiz, because a picture
  * of a quiz is a fact about the file, and a runner frozen on question one is a picture of nothing.
  */
-export function Sheet({ name, title, description, questions }: { name: string; title: string; description: string; questions: Question[] }) {
+export function Sheet({
+  name,
+  title,
+  description,
+  questions,
+}: {
+  name: string;
+  title: string;
+  description: string;
+  questions: Question[];
+}) {
   return (
     <article className="dag-quiz-sheet" data-dag-quiz-sheet="">
       <h1 className="dag-quiz-sheet__title">{title}</h1>
@@ -616,18 +639,24 @@ export function Sheet({ name, title, description, questions }: { name: string; t
               </p>
             ) : null}
             {q.options.length ? (
-            <ul className="dag-quiz-sheet__options">
-              {q.options.map((o, i) => (
-                <li
-                  key={i}
-                  className={isBlock(o.text) ? "dag-quiz-sheet__option dag-quiz-sheet__option--block" : "dag-quiz-sheet__option"}
-                  data-dag-run-mark={o.correct ? "right" : undefined}
-                >
-                  {o.correct ? <Check className="dag-run__mark" size={14} strokeWidth={2.5} aria-label="Correct" /> : <span className="dag-quiz-sheet__blank" />}
-                  <OptionText name={name} md={o.text} block={isBlock(o.text)} />
-                </li>
-              ))}
-            </ul>
+              <ul className="dag-quiz-sheet__options">
+                {q.options.map((o, i) => (
+                  <li
+                    key={i}
+                    className={
+                      isBlock(o.text) ? "dag-quiz-sheet__option dag-quiz-sheet__option--block" : "dag-quiz-sheet__option"
+                    }
+                    data-dag-run-mark={o.correct ? "right" : undefined}
+                  >
+                    {o.correct ? (
+                      <Check className="dag-run__mark" size={14} strokeWidth={2.5} aria-label="Correct" />
+                    ) : (
+                      <span className="dag-quiz-sheet__blank" />
+                    )}
+                    <OptionText name={name} md={o.text} block={isBlock(o.text)} />
+                  </li>
+                ))}
+              </ul>
             ) : null}
             {q.why ? (
               <div className="dag-run__why dag-md">

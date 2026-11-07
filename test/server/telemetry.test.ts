@@ -111,7 +111,11 @@ describe("where logs go", () => {
     await t.flush();
     expect(sent).toHaveLength(1);
     expect(sent[0]!.url).toBe("https://logs.example/v1/logs");
-    expect(sent[0]!.body).toMatchObject({ v: 1, env: { version: "0.1.0", install: env.home.get("telemetry.install") }, events: [{ name: "feature.use" }] });
+    expect(sent[0]!.body).toMatchObject({
+      v: 1,
+      env: { version: "0.1.0", install: env.home.get("telemetry.install") },
+      events: [{ name: "feature.use" }],
+    });
 
     const nowhere = new Telemetry(env.home, "0.1.0", { ANYDAG_LOGS_URL: "off" }, fake);
     nowhere.event("feature.use", { what: "search" });

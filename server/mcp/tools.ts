@@ -53,7 +53,7 @@ export interface Kit {
   needWrite(what: string): void;
 }
 
-export interface Call extends Omit<CallOptions, "raw"> {
+interface Call extends Omit<CallOptions, "raw"> {
   vault?: string | undefined;
 }
 
@@ -151,7 +151,8 @@ function blank(kind: string, title: string | undefined, text: string, named: boo
 }
 
 const leafOf = (n: string) => n.slice(n.lastIndexOf("/") + 1);
-const inFolder = (folder: string | undefined, leaf: string) => (folder && folder.replace(/^\/+|\/+$/g, "") ? `${folder.replace(/^\/+|\/+$/g, "")}/${leaf}` : leaf);
+const inFolder = (folder: string | undefined, leaf: string) =>
+  folder && folder.replace(/^\/+|\/+$/g, "") ? `${folder.replace(/^\/+|\/+$/g, "")}/${leaf}` : leaf;
 
 /** The first and last day an event touches, as written. */
 function eventDays(event: { start: string; end?: string }): [string, string] {
@@ -171,7 +172,11 @@ function eventDays(event: { start: string; end?: string }): [string, string] {
 function projectArg(project: string, listed: { projects: Record<string, Project> }): { only: string | null; none: boolean } {
   if (project === "none") return { only: null, none: true };
   const folders = projectFolders(listed.projects);
-  const only = folders.has(project) ? project : project in listed.projects ? project.slice(0, project.lastIndexOf("/")) : undefined;
+  const only = folders.has(project)
+    ? project
+    : project in listed.projects
+      ? project.slice(0, project.lastIndexOf("/"))
+      : undefined;
   if (only === undefined || !only) throw new ToolError(`no project \`${project}\` — \`project_list\` says which there are`);
   return { only, none: false };
 }
@@ -194,10 +199,10 @@ function pictureOf(data: Uint8Array, mime: string, path: string): Picture {
  * starts. The maps beside the names — titles, ids, tasks — are cut to the page.
  */
 /** Enough to see a folder whole, little enough to read: about 45 KB of quizzes at the most. */
-export const LIMIT = 100;
-export const MAX_LIMIT = 500;
+const LIMIT = 100;
+const MAX_LIMIT = 500;
 
-export interface Page {
+interface Page {
   names: string[];
   folders: string[];
   total: number;
@@ -205,19 +210,23 @@ export interface Page {
 }
 
 /** The three arguments every list tool takes. */
-export const pageArgs = {
+const pageArgs = {
   folder: z.string().optional().describe("Only what is under this folder, subfolders included."),
   limit: z.number().int().default(LIMIT).describe(`How many at a time: ${LIMIT} unless said, at most ${MAX_LIMIT}.`),
   cursor: z.string().optional().describe("Where the page starts: a listing's `next_cursor`, as it came."),
 };
 
-export const PAGE_NOTE =
+const PAGE_NOTE =
   "`folder` narrows it to what is under that folder, subfolders included; it comes `limit` at a time (100, at most 500), and `next_cursor`, when there is more, is the `cursor` for the next page — `total` says how many there are in all.";
 
 const under = (name: string, folder: string): boolean => name.startsWith(`${folder}/`);
 
 /** The names under `folder` (all of them without one), `limit` from `cursor`, and the folders under it. */
-export function page(names: Iterable<string>, folders: Iterable<string>, opts: { folder?: string; limit?: number; cursor?: string } = {}): Page {
+function page(
+  names: Iterable<string>,
+  folders: Iterable<string>,
+  opts: { folder?: string; limit?: number; cursor?: string } = {},
+): Page {
   const where = (opts.folder ?? "").replace(/^\/+|\/+$/g, "");
   const size = opts.limit ?? LIMIT;
   if (!Number.isInteger(size) || size < 1 || size > MAX_LIMIT) throw new ToolError(`\`limit\` is from 1 to ${MAX_LIMIT}`);
@@ -236,7 +245,12 @@ export function page(names: Iterable<string>, folders: Iterable<string>, opts: {
   };
 }
 
-async function docList(kit: Kit, kind: "board" | "note" | "quiz" | "table", v?: string, paging: { folder?: string; limit?: number; cursor?: string } = {}) {
+async function docList(
+  kit: Kit,
+  kind: "board" | "note" | "quiz" | "table",
+  v?: string,
+  paging: { folder?: string; limit?: number; cursor?: string } = {},
+) {
   const got = await kit.api("GET", "/__board/list", { vault: v });
   const shown = page(got[PLURAL[kind]] as string[], got.folders as string[], paging);
   const names = shown.names;
@@ -274,7 +288,11 @@ async function docCreate(kit: Kit, kind: string, name: string, text: string, tit
 
 async function docWrite(kit: Kit, kind: string, name: string, text: string, base: string | undefined, v?: string) {
   kit.needWrite(`write a ${kind}`);
-  const got = await kit.api("POST", "/__board/put", { vault: v, query: { name, kind }, body: { text, ...(base !== undefined ? { base } : {}) } });
+  const got = await kit.api("POST", "/__board/put", {
+    vault: v,
+    query: { name, kind },
+    body: { text, ...(base !== undefined ? { base } : {}) },
+  });
   return { name, base: got.base, url: await kit.url(name, kind, v) };
 }
 
@@ -297,7 +315,19 @@ async function docTitle(kit: Kit, kind: string, name: string, title: string, fol
 }
 
 /** The tools every text kind has, named `<kind>_…` and described for that kind. */
-function kindTools(kind: "note" | "quiz" | "table", lines: { read: string; create: string; write: string; rename: string; duplicate: string; del: string; title: string; list: string }): Tool[] {
+function kindTools(
+  kind: "note" | "quiz" | "table",
+  lines: {
+    read: string;
+    create: string;
+    write: string;
+    rename: string;
+    duplicate: string;
+    del: string;
+    title: string;
+    list: string;
+  },
+): Tool[] {
   const createArgs = { name: z.string().default(""), text: z.string().default(""), title: z.string().optional(), vault };
   return [
     tool({
@@ -385,7 +415,9 @@ const boardTools: Tool[] = [
   }),
   tool({
     name: "board_fences",
-    description: withNote("What items are on a board — each one's id, type, page and line — without its whole text. Read this before `board_read` on a board you only need one item of."),
+    description: withNote(
+      "What items are on a board — each one's id, type, page and line — without its whole text. Read this before `board_read` on a board you only need one item of.",
+    ),
     write: false,
     input: { name: z.string(), vault },
     run: ({ name, vault: v }, kit) => kit.api("GET", "/__board/fences", { vault: v, query: { name } }),
@@ -439,20 +471,26 @@ const boardTools: Tool[] = [
     name: "board_patch",
     description: withNote(
       "Change part of a board, leaving the rest of the file byte for byte as it was.\n\n" +
-        "An op is one of `{id, attrs}` · `{id, body}` · `{id, remove: true}` · `{insert: \"<text>\", after?: \"<id>\"}` · `{meta: {...}}` — the frontmatter. Use this rather than `board_write` when a person may be editing the same board: it rewrites one span, so their concurrent change to another item survives and the diff stays the size of the edit.\n\n" +
+        'An op is one of `{id, attrs}` · `{id, body}` · `{id, remove: true}` · `{insert: "<text>", after?: "<id>"}` · `{meta: {...}}` — the frontmatter. Use this rather than `board_write` when a person may be editing the same board: it rewrites one span, so their concurrent change to another item survives and the diff stays the size of the edit.\n\n' +
         "`attrs` merges; a key set to null is removed. A `remove` takes every link that named the item, or a card inside it, out of the board's `edges` fences in the same write.",
     ),
     write: true,
     input: { name: z.string(), ops: z.array(z.record(z.string(), z.unknown())), base: z.string().optional(), vault },
     run: async ({ name, ops, base, vault: v }, kit) => {
       kit.needWrite("patch a board");
-      const got = await kit.api("POST", "/__board/patch", { vault: v, query: { name }, body: { ops, ...(base !== undefined ? { base } : {}) } });
+      const got = await kit.api("POST", "/__board/patch", {
+        vault: v,
+        query: { name },
+        body: { ops, ...(base !== undefined ? { base } : {}) },
+      });
       return { name, base: got.base, text: got.text, url: await kit.url(name, "board", v) };
     },
   }),
   tool({
     name: "board_rename",
-    description: withNote("Rename or move a board. A `/` in `to` is the folder it moves into, assets and all.\n\nWithin one vault; `board_transfer` moves a board to another."),
+    description: withNote(
+      "Rename or move a board. A `/` in `to` is the folder it moves into, assets and all.\n\nWithin one vault; `board_transfer` moves a board to another.",
+    ),
     write: true,
     input: { name: z.string(), to: z.string(), vault },
     run: ({ name, to, vault: v }, kit) => docMove(kit, "board", name, to, false, v),
@@ -466,7 +504,10 @@ const boardTools: Tool[] = [
   }),
   tool({
     name: "board_delete",
-    description: withNote("Delete a board."+" It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days."),
+    description: withNote(
+      "Delete a board." +
+        " It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
+    ),
     write: true,
     input: { name: z.string(), vault },
     run: async ({ name, vault: v }, kit) => {
@@ -490,7 +531,9 @@ const boardTools: Tool[] = [
   }),
   tool({
     name: "board_mkdir",
-    description: withNote("Make a folder. Idempotent — a folder asked for twice is one folder, not `reference-2`.\n\nOnly needed for a folder with nothing in it yet: a board named `reference/erd` makes `reference/` on its own."),
+    description: withNote(
+      "Make a folder. Idempotent — a folder asked for twice is one folder, not `reference-2`.\n\nOnly needed for a folder with nothing in it yet: a board named `reference/erd` makes `reference/` on its own.",
+    ),
     write: true,
     input: { name: z.string(), vault },
     run: ({ name, vault: v }, kit) => {
@@ -508,7 +551,8 @@ const boardTools: Tool[] = [
     input: { name: z.string(), recursive: z.boolean().default(false), confirm: z.string().optional(), vault },
     run: ({ name, recursive, confirm, vault: v }, kit) => {
       kit.needWrite("remove a folder");
-      if (recursive && confirm !== name) throw new ToolError(`emptying \`${name}\` takes everything in it: ask the person, and pass \`confirm\` as \`${name}\``);
+      if (recursive && confirm !== name)
+        throw new ToolError(`emptying \`${name}\` takes everything in it: ask the person, and pass \`confirm\` as \`${name}\``);
       return kit.api("POST", "/__board/rmdir", { vault: v, body: { name, recursive } });
     },
   }),
@@ -546,8 +590,11 @@ const noteTools = kindTools("note", {
     "Replace a note's whole text.\n\nPass the `base` from `note_read`: a person may be typing in it, and a note that moved underneath answers a conflict naming its new base — read it again, redo the change, write again. Without one the write wins unconditionally.",
   rename: "Rename or move a note, its images with it. A `/` in `to` is the folder it moves into.",
   duplicate: "Copy a note. The copy is a new document with its own id.",
-  del: "Delete a note."+" It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
-  title: "Call a note something: its frontmatter's `title:`, and no other byte. With `follow` the file's name follows the title, as the title field at the top of the note's page does.",
+  del:
+    "Delete a note." +
+    " It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
+  title:
+    "Call a note something: its frontmatter's `title:`, and no other byte. With `follow` the file's name follows the title, as the title field at the top of the note's page does.",
 });
 
 const quizTools = kindTools("quiz", {
@@ -559,7 +606,9 @@ const quizTools = kindTools("quiz", {
     "Replace a quiz's whole text, under the `base` from `quiz_read`. Keep every question's `{#id}`: what somebody answered is recorded against it. To change one question, add one, remove one or reorder them, `quiz_question_set`, `quiz_question_remove` and `quiz_question_move` send that question alone and leave every other byte as it is.",
   rename: "Rename or move a quiz. Its id, and so what was answered in it, go with it.",
   duplicate: "Copy a quiz. The copy is a new document: nothing answered in the original is in it.",
-  del: "Delete a quiz."+" It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
+  del:
+    "Delete a quiz." +
+    " It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
   title: "Call a quiz something: its frontmatter's `title:`. With `follow` the file's name follows.",
 });
 
@@ -575,7 +624,14 @@ async function questionOps(kit: Kit, name: string, ops: Record<string, unknown>[
   const ids: string[] = got.ids ?? [];
   const mine = new Set(ids);
   const problems = ((got.diagnostics ?? []) as any[]).filter((d) => mine.has(d.question) || d.severity === "error");
-  return { name, id: ids[0] ?? null, changed: Boolean(got.changed), base: got.base, problems, url: await kit.url(name, "quiz", v) };
+  return {
+    name,
+    id: ids[0] ?? null,
+    changed: Boolean(got.changed),
+    base: got.base,
+    problems,
+    url: await kit.url(name, "quiz", v),
+  };
 }
 
 function at(op: Record<string, unknown>, before?: string, after?: string): Record<string, unknown> {
@@ -594,23 +650,43 @@ const quizMore: Tool[] = [
         "Pass `base` to refuse the write if the quiz moved since you read it; without one an edit that meets another writer's is redone on the text that beat it. Answers the question's `id`, the quiz's new `base`, and the `problems` the parser has with it.",
     ),
     write: true,
-    input: { name: z.string(), markdown: z.string(), id: z.string().optional(), before: z.string().optional(), after: z.string().optional(), base: z.string().optional(), vault },
+    input: {
+      name: z.string(),
+      markdown: z.string(),
+      id: z.string().optional(),
+      before: z.string().optional(),
+      after: z.string().optional(),
+      base: z.string().optional(),
+      vault,
+    },
     run: ({ name, markdown, id, before, after, base, vault: v }, kit) =>
       questionOps(kit, name, [at({ op: "set", markdown, ...(id ? { id } : {}) }, before, after)], base, v),
   }),
   tool({
     name: "quiz_question_remove",
-    description: withNote("Remove one question from a quiz by its `{#id}`, and the blank lines it leaves — no other byte changes. What was answered in it stays in the person's record, unasked."),
+    description: withNote(
+      "Remove one question from a quiz by its `{#id}`, and the blank lines it leaves — no other byte changes. What was answered in it stays in the person's record, unasked.",
+    ),
     write: true,
     input: { name: z.string(), id: z.string(), base: z.string().optional(), vault },
     run: ({ name, id, base, vault: v }, kit) => questionOps(kit, name, [{ op: "remove", id }], base, v),
   }),
   tool({
     name: "quiz_question_move",
-    description: withNote("Move one question of a quiz `before` or `after` another, by their `{#id}`s — or to the end with neither. Every question keeps its bytes; only the order changes."),
+    description: withNote(
+      "Move one question of a quiz `before` or `after` another, by their `{#id}`s — or to the end with neither. Every question keeps its bytes; only the order changes.",
+    ),
     write: true,
-    input: { name: z.string(), id: z.string(), before: z.string().optional(), after: z.string().optional(), base: z.string().optional(), vault },
-    run: ({ name, id, before, after, base, vault: v }, kit) => questionOps(kit, name, [at({ op: "move", id }, before, after)], base, v),
+    input: {
+      name: z.string(),
+      id: z.string(),
+      before: z.string().optional(),
+      after: z.string().optional(),
+      base: z.string().optional(),
+      vault,
+    },
+    run: ({ name, id, before, after, base, vault: v }, kit) =>
+      questionOps(kit, name, [at({ op: "move", id }, before, after)], base, v),
   }),
   tool({
     name: "quiz_check",
@@ -638,7 +714,11 @@ const quizMore: Tool[] = [
       const got = await kit.api("GET", "/__board/get", { vault: v, query: { name, kind: "quiz" } });
       const parsed = await grammar.quiz(got.text, !kit.readOnly);
       if (parsed.changed) {
-        await kit.api("POST", "/__board/put", { vault: v, query: { name, kind: "quiz" }, body: { text: parsed.text, base: got.base } });
+        await kit.api("POST", "/__board/put", {
+          vault: v,
+          query: { name, kind: "quiz" },
+          body: { text: parsed.text, base: got.base },
+        });
       }
       return {
         name,
@@ -653,7 +733,7 @@ const quizMore: Tool[] = [
   tool({
     name: "quiz_answer",
     description: withNote(
-      "Record what the person answered: `answers` is `[{question: \"<id>\", correct: true|false}]`, in the order they were given.\n\n" +
+      'Record what the person answered: `answers` is `[{question: "<id>", correct: true|false}]`, in the order they were given.\n\n' +
         "**Only answers the person gave**, never ones you worked out: a wrong one puts the question into Mistakes, and in the `mistakes` run enough right in a row (`quiz_threshold`) take it out. A question is named by the `id` `quiz_questions` gave it.",
     ),
     write: true,
@@ -686,7 +766,9 @@ const quizMore: Tool[] = [
   }),
   tool({
     name: "quiz_threshold",
-    description: withNote("How many right answers in a row, in the Mistakes run, take a question out of Mistakes — or, with `graduate` (1 to 10), set it. The vault's, for every quiz in it."),
+    description: withNote(
+      "How many right answers in a row, in the Mistakes run, take a question out of Mistakes — or, with `graduate` (1 to 10), set it. The vault's, for every quiz in it.",
+    ),
     // Only setting it writes; reading is allowed under --read-only.
     write: false,
     input: { graduate: z.number().int().optional(), vault },
@@ -701,20 +783,23 @@ const quizMore: Tool[] = [
 const tableTools: Tool[] = [
   ...kindTools("table", {
     list: "Every table in a vault, with its title and id, and every folder.",
-    read:
-      "One table's whole text, and the `base` a write of it must carry.\n\nA table is Markdown: a `## Tab {#id}` heading per tab and a GFM pipe table under it. A header cell is a column, `Name {#id type}` with the type one of text, number, date, checkbox, select (`options=\"a,b\"`) or link; a row's first cell ends `{#id}`. `table_get` answers the same as data, and `table_edit` changes cells without writing the whole text.",
+    read: "One table's whole text, and the `base` a write of it must carry.\n\nA table is Markdown: a `## Tab {#id}` heading per tab and a GFM pipe table under it. A header cell is a column, `Name {#id type}` with the type one of text, number, date, checkbox, select (`options=\"a,b\"`) or link; a row's first cell ends `{#id}`. `table_get` answers the same as data, and `table_edit` changes cells without writing the whole text.",
     create:
       "Make a table. The name is settled by the server and may be numbered; with a `title` the file is named after it. Every tab, column and row it holds is given an id if it has none, so it can be addressed by `table_edit` at once. With no text it has no tabs yet: add one with `table_edit`'s `addTab`, or write `## Tab` and a GFM table, or `importCsv`.",
     write:
       "Replace a table's whole text, under the `base` from `table_read`. Keep every `{#id}`: a reference, a sort, a filter and a card on a board name them. To change a few cells, rows or columns, `table_edit` is the smaller write and never loses a person's edit to another row.",
     rename: "Rename or move a table. Its id goes with it, so every card and reference to it still works.",
     duplicate: "Copy a table. The copy is a new document with its own id.",
-    del: "Delete a table."+" It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
+    del:
+      "Delete a table." +
+      " It goes to the vault's trash, where `trash_restore` puts it back as it was — with its id, so every reference to it works again — for thirty days.",
     title: "Call a table something: its frontmatter's `title:`. With `follow` the file's name follows.",
   }),
   tool({
     name: "table_check",
-    description: withNote("What the parser says about a table: how many tabs and rows, and every problem as a stable code with its line — `ET_` for two things claiming one id, `WT_` for everything that still works: a cell its column cannot read, a row with no id, a sort naming a column that went. Give `text` to check a draft before `table_create`, with nothing read or written."),
+    description: withNote(
+      "What the parser says about a table: how many tabs and rows, and every problem as a stable code with its line — `ET_` for two things claiming one id, `WT_` for everything that still works: a cell its column cannot read, a row with no id, a sort naming a column that went. Give `text` to check a draft before `table_create`, with nothing read or written.",
+    ),
     write: false,
     input: { name: z.string().default(""), text: z.string().optional(), vault },
     run: ({ name, text, vault: v }, kit) => {
@@ -732,7 +817,10 @@ const tableTools: Tool[] = [
     write: false,
     input: { name: z.string(), tab: z.string().optional(), view: z.boolean().default(false), vault },
     run: async ({ name, tab, view, vault: v }, kit) => ({
-      ...(await kit.api("GET", "/__board/table", { vault: v, query: { name, tab, view: view ? 1 : undefined, stamp: kit.readOnly ? undefined : 1 } })),
+      ...(await kit.api("GET", "/__board/table", {
+        vault: v,
+        query: { name, tab, view: view ? 1 : undefined, stamp: kit.readOnly ? undefined : 1 },
+      })),
       url: await kit.url(name, "table", v),
     }),
   }),
@@ -740,15 +828,25 @@ const tableTools: Tool[] = [
     name: "table_edit",
     description: withNote(
       "Change a table's cells, rows, columns and tabs — `ops`, applied in order, each addressed by the ids `table_get` gives:\n\n" +
-        "`{op: \"cell\", tab, row, column, value}` · `{op: \"addRow\", tab, values?: {column: value}, after?, before?, id?}` · `{op: \"removeRow\", tab, row}` · `{op: \"moveRow\", tab, row, before: row|null}` · `{op: \"rowHeight\", tab, row, h: px|null}` · `{op: \"addColumn\", tab, name, type?, options?, after?, id?, w?}` · `{op: \"setColumn\", tab, column, name?, type?, options?, w?}` · `{op: \"removeColumn\", tab, column}` · `{op: \"moveColumn\", tab, column, before: column|null}` · `{op: \"addTab\", name, after?, id?}` · `{op: \"setTab\", tab, name?, sort?, filter?}` · `{op: \"removeTab\", tab}` · `{op: \"moveTab\", tab, before: tab|null}` · `{op: \"importCsv\", name, csv}` (a new tab).\n\n" +
+        '`{op: "cell", tab, row, column, value}` · `{op: "addRow", tab, values?: {column: value}, after?, before?, id?}` · `{op: "removeRow", tab, row}` · `{op: "moveRow", tab, row, before: row|null}` · `{op: "rowHeight", tab, row, h: px|null}` · `{op: "addColumn", tab, name, type?, options?, after?, id?, w?}` · `{op: "setColumn", tab, column, name?, type?, options?, w?}` · `{op: "removeColumn", tab, column}` · `{op: "moveColumn", tab, column, before: column|null}` · `{op: "addTab", name, after?, id?}` · `{op: "setTab", tab, name?, sort?, filter?}` · `{op: "removeTab", tab}` · `{op: "moveTab", tab, before: tab|null}` · `{op: "importCsv", name, csv}` (a new tab).\n\n' +
         "A value is the cell's text: a number, `YYYY-MM-DD`, `[x]`/`[ ]`, a select's option, or a link `[words](https://…)` / `[Title](dag:<id>)`. A sort is `amount:desc, name`; a filter `stage!=Lost; amount>=1000` (operators = != ~ !~ > >= < <=); `null` takes either off. An op naming something the table does not have refuses the whole list. Without `base` a list that meets somebody else's write is applied again to what they wrote; with one, it is refused. The ids it minted come back in `minted`.",
     ),
     write: true,
     input: { name: z.string(), ops: z.array(z.record(z.string(), z.unknown())), base: z.string().optional(), vault },
     run: async ({ name, ops, base, vault: v }, kit) => {
       kit.needWrite("edit a table");
-      const got = await kit.api("POST", "/__board/table", { vault: v, body: { name, ops, ...(base !== undefined ? { base } : {}) } });
-      return { name, base: got.base, changed: got.changed, minted: got.minted, diagnostics: got.diagnostics, url: await kit.url(name, "table", v) };
+      const got = await kit.api("POST", "/__board/table", {
+        vault: v,
+        body: { name, ops, ...(base !== undefined ? { base } : {}) },
+      });
+      return {
+        name,
+        base: got.base,
+        changed: got.changed,
+        minted: got.minted,
+        diagnostics: got.diagnostics,
+        url: await kit.url(name, "table", v),
+      };
     },
   }),
 ];
@@ -772,7 +870,14 @@ const taskTools: Tool[] = [
         if (want?.only && !name.startsWith(`${want.only}/`)) continue;
         if (want?.none && home !== null) continue;
         if (status && task.status !== status) continue;
-        tasks.push({ name, title: got.titles[name] ?? null, status: task.status, due: task.due ?? null, start: task.start ?? null, project: home });
+        tasks.push({
+          name,
+          title: got.titles[name] ?? null,
+          status: task.status,
+          due: task.due ?? null,
+          start: task.start ?? null,
+          project: home,
+        });
       }
       tasks.sort(
         (a, b) =>
@@ -789,10 +894,18 @@ const taskTools: Tool[] = [
       "Make a task: a note titled `title`, with a `status:` and, if given, a `due:` date and a `start:` date (`YYYY-MM-DD` each). Its file is named after the title, in `folder` if given — a project's folder puts it in that project. Its description is the note's body: write it with `note_write`.",
     ),
     write: true,
-    input: { title: z.string(), folder: z.string().optional(), status: z.enum(STATUSES).default("todo"), due: z.string().optional(), start: z.string().optional(), vault },
+    input: {
+      title: z.string(),
+      folder: z.string().optional(),
+      status: z.enum(STATUSES).default("todo"),
+      due: z.string().optional(),
+      start: z.string().optional(),
+      vault,
+    },
     run: async ({ title, folder, status, due, start, vault: v }, kit) => {
       kit.needWrite("make a task");
-      for (const day of [due, start]) if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
+      for (const day of [due, start])
+        if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
       const dates = { ...(due ? { due } : {}), ...(start ? { start } : {}) };
       const text = withTask(withTitle("", cleanTitle(title) ?? title, "note"), { status, ...dates });
       const name = inFolder(folder, titleStem(title) || "untitled");
@@ -804,10 +917,16 @@ const taskTools: Tool[] = [
     name: "task_set",
     description: withNote(
       "Change a task's status, due date or start date — or make a plain note a task by giving it a status.\n\n" +
-        "`status: \"none\"` makes it a plain note again, taking all three lines out. `due` and `start` are `YYYY-MM-DD`, or `\"none\"` to take that date off. Only those lines of the note change.",
+        '`status: "none"` makes it a plain note again, taking all three lines out. `due` and `start` are `YYYY-MM-DD`, or `"none"` to take that date off. Only those lines of the note change.',
     ),
     write: true,
-    input: { name: z.string(), status: z.enum([...STATUSES, "none"]).optional(), due: z.string().optional(), start: z.string().optional(), vault },
+    input: {
+      name: z.string(),
+      status: z.enum([...STATUSES, "none"]).optional(),
+      due: z.string().optional(),
+      start: z.string().optional(),
+      vault,
+    },
     run: ({ name, status, due, start, vault: v }, kit) => {
       kit.needWrite("change a task");
       const body: Record<string, unknown> = { name };
@@ -815,7 +934,8 @@ const taskTools: Tool[] = [
       else if (status !== undefined) body.status = status;
       if (due !== undefined && status !== "none") body.due = due === "none" ? null : due;
       if (start !== undefined && status !== "none") body.start = start === "none" ? null : start;
-      if (Object.keys(body).length === 1) throw new ToolError("say what to change: a `status`, a `due` date, a `start` date, or more than one");
+      if (Object.keys(body).length === 1)
+        throw new ToolError("say what to change: a `status`, a `due` date, a `start` date, or more than one");
       return kit.api("POST", "/__board/task", { vault: v, body });
     },
   }),
@@ -831,7 +951,8 @@ const eventTools: Tool[] = [
     write: false,
     input: { since: z.string().optional(), until: z.string().optional(), project: z.string().optional(), vault },
     run: async ({ since, until, project, vault: v }, kit) => {
-      for (const day of [since, until]) if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
+      for (const day of [since, until])
+        if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
       const got = await kit.api("GET", "/__board/list", { vault: v });
       const folders = projectFolders(got.projects);
       const want = project ? projectArg(project, got) : null;
@@ -842,9 +963,22 @@ const eventTools: Tool[] = [
         if (want?.none && home !== null) continue;
         const [first, last] = eventDays(event);
         if ((since && last < since) || (until && first > until)) continue;
-        events.push({ name, title: got.titles[name] ?? null, start: event.start, end: event.end ?? null, all_day: isDay(event.start), project: home, url: await kit.url(name, "note", v) });
+        events.push({
+          name,
+          title: got.titles[name] ?? null,
+          start: event.start,
+          end: event.end ?? null,
+          all_day: isDay(event.start),
+          project: home,
+          url: await kit.url(name, "note", v),
+        });
       }
-      events.sort((a, b) => eventDays(a as any)[0].localeCompare(eventDays(b as any)[0]) || a.start.localeCompare(b.start) || (a.title ?? a.name).localeCompare(b.title ?? b.name));
+      events.sort(
+        (a, b) =>
+          eventDays(a as any)[0].localeCompare(eventDays(b as any)[0]) ||
+          a.start.localeCompare(b.start) ||
+          (a.title ?? a.name).localeCompare(b.title ?? b.name),
+      );
       return { events, time_zone: await zoneOf(kit, v) };
     },
   }),
@@ -870,7 +1004,8 @@ const eventTools: Tool[] = [
         throw new ToolError("an all-day event ends on a date, and a timed one at a time: send `end` in `start`'s form");
       }
       const text = withEvent(withTitle("", cleanTitle(title) ?? title, "note"), change);
-      if (endsBeforeItStarts(eventOf(text)!)) throw new ToolError(`\`${change.end}\` is before \`${change.start}\`: an event ends after it starts`);
+      if (endsBeforeItStarts(eventOf(text)!))
+        throw new ToolError(`\`${change.end}\` is before \`${change.start}\`: an event ends after it starts`);
       const name = inFolder(folder, titleStem(title) || "untitled");
       const got = await kit.api("POST", "/__board/create", { vault: v, body: { name, text, kind: "note" } });
       return { name: got.name, id: got.id, event: change, url: await kit.url(got.name, "note", v) };
@@ -880,7 +1015,7 @@ const eventTools: Tool[] = [
     name: "event_set",
     description: withNote(
       "Move an event, or make a plain note one by giving it a `start`.\n\n" +
-        "`start` and `end` are what `event_create` takes — a time with no offset is in the vault's time zone — and `end: \"none\"` takes the end off, and `start: \"none\"` makes it a plain note again, taking both lines out. Only those lines change. A task is refused: its dates are `task_set`'s `start` and `due`.",
+        '`start` and `end` are what `event_create` takes — a time with no offset is in the vault\'s time zone — and `end: "none"` takes the end off, and `start: "none"` makes it a plain note again, taking both lines out. Only those lines change. A task is refused: its dates are `task_set`\'s `start` and `due`.',
     ),
     write: true,
     input: { name: z.string(), start: z.string().optional(), end: z.string().optional(), vault },
@@ -915,8 +1050,16 @@ const projectTools: Tool[] = [
       const out = [];
       for (const [folder, note] of [...projectFolders(got.projects)].sort((a, b) => a[0].localeCompare(b[0]))) {
         const counts: Record<string, number> = Object.fromEntries(STATUSES.map((s) => [s, 0]));
-        for (const [name, task] of Object.entries<any>(got.tasks)) if (name.startsWith(`${folder}/`) && task.status in counts) counts[task.status]!++;
-        out.push({ folder, note, title: got.titles[note] ?? null, ...got.projects[note], tasks: counts, url: await kit.url(note, "note", v) });
+        for (const [name, task] of Object.entries<any>(got.tasks))
+          if (name.startsWith(`${folder}/`) && task.status in counts) counts[task.status]!++;
+        out.push({
+          folder,
+          note,
+          title: got.titles[note] ?? null,
+          ...got.projects[note],
+          tasks: counts,
+          url: await kit.url(note, "note", v),
+        });
       }
       return { projects: out };
     },
@@ -927,7 +1070,13 @@ const projectTools: Tool[] = [
       "Make a folder a project: write its project note, titled `title` (the folder's name in words by default). The folder is made if it is not there, and everything in it, now or later, is in the project. `hue` is one of the ten colours. The note's body is the project's description: write it with `note_write`.",
     ),
     write: true,
-    input: { folder: z.string(), title: z.string().optional(), status: z.enum(PROJECT_STATUSES).default("active"), hue: z.string().optional(), vault },
+    input: {
+      folder: z.string(),
+      title: z.string().optional(),
+      status: z.enum(PROJECT_STATUSES).default("active"),
+      hue: z.string().optional(),
+      vault,
+    },
     run: async ({ folder, title, status, hue, vault: v }, kit) => {
       kit.needWrite("make a project");
       const dir = folder.replace(/^\/+|\/+$/g, "");
@@ -941,14 +1090,17 @@ const projectTools: Tool[] = [
       const named = title ?? (leaf ? leaf[0]!.toUpperCase() + leaf.slice(1) : "Project");
       const change: Record<string, string | null> = { project: status, ...(tint ? { hue: tint } : {}) };
       const text = withProject(withTitle("", named, "note"), change);
-      const made = await kit.api("POST", "/__board/create", { vault: v, body: { name: `${dir}/${titleStem(named) || "project"}`, text, kind: "note" } });
+      const made = await kit.api("POST", "/__board/create", {
+        vault: v,
+        body: { name: `${dir}/${titleStem(named) || "project"}`, text, kind: "note" },
+      });
       return { folder: dir, name: made.name, id: made.id, project: change, url: await kit.url(made.name, "note", v) };
     },
   }),
   tool({
     name: "project_set",
     description: withNote(
-      "Change a project's status or colour. Name it by its folder or its note.\n\n`status: \"none\"` makes the folder a plain folder again — the note stays, as a plain note. `hue` is one of the ten colours, or `\"none\"` to take it off.",
+      'Change a project\'s status or colour. Name it by its folder or its note.\n\n`status: "none"` makes the folder a plain folder again — the note stays, as a plain note. `hue` is one of the ten colours, or `"none"` to take it off.',
     ),
     write: true,
     input: { project: z.string(), status: z.enum([...PROJECT_STATUSES, "none"]).optional(), hue: z.string().optional(), vault },
@@ -956,7 +1108,8 @@ const projectTools: Tool[] = [
       kit.needWrite("change a project");
       const got = await kit.api("GET", "/__board/list", { vault: v });
       // A plain note being made a project is named as itself: the route decides whether it can be.
-      const note = project in got.projects ? project : (projectFolders(got.projects).get(project.replace(/^\/+|\/+$/g, "")) ?? project);
+      const note =
+        project in got.projects ? project : (projectFolders(got.projects).get(project.replace(/^\/+|\/+$/g, "")) ?? project);
       const body: Record<string, unknown> = { name: note };
       if (status === "none") Object.assign(body, { status: null, hue: null });
       else if (status !== undefined) body.status = status;
@@ -1003,7 +1156,12 @@ const findTools: Tool[] = [
  * A file fetched from `url` by the server, under `fetch.ts`'s rules and this vault's size limit
  * — or the bytes `data` already carries. Exactly one of the two.
  */
-async function bytesFrom(kit: Kit, v: string | undefined, data: string | undefined, url: string | undefined): Promise<Fetched | null> {
+async function bytesFrom(
+  kit: Kit,
+  v: string | undefined,
+  data: string | undefined,
+  url: string | undefined,
+): Promise<Fetched | null> {
   if ((data === undefined) === (url === undefined)) throw new ToolError("give exactly one of `data` and `url`");
   if (url === undefined) return null;
   const limits = ((await kit.api("GET", "/__board/files", { vault: v })) as { limits: { maxBytes: number } }).limits;
@@ -1046,7 +1204,10 @@ const imageTools: Tool[] = [
       let dataUrl: string;
       if (got0) {
         const type = got0.contentType.startsWith("image/") ? got0.contentType : (mime ?? "");
-        if (!type.startsWith("image/")) throw new ToolError(`\`${url}\` is not a picture (${got0.contentType || "no type given"}); say what it is with \`mime\`, or keep it with \`file_upload\``);
+        if (!type.startsWith("image/"))
+          throw new ToolError(
+            `\`${url}\` is not a picture (${got0.contentType || "no type given"}); say what it is with \`mime\`, or keep it with \`file_upload\``,
+          );
         dataUrl = `data:${type};base64,${got0.data.toString("base64")}`;
       } else dataUrl = data!.startsWith("data:") ? data! : `data:${mime ?? "image/png"};base64,${data}`;
       if (kind !== "board") {
@@ -1080,7 +1241,8 @@ const imageTools: Tool[] = [
           else if (p !== "." && p !== "") out.push(p);
         }
         rel = out.join("/");
-        if (path.split("/").filter((p) => p === "..").length > name.split("/").length - 1) throw new ToolError("that `src` climbs out of the vault");
+        if (path.split("/").filter((p) => p === "..").length > name.split("/").length - 1)
+          throw new ToolError("that `src` climbs out of the vault");
       }
       const got = await kit.bytes("GET", `/__board/assets/${rel.split("/").map(encodeURIComponent).join("/")}`, { vault: v });
       return pictureOf(got.data, got.mime, rel);
@@ -1088,14 +1250,18 @@ const imageTools: Tool[] = [
   }),
   tool({
     name: "image_unused",
-    description: withNote("The pictures kept beside a board (in its `.assets/` folder) that no document's text names any more, and their size — what Settings' *Unused images* counts. Nothing is removed."),
+    description: withNote(
+      "The pictures kept beside a board (in its `.assets/` folder) that no document's text names any more, and their size — what Settings' *Unused images* counts. Nothing is removed.",
+    ),
     write: false,
     input: { name: z.string(), vault },
     run: ({ name, vault: v }, kit) => kit.api("GET", "/__board/assets/unused", { vault: v, query: { name } }),
   }),
   tool({
     name: "image_sweep",
-    description: withNote("Remove the pictures beside a board that no document's text names — `image_unused`'s list. A picture an undo would bring back is one of these, so only when the person asked."),
+    description: withNote(
+      "Remove the pictures beside a board that no document's text names — `image_unused`'s list. A picture an undo would bring back is one of these, so only when the person asked.",
+    ),
     write: true,
     input: { name: z.string(), vault },
     run: ({ name, vault: v }, kit) => {
@@ -1110,10 +1276,17 @@ const fileTools: Tool[] = [
     name: "file_upload",
     description: withNote(
       "Keep a file — a PDF, a picture, a document, a sheet, slides, audio, video, an archive — as an attachment, listed with the boards and notes. `data` is its bytes as base64 (a `data:…;base64,…` URL is taken too) — or, instead, `url`: an `https://` address the server fetches it from, so its bytes never pass through you (an address on this machine or a private network is refused). `filename` is what it is called, extension and all (`Q3 Report.pdf`), which is what decides its type — with a `url` it defaults to the address's last segment; `folder` is where it goes, `\"\"` the top. What this vault accepts is `file_list`'s `limits`; anything else is refused, with why.\n\n" +
-        "Refer to it from a note with `![Q3 Report.pdf](dag:<id>)` — drawn: a picture inline, anything else as a card — or `[Q3 Report.pdf](dag:<id>)`, a link; on a board a picture is an `image` fence with `src=\"dag:<id>\"`. The `id` comes back, and `sha256`, the checksum of the bytes that arrived.",
+        'Refer to it from a note with `![Q3 Report.pdf](dag:<id>)` — drawn: a picture inline, anything else as a card — or `[Q3 Report.pdf](dag:<id>)`, a link; on a board a picture is an `image` fence with `src="dag:<id>"`. The `id` comes back, and `sha256`, the checksum of the bytes that arrived.',
     ),
     write: true,
-    input: { filename: z.string().optional(), data: z.string().optional(), url: z.string().optional(), folder: z.string().default(""), title: z.string().optional(), vault },
+    input: {
+      filename: z.string().optional(),
+      data: z.string().optional(),
+      url: z.string().optional(),
+      folder: z.string().default(""),
+      title: z.string().optional(),
+      vault,
+    },
     run: async ({ filename, data, url, folder, title, vault: v }, kit) => {
       kit.needWrite("upload a file");
       const fetched = await bytesFrom(kit, v, data, url);
@@ -1140,7 +1313,8 @@ const fileTools: Tool[] = [
   tool({
     name: "file_list",
     description: withNote(
-      "Every attachment — `{files: [{name, id, title, ext, mime, bytes}], limits: {maxBytes, types}}` — and what this vault accepts: the largest file, and the extensions.\n\n" + PAGE_NOTE,
+      "Every attachment — `{files: [{name, id, title, ext, mime, bytes}], limits: {maxBytes, types}}` — and what this vault accepts: the largest file, and the extensions.\n\n" +
+        PAGE_NOTE,
     ),
     write: false,
     input: { ...pageArgs, vault },
@@ -1148,7 +1322,12 @@ const fileTools: Tool[] = [
       const got = await kit.api("GET", "/__board/files", { vault: v });
       const byName = new Map((got.files as { name: string }[]).map((f) => [f.name, f]));
       const shown = page(byName.keys(), [], { folder, limit, cursor });
-      return { files: shown.names.map((n) => byName.get(n)), limits: got.limits, total: shown.total, next_cursor: shown.next_cursor };
+      return {
+        files: shown.names.map((n) => byName.get(n)),
+        limits: got.limits,
+        total: shown.total,
+        next_cursor: shown.next_cursor,
+      };
     },
   }),
   tool({
@@ -1165,7 +1344,14 @@ const fileTools: Tool[] = [
       if (!info) throw new ToolError(`no file \`${name || id}\``);
       const got = await kit.bytes("GET", "/__board/file", { vault: v, query: { name: info.name } });
       if (got.mime.startsWith("image/") && !got.mime.includes("svg")) return pictureOf(got.data, got.mime, info.name);
-      const out: Record<string, unknown> = { name: info.name, id: info.id, title: info.title, mime: got.mime, bytes: info.bytes, url: await kit.url(info.name, "file", v) };
+      const out: Record<string, unknown> = {
+        name: info.name,
+        id: info.id,
+        title: info.title,
+        mime: got.mime,
+        bytes: info.bytes,
+        url: await kit.url(info.name, "file", v),
+      };
       if (got.mime.startsWith("text/") || ["json", "md", "csv", "txt", "log", "tsv"].includes(info.ext)) {
         out.text = decoder.decode(got.data.slice(0, TEXT_CAP));
         out.truncated = got.data.length > TEXT_CAP;
@@ -1175,7 +1361,9 @@ const fileTools: Tool[] = [
   }),
   tool({
     name: "file_rename",
-    description: withNote("Move or rename an attachment: `to` is its whole new name, folders and all — its extension is always its own, so `work/final` is `work/final.pdf`. Its id, and every reference to it, survive. To change only what it is called, `file_title`."),
+    description: withNote(
+      "Move or rename an attachment: `to` is its whole new name, folders and all — its extension is always its own, so `work/final` is `work/final.pdf`. Its id, and every reference to it, survive. To change only what it is called, `file_title`.",
+    ),
     write: true,
     input: { name: z.string(), to: z.string(), vault },
     run: ({ name, to, vault: v }, kit) => docMove(kit, "file", name, to, false, v),
@@ -1189,7 +1377,9 @@ const fileTools: Tool[] = [
   }),
   tool({
     name: "file_title",
-    description: withNote("Call an attachment something — what every list and card shows (`Q3 Report.pdf`). With `follow`, its file name follows the title, keeping its extension; open the `name` back."),
+    description: withNote(
+      "Call an attachment something — what every list and card shows (`Q3 Report.pdf`). With `follow`, its file name follows the title, keeping its extension; open the `name` back.",
+    ),
     write: true,
     input: { name: z.string(), title: z.string(), follow: z.boolean().default(true), vault },
     run: ({ name, title, follow, vault: v }, kit) => docTitle(kit, "file", name, title, follow, v),
@@ -1203,7 +1393,8 @@ const fileTools: Tool[] = [
     input: { name: z.string(), confirm: z.string().default(""), vault },
     run: async ({ name, confirm, vault: v }, kit) => {
       kit.needWrite("delete a file");
-      if (confirm !== name) throw new ToolError(`to delete \`${name}\`, pass \`confirm\` as its name; \`refs\` says what uses it first`);
+      if (confirm !== name)
+        throw new ToolError(`to delete \`${name}\`, pass \`confirm\` as its name; \`refs\` says what uses it first`);
       // A file that is not there is the delete's own 404 to say, below.
       const refs = await kit.api("GET", "/__board/refs", { vault: v, query: { name, kind: "file" } }).catch(() => null);
       const used = ((refs?.backlinks ?? []) as any[]).map((d) => ({ name: d.name, kind: d.kind, title: d.title ?? null }));
@@ -1213,7 +1404,9 @@ const fileTools: Tool[] = [
   }),
   tool({
     name: "component_delete",
-    description: withNote("Delete one of the person's saved components — the `saved` list `library` answers. Keeping one is `board_create` with a name under `components/`."),
+    description: withNote(
+      "Delete one of the person's saved components — the `saved` list `library` answers. Keeping one is `board_create` with a name under `components/`.",
+    ),
     write: true,
     input: { name: z.string(), vault },
     run: ({ name, vault: v }, kit) => {
@@ -1231,7 +1424,10 @@ function merged(held: Record<string, any> | null, change: Record<string, any>): 
     else if (key === "settings" && value && typeof value === "object" && out[key] && typeof out[key] === "object") {
       const groups = { ...out[key] };
       for (const [group, fields] of Object.entries<any>(value)) {
-        groups[group] = fields && typeof fields === "object" && groups[group] && typeof groups[group] === "object" ? { ...groups[group], ...fields } : fields;
+        groups[group] =
+          fields && typeof fields === "object" && groups[group] && typeof groups[group] === "object"
+            ? { ...groups[group], ...fields }
+            : fields;
       }
       out[key] = groups;
     } else out[key] = value;
@@ -1255,7 +1451,7 @@ const grammarTools: Tool[] = [
     description: withNote(
       "Ready-made pieces, rendered as the text they become — plus this vault's saved ones.\n\n" +
         "Five layers: an **atom** is one statement, a **molecule** a container with something in it, a **pattern** several of those wired together, a **diagram** a whole board item, a **stack** several items. `type` narrows to one dialect, `id` fetches one blueprint, and `q` searches.\n\n" +
-        "**Objects** are pictures to illustrate with — a person, a house, a book, a truck: one `sketch` `figure` each, a picture with its caption under it, about 1,700 of them. They are not listed unless `q` finds them (`q=\"truck\"`); `objects` in the answer says how many there are and on which shelves.\n\n" +
+        '**Objects** are pictures to illustrate with — a person, a house, a book, a truck: one `sketch` `figure` each, a picture with its caption under it, about 1,700 of them. They are not listed unless `q` finds them (`q="truck"`); `objects` in the answer says how many there are and on which shelves.\n\n' +
         "Reach for one before writing from the cheat sheet, and prefer a *saved* component whose name matches what the person asked for — it is their own vocabulary.",
     ),
     write: false,
@@ -1274,7 +1470,8 @@ const grammarTools: Tool[] = [
   }),
   tool({
     name: "llm",
-    description: "Which model providers this machine could ask to draw, their models, and why one cannot — what `generate` may be pointed at. Never a key.",
+    description:
+      "Which model providers this machine could ask to draw, their models, and why one cannot — what `generate` may be pointed at. Never a key.",
     write: false,
     input: {},
     run: (_, kit) => kit.api("GET", "/__board/llm"),
@@ -1301,7 +1498,14 @@ const grammarTools: Tool[] = [
       const mine = (await kit.api("GET", "/api/vault/settings", { vault: v })).settings?.settings ?? {};
       const chosen = mine.llm && typeof mine.llm === "object" ? mine.llm : {};
       const body: Record<string, unknown> = { prompt };
-      for (const [k, val] of Object.entries({ as: as_type, source, from: from_type, provider: provider ?? chosen.provider, model: model ?? chosen.model, reasoning: reasoning ?? chosen.reasoning })) {
+      for (const [k, val] of Object.entries({
+        as: as_type,
+        source,
+        from: from_type,
+        provider: provider ?? chosen.provider,
+        model: model ?? chosen.model,
+        reasoning: reasoning ?? chosen.reasoning,
+      })) {
         if (val !== undefined) body[k] = val;
       }
       return kit.api("POST", "/__board/generate", { vault: v, body });
@@ -1342,7 +1546,9 @@ const appTools: Tool[] = [
         server: { version: health.version, via: kit.via },
         read_only: kit.readOnly,
         time_zone: me.zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-        vaults: (listed.vaults as any[]).filter((v) => v.open).map((v) => ({ id: v.id, name: v.name, path: v.path, default: v.default })),
+        vaults: (listed.vaults as any[])
+          .filter((v) => v.open)
+          .map((v) => ({ id: v.id, name: v.name, path: v.path, default: v.default })),
       };
     },
   }),
@@ -1367,7 +1573,8 @@ const appTools: Tool[] = [
   }),
   tool({
     name: "vault_create",
-    description: "Make a folder called `name` inside `parent` and open it as a vault. Refused when something is already there. Returns the vault's `id`.",
+    description:
+      "Make a folder called `name` inside `parent` and open it as a vault. Refused when something is already there. Returns the vault's `id`.",
     write: true,
     input: { parent: z.string(), name: z.string() },
     run: ({ parent, name }, kit) => {
@@ -1377,7 +1584,8 @@ const appTools: Tool[] = [
   }),
   tool({
     name: "vault_close",
-    description: "Stop serving a vault. **Its folder is never deleted**; it stays on the recent list unless `forget` takes it off.",
+    description:
+      "Stop serving a vault. **Its folder is never deleted**; it stays on the recent list unless `forget` takes it off.",
     write: false,
     input: { id: z.string(), forget: z.boolean().default(false) },
     run: ({ id, forget }, kit) => kit.api("POST", "/api/vaults/close", { body: { id, forget } }),
@@ -1419,7 +1627,9 @@ const trashTools: Tool[] = [
       const entry = (held.entries as any[]).find((e) => e.id === id);
       if (!entry) throw new ToolError(`nothing in the trash is \`${id}\` — \`trash_list\` says what is`);
       if (confirm !== entry.name)
-        throw new ToolError(`deleting \`${entry.name}\` for good cannot be undone: ask the person, and pass \`confirm\` as \`${entry.name}\``);
+        throw new ToolError(
+          `deleting \`${entry.name}\` for good cannot be undone: ask the person, and pass \`confirm\` as \`${entry.name}\``,
+        );
       return kit.api("POST", "/__board/trash/delete", { vault: v, body: { id } });
     },
   }),
@@ -1431,7 +1641,8 @@ const trashTools: Tool[] = [
     input: { confirm: z.string(), vault },
     run: ({ confirm, vault: v }, kit) => {
       kit.needWrite("empty the trash");
-      if (confirm !== "empty the trash") throw new ToolError("emptying the trash cannot be undone: ask the person, and pass `confirm` as `empty the trash`");
+      if (confirm !== "empty the trash")
+        throw new ToolError("emptying the trash cannot be undone: ask the person, and pass `confirm` as `empty the trash`");
       return kit.api("POST", "/__board/trash/empty", { vault: v });
     },
   }),

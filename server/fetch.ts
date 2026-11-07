@@ -25,8 +25,8 @@ import dns from "node:dns";
 import https from "node:https";
 import net from "node:net";
 
-export const TIMEOUT_MS = 10_000;
-export const MAX_REDIRECTS = 5;
+const TIMEOUT_MS = 10_000;
+const MAX_REDIRECTS = 5;
 
 /** A URL the server will not fetch, or a fetch that failed — said in words for whoever asked. */
 export class FetchRefused extends Error {}
@@ -175,7 +175,10 @@ export async function fetchFile(url: string, opts: { maxBytes: number; resolver?
         }
         chunks.push(chunk);
       }
-      const type = String(answer.res.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
+      const type = String(answer.res.headers["content-type"] ?? "")
+        .split(";")[0]!
+        .trim()
+        .toLowerCase();
       return { data: Buffer.concat(chunks), filename: first ?? "", contentType: type };
     }
     throw new FetchRefused(`\`${url}\` redirects more than ${MAX_REDIRECTS} times`);
@@ -201,7 +204,8 @@ function get(url: URL, host: string, pinned: { address: string; family: number }
         signal,
         // The address that was checked, whatever the name says now.
         lookup: (_name, options, cb) => {
-          if ((options as { all?: boolean }).all) (cb as unknown as (e: null, a: { address: string; family: number }[]) => void)(null, [pinned]);
+          if ((options as { all?: boolean }).all)
+            (cb as unknown as (e: null, a: { address: string; family: number }[]) => void)(null, [pinned]);
           else cb(null, pinned.address, pinned.family);
         },
       },

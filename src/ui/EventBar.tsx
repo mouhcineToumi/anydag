@@ -29,7 +29,15 @@ const zoneAt = (at: Date): string => zoneName(at);
  * The bar at the top of an event's own page: all day or not, when it starts, when it ends, the zone
  * those are in, and the way back to being a plain note. Moving the start keeps how long it is.
  */
-export function EventBar({ event, onChange, editable }: { event: NoteEvent; onChange(change: EventChange): void; editable: boolean }) {
+export function EventBar({
+  event,
+  onChange,
+  editable,
+}: {
+  event: NoteEvent;
+  onChange(change: EventChange): void;
+  editable: boolean;
+}) {
   useZone();
   const f = fieldsOf(event);
   const zone = f.allDay ? "" : zoneAt(momentOf(event.start));
@@ -99,7 +107,11 @@ export function EventBar({ event, onChange, editable }: { event: NoteEvent; onCh
           />
         )}
         {zone ? (
-          <span className="dag-eventbar__zone" data-dag-eventbar-zone="" title={`Shown in ${currentZone().replace(/_/g, " ")}, and written with its offset. Settings → Calendar changes the time zone.`}>
+          <span
+            className="dag-eventbar__zone"
+            data-dag-eventbar-zone=""
+            title={`Shown in ${currentZone().replace(/_/g, " ")}, and written with its offset. Settings → Calendar changes the time zone.`}
+          >
             {zone}
           </span>
         ) : null}

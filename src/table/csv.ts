@@ -19,7 +19,11 @@ const DELIMITERS = [",", ";", "\t"] as const;
 
 /** The delimiter a CSV most likely uses: the one that splits its first lines into the most, evenly. */
 export function sniffDelimiter(csv: string): string {
-  const lines = csv.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim()).slice(0, 10);
+  const lines = csv
+    .replace(/^﻿/, "")
+    .split(/\r?\n/)
+    .filter((l) => l.trim())
+    .slice(0, 10);
   let best: string = ",";
   let score = -1;
   for (const d of DELIMITERS) {

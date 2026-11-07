@@ -13,7 +13,20 @@
  */
 import { createContext, useContext, useEffect, useState } from "react";
 import { defaultUrlTransform, type Components } from "react-markdown";
-import { ArrowUpRight, CalendarClock, ChevronDown, Download, File as FileGlyph, FileQuestion, FileText, GraduationCap, LayoutDashboard, Play, Table2, type LucideIcon } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  ChevronDown,
+  Download,
+  File as FileGlyph,
+  FileQuestion,
+  FileText,
+  GraduationCap,
+  LayoutDashboard,
+  Play,
+  Table2,
+  type LucideIcon,
+} from "lucide-react";
 
 import { assertNever, setTask, useBoard, type FileKind } from "@/board/useBoard";
 import { useLocked } from "@/settings/lock";
@@ -47,7 +60,10 @@ import { hrefFor, titleOf, useIndex } from "./useIndex";
 const OnItsOwn = createContext(false);
 
 /** What each kind of document wears on a card. A `Record`, so a sixth kind is a type error here. */
-const DOC_ICON = { board: LayoutDashboard, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<FileKind, LucideIcon>;
+const DOC_ICON = { board: LayoutDashboard, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<
+  FileKind,
+  LucideIcon
+>;
 
 /** A card standing for a document that is not drawn inline — a board inside a board, or one too deep. */
 function RefCard({ id, fallback }: { id: string; fallback: string }) {
@@ -87,7 +103,9 @@ function EmbeddedBoard({ id, name }: { id: string; name: string }) {
         <LayoutDashboard size={14} strokeWidth={2} aria-hidden="true" />
         {board?.title ?? name.slice(name.lastIndexOf("/") + 1)}
       </a>
-      <div className="dag-embed__canvas">{board ? <BoardView board={board} theme={theme} scrollThrough onReady={setDrawn} /> : null}</div>
+      <div className="dag-embed__canvas">
+        {board ? <BoardView board={board} theme={theme} scrollThrough onReady={setDrawn} /> : null}
+      </div>
     </div>
   );
 }
@@ -133,13 +151,33 @@ function EmbeddedNote({ id, name }: { id: string; name: string }) {
  * second after it was pressed. `live` is false wherever nothing may change the file — `?view=1`, a
  * snapshot — where the button is drawn as the glyph it would have been.
  */
-function TaskCard({ id, name, title, task, href, live: may }: { id: string; name: string; title: string; task: Task; href: string; live: boolean }) {
+function TaskCard({
+  id,
+  name,
+  title,
+  task,
+  href,
+  live: may,
+}: {
+  id: string;
+  name: string;
+  title: string;
+  task: Task;
+  href: string;
+  live: boolean;
+}) {
   const [shown, onStatus] = useLiveTask(name, task);
   /* The lock is a hook rather than part of `live`, which is read once: a card on a board is
      inside a memoised item, and a hook is what reaches it when the lock is switched. */
   const live = may && !useLocked();
   return (
-    <div className="dag-embed dag-embed--task" data-dag-embed={id} data-dag-embed-kind="task" data-dag-embed-task={shown.status} data-dag-embed-ready="">
+    <div
+      className="dag-embed dag-embed--task"
+      data-dag-embed={id}
+      data-dag-embed-kind="task"
+      data-dag-embed-task={shown.status}
+      data-dag-embed-ready=""
+    >
       <StatusButton status={shown.status} onStatus={live ? (next) => void onStatus(next) : undefined} size={16} />
       <div className="dag-embed__task">
         <a className="dag-embed__title" href={href}>
@@ -335,7 +373,16 @@ function QuizCard({
 /** A table the editor's page draws — a card on a board or an embed in a note — read through the one cache. */
 function OwnTableCard({ id, name, title, part, rows }: { id: string; name: string; title: string; part?: string; rows: number }) {
   const text = useTableText(name);
-  return <TableCard id={id} title={title} text={text} tab={part ? part.split("/")[0] : undefined} href={hrefFor(id, part)} rows={rows} />;
+  return (
+    <TableCard
+      id={id}
+      title={title}
+      text={text}
+      tab={part ? part.split("/")[0] : undefined}
+      href={hrefFor(id, part)}
+      rows={rows}
+    />
+  );
 }
 
 /**
@@ -399,7 +446,12 @@ function FileEmbed({
   const stop = (e: { stopPropagation(): void }) => e.stopPropagation();
   if (isPicture(name))
     return (
-      <figure className="dag-embed dag-embed--picture" data-dag-embed={id} data-dag-embed-kind="file" data-dag-embed-ready={drawn ? "" : undefined}>
+      <figure
+        className="dag-embed dag-embed--picture"
+        data-dag-embed={id}
+        data-dag-embed-kind="file"
+        data-dag-embed-ready={drawn ? "" : undefined}
+      >
         <img src={url} alt={title} data-dag-embed-picture="" onLoad={() => setDrawn(true)} onError={() => setDrawn(true)} />
       </figure>
     );
@@ -433,7 +485,12 @@ function FileEmbed({
             onPointerDown={stop}
             onClick={() => setPreviewing((v) => !v)}
           >
-            <ChevronDown size={16} strokeWidth={2} aria-hidden="true" className={previewing ? "dag-embed__chev--open" : undefined} />
+            <ChevronDown
+              size={16}
+              strokeWidth={2}
+              aria-hidden="true"
+              className={previewing ? "dag-embed__chev--open" : undefined}
+            />
           </button>
         ) : null}
         <a
@@ -529,7 +586,8 @@ function RefEmbed({ id, part, fallback, depth, boards, placed }: EmbedProps) {
             live={mayWrite()}
           />
         );
-      if (doc.task) return <TaskCard id={id} name={doc.name} title={titleOf(doc)} task={doc.task} href={hrefFor(id)} live={mayWrite()} />;
+      if (doc.task)
+        return <TaskCard id={id} name={doc.name} title={titleOf(doc)} task={doc.task} href={hrefFor(id)} live={mayWrite()} />;
       return <EmbeddedNote id={id} name={doc.name} />;
     case "quiz": {
       const live = mayWrite();
@@ -590,7 +648,15 @@ function WikiEmbed({ target, part, fallback, depth, boards, placed }: Omit<Embed
  */
 const made = new Map<string, Components>();
 
-export function refComponents({ depth = 0, boards = true, placed = false }: { depth?: number; boards?: boolean; placed?: boolean } = {}): Components {
+export function refComponents({
+  depth = 0,
+  boards = true,
+  placed = false,
+}: {
+  depth?: number;
+  boards?: boolean;
+  placed?: boolean;
+} = {}): Components {
   const key = `${depth}|${boards}|${placed}`;
   let got = made.get(key);
   if (!got) made.set(key, (got = makeRefComponents(depth, boards, placed)));
@@ -609,7 +675,10 @@ function makeRefComponents(depth: number, boards: boolean, placed: boolean): Com
        `dag:` image is therefore drawn as the block it is. */
     p: ({ node, children, ...rest }) => {
       const only = node?.children.length === 1 ? node.children[0] : undefined;
-      const src = only?.type === "element" && only.tagName === "img" && typeof only.properties?.src === "string" ? only.properties.src : null;
+      const src =
+        only?.type === "element" && only.tagName === "img" && typeof only.properties?.src === "string"
+          ? only.properties.src
+          : null;
       const embed = src !== null && (parseDagUrl(src) || parseWikiUrl(src));
       if (!embed) return <p {...rest}>{children}</p>;
       return (
@@ -621,14 +690,27 @@ function makeRefComponents(depth: number, boards: boolean, placed: boolean): Com
     a: ({ node: _node, href, children, ...rest }) => {
       const hit = href ? parseDagUrl(href) : null;
       const wiki = !hit && href ? parseWikiUrl(href) : null;
-      if (wiki) return <WikiLink target={wiki.target} part={wiki.part}>{children}</WikiLink>;
-      if (!hit) return <a href={href} {...rest}>{children}</a>;
+      if (wiki)
+        return (
+          <WikiLink target={wiki.target} part={wiki.part}>
+            {children}
+          </WikiLink>
+        );
+      if (!hit)
+        return (
+          <a href={href} {...rest}>
+            {children}
+          </a>
+        );
       return <RefLink id={hit.id} part={hit.part} fallback={children} />;
     },
     img: ({ node: _node, src, alt, ...rest }) => {
       const hit = typeof src === "string" ? parseDagUrl(src) : null;
       const wiki = !hit && typeof src === "string" ? parseWikiUrl(src) : null;
-      if (wiki) return <WikiEmbed target={wiki.target} part={wiki.part} fallback={alt ?? ""} depth={depth} boards={boards} placed={placed} />;
+      if (wiki)
+        return (
+          <WikiEmbed target={wiki.target} part={wiki.part} fallback={alt ?? ""} depth={depth} boards={boards} placed={placed} />
+        );
       if (!hit) return <img src={src} alt={alt} {...rest} />;
       return <RefEmbed id={hit.id} part={hit.part} fallback={alt ?? ""} depth={depth} boards={boards} placed={placed} />;
     },

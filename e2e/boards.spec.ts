@@ -53,7 +53,7 @@ test("the open board is marked, and the reference set is a section of its own", 
   await expect(page.locator(".dag-browser__folder", { hasText: "reference" })).toBeVisible();
 });
 
-test("a keyword filters the list, and clicking a row opens that board", async ({ page }) => {
+test("a keyword filters the list, and clicking a row opens that board", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await openBoards(page);
 

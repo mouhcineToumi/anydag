@@ -27,15 +27,26 @@ describe("the zone", () => {
     /* Paris: +02:00 in summer, +01:00 from the last Sunday of October at 01:00 UTC. */
     expect(offsetOf(Date.parse("2026-10-25T00:59Z"), "Europe/Paris")).toBe(120);
     expect(offsetOf(Date.parse("2026-10-25T01:00Z"), "Europe/Paris")).toBe(60);
-    expect(wallOf(Date.parse("2026-10-03T07:30Z"), "Asia/Kolkata")).toEqual({ year: 2026, month: 10, day: 3, hour: 13, minute: 0, second: 0 });
+    expect(wallOf(Date.parse("2026-10-03T07:30Z"), "Asia/Kolkata")).toEqual({
+      year: 2026,
+      month: 10,
+      day: 3,
+      hour: 13,
+      minute: 0,
+      second: 0,
+    });
   });
 
   it("turns a wall clock back into the instant, the earlier one in an overlap and an hour on in a gap", () => {
     expect(instantOf({ year: 2026, month: 10, day: 3, hour: 9 }, "America/New_York")).toBe(Date.parse("2026-10-03T13:00Z"));
     /* 02:30 happens twice in Paris on 2026-10-25: first at +02:00. */
-    expect(instantOf({ year: 2026, month: 10, day: 25, hour: 2, minute: 30 }, "Europe/Paris")).toBe(Date.parse("2026-10-25T00:30Z"));
+    expect(instantOf({ year: 2026, month: 10, day: 25, hour: 2, minute: 30 }, "Europe/Paris")).toBe(
+      Date.parse("2026-10-25T00:30Z"),
+    );
     /* 02:30 never happens in Paris on 2026-03-29: read as 03:30, where the clocks are. */
-    expect(instantOf({ year: 2026, month: 3, day: 29, hour: 2, minute: 30 }, "Europe/Paris")).toBe(Date.parse("2026-03-29T01:30Z"));
+    expect(instantOf({ year: 2026, month: 3, day: 29, hour: 2, minute: 30 }, "Europe/Paris")).toBe(
+      Date.parse("2026-03-29T01:30Z"),
+    );
     /* Hour 24 carries over to the next midnight. */
     expect(instantOf({ year: 2026, month: 10, day: 3, hour: 24 }, "UTC")).toBe(Date.parse("2026-10-04T00:00Z"));
   });
@@ -77,7 +88,12 @@ describe("events read and written in the account's zone", () => {
 
   it("draws a timed event at its wall-clock hour in the zone's grid", () => {
     setZone("Asia/Tokyo");
-    const items = itemsOf({ notes: ["m"], events: { m: { start: "2026-10-03T00:00Z", end: "2026-10-03T01:00Z" } } }, new Set(["event"]), "2026-10-01", "2026-10-05");
+    const items = itemsOf(
+      { notes: ["m"], events: { m: { start: "2026-10-03T00:00Z", end: "2026-10-03T01:00Z" } } },
+      new Set(["event"]),
+      "2026-10-01",
+      "2026-10-05",
+    );
     const [b] = blocks(items, "2026-10-03");
     expect(b!.top).toBe(9 * 60);
     expect(b!.length).toBe(60);
@@ -92,6 +108,9 @@ describe("events read and written in the account's zone", () => {
 
   it("starts a new event at the next whole hour in the zone", () => {
     setZone("Asia/Kolkata");
-    expect(nextHourEvent(new Date("2026-10-03T03:40Z"))).toEqual({ start: "2026-10-03T10:00+05:30", end: "2026-10-03T11:00+05:30" });
+    expect(nextHourEvent(new Date("2026-10-03T03:40Z"))).toEqual({
+      start: "2026-10-03T10:00+05:30",
+      end: "2026-10-03T11:00+05:30",
+    });
   });
 });

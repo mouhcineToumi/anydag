@@ -18,7 +18,7 @@ import { scopeUrl } from "@/vault/current";
 export type AssetUrl = (doc: string, src: string) => string;
 
 /** A `src` that already says where it is — a URL, a data URL, a path from the root — is left alone. */
-export const external = (src: string): boolean => /^(https?:|data:|blob:|\/)/.test(src);
+const external = (src: string): boolean => /^(https?:|data:|blob:|\/)/.test(src);
 
 /** The folder a document is in, with its slash, or `""` at the top level. */
 const folderOf = (name: string): string => (name.includes("/") ? `${name.slice(0, name.lastIndexOf("/"))}/` : "");
@@ -27,7 +27,7 @@ const folderOf = (name: string): string => (name.includes("/") ? `${name.slice(0
  * The attachment an image is drawn from, when its `src` is one — `dag:<id>` — or `null`.
  * The id rather than a name, so a picture on a board survives the file being renamed or moved.
  */
-export const attachmentOf = (src: string): string | null => /^dag:([0-9a-z]{10})$/.exec(src.trim())?.[1] ?? null;
+const attachmentOf = (src: string): string | null => /^dag:([0-9a-z]{10})$/.exec(src.trim())?.[1] ?? null;
 
 /** The session's: the document's own folder, through the route behind it. An empty `src` is an upload still in flight and asks for nothing. */
 export const ownAssets: AssetUrl = (doc, src) => {

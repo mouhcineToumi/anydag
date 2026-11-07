@@ -69,7 +69,11 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const res = await call(h, "POST", "/v1/pair", { json: { code: "X" } });
       expect(res.status).toBe(400);
       expect((await err(res)).code).toBe("ES_BAD_REQUEST");
-      const notJson = await h.app.request("/v1/pair", { method: "POST", body: "{nope", headers: { "content-type": "application/json" } });
+      const notJson = await h.app.request("/v1/pair", {
+        method: "POST",
+        body: "{nope",
+        headers: { "content-type": "application/json" },
+      });
       expect((await err(notJson)).code).toBe("ES_BAD_REQUEST");
     });
 
@@ -122,7 +126,10 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const me = await device(h);
       await call(h, "GET", "/v1/vaults", { token: me.token });
       await call(h, "GET", "/v1/vaults", { token: me.token });
-      const count = async () => (await h.meta.usage({ account: me.account })).filter((r) => r.metric === "devices_active").reduce((n, r) => n + Number(r.value), 0);
+      const count = async () =>
+        (await h.meta.usage({ account: me.account }))
+          .filter((r) => r.metric === "devices_active")
+          .reduce((n, r) => n + Number(r.value), 0);
       expect(await count()).toBe(1);
       h.clock.advance(24 * 60 * 60 * 1000);
       await call(h, "GET", "/v1/vaults", { token: me.token });
@@ -138,7 +145,9 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       expect(await res.json()).toMatchObject({ id: "abcdefgh12", name: "c2VhbGVk", seq: 0, keyed: false });
       const list = (await (await call(h, "GET", "/v1/vaults", { token: me.token })).json()) as { vaults: { id: string }[] };
       expect(list.vaults.map((v) => v.id)).toEqual(["abcdefgh12"]);
-      expect((await err(await call(h, "POST", "/v1/vaults", { token: me.token, json: { name: "x", id: "BAD" } }))).code).toBe("ES_BAD_REQUEST");
+      expect((await err(await call(h, "POST", "/v1/vaults", { token: me.token, json: { name: "x", id: "BAD" } }))).code).toBe(
+        "ES_BAD_REQUEST",
+      );
       expect((await err(await call(h, "POST", "/v1/vaults", { token: me.token, json: {} }))).code).toBe("ES_BAD_REQUEST");
     });
 
@@ -146,21 +155,35 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const me = await device(h);
       const v = await vault(h, me.token);
       expect((await err(await call(h, "GET", `/v1/vaults/${v}/key`, { token: me.token }))).code).toBe("ES_NOT_FOUND");
-      const put = { wrapped: "d3JhcHBlZA", recovery: "cmVjb3Zlcnk", params: { kdf: "scrypt", N: 131072, r: 8, p: 1, salt: "c2FsdA" } };
+      const put = {
+        wrapped: "d3JhcHBlZA",
+        recovery: "cmVjb3Zlcnk",
+        params: { kdf: "scrypt", N: 131072, r: 8, p: 1, salt: "c2FsdA" },
+      };
       const first = await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: put });
       expect(first.status).toBe(200);
       const key = (await first.json()) as { etag: string };
       expect(key.etag).toBeTruthy();
-      const got = (await (await call(h, "GET", `/v1/vaults/${v}/key`, { token: me.token })).json()) as typeof put & { etag: string };
+      const got = (await (await call(h, "GET", `/v1/vaults/${v}/key`, { token: me.token })).json()) as typeof put & {
+        etag: string;
+      };
       expect(got).toMatchObject(put);
       const second = await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: put });
       expect(second.status).toBe(409);
       expect((await err(second)).code).toBe("ES_KEY_SET");
-      expect((await err(await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: { ...put, etag: "nope" } }))).code).toBe("ES_KEY_SET");
-      const changed = await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: { ...put, wrapped: "bmV3", etag: key.etag } });
+      expect(
+        (await err(await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: { ...put, etag: "nope" } }))).code,
+      ).toBe("ES_KEY_SET");
+      const changed = await call(h, "PUT", `/v1/vaults/${v}/key`, {
+        token: me.token,
+        json: { ...put, wrapped: "bmV3", etag: key.etag },
+      });
       expect(changed.status).toBe(200);
       expect(((await changed.json()) as { etag: string }).etag).not.toBe(key.etag);
-      expect((await err(await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: { ...put, params: { kdf: "md5" } } }))).code).toBe("ES_BAD_REQUEST");
+      expect(
+        (await err(await call(h, "PUT", `/v1/vaults/${v}/key`, { token: me.token, json: { ...put, params: { kdf: "md5" } } })))
+          .code,
+      ).toBe("ES_BAD_REQUEST");
       const vaults = (await (await call(h, "GET", "/v1/vaults", { token: me.token })).json()) as { vaults: { keyed: boolean }[] };
       expect(vaults.vaults[0]!.keyed).toBe(true);
     });
@@ -171,13 +194,19 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const me = await device(h);
       const v = await vault(h, me.token);
       const id = wid("blob-one");
-      const head0 = await h.app.request(`/v1/vaults/${v}/blobs/${id}`, { method: "HEAD", headers: { authorization: `Bearer ${me.token}` } });
+      const head0 = await h.app.request(`/v1/vaults/${v}/blobs/${id}`, {
+        method: "HEAD",
+        headers: { authorization: `Bearer ${me.token}` },
+      });
       expect(head0.status).toBe(404);
 
       const put = await upload(h, me.token, v, id, bytes("sealed bytes"));
       expect(put.status).toBe(200);
       expect(await put.json()).toEqual({ ok: true, size: 12 });
-      const head = await h.app.request(`/v1/vaults/${v}/blobs/${id}`, { method: "HEAD", headers: { authorization: `Bearer ${me.token}` } });
+      const head = await h.app.request(`/v1/vaults/${v}/blobs/${id}`, {
+        method: "HEAD",
+        headers: { authorization: `Bearer ${me.token}` },
+      });
       expect(head.status).toBe(200);
       expect(head.headers.get("content-length")).toBe("12");
       const got = await call(h, "GET", `/v1/vaults/${v}/blobs/${id}`, { token: me.token });
@@ -186,7 +215,9 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       // A second upload of an id held reads nothing and answers the same.
       const again = await upload(h, me.token, v, id, bytes("other bytes!"));
       expect(await again.json()).toEqual({ ok: true, size: 12 });
-      expect(Buffer.from(await (await call(h, "GET", `/v1/vaults/${v}/blobs/${id}`, { token: me.token })).arrayBuffer()).toString()).toBe("sealed bytes");
+      expect(
+        Buffer.from(await (await call(h, "GET", `/v1/vaults/${v}/blobs/${id}`, { token: me.token })).arrayBuffer()).toString(),
+      ).toBe("sealed bytes");
 
       const usage = await h.meta.usage({ account: me.account });
       const sum = (m: string) => usage.filter((r) => r.metric === m).reduce((n, r) => n + Number(r.value), 0);
@@ -198,7 +229,9 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const me = await device(h);
       const v = await vault(h, me.token);
       expect((await err(await upload(h, me.token, v, "short", bytes("x")))).code).toBe("ES_BAD_REQUEST");
-      expect((await err(await call(h, "GET", `/v1/vaults/${v}/blobs/${wid("absent")}`, { token: me.token }))).code).toBe("ES_NOT_FOUND");
+      expect((await err(await call(h, "GET", `/v1/vaults/${v}/blobs/${wid("absent")}`, { token: me.token }))).code).toBe(
+        "ES_NOT_FOUND",
+      );
       const noLength = await h.app.request(`/v1/vaults/${v}/blobs/${wid("nolen")}`, {
         method: "PUT",
         headers: { authorization: `Bearer ${me.token}` },
@@ -214,7 +247,10 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       expect(big.status).toBe(413);
       expect((await err(big)).code).toBe("ES_QUOTA");
       // The server's own cap, whatever the plan: refused at the header, before the body.
-      const huge = await call(h, "PUT", `/v1/vaults/${v}/blobs/${wid("huge")}`, { token: me.token, headers: { "content-length": String(h.config.maxBodyBytes + 1) } });
+      const huge = await call(h, "PUT", `/v1/vaults/${v}/blobs/${wid("huge")}`, {
+        token: me.token,
+        headers: { "content-length": String(h.config.maxBodyBytes + 1) },
+      });
       expect((await err(huge)).code).toBe("ES_QUOTA");
     });
   });
@@ -226,29 +262,50 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const ids = [wid("c1"), wid("c2"), wid("c3")];
       for (const [i, id] of ids.entries()) await upload(h, me.token, v, id, bytes(`content ${i}`));
       const keys = [wid("k1"), wid("k2"), wid("k3")];
-      const one = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: keys.map((key, i) => ({ key, parent: null, blob: ids[i], meta: "bWV0YQ" })) } });
+      const one = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: keys.map((key, i) => ({ key, parent: null, blob: ids[i], meta: "bWV0YQ" })) },
+      });
       expect(one.status).toBe(200);
       expect(await one.json()).toEqual({ seqs: [1, 2, 3] });
-      const two = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key: keys[0], parent: 1, blob: null, meta: "ZGVs" }] } });
+      const two = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: keys[0], parent: 1, blob: null, meta: "ZGVs" }] },
+      });
       expect(await two.json()).toEqual({ seqs: [4] });
 
-      const p1 = (await (await call(h, "GET", `/v1/vaults/${v}/changes?since=0&limit=3`, { token: me.token })).json()) as ChangesResponse;
+      const p1 = (await (
+        await call(h, "GET", `/v1/vaults/${v}/changes?since=0&limit=3`, { token: me.token })
+      ).json()) as ChangesResponse;
       expect(p1.changes.map((c) => c.seq)).toEqual([1, 2, 3]);
       expect(p1).toMatchObject({ next: 3, more: true, head: 4, horizon: 1 });
-      expect(p1.changes[0]).toMatchObject({ key: keys[0], parent: null, blob: ids[0], size: 9, meta: "bWV0YQ", device: me.device });
-      const p2 = (await (await call(h, "GET", `/v1/vaults/${v}/changes?since=3&limit=3`, { token: me.token })).json()) as ChangesResponse;
+      expect(p1.changes[0]).toMatchObject({
+        key: keys[0],
+        parent: null,
+        blob: ids[0],
+        size: 9,
+        meta: "bWV0YQ",
+        device: me.device,
+      });
+      const p2 = (await (
+        await call(h, "GET", `/v1/vaults/${v}/changes?since=3&limit=3`, { token: me.token })
+      ).json()) as ChangesResponse;
       expect(p2).toMatchObject({ next: 4, more: false });
       expect(p2.changes[0]).toMatchObject({ seq: 4, parent: 1, blob: null });
       const p3 = (await (await call(h, "GET", `/v1/vaults/${v}/changes?since=4`, { token: me.token })).json()) as ChangesResponse;
       expect(p3).toMatchObject({ changes: [], next: 4, more: false });
-      expect((await err(await call(h, "GET", `/v1/vaults/${v}/changes?since=-1`, { token: me.token }))).code).toBe("ES_BAD_REQUEST");
+      expect((await err(await call(h, "GET", `/v1/vaults/${v}/changes?since=-1`, { token: me.token }))).code).toBe(
+        "ES_BAD_REQUEST",
+      );
 
       const sorted = [...keys].sort();
       const h1 = (await (await call(h, "GET", `/v1/vaults/${v}/heads?limit=2`, { token: me.token })).json()) as HeadsResponse;
       expect(h1.heads.map((x) => x.key)).toEqual(sorted.slice(0, 2));
       expect(h1.next).toBe(sorted[1]);
       expect(h1.seq).toBe(4);
-      const h2 = (await (await call(h, "GET", `/v1/vaults/${v}/heads?after=${h1.next}&limit=2`, { token: me.token })).json()) as HeadsResponse;
+      const h2 = (await (
+        await call(h, "GET", `/v1/vaults/${v}/heads?after=${h1.next}&limit=2`, { token: me.token })
+      ).json()) as HeadsResponse;
       expect(h2.heads.map((x) => x.key)).toEqual(sorted.slice(2));
       expect(h2.next).toBeNull();
       const deleted = [...h1.heads, ...h2.heads].find((x) => x.key === keys[0])!;
@@ -266,16 +323,26 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const blob = wid("s-blob");
       await upload(h, me.token, v, blob, bytes("x"));
       const [a, b] = [wid("s-a"), wid("s-b")];
-      await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key: a, parent: null, blob, meta: "m" }] } });
+      await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: a, parent: null, blob, meta: "m" }] },
+      });
       const res = await call(h, "POST", `/v1/vaults/${v}/commit`, {
         token: me.token,
-        json: { changes: [{ key: b, parent: null, blob, meta: "m" }, { key: a, parent: null, blob, meta: "m" }] },
+        json: {
+          changes: [
+            { key: b, parent: null, blob, meta: "m" },
+            { key: a, parent: null, blob, meta: "m" },
+          ],
+        },
       });
       expect(res.status).toBe(409);
       const e = await err(res);
       expect(e.code).toBe("ES_STALE");
       expect(e.conflicts).toEqual([{ key: a, head: 1, blob }]);
-      const log = (await (await call(h, "GET", `/v1/vaults/${v}/changes?since=0`, { token: me.token })).json()) as ChangesResponse;
+      const log = (await (
+        await call(h, "GET", `/v1/vaults/${v}/changes?since=0`, { token: me.token })
+      ).json()) as ChangesResponse;
       expect(log.head).toBe(1);
       expect((await h.meta.usage({ account: me.account })).some((r) => r.metric === "conflicts_stale")).toBe(true);
     });
@@ -286,12 +353,24 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const blob = wid("r-blob");
       await upload(h, me.token, v, blob, bytes("x"));
       const key = wid("r-key");
-      await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent: null, blob, meta: "m" }] } });
-      await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent: 1, blob: null, meta: "m" }] } });
-      const wrong = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent: null, blob, meta: "m" }] } });
+      await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key, parent: null, blob, meta: "m" }] },
+      });
+      await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key, parent: 1, blob: null, meta: "m" }] },
+      });
+      const wrong = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key, parent: null, blob, meta: "m" }] },
+      });
       expect(wrong.status).toBe(409);
       expect((await err(wrong)).conflicts).toEqual([{ key, head: 2, blob: null }]);
-      const right = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent: 2, blob, meta: "m" }] } });
+      const right = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key, parent: 2, blob, meta: "m" }] },
+      });
       expect(await right.json()).toEqual({ seqs: [3] });
     });
 
@@ -299,7 +378,10 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const me = await device(h);
       const v = await vault(h, me.token);
       const missing = wid("never-uploaded");
-      const res = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key: wid("n-key"), parent: null, blob: missing, meta: "m" }] } });
+      const res = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: wid("n-key"), parent: null, blob: missing, meta: "m" }] },
+      });
       expect(res.status).toBe(422);
       const e = await err(res);
       expect(e.code).toBe("ES_NO_BLOB");
@@ -311,8 +393,22 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const v = await vault(h, me.token);
       const key = wid("dup");
       const post = (changes: unknown) => call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes } });
-      expect((await err(await post([{ key, parent: null, blob: null, meta: "m" }, { key, parent: null, blob: null, meta: "m" }]))).code).toBe("ES_BAD_REQUEST");
-      const many = Array.from({ length: MAX_CHANGES + 1 }, (_, i) => ({ key: wid(`many-${i}`), parent: null, blob: null, meta: "m" }));
+      expect(
+        (
+          await err(
+            await post([
+              { key, parent: null, blob: null, meta: "m" },
+              { key, parent: null, blob: null, meta: "m" },
+            ]),
+          )
+        ).code,
+      ).toBe("ES_BAD_REQUEST");
+      const many = Array.from({ length: MAX_CHANGES + 1 }, (_, i) => ({
+        key: wid(`many-${i}`),
+        parent: null,
+        blob: null,
+        meta: "m",
+      }));
       expect((await err(await post(many))).code).toBe("ES_BAD_REQUEST");
       expect((await err(await post([]))).code).toBe("ES_BAD_REQUEST");
       expect((await err(await post([{ key: "short", parent: null, blob: null, meta: "m" }]))).code).toBe("ES_BAD_REQUEST");
@@ -330,13 +426,22 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       await upload(h, me.token, v, small, bytes("12345678"));
       await upload(h, me.token, v, large, bytes("123456789012"));
       const key = wid("q-key");
-      const ok = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent: null, blob: small, meta: "m" }] } });
+      const ok = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key, parent: null, blob: small, meta: "m" }] },
+      });
       expect(ok.status).toBe(200);
-      const over = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key: wid("q-other"), parent: null, blob: large, meta: "m" }] } });
+      const over = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: wid("q-other"), parent: null, blob: large, meta: "m" }] },
+      });
       expect(over.status).toBe(413);
       expect((await err(over)).code).toBe("ES_QUOTA");
       // A delete frees what its head held, so it is never refused.
-      const replace = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent: 1, blob: null, meta: "m" }] } });
+      const replace = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key, parent: 1, blob: null, meta: "m" }] },
+      });
       expect(replace.status).toBe(200);
     });
 
@@ -348,7 +453,10 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       for (const b of blobs) await upload(h, me.token, v, b, bytes(b));
       let parent: number | null = null;
       for (const b of blobs) {
-        const res = await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key, parent, blob: b, meta: "m" }] } });
+        const res = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+          token: me.token,
+          json: { changes: [{ key, parent, blob: b, meta: "m" }] },
+        });
         parent = ((await res.json()) as { seqs: number[] }).seqs[0]!;
       }
       await collect(h.meta, h.blobs, { historyDays: 30, now: new Date(h.clock.now.getTime() + 31 * 86_400_000) });
@@ -372,7 +480,10 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const reader = res.body!.getReader();
       const blob = wid("p-blob");
       await upload(h, me.token, v, blob, bytes("x"));
-      await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key: wid("p-key"), parent: null, blob, meta: "m" }] } });
+      await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: wid("p-key"), parent: null, blob, meta: "m" }] },
+      });
       let text = "";
       while (!/data: /.test(text)) {
         const { value, done } = await reader.read();
@@ -387,52 +498,71 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       expect(h.hub.open).toBe(0);
     });
 
-    it.skipIf(skip)("is 204 when ANYDAG_SYNC_POKE=off", async () => {
-      const off = await harness(name, { ANYDAG_SYNC_POKE: "off" });
-      try {
-        const me = await device(off);
-        const v = await vault(off, me.token);
-        expect((await call(off, "GET", `/v1/vaults/${v}/poke`, { token: me.token })).status).toBe(204);
-      } finally {
-        await off.close();
-      }
-    }, 60_000);
+    it.skipIf(skip)(
+      "is 204 when ANYDAG_SYNC_POKE=off",
+      async () => {
+        const off = await harness(name, { ANYDAG_SYNC_POKE: "off" });
+        try {
+          const me = await device(off);
+          const v = await vault(off, me.token);
+          expect((await call(off, "GET", `/v1/vaults/${v}/poke`, { token: me.token })).status).toBe(204);
+        } finally {
+          await off.close();
+        }
+      },
+      60_000,
+    );
   });
 
   describe("report and account", () => {
     it.skipIf(skip)("a report bumps the ledger, and the account says its plan and use", async () => {
       const me = await device(h);
       const v = await vault(h, me.token);
-      expect((await call(h, "POST", `/v1/vaults/${v}/report`, { token: me.token, json: { copied: 2, merged: 3 } })).status).toBe(200);
-      expect((await err(await call(h, "POST", `/v1/vaults/${v}/report`, { token: me.token, json: { copied: -1, merged: 0 } }))).code).toBe("ES_BAD_REQUEST");
+      expect((await call(h, "POST", `/v1/vaults/${v}/report`, { token: me.token, json: { copied: 2, merged: 3 } })).status).toBe(
+        200,
+      );
+      expect(
+        (await err(await call(h, "POST", `/v1/vaults/${v}/report`, { token: me.token, json: { copied: -1, merged: 0 } }))).code,
+      ).toBe("ES_BAD_REQUEST");
       const usage = await h.meta.usage({ account: me.account });
       expect(usage.find((r) => r.metric === "conflicts_copied")).toMatchObject({ vault: v, value: 2 });
       expect(usage.find((r) => r.metric === "merged")).toMatchObject({ vault: v, value: 3 });
 
       const blob = wid("a-blob");
       await upload(h, me.token, v, blob, bytes("12345"));
-      await call(h, "POST", `/v1/vaults/${v}/commit`, { token: me.token, json: { changes: [{ key: wid("a-key"), parent: null, blob, meta: "m" }] } });
+      await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: wid("a-key"), parent: null, blob, meta: "m" }] },
+      });
       const info = await (await call(h, "GET", "/v1/account", { token: me.token })).json();
-      expect(info).toMatchObject({ id: me.account, plan: { id: "free", storage_bytes: null, devices: null }, used: { storage_live: 5, devices: 1, vaults: 1 } });
+      expect(info).toMatchObject({
+        id: me.account,
+        plan: { id: "free", storage_bytes: null, devices: null },
+        used: { storage_live: 5, devices: 1, vaults: 1 },
+      });
     });
   });
 
   describe("admin and metrics", () => {
     const admin = { authorization: `Bearer ${ADMIN}` };
 
-    it.skipIf(skip)("refuses without the admin token, and is off without one configured", async () => {
-      expect((await err(await call(h, "GET", "/v1/admin/accounts"))).code).toBe("ES_FORBIDDEN");
-      const res = await call(h, "GET", "/metrics", { headers: { authorization: "Bearer wrong" } });
-      expect(res.status).toBe(403);
-      const me = await device(h);
-      expect((await call(h, "GET", "/v1/admin/accounts", { token: me.token })).status).toBe(403);
-      const off = await harness(name, { ANYDAG_SYNC_ADMIN_TOKEN: "" });
-      try {
-        expect((await err(await call(off, "GET", "/v1/admin/accounts", { headers: admin }))).code).toBe("ES_FORBIDDEN");
-      } finally {
-        await off.close();
-      }
-    }, 60_000);
+    it.skipIf(skip)(
+      "refuses without the admin token, and is off without one configured",
+      async () => {
+        expect((await err(await call(h, "GET", "/v1/admin/accounts"))).code).toBe("ES_FORBIDDEN");
+        const res = await call(h, "GET", "/metrics", { headers: { authorization: "Bearer wrong" } });
+        expect(res.status).toBe(403);
+        const me = await device(h);
+        expect((await call(h, "GET", "/v1/admin/accounts", { token: me.token })).status).toBe(403);
+        const off = await harness(name, { ANYDAG_SYNC_ADMIN_TOKEN: "" });
+        try {
+          expect((await err(await call(off, "GET", "/v1/admin/accounts", { headers: admin }))).code).toBe("ES_FORBIDDEN");
+        } finally {
+          await off.close();
+        }
+      },
+      60_000,
+    );
 
     it.skipIf(skip)("/metrics is Prometheus text with no ids in it", async () => {
       const me = await device(h);
@@ -453,32 +583,64 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       expect(made.status).toBe(201);
       const acct = (await made.json()) as { id: string; plan: string; devices: number };
       expect(acct).toMatchObject({ plan: "free", devices: 0, vaults: 0 });
-      expect((await err(await call(h, "POST", "/v1/admin/accounts", { headers: admin, json: { name: `ops-${name}` } }))).code).toBe("ES_BAD_REQUEST");
-      expect((await err(await call(h, "POST", "/v1/admin/accounts", { headers: admin, json: { name: "x", plan: "nope" } }))).code).toBe("ES_NOT_FOUND");
-      const list = (await (await call(h, "GET", "/v1/admin/accounts", { headers: admin })).json()) as { accounts: { name: string }[] };
+      expect(
+        (await err(await call(h, "POST", "/v1/admin/accounts", { headers: admin, json: { name: `ops-${name}` } }))).code,
+      ).toBe("ES_BAD_REQUEST");
+      expect(
+        (await err(await call(h, "POST", "/v1/admin/accounts", { headers: admin, json: { name: "x", plan: "nope" } }))).code,
+      ).toBe("ES_NOT_FOUND");
+      const list = (await (await call(h, "GET", "/v1/admin/accounts", { headers: admin })).json()) as {
+        accounts: { name: string }[];
+      };
       expect(list.accounts.some((a) => a.name === `ops-${name}`)).toBe(true);
 
-      const pair = (await (await call(h, "POST", "/v1/admin/pair", { headers: admin, json: { account: `ops-${name}` } })).json()) as { code: string; url: string };
+      const pair = (await (
+        await call(h, "POST", "/v1/admin/pair", { headers: admin, json: { account: `ops-${name}` } })
+      ).json()) as { code: string; url: string };
       expect(pair.url).toBe("http://sync.test");
       const paired = await call(h, "POST", "/v1/pair", { json: { code: pair.code, device: { name: "d", platform: "p" } } });
       expect(paired.status).toBe(200);
-      expect((await err(await call(h, "POST", "/v1/admin/pair", { headers: admin, json: { account: "nobody" } }))).code).toBe("ES_NOT_FOUND");
+      expect((await err(await call(h, "POST", "/v1/admin/pair", { headers: admin, json: { account: "nobody" } }))).code).toBe(
+        "ES_NOT_FOUND",
+      );
 
-      const plan = await call(h, "PUT", `/v1/admin/plans/pro-${name}`, { headers: admin, json: { storage_bytes: 1000, devices: 5 } });
-      expect(await plan.json()).toEqual({ id: `pro-${name}`, storage_bytes: 1000, history_days: null, max_file_bytes: null, devices: 5 });
+      const plan = await call(h, "PUT", `/v1/admin/plans/pro-${name}`, {
+        headers: admin,
+        json: { storage_bytes: 1000, devices: 5 },
+      });
+      expect(await plan.json()).toEqual({
+        id: `pro-${name}`,
+        storage_bytes: 1000,
+        history_days: null,
+        max_file_bytes: null,
+        devices: 5,
+      });
       const set = await call(h, "POST", `/v1/admin/accounts/${acct.id}/plan`, { headers: admin, json: { plan: `pro-${name}` } });
       expect(await set.json()).toMatchObject({ plan: `pro-${name}` });
-      const both = await call(h, "PUT", "/v1/admin/plan", { headers: admin, json: { id: `max-${name}`, devices: 9, account: `ops-${name}` } });
+      const both = await call(h, "PUT", "/v1/admin/plan", {
+        headers: admin,
+        json: { id: `max-${name}`, devices: 9, account: `ops-${name}` },
+      });
       expect(both.status).toBe(200);
       expect((await h.meta.accountByName(`ops-${name}`))!.plan).toBe(`max-${name}`);
-      expect((await err(await call(h, "PUT", "/v1/admin/plans/bad%20id", { headers: admin, json: {} }))).code).toBe("ES_BAD_REQUEST");
+      expect((await err(await call(h, "PUT", "/v1/admin/plans/bad%20id", { headers: admin, json: {} }))).code).toBe(
+        "ES_BAD_REQUEST",
+      );
 
-      const usage = (await (await call(h, "GET", `/v1/admin/usage?account=ops-${name}&since=2000-01-01`, { headers: admin })).json()) as { usage: { metric: string }[] };
+      const usage = (await (
+        await call(h, "GET", `/v1/admin/usage?account=ops-${name}&since=2000-01-01`, { headers: admin })
+      ).json()) as { usage: { metric: string }[] };
       expect(usage.usage.some((r) => r.metric === "devices_active")).toBe(false); // paired, not yet asked anything
-      expect((await err(await call(h, "GET", "/v1/admin/usage?since=yesterday", { headers: admin }))).code).toBe("ES_BAD_REQUEST");
+      expect((await err(await call(h, "GET", "/v1/admin/usage?since=yesterday", { headers: admin }))).code).toBe(
+        "ES_BAD_REQUEST",
+      );
 
       const gc = await call(h, "POST", "/v1/admin/gc", { headers: admin });
-      expect(await gc.json()).toMatchObject({ compacted: expect.any(Number), blobs: expect.any(Number), bytes: expect.any(Number) });
+      expect(await gc.json()).toMatchObject({
+        compacted: expect.any(Number),
+        blobs: expect.any(Number),
+        bytes: expect.any(Number),
+      });
     });
   });
 });

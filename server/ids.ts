@@ -33,7 +33,9 @@ export function mint(taken: (id: string) => boolean = () => false): string {
  */
 export function derivedId(id: string, rel: string, taken: (x: string) => boolean = () => false): string {
   for (let n = 0; ; n++) {
-    const digest = createHash("sha256").update(`${id}\0${rel.toLowerCase()}${n ? `\0${n}` : ""}`).digest();
+    const digest = createHash("sha256")
+      .update(`${id}\0${rel.toLowerCase()}${n ? `\0${n}` : ""}`)
+      .digest();
     let out = "";
     for (let i = 0; i < 10; i++) out += ALPHABET[digest[i]! & 31];
     if (!taken(out)) return out;

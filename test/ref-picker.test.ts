@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { rank, refItems } from "@/blocks/refs";
 import type { IndexDoc } from "@/refs/useIndex";
 
-const doc = (id: string, name: string, title?: string, kind: IndexDoc["kind"] = "board"): IndexDoc => ({ id, name, kind, title, refs: [] });
+const doc = (id: string, name: string, title?: string, kind: IndexDoc["kind"] = "board"): IndexDoc => ({
+  id,
+  name,
+  kind,
+  title,
+  refs: [],
+});
 
 const DOCS = [
   doc("a000000001", "acme/153", "Acme research"),
@@ -31,7 +37,11 @@ describe("the reference picker", () => {
   });
 
   it("tells them apart by their folders when those differ, and never shows a name otherwise", () => {
-    const docs = [doc("b000000001", "untitled", "Untitled"), doc("b000000002", "work/untitled", "Untitled"), doc("b000000003", "plan-7", "Plan")];
+    const docs = [
+      doc("b000000001", "untitled", "Untitled"),
+      doc("b000000002", "work/untitled", "Untitled"),
+      doc("b000000003", "plan-7", "Plan"),
+    ];
     const got = refItems(docs, "", null, () => {});
     expect(got.map((i) => i.title)).toEqual(["Plan", "Untitled (top level)", "Untitled (work)"]);
     expect(got.map((i) => i.subtext)).toEqual(["Board", "Board", "Board · work"]);

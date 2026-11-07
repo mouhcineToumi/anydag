@@ -33,7 +33,12 @@ const hit = (question = "qa", run: Answer["run"] = "mistakes", quiz = Q): Answer
 
 describe("the rule", () => {
   it("a miss counts and resets the streak wherever it happens", () => {
-    expect(record({ wrong: 1, right: 2, streak: 1, at: "" }, false, "quiz", "t")).toEqual({ wrong: 2, right: 2, streak: 0, at: "t" });
+    expect(record({ wrong: 1, right: 2, streak: 1, at: "" }, false, "quiz", "t")).toEqual({
+      wrong: 2,
+      right: 2,
+      streak: 0,
+      at: "t",
+    });
     expect(record({ wrong: 1, right: 2, streak: 1, at: "" }, false, "mistakes", "t").streak).toBe(0);
   });
 

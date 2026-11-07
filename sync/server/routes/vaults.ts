@@ -23,7 +23,7 @@ import { live } from "./pair";
 
 const SEALED_MAX = 64 * 1024;
 
-export function wireVault(v: VaultRow): RemoteVault {
+function wireVault(v: VaultRow): RemoteVault {
   return { id: v.id, name: v.name, seq: Number(v.seq), created: v.created, keyed: v.keyed };
 }
 
@@ -32,7 +32,8 @@ function params(v: unknown): KdfParams {
   const salt = str(v.salt, "params.salt", 1024);
   const n = (k: string): number => {
     const x = v[k];
-    if (typeof x !== "number" || !Number.isSafeInteger(x) || x < 1) throw new HttpError("ES_BAD_REQUEST", `params.${k} must be a whole number of at least 1`);
+    if (typeof x !== "number" || !Number.isSafeInteger(x) || x < 1)
+      throw new HttpError("ES_BAD_REQUEST", `params.${k} must be a whole number of at least 1`);
     return x;
   };
   if (v.kdf === "argon2id") return { kdf: "argon2id", m: n("m"), t: n("t"), p: n("p"), salt };
@@ -54,7 +55,8 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     let id: string | undefined;
     if (b.id !== undefined && b.id !== null) {
       id = str(b.id, "id", 10, 10);
-      if (!/^[0-9a-z]{10}$/.test(id)) throw new HttpError("ES_BAD_REQUEST", "id must be ten characters of lower-case Crockford base32");
+      if (!/^[0-9a-z]{10}$/.test(id))
+        throw new HttpError("ES_BAD_REQUEST", "id must be ten characters of lower-case Crockford base32");
     }
     const row = await deps.meta.createVault(c.get("device").account, name, id);
     return c.json(wireVault(row) satisfies RemoteVault, 201);
@@ -68,10 +70,20 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
 
   app.put("/v1/vaults/:v/key", async (c) => {
     const b = await body(c);
-    const put: PutVaultKey = { wrapped: str(b.wrapped, "wrapped", SEALED_MAX), recovery: str(b.recovery, "recovery", SEALED_MAX), params: params(b.params) };
+    const put: PutVaultKey = {
+      wrapped: str(b.wrapped, "wrapped", SEALED_MAX),
+      recovery: str(b.recovery, "recovery", SEALED_MAX),
+      params: params(b.params),
+    };
     if (b.etag !== undefined && b.etag !== null) put.etag = str(b.etag, "etag", 200);
     const key = await deps.meta.putKey(c.get("vault").id, put);
-    if (!key) throw new HttpError("ES_KEY_SET", put.etag ? "that etag is not the key's current one: read the key again" : "this vault already has a key: send its etag to change it");
+    if (!key)
+      throw new HttpError(
+        "ES_KEY_SET",
+        put.etag
+          ? "that etag is not the key's current one: read the key again"
+          : "this vault already has a key: send its etag to change it",
+      );
     return c.json(key);
   });
 
@@ -89,12 +101,22 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const id = c.get("device").account;
     const account = await deps.meta.account(id);
     if (!account) throw new HttpError("ES_NOT_FOUND", "this device's account is gone");
-    const [plan, storage, devices, vaults] = await Promise.all([deps.meta.plan(account.plan), deps.meta.storage(id), deps.meta.devices(id), deps.meta.vaults(id)]);
+    const [plan, storage, devices, vaults] = await Promise.all([
+      deps.meta.plan(account.plan),
+      deps.meta.storage(id),
+      deps.meta.devices(id),
+      deps.meta.vaults(id),
+    ]);
     return c.json({
       id: account.id,
       name: account.name,
       plan,
-      used: { storage_live: Number(storage.live), storage_history: Number(storage.history), devices: live(devices), vaults: vaults.length },
+      used: {
+        storage_live: Number(storage.live),
+        storage_history: Number(storage.history),
+        devices: live(devices),
+        vaults: vaults.length,
+      },
     } satisfies AccountInfo);
   });
 

@@ -18,7 +18,10 @@ import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, sc
 import type { KdfParams } from "./wire";
 
 /** Node 24's Argon2, which the installed `@types/node` does not describe yet. */
-type Argon2 = (algorithm: "argon2id", p: { message: Uint8Array; nonce: Uint8Array; parallelism: number; tagLength: number; memory: number; passes: number }) => Buffer;
+type Argon2 = (
+  algorithm: "argon2id",
+  p: { message: Uint8Array; nonce: Uint8Array; parallelism: number; tagLength: number; memory: number; passes: number },
+) => Buffer;
 const argon2Sync = (nodeCrypto as unknown as { argon2Sync?: Argon2 }).argon2Sync;
 
 const VERSION = 0x01;
@@ -44,7 +47,11 @@ export const randomKey = (): Uint8Array => new Uint8Array(randomBytes(32));
  * no empty, `.` or `..` segment. Throws on a path that would not name one place in a vault.
  */
 export function normalise(rel: string): string {
-  const parts = rel.normalize("NFC").replace(/\\/g, "/").split("/").filter((p) => p !== "");
+  const parts = rel
+    .normalize("NFC")
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((p) => p !== "");
   if (!parts.length || parts.some((p) => p === "." || p === "..")) throw new Error(`not a vault path: ${JSON.stringify(rel)}`);
   return parts.join("/");
 }
@@ -60,7 +67,8 @@ export interface VaultKeys {
   enc: Uint8Array;
 }
 
-const sub = (vk: Uint8Array, label: string): Uint8Array => new Uint8Array(hkdfSync("sha256", vk, new Uint8Array(0), `anydag-sync/v1/${label}`, 32));
+const sub = (vk: Uint8Array, label: string): Uint8Array =>
+  new Uint8Array(hkdfSync("sha256", vk, new Uint8Array(0), `anydag-sync/v1/${label}`, 32));
 
 export function keysOf(vk: Uint8Array): VaultKeys {
   if (vk.byteLength !== 32) throw new Error("a vault key is 32 bytes");
@@ -102,19 +110,21 @@ export function open(kEnc: Uint8Array, sealed: Uint8Array, aad: string, what = "
 
 /** A file's bytes, bound to their blob id. */
 export const sealBlob = (kEnc: Uint8Array, id: string, plain: Uint8Array): Uint8Array => seal(kEnc, plain, `blob:${id}`);
-export const openBlob = (kEnc: Uint8Array, id: string, sealed: Uint8Array): Uint8Array => open(kEnc, sealed, `blob:${id}`, `blob ${id}`);
+export const openBlob = (kEnc: Uint8Array, id: string, sealed: Uint8Array): Uint8Array =>
+  open(kEnc, sealed, `blob:${id}`, `blob ${id}`);
 
 /** A short text (a vault's name), bound to a label. */
-export const sealText = (kEnc: Uint8Array, label: string, text: string): string => b64(seal(kEnc, Buffer.from(text, "utf8"), `text:${label}`));
-export const openText = (kEnc: Uint8Array, label: string, sealed: string): string =>
-  Buffer.from(open(kEnc, unb64(sealed), `text:${label}`, label)).toString("utf8");
+export const sealText = (kEnc: Uint8Array, label: string, text: string): string =>
+  b64(seal(kEnc, Buffer.from(text, "utf8"), `text:${label}`));
 
 // -- the vault key, wrapped -----------------------------------------------------------------------
 
 /** What a new vault's passphrase is stretched with. Argon2id where Node has it, scrypt where not. */
 export function newParams(): KdfParams {
   const salt = b64(randomBytes(16));
-  return typeof argon2Sync === "function" ? { kdf: "argon2id", m: 65536, t: 3, p: 1, salt } : { kdf: "scrypt", N: 1 << 17, r: 8, p: 1, salt };
+  return typeof argon2Sync === "function"
+    ? { kdf: "argon2id", m: 65536, t: 3, p: 1, salt }
+    : { kdf: "scrypt", N: 1 << 17, r: 8, p: 1, salt };
 }
 
 /** The key a passphrase unlocks the vault key with. ~200 ms by design. */
@@ -123,13 +133,18 @@ export function deriveKek(passphrase: string, params: KdfParams): Uint8Array {
   const salt = Buffer.from(params.salt, "base64url");
   if (params.kdf === "argon2id") {
     if (typeof argon2Sync !== "function") throw new Error("this Node has no Argon2: the vault was made where one exists");
-    return new Uint8Array(argon2Sync("argon2id", { message, nonce: salt, parallelism: params.p, tagLength: 32, memory: params.m, passes: params.t }));
+    return new Uint8Array(
+      argon2Sync("argon2id", { message, nonce: salt, parallelism: params.p, tagLength: 32, memory: params.m, passes: params.t }),
+    );
   }
-  return new Uint8Array(scryptSync(message, salt, 32, { N: params.N, r: params.r, p: params.p, maxmem: 256 * params.N * params.r }));
+  return new Uint8Array(
+    scryptSync(message, salt, 32, { N: params.N, r: params.r, p: params.p, maxmem: 256 * params.N * params.r }),
+  );
 }
 
 export const wrapKey = (kek: Uint8Array, vk: Uint8Array): string => b64(seal(kek, vk, "vault-key"));
-export const unwrapKey = (kek: Uint8Array, wrapped: string): Uint8Array => open(kek, unb64(wrapped), "vault-key", "the vault key");
+export const unwrapKey = (kek: Uint8Array, wrapped: string): Uint8Array =>
+  open(kek, unb64(wrapped), "vault-key", "the vault key");
 
 // -- the recovery key ------------------------------------------------------------------------------
 
@@ -177,7 +192,8 @@ function fromB32(text: string, bytes: number): Uint8Array | null {
   return at === bytes && value === 0 ? out : null;
 }
 
-const check = (key: Uint8Array): string => toB32(createHmac("sha256", "anydag-sync/recovery").update(key).digest().subarray(0, 3)).slice(0, 4);
+const check = (key: Uint8Array): string =>
+  toB32(createHmac("sha256", "anydag-sync/recovery").update(key).digest().subarray(0, 3)).slice(0, 4);
 
 export function recoveryCode(key: Uint8Array): string {
   if (key.byteLength !== 32) throw new Error("a recovery key is 32 bytes");

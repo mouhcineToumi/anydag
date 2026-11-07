@@ -124,14 +124,20 @@ async function mistakesRun(page: Page, ours: string, right: number) {
       const where = await page.locator(".dag-run__where").textContent();
       await page.locator("[data-dag-run-next]").click();
       await expect
-        .poll(async () => (await state.getAttribute("data-dag-run")) === "done" || (await page.locator(".dag-run__where").textContent()) !== where)
+        .poll(
+          async () =>
+            (await state.getAttribute("data-dag-run")) === "done" ||
+            (await page.locator(".dag-run__where").textContent()) !== where,
+        )
         .toBe(true);
     }
   }
   expect(met, `the Mistakes run asked ${ours}`).toBe(true);
 }
 
-test("a quiz written as a file is a card on the Quizzes page, and its questions are cards in the form", async ({ page }) => {
+test("a quiz written as a file is a card on the Quizzes page, and its questions are cards in the form", {
+  tag: "@smoke",
+}, async ({ page }) => {
   const name = write("pg");
   await page.goto("/?quizzes=1");
   await page.locator("[data-dag-quizzes-filter]").fill(folder);
@@ -173,7 +179,9 @@ test("a question added in the form is written, and asks for every answer once tw
   await added.locator("[data-dag-quiz-option-text]").nth(0).fill("Snapshots");
   await added.locator("[data-dag-quiz-option-text]").nth(1).fill("Row versions");
   await added.locator("[data-dag-quiz-correct-toggle]").nth(1).check();
-  await expect.poll(() => read("pg")).toMatch(/## Which of these are MVCC\? \{#q[0-9a-z]{6}\}\n\n- \[x\] Snapshots\n- \[x\] Row versions\n$/);
+  await expect
+    .poll(() => read("pg"))
+    .toMatch(/## Which of these are MVCC\? \{#q[0-9a-z]{6}\}\n\n- \[x\] Snapshots\n- \[x\] Row versions\n$/);
   await expect(added.locator("[data-dag-quiz-multi]")).toBeChecked();
   await expect(added.locator("[data-dag-quiz-multi]")).toBeDisabled();
 });
@@ -188,7 +196,9 @@ test("a question the runner cannot ask says so, and Source shows the whole file 
   await expect(page.locator('[data-dag-quiz-problem="EQ_NO_ANSWER"]')).toContainText("line 6");
 });
 
-test("a run records a miss into Mistakes, and two right in a row in the Mistakes run take it out", async ({ page }) => {
+test("a run records a miss into Mistakes, and two right in a row in the Mistakes run take it out", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const name = write("pg");
   const id = await idOf(page, name);
   await page.goto(`/?quiz=${name}`);

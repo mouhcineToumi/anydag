@@ -23,7 +23,10 @@ export function systemPrompt(o: { mode: Mode; reach: Reach[]; others: { id: stri
     "You reach the vaults only through the `anydag` tools. You have no shell and no other file access.",
     "",
     "## Vaults in reach",
-    ...o.reach.map((r) => `- \`${r.id}\` — ${r.name}${r.home ? " (this chat's vault; tools default to it)" : ""}: ${r.mode === "edit" ? "read and change" : "read only"}`),
+    ...o.reach.map(
+      (r) =>
+        `- \`${r.id}\` — ${r.name}${r.home ? " (this chat's vault; tools default to it)" : ""}: ${r.mode === "edit" ? "read and change" : "read only"}`,
+    ),
     "",
     o.others.length
       ? `Other vaults are open but not in reach: ${o.others.map((v) => `\`${v.id}\` (${v.name})`).join(", ")}. To use one, call \`vault_request\` with why; only the person can grant it.`
@@ -34,7 +37,7 @@ export function systemPrompt(o: { mode: Mode; reach: Reach[]; others: { id: stri
     "## Mode",
     o.mode === "ask"
       ? "**Ask.** Answer from the vault. Do not change anything: tools that write are not available, and the person has to switch to Edit for that."
-      : "**Edit.** You may change the vault. Before each distinct group of changes, call `change_block` with a short title saying what the group does (\"Draw the auth flow\", \"Move the meeting notes into 2026/\") — the person undoes a block as one. Deleting, moving folders and emptying the trash wait for the person's approval; if they say no, do not try another way around it.",
+      : '**Edit.** You may change the vault. Before each distinct group of changes, call `change_block` with a short title saying what the group does ("Draw the auth flow", "Move the meeting notes into 2026/") — the person undoes a block as one. Deleting, moving folders and emptying the trash wait for the person\'s approval; if they say no, do not try another way around it.',
     "",
     "## Answering",
     "- Ground every answer in what the tools return; say so plainly when the vault does not say.",

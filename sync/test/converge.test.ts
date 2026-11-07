@@ -40,7 +40,9 @@ describe("convergence", () => {
       }
       if (failed.length) {
         console.error(failed.map(describeFailure).join("\n\n"));
-        expect.fail(`${failed.length} of ${SEEDS.length} seed(s) failed: ${failed.map((r) => r.seed).join(", ")} — the steps are printed above`);
+        expect.fail(
+          `${failed.length} of ${SEEDS.length} seed(s) failed: ${failed.map((r) => r.seed).join(", ")} — the steps are printed above`,
+        );
       }
     },
     Math.max(60_000, SEEDS.length * 15_000),

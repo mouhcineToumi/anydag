@@ -75,7 +75,7 @@ const centreOf = async (page: Page, selector: string) => {
 
 /* --------------------------------------------------------------------------- inline rename */
 
-test("double-clicking a card renames it where it is drawn", async ({ page }) => {
+test("double-clicking a card renames it where it is drawn", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await page.locator('[data-dag-node="api"]').dblclick();
 
@@ -116,10 +116,7 @@ test("the same gesture renames a group's label", async ({ page }) => {
 test("the same gesture writes an edge's label, on the segment it was drawn on", async ({ page }) => {
   /* Two cards and one line, and nothing else in the fence: a forced click lands on the middle of
      the *bounding box*, and on the board above that point sits over the group's own card. */
-  fs.writeFileSync(
-    file,
-    `\`\`\`arch {#pair x=0 y=0}\nservice api "The API"\nstore db "Database"\n\napi --> db\n\`\`\`\n`,
-  );
+  fs.writeFileSync(file, `\`\`\`arch {#pair x=0 y=0}\nservice api "The API"\nstore db "Database"\n\napi --> db\n\`\`\`\n`);
   await open(page);
 
   /* An edge with no label has no `<text>` to measure, so the box lands on the middle of the hit
@@ -182,7 +179,9 @@ test("a card grown from inside a group stays in that group", async ({ page }) =>
   await expect(page.locator("[data-dag-rename-box]")).toBeVisible({ timeout: 10_000 });
   await page.locator("[data-dag-rename-box]").press("Escape");
 
-  await expect.poll(() => bodyOf("infra"), { timeout: 5_000 }).toMatch(/ {2}service jobs "Jobs"\n {2}service \w+ "New service"\n\}/);
+  await expect
+    .poll(() => bodyOf("infra"), { timeout: 5_000 })
+    .toMatch(/ {2}service jobs "Jobs"\n {2}service \w+ "New service"\n\}/);
 });
 
 test("a plus on a sketch box lands to its right, and draws no edge", async ({ page }) => {

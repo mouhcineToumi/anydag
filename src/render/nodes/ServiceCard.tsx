@@ -46,7 +46,9 @@ export function ServiceCard({ node, box, theme }: Props) {
           <Icon icon={icon} size={theme.metric.tile.icon} stroke={theme.metric.tile.stroke} />
         </span>
         <span className="dag-node__text">
-          <span className="dag-node__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+          <span className="dag-node__title" data-dag-title="" {...emOf(node)}>
+            {node.title}
+          </span>
           {node.meta ? <span className="dag-node__meta">{node.meta}</span> : null}
         </span>
         {node.async ? <span className="dag-pill">async</span> : null}

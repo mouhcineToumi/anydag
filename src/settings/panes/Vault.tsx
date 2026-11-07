@@ -67,7 +67,12 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
               {here.path}
             </span>
             {reveal ? (
-              <button type="button" className="dag-button" data-dag-setting-vault-reveal="" onClick={() => void reveal(here.path)}>
+              <button
+                type="button"
+                className="dag-button"
+                data-dag-setting-vault-reveal=""
+                onClick={() => void reveal(here.path)}
+              >
                 <FolderOpen size={14} strokeWidth={2} aria-hidden="true" />
                 <span>Show in folder</span>
               </button>
@@ -77,7 +82,10 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
       </Group>
 
       <Group title="Attachments">
-        <Field label="Attachments folder" hint="Where an uploaded file is kept, inside the vault. Files already there stay where they are.">
+        <Field
+          label="Attachments folder"
+          hint="Where an uploaded file is kept, inside the vault. Files already there stay where they are."
+        >
           <TextField
             wide
             data-dag-setting-attachments=""
@@ -118,7 +126,11 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
       </Group>
 
       <Group title="Close">
-        <Field label="Close this vault" hint="The folder and its files stay as they are, and the vault stays on the recent list." plain>
+        <Field
+          label="Close this vault"
+          hint="The folder and its files stay as they are, and the vault stays on the recent list."
+          plain
+        >
           <button type="button" className="dag-button" data-dag-vault-close-setting="" onClick={() => void closeThis()}>
             <Power size={14} strokeWidth={2} aria-hidden="true" />
             <span>Close vault</span>
@@ -138,7 +150,10 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
 function UpdateLinks() {
   const [on, setOn] = useState(() => readFlag(UPDATE_LINKS, true));
   return (
-    <Field label="Update links when a file moves" hint="Renaming or moving a file rewrites the [[wikilinks]] to it in every other file.">
+    <Field
+      label="Update links when a file moves"
+      hint="Renaming or moving a file rewrites the [[wikilinks]] to it in every other file."
+    >
       <Switch
         data-dag-setting-update-links=""
         checked={on}
@@ -201,7 +216,12 @@ function UnusedImages({ boardName }: { boardName: string | null }) {
         </span>
       ) : unused.asking ? (
         <span className="dag-settings__actions">
-          <button type="button" className="dag-button dag-button--danger" data-dag-setting-sweep-confirm="" onClick={unused.sweep}>
+          <button
+            type="button"
+            className="dag-button dag-button--danger"
+            data-dag-setting-sweep-confirm=""
+            onClick={unused.sweep}
+          >
             Remove {unused.files.length}
           </button>
           <button type="button" className="dag-icon" aria-label="Cancel" onClick={() => unused.ask(false)}>

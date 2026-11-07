@@ -76,7 +76,17 @@ import {
   type LucideProps,
 } from "lucide-react";
 
-import { BROWSABLE, CATEGORIES, categoryOf, isFragment, madeOf, matches, noteCard, SHELVES, type Component } from "@/board/library";
+import {
+  BROWSABLE,
+  CATEGORIES,
+  categoryOf,
+  isFragment,
+  madeOf,
+  matches,
+  noteCard,
+  SHELVES,
+  type Component,
+} from "@/board/library";
 import { isItemType, itemName } from "@/board/types";
 import type { Theme } from "@/theme/contract";
 import { Icon, iconFor } from "@/render/Icon";
@@ -104,15 +114,78 @@ import type { Editor } from "./useEditor";
  * Lucide: importing the namespace would put twelve hundred glyphs in the bundle for thirty.
  */
 const ICONS: Record<string, LucideIcon | ComponentType<LucideProps>> = {
-  BarChart3, Box, Boxes, Braces, Brain, CalendarRange, Circle, CircleDot, Cloud, Container, Database,
-  Donut, Dot, FileText, Flag, GraduationCap, GitBranch, GitCommitHorizontal, GitFork, Globe, Group, Heading1, Image,
-  KeyRound, Layers, LayoutTemplate, LineChart, ListChecks, ListTree, Merge, MessagesSquare, Milestone,
-  Monitor, MoveRight, Minus, Package, PieChart, Quote, Radio, RectangleHorizontal, Repeat, Route,
-  Rows3, Server, Smartphone, Sparkles, Split, Square, SquareCheckBig, StickyNote, Table, Table2, TextCursorInput, Type, UserRound,
-  Users, Workflow,
+  BarChart3,
+  Box,
+  Boxes,
+  Braces,
+  Brain,
+  CalendarRange,
+  Circle,
+  CircleDot,
+  Cloud,
+  Container,
+  Database,
+  Donut,
+  Dot,
+  FileText,
+  Flag,
+  GraduationCap,
+  GitBranch,
+  GitCommitHorizontal,
+  GitFork,
+  Globe,
+  Group,
+  Heading1,
+  Image,
+  KeyRound,
+  Layers,
+  LayoutTemplate,
+  LineChart,
+  ListChecks,
+  ListTree,
+  Merge,
+  MessagesSquare,
+  Milestone,
+  Monitor,
+  MoveRight,
+  Minus,
+  Package,
+  PieChart,
+  Quote,
+  Radio,
+  RectangleHorizontal,
+  Repeat,
+  Route,
+  Rows3,
+  Server,
+  Smartphone,
+  Sparkles,
+  Split,
+  Square,
+  SquareCheckBig,
+  StickyNote,
+  Table,
+  Table2,
+  TextCursorInput,
+  Type,
+  UserRound,
+  Users,
+  Workflow,
   /* The geometric shapes. */
-  ArrowBigRight, Cylinder, Diamond, Egg, Hexagon, MessageCircle, Octagon, Pentagon, Pill, Shapes, Star,
-  Triangle, Parallelogram, Trapezoid,
+  ArrowBigRight,
+  Cylinder,
+  Diamond,
+  Egg,
+  Hexagon,
+  MessageCircle,
+  Octagon,
+  Pentagon,
+  Pill,
+  Shapes,
+  Star,
+  Triangle,
+  Parallelogram,
+  Trapezoid,
 };
 
 /** Lucide at one size and weight, stated once. */
@@ -152,7 +225,12 @@ function entry(c: Component, press: (c: Component) => (e: ReactPointerEvent<HTML
   );
   if (c.inner)
     return (
-      <span key={c.id} className="dag-component dag-component--inner" data-dag-component={c.id} title="Only inside the thing above it">
+      <span
+        key={c.id}
+        className="dag-component dag-component--inner"
+        data-dag-component={c.id}
+        title="Only inside the thing above it"
+      >
         {inside}
       </span>
     );
@@ -228,8 +306,7 @@ function shapeTile(c: Component, press: (c: Component) => (e: ReactPointerEvent<
  * panel opens on something other than fifteen hundred pictures. The two picked shelves show more,
  * and a search shows more again, because by then the list is short for a reason.
  */
-const shelfCap = (shelf: string, query: boolean): number =>
-  query ? 48 : shelf === "Drawn" || shelf === "Essentials" ? 16 : 8;
+const shelfCap = (shelf: string, query: boolean): number => (query ? 48 : shelf === "Drawn" || shelf === "Essentials" ? 16 : 8);
 
 /** The diagram item under a client point, if any. */
 const itemAt = (x: number, y: number): HTMLElement | null =>
@@ -255,7 +332,11 @@ export function Library({ editor, saved, onClose }: { editor: Editor; saved: Com
      refreshing re-renders an open library and never the canvas. */
   const docs = useIndex().docs;
   const all = useMemo(
-    () => [...saved, ...docs.filter((d) => d.kind === "note" || d.kind === "quiz" || d.kind === "table").map(noteCard), ...BROWSABLE],
+    () => [
+      ...saved,
+      ...docs.filter((d) => d.kind === "note" || d.kind === "quiz" || d.kind === "table").map(noteCard),
+      ...BROWSABLE,
+    ],
     [saved, docs],
   );
 
@@ -401,42 +482,42 @@ export function Library({ editor, saved, onClose }: { editor: Editor; saved: Com
               })}
             </section>
           ) : (
-          <section key={category} className="dag-panel__group">
-            <h3 className="dag-panel__folder">{category}</h3>
-            {category === "Shapes" && items.some((c) => !made.has(c.id)) ? (
-              <div className="dag-shelf__grid dag-shapes__grid" data-dag-shapes="">
-                {items.filter((c) => !made.has(c.id)).map((c) => shapeTile(c, onPointerDown))}
-              </div>
-            ) : null}
-            {(category === "Shapes" ? items.filter((c) => made.has(c.id)) : items).map((c) => {
-              const parts = made.get(c.id) ?? [];
-              return (
-                <div key={c.id} className="dag-component__block">
-                  <div className="dag-component__row">
-                    {entry(c, onPointerDown)}
-                    {parts.length > 0 ? (
-                      <button
-                        type="button"
-                        className="dag-component__toggle"
-                        data-dag-expand={c.id}
-                        aria-expanded={open.has(c.id)}
-                        aria-label={`What ${c.name} is made of`}
-                        title={`What ${c.name} is made of`}
-                        onClick={() => toggle(c.id)}
-                      >
-                        <ChevronRight {...ICON} aria-hidden="true" />
-                      </button>
+            <section key={category} className="dag-panel__group">
+              <h3 className="dag-panel__folder">{category}</h3>
+              {category === "Shapes" && items.some((c) => !made.has(c.id)) ? (
+                <div className="dag-shelf__grid dag-shapes__grid" data-dag-shapes="">
+                  {items.filter((c) => !made.has(c.id)).map((c) => shapeTile(c, onPointerDown))}
+                </div>
+              ) : null}
+              {(category === "Shapes" ? items.filter((c) => made.has(c.id)) : items).map((c) => {
+                const parts = made.get(c.id) ?? [];
+                return (
+                  <div key={c.id} className="dag-component__block">
+                    <div className="dag-component__row">
+                      {entry(c, onPointerDown)}
+                      {parts.length > 0 ? (
+                        <button
+                          type="button"
+                          className="dag-component__toggle"
+                          data-dag-expand={c.id}
+                          aria-expanded={open.has(c.id)}
+                          aria-label={`What ${c.name} is made of`}
+                          title={`What ${c.name} is made of`}
+                          onClick={() => toggle(c.id)}
+                        >
+                          <ChevronRight {...ICON} aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </div>
+                    {open.has(c.id) ? (
+                      <div className="dag-component__parts" data-dag-parts={c.id}>
+                        {parts.map((p) => entry(p, onPointerDown))}
+                      </div>
                     ) : null}
                   </div>
-                  {open.has(c.id) ? (
-                    <div className="dag-component__parts" data-dag-parts={c.id}>
-                      {parts.map((p) => entry(p, onPointerDown))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </section>
+                );
+              })}
+            </section>
           ),
         )}
       </div>

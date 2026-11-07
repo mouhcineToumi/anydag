@@ -34,7 +34,7 @@ export const NEVER_IN_CHAT = new Set([
 const changeBlock: Tool = {
   name: "change_block",
   description:
-    "Start a new group of changes, titled with what it does (\"Draw the login flow\", \"File the meeting notes under 2026/\"). Every change after it, until the next change_block, is one block the person can undo in one click. Call it before each distinct group of changes.",
+    'Start a new group of changes, titled with what it does ("Draw the login flow", "File the meeting notes under 2026/"). Every change after it, until the next change_block, is one block the person can undo in one click. Call it before each distinct group of changes.',
   write: true,
   input: { title: z.string().describe("What the changes in this block do, in a few words.") },
   async run(args: { title: string }, kit) {
@@ -85,7 +85,7 @@ const DOC_OPS: { op: string; kinds: DocKind[]; description: string }[] = [
       "One document's whole text, and the `base` (a sha1) a write of it must carry. An attachment is `file_get`.\n\n" +
       "- note: Markdown with optional frontmatter. A reference is `[Title](dag:<id>)`, an embed `![Title](dag:<id>)`; a `[[wikilink]]` is followed by name.\n" +
       "- quiz: a `##` heading per question, its options one checklist (`- [x]` right, `- [ ]` wrong), one `>` quote explaining. An option's indented lines, a code block included, are its own. A question with no checklist and a final `>` quote is answered in words.\n" +
-      "- table: a `## Tab {#id}` heading per tab over a GFM pipe table; a header cell is `Name {#id type}` (text, number, date, checkbox, select `options=\"a,b\"`, link), a row's first cell ends `{#id}`. `table_get` and `table_edit` work on cells.\n" +
+      '- table: a `## Tab {#id}` heading per tab over a GFM pipe table; a header cell is `Name {#id type}` (text, number, date, checkbox, select `options="a,b"`, link), a row\'s first cell ends `{#id}`. `table_get` and `table_edit` work on cells.\n' +
       "- board: fenced diagrams; `board_fences` lists its items without the text.",
   },
   {
@@ -129,7 +129,7 @@ const DOC_OPS: { op: string; kinds: DocKind[]; description: string }[] = [
 const named = new Map(TOOLS.map((t) => [t.name, t]));
 
 /** The `<kind>_<op>` tools the `doc_*` ones stand for, which a chat is not offered. */
-export const FOLDED = new Set(DOC_OPS.flatMap(({ op, kinds }) => kinds.map((k) => `${k}_${op}`)));
+const FOLDED = new Set(DOC_OPS.flatMap(({ op, kinds }) => kinds.map((k) => `${k}_${op}`)));
 
 function docTool(op: string, kinds: DocKind[], description: string): Tool {
   const inners = kinds.map((k) => {
@@ -148,7 +148,10 @@ function docTool(op: string, kinds: DocKind[], description: string): Tool {
     async run({ kind, ...rest }: Record<string, unknown> & { kind: DocKind }, kit) {
       const inner = named.get(`${kind}_${op}`)!;
       const got = z.object(inner.input).safeParse(Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)));
-      if (!got.success) throw new ToolError(`doc_${op} for a ${kind}: ${got.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ")}`);
+      if (!got.success)
+        throw new ToolError(
+          `doc_${op} for a ${kind}: ${got.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ")}`,
+        );
       return inner.run(got.data, kit);
     },
   };

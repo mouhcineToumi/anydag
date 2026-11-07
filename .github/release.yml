@@ -1,0 +1,25 @@
+# What GitHub's generated release notes (`gh release create --generate-notes`, in `release.yml` and
+# `nightly.yml`) are made of: the pull requests merged since the previous release, grouped by label.
+# A pull request with none of these labels is listed under Other changes; one labelled
+# `skip-changelog` is left out.
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Features
+      labels:
+        - "type: feature"
+    - title: Fixes
+      labels:
+        - "type: bug"
+    - title: Docs
+      labels:
+        - "type: docs"
+    - title: Maintenance
+      labels:
+        - "type: chore"
+        - dependencies
+    - title: Other changes
+      labels:
+        - "*"

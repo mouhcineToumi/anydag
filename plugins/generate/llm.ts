@@ -168,11 +168,23 @@ export function opencodeConfig(system: string): object {
 }
 
 /** `-m`'s value: the model, with the variant after a `#` unless the model already names one. */
-export const opencodeModel = (model: string, variant?: string): string => (variant && !model.includes("#") ? `${model}#${variant}` : model);
+export const opencodeModel = (model: string, variant?: string): string =>
+  variant && !model.includes("#") ? `${model}#${variant}` : model;
 
 /** The flags of one run, checked against `opencode run --help` (2.2.5) and a real run. */
 export function opencodeArgs(model: string, variant?: string): string[] {
-  return ["run", "--standalone", "-m", opencodeModel(model, variant), "--agent", "dag-diagram", "--title", "dag-generate", "--format", "json"];
+  return [
+    "run",
+    "--standalone",
+    "-m",
+    opencodeModel(model, variant),
+    "--agent",
+    "dag-diagram",
+    "--title",
+    "dag-generate",
+    "--format",
+    "json",
+  ];
 }
 
 /** The session a run made, read off its events, so it can be deleted after. */
@@ -209,9 +221,19 @@ export function opencodeComplete(o: OpencodeOptions): Complete {
     let out = "";
     try {
       const system = path.join(dir, "system.md");
-      fs.writeFileSync(system, messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n"));
+      fs.writeFileSync(
+        system,
+        messages
+          .filter((m) => m.role === "system")
+          .map((m) => m.content)
+          .join("\n\n"),
+      );
       fs.mkdirSync(path.join(dir, "config"));
-      const env = { ...opencodeEnv(o.env), XDG_CONFIG_HOME: path.join(dir, "config"), OPENCODE_CONFIG_CONTENT: JSON.stringify(opencodeConfig(system)) };
+      const env = {
+        ...opencodeEnv(o.env),
+        XDG_CONFIG_HOME: path.join(dir, "config"),
+        OPENCODE_CONFIG_CONTENT: JSON.stringify(opencodeConfig(system)),
+      };
       return await new Promise<string>((resolve, reject) => {
         const child = spawn(bin, opencodeArgs(o.model, o.variant), { cwd: dir, env, stdio: ["pipe", "pipe", "pipe"] });
         let err = "";
@@ -242,7 +264,8 @@ export function opencodeComplete(o: OpencodeOptions): Complete {
           } catch (e) {
             return reject(e);
           }
-          if (code !== 0) return reject(new LlmError(`opencode exited ${code}: ${(err || out).trim().split("\n").slice(-3).join(" ")}`));
+          if (code !== 0)
+            return reject(new LlmError(`opencode exited ${code}: ${(err || out).trim().split("\n").slice(-3).join(" ")}`));
           if (!text) return reject(new LlmError("OpenCode answered with no text"));
           resolve(text);
         });
@@ -329,7 +352,13 @@ export function claudeComplete(o: ClaudeOptions): Complete {
     const dir = fs.mkdtempSync(path.join(o.tmpRoot ?? os.tmpdir(), "dag-claude-"));
     try {
       const system = path.join(dir, "system.md");
-      fs.writeFileSync(system, messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n"));
+      fs.writeFileSync(
+        system,
+        messages
+          .filter((m) => m.role === "system")
+          .map((m) => m.content)
+          .join("\n\n"),
+      );
       return await new Promise<string>((resolve, reject) => {
         const child = spawn(o.bin ?? "claude", claudeArgs(o.model, system, o.effort), {
           cwd: dir,
@@ -349,7 +378,8 @@ export function claudeComplete(o: ClaudeOptions): Complete {
         const abort = () => stop("cancelled");
         if (signal?.aborted) return abort();
         signal?.addEventListener("abort", abort, { once: true });
-        if (o.timeout) timer = setTimeout(() => stop(`Claude Code did not answer in ${Math.round(o.timeout! / 1000)} s`), o.timeout);
+        if (o.timeout)
+          timer = setTimeout(() => stop(`Claude Code did not answer in ${Math.round(o.timeout! / 1000)} s`), o.timeout);
         child.on("error", (e) => reject(new LlmError(`could not start Claude Code: ${e.message}`)));
         child.stdin?.on("error", () => undefined);
         child.stdin?.end(flatten(messages));
@@ -359,7 +389,8 @@ export function claudeComplete(o: ClaudeOptions): Complete {
           if (signal?.aborted) return;
           const said = parseClaudeResult(out);
           if (said && "error" in said) return reject(new LlmError(`Claude Code: ${said.error}`));
-          if (code !== 0 || !said) return reject(new LlmError(`claude exited ${code}: ${(err || out).trim().split("\n").slice(-3).join(" ")}`));
+          if (code !== 0 || !said)
+            return reject(new LlmError(`claude exited ${code}: ${(err || out).trim().split("\n").slice(-3).join(" ")}`));
           if (!said.text) return reject(new LlmError("Claude Code answered with no text"));
           resolve(said.text);
         });
@@ -408,9 +439,21 @@ export function variantFor(env: Env, want?: Want): string | undefined {
 /** The adapter a resolved provider needs, with the knobs the environment sets. */
 export function completeFor(r: Resolved, env: Env, want?: Want): Complete {
   if (r.spec.id === "claude")
-    return claudeComplete({ model: r.model, effort: effortFor(want), env, bin: r.bin, timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000 });
+    return claudeComplete({
+      model: r.model,
+      effort: effortFor(want),
+      env,
+      bin: r.bin,
+      timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000,
+    });
   if (r.spec.id === "opencode")
-    return opencodeComplete({ model: r.model, variant: variantFor(env, want), env, bin: r.bin, timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000 });
+    return opencodeComplete({
+      model: r.model,
+      variant: variantFor(env, want),
+      env,
+      bin: r.bin,
+      timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000,
+    });
   return httpComplete({ baseURL: r.baseURL!, key: r.key, model: r.model, extra: extraFor(r, env, want) });
 }
 

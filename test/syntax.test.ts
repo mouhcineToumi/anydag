@@ -124,7 +124,7 @@ describe("the tokenizers of our own", () => {
   });
 
   it("shell: the command, its options, a variable and a comment", async () => {
-    const sh = "npm run dev --silent  # start it\necho \"$HOME\" | grep -v x";
+    const sh = 'npm run dev --silent  # start it\necho "$HOME" | grep -v x';
     const r = await read(sh, "bash");
     expect(word(sh, r, "npm")).toBe("dag-tok-function");
     expect(word(sh, r, "--silent")).toBe("dag-tok-type");
@@ -149,9 +149,7 @@ describe("the code blocks this repository holds", () => {
      check says about a person's code should be true about ours first. */
   it("reads clean", async () => {
     /* Tracked files only: `boards/` is also where the e2e suite and a person's own files are written. */
-    const files = execFileSync("git", ["ls-files", "--", "*.md"], { encoding: "utf8" })
-      .split("\n")
-      .filter(Boolean);
+    const files = execFileSync("git", ["ls-files", "--", "*.md"], { encoding: "utf8" }).split("\n").filter(Boolean);
     const fence = /^(\s*)(`{3,})([\w+-]+)[^\n]*\n([\s\S]*?)\n\1\2\s*$/gm;
     const found: string[] = [];
     for (const f of files) {

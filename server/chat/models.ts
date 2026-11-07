@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { claudeReady, opencodeReady } from "../../plugins/generate/providers";
 import type { Provider } from "./types";
 
-export interface ModelChoice {
+interface ModelChoice {
   id: string;
   label: string;
 }
@@ -28,7 +28,7 @@ export interface ProviderModels {
   default: string;
 }
 
-export const CLAUDE_MODELS: ModelChoice[] = [
+const CLAUDE_MODELS: ModelChoice[] = [
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
   { id: "claude-opus-5-5", label: "Opus 5.5" },
   { id: "claude-haiku-5-5", label: "Haiku 5.5" },
@@ -60,7 +60,11 @@ function opencodeModels(bin: string): Promise<ModelChoice[]> {
  * `fake`: the server runs the scripted harness, which needs neither binary — so both are available
  * whatever is installed, and the answer says so for the e2e suite to check.
  */
-export async function modelsFor(have: readonly Provider[], env: NodeJS.ProcessEnv = process.env, fake = false): Promise<{ providers: ProviderModels[]; fake?: true }> {
+export async function modelsFor(
+  have: readonly Provider[],
+  env: NodeJS.ProcessEnv = process.env,
+  fake = false,
+): Promise<{ providers: ProviderModels[]; fake?: true }> {
   const out: ProviderModels[] = [];
   const claude = fake ? { ok: true as const, bin: "fake" } : claudeReady(env);
   out.push({

@@ -97,7 +97,12 @@ export function DueLabel({ task }: { task: Task }) {
   if (!task.due) return null;
   const late = overdue(task);
   return (
-    <span className="dag-task-due" data-dag-task-due={task.due} data-overdue={late ? "" : undefined} title={late ? `Overdue: due ${task.due}` : `Due ${task.due}`}>
+    <span
+      className="dag-task-due"
+      data-dag-task-due={task.due}
+      data-overdue={late ? "" : undefined}
+      title={late ? `Overdue: due ${task.due}` : `Due ${task.due}`}
+    >
       {dueText(task.due)}
     </span>
   );

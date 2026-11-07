@@ -271,7 +271,10 @@ function buildAwsService(awsRoot, reverseMap) {
   for (const cat of catDirs) {
     const dir48 = path.join(familyPath, cat, "48");
     if (!fs.existsSync(dir48)) continue;
-    for (const f of fs.readdirSync(dir48).filter((f) => /\.svg$/i.test(f)).sort()) {
+    for (const f of fs
+      .readdirSync(dir48)
+      .filter((f) => /\.svg$/i.test(f))
+      .sort()) {
       if (!grouped.has(f)) grouped.set(f, []);
       grouped.get(f).push({ category: cat, absPath: path.join(dir48, f) });
     }
@@ -348,7 +351,10 @@ function buildAwsGroup(awsRoot, reverseMap) {
 function makeAzureEntry(occ, reverseMap) {
   const relPath = occ.relPath;
   const fileTag = `azure:${relPath}`;
-  const stem = path.basename(occ.absPath).replace(/\.svg$/i, "").replace(/^\d+-icon-service-/i, "");
+  const stem = path
+    .basename(occ.absPath)
+    .replace(/\.svg$/i, "")
+    .replace(/^\d+-icon-service-/i, "");
   const { rest, word } = stripVendorPrefix(stem, ["Azure-"]);
   const descriptive = slugify(rest);
   const { slug: shortSlug, aliases } = abbreviate(AZURE_ABBR, descriptive, word);
@@ -535,17 +541,34 @@ function processSvg(absPath, slug) {
 
 /* -------------------------------------------------------------------------------------------- */
 
-function report({ awsServiceEntries, awsGroupEntries, azureEntries, azureDuplicates, gcpCoreEntries, gcpCatEntries, collisions, outPath }) {
+function report({
+  awsServiceEntries,
+  awsGroupEntries,
+  azureEntries,
+  azureDuplicates,
+  gcpCoreEntries,
+  gcpCatEntries,
+  collisions,
+  outPath,
+}) {
   const size = fs.statSync(outPath).size;
   const kib = (n) => `${(n / 1024).toFixed(1)} KiB`;
 
-  console.log(`aws:   ${awsServiceEntries.length} service + ${awsGroupEntries.length} group = ${awsServiceEntries.length + awsGroupEntries.length}`);
+  console.log(
+    `aws:   ${awsServiceEntries.length} service + ${awsGroupEntries.length} group = ${awsServiceEntries.length + awsGroupEntries.length}`,
+  );
   console.log(
     `azure: ${azureEntries.length} unique icons` +
-      (azureDuplicates.length ? ` (${azureDuplicates.length} filenames cross-listed under multiple categories with identical artwork, deduped)` : ""),
+      (azureDuplicates.length
+        ? ` (${azureDuplicates.length} filenames cross-listed under multiple categories with identical artwork, deduped)`
+        : ""),
   );
-  console.log(`gcp:   ${gcpCoreEntries.length} core + ${gcpCatEntries.length} category = ${gcpCoreEntries.length + gcpCatEntries.length}`);
-  console.log(`total: ${awsServiceEntries.length + awsGroupEntries.length + azureEntries.length + gcpCoreEntries.length + gcpCatEntries.length} icons`);
+  console.log(
+    `gcp:   ${gcpCoreEntries.length} core + ${gcpCatEntries.length} category = ${gcpCoreEntries.length + gcpCatEntries.length}`,
+  );
+  console.log(
+    `total: ${awsServiceEntries.length + awsGroupEntries.length + azureEntries.length + gcpCoreEntries.length + gcpCatEntries.length} icons`,
+  );
   console.log(`output: ${outPath} (${kib(size)})`);
 
   if (collisions.length) {
@@ -618,8 +641,16 @@ function main() {
     }
 
     /* Stable key order so a rebuild's diff is the actual change, not a re-shuffled object. */
-    const sortedIcons = Object.fromEntries(Object.keys(icons).sort().map((k) => [k, icons[k]]));
-    const sortedSlugMap = Object.fromEntries(Object.keys(slugMapOut).sort().map((k) => [k, slugMapOut[k]]));
+    const sortedIcons = Object.fromEntries(
+      Object.keys(icons)
+        .sort()
+        .map((k) => [k, icons[k]]),
+    );
+    const sortedSlugMap = Object.fromEntries(
+      Object.keys(slugMapOut)
+        .sort()
+        .map((k) => [k, slugMapOut[k]]),
+    );
 
     const bundle = {
       generated: new Date().toISOString(),
@@ -639,7 +670,16 @@ function main() {
     fs.writeFileSync(outPath, JSON.stringify(bundle, null, 2) + "\n");
     fs.writeFileSync(slugMapPath, JSON.stringify(sortedSlugMap, null, 2) + "\n");
 
-    report({ awsServiceEntries, awsGroupEntries, azureEntries, azureDuplicates, gcpCoreEntries, gcpCatEntries, collisions, outPath });
+    report({
+      awsServiceEntries,
+      awsGroupEntries,
+      azureEntries,
+      azureDuplicates,
+      gcpCoreEntries,
+      gcpCatEntries,
+      collisions,
+      outPath,
+    });
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }

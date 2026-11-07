@@ -77,7 +77,7 @@ async function endOf(page: Page, text: string) {
   await page.keyboard.press("End");
 }
 
-test("typing rewrites the block it is in and leaves every other byte alone", async ({ page }) => {
+test("typing rewrites the block it is in and leaves every other byte alone", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await endOf(page, "The second paragraph.");
   await page.keyboard.type(" Typed by a person.");
@@ -207,7 +207,7 @@ test("an outside write to a note of one paragraph lands, and leaving does not pu
   expect(read()).toBe("---\ntitle: One line\n---\nWritten elsewhere.\n\nAnd a second.\n");
 });
 
-test("two writers on different blocks are merged", async ({ page }) => {
+test("two writers on different blocks are merged", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await endOf(page, "The second paragraph.");
   /* Typed, and the file changed on disk before the quarter-second save goes out: the save meets a
@@ -259,7 +259,7 @@ test("the list shows a note beside the boards, and opens either", async ({ page 
   await expect(block(page, "The second paragraph.")).toBeVisible();
 });
 
-test("New note makes one, opens it, and names it in its own title", async ({ page }) => {
+test("New note makes one, opens it, and names it in its own title", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await newFile(page, "note", { top: true });
   /* Named at the top of its page, Notion's way — not in a box in its sidebar row. */
@@ -276,7 +276,9 @@ test("New note makes one, opens it, and names it in its own title", async ({ pag
      create. No heading — a second copy of the title is one nothing rewrites. */
   const created = path.join(DIR, `${name}-new.md`);
   made.push(created);
-  await expect.poll(() => fs.existsSync(created) && fs.readFileSync(created, "utf8"), { timeout: 5_000 }).toMatch(/^---\nid: [0-9a-z]{10}\n---\n$/);
+  await expect
+    .poll(() => fs.existsSync(created) && fs.readFileSync(created, "utf8"), { timeout: 5_000 })
+    .toMatch(/^---\nid: [0-9a-z]{10}\n---\n$/);
   await expect(page.locator(".dag-toolbar__title")).toHaveText(`${name}-new`);
 });
 
@@ -296,7 +298,9 @@ test("the title at the top of a note is its name, and the editor stays up while 
   await title.press("Enter");
   await page.keyboard.type("Typed after the title.");
   await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toBe(named);
-  await expect.poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 }).toContain("Typed after the title.");
+  await expect
+    .poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 })
+    .toContain("Typed after the title.");
   const text = fs.readFileSync(moved, "utf8");
   expect(text.startsWith(`---\ntitle: ${named}\n---\nTyped after the title.\n\n# The plan\n`)).toBe(true);
   /* Every block nobody touched is the agent's bytes still. */
@@ -342,7 +346,9 @@ test("Escape takes the title back, and emptying it makes the note Untitled again
   await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toMatch(/^Untitled( \d+)?$/);
   const moved = path.join(DIR, `${new URL(page.url()).searchParams.get("note")}.note.md`);
   made.push(moved);
-  await expect.poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 }).toMatch(/^---\ntitle: Untitled\n---\n# The plan\n/);
+  await expect
+    .poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 })
+    .toMatch(/^---\ntitle: Untitled\n---\n# The plan\n/);
   await expect(title).toHaveValue("");
 });
 

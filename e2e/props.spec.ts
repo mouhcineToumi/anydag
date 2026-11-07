@@ -81,7 +81,7 @@ async function props(page: Page, selector: string) {
 
 /* ------------------------------------------------------------------------- a picked card */
 
-test("the kind menu is the dialect's vocabulary, and it retypes the card", async ({ page }) => {
+test("the kind menu is the dialect's vocabulary, and it retypes the card", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await props(page, '[data-dag-item="infra"] [data-dag-node="api"]');
 

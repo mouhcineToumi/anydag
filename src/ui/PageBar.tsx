@@ -115,7 +115,7 @@ export function PageBar({ pages, page, onPage, edit, noun = "page" }: Props) {
       const to = at + dir;
       if (to < 0 || to >= pages.length) return;
       /* Moving right means landing in front of the page after the one you are passing. */
-      edit.reorder(id, dir < 0 ? pages[to]!.id : pages[to + 1]?.id ?? null);
+      edit.reorder(id, dir < 0 ? pages[to]!.id : (pages[to + 1]?.id ?? null));
       return;
     }
     const next = pages[at + dir];
@@ -168,7 +168,11 @@ export function PageBar({ pages, page, onPage, edit, noun = "page" }: Props) {
                   className="dag-tab__close"
                   data-dag-page-remove={p.id}
                   aria-label={`Remove ${p.name}`}
-                  title={noun === "tab" ? "Remove this tab and its rows (Ctrl+Z brings it back)" : "Remove this page: what is on it moves to the first"}
+                  title={
+                    noun === "tab"
+                      ? "Remove this tab and its rows (Ctrl+Z brings it back)"
+                      : "Remove this page: what is on it moves to the first"
+                  }
                   onClick={() => edit.remove(p.id)}
                 >
                   <X size={12} strokeWidth={2} aria-hidden="true" />
@@ -178,7 +182,13 @@ export function PageBar({ pages, page, onPage, edit, noun = "page" }: Props) {
           ),
         )}
         {edit ? (
-          <button className="dag-tab dag-tab__add" data-dag-page-add="" aria-label={`Add a ${noun}`} title={`Add a ${noun}`} onClick={edit.add}>
+          <button
+            className="dag-tab dag-tab__add"
+            data-dag-page-add=""
+            aria-label={`Add a ${noun}`}
+            title={`Add a ${noun}`}
+            onClick={edit.add}
+          >
             <Plus size={14} strokeWidth={2} aria-hidden="true" />
           </button>
         ) : null}

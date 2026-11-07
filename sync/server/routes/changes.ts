@@ -30,8 +30,14 @@ export function changeRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const page = await deps.meta.changes(v.id, since, limit);
     const head = Number(page.head);
     const horizon = Number(page.horizon);
-    if (since < horizon - 1) throw new HttpError("ES_HORIZON", `the log before seq ${horizon} was compacted: read the heads`, { horizon });
-    const changes = page.changes.map((e) => ({ ...e, seq: Number(e.seq), parent: e.parent === null ? null : Number(e.parent), size: Number(e.size) }));
+    if (since < horizon - 1)
+      throw new HttpError("ES_HORIZON", `the log before seq ${horizon} was compacted: read the heads`, { horizon });
+    const changes = page.changes.map((e) => ({
+      ...e,
+      seq: Number(e.seq),
+      parent: e.parent === null ? null : Number(e.parent),
+      size: Number(e.size),
+    }));
     const next = changes.length ? changes[changes.length - 1]!.seq : since;
     return c.json({ changes, next, more: next < head, head, horizon } satisfies ChangesResponse);
   });

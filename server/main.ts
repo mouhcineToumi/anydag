@@ -38,7 +38,8 @@ process.on("unhandledRejection", (e) => {
 
 async function main(): Promise<void> {
   const takes = new Set(["--port", "--page", "--token"]);
-  const folder = process.argv.slice(2).find((a, i, all) => !a.startsWith("--") && !takes.has(all[i - 1] ?? "")) ?? process.env.ANYDAG_VAULT;
+  const folder =
+    process.argv.slice(2).find((a, i, all) => !a.startsWith("--") && !takes.has(all[i - 1] ?? "")) ?? process.env.ANYDAG_VAULT;
   const home = new Home(homeDir());
   const session = new Session(home, null, VERSION, process.env, { types: parseTypes(process.env.ANYDAG_UPLOAD_TYPES) });
   // The folder named, or else the vault opened last — and with neither, none: the page offers to
@@ -69,9 +70,17 @@ async function main(): Promise<void> {
   const runtime = path.join(home.dir, "server.json");
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: Number(arg("port") ?? 0) }, (info) => {
     assistant.listening(info.port);
-    fs.writeFileSync(runtime, JSON.stringify({ port: info.port, pid: process.pid, token, vault: session.any ? session.vault.root : null, version: VERSION }, null, 2), {
-      mode: 0o600,
-    });
+    fs.writeFileSync(
+      runtime,
+      JSON.stringify(
+        { port: info.port, pid: process.pid, token, vault: session.any ? session.vault.root : null, version: VERSION },
+        null,
+        2,
+      ),
+      {
+        mode: 0o600,
+      },
+    );
     console.log(`anydag: ${session.any ? session.vault.root : "no vault open"}`);
     console.log(`open http://127.0.0.1:${info.port}/?token=${token}`);
   });
@@ -143,7 +152,11 @@ async function chatMcp(chat: string, startMcp: typeof import("./mcp/server").sta
   } catch {
     /* the server says so on the first tool call */
   }
-  const server = await startMcp(backend, { readOnly: mode === "ask", version: VERSION, chat: { id: chat, mode, ...(home ? { home } : {}) } });
+  const server = await startMcp(backend, {
+    readOnly: mode === "ask",
+    version: VERSION,
+    chat: { id: chat, mode, ...(home ? { home } : {}) },
+  });
   console.error(`anydag mcp: chat ${chat}, ${mode}`);
   server.server.onclose = () => process.exit(0);
 }

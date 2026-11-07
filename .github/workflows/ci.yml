@@ -1,44 +1,170 @@
-# Every push to main and every pull request runs the fast tier (`scripts/checks.sh`: the
-# typechecks, the contract checks, parity and the unit suite).
+# What runs on a pull request and on a push to a long-lived branch — the test tiers.
 #
-# **Playwright does not run here.** Its screenshot baselines are compared against one pinned
-# Chromium, and a runner's fonts rasterise differently, so the browser suite runs locally
-# (`npm run e2e:local`, and `.githooks/pre-push`). A green tick means the types, the contracts and
-# the unit suite; it does not mean the app was opened in a browser.
+#   pull request into develop      fast tier (typecheck, lint, contracts, unit) + the desktop app on
+#                                  Linux, when something it is made of changed
+#   push to develop                fast tier
+#   release/**, hotfix/**          fast tier + the desktop app on Linux, Windows and macOS — on a push,
+#   and a pull request into main   on a pull request into them, and on any pull request into main
+#   nightly and release            everything: `nightly.yml` and `release.yml`, which call the same
+#                                  reusable workflows (`checks.yml`, `desktop-build.yml`, `e2e.yml`)
 #
-# Releases are `.github/workflows/release.yml`, on a `v*` tag.
+# **The fast tier always runs, whatever changed**, so a required check always reports. Only the
+# heavy job is skipped for a change that cannot touch the app (docs, issue templates, e2e specs…).
+#
+# **`CI passed` is the one check to require.** A reusable workflow's jobs exist only when the job that
+# calls it runs, so "desktop / build (ubuntu-latest)" is never reported on a pull request that skipped
+# it, and a ruleset waiting for it would wait for ever. `CI passed` runs last, always, and is red when
+# a job that should have run did not pass.
+#
+# Playwright's own tiers are `e2e.yml`. Policy about a pull request itself (its title, its target and
+# the issue it closes) is `pr-policy.yml`, in a workflow of its own because it re-runs on an edit or a
+# label, and re-running this one for that would cancel a desktop build already in flight.
 name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main, "release/**", "hotfix/**"]
   pull_request:
+    branches: [develop, main, "release/**", "hotfix/**"]
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # A newer push to a pull request makes the older run's answer worthless; on a branch every commit's
+  # own result is the record.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  # The fast one, and the one that fails first: typecheck, the four `check:*` contracts, and the
-  # unit suite. Nothing here needs a browser or a container.
-  checks:
+  # What changed, and so which heavy jobs this run owes.
+  changes:
+    name: changes
     runs-on: ubuntu-latest
-    env:
-      # `tsc -p desktop` needs Electron's types, not its 100 MB binary.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      desktop_os: ${{ steps.plan.outputs.desktop_os }}
+      workflows: ${{ steps.filter.outputs.workflows }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          filters: |
+            # Everything the packaged app is built from. Docs, issue templates, e2e specs, boards
+            # and unit tests are not in it (`desktop/electron-builder.yml` excludes them from the
+            # package too), and the unit suite, which always runs, is what reads them.
+            desktop:
+              - "desktop/**"
+              - "server/**"
+              - "cli/**"
+              - "src/**"
+              - "sync/**"
+              - "plugins/**"
+              - "icons/**"
+              - "themes/**"
+              - "public/**"
+              - "index.html"
+              - "vite.config.ts"
+              - "tsconfig*.json"
+              - "package.json"
+              - "package-lock.json"
+              - "VERSION"
+              - ".github/workflows/desktop-build.yml"
+              - ".github/workflows/ci.yml"
+            workflows:
+              - ".github/workflows/**"
+              - ".github/actions/**"
+      - name: Which desktop builds are owed
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+          REF: ${{ github.ref_name }}
+          DESKTOP: ${{ steps.filter.outputs.desktop }}
+        run: |
+          all='["ubuntu-latest","windows-latest","macos-latest"]'
+          linux='["ubuntu-latest"]'
+          os=""
+          if [ "$EVENT" = "pull_request" ]; then
+            case "$BASE" in
+              main | release/* | hotfix/*) os="$all" ;;   # a release is verified everywhere
+              *) os="$linux" ;;
+            esac
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            os="$all"; DESKTOP=true
+          else
+            case "$REF" in
+              release/* | hotfix/*) os="$all" ;;
+            esac
+          fi
+          if [ "$DESKTOP" != "true" ]; then os=""; fi
+          echo "desktop_os=$os" >> "$GITHUB_OUTPUT"
+          echo "desktop builds: ${os:-none}"
 
-      # One step rather than seven, and `scripts/checks.sh` is why: the same list was written out
-      # here, in `scripts/gate.sh` and now in `.githooks/pre-commit`, and three copies is three
-      # chances for a check to be added to one of them. The script prints each step's name, so a
-      # red run still says which one went red.
-      - run: npm run checks
+  checks:
+    name: checks
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+
+  desktop:
+    name: desktop
+    needs: changes
+    if: needs.changes.outputs.desktop_os != ''
+    uses: ./.github/workflows/desktop-build.yml
+    permissions:
+      contents: read
+    with:
+      os: ${{ needs.changes.outputs.desktop_os }}
+      artifact: desktop
+      # No certificate reaches a run on a pull request; a branch's build is a check, not a release.
+      sign: false
+
+  # The workflow files themselves. Cheap, and the one place a typo in a `needs` or an expression is
+  # found before it is a red nightly at two in the morning.
+  actionlint:
+    name: actionlint
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
+  required:
+    name: CI passed
+    needs: [changes, checks, desktop, actionlint]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Everything this run owed passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          CHECKS: ${{ needs.checks.result }}
+          DESKTOP: ${{ needs.desktop.result }}
+          DESKTOP_OS: ${{ needs.changes.outputs.desktop_os }}
+          ACTIONLINT: ${{ needs.actionlint.result }}
+          WORKFLOWS: ${{ needs.changes.outputs.workflows }}
+        run: |
+          bad=0
+          want() { # name, result, owed ("true"/"false")
+            if [ "$2" = "success" ] || { [ "$3" = "false" ] && [ "$2" = "skipped" ]; }; then
+              echo "ok   $1: $2"
+            else
+              echo "::error::$1 is $2"; bad=1
+            fi
+          }
+          want changes "$CHANGES" true
+          want checks "$CHECKS" true
+          want desktop "$DESKTOP" "$([ -n "$DESKTOP_OS" ] && echo true || echo false)"
+          want actionlint "$ACTIONLINT" "$([ "$WORKFLOWS" = true ] && echo true || echo false)"
+          exit $bad
