@@ -123,7 +123,7 @@ jobs:
           fi
       - name: What was built
         run: ls -la release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact }}-${{ runner.os }}
           retention-days: ${{ inputs.retention-days }}
