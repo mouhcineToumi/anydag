@@ -1,18 +1,18 @@
 # The gate and releases
 
-> Versions, how a release is cut, and what `npm run gate`, `checks` and CI run.
-
-> **Note.** This file is the original text, kept as it was. Where it describes the branch model,
-> which CI jobs run, or how a release is cut, [`CONTRIBUTING.md`](../../CONTRIBUTING.md) and
-> [`docs/RELEASING.md`](../RELEASING.md) are authoritative; the rest of it (versions, the layout of
-> `scripts/checks.sh`, what each `check:*` holds) still stands.
+> Versions, the branch model, how a release is cut, and what `npm run checks`, the hooks and CI run.
+> [`CONTRIBUTING.md`](../../CONTRIBUTING.md) is the contributor's view of the same rules, and
+> [`docs/RELEASING.md`](../RELEASING.md) the step-by-step for a maintainer.
 
 ## Versions and releases
 
-The version is semver, `MAJOR.MINOR.PATCH` with an optional pre-release (`0.2.0-beta.1`), and it is
-said in two files that must agree: `VERSION`, which every build reads, and `package.json`'s
-`version`, which electron-builder names a release by. `check:version` (in `npm run checks`) refuses a
-tree where they differ or where either is not semver.
+The version is semver: `MAJOR.MINOR.PATCH`, a beta `X.Y.Z-beta.N`, or a nightly
+`X.Y.Z-nightly.YYYYMMDDHHmm` (UTC, one numeric identifier, because a semver number may not start with
+a zero and `0230` would). `scripts/lib/version.mjs` defines the three forms. They are said in three
+places that must agree — `VERSION`, which every build reads, `package.json`'s `version`, which
+electron-builder names a release by, and the lockfile's root — and `node scripts/set-version.mjs`
+writes all three. `check:version` (in `npm run checks`) refuses a tree where they differ or where
+any is not one of the forms.
 
 It reaches the server's `/api/health` through `server/build.mjs`'s `__ANYDAG_VERSION__`, the desktop
 shell through `desktop/build.mjs`, the page's `<meta name="version">` and Settings' About tab through
@@ -23,14 +23,36 @@ shell through `desktop/build.mjs`, the page's `<meta name="version">` and Settin
 | `MINOR` | a feature, a page, a route — anything a person would notice (while `MAJOR` is 0, a breaking change too) |
 | `PATCH` | a fix to something already released |
 
-**A release is a tag.** Bump `VERSION` and `package.json` together in one commit on `main`, then push
-`v<version>`: `.github/workflows/release.yml` checks the tag against both files
-(`node scripts/check-version.mjs v0.2.0`), runs the fast tier once, packages the app on Linux,
-Windows and macOS (signing where the secrets allow — see *The desktop app*), opens each on a temp
-vault, and creates the GitHub Release with every installer, its blockmap and the three files the
-app's updater reads: `latest-linux.yml`, `latest.yml` (Windows) and `latest-mac.yml`. The release is
-not created unless all three are there. A tag with a `-` in it is a pre-release. The notes are
-generated from the merged pull requests and can be edited on GitHub afterwards.
+**The branches are Git Flow.** `develop` is the default branch, every pull request targets it, and
+its `VERSION` is always the *next* version to be released. `main` holds released code only and
+changes only through a pull request from `release/X.Y.Z` or `hotfix/X.Y.Z` (a merge commit; the
+`PR target` check refuses anything else). A `release/X.Y.Z` branch is cut from develop to stabilise a
+version and kept after it ships; betas are tagged on it. Every merge into `main` is tagged `vX.Y.Z`,
+and main is merged back into develop with the version bumped. Branches are never deleted after a
+merge. Rulesets on GitHub hold all of it: a pull request for `main`, `develop`, `release/**` and
+`hotfix/**`, the code owner's approval for anybody but the owner, no force-push or deletion, and
+`v*` tags and `nightly/**` branches that cannot be moved once made.
+
+**A release is a tag, and the workflow checks where it stands.** `release.yml` runs on `v*` tags that
+are not nightlies: a stable tag must be on `main` and a beta on `release/<core>` or `hotfix/<core>`.
+It runs the whole tier — `checks.yml` with the sync harness and the Postgres suites, `e2e.yml` with
+`scope: full`, the desktop app packaged and opened on Linux, Windows and macOS (signing where the
+secrets allow — see *The desktop app*) — and publishes only when `scripts/check-release-assets.mjs`
+finds every installer and the update feeds for the version's channel.
+
+**A nightly is built from develop by itself.** `nightly.yml` runs at 02:00 UTC (and by hand): if
+develop has moved since the last one, it makes a `nightly/<version>` branch holding one commit that
+stamps the version, tags it `v<version>`, runs the whole tier against it, and publishes a
+pre-release. It keeps the GitHub *releases* of the newest seven nightlies and never deletes a tag or a
+branch — electron-updater reads the ten newest releases, and ten nightlies in a row would hide a
+beta's next version from it.
+
+**The update channel is the version's own word.** `0.2.0` is `latest`, `0.2.0-beta.1` is `beta`,
+`0.2.0-nightly.…` is `nightly`. electron-builder names the update files after it (`latest*.yml`,
+`beta*.yml`, `nightly*.yml`) and electron-updater reads the same word off the running version, so a
+stable build never sees a pre-release and a nightly build follows nightlies. `desktop/main.ts` sets
+`allowPrerelease` from it and never sets `autoUpdater.channel`, whose setter turns on
+`allowDowngrade`. `desktop/package.mjs` fails a build whose update files do not match its channel.
 
 **The file names are the updater's URLs**, so none has a space: `AnyDag-<v>.AppImage`,
 `AnyDag-Setup-<v>.exe`, `AnyDag-<v>-<arm64|x64>.dmg` and `.zip`. electron-builder's default
@@ -39,29 +61,78 @@ file the release does not have.
 
 ## Gate
 
-`npm run gate` runs everything in the order that fails fastest: typecheck (all three tsconfigs) →
+**`npm run checks` is the fast tier** (`scripts/checks.sh`): `biome lint` → knip → typecheck →
 `check:version` → `check:case` → `check:theme` → `check:literals` → `check:icons` → `check:skill` →
-vitest → the Playwright suite. `npm run typecheck && npm test` is the quick loop.
+vitest (parity included). It has three readers — the pre-commit hook, CI's `checks.yml`, and
+`scripts/gate.sh` — one list, so a check added is added everywhere. It needs no browser and no
+network and takes about half a minute, which is what lets it sit in a commit hook: `tsc` is
+incremental (its build info under `node_modules/.cache/tsc/`, which CI caches too) and the unit suite
+shares modules between the files each worker runs. `npm run gate` is the fast tier and then the
+browser suite.
 
-**Everything before Playwright is `npm run checks`** (`scripts/checks.sh`), and it has three readers:
-`gate.sh`, the pre-commit hook, and the `checks` job in CI — one list, so a check added is added
-everywhere. It needs no browser and no network and takes seconds, which is what lets it sit in a
-commit hook: `tsc` is incremental (its build info under `node_modules/.cache/tsc/`) and the unit
-suite shares modules between the files each worker runs. `.githooks/pre-commit` is the hook, and
-`npm run prepare` installs it with `git config core.hooksPath .githooks` — relative on purpose, so one
-setting serves every worktree. `prepare` is `scripts/hooks.mjs`, which does nothing without git or a
-repository, because `npm ci` runs it where there may be neither — and is Node, because npm runs a
-script line with `cmd.exe` on Windows, where `command -v` and `true` are not commands and the shell
-form failed `npm ci` there. `ANYDAG_NO_HOOK=1` skips the hooks.
+**Lint is Biome, and promises are typescript-eslint.** `biome.jsonc` holds Biome's recommended
+*correctness* and *suspicious* rules, with every rule turned off or narrowed carrying its reason;
+`useExhaustiveDependencies` is off on purpose (effects here deliberately have no dependency lists).
+`npm run format` and `format:check` are Biome's formatter over `ts/tsx/mjs/cjs/js`; a reformat is
+its own commit, listed in `.git-blame-ignore-revs`. `npm run lint:promises` is typescript-eslint's
+three promise rules (`no-floating-promises`, `no-misused-promises`, `await-thenable`) over one program
+that includes `e2e/` and `desktop/`, which no `tsc` step checks — about 40 s, so it is CI's `promises`
+job and not in the hook. Biome's own promise rules are not used: they infer types without `tsc`, and
+missed an unawaited `fs.readFile()` while flagging correct code. **knip** (`knip.jsonc`) holds the count
+of unused files, exports and dependencies at zero; each exception in it says why.
 
-**CI runs the fast tier and no Playwright.** The screenshot baselines are compared against one pinned
-Chromium, and a runner's fonts rasterise differently, so a green tick on GitHub does not mean the app
-was opened in a browser. The browser suite is `npm run e2e:local` (`scripts/e2e-local.sh`): against
-the dev server, baselines compared, the only run that can fire the dev size assertion, under `nice`
-and three browsers wide (`ANYDAG_E2E_WORKERS`). `.githooks/pre-push` runs it.
+`.githooks/pre-commit` runs the fast tier, and `npm run prepare` installs the hooks with
+`git config core.hooksPath .githooks` — relative on purpose, so one setting serves every worktree.
+`prepare` is `scripts/hooks.mjs`, which does nothing without git or a repository, because `npm ci`
+runs it where there may be neither — and is Node, because npm runs a script line with `cmd.exe` on
+Windows, where `command -v` and `true` are not commands. `ANYDAG_NO_HOOK=1` skips the hooks.
+
+**The browser suite runs in one place, and that place is a Docker image.** Every screenshot is taken
+and compared inside `mcr.microsoft.com/playwright:v<version>-noble`, where `<version>` is the exact
+`@playwright/test` pin in `package.json` (`test/e2e-image.test.ts` holds `package.json`, the lockfile and
+`.github/workflows/e2e.yml` to one number). `npm run e2e:docker` is that run on a laptop
+(`scripts/e2e-docker.sh`: the repo mounted at `/work`, the host user's uid so the baselines and
+`test-results/` it writes are yours, `node_modules` in a per-checkout named volume installed inside the
+container, the dev server started by `playwright.config.ts` inside it, so it never meets your own on
+3500); everything after the script's name goes to `playwright test`. `npm run e2e:smoke` is its `@smoke`
+tier. **Regenerating baselines is `npm run e2e:docker -- --update-snapshots=all`, and nothing else
+produces a valid one.** `npm run e2e:local` is the host's own browser and compares **no** screenshots
+(`ANYDAG_NO_SNAPSHOTS=1` is set for it): the `neutral` theme is `system-ui`, so its cards are measured
+by whatever fonts the machine has, and a host's layout is not the image's.
+
+**CI is a handful of workflows, and each required check always reports.**
+
+| Workflow | Runs | On |
+|---|---|---|
+| `ci.yml` → `CI passed` | the fast tier and `promises` (`checks.yml`); the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
+| `e2e.yml` → `e2e` | the `@smoke` tier on a pull request; the whole suite sharded four ways on a push, with the shards' reports merged into one | the same branches; `workflow_call` with `scope: smoke \| full` |
+| `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
+| `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
+| `codeql.yml`, `dependency-review.yml` | static security analysis; new dependencies' advisories and licences | pull requests and develop; not required |
+
+`CI passed` and `e2e` are summary jobs: a reusable workflow's jobs do not exist when the job that calls
+them is skipped, and a workflow with `paths-ignore` never starts, and either leaves a required check
+"expected" for ever. So the workflow always runs, decides what is owed, and the summary fails only when
+something owed did not pass. `scripts/e2e-plan.mjs` decides what the browser can see (prose, CI config,
+unit tests and the desktop shell are nothing to it; `boards/` is a fixture, not prose).
+
+**The `@smoke` tag** (`test("…", { tag: "@smoke" }, …)`) is a promise about *breadth*: a new surface gets
+one fast test in it. Tag a test that touches a surface nothing tagged touches; do not tag a second test
+for a surface that has one — the tier is under a minute on purpose.
+
+**`pre-push` runs only what the push can have changed.** Nothing new on the push (every sha is already on
+a remote) → no tests, one line saying so. Otherwise `scripts/e2e-plan.mjs` reads the diff against
+`origin/develop` (else `origin/main`, else the whole suite) and answers with a `--grep`: docs, CI config
+and unit tests run nothing; application code the `@smoke` tier; what can move pixels (`boards/`,
+`icons/`, the drawing layers of `src/`) also `reference.spec.ts`; `sync/` also `sync.spec.ts`; and a
+change under `e2e/` the specs Playwright's `--only-changed` traces it to. It runs in the image when
+Docker answers, else on the host with no screenshots, and says which. The number of browsers comes from
+the machine (`scripts/e2e-lib.sh`: cores − 2 and free memory at 600 MB a worker, clamped to 1..6) and the
+run prints why; `ANYDAG_E2E_WORKERS` overrides.
 
 **`playwright.config.ts` sets `retries: 1`.** A check that passes on its second try is reported as
-`flaky` on Playwright's summary line; one that fails twice is a failure.
+`flaky` on Playwright's summary line; one that fails twice is a failure. Under `CI` it also sets
+`forbidOnly` and `trace: "on-first-retry"`.
 
 **The hooks never stash**, the usual trick for checking the index rather than the working tree: the
 stash stack is shared with every worktree, so a hook that pushes and pops could restore somebody
@@ -84,9 +155,7 @@ table code tables match `QUIZ_CODES` and `TABLE_CODES`. A missing skill is a fai
 cheat sheets under `skills/anydag/references/dsl` are a symlink to `docs/dsl/`, so they cannot drift.
 
 `test/parity.test.ts` runs in `npm run checks` too, so **a route, a command or a tool that
-`docs/parity.json` does not name fails the commit that adds it** (see *Parity*).
+`docs/parity.json` does not name fails the commit that adds it** (see *Parity* in `cli.md`).
 
-Two things about the Playwright run. Baselines are `-linux` and will not match elsewhere;
-regenerate rather than fight them. And a stale HMR module can fail every check at once with a
-"does not provide an export named …" error, or make the size assertion fire — restart the dev server
-before believing a mass failure.
+A stale HMR module can fail every check at once with a "does not provide an export named …" error,
+or make the size assertion fire — restart the dev server before believing a mass failure.

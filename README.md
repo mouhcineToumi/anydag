@@ -115,8 +115,10 @@ npm run dev                 # Vite + the local server on boards/local/:  http://
 npm run desktop:dev         # the Electron app on the same code
 npm run desktop:dist        # package it for the system you are on, into release/
 
-npm run checks              # typechecks, the check:* scripts, the unit suite — what every commit runs
-npm run gate                # the same, then the Playwright suite
+npm run checks              # lint, knip, typechecks, the check:* scripts, the unit suite — what every commit runs
+npm run e2e:smoke           # the browser suite's smoke tier, in the Playwright Docker image
+npm run e2e:docker          # the whole browser suite there, screenshots compared
+npm run gate                # checks, then the whole browser suite
 
 npm link                    # puts `anydag` on the PATH from this checkout
 ```

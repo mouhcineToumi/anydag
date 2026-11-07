@@ -44,7 +44,7 @@ TypeScript, React, Hono and Electron, in one repository.
 
 ## Before you push
 
-Run **`npm run checks`** (typecheck, lint, the `check:*` contracts, `docs/parity.json`, unit tests).
+Run **`npm run checks`** (Biome lint, knip, typecheck, the `check:*` contracts, `docs/parity.json`, unit tests).
 It is also the pre-commit hook; do not skip it with `--no-verify`, and do not push on red. Then:
 
 - **Add or update tests** for the behaviour you changed: unit tests in `test/`, browser checks in `e2e/`.
@@ -58,8 +58,8 @@ It is also the pre-commit hook; do not skip it with `--no-verify`, and do not pu
 - The browser suite runs in CI in the Playwright Docker image. To run it yourself use
   `npm run e2e:docker`. Run only the specs for the area you changed when iterating, and measure
   flakiness at no more workers than the machine has cores.
-- **Screenshots are never updated casually.** The visual baselines are compared against one pinned
-  Chromium. Update one only when a pixel change is the point of the PR, with
+- **Screenshots are never updated casually.** The visual baselines are valid only in the Playwright
+  Docker image. Update one only when a pixel change is the point of the PR, with
   `--update-snapshots=all` inside the Docker runner, and look at every changed image before you commit
   it. If a baseline fails and you did not mean to move pixels, that is a regression: fix the code.
 

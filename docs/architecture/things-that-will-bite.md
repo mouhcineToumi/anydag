@@ -249,11 +249,21 @@
   outside its own fill and changes no geometry, which is the property the outline was chosen for in
   the first place. A line is the one mark that already wears a stroke — its hue — so a picked line
   takes the accent for as long as it is picked.
-- **`--update-snapshots` leaves a baseline alone when the change is inside the tolerance.** The
-  screenshot checks allow 1% of pixels to differ, and Playwright's default update mode rewrites only
-  a baseline that *fails* — so a small cloud moved 240px, or every link on a board shortened by 8px,
-  passes, is not rewritten, and quietly spends the tolerance the next real change needed. A change
-  that is *meant* to move pixels is regenerated with `--update-snapshots=all`, and read.
+- **A baseline is only valid in the image it was made in, and a theme that names no font is the proof.**
+  `neutral` is `ui-sans-serif, system-ui, …`, so the same board is a different size on a laptop, a GitHub
+  runner and a contributor's machine (24 of the 46 baselines changed when they were first regenerated in
+  the image: all 15 `neutral` ones, 7 of them in *size* — the layout, not the pixels — and 4 `paper`, 4
+  `paper-dark` and the export item by antialiasing only). Playwright's default update mode rewrites only a
+  baseline that *fails*, so a change inside the 1% tolerance quietly spends it; regenerate with
+  `npm run e2e:docker -- --update-snapshots=all`, which rewrites every baseline it runs, read the diff of a
+  sample, and commit the images on their own.
+- **A path that looks like documentation is a fixture.** `boards/local/**/*.board.md` and `boards/local/*.md`
+  are what the browser suite draws, so "markdown only → skip the browser" is wrong for them; `kindOf` in
+  `scripts/e2e-plan.mjs` tests `boards/` before `.md`, and `test/e2e-plan.test.ts` holds it.
+- **A required check must report when its jobs are skipped.** A workflow with `paths-ignore` never starts,
+  and a reusable workflow's jobs never exist when the job calling them is skipped — either leaves a
+  required check "expected" for ever. `ci.yml`'s `CI passed` and `e2e.yml`'s `e2e` always run and decide
+  what was owed.
 - **A check that asserts something is absent must be able to find it.** `[data-dag-error]` was
   asserted absent seventeen times while no element carried it, and `reference.spec.ts` asked for
   `.dag-error`, which a broken diagram stopped drawing the moment the problems dock landed. Both

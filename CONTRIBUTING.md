@@ -38,9 +38,11 @@ npm run dev     # Vite + the local server on boards/local/ → http://localhost:
 |---|---|
 | `npm run dev` | the app in a browser, with hot reload, on the development vault `boards/local/` |
 | `npm run desktop:dev` | the Electron app on the same code |
-| `npm run checks` | the **fast tier**: typechecks, lint, the contract checks, parity, the unit tests. No browser, about fifteen seconds. It is also the pre-commit hook |
+| `npm run checks` | the **fast tier**: Biome lint, knip, typechecks, the contract checks, parity, the unit tests. No browser, about half a minute. It is also the pre-commit hook |
 | `npm test` | the unit tests alone (`npm run test:watch` while you work) |
 | `npm run e2e:docker` | the browser suite in the same Playwright Docker image CI uses |
+| `npm run e2e:smoke` | the browser suite's `@smoke` tier, in the same image — what CI runs on a pull request |
+| `npm run format` | Biome's formatter over the code |
 | `npm run parity` | redraws `docs/PARITY.md` from `docs/parity.json` |
 
 The server is a bundle (`server/dist/`). If you change `server/`, `src/board/`, `src/dsl/`,
