@@ -108,7 +108,7 @@ exit 0 done · 3 not tidy (--check) · 5 not ready · 6 no server`);
     process.exit(6);
   }
 
-  const { chromium } = require("playwright");
+  const { chromium } = require("@playwright/test");
   const browser = await launch(chromium);
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1200 },

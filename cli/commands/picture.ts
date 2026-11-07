@@ -50,7 +50,7 @@ type Box = { x: number; y: number; width: number; height: number };
 async function launch(ctx: Ctx): Promise<Browser> {
   let chromium: { launch(o: Record<string, unknown>): Promise<Browser> };
   try {
-    const mod = (await import("playwright")) as unknown as { chromium: typeof chromium; default?: { chromium: typeof chromium } };
+    const mod = (await import("@playwright/test")) as unknown as { chromium: typeof chromium; default?: { chromium: typeof chromium } };
     chromium = mod.chromium ?? mod.default!.chromium;
   } catch {
     throw new ApiError(
