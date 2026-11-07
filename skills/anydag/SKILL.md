@@ -123,6 +123,7 @@ anydag tidy plan                       # straighten it, as `space T` does, and w
 | `anydag generate` · `anydag rewrite` · `anydag prompt run` | asking a model, with the app's own model settings |
 | `anydag snapshot` · `anydag tidy` · `anydag board export` · `anydag note export` | the laid-out page — and a note as a PDF: `anydag note export <name> --format pdf -o notes.pdf`, the page's own print of it, embedded boards and all; `--format zip` is the text with every picture and attachment it names beside it |
 | `anydag vault` | `anydag vault ls`, `open <path>`, `create <parent> <name>`, `close <id>` (`--forget` takes it off the list), and `anydag vault transfer <name> --to <id>` — every other command acts in the vault `--vault <path-or-id>` or `ANYDAG_VAULT` names, else the one opened last; nothing here ever deletes a folder |
+| `anydag remote` | whether a paired phone can reach the running app: `anydag remote status`, `anydag remote devices`; `anydag remote on`, `anydag remote off`, `anydag remote serve` (Tailscale), `anydag remote pair` and `anydag remote revoke <id>` — **the person's, never an agent's**: who can reach this machine is theirs to decide, and MCP has no tool for it |
 | `anydag telemetry` | whether this install sends anonymous logs and where: `anydag telemetry` says, and `on`, `off` or `ask` change it — **the person's answer, never yours to give**; MCP has no tool for it |
 
 `anydag help` lists all of it, and `anydag help --json` is the same as data. **Every edit carries

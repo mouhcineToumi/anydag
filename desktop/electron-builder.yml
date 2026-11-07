@@ -64,6 +64,9 @@ asarUnpack:
   - node_modules/detect-libc/**
   - server/dist/**
   - cli/dist/**
+  # The page, for the server's remote door (`--remote-page`): the child reads it with plain `fs`. The
+  # main process still reads it at its asar path; Electron sends an unpacked file's read to the disk.
+  - dist/**
 protocols:
   - name: AnyDag
     schemes:

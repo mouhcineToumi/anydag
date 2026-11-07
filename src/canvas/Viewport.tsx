@@ -5,6 +5,7 @@ import {
   clampZoom,
   DRAG_SLOP,
   fitTo,
+  openOn,
   PAN_STEP,
   stepZoom,
   wheelPixels,
@@ -70,6 +71,11 @@ export type Tool = "select" | "hand" | "pen";
 
 interface Props {
   content: Rect;
+  /**
+   * The item a reader starts with. On a phone, a board whose whole would be too small to read opens
+   * here instead (`openOn`); left out, the board always opens fitted.
+   */
+  first?: Rect | null;
   tool?: Tool;
   onZoom?(zoom: number): void;
   /** A marquee was drawn, in board coordinates. `additive` when shift was held. */
@@ -96,6 +102,7 @@ interface Props {
 
 export function Viewport({
   content,
+  first = null,
   tool = "select",
   onZoom,
   onMarquee,
@@ -121,6 +128,8 @@ export function Viewport({
   const touched = useRef(false);
   const contentRef = useRef(content);
   contentRef.current = content;
+  const firstRef = useRef(first);
+  firstRef.current = first;
 
   const onZoomRef = useRef(onZoom);
   onZoomRef.current = onZoom;
@@ -164,9 +173,23 @@ export function Viewport({
     [],
   );
 
+  /** Somebody asked for the whole board (`F`, the fit button): a resize refits to the whole too. */
+  const wholeAsked = useRef(false);
+
+  /**
+   * Frame `target`, or the board. The board's own fit — on open, on a resize nobody has taken over —
+   * is `auto`, and on a phone opens where it can be read (`openOn`); a fit somebody asked for is the
+   * whole of it, whatever the window.
+   */
   const fit = useCallback(
-    (target?: Rect) => {
-      const { zoom: z, off: o } = fitTo(target ?? contentRef.current, viewSize());
+    (target?: Rect, auto = false) => {
+      if (!auto && !target) wholeAsked.current = true;
+      const view = viewSize();
+      const { zoom: z, off: o } = target
+        ? fitTo(target, view)
+        : auto && !wholeAsked.current
+          ? openOn(contentRef.current, firstRef.current, view)
+          : fitTo(contentRef.current, view);
       commit(z, o);
       touched.current = false;
     },
@@ -657,7 +680,7 @@ export function Viewport({
     const key = `${content.x},${content.y},${content.w},${content.h}`;
     if (key === fitted.current || content.w <= 1) return;
     fitted.current = key;
-    if (!touched.current) fit(content);
+    if (!touched.current) fit(undefined, true);
   }, [content, fit]);
 
   useEffect(() => {
@@ -674,7 +697,7 @@ export function Viewport({
          the window's first resize left an empty plane reading **400%**. That was reachable before
          only on a board with no items; now it is the first screen anybody sees, and a zoom figure
          about nothing is worse than no figure at all. */
-      if (!touched.current && contentRef.current.w > 1) return fit();
+      if (!touched.current && contentRef.current.w > 1) return fit(undefined, true);
       /*
        * **The drawing does not move when the chrome beside it does.**
        *

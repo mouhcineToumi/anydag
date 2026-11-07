@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { serve } from "@hono/node-server";
+import { serve, type ServerType } from "@hono/node-server";
 
 import { createApp } from "./app";
 import { defaultHarnesses } from "./chat/harnesses";
@@ -37,7 +37,7 @@ process.on("unhandledRejection", (e) => {
 });
 
 async function main(): Promise<void> {
-  const takes = new Set(["--port", "--page", "--token"]);
+  const takes = new Set(["--port", "--page", "--token", "--remote-page"]);
   const folder = process.argv.slice(2).find((a, i, all) => !a.startsWith("--") && !takes.has(all[i - 1] ?? "")) ?? process.env.ANYDAG_VAULT;
   const home = new Home(homeDir());
   const session = new Session(home, null, VERSION, process.env, { types: parseTypes(process.env.ANYDAG_UPLOAD_TYPES) });
@@ -61,8 +61,12 @@ async function main(): Promise<void> {
     console.error(`no built page at ${page} — run \`npm run build\` first, or pass --no-page`);
     process.exit(2);
   }
+  /* The remote door serves the page itself: the desktop app serves it through its own scheme and
+     starts this with `--no-page`, so it says where `dist/` is with `--remote-page`. */
+  const remotePage = arg("remote-page") ? path.resolve(arg("remote-page")!) : page;
   const assistant = new Assistant({ session, token, harnesses: defaultHarnesses(process.env) });
   const app = createApp({ session, token, page, assistant });
+  const door = remoteDoor(createApp({ session, token, page: remotePage, assistant, door: "remote" }), session, remotePage);
   // A server that stays up sends its logs; the CLI's in-process one never starts this.
   session.telemetry.start();
   logged = (e) => session.telemetry.fail(e);
@@ -82,6 +86,7 @@ async function main(): Promise<void> {
     } catch {
       /* already gone */
     }
+    door.close();
     void assistant.close();
     void session.telemetry.stop();
     void session.closeAll();
@@ -93,6 +98,49 @@ async function main(): Promise<void> {
   /* Started by the desktop app, which holds an IPC channel to this process: the channel closing —
      the app asking, or the app gone — is the stop. Windows has no SIGTERM to send, only a hard kill. */
   if (process.send) process.on("disconnect", quit);
+}
+
+/**
+ * The remote door's listener: opened, moved or closed whenever the setting changes, on `127.0.0.1`
+ * and the setting's port — a proxy in front of it (`tailscale serve`) is what a phone reaches. Closing
+ * it cuts every connection it holds, the change feeds included (`server/remote.ts`).
+ */
+function remoteDoor(app: { fetch: (req: Request, env?: unknown) => Response | Promise<Response> }, session: Session, page: string | null): { close(): void } {
+  const r = session.remote;
+  let open: { port: number; server: ServerType } | null = null;
+  const shut = () => {
+    if (!open) return;
+    const { server } = open;
+    open = null;
+    server.close();
+    (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+  };
+  const settle = () => {
+    const want = r.enabled();
+    const port = r.port();
+    if (open && (!want || open.port !== port)) shut();
+    if (!want) return r.listening(false);
+    if (open) return;
+    if (!page || !fs.existsSync(path.join(page, "index.html"))) return r.listening(false, "there is no built page to serve — run `npm run build`");
+    const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port }, () => {
+      r.listening(true);
+      console.log(`anydag: remote access on 127.0.0.1:${port}`);
+    });
+    open = { port, server };
+    server.on("error", (e: NodeJS.ErrnoException) => {
+      if (open?.server === server) open = null;
+      r.listening(false, e.code === "EADDRINUSE" ? `port ${port} is taken by another program` : e.message);
+      console.error(`anydag: remote access: ${e.message}`);
+    });
+  };
+  const off = r.onChange(settle);
+  settle();
+  return {
+    close() {
+      off();
+      shut();
+    },
+  };
 }
 
 /**

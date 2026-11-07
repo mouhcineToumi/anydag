@@ -15,13 +15,13 @@
 
 import { SETTINGS_TAB, readPref, writeLocal } from "./prefs";
 
-export type SettingsTab = "calendar" | "shortcuts" | "privacy" | "about" | "preferences" | "vault" | "agents" | "export" | "sync";
+export type SettingsTab = "calendar" | "shortcuts" | "devices" | "privacy" | "about" | "preferences" | "vault" | "agents" | "export" | "sync";
 
 export type SettingsGroup = "account" | "vault";
 
 /** The tabs in the order they are drawn, which is also the order the arrow keys walk. */
 export const GROUPS: readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[] = [
-  { group: "account", tabs: ["calendar", "shortcuts", "privacy", "about"] },
+  { group: "account", tabs: ["calendar", "shortcuts", "devices", "privacy", "about"] },
   { group: "vault", tabs: ["preferences", "vault", "sync", "agents", "export"] },
 ];
 
@@ -30,6 +30,7 @@ export const TABS: readonly SettingsTab[] = GROUPS.flatMap((g) => g.tabs);
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   calendar: "Calendar",
   shortcuts: "Shortcuts",
+  devices: "Devices",
   privacy: "Privacy",
   about: "About",
   preferences: "Preferences",

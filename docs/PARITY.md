@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**132 features, 0 gaps.** Each row is one thing the backend can do, and what reaches it
+**137 features, 0 gaps.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose. The reason for
 every ↳ and ✗ is numbered under the tables.
@@ -158,18 +158,28 @@ every ↳ and ✗ is numbered under the tables.
 | The devices paired into the sync account | `GET /api/sync/devices` | `sync devices` | ✗ [15] |
 | Sign a device out of the sync account | `POST /api/sync/devices/revoke` | `sync devices revoke` | ✗ [16] |
 
+## Remote access
+
+| Feature | REST | CLI | MCP |
+|---|---|---|---|
+| Whether a paired phone can reach this desktop: the remote door on or off, its port, the address a phone opens | `GET /api/remote` `PUT /api/remote` | `remote status` `remote on` `remote off` | ✗ [17] |
+| What Tailscale says about this machine — its tailnet address, whether `tailscale serve` passes it to the door — and asking it to | `GET /api/remote/tailscale` `POST /api/remote/tailscale/serve` | `remote status` `remote on` `remote serve` | ✗ [18] |
+| A one-time code a phone pairs with | `POST /api/remote/pair` | `remote pair` | ✗ [19] |
+| The devices paired with this desktop, and unpairing one | `GET /api/remote/devices` `POST /api/remote/devices/revoke` | `remote devices` `remote revoke` | ✗ [20] |
+| A paired device's own routes on the remote door: spending a pairing code, which device it is, forgetting itself | `POST /api/device/pair` `GET /api/device` `POST /api/device/forget` | ✗ [21] | ✗ [22] |
+
 ## Inside a board
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | One item's fence line and body | `GET /__board/get` | `item show` | `board_read` |
-| Duplicate, restack, group, rename, convert or re-lay-out items | `POST /__board/patch` `POST /__board/put` | `item dup` `item front` `item back` `item rename` `item group` `item ungroup` `item convert` `item relayout` | ↳ `board_patch` `board_write` [17] |
-| A board's pages: list, add, rename, remove, reorder | `GET /__board/get` `POST /__board/patch` | `page ls` `page add` `page rename` `page rm` `page move` | ↳ `board_patch` [18] |
-| Lines between items: list, add, change, remove | `GET /__board/get` `POST /__board/patch` | `link ls` `link add` `link set` `link rm` | ↳ `board_patch` [19] |
-| The cards inside one diagram | `GET /__board/get` `POST /__board/patch` | `node ls` `node add` `node set` `node rm` `node rename` `node dup` `node move` | ↳ `board_patch` [17] |
-| The edges inside one diagram | `POST /__board/patch` | `edge add` `edge set` `edge rm` | ↳ `board_patch` [17] |
-| A card's rows: columns, members | `GET /__board/get` `POST /__board/patch` | `row ls` `row add` `row set` `row rm` | ↳ `board_patch` [17] |
-| A chart's own statements: form, legend, scale, categories | `POST /__board/patch` | `chart set` | ↳ `board_patch` [17] |
+| Duplicate, restack, group, rename, convert or re-lay-out items | `POST /__board/patch` `POST /__board/put` | `item dup` `item front` `item back` `item rename` `item group` `item ungroup` `item convert` `item relayout` | ↳ `board_patch` `board_write` [23] |
+| A board's pages: list, add, rename, remove, reorder | `GET /__board/get` `POST /__board/patch` | `page ls` `page add` `page rename` `page rm` `page move` | ↳ `board_patch` [24] |
+| Lines between items: list, add, change, remove | `GET /__board/get` `POST /__board/patch` | `link ls` `link add` `link set` `link rm` | ↳ `board_patch` [25] |
+| The cards inside one diagram | `GET /__board/get` `POST /__board/patch` | `node ls` `node add` `node set` `node rm` `node rename` `node dup` `node move` | ↳ `board_patch` [23] |
+| The edges inside one diagram | `POST /__board/patch` | `edge add` `edge set` `edge rm` | ↳ `board_patch` [23] |
+| A card's rows: columns, members | `GET /__board/get` `POST /__board/patch` | `row ls` `row add` `row set` `row rm` | ↳ `board_patch` [23] |
+| A chart's own statements: form, legend, scale, categories | `POST /__board/patch` | `chart set` | ↳ `board_patch` [23] |
 
 ## Images
 
@@ -197,8 +207,8 @@ every ↳ and ✗ is numbered under the tables.
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | The person's saved components | `GET /__board/components` | `component ls` | `library` |
-| Keep items as a component | `POST /__board/create` | `component keep` | ↳ `board_create` [20] |
-| Put a saved component on a board | `GET /__board/components` `POST /__board/patch` | `component place` | ↳ `library` `board_patch` [21] |
+| Keep items as a component | `POST /__board/create` | `component keep` | ↳ `board_create` [26] |
+| Put a saved component on a board | `GET /__board/components` `POST /__board/patch` | `component place` | ↳ `library` `board_patch` [27] |
 | Delete a saved component | `POST /__board/components/delete` | `component rm` | `component_delete` |
 
 ## Grammar
@@ -215,34 +225,34 @@ every ↳ and ✗ is numbered under the tables.
 |---|---|---|---|
 | Which model providers could answer | `GET /__board/llm` | `llm` | `llm` |
 | Ask a model to draw a diagram | `POST /__board/generate` | `generate` | `generate` |
-| Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | `prompt run` | ↳ `generate` `board_patch` [22] |
-| Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | `rewrite` | ↳ `generate` `board_patch` [23] |
+| Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | `prompt run` | ↳ `generate` `board_patch` [28] |
+| Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | `rewrite` | ↳ `generate` `board_patch` [29] |
 
 ## Pictures
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| A picture of a board, with what is wrong with the drawing | ✗ [24] | `snapshot` | ✗ [25] |
-| Tidy a board's layout | ✗ [24] | `tidy` | ✗ [25] |
-| A board as SVG or PNG, a note as PDF | ✗ [24] | `board export` `note export` | ✗ [25] |
+| A picture of a board, with what is wrong with the drawing | ✗ [30] | `snapshot` | ✗ [31] |
+| Tidy a board's layout | ✗ [30] | `tidy` | ✗ [31] |
+| A board as SVG or PNG, a note as PDF | ✗ [30] | `board export` `note export` | ✗ [31] |
 
 ## Assistant
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| The chats in a vault, newest first | `GET /__board/chats` | `chat ls` | ✗ [26] |
-| The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | `chat models` | ✗ [26] |
-| Start a chat | `POST /__board/chat` | `chat new` | ✗ [26] |
-| A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | `chat cat` | ✗ [26] |
-| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | `chat say` | ✗ [26] |
-| Stop the turn that is answering | `POST /__board/chat/stop` | `chat stop` | ✗ [26] |
-| Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | `chat approve` | ✗ [26] |
-| Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | `chat grant` | ✗ [26] |
-| Take back, or put back, one block of changes a turn made | `POST /__board/chat/undo` `POST /__board/chat/redo` | `chat undo` `chat redo` | ✗ [26] |
-| Give a chat a title | `POST /__board/chat/rename` | `chat rename` | ✗ [26] |
-| Delete a chat and its turns | `POST /__board/chat/delete` | `chat rm` | ✗ [26] |
-| The chat's own recorder: group the writes that follow into one undoable block | `POST /__board/chat/block` | ✗ [27] | ✗ [28] |
-| The chat's own request to reach another vault, put to the person | `POST /__board/chat/access` | ✗ [29] | ✗ [30] |
+| The chats in a vault, newest first | `GET /__board/chats` | `chat ls` | ✗ [32] |
+| The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | `chat models` | ✗ [32] |
+| Start a chat | `POST /__board/chat` | `chat new` | ✗ [32] |
+| A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | `chat cat` | ✗ [32] |
+| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | `chat say` | ✗ [32] |
+| Stop the turn that is answering | `POST /__board/chat/stop` | `chat stop` | ✗ [32] |
+| Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | `chat approve` | ✗ [32] |
+| Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | `chat grant` | ✗ [32] |
+| Take back, or put back, one block of changes a turn made | `POST /__board/chat/undo` `POST /__board/chat/redo` | `chat undo` `chat redo` | ✗ [32] |
+| Give a chat a title | `POST /__board/chat/rename` | `chat rename` | ✗ [32] |
+| Delete a chat and its turns | `POST /__board/chat/delete` | `chat rm` | ✗ [32] |
+| The chat's own recorder: group the writes that follow into one undoable block | `POST /__board/chat/block` | ✗ [33] | ✗ [34] |
+| The chat's own request to reach another vault, put to the person | `POST /__board/chat/access` | ✗ [35] | ✗ [36] |
 
 ## Why
 
@@ -262,17 +272,23 @@ every ↳ and ✗ is numbered under the tables.
 14. Undoing a link is the person's, as making one is: a passphrase is the person's, and so is the decision to stop using it.
 15. The account's devices are the person's to manage, beside the passphrase that is theirs.
 16. Signing a device out is the person's, beside the passphrase that is theirs.
-17. An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal.
-18. Pages are the frontmatter's `pages:` and each item's `page=`: `board_patch`'s `{meta}` op and `{id, attrs}` op write them.
-19. A link is a line of a page's `edges` fence: `board_patch` rewrites that fence's body, or inserts one.
-20. A component is a board under `components/`: `board_create` with that name keeps one, with the text of the items to keep.
-21. `library` answers every saved component's text, and `board_patch`'s `{insert}` places it.
-22. `generate` answers the draft and `board_patch` puts it where the card was: `{insert}` after it, `{remove}` on it.
-23. `generate` with `source` answers the rewritten body, and `board_patch`'s `{id, body}` lands it on the item.
-24. Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright.
-25. A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead.
-26. An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer.
-27. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: nothing outside a running turn has a block to start.
-28. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `change_block` (server/mcp/chat.ts), which is not one of this server's tools.
-29. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: the person answers it with `chat approve`, and grants a vault up front with `chat grant`.
-30. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `vault_request` (server/mcp/chat.ts), which is not one of this server's tools.
+17. Who can reach this machine is the person's to decide; an agent opening a door onto the desktop is the thing remote access must never be.
+18. Putting the desktop on a network is the person's to decide, as the door it leads to is.
+19. A pairing code admits a device to the desktop; it is the person's to hand over, never an agent's.
+20. Which devices reach the desktop is the person's to manage, beside the codes that admit them.
+21. These are the phone's, answered only on the remote door; from the desktop's terminal it is `anydag remote revoke`.
+22. These are the phone's, answered only on the remote door; an agent is never a paired device.
+23. An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal.
+24. Pages are the frontmatter's `pages:` and each item's `page=`: `board_patch`'s `{meta}` op and `{id, attrs}` op write them.
+25. A link is a line of a page's `edges` fence: `board_patch` rewrites that fence's body, or inserts one.
+26. A component is a board under `components/`: `board_create` with that name keeps one, with the text of the items to keep.
+27. `library` answers every saved component's text, and `board_patch`'s `{insert}` places it.
+28. `generate` answers the draft and `board_patch` puts it where the card was: `{insert}` after it, `{remove}` on it.
+29. `generate` with `source` answers the rewritten body, and `board_patch`'s `{id, body}` lands it on the item.
+30. Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright.
+31. A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead.
+32. An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer.
+33. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: nothing outside a running turn has a block to start.
+34. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `change_block` (server/mcp/chat.ts), which is not one of this server's tools.
+35. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: the person answers it with `chat approve`, and grants a vault up front with `chat grant`.
+36. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `vault_request` (server/mcp/chat.ts), which is not one of this server's tools.

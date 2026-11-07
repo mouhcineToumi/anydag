@@ -198,6 +198,14 @@ export function CalendarView({
 }) {
   const today = useToday();
   const phone = usePhone();
+  /* Seven columns do not fit a phone: the day names ran into each other and an event was "Te…". A
+     week there is the three days from the one it is around, and steps by three; the address still
+     says `week`, so the same link opens a whole week on a desktop. */
+  const asked = view;
+  if (phone && view === "week") {
+    view = "days";
+    count = PHONE_WEEK;
+  }
   /* Every moment is placed in the account's zone, so a change of zone places them again. */
   const [zone] = useZone();
   const { first, last } = rangeOf(view, day, weekStart, count);
@@ -283,7 +291,7 @@ export function CalendarView({
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
 
   return (
-    <main className="dag-calendar" data-dag-calendar={view} data-dag-calendar-first={first} data-dag-calendar-last={last}>
+    <main className="dag-calendar" data-dag-calendar={asked} data-dag-calendar-first={first} data-dag-calendar-last={last}>
       {/* The title on the left and every control in one cluster on the right: the day's
           arrows were on the left, the views in the middle and the filters on the right, so moving a
           week and changing what showed were three trips across the page. */}
@@ -308,12 +316,12 @@ export function CalendarView({
           <span className="dag-calendar__look">
             <div className="dag-calendar__views" role="radiogroup" aria-label="Show">
               {VIEWS.map((v) => (
-                <button key={v} type="button" role="radio" aria-checked={view === v} className="dag-tasks__layout-choice" data-dag-calendar-view={v} onClick={() => onGo({ view: v })}>
-                  {v === "month" ? "Month" : v === "week" ? "Week" : "Days"}
+                <button key={v} type="button" role="radio" aria-checked={asked === v} className="dag-tasks__layout-choice" data-dag-calendar-view={v} onClick={() => onGo({ view: v })}>
+                  {v === "month" ? "Month" : v === "week" ? (phone ? `${PHONE_WEEK} days` : "Week") : "Days"}
                 </button>
               ))}
             </div>
-            {view === "days" ? (
+            {asked === "days" ? (
               <label className="dag-calendar__count">
                 <input
                   type="number"
@@ -345,6 +353,9 @@ export function CalendarView({
     </main>
   );
 }
+
+/** How many days a week is on a phone. */
+const PHONE_WEEK = 3;
 
 /** Whether the window is a phone's — under 720px, where the chrome folds. */
 function usePhone(): boolean {

@@ -1,7 +1,7 @@
 import { CalendarPlus, FilePlus2, Pencil, Play, SquareCheckBig, CircleSlash, CalendarX2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { contentBounds, placeItems } from "@/board/flow";
+import { contentBounds, firstPlacement, placeItems } from "@/board/flow";
 import { isDiagramType, isLinkType } from "@/board/types";
 import { fileCard, noteCard, toBlueprint, type Component } from "@/board/library";
 import type { Draft, DraftDiagnostic } from "@/edit/generate";
@@ -1670,6 +1670,8 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   }, [snapshot, boardName, locked]);
 
   const bounds = useMemo(() => contentBounds(places), [places]);
+  /* Where a phone opens a board too big to read whole (`openOn`). A snapshot is the whole board, always. */
+  const first = useMemo(() => (snapshot ? null : firstPlacement(places)), [snapshot, places]);
 
   /*
    * The rewrite preview, and the request that produced it.
@@ -2143,6 +2145,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
 
         <Viewport
           content={bounds}
+          first={first}
           handleRef={viewport}
           /* The zoom figure goes out as an event rather than into state here: as `App` state it
              would re-render every child on every wheel step, which is the cost `data-zoom` was

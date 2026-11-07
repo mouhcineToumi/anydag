@@ -6434,3 +6434,32 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 @media (prefers-reduced-motion: reduce) {
   .dag-chat-tool__chev { transition: none; }
 }
+
+/* Settings → Devices (`src/settings/panes/Devices.tsx`): the pairing code and the inline links. */
+.dag-remote__pair { display: flex; gap: 16px; align-items: flex-start; padding: 14px 16px; }
+.dag-remote__qr { flex: none; width: 176px; height: 176px; border-radius: 6px; }
+.dag-remote__pair-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dag-remote__link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 6px;
+  background: var(--dag-color-paper100);
+}
+.dag-remote__inline {
+  padding: 0;
+  font: inherit;
+  color: var(--dag-color-accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.dag-remote__inline:disabled { color: var(--dag-color-muted); cursor: default; }
+@media (max-width: 719px) {
+  .dag-remote__pair { flex-direction: column; align-items: center; }
+}

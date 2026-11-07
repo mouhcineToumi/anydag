@@ -84,3 +84,18 @@ export function contentBounds(places: Map<string, Placement>): { x: number; y: n
   }
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
+
+/**
+ * The item a reader starts with: the top row's leftmost. A row is anything starting within
+ * `ROW_SLACK` of the topmost item, so two cards side by side that are a few pixels out of line still
+ * read left to right. `null` on an empty page.
+ */
+export function firstPlacement(places: Map<string, Placement>): Placement | null {
+  let top = Infinity;
+  for (const p of places.values()) top = Math.min(top, p.y);
+  let first: Placement | null = null;
+  for (const p of places.values()) if (p.y <= top + ROW_SLACK && (!first || p.x < first.x)) first = p;
+  return first;
+}
+
+const ROW_SLACK = 48;

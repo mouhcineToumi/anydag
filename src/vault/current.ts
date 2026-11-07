@@ -54,7 +54,7 @@ export function pinVault(id: string | null): void {
 }
 
 /** Routes about the app and not a vault: they answer with no vault open, and are never scoped. */
-const UNSCOPED = ["/api/auth/", "/api/vaults", "/api/settings", "/api/health"];
+const UNSCOPED = ["/api/auth/", "/api/vaults", "/api/settings", "/api/health", "/api/remote", "/api/device"];
 
 /** Whether a path is one a vault scopes: the document routes, and `/api/` but the app's own. */
 export function scopes(path: string): boolean {

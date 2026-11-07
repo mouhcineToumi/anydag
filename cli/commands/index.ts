@@ -15,6 +15,7 @@ import { MODELS } from "./models";
 import { PICTURE } from "./picture";
 import { PROJECTS } from "./projects";
 import { QUIZ } from "./quiz";
+import { REMOTE } from "./remote";
 import { SYNC } from "./sync";
 import { TABLE } from "./table";
 import { TASKS } from "./tasks";
@@ -28,7 +29,7 @@ import { VAULT } from "./vault";
  * one is open, then the files, then what is inside a board from the outside in — items, then the pages and
  * links between them, then what is inside one diagram.
  */
-export const COMMANDS: Command[] = [...VAULT, ...DOCS, ...TASKS, ...EVENTS, ...PROJECTS, ...QUIZ, ...TABLE, ...FILES, ...TRASH, ...SYNC, ...CHAT, ...ITEMS, ...INSIDE, ...ASSETS, ...GRAMMAR, ...MODELS, ...PICTURE, ...APP];
+export const COMMANDS: Command[] = [...VAULT, ...DOCS, ...TASKS, ...EVENTS, ...PROJECTS, ...QUIZ, ...TABLE, ...FILES, ...TRASH, ...SYNC, ...REMOTE, ...CHAT, ...ITEMS, ...INSIDE, ...ASSETS, ...GRAMMAR, ...MODELS, ...PICTURE, ...APP];
 
 /**
  * The routes no command reaches, each with the reason — read out of `docs/parity.json`,
@@ -58,6 +59,7 @@ export const GROUPS: Group[] = [
   { name: "folder", title: "folder", blurb: "folders of boards, notes, tables and files" },
   { name: "trash", title: "trash", blurb: "what was deleted, kept for thirty days — restored, or deleted for good" },
   { name: "sync", title: "sync", blurb: "this vault's link to a sync server — end-to-end encrypted, the passphrase never an argument" },
+  { name: "remote", title: "remote access", blurb: "whether a paired phone reaches the running app — the person's to turn on, never an agent's" },
   { name: "chat", title: "chat", blurb: "the Assistant: a conversation with a model that works on this vault — started, followed, approved and undone" },
   { name: "item", title: "item", blurb: "what is on a board — the gestures on the canvas" },
   { name: "page", title: "page", blurb: "a board's pages" },

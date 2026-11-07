@@ -690,6 +690,46 @@
       "mcp": {"refused": "Signing a device out is the person's, beside the passphrase that is theirs."}
     },
     {
+      "id": "remote.setting",
+      "area": "Remote access",
+      "what": "Whether a paired phone can reach this desktop: the remote door on or off, its port, the address a phone opens",
+      "rest": ["GET /api/remote", "PUT /api/remote"],
+      "cli": ["remote status", "remote on", "remote off"],
+      "mcp": {"refused": "Who can reach this machine is the person's to decide; an agent opening a door onto the desktop is the thing remote access must never be."}
+    },
+    {
+      "id": "remote.tailscale",
+      "area": "Remote access",
+      "what": "What Tailscale says about this machine — its tailnet address, whether `tailscale serve` passes it to the door — and asking it to",
+      "rest": ["GET /api/remote/tailscale", "POST /api/remote/tailscale/serve"],
+      "cli": ["remote status", "remote on", "remote serve"],
+      "mcp": {"refused": "Putting the desktop on a network is the person's to decide, as the door it leads to is."}
+    },
+    {
+      "id": "remote.pair",
+      "area": "Remote access",
+      "what": "A one-time code a phone pairs with",
+      "rest": ["POST /api/remote/pair"],
+      "cli": ["remote pair"],
+      "mcp": {"refused": "A pairing code admits a device to the desktop; it is the person's to hand over, never an agent's."}
+    },
+    {
+      "id": "remote.devices",
+      "area": "Remote access",
+      "what": "The devices paired with this desktop, and unpairing one",
+      "rest": ["GET /api/remote/devices", "POST /api/remote/devices/revoke"],
+      "cli": ["remote devices", "remote revoke"],
+      "mcp": {"refused": "Which devices reach the desktop is the person's to manage, beside the codes that admit them."}
+    },
+    {
+      "id": "remote.device",
+      "area": "Remote access",
+      "what": "A paired device's own routes on the remote door: spending a pairing code, which device it is, forgetting itself",
+      "rest": ["POST /api/device/pair", "GET /api/device", "POST /api/device/forget"],
+      "cli": {"refused": "These are the phone's, answered only on the remote door; from the desktop's terminal it is `anydag remote revoke`."},
+      "mcp": {"refused": "These are the phone's, answered only on the remote door; an agent is never a paired device."}
+    },
+    {
       "id": "item.show",
       "area": "Inside a board",
       "what": "One item's fence line and body",

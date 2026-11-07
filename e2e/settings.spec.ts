@@ -207,6 +207,10 @@ test("the arrow keys walk the tabs across both groups, and the last tab is where
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "shortcuts");
   await expect(page.locator('[data-dag-settings-pane="shortcuts"] .dag-shortcuts__row').first()).toBeVisible();
   await page.keyboard.press("ArrowDown");
+  /* Remote access: the desktop's half, since this page came through the desktop's own door. */
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "devices");
+  await expect(page.locator('[data-dag-settings-pane="devices"] [data-dag-setting-remote]')).toBeVisible();
+  await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   /* Out of the app's group and into the vault's, as though the heading were not there. */

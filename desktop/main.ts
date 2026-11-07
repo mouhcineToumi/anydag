@@ -109,7 +109,9 @@ async function startServer(folder: string | null): Promise<void> {
   serverToken = randomBytes(32).toString("base64url");
   const args: string[] = [serverBundle()];
   if (folder) args.push(folder);
-  args.push("--port", "0", "--no-page");
+  /* The remote door, when the person turns it on, serves the page to a phone itself: the child is
+     told where it is, unpacked from the asar so its plain `fs` can read it. */
+  args.push("--port", "0", "--no-page", "--remote-page", unpackedPath("dist"));
   /* The token goes in the environment, never on the command line: argv is readable by every user
      of the machine (`ps`), a process's environment only by its own user. */
   /* `ANYDAG_DESKTOP` makes the person's own Claude subscription the prompt card's default when

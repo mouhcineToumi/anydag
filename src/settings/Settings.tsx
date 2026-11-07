@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
+  Smartphone,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { useVaults } from "@/vault/useVaults";
 import { AboutPane } from "./panes/About";
 import { AgentsPane } from "./panes/Agents";
 import { CalendarPane } from "./panes/Calendar";
+import { DevicesPane } from "./panes/Devices";
 import { ICON } from "./panes/common";
 import { ExportPane } from "./panes/Export";
 import { PreferencesPane } from "./panes/Preferences";
@@ -34,6 +36,7 @@ import { GROUPS, TAB_LABEL, lastTab, rememberTab, stepTab, type SettingsTab } fr
 const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   calendar: CalendarDays,
   shortcuts: Keyboard,
+  devices: Smartphone,
   privacy: ShieldCheck,
   about: Info,
   preferences: SlidersHorizontal,
@@ -283,6 +286,8 @@ export function Settings({
               <CalendarPane />
             ) : tab === "shortcuts" ? (
               <ShortcutList />
+            ) : tab === "devices" ? (
+              <DevicesPane />
             ) : tab === "privacy" ? (
               <PrivacyPane />
             ) : tab === "about" ? (

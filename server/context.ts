@@ -20,6 +20,7 @@ import { Parsed, grammar } from "./grammar";
 import type { Home } from "./home";
 import { err } from "./http";
 import { Practice } from "./practice";
+import { Remote } from "./remote";
 import { SyncLinks } from "./sync/link";
 import { Telemetry } from "./telemetry";
 import { DEFAULT_MAX_MB } from "./uploads";
@@ -71,6 +72,7 @@ export class Session {
   private defaultId: string | null = null;
   private links: SyncLinks | null = null;
   private logs: Telemetry | null = null;
+  private door: Remote | null = null;
 
   constructor(
     readonly home: Home,
@@ -91,6 +93,11 @@ export class Session {
   /** Logs: the person's answer, what waits to be sent, and where it goes (`server/telemetry.ts`). */
   get telemetry(): Telemetry {
     return (this.logs ??= new Telemetry(this.home, this.version, this.env));
+  }
+
+  /** Remote access: the setting, the paired devices, pairing (`server/remote.ts`). */
+  get remote(): Remote {
+    return (this.door ??= new Remote(this.home));
   }
 
   /** The vault this request is about. */

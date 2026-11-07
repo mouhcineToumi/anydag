@@ -69,6 +69,29 @@ export function fitTo(content: Rect, view: { w: number; h: number }): { zoom: nu
   };
 }
 
+/** A window narrower than this is a phone's: the sidebar is a sheet there and never docks. */
+export const NARROW = 720;
+/** The least zoom a board opens at on a phone: below it a card's title is too small to read. */
+export const READABLE = 0.6;
+/** The margin round what a phone opens on: a desktop's sixty-four pixels are a sixth of its width. */
+const NARROW_MARGIN = 16;
+
+/**
+ * Where a board opens: the whole of it, fitted — unless the window is a phone's and the whole of it
+ * would be too small to read. Then it opens on `first`, the item a reader starts with, as wide as the
+ * window allows and never smaller than {@link READABLE}, its top-left corner at the margin, and the
+ * rest is a pan or a pinch away. A drawing nobody can read is not an overview of anything.
+ */
+export function openOn(content: Rect, first: Rect | null, view: { w: number; h: number }): { zoom: number; off: Point } {
+  const whole = fitTo(content, view);
+  if (view.w >= NARROW || !first || whole.zoom >= READABLE) return whole;
+  const across = (view.w - NARROW_MARGIN * 2) / Math.max(first.w, 1);
+  const zoom = clampZoom(Math.max(READABLE, Math.min(1, across)));
+  /* Centred when it fits across, held at the left margin when it does not. */
+  const x = first.w * zoom <= view.w - NARROW_MARGIN * 2 ? (view.w - first.w * zoom) / 2 : NARROW_MARGIN;
+  return { zoom, off: { x: x - first.x * zoom, y: NARROW_MARGIN - first.y * zoom } };
+}
+
 /**
  * A wheel delta in CSS pixels, whatever unit the browser chose to report it in.
  *

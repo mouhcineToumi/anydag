@@ -16,7 +16,7 @@ import { cleanTitle } from "../../src/note/format";
 import type { Session } from "../context";
 import { bodyOf, err, mustRead, textKind } from "../http";
 import { extOf, fileNameFrom, folderFrom, leafOf } from "../names";
-import { byteRange, fileHeaders, megabytes, mimeOf } from "../uploads";
+import { byteRange, fileHeaders, IMAGE_EXT as PICTURE_EXT, megabytes, mimeOf } from "../uploads";
 import { Refused, sha1 } from "../vault";
 import { fileAnswer } from "./docs";
 
@@ -220,6 +220,10 @@ export function fileRoutes(app: Hono, s: Session): void {
       throw e;
     }
     if (!data) throw err(404, "not found");
-    return c.body(new Uint8Array(data), 200, { "content-type": mimeOf(extOf(rel)), "cache-control": "no-cache" });
+    /* The guards `/__board/file` sends: a legacy picture folder is a folder anybody's sync or agent can
+       put a file in, and an SVG opened as a page here ran its script on the app's own origin — with
+       the cookie, so it could write. Sandboxed, scriptless, and anything but a picture a download. */
+    const ext = extOf(rel);
+    return c.body(new Uint8Array(data), 200, fileHeaders(ext, rel.split("/").pop() ?? rel, !PICTURE_EXT.has(ext.toLowerCase())));
   });
 }

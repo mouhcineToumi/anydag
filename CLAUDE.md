@@ -4664,6 +4664,62 @@ Six things are load-bearing:
 share any folder); references across vaults; and sync, which is the folder's — Syncthing, iCloud,
 git — and which nothing here may break.
 
+## Remote access
+
+A **second door** onto the running server, for a phone (`server/remote.ts`; the plan and the
+phases are `docs/remote-access.md`). The mobile app is a thin client: no vault on the phone, the
+desktop must be running, and everything runs there.
+
+| Where | Owns |
+|---|---|
+| `server/remote.ts` | the setting (`remote.*` in the home's `kv`), the `devices` table, pairing codes, `localOnly`, cutting a revoked device's sockets |
+| `server/app.ts` (`door: "remote"`, `remoteGate`) | the remote door's gate: the `Host`, the setting, a device token or a code being spent |
+| `server/main.ts` (`remoteDoor`) | the second listener: opened, moved or closed when the setting changes |
+| `server/routes/remote.ts` | `/api/remote*` (the local door's) and `/api/device*` (the remote door's) |
+| `server/tailscale.ts` | the `tailscale` CLI asked: this machine's tailnet address, whether `tailscale serve` passes it to the door, and `serve --bg` on a button |
+| `src/settings/panes/Devices.tsx` | Settings → Devices: the switch, the address, Tailscale, a pairing code drawn as a QR code, the devices; on a phone, *this device* and Forget |
+| `cli/commands/remote.ts` | `anydag remote status\|on\|off\|serve\|pair\|devices\|revoke` |
+
+Nine things are load-bearing:
+
+- **The local door is not widened.** The remote door is another listener with its own gate, on a
+  fixed port (4319) so a phone finds it again — and it listens on `127.0.0.1` too: what a phone
+  reaches is `tailscale serve` in front of it, which holds the certificate. A hosted bridge later is
+  one more proxy of that kind.
+- **The device token is the gate, the `Host` the defence behind it.** The remote door takes this
+  machine's names and the host of `remote.url`, and never the launch token. A token is shown once and
+  kept as its SHA-256.
+- **Pairing is one code, 128 bits, five minutes, single use**; making one burns the last, five wrong
+  tries burn it, turning remote access off burns it. A browser spends it at `/?pair=` for an
+  `httpOnly`, `SameSite=Strict` cookie; the native app at `POST /api/device/pair`.
+- **What only the desktop may do** — the `/api/remote` routes, opening, making or closing a vault,
+  linking sync, answering the logs question — is a 403 `local-only` on the remote door, so a phone
+  never pairs another phone or closes the door it stands in. A chat's `x-anydag-chat` there is a 400.
+- **Revoking cuts now**: the device's next request is a 401 and every socket it holds — the change
+  feed's included — is destroyed (`hold`, through `c.env.incoming.socket`). Off closes the listener
+  and every connection on it.
+- **The desktop starts the server with `--remote-page`**, `dist/` unpacked from the asar, because it
+  serves the page itself and runs the server `--no-page`.
+- **The page asks which door it is on with `GET /api/device`**, which is `{device: null}` on the
+  local door: every `/api/remote` route is a 403 from a phone, and a 4xx is a console error the suite
+  fails on. A browser that pairs by link is named from its `User-Agent` (`browserName`), never with it.
+- **The QR code is a light theme's ink on its paper in every theme** — a camera reads an inverted
+  code badly — drawn from `uqr` on the page, with nothing sent anywhere; `paperTheme`, not a literal.
+- **Every route that serves vault bytes sends `fileHeaders`' guards** — a scriptless `sandbox` CSP
+  and `nosniff`, and anything but a picture a download. `/__board/assets/*`, the legacy picture
+  folders, sent an SVG bare: opened as a page on the remote door its script ran on the app's origin
+  with the device's cookie and wrote to the vault, measured. A file is not a picture because of the
+  folder it is in; a new route that serves bytes takes the headers too.
+
+Names claimed, grepped first: the `x-anydag-device` header, the `anydag_device` cookie, the `pair`
+query key, the `devices` table, the Settings tab `devices`, `dag-remote__*`, `data-dag-remote-*` and
+`data-dag-setting-remote`.
+
+**Out, and why:** read-only devices (not wanted yet); a door the server itself puts on a network
+interface (a certificate this process would have to hold); working with the desktop off, which
+the thin-client model rules out; and Tailscale's local API, when its CLI is the documented surface
+and what a person would type.
+
 ## The desktop app
 
 `desktop/`. Electron around the one server and the built page:
