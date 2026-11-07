@@ -68,9 +68,10 @@ if [ "$(field run)" != "true" ]; then
   exit 0
 fi
 
-selection=()
+# One line a test, not fifty: a push is not the place to read a list reporter.
+selection=(--reporter=line)
 grep="$(field grep)"
-[ -n "$grep" ] && selection=(--grep "$grep")
+[ -n "$grep" ] && selection+=(--grep "$grep")
 echo "pre-push: $(field why)"
 
 use_docker=yes
@@ -82,6 +83,6 @@ elif ! docker info >/dev/null 2>&1; then
 fi
 
 if [ -n "$use_docker" ]; then
-  exec bash scripts/e2e-docker.sh "${selection[@]+"${selection[@]}"}"
+  exec bash scripts/e2e-docker.sh "${selection[@]}"
 fi
-exec bash scripts/e2e-local.sh "${selection[@]+"${selection[@]}"}"
+exec bash scripts/e2e-local.sh "${selection[@]}"
