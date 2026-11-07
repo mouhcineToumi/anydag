@@ -134,7 +134,7 @@ export interface ChartModel {
  * One list, read by `E_UNKNOWN_KIND`'s message and by the suggester, for the reason `kindsOf()`
  * exists: a menu and an error that disagree about what a word may be is two chances to be wrong.
  */
-export const CHART_WORDS: readonly string[] = [...FORMS, "x", "series", "slice", "legend", "values", "unit", "min", "max"];
+const CHART_WORDS: readonly string[] = [...FORMS, "x", "series", "slice", "legend", "values", "unit", "min", "max"];
 
 /** A statement's trailing `hue=` / `icon=`. A `Series` is not a `Node`, so it never sees `modifiers()`. */
 function readModifiers(

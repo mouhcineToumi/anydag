@@ -66,7 +66,7 @@ const SORT_OF: Readonly<Record<string, FileSort>> = {
 };
 
 /** What each sort is called where a card says what a file is: `PDF · 2.3 MB`. */
-export const SORT_LABEL: Readonly<Record<FileSort, string>> = {
+const SORT_LABEL: Readonly<Record<FileSort, string>> = {
   pdf: "PDF",
   image: "Image",
   doc: "Document",

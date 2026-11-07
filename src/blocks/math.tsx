@@ -235,7 +235,7 @@ const typing = Extension.create({
 });
 
 /** The selection as an inline equation — its words the TeX — or an empty one at the caret, opened. */
-export function makeInlineEquation(editor: Editor): boolean {
+function makeInlineEquation(editor: Editor): boolean {
   /* ProseMirror reads a selection the browser changed on `selectionchange`, which comes later than a
      key pressed straight after a shift+arrow: read it now, or the words just selected are not. */
   (editor.prosemirrorView as unknown as { domObserver?: { flush?(): void } }).domObserver?.flush?.();

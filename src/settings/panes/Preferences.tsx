@@ -22,7 +22,7 @@ const PLACEMENT: { value: PasteSize; label: string; hint: string }[] = [
 
 /** What a theme is called for a person; its folder name is what a link and a board say. */
 const THEME_LABEL: Record<string, string> = { paper: "Light", "paper-dark": "Dark", neutral: "Neutral" };
-export const themeLabel = (t: string): string => THEME_LABEL[t] ?? t.replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase());
+const themeLabel = (t: string): string => THEME_LABEL[t] ?? t.replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /**
  * How this vault looks and behaves: the theme, how loudly problems speak, and how a pasted

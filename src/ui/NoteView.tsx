@@ -836,7 +836,7 @@ function TaskBar({ task, onChange, editable }: { task: Task; onChange(change: Ta
  * colour of a value. The date is not repeated beside it in other words, as it was; an overdue one is
  * marked in the input itself.
  */
-export function DateField({
+function DateField({
   value,
   max,
   min,

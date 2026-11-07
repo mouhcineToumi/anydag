@@ -227,7 +227,7 @@ function quizCorpus(text: string): CorpusDoc {
  * `<tab>/L<line>`, the note's rule for a block nothing has anchored, because a search is a read and
  * minting an id would be a write.
  */
-export function tableCorpus(text: string): CorpusDoc {
+function tableCorpus(text: string): CorpusDoc {
   const table = parseTable(text);
   const { title } = splitNote(text);
   const units: Unit[] = [];

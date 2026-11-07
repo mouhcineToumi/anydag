@@ -23,9 +23,9 @@ import { TEXT_KINDS } from "./names";
 import { byKind, textKey, type Tree } from "./vault";
 
 /** The vault preference that turns it off. Anything but `"0"` (or `false`) is on. */
-export const UPDATE_LINKS = "dag:update-links";
+const UPDATE_LINKS = "dag:update-links";
 
-export function updatesLinks(s: Session): boolean {
+function updatesLinks(s: Session): boolean {
   const v = readPrefs(s, "vault")?.[UPDATE_LINKS];
   return !(v === "0" || v === false);
 }
@@ -39,7 +39,7 @@ export interface Relinks {
 }
 
 /** Every document as resolution sees it: its name, its kind and its title. */
-export function candidatesOf(tree: Tree): WikiCandidate[] {
+function candidatesOf(tree: Tree): WikiCandidate[] {
   const out: WikiCandidate[] = [];
   for (const [kind, names] of Object.entries(byKind(tree))) {
     for (const name of names) {
@@ -64,7 +64,7 @@ export async function relinking<T>(s: Session, change: () => Promise<T>): Promis
 }
 
 /** Rewrite every text whose links resolved differently in `before` than in the vault now. */
-export async function relink(s: Session, before: readonly WikiCandidate[]): Promise<Relinks> {
+async function relink(s: Session, before: readonly WikiCandidate[]): Promise<Relinks> {
   const tree = await s.vault.tree();
   const change = changeOf(before, candidatesOf(tree));
   const out = NONE();

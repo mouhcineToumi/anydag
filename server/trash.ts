@@ -9,7 +9,7 @@
 
 import type { Trashed, Vault } from "./vault";
 
-export const DEFAULT_DAYS = 30;
+const DEFAULT_DAYS = 30;
 const DAY = 86_400_000;
 
 /**
@@ -22,7 +22,7 @@ export function trashDays(raw: string | undefined = process.env.ANYDAG_TRASH_DAY
 }
 
 /** When `entry` leaves the trash for good, as an instant. */
-export function expiresAt(entry: Trashed, days: number): string {
+function expiresAt(entry: Trashed, days: number): string {
   return new Date(Date.parse(entry.deleted) + days * DAY).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 

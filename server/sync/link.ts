@@ -39,7 +39,7 @@ export interface Rekeys {
   rekeyVault(oldId: string, newId: string): Promise<Vault>;
 }
 
-export const MIN_PASSPHRASE = 8;
+const MIN_PASSPHRASE = 8;
 
 export class SyncLinks {
   /** The loop's timers and `fetch`; a test sets it before a vault opens. */
@@ -229,7 +229,7 @@ export class SyncLinks {
 // -- what the routes do ------------------------------------------------------------------------------
 
 /** A sync server's refusal as the app's own failure, its `ES_*` kept in `code`. */
-export function refusal(e: unknown, server: string | null): never {
+function refusal(e: unknown, server: string | null): never {
   if (isSyncError(e)) {
     if (e.code === "ES_NETWORK") throw err(502, `The sync server${server ? ` at ${server}` : ""} did not answer.`, { code: "ES_NETWORK" });
     // A 401 here would be read by the page as its own token gone; it is the sync server's word.

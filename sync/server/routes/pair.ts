@@ -27,14 +27,14 @@ import { body, HttpError, str, type Deps, type Vars } from "./http";
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /** The canonical form of a typed code, or `null` when it cannot be one. */
-export function canonicalCode(typed: string): string | null {
+function canonicalCode(typed: string): string | null {
   const clean = typed.toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
   if (clean.length !== 10) return null;
   for (const ch of clean) if (!B32.includes(ch)) return null;
   return clean;
 }
 
-export const codeHash = (canonical: string): string => sha256(`anydag-sync/pair:${canonical}`);
+const codeHash = (canonical: string): string => sha256(`anydag-sync/pair:${canonical}`);
 
 /** A fresh code for `account`, remembered by its hash. */
 export async function mintPairCode(meta: Meta, account: string, now: Date): Promise<{ code: string; expires: string }> {

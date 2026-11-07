@@ -20,7 +20,7 @@ function Mark({ name }: { name: string }) {
 const sayOf = (error: unknown): string => (error instanceof Error ? error.message : "That did not work.");
 
 /** Go to a vault from the recent list: open it first when it is only remembered. */
-export async function enterVault(v: Pick<Vault, "id" | "path" | "open">): Promise<void> {
+async function enterVault(v: Pick<Vault, "id" | "path" | "open">): Promise<void> {
   if (!v.open) await openVault(v.path);
   switchVault(v.id);
 }

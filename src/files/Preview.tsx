@@ -102,7 +102,7 @@ function TextPreview(props: PreviewProps) {
 }
 
 /** A file the app cannot draw: what it is, how big, and the way to save it. */
-export function FileBlock({ name, title, bytes, download, onReady }: PreviewProps) {
+function FileBlock({ name, title, bytes, download, onReady }: PreviewProps) {
   useEffect(() => onReady?.(), [onReady]);
   const Icon = SORT_ICON[sortOf(name)];
   return (

@@ -126,7 +126,7 @@ const EXPECTS: Record<ColumnType, string> = {
  * is the part of a parse only a checker wants — the page reads cells itself as it draws them, and
  * reading every cell twice to say nothing is a cost on the busiest thing the page does.
  */
-export function cellDiagnostics(table: Table): TableDiagnostic[] {
+function cellDiagnostics(table: Table): TableDiagnostic[] {
   const out: TableDiagnostic[] = [];
   for (const tab of table.tabs) {
     tab.columns.forEach((col, i) => {
@@ -206,7 +206,7 @@ export function sortRows(tab: Pick<Tab, "columns" | "rows">, keys: readonly Sort
 }
 
 /** Whether one row passes one rule. */
-export function passes(column: Column, text: string, rule: FilterRule, options: readonly string[] = []): boolean {
+function passes(column: Column, text: string, rule: FilterRule, options: readonly string[] = []): boolean {
   const cell = text.trim();
   const want = rule.value.trim();
   if (want === "" && (rule.op === "=" || rule.op === "!=")) {

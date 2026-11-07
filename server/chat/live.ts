@@ -37,7 +37,7 @@ import {
 } from "./types";
 
 /** How long a write or a vault request waits for the person. Both harnesses' MCP timeouts are longer. */
-export const APPROVAL_MS = 5 * 60_000;
+const APPROVAL_MS = 5 * 60_000;
 
 /** The longest tool answer a turn keeps: the model saw it all, the page needs the gist. */
 const OUTPUT_CAP = 4000;

@@ -62,7 +62,7 @@ function pastedName(ext: string, at = new Date()): string {
  * Keep one uploaded file as an attachment, checked against the limits, named from what it was called
  * inside `folder`, numbered when taken. `store_upload`, ported; the refusals are word for word.
  */
-export async function storeUpload(s: Session, filename: string, folder: string, data: Uint8Array, title?: string | null) {
+async function storeUpload(s: Session, filename: string, folder: string, data: Uint8Array, title?: string | null) {
   const limits = s.limits();
   const leaf = leafOf(String(filename ?? "").replace(/\\/g, "/")).trim();
   const ext = extOf(leaf);

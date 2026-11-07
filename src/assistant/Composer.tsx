@@ -24,7 +24,7 @@ export interface Choice {
  * What a chat that has none starts with: the Settings default when that provider can answer, else the
  * first provider that can, else Claude Code's — which the picker then shows as unavailable and says why.
  */
-export function defaultChoice(models: readonly ProviderModels[] | null, pref: { provider: string | null; model: string | null; mode: Mode }): Choice {
+function defaultChoice(models: readonly ProviderModels[] | null, pref: { provider: string | null; model: string | null; mode: Mode }): Choice {
   const usable = models?.filter((m) => m.available) ?? [];
   const wanted = models?.find((m) => m.provider === pref.provider && m.available);
   const at = wanted ?? usable[0] ?? models?.[0];

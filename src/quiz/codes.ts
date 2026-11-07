@@ -9,7 +9,7 @@
  *
  * Codes are append-only. Retiring one is fine; reusing a retired one for something else is not.
  */
-export const QUIZ_CODES = {
+const QUIZ_CODES = {
   /** A `##` heading with nothing but its attributes: a question that asks nothing. */
   EQ_NO_PROMPT: "EQ_NO_PROMPT",
   /**

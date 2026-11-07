@@ -173,7 +173,7 @@ const CACHE_MAX = 500;
 const CACHE_CHARS = 1_000_000;
 let cached = 0;
 /** Past this, a block is drawn as it is: a pasted log file is not worth a parse on every keystroke. */
-export const READ_MAX = 100_000;
+const READ_MAX = 100_000;
 
 /** What `word`'s language makes of `code`, or `null` while the language has not landed — or never will. */
 export function readCode(code: string, word: string | null | undefined): CodeRead | null {

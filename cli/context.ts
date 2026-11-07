@@ -1,7 +1,4 @@
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import readline from "node:readline/promises";
 
 import type { Api } from "./api";
@@ -177,32 +174,4 @@ export async function confirm(ctx: Ctx, question: string, yes: boolean): Promise
   if (!ctx.io.stdinIsTTY) throw new UsageError(`${question} — pass --yes to do it without a terminal`);
   const answer = (await ctx.io.ask(`${question} [y/N] `)).trim().toLowerCase();
   if (answer !== "y" && answer !== "yes") throw new UsageError("left as it was");
-}
-
-/**
- * `$VISUAL`, then `$EDITOR`, then `vi`, over a file named like the thing being edited — so an
- * editor that picks its mode by extension picks Markdown. Returns what the file holds afterwards.
- */
-/** A name safe to hand a shell: the editor is run through one, so nothing in it may be read as syntax. */
-const safeName = (name: string): string => name.replace(/[^\w.-]+/g, "-");
-
-export function editInEditor(ctx: Ctx, text: string, filename: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-"));
-  const file = path.join(dir, safeName(filename));
-  fs.writeFileSync(file, text);
-  const editor = ctx.env.VISUAL || ctx.env.EDITOR || "vi";
-  /* Through a shell, because `EDITOR="code --wait"` is a command line and not a path. */
-  const run = spawnSync(`${editor} ${JSON.stringify(file)}`, { stdio: "inherit", shell: true });
-  if (run.status !== 0) throw new UsageError(`${editor} exited ${run.status ?? run.signal}; nothing was written`);
-  const after = fs.readFileSync(file, "utf8");
-  fs.rmSync(dir, { recursive: true, force: true });
-  return after;
-}
-
-/** Keep somebody's text somewhere they can find it when it could not be written. */
-export function keepAside(text: string, filename: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-kept-"));
-  const file = path.join(dir, safeName(filename));
-  fs.writeFileSync(file, text);
-  return file;
 }

@@ -92,7 +92,7 @@ type State = SyncStatus["state"];
  */
 export type First = "resync" | "merge";
 
-export const REASONS = {
+const REASONS = {
   auth: "The sync server no longer accepts this device: it was signed out or revoked. Pair it again to go on syncing.",
   quota: "The sync account is out of room: nothing more is pushed until there is space. Changes here are kept and go when there is.",
   forbidden: "The sync server refuses this device the remote vault: it belongs to another account, or was removed.",

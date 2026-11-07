@@ -76,9 +76,6 @@ export function classify(path: string, types: ReadonlySet<string> = DEFAULT_SET)
 
 const DEFAULT_SET: ReadonlySet<string> = new Set(DEFAULT_TYPES);
 
-/** The stored file of a text: `name` plus its kind's suffix. A note's is decided by the store. */
-export const suffixed = (name: string, kind: TextKind): string => name + (kind === "note" ? NOTE_SUFFIXES[0] : SUFFIX[kind]);
-
 /**
  * A directory or file the walk never enters or lists: a dot-entry (`.anydag`, `.obsidian`, `.git`,
  * `.trash`, `.stversions`), a document's legacy picture folder, `node_modules`, and what sync tools

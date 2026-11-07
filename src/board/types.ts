@@ -54,7 +54,7 @@ export type ItemType = DiagramType | ProseType | LinkType | PromptType;
 
 export const isDiagramType = (t: string): t is DiagramType => (DIAGRAM_TYPES as readonly string[]).includes(t);
 export const isLinkType = (t: string): t is LinkType => (LINK_TYPES as readonly string[]).includes(t);
-export const isPromptType = (t: string): t is PromptType => (PROMPT_TYPES as readonly string[]).includes(t);
+const isPromptType = (t: string): t is PromptType => (PROMPT_TYPES as readonly string[]).includes(t);
 export const isItemType = (t: string): t is ItemType =>
   isDiagramType(t) || isLinkType(t) || isPromptType(t) || (PROSE_TYPES as readonly string[]).includes(t);
 
@@ -62,7 +62,7 @@ export const isItemType = (t: string): t is ItemType =>
  * What a person calls each kind of item: the words the inspector, the search and the library show.
  * The fence's own word (`arch`, `md`) stays the file's and the Source view's.
  */
-export const ITEM_NAME: Record<ItemType, string> = {
+const ITEM_NAME: Record<ItemType, string> = {
   erd: "Data model",
   flow: "Flowchart",
   arch: "Architecture",

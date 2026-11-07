@@ -1,7 +1,6 @@
 import { CALENDAR_HIDE, FAVOURITES, ATTACHMENTS, INSPECTOR_MODE, LIBRARY, SIDEBAR, THEME, WEEK_START, VAULT_PREF_KEYS } from "../../src/settings/prefs";
 import { DEFAULTS, normalise, type Settings } from "../../src/settings/store";
 
-import { ApiError, EXIT } from "../api";
 import { UsageError, pairs } from "../args";
 import { emit, table, type Command, type Ctx } from "../context";
 
@@ -35,16 +34,6 @@ async function readBundle(ctx: Ctx): Promise<Bundle | null> {
 async function readVaultBundle(ctx: Ctx): Promise<Bundle> {
   const got = await ctx.api.get<{ settings: Bundle | null }>("/api/vault/settings");
   return got.settings ?? {};
-}
-
-/** The vault's settings, checked the way the page checks them — defaults for anything never chosen. */
-export async function accountSettings(ctx: Ctx): Promise<Settings> {
-  try {
-    return normalise((await readVaultBundle(ctx)).settings);
-  } catch (e) {
-    if (e instanceof ApiError && e.exit === EXIT.noServer) throw e;
-    return DEFAULTS;
-  }
 }
 
 /** The preferences the card and the sidebar hold, by the name a person would use. */

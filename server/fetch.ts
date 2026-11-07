@@ -25,8 +25,8 @@ import dns from "node:dns";
 import https from "node:https";
 import net from "node:net";
 
-export const TIMEOUT_MS = 10_000;
-export const MAX_REDIRECTS = 5;
+const TIMEOUT_MS = 10_000;
+const MAX_REDIRECTS = 5;
 
 /** A URL the server will not fetch, or a fetch that failed — said in words for whoever asked. */
 export class FetchRefused extends Error {}

@@ -23,7 +23,7 @@ import { live } from "./pair";
 
 const SEALED_MAX = 64 * 1024;
 
-export function wireVault(v: VaultRow): RemoteVault {
+function wireVault(v: VaultRow): RemoteVault {
   return { id: v.id, name: v.name, seq: Number(v.seq), created: v.created, keyed: v.keyed };
 }
 

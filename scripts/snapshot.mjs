@@ -28,7 +28,7 @@ import { authed, signIn, storageState } from "./session.mjs";
 import { launch, tidyInPage } from "./tidy.mjs";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require("playwright");
+const { chromium } = require("@playwright/test");
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

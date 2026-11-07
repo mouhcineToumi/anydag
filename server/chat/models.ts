@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { claudeReady, opencodeReady } from "../../plugins/generate/providers";
 import type { Provider } from "./types";
 
-export interface ModelChoice {
+interface ModelChoice {
   id: string;
   label: string;
 }
@@ -28,7 +28,7 @@ export interface ProviderModels {
   default: string;
 }
 
-export const CLAUDE_MODELS: ModelChoice[] = [
+const CLAUDE_MODELS: ModelChoice[] = [
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
   { id: "claude-opus-5-5", label: "Opus 5.5" },
   { id: "claude-haiku-5-5", label: "Haiku 5.5" },

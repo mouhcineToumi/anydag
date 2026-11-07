@@ -150,7 +150,7 @@ interface Entry<D> {
  * passes over every document per link, and a 5,000-note vault with 150,000 links took five minutes
  * of the server's only thread to answer `/__board/index`.
  */
-export interface WikiIndex<D extends WikiCandidate> {
+interface WikiIndex<D extends WikiCandidate> {
   resolve(target: string): D | undefined;
 }
 
@@ -160,7 +160,7 @@ const push = <D>(m: Map<string, Entry<D>[]>, k: string, e: Entry<D>) => {
   else m.set(k, [e]);
 };
 
-export function wikiIndex<D extends WikiCandidate>(docs: readonly D[]): WikiIndex<D> {
+function wikiIndex<D extends WikiCandidate>(docs: readonly D[]): WikiIndex<D> {
   const names = new Map<string, Entry<D>[]>();
   const tails = new Map<string, Entry<D>[]>();
   const titles = new Map<string, Entry<D>[]>();

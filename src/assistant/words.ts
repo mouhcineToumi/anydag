@@ -6,7 +6,7 @@
 import type { Block, Step, UndoRecord } from "./types";
 
 /** `mcp__anydag__note_create` (Claude Code), `anydag_note_create` (OpenCode) and `note_create` are one tool. */
-export const toolName = (name: string): string => name.replace(/^mcp__anydag__/, "").replace(/^anydag_/, "");
+const toolName = (name: string): string => name.replace(/^mcp__anydag__/, "").replace(/^anydag_/, "");
 
 const KINDS: Record<string, [one: string, many: string]> = {
   note: ["a note", "notes"],

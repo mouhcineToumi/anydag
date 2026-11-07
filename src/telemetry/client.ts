@@ -28,7 +28,7 @@ export interface TelemetryStatus {
 }
 
 /** Dispatched on `window` whenever the answer is known or changes. */
-export const TELEMETRY_EVENT = "dag:telemetry";
+const TELEMETRY_EVENT = "dag:telemetry";
 
 const EVERY_MS = 30_000;
 /** A `keepalive` body over 64 KB is refused before it is sent (`docs/architecture/things-that-will-bite.md`). */
@@ -48,7 +48,7 @@ function announce(): void {
 }
 
 /** Whether this page is one nothing is collected on: a picture, or the read-only view. */
-export function quietPage(): boolean {
+function quietPage(): boolean {
   try {
     const q = new URLSearchParams(location.search);
     return q.get("snapshot") === "1" || q.get("view") === "1";
@@ -58,15 +58,10 @@ export function quietPage(): boolean {
 }
 
 /** Which kind of page this is, as a log says it — never which document. */
-export function pageKind(): (typeof PAGES)[number] {
+function pageKind(): (typeof PAGES)[number] {
   const q = new URLSearchParams(location.search);
   for (const k of ["board", "note", "quiz", "table", "file", "tasks", "calendar", "quizzes", "trash", "chat"] as const) if (q.has(k)) return k;
   return q.toString() === "" || q.has("vault") ? "home" : "other";
-}
-
-/** The answer as last heard, or `null` before the server has said. */
-export function telemetryStatus(): TelemetryStatus | null {
-  return status;
 }
 
 export function useTelemetry(): TelemetryStatus | null {

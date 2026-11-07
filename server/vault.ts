@@ -1657,7 +1657,7 @@ function sameFile(a: string, b: string): boolean {
 }
 
 /** The vault's own id, kept in `.anydag/vault.json` so caches keyed by it survive a moved folder. */
-export function vaultId(root: string): string {
+function vaultId(root: string): string {
   const file = path.join(root, ".anydag", "vault.json");
   try {
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as { id?: unknown };
@@ -1705,8 +1705,6 @@ export function writeAtomic(file: string, text: string | Uint8Array): void {
     throw e;
   }
 }
-
-export { KINDS };
 
 /** `${size}:${sha1}` of an attachment's bytes. */
 function digestOf(data: Uint8Array): string {

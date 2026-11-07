@@ -129,7 +129,7 @@ const DOC_OPS: { op: string; kinds: DocKind[]; description: string }[] = [
 const named = new Map(TOOLS.map((t) => [t.name, t]));
 
 /** The `<kind>_<op>` tools the `doc_*` ones stand for, which a chat is not offered. */
-export const FOLDED = new Set(DOC_OPS.flatMap(({ op, kinds }) => kinds.map((k) => `${k}_${op}`)));
+const FOLDED = new Set(DOC_OPS.flatMap(({ op, kinds }) => kinds.map((k) => `${k}_${op}`)));
 
 function docTool(op: string, kinds: DocKind[], description: string): Tool {
   const inners = kinds.map((k) => {

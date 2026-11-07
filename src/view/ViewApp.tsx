@@ -101,7 +101,7 @@ export function ViewApp() {
  * The slim bar across the top: the mark, what is open, and what may be done about it — the
  * backlinks and the way into the editor.
  */
-export function Bar({ title, children }: { title: string; children?: ReactNode }) {
+function Bar({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <header className="dag-toolbar dag-view-bar">
       <Lockup size={20} className="dag-toolbar__logo" />
@@ -153,7 +153,7 @@ function BoardPage({ name }: { name: string }) {
  * A board drawn read-only, with its bar, its zoom and its pages. It reads through `useBoard`, the
  * same fetch the editor's page makes.
  */
-export function BoardFrame({ board, bar }: { board: Board | null; bar: ReactNode }) {
+function BoardFrame({ board, bar }: { board: Board | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
   const [page, setPage] = useState<string | null>(query.get("page"));
   const { theme } = useTheme(query.get("theme") ?? undefined, board?.theme, query.get("snapshot") === "1");
@@ -235,7 +235,7 @@ function NotePage({ name }: { name: string }) {
  * A note drawn read-only, with its bar, as `BoardFrame` is for a board. `text` is
  * `null` until it has arrived. `name` is what its images are relative to.
  */
-export function NoteFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
+function NoteFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
   useTheme(query.get("theme") ?? undefined, undefined, query.get("snapshot") === "1");
 
@@ -325,7 +325,7 @@ function TablePage({ name }: { name: string }) {
  * is `null` until the file is known to be there: a picture pointed at a name that is not is a 404 on
  * the console.
  */
-export function FileFrame({
+function FileFrame({
   name,
   title,
   bytes,
@@ -403,7 +403,7 @@ function QuizPage({ name }: { name: string }) {
  * Under `?snapshot=1` it is the sheet, every question with its answers showing: a picture of a quiz
  * is a fact about the file, and a run frozen on its first question is a picture of nothing.
  */
-export function QuizFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
+function QuizFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
   const snapshot = query.get("snapshot") === "1";
   useTheme(query.get("theme") ?? undefined, undefined, snapshot);

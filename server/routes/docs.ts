@@ -13,7 +13,7 @@
 import type { Context, Hono } from "hono";
 
 import { HUE_ORDER } from "../../src/dsl/ir";
-import { hasOffset, isDay, eventOf, withEvent } from "../../src/note/event";
+import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
 import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
@@ -24,7 +24,7 @@ import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../
 import { OPS_SHAPE } from "../handle";
 import { grammar, type Parsed } from "../grammar";
 import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
-import { extOf, folderOf, leafOf, same, titleName, type Kind, type TextKind } from "../names";
+import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { mimeOf } from "../uploads";
 import { Conflict, NotFound, Refused, byKind, sha1, textKey, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
@@ -109,7 +109,7 @@ async function indexDocs(s: Session): Promise<IndexDoc[]> {
 }
 
 /** The corpus: every text cut into the units a search opens onto, and every attachment by its names. */
-export async function corpusDocs(s: Session): Promise<Record<string, unknown>[]> {
+async function corpusDocs(s: Session): Promise<Record<string, unknown>[]> {
   return (await corpusOf(s)).docs;
 }
 
@@ -117,7 +117,7 @@ export async function corpusDocs(s: Session): Promise<Record<string, unknown>[]>
    in it moved, so a search can name the engine built from it rather than build one per query. */
 const corpora = new WeakMap<Parsed, { key: string; version: string; docs: Record<string, unknown>[] }>();
 
-export async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
+async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
   const tree = await s.vault.tree();
   const docs = await listed(s, tree);
   const parsed = s.corpus;
@@ -619,5 +619,3 @@ async function retitleFile(s: Session, name: string, title: string, follow: bool
   await s.vault.titleFile(settled, title);
   return { name: settled, id: await s.vault.peekId(settled, "file"), title };
 }
-
-export { sha1, same, hasOffset };

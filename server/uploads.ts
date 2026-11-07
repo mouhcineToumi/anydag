@@ -93,8 +93,6 @@ const INLINE = new Set([
   "text/tab-separated-values",
 ]);
 
-export const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp"]);
-
 const SANDBOX = "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox";
 
 export const mimeOf = (ext: string): string => MIME[ext.toLowerCase()] ?? "application/octet-stream";

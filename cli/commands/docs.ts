@@ -42,7 +42,7 @@ const LIST_KINDS: readonly ListKind[] = ["boards", "notes", "quizzes", "tables",
  * while the text was the folder; a field the route grows later is cut by its shape, an
  * array of names or a map keyed by one, without a line here.
  */
-export function narrowListed<T extends object>(listed: T, under: string | undefined, only: readonly ListKind[]): T {
+function narrowListed<T extends object>(listed: T, under: string | undefined, only: readonly ListKind[]): T {
   const inside = (n: string) => !under || n === under || n.startsWith(`${under}/`);
   const wants = (k: ListKind) => !only.length || only.includes(k);
   const record = listed as Record<string, unknown>;
@@ -85,7 +85,7 @@ export interface Refs {
  * The vault is the one this command acts in, else the server's default; with no vault
  * open the link names none and the app asks.
  */
-export async function appBase(ctx: Ctx): Promise<string> {
+async function appBase(ctx: Ctx): Promise<string> {
   let id = ctx.vault;
   if (!id) {
     const listed = await ctx.api.get<{ vaults: { id: string; default: boolean }[] }>("/api/vaults").catch(() => null);
@@ -94,7 +94,7 @@ export async function appBase(ctx: Ctx): Promise<string> {
   return id ? `anydag://open?vault=${encodeURIComponent(id)}` : "anydag://open";
 }
 
-export const docUrl = (base: string, name: string, kind: Kind | "file", view = false): string =>
+const docUrl = (base: string, name: string, kind: Kind | "file", view = false): string =>
   `${base}${base.includes("?") ? "&" : "?"}${kind}=${encodeURIComponent(name)}${view ? "&view=1" : ""}`;
 
 const get = (ctx: Ctx, name: string, kind: Kind) => ctx.api.get<Got>("/__board/get", { name, kind: kindQuery(kind) });
@@ -123,7 +123,7 @@ function quizReport(ctx: Ctx, text: string): number {
  *: the same route either way, so the two answers are one answer. A name beside `--file`
  * only labels it.
  */
-export async function checked<T>(ctx: Ctx, p: Parsed, kind: Kind): Promise<T> {
+async function checked<T>(ctx: Ctx, p: Parsed, kind: Kind): Promise<T> {
   const file = str(p, "file");
   const name = p.pos[0];
   if (file !== undefined) {
@@ -135,7 +135,7 @@ export async function checked<T>(ctx: Ctx, p: Parsed, kind: Kind): Promise<T> {
 }
 
 /** A quiz's diagnostics printed one a line, and the exit code they make — however they were found. */
-export function quizLines(ctx: Ctx, diagnostics: readonly QuizDiagnostic[]): number {
+function quizLines(ctx: Ctx, diagnostics: readonly QuizDiagnostic[]): number {
   for (const d of diagnostics) ctx.io.out(`${d.line}:${d.col} ${d.severity} ${d.code} ${d.message}`);
   const errors = diagnostics.filter((d) => d.severity === "error").length;
   if (diagnostics.length) ctx.io.err(`${errors} error${errors === 1 ? "" : "s"}, ${diagnostics.length - errors} warning${diagnostics.length - errors === 1 ? "" : "s"}`);
