@@ -31,7 +31,7 @@ import { parseAttrs, type AttrError, type Attrs } from "../board/attrs";
 import type { TableCode, TableDiagnostic } from "./codes";
 
 /** A range of the text, `[start, end)`, in string offsets. */
-export interface Span {
+interface Span {
   start: number;
   end: number;
 }
@@ -94,7 +94,7 @@ export interface FilterRule {
 }
 
 /** Where a tab's grid sits: the header line, the delimiter line, and the end of its last row. */
-export interface Grid {
+interface Grid {
   header: Span;
   delimiter: Span;
   /** After the last row's newline — where a row appended at the end goes. */
@@ -315,7 +315,7 @@ export const writeFilter = (rules: readonly FilterRule[]): string =>
   rules.map((r) => `${r.column}${r.op}${r.value.replace(/;/g, ",").trim()}`).join("; ");
 
 /** Split a comma list of a select's options, trimmed, empty ones dropped, first of each kept. */
-export const readOptions = (text: string): string[] => [...new Set(text.split(",").map((s) => s.trim()).filter(Boolean))];
+const readOptions = (text: string): string[] => [...new Set(text.split(",").map((s) => s.trim()).filter(Boolean))];
 
 interface HeadingRead {
   name: string;
@@ -607,7 +607,7 @@ export function parseTable(text: string): Table {
 }
 
 /** The 1-based line an offset is on. */
-export function lineOf(text: string, offset: number): number {
+function lineOf(text: string, offset: number): number {
   let n = 1;
   for (let i = 0; i < offset && i < text.length; i++) if (text.charCodeAt(i) === 10) n++;
   return n;

@@ -28,7 +28,7 @@ const SOURCE_MAX = 16000;
 const RUNNING_MAX = 4;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
-export const LOCAL_ACCOUNT = { uid: "local", handle: "local", email: "", name: "You" };
+const LOCAL_ACCOUNT = { uid: "local", handle: "local", email: "", name: "You" };
 
 /** The person's saved components, with what their frontmatter says each is. */
 async function savedComponents(s: Session) {

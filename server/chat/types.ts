@@ -5,7 +5,7 @@
 
 import type { Conflict, Op } from "./record";
 
-export type { Before, Conflict, Image, Op } from "./record";
+export type { Op } from "./record";
 
 export type Provider = "claude" | "opencode";
 export const PROVIDERS: readonly Provider[] = ["claude", "opencode"];
@@ -13,7 +13,7 @@ export const PROVIDERS: readonly Provider[] = ["claude", "opencode"];
 export type Mode = "ask" | "edit";
 
 /** What another vault was granted: read it, or change it too. `null` is a grant taken back. */
-export type Grant = { mode: Mode; at: string } | null;
+type Grant = { mode: Mode; at: string } | null;
 
 /**
  * `chat.json`, the one chat file written more than once. Sync merges it **by key**, shallowly, so
@@ -68,7 +68,7 @@ export interface Usage {
   cost?: number;
 }
 
-export type TurnStatus = "running" | "done" | "stopped" | "failed";
+type TurnStatus = "running" | "done" | "stopped" | "failed";
 
 /** `<turnId>.json`: written once, when the turn ends. */
 export interface Turn {

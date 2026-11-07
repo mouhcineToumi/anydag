@@ -27,7 +27,7 @@ import { body, HttpError, isObject, type Deps, type Vars } from "./http";
 
 const META_MAX = 64 * 1024;
 
-export function parseChanges(raw: unknown): NewChange[] {
+function parseChanges(raw: unknown): NewChange[] {
   if (!Array.isArray(raw)) throw new HttpError("ES_BAD_REQUEST", "changes must be a list");
   if (raw.length === 0) throw new HttpError("ES_BAD_REQUEST", "a commit needs at least one change");
   if (raw.length > MAX_CHANGES) throw new HttpError("ES_BAD_REQUEST", `a commit holds at most ${MAX_CHANGES} changes; send several`);

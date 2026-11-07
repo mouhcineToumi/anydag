@@ -23,10 +23,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 /** Past this, a file or a folder is not kept, and the op it is in cannot be undone. */
-export const IMAGE_CAP = 8 * 1024 * 1024;
+const IMAGE_CAP = 8 * 1024 * 1024;
 
 /** What a path held before an op touched it. Bytes are base64, so a turn file is plain JSON. */
-export type Before =
+type Before =
   | { t: "absent" }
   | { t: "file"; b64: string }
   | { t: "dir"; files: Record<string, string>; dirs: string[] }

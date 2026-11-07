@@ -23,12 +23,12 @@
 import { askable, parseQuiz, type Quiz } from "./parse";
 import { mintQuestionId, moveQuestion, removeQuestion } from "./write";
 
-export type QuizOp =
+type QuizOp =
   | { op: "set"; markdown: string; id?: string; before?: string; after?: string }
   | { op: "remove"; id: string }
   | { op: "move"; id: string; before?: string; after?: string };
 
-export const QUIZ_OPS = ["set", "remove", "move"] as const;
+const QUIZ_OPS = ["set", "remove", "move"] as const;
 
 export type QuizApplied =
   | { ok: true; text: string; /** The question each op was about, a new one's minted id included. */ ids: string[] }

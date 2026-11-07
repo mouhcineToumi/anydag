@@ -53,7 +53,7 @@ export interface Kit {
   needWrite(what: string): void;
 }
 
-export interface Call extends Omit<CallOptions, "raw"> {
+interface Call extends Omit<CallOptions, "raw"> {
   vault?: string | undefined;
 }
 
@@ -194,10 +194,10 @@ function pictureOf(data: Uint8Array, mime: string, path: string): Picture {
  * starts. The maps beside the names — titles, ids, tasks — are cut to the page.
  */
 /** Enough to see a folder whole, little enough to read: about 45 KB of quizzes at the most. */
-export const LIMIT = 100;
-export const MAX_LIMIT = 500;
+const LIMIT = 100;
+const MAX_LIMIT = 500;
 
-export interface Page {
+interface Page {
   names: string[];
   folders: string[];
   total: number;
@@ -205,19 +205,19 @@ export interface Page {
 }
 
 /** The three arguments every list tool takes. */
-export const pageArgs = {
+const pageArgs = {
   folder: z.string().optional().describe("Only what is under this folder, subfolders included."),
   limit: z.number().int().default(LIMIT).describe(`How many at a time: ${LIMIT} unless said, at most ${MAX_LIMIT}.`),
   cursor: z.string().optional().describe("Where the page starts: a listing's `next_cursor`, as it came."),
 };
 
-export const PAGE_NOTE =
+const PAGE_NOTE =
   "`folder` narrows it to what is under that folder, subfolders included; it comes `limit` at a time (100, at most 500), and `next_cursor`, when there is more, is the `cursor` for the next page — `total` says how many there are in all.";
 
 const under = (name: string, folder: string): boolean => name.startsWith(`${folder}/`);
 
 /** The names under `folder` (all of them without one), `limit` from `cursor`, and the folders under it. */
-export function page(names: Iterable<string>, folders: Iterable<string>, opts: { folder?: string; limit?: number; cursor?: string } = {}): Page {
+function page(names: Iterable<string>, folders: Iterable<string>, opts: { folder?: string; limit?: number; cursor?: string } = {}): Page {
   const where = (opts.folder ?? "").replace(/^\/+|\/+$/g, "");
   const size = opts.limit ?? LIMIT;
   if (!Number.isInteger(size) || size < 1 || size > MAX_LIMIT) throw new ToolError(`\`limit\` is from 1 to ${MAX_LIMIT}`);

@@ -117,7 +117,7 @@ function CodeBlockRead({
 }
 
 /** The text in runs, each wearing its token's class and, where it could not be read, the underline. */
-export function painted(text: string, read: CodeRead): ReactNode[] {
+function painted(text: string, read: CodeRead): ReactNode[] {
   return segmentsOf(text.length, read).map((s) => {
     const piece = text.slice(s.from, s.to);
     if (!s.cls && !s.problem) return piece;

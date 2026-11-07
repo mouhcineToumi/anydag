@@ -141,7 +141,7 @@ if (!libSection) {
  */
 const chartSrc = fs.readFileSync(at("src/dsl/chart.ts"), "utf8");
 const forms = quoted(/export const FORMS =([\s\S]*?);/.exec(chartSrc)?.[1] ?? "");
-const chartWords = quoted(/export const CHART_WORDS[^=]*=([\s\S]*?);/.exec(chartSrc)?.[1] ?? "");
+const chartWords = quoted(/(?:export )?const CHART_WORDS[^=]*=([\s\S]*?);/.exec(chartSrc)?.[1] ?? "");
 if (forms.length === 0 || chartWords.length === 0) {
   console.error("could not read `FORMS` / `CHART_WORDS` out of src/dsl/chart.ts — this check needs updating");
   process.exit(1);
@@ -349,7 +349,7 @@ for (const kind of sketchKinds) {
  * `HUE_ORDER`'s reason.
  */
 const quizSrc = fs.readFileSync(at("src/quiz/codes.ts"), "utf8");
-const quizCodes = [...(/export const QUIZ_CODES = \{([\s\S]*?)\} as const;/.exec(quizSrc)?.[1] ?? "").matchAll(/^\s*([EW]Q_[A-Z_]+):/gm)].map(
+const quizCodes = [...(/(?:export )?const QUIZ_CODES = \{([\s\S]*?)\} as const;/.exec(quizSrc)?.[1] ?? "").matchAll(/^\s*([EW]Q_[A-Z_]+):/gm)].map(
   (m) => m[1],
 );
 if (quizCodes.length === 0) {
@@ -373,7 +373,7 @@ if (!quizSection) {
  * `TABLE_CODES` both ways.
  */
 const tableSrc = fs.readFileSync(at("src/table/codes.ts"), "utf8");
-const tableCodes = [...(/export const TABLE_CODES = \{([\s\S]*?)\} as const;/.exec(tableSrc)?.[1] ?? "").matchAll(/^\s*([EW]T_[A-Z_]+):/gm)].map(
+const tableCodes = [...(/(?:export )?const TABLE_CODES = \{([\s\S]*?)\} as const;/.exec(tableSrc)?.[1] ?? "").matchAll(/^\s*([EW]T_[A-Z_]+):/gm)].map(
   (m) => m[1],
 );
 if (tableCodes.length === 0) {

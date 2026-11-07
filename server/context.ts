@@ -54,7 +54,7 @@ export interface Recent {
 }
 
 /** What a vault reads from its own `.anydag/settings.json` when it opens. */
-export function vaultOptions(root: string, base: VaultOptions = {}): VaultOptions {
+function vaultOptions(root: string, base: VaultOptions = {}): VaultOptions {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(root, ".anydag", "settings.json"), "utf8")) as Record<string, unknown>;
     const at = raw["dag:attachments"];

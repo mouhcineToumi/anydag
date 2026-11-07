@@ -46,7 +46,7 @@ export class TableError extends Error {}
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 
 /** A fresh row id: `r` and five characters, none of `taken`. */
-export function mintRowId(taken: ReadonlySet<string> = new Set()): string {
+function mintRowId(taken: ReadonlySet<string> = new Set()): string {
   for (;;) {
     const bytes = new Uint8Array(5);
     globalThis.crypto.getRandomValues(bytes);
@@ -69,7 +69,7 @@ export function slug(name: string, fallback = "col"): string {
 }
 
 /** `wanted`, or `wanted-2`, `-3` … whichever `taken` does not hold. */
-export function freeId(wanted: string, taken: ReadonlySet<string>): string {
+function freeId(wanted: string, taken: ReadonlySet<string>): string {
   if (!taken.has(wanted)) return wanted;
   let n = 2;
   while (taken.has(`${wanted}-${n}`)) n++;
@@ -139,7 +139,7 @@ export interface ColumnInput {
 const NO_ATTRS: Attrs = { map: {}, order: [] };
 
 /** One header cell's content: the name and its `{…}`. */
-export function headerCell(c: ColumnInput): string {
+function headerCell(c: ColumnInput): string {
   const type = c.type && c.type !== "text" ? c.type : undefined;
   const a = attrs(
     [
@@ -164,7 +164,7 @@ export interface RowInput {
 }
 
 /** A row's line in the house form, without its newline. */
-export function rowLine(r: RowInput, width: number): string {
+function rowLine(r: RowInput, width: number): string {
   const a = attrs(
     [
       ["id", r.id],
@@ -180,7 +180,7 @@ export function rowLine(r: RowInput, width: number): string {
 }
 
 /** A tab's heading line in the house form, without its newline. */
-export function headingLine(t: { id?: string; name: string; sort?: string; filter?: string; extra?: Attrs }): string {
+function headingLine(t: { id?: string; name: string; sort?: string; filter?: string; extra?: Attrs }): string {
   const a = attrs(
     [
       ["id", t.id],

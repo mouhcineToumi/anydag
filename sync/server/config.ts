@@ -45,7 +45,7 @@ export interface Config {
   logsDays: number;
 }
 
-export class ConfigError extends Error {}
+class ConfigError extends Error {}
 
 const MODES: readonly Mode[] = ["single", "multi"];
 

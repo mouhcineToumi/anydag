@@ -269,7 +269,7 @@ const NO_BOARDS: BoardTree = {
 export type KindLists = Pick<BoardTree, "boards" | "notes" | "quizzes" | "tables" | "files">;
 
 /** The names of one kind of file in a tree. The one place a kind picks its list. */
-export function namesOf(tree: KindLists, kind: FileKind): string[] {
+function namesOf(tree: KindLists, kind: FileKind): string[] {
   switch (kind) {
     case "board":
       return tree.boards;
@@ -646,7 +646,7 @@ export const createQuiz = async (name: string, text?: string): Promise<string | 
  */
 export const blankTableText = (): string => blankTable(UNTITLED);
 
-export const createTable = async (name: string, text?: string): Promise<string | null> =>
+const createTable = async (name: string, text?: string): Promise<string | null> =>
   (await boardCall("create", { name, text: text ?? blankTableText(), kind: "table" }))?.name ?? null;
 
 /** Make a file of any kind with a text, as the sidebar's New does. An attachment is uploaded, never made. */

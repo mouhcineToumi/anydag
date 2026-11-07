@@ -109,7 +109,7 @@ async function indexDocs(s: Session): Promise<IndexDoc[]> {
 }
 
 /** The corpus: every text cut into the units a search opens onto, and every attachment by its names. */
-export async function corpusDocs(s: Session): Promise<Record<string, unknown>[]> {
+async function corpusDocs(s: Session): Promise<Record<string, unknown>[]> {
   return (await corpusOf(s)).docs;
 }
 
@@ -117,7 +117,7 @@ export async function corpusDocs(s: Session): Promise<Record<string, unknown>[]>
    in it moved, so a search can name the engine built from it rather than build one per query. */
 const corpora = new WeakMap<Parsed, { key: string; version: string; docs: Record<string, unknown>[] }>();
 
-export async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
+async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
   const tree = await s.vault.tree();
   const docs = await listed(s, tree);
   const parsed = s.corpus;

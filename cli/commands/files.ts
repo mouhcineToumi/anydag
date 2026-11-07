@@ -60,7 +60,7 @@ function deliver(ctx: Ctx, bytes: Uint8Array, out: string | undefined): void {
 }
 
 /** A size a person reads. */
-export const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
 const fileStem = (s: string) => s.replace(/[^\w.-]+/g, "-");
 

@@ -11,7 +11,7 @@ import type { Backend } from "./backend";
 import { chatTools } from "./chat";
 import { Picture, TOOLS, ToolError, makeKit, type Kit, type Tool } from "./tools";
 
-export const INSTRUCTIONS =
+const INSTRUCTIONS =
   "AnyDag draws technical diagrams from a DSL onto an infinite canvas, kept as plain files in a vault — a folder on this machine. " +
   "A board is one Markdown file holding fenced diagrams, notes, tables and images; writing the file is how a diagram is made. " +
   "Read `dsl_reference` before writing a fence body, and `board_diagnose` after — its codes are stable and are what to branch on. " +
@@ -26,7 +26,7 @@ function content(out: unknown) {
 }
 
 /** Run one tool, turning any refusal into a tool error the model can read — never a protocol error. */
-export async function runTool(tool: Tool, args: unknown, kit: Kit) {
+async function runTool(tool: Tool, args: unknown, kit: Kit) {
   try {
     if (tool.write && kit.readOnly) {
       throw new ToolError(`\`${tool.name}\` changes things, and this server was started with --read-only`);

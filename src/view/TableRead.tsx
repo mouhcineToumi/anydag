@@ -132,7 +132,7 @@ export const colStyle = (c: Column): CSSProperties | undefined => (c.w ? { width
  * after that many — a card's preview — and says how many more there are. `mark` is a row a reference
  * or a search result named, drawn marked.
  */
-export function GridRead({ tab, limit, mark }: { tab: Tab; limit?: number; mark?: string | null }) {
+function GridRead({ tab, limit, mark }: { tab: Tab; limit?: number; mark?: string | null }) {
   const rows = useMemo(() => viewRows(tab), [tab]);
   const options = useMemo(() => tab.columns.map((c, i) => (c.type === "select" ? optionsOf(c, tab.rows, i) : [])), [tab]);
   const shown = limit === undefined ? rows : rows.slice(0, limit);

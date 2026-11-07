@@ -17,7 +17,7 @@ const PLUGINS = [remarkGfm];
 const MD = refComponents({ boards: false, placed: true });
 
 /** The agent's words, as Markdown, with `dag:` citations drawn as the references they are. */
-export const Said = memo(function Said({ text }: { text: string }) {
+const Said = memo(function Said({ text }: { text: string }) {
   return (
     <div className="dag-md dag-chat-md" data-dag-chat-said="">
       <ReactMarkdown remarkPlugins={PLUGINS} urlTransform={urlTransform} components={MD}>
@@ -43,7 +43,7 @@ export interface Actions {
 }
 
 /** The newest undo or redo record of a block, which is what says whether it is undone and why not whole. */
-export function latestUndo(undos: readonly UndoRecord[], block: string): UndoRecord | undefined {
+function latestUndo(undos: readonly UndoRecord[], block: string): UndoRecord | undefined {
   let last: UndoRecord | undefined;
   for (const u of undos) if (u.block === block && (!last || u.id > last.id)) last = u;
   return last;
@@ -134,7 +134,7 @@ function AccessCard({ step, live, a }: { step: Extract<Step, { kind: "access" }>
 }
 
 /** The files a block touched, each a link when it is a document the app opens. */
-export function Files({ block, open, max = 5 }: { block: Block; open(kind: "board" | "note" | "quiz" | "table", name: string): void; max?: number }) {
+function Files({ block, open, max = 5 }: { block: Block; open(kind: "board" | "note" | "quiz" | "table", name: string): void; max?: number }) {
   const all = touched(block);
   const shown = all.slice(0, max);
   return (
@@ -211,7 +211,7 @@ export function BlockCard({ turn, block, undos, a, hook }: { turn: string; block
 }
 
 /** One turn: what was asked, who answered, what it did, what it said, and what it changed. */
-export const TurnView = memo(function TurnView({
+const TurnView = memo(function TurnView({
   turn,
   live,
   typing,

@@ -47,7 +47,7 @@ export function sameRecovery(a: string, b: string): boolean {
   return x.length > 0 && x === normaliseRecovery(b);
 }
 
-export const MIN_PASSPHRASE = 8;
+const MIN_PASSPHRASE = 8;
 
 /** The sentence refusing a passphrase pair, or `null` when it will do. */
 export function passphraseProblem(a: string, b: string): string | null {

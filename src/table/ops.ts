@@ -32,7 +32,7 @@ import {
   stampTable,
 } from "./write";
 
-export type TableOp =
+type TableOp =
   | { op: "cell"; tab: string; row: string; column: string; value: string }
   | { op: "addRow"; tab: string; id?: string; values?: Record<string, string>; after?: string; before?: string }
   | { op: "removeRow"; tab: string; row: string }
@@ -48,7 +48,7 @@ export type TableOp =
   | { op: "moveTab"; tab: string; before: string | null }
   | { op: "importCsv"; id?: string; name: string; csv: string; after?: string };
 
-export const TABLE_OPS = [
+const TABLE_OPS = [
   "cell",
   "addRow",
   "removeRow",

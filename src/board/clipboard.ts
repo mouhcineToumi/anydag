@@ -95,7 +95,7 @@ type Read<T> = ({ ok: true } & T) | { ok: false; error: string };
  * which is what every other way an item arrives does; one whose id is taken is left for
  * `applyPatch` to refuse, as it refuses the object form.
  */
-export function readInsert(text: string, taken: ReadonlySet<string>): Read<{ items: NewItem[] }> {
+function readInsert(text: string, taken: ReadonlySet<string>): Read<{ items: NewItem[] }> {
   const trimmed = text.replace(/\r\n/g, "\n").trim();
   if (!trimmed) return { ok: false, error: "an insert's text holds no item" };
   const located = locateItems(trimmed, isItemType);

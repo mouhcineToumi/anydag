@@ -11,7 +11,7 @@ import { confirm, emit, table, type Command, type Ctx } from "../context";
  */
 
 /** One entry, as `GET /__board/trash` says it. */
-export interface TrashEntry {
+interface TrashEntry {
   id: string;
   name: string;
   kind: string;
@@ -30,7 +30,7 @@ interface TrashList {
 const DAY = 86_400_000;
 
 /** Days until it goes for good, counted up — thirty the moment it is deleted, one on its last day. */
-export const daysLeft = (expires: string, now = Date.now()): number => Math.max(0, Math.ceil((Date.parse(expires) - now) / DAY));
+const daysLeft = (expires: string, now = Date.now()): number => Math.max(0, Math.ceil((Date.parse(expires) - now) / DAY));
 
 /** What a folder entry held, counted: `3 files, 1 folder`. */
 function held(e: TrashEntry): string {

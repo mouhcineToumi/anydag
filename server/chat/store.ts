@@ -21,7 +21,7 @@ import { writeAtomic } from "../vault";
 import { isOp } from "./record";
 import type { ChatMeta, ChatRow, Provider, Turn, UndoRecord } from "./types";
 
-export const CHATS = ".anydag/chats";
+const CHATS = ".anydag/chats";
 
 const CHAT_ID = /^c[0-9a-z]{9}[0-9a-z]{4}[0-9a-z]{4}$/;
 const STEP_ID = /^[tu][0-9a-z]{9}[0-9a-z]{4}[0-9a-z]{4}$/;
@@ -33,7 +33,7 @@ const rand = (n: number): string => {
 };
 
 /** This machine, as four characters: minted once, kept in the home. */
-export function deviceOf(home: Home): string {
+function deviceOf(home: Home): string {
   let d = home.get("chat-device");
   if (!d || !/^[0-9a-z]{4}$/.test(d)) {
     d = rand(4);
