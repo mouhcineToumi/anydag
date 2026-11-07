@@ -208,6 +208,7 @@ test("the arrow keys walk the tabs across both groups, and the last tab is where
   await expect(page.locator('[data-dag-settings-pane="shortcuts"] .dag-shortcuts__row').first()).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
   /* Out of the app's group and into the vault's, as though the heading were not there. */
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "preferences");
   await expect(selected).toBeFocused();

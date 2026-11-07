@@ -113,6 +113,9 @@ const EVENTS = new Set([
   /* The trash changed: the change feed's event, and this tab's own after a delete, a
      restore or a delete for good — `onTrash`, `onBoards`' shape. */
   "dag:trash",
+  /* Whether this install sends logs, heard or changed (`telemetry/client.ts`): the answer is the
+     server's, never stored here. */
+  "dag:telemetry",
   /* A sidebar change drawn before the server answers, made or let go: every list redraws. */
   "dag:guessed",
   /* A linked vault's sync status changed: the change feed's event, a `SyncStatus`. */

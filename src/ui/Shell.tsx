@@ -46,6 +46,7 @@ import { AssistantPanel } from "@/assistant/Panel";
 import { usePanel } from "@/assistant/panelState";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
+import { TelemetryPrompt } from "@/telemetry/Prompt";
 import { ancestors, follow, keyOf, leaf, rebase, type Change } from "./tree";
 
 /**
@@ -862,6 +863,7 @@ export function Shell({
           />
         ) : null}
         <LockNotice />
+        <TelemetryPrompt />
       </SidebarContext.Provider>
     </div>
   );

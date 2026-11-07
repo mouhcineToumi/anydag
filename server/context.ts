@@ -21,6 +21,7 @@ import type { Home } from "./home";
 import { err } from "./http";
 import { Practice } from "./practice";
 import { SyncLinks } from "./sync/link";
+import { Telemetry } from "./telemetry";
 import { DEFAULT_MAX_MB } from "./uploads";
 import { validId } from "./ids";
 import { Refused, Vault, type VaultOptions, writeAtomic } from "./vault";
@@ -69,6 +70,7 @@ export class Session {
   private here = new AsyncLocalStorage<Open>();
   private defaultId: string | null = null;
   private links: SyncLinks | null = null;
+  private logs: Telemetry | null = null;
 
   constructor(
     readonly home: Home,
@@ -84,6 +86,11 @@ export class Session {
   /** Which open vaults sync, and their loops (`server/sync/link.ts`). Nothing for a vault not linked. */
   get sync(): SyncLinks {
     return (this.links ??= new SyncLinks(this.home.dir, this.env));
+  }
+
+  /** Logs: the person's answer, what waits to be sent, and where it goes (`server/telemetry.ts`). */
+  get telemetry(): Telemetry {
+    return (this.logs ??= new Telemetry(this.home, this.version, this.env));
   }
 
   /** The vault this request is about. */
