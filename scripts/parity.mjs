@@ -30,8 +30,6 @@ export function readManifest() {
   return JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
 }
 
-const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
-
 /**
  * Every route the local server declares, as `METHOD /path` — the Hono `app.get("/…"`/`app.post(` calls
  * in `server/routes/*.ts`. A route file left off the directory is a whole file of routes nothing is

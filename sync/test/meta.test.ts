@@ -73,7 +73,7 @@ const pgSuite = async (url: string): Promise<Suite> => {
   } catch (cause) {
     await root.close().catch(() => {});
     throw new Error(
-      `ANYDAG_SYNC_TEST_PG=${url} did not answer — is the compose database up? (docker compose -f sync/compose.yaml up -d --wait db)`,
+      `ANYDAG_SYNC_TEST_PG=${url} did not answer (${cause instanceof Error ? cause.message : String(cause)}) — is the compose database up? (docker compose -f sync/compose.yaml up -d --wait db)`,
     );
   }
   const schema = `t_${Math.random().toString(36).slice(2, 12)}`;

@@ -27,7 +27,7 @@
  */
 import { math as mathSyntax } from "micromark-extension-math";
 import { mathFromMarkdown, mathToMarkdown } from "mdast-util-math";
-import type { InlineMath, Math } from "mdast-util-math";
+import type { InlineMath, Math as MathBlock } from "mdast-util-math";
 import type { CompileContext, Extension as FromMarkdownExtension } from "mdast-util-from-markdown";
 import type { Options as ToMarkdownOptions } from "mdast-util-to-markdown";
 import type { Code, Construct, Event, Previous, Resolver, State, Token, TokenizeContext, Tokenizer } from "micromark-util-types";
@@ -263,7 +263,7 @@ function inlineMath(node: InlineMath): string {
 }
 inlineMath.peek = () => "$";
 
-function math(node: Math): string {
+function math(node: MathBlock): string {
   let fence = "$$";
   while (node.value.includes(fence)) fence += "$";
   return `${fence}\n${node.value ? `${node.value}\n` : ""}${fence}`;
