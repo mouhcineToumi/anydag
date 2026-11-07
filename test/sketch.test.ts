@@ -33,8 +33,7 @@ import type { Theme } from "@/theme/contract";
 const T = theme as unknown as Theme;
 beforeAll(() => setMeasurer(new TableMeasurer()));
 
-const parse = (src: string, layout?: "fixed", type = "sketch") =>
-  parseDiagram(type, src, undefined, undefined, layout)!;
+const parse = (src: string, layout?: "fixed", type = "sketch") => parseDiagram(type, src, undefined, undefined, layout)!;
 
 const run = (g: Graph): Promise<Placed> => layoutGraph(g, sizeGraph(g, T), sizeLabels(g, T), T.metric);
 
@@ -72,9 +71,7 @@ hero --- caption
   });
 
   it("draws a line with no head from the shared arrow table", () => {
-    expect(g.edges.map((e) => [e.from.node, e.to.node, e.head, e.tail])).toEqual([
-      ["hero", "caption", "none", "none"],
-    ]);
+    expect(g.edges.map((e) => [e.from.node, e.to.node, e.head, e.tail])).toEqual([["hero", "caption", "none", "none"]]);
   });
 
   it("parses a stroke the pen left behind", () => {
@@ -334,7 +331,12 @@ describe("layoutSketch", () => {
     /* The bow is above the row, so the row moved down to make room — and a box plus `origin` is
        still the file's own number, which is what every writer turns a laid-out box back into. */
     expect(placed.nodes.a!.y).toBeGreaterThan(0);
-    for (const [id, x] of [["a", 0], ["b", 120], ["c", 240], ["d", 360]] as const) {
+    for (const [id, x] of [
+      ["a", 0],
+      ["b", 120],
+      ["c", 240],
+      ["d", 360],
+    ] as const) {
       expect(placed.nodes[id]!.x + placed.origin!.x).toBe(x);
       expect(placed.nodes[id]!.y + placed.origin!.y).toBe(0);
     }
@@ -420,9 +422,7 @@ describe("the reference board", () => {
 
   it("draws every geometric shape, so each one is in the baselines", () => {
     const kinds = new Set(
-      board.items
-        .filter((i) => i.type === "sketch")
-        .flatMap((i) => parseDiagram("sketch", i.body)!.nodes.map((n) => n.kind)),
+      board.items.filter((i) => i.type === "sketch").flatMap((i) => parseDiagram("sketch", i.body)!.nodes.map((n) => n.kind)),
     );
     for (const k of SHAPE_KINDS) expect(kinds.has(k), k).toBe(true);
   });

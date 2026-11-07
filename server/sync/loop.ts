@@ -94,7 +94,8 @@ export type First = "resync" | "merge";
 
 const REASONS = {
   auth: "The sync server no longer accepts this device: it was signed out or revoked. Pair it again to go on syncing.",
-  quota: "The sync account is out of room: nothing more is pushed until there is space. Changes here are kept and go when there is.",
+  quota:
+    "The sync account is out of room: nothing more is pushed until there is space. Changes here are kept and go when there is.",
   forbidden: "The sync server refuses this device the remote vault: it belongs to another account, or was removed.",
   gone: "The remote vault is not on the sync server any more.",
 } as const;
@@ -333,7 +334,10 @@ export class SyncLoop {
       const ctl = new AbortController();
       this.pokeAbort = ctl;
       try {
-        const res = await fetcher(url, { headers: { authorization: `Bearer ${this.o.pairing.token}`, accept: "text/event-stream" }, signal: ctl.signal });
+        const res = await fetcher(url, {
+          headers: { authorization: `Bearer ${this.o.pairing.token}`, accept: "text/event-stream" },
+          signal: ctl.signal,
+        });
         // Pokes switched off on the server: the poll is all there is.
         if (res.status === 204) break;
         if (!res.ok || !res.body) throw new Error(`poke: ${res.status}`);

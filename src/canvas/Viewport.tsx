@@ -159,10 +159,7 @@ export function Viewport({
     [paint],
   );
 
-  const viewSize = useCallback(
-    () => ({ w: boxRef.current?.clientWidth ?? 1, h: boxRef.current?.clientHeight ?? 1 }),
-    [],
-  );
+  const viewSize = useCallback(() => ({ w: boxRef.current?.clientWidth ?? 1, h: boxRef.current?.clientHeight ?? 1 }), []);
 
   const fit = useCallback(
     (target?: Rect) => {
@@ -483,7 +480,8 @@ export function Viewport({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (e.pointerType === "touch" && fingers.current.has(e.pointerId)) fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (e.pointerType === "touch" && fingers.current.has(e.pointerId))
+      fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const p = pinch.current;
     if (p && fingers.current.size >= 2) {
       const rect = boxRef.current?.getBoundingClientRect();
@@ -586,7 +584,8 @@ export function Viewport({
     if (!d.moved) {
       /* A tap on the paper, with a finger: the selection goes, as a click does. On an
          item it is that item's — `useEditor` selects it on the same release. */
-      if (e.pointerType === "touch" && e.type === "pointerup" && !(e.target as Element | null)?.closest?.("[data-dag-item]")) onPaperClickRef.current?.();
+      if (e.pointerType === "touch" && e.type === "pointerup" && !(e.target as Element | null)?.closest?.("[data-dag-item]"))
+        onPaperClickRef.current?.();
       return;
     }
     /* Only a left drag has a `click` coming to eat. A middle one fires `auxclick` instead, and

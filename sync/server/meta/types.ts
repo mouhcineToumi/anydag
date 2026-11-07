@@ -7,7 +7,19 @@
  * mints are 10 characters of Crockford base32, the app's own shape.
  */
 
-import type { AccountRef, Device, Head, LogEntry, Metric, Plan, RemoteVault, StaleKey, UsageRow, VaultKey, PutVaultKey } from "../../protocol/wire";
+import type {
+  AccountRef,
+  Device,
+  Head,
+  LogEntry,
+  Metric,
+  Plan,
+  RemoteVault,
+  StaleKey,
+  UsageRow,
+  VaultKey,
+  PutVaultKey,
+} from "../../protocol/wire";
 
 /** A connection: a pool or PGlite. Parameters are `$1`, `$2`…, as Postgres spells them. */
 export interface Db {

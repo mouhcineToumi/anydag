@@ -35,13 +35,7 @@ const DIALECTS: Partial<Record<DiagramType, Dialect>> = {
  * the layout does: `x=` on a statement is geometry inside a fixed fence and a `W_UNKNOWN_ATTR`
  * outside one, and that is decided while the tokens are still going past.
  */
-export function parseDiagram(
-  type: string,
-  src: string,
-  dir?: "LR" | "TB",
-  aspect?: number,
-  layout?: "fixed",
-): Graph | null {
+export function parseDiagram(type: string, src: string, dir?: "LR" | "TB", aspect?: number, layout?: "fixed"): Graph | null {
   /* Mindmap owns its parser: indentation *is* the grammar, and quoting every label would drown the
      one form whose appeal is that it is fast to type. */
   const own = (g: Graph | null) => {
@@ -99,8 +93,4 @@ export const hasRows = (type: string): boolean => Boolean(DIALECTS[type as Diagr
 export const hasGraph = (type: string): boolean => !(OWN_MODEL_TYPES as readonly string[]).includes(type);
 
 export const hasDialect = (type: string): boolean =>
-  type === "mindmap" ||
-  type === "timeline" ||
-  type === "gitgraph" ||
-  !hasGraph(type) ||
-  type in DIALECTS;
+  type === "mindmap" || type === "timeline" || type === "gitgraph" || !hasGraph(type) || type in DIALECTS;

@@ -66,7 +66,14 @@ async function listed(s: Session, tree: Tree): Promise<Listed[]> {
 function fileDocs(tree: Tree) {
   return tree.files
     .filter((n) => tree.ids[n])
-    .map((n) => ({ id: tree.ids[n]!, name: n, kind: "file", title: tree.titles[n] ?? null, bytes: tree.sizes[n] ?? 0, refs: [] }));
+    .map((n) => ({
+      id: tree.ids[n]!,
+      name: n,
+      kind: "file",
+      title: tree.titles[n] ?? null,
+      bytes: tree.sizes[n] ?? 0,
+      refs: [],
+    }));
 }
 
 interface IndexDoc {
@@ -86,7 +93,12 @@ async function indexDocs(s: Session): Promise<IndexDoc[]> {
   const files = fileDocs(tree);
   // A `[[wikilink]]` names a document by name (decision 7): which one is the vault's answer now.
   const named: WikiCandidate[] = [
-    ...docs.map((d) => ({ id: d.id, name: d.name, kind: d.kind, title: (found[d.key]?.title as string | undefined) ?? tree.titles[d.name] ?? null })),
+    ...docs.map((d) => ({
+      id: d.id,
+      name: d.name,
+      kind: d.kind,
+      title: (found[d.key]?.title as string | undefined) ?? tree.titles[d.name] ?? null,
+    })),
     ...files,
   ];
   return [
@@ -154,7 +166,9 @@ async function corpusOf(s: Session): Promise<{ version: string; docs: Record<str
 
 /** The zone a time with no offset is read in: the vault's settings, else the app's, else this machine's. */
 function zoneOf(s: Session): string {
-  return zoneIn(readPrefs(s, "vault")) ?? zoneIn(readPrefs(s, "app")) ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+  return (
+    zoneIn(readPrefs(s, "vault")) ?? zoneIn(readPrefs(s, "app")) ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC"
+  );
 }
 
 /**
@@ -257,7 +271,8 @@ export function docRoutes(app: Hono, s: Session): void {
       const after = await s.vault.write(name, "board", text, current.base);
       return c.json({ base: after.base, text: after.text });
     } catch (e) {
-      if (e instanceof Conflict) return c.json({ error: "the board changed underneath this edit", base: e.base, text: e.text }, 409);
+      if (e instanceof Conflict)
+        return c.json({ error: "the board changed underneath this edit", base: e.base, text: e.text }, 409);
       throw e;
     }
   });
@@ -337,7 +352,9 @@ export function docRoutes(app: Hono, s: Session): void {
     const follow = body.follow === true;
     // A new title is a new name to every `[[wikilink]]` that names it by title, and with `follow` a
     // new file name too: either way the links that named it are kept naming it (`server/relink.ts`).
-    const { result, relinked } = await relinking(s, () => (kind === "file" ? retitleFile(s, name, title, follow) : retitleText(s, name, kind, title, follow)));
+    const { result, relinked } = await relinking(s, () =>
+      kind === "file" ? retitleFile(s, name, title, follow) : retitleText(s, name, kind, title, follow),
+    );
     return c.json({ ...result, relinked });
   });
 
@@ -367,7 +384,8 @@ export function docRoutes(app: Hono, s: Session): void {
       "note",
       (t) => {
         const next = withTask(t, change);
-        if ((change.due || change.start) && !taskOf(next)) throw err(400, `\`${name}\` is not a task: give it a status as well as a date`);
+        if ((change.due || change.start) && !taskOf(next))
+          throw err(400, `\`${name}\` is not a task: give it a status as well as a date`);
         return next;
       },
       "the status",
@@ -437,7 +455,8 @@ export function docRoutes(app: Hono, s: Session): void {
         if (asked.start && !("end" in asked) && was?.end !== undefined && isDay(was.end) !== isDay(asked.start)) asked.end = null;
         const next = withEvent(t, asked);
         const event = eventOf(next);
-        if (Object.values(asked).some((v) => v !== null) && !event) throw err(400, `\`${name}\` is not an event: give it a start as well as an end`);
+        if (Object.values(asked).some((v) => v !== null) && !event)
+          throw err(400, `\`${name}\` is not an event: give it a start as well as an end`);
         if (event && asked.end && event.end !== asked.end) {
           throw err(400, "an all-day event ends on a date, and a timed one at a time: send `end` in `start`'s form");
         }
@@ -476,7 +495,13 @@ export function docRoutes(app: Hono, s: Session): void {
     }
     if (!got || tab || view) got = await grammar.table(current.text, { view, ...(tab ? { tab } : {}) });
     if (tab && !got.table.tabs.length) throw err(404, `no tab \`${tab}\` in \`${name}\``);
-    return c.json({ name, id: await s.vault.peekId(name, "table"), base: current.base, ...got.table, title: (got.table.title as string | null | undefined) ?? leafOf(name) });
+    return c.json({
+      name,
+      id: await s.vault.peekId(name, "table"),
+      base: current.base,
+      ...got.table,
+      title: (got.table.title as string | null | undefined) ?? leafOf(name),
+    });
   });
 
   app.post("/__board/table", async (c) => {

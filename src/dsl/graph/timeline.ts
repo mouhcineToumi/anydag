@@ -129,13 +129,23 @@ export function parseTimeline(src: string): Graph {
 
     const m = /^(\S+)(?:\s*\.\.\s*(\S+))?\s+"([^"]*)"\s*(.*)$/.exec(line);
     if (!m) {
-      graph.diagnostics.push({ line: i + 1, code: CODES.E_BAD_DATE, message: `expected \`<date> "label"\`, got \`${line}\``, severity: "error" });
+      graph.diagnostics.push({
+        line: i + 1,
+        code: CODES.E_BAD_DATE,
+        message: `expected \`<date> "label"\`, got \`${line}\``,
+        severity: "error",
+      });
       return;
     }
 
     const start = parseDate(m[1]!);
     if (start === null) {
-      graph.diagnostics.push({ line: i + 1, code: CODES.E_BAD_DATE, message: `\`${m[1]}\` is not a date (YYYY, YYYY-MM or YYYY-MM-DD)`, severity: "error" });
+      graph.diagnostics.push({
+        line: i + 1,
+        code: CODES.E_BAD_DATE,
+        message: `\`${m[1]}\` is not a date (YYYY, YYYY-MM or YYYY-MM-DD)`,
+        severity: "error",
+      });
       return;
     }
     const end = m[2] ? parseDate(m[2]) : null;

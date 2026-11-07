@@ -29,7 +29,12 @@ const subscribe = (cb: () => void) => {
   return () => listeners.delete(cb);
 };
 
-export const usePanel = (): State => useSyncExternalStore(subscribe, () => state, () => state);
+export const usePanel = (): State =>
+  useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => state,
+  );
 
 /** `space A`, and the sparkle. */
 export const toggleAssistant = (): void => set({ ...state, open: !state.open });

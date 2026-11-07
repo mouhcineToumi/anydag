@@ -75,7 +75,10 @@ export function anchorsOf(md: string): Anchor[] {
       start,
       end,
       line: n.position?.start.line ?? 1,
-      text: source.slice(0, m.index).replace(/^#{1,6}[ \t]+/, "").trim(),
+      text: source
+        .slice(0, m.index)
+        .replace(/^#{1,6}[ \t]+/, "")
+        .trim(),
     });
   }
   return out;

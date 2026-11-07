@@ -240,8 +240,14 @@ function tableCorpus(text: string): CorpusDoc {
     const heading = squash([tab.name, ...tab.columns.map((c) => c.name)].join(" "));
     if (heading) units.push({ part: at, what: "tab", text: heading });
     for (const row of tab.rows) {
-      const cells = squash(row.cells.map((c) => words(c.replace(/\n/g, " "))).filter(Boolean).join(" "));
-      if (cells) units.push({ part: tab.id ? `${tab.id}/${row.id ?? `L${row.line}`}` : `L${row.line}`, what: "row", text: cells });
+      const cells = squash(
+        row.cells
+          .map((c) => words(c.replace(/\n/g, " ")))
+          .filter(Boolean)
+          .join(" "),
+      );
+      if (cells)
+        units.push({ part: tab.id ? `${tab.id}/${row.id ?? `L${row.line}`}` : `L${row.line}`, what: "row", text: cells });
     }
   }
   return title ? { title, units } : { units };

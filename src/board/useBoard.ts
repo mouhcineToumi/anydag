@@ -290,7 +290,8 @@ function namesOf(tree: KindLists, kind: FileKind): string[] {
 export const everyFile = (tree: KindLists): { name: string; kind: FileKind }[] =>
   FILE_KINDS.flatMap((kind) => namesOf(tree, kind).map((name) => ({ name, kind })));
 
-const sameTask = (a: Task | undefined, b: Task | undefined): boolean => a?.status === b?.status && a?.due === b?.due && a?.start === b?.start;
+const sameTask = (a: Task | undefined, b: Task | undefined): boolean =>
+  a?.status === b?.status && a?.due === b?.due && a?.start === b?.start;
 const sameEvent = (a: NoteEvent | undefined, b: NoteEvent | undefined): boolean => a?.start === b?.start && a?.end === b?.end;
 const sameProject = (a: Project | undefined, b: Project | undefined): boolean => a?.status === b?.status && a?.hue === b?.hue;
 
@@ -751,7 +752,7 @@ export const deleteBoard = async (name: string, kind: FileKind = "board"): Promi
  * is exactly the case that can be missed, and a folder that does not appear until the next reload
  * reads as a button that did nothing.
  */
-const toldTheList = <T,>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
+const toldTheList = <T>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
 
 export const createFolder = async (name: string): Promise<string | null> =>
   toldTheList(((await boardCall("mkdir", { name })) as { folder?: string } | null)?.folder ?? null);

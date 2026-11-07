@@ -212,7 +212,11 @@ export function installFsHooks(): void {
  * Run `fn` as one op on `vault`, and hand back what it changed — `null` when it touched nothing.
  * The op is closed when `fn` settles: a timer `fn` left behind cannot add to it later.
  */
-export async function record<T>(vault: { id: string; root: string }, what: string, fn: () => Promise<T>): Promise<{ value: T; op: Op | null }> {
+export async function record<T>(
+  vault: { id: string; root: string },
+  what: string,
+  fn: () => Promise<T>,
+): Promise<{ value: T; op: Op | null }> {
   installFsHooks();
   const r: Recording = { root: vault.root, vault: vault.id, what, order: [], before: new Map(), closed: false };
   try {
@@ -232,7 +236,13 @@ function close(r: Recording): Op | null {
   // A path written and put back as it was is no change at all.
   const real = images.filter((i) => !(i.before.t === "absent" && i.after === "-"));
   if (!real.length) return null;
-  return { what: r.what, vault: r.vault, at: new Date().toISOString(), images: real, undoable: real.every((i) => i.before.t !== "big") };
+  return {
+    what: r.what,
+    vault: r.vault,
+    at: new Date().toISOString(),
+    images: real,
+    undoable: real.every((i) => i.before.t !== "big"),
+  };
 }
 
 /* -- undo ------------------------------------------------------------------------------------ */
@@ -243,11 +253,18 @@ const BEFORE = new Set(["absent", "file", "dir", "moved", "big"]);
 export function isOp(x: unknown): x is Op {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;
-  if (typeof o.what !== "string" || typeof o.vault !== "string" || typeof o.undoable !== "boolean" || !Array.isArray(o.images)) return false;
+  if (typeof o.what !== "string" || typeof o.vault !== "string" || typeof o.undoable !== "boolean" || !Array.isArray(o.images))
+    return false;
   return o.images.every((i: unknown) => {
     if (!i || typeof i !== "object") return false;
     const { rel, before, after } = i as Record<string, unknown>;
-    return typeof rel === "string" && typeof after === "string" && !!before && typeof before === "object" && BEFORE.has((before as { t?: unknown }).t as string);
+    return (
+      typeof rel === "string" &&
+      typeof after === "string" &&
+      !!before &&
+      typeof before === "object" &&
+      BEFORE.has((before as { t?: unknown }).t as string)
+    );
   });
 }
 
@@ -425,7 +442,11 @@ function restore(plan: Plan): void {
  * it left. `roots` finds a vault's folder by id; a vault that is not open is a conflict, and so is
  * one `reaches` says the ops' owner may not touch.
  */
-export async function undo(ops: readonly Op[], roots: (vault: string) => string | null, reaches: (vault: string) => boolean = () => true): Promise<Undone> {
+export async function undo(
+  ops: readonly Op[],
+  roots: (vault: string) => string | null,
+  reaches: (vault: string) => boolean = () => true,
+): Promise<Undone> {
   const out: Undone = { ops: [], conflicts: [] };
   const pathsOf = (op: Op): string[] => (Array.isArray(op.images) ? op.images.map((i) => String(i?.rel)) : []);
   for (const op of [...ops].reverse()) {
@@ -451,7 +472,12 @@ export async function undo(ops: readonly Op[], roots: (vault: string) => string 
     }
     // `undoable` is the file's word; a big image is never restored whatever it says.
     if (op.undoable !== true || plans.some((p) => p.img.before.t === "big")) {
-      out.conflicts.push({ what, vault: op.vault, paths: op.images.filter((i) => i.before.t === "big").map((i) => i.rel), why: "big" });
+      out.conflicts.push({
+        what,
+        vault: op.vault,
+        paths: op.images.filter((i) => i.before.t === "big").map((i) => i.rel),
+        why: "big",
+      });
       continue;
     }
     const moved = plans.filter((p) => hashOf(p.abs) !== p.img.after).map((p) => p.img.rel);

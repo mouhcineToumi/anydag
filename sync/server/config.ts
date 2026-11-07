@@ -53,7 +53,8 @@ function int(env: Record<string, string | undefined>, name: string, fallback: nu
   const raw = env[name];
   if (raw === undefined || raw.trim() === "") return fallback;
   const n = Number(raw.trim());
-  if (!Number.isInteger(n) || n < min || n > max) throw new ConfigError(`${name} must be a whole number from ${min} to ${max}, not ${JSON.stringify(raw)}`);
+  if (!Number.isInteger(n) || n < min || n > max)
+    throw new ConfigError(`${name} must be a whole number from ${min} to ${max}, not ${JSON.stringify(raw)}`);
   return n;
 }
 
@@ -64,34 +65,53 @@ function text(env: Record<string, string | undefined>, name: string): string | n
 
 export function configFrom(env: Record<string, string | undefined> = process.env, cwd: string = process.cwd()): Config {
   const mode = (text(env, "ANYDAG_SYNC_MODE") ?? "single") as Mode;
-  if (!MODES.includes(mode)) throw new ConfigError(`ANYDAG_SYNC_MODE must be single or multi, not ${JSON.stringify(env.ANYDAG_SYNC_MODE)}`);
+  if (!MODES.includes(mode))
+    throw new ConfigError(`ANYDAG_SYNC_MODE must be single or multi, not ${JSON.stringify(env.ANYDAG_SYNC_MODE)}`);
 
   const databaseUrl = text(env, "DATABASE_URL");
-  if (databaseUrl && !/^postgres(ql)?:\/\//.test(databaseUrl)) throw new ConfigError("DATABASE_URL must be a postgres:// URL (or unset, for PGlite in ANYDAG_SYNC_DATA)");
+  if (databaseUrl && !/^postgres(ql)?:\/\//.test(databaseUrl))
+    throw new ConfigError("DATABASE_URL must be a postgres:// URL (or unset, for PGlite in ANYDAG_SYNC_DATA)");
 
   const data = path.resolve(cwd, text(env, "ANYDAG_SYNC_DATA") ?? "anydag-sync-data");
   const port = int(env, "ANYDAG_SYNC_PORT", 8790, 0, 65535);
   const host = text(env, "ANYDAG_SYNC_HOST") ?? "127.0.0.1";
 
   const adminToken = text(env, "ANYDAG_SYNC_ADMIN_TOKEN");
-  if (adminToken !== null && adminToken.length < 16) throw new ConfigError("ANYDAG_SYNC_ADMIN_TOKEN must be at least 16 characters (or unset, which turns the admin routes off)");
+  if (adminToken !== null && adminToken.length < 16)
+    throw new ConfigError("ANYDAG_SYNC_ADMIN_TOKEN must be at least 16 characters (or unset, which turns the admin routes off)");
 
   const historyDays = int(env, "ANYDAG_SYNC_HISTORY_DAYS", 30, 1, 36500);
 
   const pokeRaw = (text(env, "ANYDAG_SYNC_POKE") ?? "on").toLowerCase();
-  if (!["on", "off", "1", "0", "true", "false"].includes(pokeRaw)) throw new ConfigError(`ANYDAG_SYNC_POKE must be on or off, not ${JSON.stringify(env.ANYDAG_SYNC_POKE)}`);
+  if (!["on", "off", "1", "0", "true", "false"].includes(pokeRaw))
+    throw new ConfigError(`ANYDAG_SYNC_POKE must be on or off, not ${JSON.stringify(env.ANYDAG_SYNC_POKE)}`);
   const poke = pokeRaw === "on" || pokeRaw === "1" || pokeRaw === "true";
 
   const shown = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host.includes(":") ? `[${host}]` : host;
   const publicUrl = (text(env, "ANYDAG_SYNC_PUBLIC_URL") ?? `http://${shown}:${port}`).replace(/\/+$/, "");
-  if (!/^https?:\/\//.test(publicUrl)) throw new ConfigError(`ANYDAG_SYNC_PUBLIC_URL must be an http(s) URL, not ${JSON.stringify(publicUrl)}`);
+  if (!/^https?:\/\//.test(publicUrl))
+    throw new ConfigError(`ANYDAG_SYNC_PUBLIC_URL must be an http(s) URL, not ${JSON.stringify(publicUrl)}`);
 
   const maxBodyMb = int(env, "ANYDAG_SYNC_MAX_BODY_MB", 512, 1, 1024 * 1024);
 
   const logsRaw = (text(env, "ANYDAG_SYNC_LOGS") ?? "on").toLowerCase();
-  if (!["on", "off", "1", "0", "true", "false"].includes(logsRaw)) throw new ConfigError(`ANYDAG_SYNC_LOGS must be on or off, not ${JSON.stringify(env.ANYDAG_SYNC_LOGS)}`);
+  if (!["on", "off", "1", "0", "true", "false"].includes(logsRaw))
+    throw new ConfigError(`ANYDAG_SYNC_LOGS must be on or off, not ${JSON.stringify(env.ANYDAG_SYNC_LOGS)}`);
   const logs = logsRaw === "on" || logsRaw === "1" || logsRaw === "true";
   const logsDays = int(env, "ANYDAG_SYNC_LOGS_DAYS", 30, 1, 3650);
 
-  return { mode, databaseUrl, data, port, host, adminToken, historyDays, poke, publicUrl, maxBodyBytes: maxBodyMb * 1024 * 1024, logs, logsDays };
+  return {
+    mode,
+    databaseUrl,
+    data,
+    port,
+    host,
+    adminToken,
+    historyDays,
+    poke,
+    publicUrl,
+    maxBodyBytes: maxBodyMb * 1024 * 1024,
+    logs,
+    logsDays,
+  };
 }

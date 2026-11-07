@@ -23,8 +23,7 @@ export interface GitMeta {
 }
 
 const META = new WeakMap<Graph, GitMeta>();
-export const gitMetaOf = (graph: Graph): GitMeta =>
-  META.get(graph) ?? { lanes: [], branchOf: {}, column: {} };
+export const gitMetaOf = (graph: Graph): GitMeta => META.get(graph) ?? { lanes: [], branchOf: {}, column: {} };
 
 export function parseGitgraph(src: string): Graph {
   const graph = emptyGraph("gitgraph" as Graph["type"], "LR");
@@ -71,7 +70,10 @@ export function parseGitgraph(src: string): Graph {
     const line = raw.trim();
     if (!line || /^(%%|\/\/)/.test(line)) return;
     const label = /"([^"]*)"/.exec(line)?.[1];
-    const [verb, arg] = line.replace(/"[^"]*"/g, "").trim().split(/\s+/);
+    const [verb, arg] = line
+      .replace(/"[^"]*"/g, "")
+      .trim()
+      .split(/\s+/);
 
     switch (verb) {
       case "commit":
@@ -92,7 +94,12 @@ export function parseGitgraph(src: string): Graph {
       case "checkout":
       case "switch": {
         if (!arg || !lanes.includes(arg)) {
-          graph.diagnostics.push({ line: i + 1, code: CODES.E_NO_BRANCH, message: `no branch \`${arg ?? ""}\``, severity: "error" });
+          graph.diagnostics.push({
+            line: i + 1,
+            code: CODES.E_NO_BRANCH,
+            message: `no branch \`${arg ?? ""}\``,
+            severity: "error",
+          });
           return;
         }
         head = arg;
@@ -101,7 +108,12 @@ export function parseGitgraph(src: string): Graph {
 
       case "merge": {
         if (!arg || !lanes.includes(arg)) {
-          graph.diagnostics.push({ line: i + 1, code: CODES.E_NO_BRANCH, message: `no branch \`${arg ?? ""}\` to merge`, severity: "error" });
+          graph.diagnostics.push({
+            line: i + 1,
+            code: CODES.E_NO_BRANCH,
+            message: `no branch \`${arg ?? ""}\` to merge`,
+            severity: "error",
+          });
           return;
         }
         /* A merge commit lands on the branch you are on and has two parents — that second edge is
@@ -118,7 +130,12 @@ export function parseGitgraph(src: string): Graph {
       }
 
       default:
-        graph.diagnostics.push({ line: i + 1, code: CODES.E_UNKNOWN_COMMAND, message: `unknown command \`${verb}\``, severity: "error" });
+        graph.diagnostics.push({
+          line: i + 1,
+          code: CODES.E_UNKNOWN_COMMAND,
+          message: `unknown command \`${verb}\``,
+          severity: "error",
+        });
     }
   });
 

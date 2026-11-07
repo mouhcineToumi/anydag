@@ -63,7 +63,9 @@ test("a shape comes from the library as one bare shape, drawn", async ({ page })
   await expect.poll(read, { timeout: 5_000 }).toMatch(/```sketch \{#sketch-[a-z0-9]{4}[^}]*\}\ndiamond diamond1 "Decide\?"/);
   await expect(page.locator('[data-dag-shape="diamond"]')).toBeVisible();
   /* Bare: no header, no type chip — the shape is the whole of what is drawn. */
-  await expect(page.locator('[data-dag-shape="diamond"]').locator("xpath=ancestor::*[contains(@class,'dag-frame')]")).toHaveClass(/dag-frame--bare/);
+  await expect(page.locator('[data-dag-shape="diamond"]').locator("xpath=ancestor::*[contains(@class,'dag-frame')]")).toHaveClass(
+    /dag-frame--bare/,
+  );
   await expect(page.locator("[data-dag-error]")).toHaveCount(0);
 });
 

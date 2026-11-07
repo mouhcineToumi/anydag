@@ -13,7 +13,8 @@
 /** `name` is under `folder` — never the folder itself, never the top level. */
 const under = (name: string, folder: string): boolean => folder !== "" && name.startsWith(`${folder}/`);
 
-const byWords = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }) || (a < b ? -1 : a > b ? 1 : 0);
+const byWords = (a: string, b: string): number =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }) || (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * The quizzes under `folder`, in the sidebar's order. `titles` is the listing's: a quiz is placed by

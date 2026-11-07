@@ -115,7 +115,9 @@ try {
    and written to the file; what is printed is what moved. */
 if (ready && tidyFirst) {
   const t = await tidyInPage(page);
-  console.log(t.moved === 0 ? `tidy  already tidy (${t.of} items)` : `tidy  moved ${t.moved} of ${t.of} items: ${(t.ids ?? []).join(", ")}`);
+  console.log(
+    t.moved === 0 ? `tidy  already tidy (${t.of} items)` : `tidy  moved ${t.moved} of ${t.of} items: ${(t.ids ?? []).join(", ")}`,
+  );
 }
 
 /* One item: park the layer at 1:1 with the item at the origin and size the viewport to it. The page

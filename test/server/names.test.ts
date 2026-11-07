@@ -80,7 +80,32 @@ describe("refusal", () => {
   });
 
   it("refuses what is not portable", () => {
-    for (const bad of ["", "/abs", "a//b", "a/./b", "a/../b", "a:b", "a?b", "a*b", 'a"b', "a<b", "a|b", "a\\b", "a\x01b", "CON", "nul.txt", "COM1", "lpt9", "a.", "a ", "work/b ", ".hidden", "a/.git/b", "plan.assets", "node_modules"])
+    for (const bad of [
+      "",
+      "/abs",
+      "a//b",
+      "a/./b",
+      "a/../b",
+      "a:b",
+      "a?b",
+      "a*b",
+      'a"b',
+      "a<b",
+      "a|b",
+      "a\\b",
+      "a\x01b",
+      "CON",
+      "nul.txt",
+      "COM1",
+      "lpt9",
+      "a.",
+      "a ",
+      "work/b ",
+      ".hidden",
+      "a/.git/b",
+      "plan.assets",
+      "node_modules",
+    ])
       expect(refusal(bad), JSON.stringify(bad)).not.toBeNull();
   });
 });
@@ -212,7 +237,18 @@ describe("classify", () => {
 
 describe("ignored", () => {
   it("never lists dot entries, picture folders, node_modules or sync debris", () => {
-    for (const s of [".anydag", ".obsidian", ".git", ".trash", ".stversions", "plan.assets", "node_modules", "a.sync-conflict-2024.md", "x.icloud"]) expect(ignored(s), s).toBe(true);
+    for (const s of [
+      ".anydag",
+      ".obsidian",
+      ".git",
+      ".trash",
+      ".stversions",
+      "plan.assets",
+      "node_modules",
+      "a.sync-conflict-2024.md",
+      "x.icloud",
+    ])
+      expect(ignored(s), s).toBe(true);
     for (const s of ["plan", "Meeting notes.md", "assets", "attachments"]) expect(ignored(s), s).toBe(false);
   });
 });

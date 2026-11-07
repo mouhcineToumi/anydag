@@ -57,35 +57,91 @@ const GEOMETRY: [string, string, string, string, string][] = [
 ];
 
 export const SKETCH_ATOMS: Blueprint[] = [
-  shape("part-sketch-box", "Box", "sketch · a plain rectangle.", "Square", 'box ${self} "${title}"${?meta}${?at}', {
-    title: "Box",
-    meta: "",
-    at: "",
-  }, "box"),
-  ...GEOMETRY.map(([kind, name, description, icon, title]) =>
-    shape(`part-sketch-${kind}`, name, `sketch · ${description}`, icon, `${kind} \${self} "\${title}"\${?at}`, { title, at: "" }, kind),
+  shape(
+    "part-sketch-box",
+    "Box",
+    "sketch · a plain rectangle.",
+    "Square",
+    'box ${self} "${title}"${?meta}${?at}',
+    {
+      title: "Box",
+      meta: "",
+      at: "",
+    },
+    "box",
   ),
-  shape("part-sketch-text", "Text", "sketch · a line of text, no chrome.", "Type", 'text ${self} "${title}"${?at}', {
-    title: "A line of text",
-    at: "",
-  }, "txt"),
-  shape("part-sketch-button", "Button", "sketch · a filled pill.", "RectangleHorizontal", 'button ${self} "${title}"${?at}', {
-    title: "Continue",
-    at: "",
-  }, "btn"),
-  shape("part-sketch-input", "Input", "sketch · a field, its title the placeholder.", "TextCursorInput", 'input ${self} "${title}"${?at}', {
-    title: "you@example.com",
-    at: "",
-  }, "field"),
-  shape("part-sketch-img", "Image", "sketch · a picture that is not there yet.", "Image", 'img ${self} "${title}" "${caption}"${?at}', {
-    title: "Image",
-    caption: "a picture goes here",
-    at: "",
-  }, "img"),
-  shape("part-sketch-sticky", "Sticky", "sketch · a square of paper. Ochre unless you say otherwise.", "StickyNote", 'sticky ${self} "${title}"${?at}', {
-    title: "Something to remember",
-    at: "",
-  }, "note"),
+  ...GEOMETRY.map(([kind, name, description, icon, title]) =>
+    shape(
+      `part-sketch-${kind}`,
+      name,
+      `sketch · ${description}`,
+      icon,
+      `${kind} \${self} "\${title}"\${?at}`,
+      { title, at: "" },
+      kind,
+    ),
+  ),
+  shape(
+    "part-sketch-text",
+    "Text",
+    "sketch · a line of text, no chrome.",
+    "Type",
+    'text ${self} "${title}"${?at}',
+    {
+      title: "A line of text",
+      at: "",
+    },
+    "txt",
+  ),
+  shape(
+    "part-sketch-button",
+    "Button",
+    "sketch · a filled pill.",
+    "RectangleHorizontal",
+    'button ${self} "${title}"${?at}',
+    {
+      title: "Continue",
+      at: "",
+    },
+    "btn",
+  ),
+  shape(
+    "part-sketch-input",
+    "Input",
+    "sketch · a field, its title the placeholder.",
+    "TextCursorInput",
+    'input ${self} "${title}"${?at}',
+    {
+      title: "you@example.com",
+      at: "",
+    },
+    "field",
+  ),
+  shape(
+    "part-sketch-img",
+    "Image",
+    "sketch · a picture that is not there yet.",
+    "Image",
+    'img ${self} "${title}" "${caption}"${?at}',
+    {
+      title: "Image",
+      caption: "a picture goes here",
+      at: "",
+    },
+    "img",
+  ),
+  shape(
+    "part-sketch-sticky",
+    "Sticky",
+    "sketch · a square of paper. Ochre unless you say otherwise.",
+    "StickyNote",
+    'sticky ${self} "${title}"${?at}',
+    {
+      title: "Something to remember",
+      at: "",
+    },
+    "note",
+  ),
 ];
 
 export const SKETCH_MOLECULES: Blueprint[] = [

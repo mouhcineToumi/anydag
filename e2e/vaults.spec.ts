@@ -38,7 +38,10 @@ let made: string[] = [];
 let files: string[] = [];
 
 test.beforeEach(({}, info) => {
-  id = info.testId.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(-10);
+  id = info.testId
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(-10);
   parents = [];
   made = [];
   files = [];
@@ -53,7 +56,8 @@ test.afterEach(async ({ page }) => {
   for (const p of parents) fs.rmSync(p, { recursive: true, force: true });
 });
 
-const listed = async (page: Page): Promise<Listed[]> => ((await (await page.request.get("/api/vaults")).json()) as { vaults: Listed[] }).vaults;
+const listed = async (page: Page): Promise<Listed[]> =>
+  ((await (await page.request.get("/api/vaults")).json()) as { vaults: Listed[] }).vaults;
 const homeId = async (page: Page): Promise<string> => (await listed(page)).find((v) => v.path === HOME)!.id;
 const restore = (page: Page) => page.request.post("/api/vaults/open", { data: { path: HOME } });
 
@@ -157,7 +161,9 @@ test("a tab names its vault in the address and in every request, and each vault 
   expect(heard).toEqual([]);
 });
 
-test("a folder opened from the switcher is the vault the tab goes to, and the typed path is refused when it is no folder", async ({ page }) => {
+test("a folder opened from the switcher is the vault the tab goes to, and the typed path is refused when it is no folder", async ({
+  page,
+}) => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-e2e-vault-"));
   parents.push(parent);
   const folder = path.join(parent, `typed-${id}`);
@@ -210,7 +216,8 @@ test("a board moves to another vault from its row, keeping its id", async ({ pag
   fixture(BOARDS, `home-${id}`, "Home");
   fixture(BOARDS, `moving-${id}`, "Moving");
   const home = await homeId(page);
-  const ids = async (v: string) => ((await (await page.request.get("/__board/list", { params: { vault: v } })).json()) as { ids: Record<string, string> }).ids;
+  const ids = async (v: string) =>
+    ((await (await page.request.get("/__board/list", { params: { vault: v } })).json()) as { ids: Record<string, string> }).ids;
   await expect.poll(async () => (await ids(home))[`moving-${id}`]).toBeTruthy();
   const ident = (await ids(home))[`moving-${id}`];
 
@@ -247,7 +254,9 @@ test("a theme chosen in one vault is that vault's", async ({ page }) => {
   await expect.poll(scheme).toBe("dark");
 });
 
-test("closing one from its Settings tab leaves its folder, keeps it on the list, and the tab goes to another vault", async ({ page }) => {
+test("closing one from its Settings tab leaves its folder, keeps it on the list, and the tab goes to another vault", async ({
+  page,
+}) => {
   const other = await vault(page);
   fixture(other.dir, `kept-${id}`, "Kept");
   const home = await homeId(page);
@@ -317,8 +326,18 @@ test("a link to a vault that is not open opens the default one", async ({ page }
 
 test("with no vault open the page is the picker: open a folder, create a vault, or choose a recent one", async ({ page }) => {
   const heard = listen(page);
-  const recent = { id: "r1", name: "Recent one", path: "/nowhere/recent-one", opened: "2026-01-01T00:00:00Z", open: false, default: false, missing: false };
-  await page.route("**/api/vaults", (route) => route.fulfill({ json: { vaults: [recent, { ...recent, id: "r2", name: "Lost", missing: true }], home: "/home/someone" } }));
+  const recent = {
+    id: "r1",
+    name: "Recent one",
+    path: "/nowhere/recent-one",
+    opened: "2026-01-01T00:00:00Z",
+    open: false,
+    default: false,
+    missing: false,
+  };
+  await page.route("**/api/vaults", (route) =>
+    route.fulfill({ json: { vaults: [recent, { ...recent, id: "r2", name: "Lost", missing: true }], home: "/home/someone" } }),
+  );
   await page.goto("/");
 
   await expect(page.locator("[data-dag-novault]")).toBeVisible();
@@ -339,7 +358,10 @@ test("the desktop shell's folder dialog is used when there is one", async ({ pag
   fs.mkdirSync(folder);
   await keepDefault(page);
   await page.addInitScript((picked) => {
-    (window as unknown as { anydagDesktop: unknown }).anydagDesktop = { pickFolder: async () => picked, revealInFolder: async () => undefined };
+    (window as unknown as { anydagDesktop: unknown }).anydagDesktop = {
+      pickFolder: async () => picked,
+      revealInFolder: async () => undefined,
+    };
   }, folder);
 
   await page.goto(`/?board=nothing-${id}`);
@@ -358,7 +380,9 @@ test("the desktop shell's folder dialog is used when there is one", async ({ pag
 test("the AI tab gives the lines that connect Claude Code and Claude Desktop to this vault", async ({ page }) => {
   await page.goto(`/?board=nothing-${id}`);
   await openSettings(page, "agents");
-  await expect(page.locator('[data-dag-setting-copy-value="mcp-claude-code"]')).toContainText(`claude mcp add anydag -- anydag mcp --vault ${HOME}`);
+  await expect(page.locator('[data-dag-setting-copy-value="mcp-claude-code"]')).toContainText(
+    `claude mcp add anydag -- anydag mcp --vault ${HOME}`,
+  );
   const json = await page.locator('[data-dag-setting-copy-value="mcp-claude-desktop"]').textContent();
   expect(JSON.parse(json ?? "{}")).toEqual({ mcpServers: { anydag: { command: "anydag", args: ["mcp", "--vault", HOME] } } });
 });

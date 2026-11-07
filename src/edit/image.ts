@@ -34,8 +34,7 @@ export type Natural = { w: number; h: number };
  */
 export function placedWidth(stored: number, dpr: number, rule: Settings["paste"], grid: number): number {
   const ratio = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
-  const w =
-    rule.size === "width" ? rule.width : rule.size === "pixels" ? stored : stored / ratio;
+  const w = rule.size === "width" ? rule.width : rule.size === "pixels" ? stored : stored / ratio;
   return Math.max(grid, Math.round(Number.isFinite(w) && w > 0 ? w : rule.width));
 }
 

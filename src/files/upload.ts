@@ -34,7 +34,7 @@ let limits: Promise<Limits | null> | null = null;
 /** The deployment's limits, asked once per page: they are the process's and do not move while it lives. */
 export function readLimits(): Promise<Limits | null> {
   limits ??= fetch("/__board/files")
-    .then(async (r) => (r.ok ? ((await r.json()) as { limits?: Limits }).limits ?? null : null))
+    .then(async (r) => (r.ok ? (((await r.json()) as { limits?: Limits }).limits ?? null) : null))
     .catch(() => null)
     .then((got) => {
       /* A failed ask is asked again next time rather than remembered as "no limits". */
@@ -62,7 +62,7 @@ export function refusal(file: { name: string; size: number }, got: Limits | null
 }
 
 /** Tell every list on the page that there is a file it has not seen, as a folder made does. */
-const told = <T,>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
+const told = <T>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
 
 /**
  * Upload one file into `folder` (`""` the top level). Resolves to what the server kept — under the

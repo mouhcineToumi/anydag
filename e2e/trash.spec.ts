@@ -24,7 +24,10 @@ let parents: string[] = [];
 const dirs = new Map<string, string>();
 
 test.beforeEach(({}, info) => {
-  id = info.testId.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(-10);
+  id = info.testId
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(-10);
   made = [];
   parents = [];
 });
@@ -67,7 +70,9 @@ async function trashed(page: Page, ws: string, name: string): Promise<void> {
 
 const entry = (page: Page, name: string) => page.locator(`[data-dag-trash-entry="${name}"]`);
 
-test("a board deleted from the sidebar is in the trash, and Restore puts it back to open", { tag: "@smoke" }, async ({ page }) => {
+test("a board deleted from the sidebar is in the trash, and Restore puts it back to open", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const ws = await workspace(page);
   const plan = await make(page, ws, "plan", "Q3 plan");
   expect(plan).toBe("Q3 plan");

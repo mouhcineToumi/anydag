@@ -50,7 +50,10 @@ test.afterEach(async ({ page }) => {
   if (fs.existsSync(file))
     for (const id of new Set([...read().matchAll(/dag:([0-9a-z]{10})/g)].map((m) => m[1]!))) {
       const got = await page.request.get(`/__board/resolve?id=${id}`);
-      if (got.ok()) await page.request.post("/__board/delete", { data: { name: ((await got.json()) as { name: string }).name, kind: "file" } });
+      if (got.ok())
+        await page.request.post("/__board/delete", {
+          data: { name: ((await got.json()) as { name: string }).name, kind: "file" },
+        });
     }
   fs.rmSync(file, { force: true });
   fs.rmSync(path.join(DIR, `${name}.assets`), { recursive: true, force: true });
@@ -164,7 +167,9 @@ test("importing text puts items on the board, and an image lands at its own size
     { name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("A paragraph that came in from a file.") },
     { name: "square.png", mimeType: "image/png", buffer: SQUARE },
   ]);
-  await expect.poll(read, { timeout: 5_000 }).toMatch(/```md \{#md-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nA paragraph that came in from a file\.\n```/);
+  await expect
+    .poll(read, { timeout: 5_000 })
+    .toMatch(/```md \{#md-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nA paragraph that came in from a file\.\n```/);
   /* An attachment, drawn by id. `w=64`, not the fixed `w=520` this used to assert: a fixed width
      was the whole of the "pasted images lose their quality" defect, and the default rule is now
      the image's own size. */
@@ -260,8 +265,18 @@ test("dropping a board file makes a new board and opens it", async ({ page }) =>
       const dt = new DataTransfer();
       dt.items.add(new File([text as string], "Came In.board.md", { type: "text/markdown" }));
       const target = document.querySelector(".dag-viewport")!;
-      target.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x as number, clientY: y as number }));
-      target.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x as number, clientY: y as number }));
+      target.dispatchEvent(
+        new DragEvent("dragover", {
+          dataTransfer: dt,
+          bubbles: true,
+          cancelable: true,
+          clientX: x as number,
+          clientY: y as number,
+        }),
+      );
+      target.dispatchEvent(
+        new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x as number, clientY: y as number }),
+      );
     },
     [vp.x + 200, vp.y + 200, text],
   );

@@ -444,9 +444,7 @@ export function addRow(body: string, nodeLine: number, rowText: string): string 
     if (!close) return body;
     const inner = stmt.slice(span(open)[1], span(close)[0]).trim();
     lines[nodeLine - 1] =
-      stmt.slice(0, span(open)[1]) +
-      (inner === "" ? ` ${rowText} ` : ` ${inner}; ${rowText} `) +
-      stmt.slice(span(close)[0]);
+      stmt.slice(0, span(open)[1]) + (inner === "" ? ` ${rowText} ` : ` ${inner}; ${rowText} `) + stmt.slice(span(close)[0]);
     return lines.join("\n");
   }
 
@@ -913,8 +911,7 @@ export function moveStatement(body: string, line: number, target: MoveTarget): s
 const depthOf = (line: string): number => indentOf(line).replace(/\t/g, "  ").length;
 
 /** Whether a line takes part in the tree at all — a blank or a comment does not. */
-const topicLine = (line: string | undefined): boolean =>
-  line !== undefined && line.trim() !== "" && !/^\s*(%%|\/\/)/.test(line);
+const topicLine = (line: string | undefined): boolean => line !== undefined && line.trim() !== "" && !/^\s*(%%|\/\/)/.test(line);
 
 /**
  * The 1-based lines a mindmap topic occupies: itself, and everything indented under it.
@@ -1020,8 +1017,7 @@ function valueRun(line: string): { span: [number, number] | null; at: number } |
 }
 
 /** How a value is written back: `-` is a gap, and nothing else is anything but a number. */
-const valueText = (values: readonly (number | null)[]): string =>
-  values.map((v) => (v === null ? "-" : String(v))).join(" ");
+const valueText = (values: readonly (number | null)[]): string => values.map((v) => (v === null ? "-" : String(v))).join(" ");
 
 /**
  * Rewrite the run of values on one `series` or `slice` statement.

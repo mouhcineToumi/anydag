@@ -110,14 +110,18 @@ test("the handles sit on the picked card, framed or not", async ({ page }) => {
     return page.evaluate((id) => {
       const card = document.querySelector(`[data-dag-node="${id}"]`)!.getBoundingClientRect();
       const tools = document.querySelector("[data-dag-node-tools]")!.getBoundingClientRect();
-      return [tools.x - card.x, tools.y - card.y, tools.width - card.width, tools.height - card.height].map((v) => Math.round(v * 10) / 10);
+      return [tools.x - card.x, tools.y - card.y, tools.width - card.width, tools.height - card.height].map(
+        (v) => Math.round(v * 10) / 10,
+      );
     }, node);
   };
   expect(await fit("api")).toEqual([0, 0, 0, 0]);
 
   /* Take the title away and the same card is drawn bare — a different top padding, the same answer. */
   fs.writeFileSync(file, BOARD.replace(' title="Infra"', ""));
-  await page.waitForFunction(() => !document.querySelector('[data-dag-item="infra"] .dag-frame__head'), null, { timeout: 10_000 });
+  await page.waitForFunction(() => !document.querySelector('[data-dag-item="infra"] .dag-frame__head'), null, {
+    timeout: 10_000,
+  });
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   expect(await fit("db")).toEqual([0, 0, 0, 0]);

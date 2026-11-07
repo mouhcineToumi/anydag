@@ -88,7 +88,12 @@ export function CellView({ type, text, options }: { type: ColumnType; text: stri
   switch (type) {
     case "checkbox":
       return (
-        <span className="dag-grid__check" data-dag-grid-check={read.value ? "on" : "off"} role="img" aria-label={read.value ? "Ticked" : "Not ticked"}>
+        <span
+          className="dag-grid__check"
+          data-dag-grid-check={read.value ? "on" : "off"}
+          role="img"
+          aria-label={read.value ? "Ticked" : "Not ticked"}
+        >
           {read.value ? <Check size={12} strokeWidth={3} aria-hidden="true" /> : null}
         </span>
       );
@@ -245,7 +250,7 @@ export function TableFrame({ name, text, bar }: { name: string; text: string | n
     };
   }, [text]);
 
-  const title = text === null ? name : splitNote(text).title ?? name;
+  const title = text === null ? name : (splitNote(text).title ?? name);
   const tabs = table?.tabs ?? [];
   const keys = keysOf(tabs);
   const at = tab === null ? -1 : keys.indexOf(tab);
@@ -274,7 +279,11 @@ export function TableFrame({ name, text, bar }: { name: string; text: string | n
         ) : null}
       </main>
       {!snapshot && tabs.length > 1 && current ? (
-        <PageBar pages={tabs.map((t, i) => ({ id: keys[i]!, name: t.name }))} page={keys[tabs.indexOf(current)]!} onPage={setTab} />
+        <PageBar
+          pages={tabs.map((t, i) => ({ id: keys[i]!, name: t.name }))}
+          page={keys[tabs.indexOf(current)]!}
+          onPage={setTab}
+        />
       ) : null}
     </div>
   );

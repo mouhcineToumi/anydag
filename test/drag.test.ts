@@ -149,19 +149,13 @@ describe("a structural drop", () => {
   });
 
   it("lands before it when the pointer is in the leading half", () => {
-    const next = drop(
-      { what: "node", id: "queue" },
-      { type: "arch", body: ARCH, node: "db", half: { x: 0.1, y: 0.1 } },
-    )!;
+    const next = drop({ what: "node", id: "queue" }, { type: "arch", body: ARCH, node: "db", half: { x: 0.1, y: 0.1 } })!;
     expect(next).toContain('  service jobs "Jobs"\n  store db "Database"\n  service queue "Queue"');
     clean("arch", next);
   });
 
   it("puts it at the head of the block when there is nothing before the target", () => {
-    const next = drop(
-      { what: "node", id: "jobs" },
-      { type: "arch", body: ARCH, node: "db", half: { x: 0.1, y: 0.1 } },
-    )!;
+    const next = drop({ what: "node", id: "jobs" }, { type: "arch", body: ARCH, node: "db", half: { x: 0.1, y: 0.1 } })!;
     expect(next).toContain('group gcp "Google Cloud" {\n  store db "Database"\n  service jobs "Jobs"');
     clean("arch", next);
   });
@@ -198,11 +192,7 @@ describe("a structural drop", () => {
   it("reorders two siblings in a state machine, which under aspect=0 is the layout", () => {
     const body = `state draft "Draft"\nstate review "Review"\nstate live "Live"\n\ndraft --> review\nreview --> live`;
     const next = drop({ what: "node", id: "live" }, { type: "state", body, node: "draft" })!;
-    expect(next.split("\n").slice(0, 3)).toEqual([
-      'state review "Review"',
-      'state live "Live"',
-      'state draft "Draft"',
-    ]);
+    expect(next.split("\n").slice(0, 3)).toEqual(['state review "Review"', 'state live "Live"', 'state draft "Draft"']);
     clean("state", next);
   });
 });
@@ -320,9 +310,7 @@ describe("a timeline drop", () => {
   });
 
   it("has nothing to say without the scale the layout publishes", () => {
-    expect(
-      drop({ what: "node", id: "t2" }, { type: "timeline", body: TL, node: "t1", by: { x: 100, y: 0 } }),
-    ).toBeNull();
+    expect(drop({ what: "node", id: "t2" }, { type: "timeline", body: TL, node: "t1", by: { x: 100, y: 0 } })).toBeNull();
   });
 });
 
@@ -346,10 +334,7 @@ api ->> db "read"`;
   });
 
   it("lands before it on the leading half, past the messages in between", () => {
-    const next = drop(
-      { what: "node", id: "db" },
-      { type: "sequence", body: SEQ, node: "learner", half: { x: 0.2, y: 0.5 } },
-    )!;
+    const next = drop({ what: "node", id: "db" }, { type: "sequence", body: SEQ, node: "learner", half: { x: 0.2, y: 0.5 } })!;
     expect(next.split("\n").slice(0, 3)).toEqual([
       'participant api "API"',
       'participant learner "Learner"',
@@ -387,10 +372,7 @@ unit "k"`;
   it("lands before it on the leading half, after the last line that says something", () => {
     /* `web` is the first declaration, so there is no previous one to land after — and `toTop` would
        put a data line in front of the statement that says what shape the chart is. */
-    const next = drop(
-      { what: "node", id: "web" },
-      { type: "chart", body: CHART, node: "mob", half: { x: 0.2, y: 0.5 } },
-    )!;
+    const next = drop({ what: "node", id: "web" }, { type: "chart", body: CHART, node: "mob", half: { x: 0.2, y: 0.5 } })!;
     expect(parses(next).split("\n")).toEqual([
       "bar",
       "x Q1 Q2 Q3",

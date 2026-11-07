@@ -85,7 +85,15 @@ function isTurn(t: unknown, id: string, chat: string): t is Turn {
 function isUndo(u: unknown, id: string, chat: string): u is UndoRecord {
   if (!u || typeof u !== "object") return false;
   const o = u as Record<string, unknown>;
-  return o.id === id && o.chat === chat && str(o.turn) && str(o.block) && typeof o.redo === "boolean" && ops(o.ops) && Array.isArray(o.conflicts);
+  return (
+    o.id === id &&
+    o.chat === chat &&
+    str(o.turn) &&
+    str(o.block) &&
+    typeof o.redo === "boolean" &&
+    ops(o.ops) &&
+    Array.isArray(o.conflicts)
+  );
 }
 
 const json = (v: unknown): string => `${JSON.stringify(v, null, 1)}\n`;
@@ -183,12 +191,25 @@ export class ChatStore {
       if (!m) continue;
       let updated = m.created;
       try {
-        const last = fs.readdirSync(dirOf(root, id)).filter((n) => n.startsWith("t") && n.endsWith(".json")).sort().pop();
+        const last = fs
+          .readdirSync(dirOf(root, id))
+          .filter((n) => n.startsWith("t") && n.endsWith(".json"))
+          .sort()
+          .pop();
         if (last) updated = new Date(parseInt(last.slice(1, 10), 36)).toISOString();
       } catch {
         /* gone while listed */
       }
-      out.push({ id, title: m.title, vault, created: m.created, updated, provider: m.provider, model: m.model, running: running(id) });
+      out.push({
+        id,
+        title: m.title,
+        vault,
+        created: m.created,
+        updated,
+        provider: m.provider,
+        model: m.model,
+        running: running(id),
+      });
     }
     return out.sort((a, b) => (a.updated < b.updated ? 1 : -1));
   }

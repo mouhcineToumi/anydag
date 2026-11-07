@@ -211,7 +211,9 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
           <p className="dag-prompt__status">
             <AlertTriangle {...ICON} aria-hidden="true" />
             {failed.message}
-            {failed.result?.model ? `; ${failed.result.model}, ${failed.result.attempts} attempt${failed.result.attempts === 1 ? "" : "s"}` : ""}
+            {failed.result?.model
+              ? `; ${failed.result.model}, ${failed.result.attempts} attempt${failed.result.attempts === 1 ? "" : "s"}`
+              : ""}
           </p>
           {shown.length ? (
             <ul className="dag-prompt__diags">

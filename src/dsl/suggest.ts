@@ -156,7 +156,7 @@ const ALIASES: Record<string, string> = {
   condition: "decision",
   choice: "decision",
   gateway: "decision",
-  "if": "decision",
+  if: "decision",
 
   /* → class */
   type: "class",

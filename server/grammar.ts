@@ -87,7 +87,12 @@ async function answer(method: "GET" | "POST", route: string, query: URLSearchPar
   return handle({ method, route, query, body });
 }
 
-async function call<T>(method: "GET" | "POST", route: string, body?: unknown, query?: Record<string, string | undefined>): Promise<T> {
+async function call<T>(
+  method: "GET" | "POST",
+  route: string,
+  body?: unknown,
+  query?: Record<string, string | undefined>,
+): Promise<T> {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined && v !== null && v !== "") q.set(k, v);
   const got = await answer(method, route, q, body);
@@ -108,7 +113,12 @@ const sent = new Set<string>();
  */
 async function searchIn(docs: unknown[], q: string, limit?: number, version?: string) {
   const ask = (withDocs: boolean) =>
-    call<Doc>("POST", "/search", { ...(withDocs ? { docs } : {}), q, ...(limit !== undefined ? { limit } : {}), ...(version ? { version } : {}) });
+    call<Doc>("POST", "/search", {
+      ...(withDocs ? { docs } : {}),
+      q,
+      ...(limit !== undefined ? { limit } : {}),
+      ...(version ? { version } : {}),
+    });
   if (!version) return ask(true);
   if (sent.has(version)) {
     try {
@@ -132,15 +142,24 @@ export const grammar = {
   corpus: async (texts: Record<string, string>) => (await call<{ docs: Record<string, Doc> }>("POST", "/corpus", { texts })).docs,
   diagnose: (name: string, text: string, kind: string) => call<Doc>("POST", "/diagnose", { name, text, kind }),
   quiz: (text: string, stamp = false, ops?: unknown[]) =>
-    call<Doc & { text: string; changed: boolean; ids?: string[]; diagnostics: unknown[] }>("POST", "/quiz", { text, stamp, ...(ops ? { ops } : {}) }),
-  table: (text: string, opts: { ops?: unknown[]; stamp?: boolean; tab?: string; view?: boolean } = {}) =>
-    call<{ text: string; changed: boolean; minted?: unknown; table: Doc & { tabs: unknown[]; diagnostics: unknown[] } }>("POST", "/table", {
+    call<Doc & { text: string; changed: boolean; ids?: string[]; diagnostics: unknown[] }>("POST", "/quiz", {
       text,
-      ...opts,
+      stamp,
+      ...(ops ? { ops } : {}),
     }),
+  table: (text: string, opts: { ops?: unknown[]; stamp?: boolean; tab?: string; view?: boolean } = {}) =>
+    call<{ text: string; changed: boolean; minted?: unknown; table: Doc & { tabs: unknown[]; diagnostics: unknown[] } }>(
+      "POST",
+      "/table",
+      {
+        text,
+        ...opts,
+      },
+    ),
   search: searchIn,
   fences: (text: string) => call<Doc>("POST", "/fences", { text }),
-  system: async (as: string | undefined, mode: "draw" | "rewrite") => (await call<{ system: string }>("GET", "/system", undefined, { as, mode })).system,
+  system: async (as: string | undefined, mode: "draw" | "rewrite") =>
+    (await call<{ system: string }>("GET", "/system", undefined, { as, mode })).system,
   library: (query: { id?: string; type?: string; q?: string }) => call<Doc>("GET", "/library", undefined, query),
   icons: (query: { q?: string; mode?: string }) => call<Doc>("GET", "/icons", undefined, query),
   dsl: (type?: string) => call<Doc>("GET", "/dsl", undefined, { type }),

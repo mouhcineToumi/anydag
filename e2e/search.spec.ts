@@ -189,6 +189,9 @@ test("the list follows an edit made while the card is open", async ({ page }) =>
   await expect(page.locator("[data-dag-hits-empty]")).toContainText("matches");
   /* Written by the other writer, with the card still up: the change feed says so, and the index
      asks again. */
-  fs.writeFileSync(path.join(BOARDS, `${board()}.board.md`), `${BOARD(word)}\n\`\`\`md {#late x=0 y=400}\nAdded ${word}later on.\n\`\`\`\n`);
+  fs.writeFileSync(
+    path.join(BOARDS, `${board()}.board.md`),
+    `${BOARD(word)}\n\`\`\`md {#late x=0 y=400}\nAdded ${word}later on.\n\`\`\`\n`,
+  );
   await expect(hit(page, board(), "late")).toBeVisible({ timeout: 10_000 });
 });

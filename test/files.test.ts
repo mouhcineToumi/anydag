@@ -16,19 +16,9 @@ describe("what a file is, by its name", () => {
   });
 
   it("tells the ten sorts apart", () => {
-    expect(["q.pdf", "a.png", "b.docx", "c.xlsx", "d.csv", "e.pptx", "f.mp3", "g.mov", "h.zip", "i.md", "j.bin"].map(sortOf)).toEqual([
-      "pdf",
-      "image",
-      "doc",
-      "sheet",
-      "sheet",
-      "slide",
-      "audio",
-      "video",
-      "archive",
-      "text",
-      "other",
-    ]);
+    expect(
+      ["q.pdf", "a.png", "b.docx", "c.xlsx", "d.csv", "e.pptx", "f.mp3", "g.mov", "h.zip", "i.md", "j.bin"].map(sortOf),
+    ).toEqual(["pdf", "image", "doc", "sheet", "sheet", "slide", "audio", "video", "archive", "text", "other"]);
     expect(sortOf("pdf")).toBe("pdf");
   });
 
@@ -63,7 +53,9 @@ describe("what this server refuses, before anything is sent", () => {
   const limits = { maxBytes: 1024 * 1024, types: ["pdf", "png"] };
   it("says it in the server's own words", () => {
     expect(refusal({ name: "a.pdf", size: 10 }, limits)).toBeNull();
-    expect(refusal({ name: "Makefile", size: 10 }, limits)).toBe("`Makefile` has no extension, so there is no telling what it is");
+    expect(refusal({ name: "Makefile", size: 10 }, limits)).toBe(
+      "`Makefile` has no extension, so there is no telling what it is",
+    );
     expect(refusal({ name: "page.html", size: 10 }, limits)).toBe("`.html` files cannot be uploaded here");
     expect(refusal({ name: "big.pdf", size: 3 * 1024 * 1024 }, limits)).toBe("`big.pdf` is 3 MB; the limit is 1 MB");
   });
@@ -104,7 +96,9 @@ describe("an export with the files beside the Markdown", () => {
   });
 
   it("rewrites only the ids it has a path for", () => {
-    expect(rewriteIds("[a](dag:k3f9x2m1qa#p) [b](dag:0123456789)", new Map([["k3f9x2m1qa", "q3.pdf"]]))).toBe("[a](q3.pdf) [b](dag:0123456789)");
+    expect(rewriteIds("[a](dag:k3f9x2m1qa#p) [b](dag:0123456789)", new Map([["k3f9x2m1qa", "q3.pdf"]]))).toBe(
+      "[a](q3.pdf) [b](dag:0123456789)",
+    );
   });
 
   it("numbers two files of one name", () => {
@@ -136,7 +130,12 @@ describe("an export with the files beside the Markdown", () => {
   });
 
   it("is nothing but the text when the text names nothing", async () => {
-    const made = await bundle("plan.note.md", "# Plan\n", async () => null, async () => null);
+    const made = await bundle(
+      "plan.note.md",
+      "# Plan\n",
+      async () => null,
+      async () => null,
+    );
     expect(made).toEqual({ text: "# Plan\n", files: [] });
   });
 });

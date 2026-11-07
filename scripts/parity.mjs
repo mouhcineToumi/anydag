@@ -46,7 +46,10 @@ export function readManifest() {
 export function apiRoutes() {
   const dir = path.join(ROOT, "server/routes");
   const out = [];
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith(".ts")).sort()) {
+  for (const file of fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".ts"))
+    .sort()) {
     const src = fs.readFileSync(path.join(dir, file), "utf8");
     for (const m of src.matchAll(/\bapp\.(get|post|put|delete|patch)\(\s*"(\/[^"]*)"/g)) {
       out.push(`${m[1].toUpperCase()} ${m[2].replace(/\/\*$/, "/{path:path}")}`);
@@ -65,9 +68,11 @@ export function apiRoutes() {
  */
 export function shapeOf(value) {
   if (Array.isArray(value)) return { kind: "done", names: value };
-  if (value && typeof value === "object" && value.admin === false && Object.keys(value).length === 1) return { kind: "outside", names: [] };
+  if (value && typeof value === "object" && value.admin === false && Object.keys(value).length === 1)
+    return { kind: "outside", names: [] };
   if (value && typeof value === "object" && Array.isArray(value.via)) return { kind: "via", names: value.via, why: value.why };
-  if (value && typeof value === "object" && typeof value.refused === "string") return { kind: "refused", names: [], why: value.refused };
+  if (value && typeof value === "object" && typeof value.refused === "string")
+    return { kind: "refused", names: [], why: value.refused };
   return { kind: "gap", names: [] };
 }
 
@@ -98,8 +103,12 @@ export function check(manifest, surface) {
     for (const i of INTERFACES) {
       const s = shapeOf(f[i]);
       if (s.kind === "gap") problems.push(`${where} says nothing for ${LABEL[i]} — a list of names, {via, why} or {refused}`);
-      if (s.kind === "outside" && i !== "cli") problems.push(`${where}'s ${LABEL[i]} says \`{"admin": false}\`, which only the CLI column may — ${LABEL[i]} is complete`);
-      if (s.kind !== "refused" && s.kind !== "outside" && s.names.length === 0 && s.kind !== "gap") problems.push(`${where}'s ${LABEL[i]} names nothing`);
+      if (s.kind === "outside" && i !== "cli")
+        problems.push(
+          `${where}'s ${LABEL[i]} says \`{"admin": false}\`, which only the CLI column may — ${LABEL[i]} is complete`,
+        );
+      if (s.kind !== "refused" && s.kind !== "outside" && s.names.length === 0 && s.kind !== "gap")
+        problems.push(`${where}'s ${LABEL[i]} names nothing`);
       if ((s.kind === "via" || s.kind === "refused") && !(typeof s.why === "string" && s.why.length >= 20))
         problems.push(`${where}'s ${LABEL[i]} ${s.kind === "via" ? "`via` needs a `why`" : "refusal needs a reason"}`);
       for (const n of s.names) {
@@ -119,7 +128,8 @@ export function check(manifest, surface) {
 
   const labels = { rest: "route", cli: "command", mcp: "tool" };
   for (const i of INTERFACES)
-    for (const n of known[i]) if (!named[i].has(n)) problems.push(`${LABEL[i]} ${labels[i]} \`${n}\` is in no feature — add it to docs/parity.json`);
+    for (const n of known[i])
+      if (!named[i].has(n)) problems.push(`${LABEL[i]} ${labels[i]} \`${n}\` is in no feature — add it to docs/parity.json`);
 
   /* A route no command declares must be refused or outside, for the CLI, by every feature that holds it. */
   const reached = new Set([...surface.cli.values()].flat());
@@ -127,7 +137,10 @@ export function check(manifest, surface) {
     if (reached.has(route)) continue;
     const holding = (manifest.features ?? []).filter((f) => shapeOf(f.rest).names.includes(route));
     const open = holding.filter((f) => !["refused", "outside"].includes(shapeOf(f.cli).kind)).map((f) => f.id);
-    if (open.length) problems.push(`no command reaches \`${route}\`, yet ${open.join(", ")} neither refuses it for the CLI nor marks it \`{"admin": false}\``);
+    if (open.length)
+      problems.push(
+        `no command reaches \`${route}\`, yet ${open.join(", ")} neither refuses it for the CLI nor marks it \`{"admin": false}\``,
+      );
   }
   return problems;
 }

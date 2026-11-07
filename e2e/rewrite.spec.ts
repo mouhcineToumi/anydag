@@ -30,7 +30,13 @@ A note.
 const DRAFT = {
   type: "arch",
   attrs: {},
-  body: ['service api "API" icon=server', 'db pg "Postgres" icon=postgresql', 'store redis "Redis cluster" icon=redis', "api --> redis", "api --> pg"].join("\n"),
+  body: [
+    'service api "API" icon=server',
+    'db pg "Postgres" icon=postgresql',
+    'store redis "Redis cluster" icon=redis',
+    "api --> redis",
+    "api --> pg",
+  ].join("\n"),
 };
 
 let name = "";
@@ -51,7 +57,11 @@ async function open(page: Page) {
 }
 
 /** Answer `/generate` with `body`, and keep what the page asked. */
-async function answer(page: Page, body: unknown, delay = 0): Promise<{ prompt: string; source?: string; as?: string; from?: string }[]> {
+async function answer(
+  page: Page,
+  body: unknown,
+  delay = 0,
+): Promise<{ prompt: string; source?: string; as?: string; from?: string }[]> {
   const asked: { prompt: string; source?: string; as?: string; from?: string }[] = [];
   await page.route("**/__board/generate*", async (route: Route) => {
     asked.push(route.request().postDataJSON());
@@ -83,7 +93,9 @@ test("the ✨ opens a dialog with the caret in it, and Escape closes only the di
   expect(read()).toBe(BOARD);
 });
 
-test("ctrl+Enter sends the change with the diagram's source; the answer is a preview until Accept, which is one undo", { tag: "@smoke" }, async ({ page }) => {
+test("ctrl+Enter sends the change with the diagram's source; the answer is a preview until Accept, which is one undo", {
+  tag: "@smoke",
+}, async ({ page }) => {
   const asked = await answer(page, { ok: true, draft: DRAFT, diagnostics: [], attempts: 1 }, 300);
   await open(page);
   await select(page, "svc");
@@ -121,7 +133,9 @@ test("an answer in another type is previewed as that type, and Accept retypes th
   const FLOW = {
     type: "flow",
     attrs: {},
-    body: ['lane app "App" {', '  step api "API"', "}", 'lane data "Data" {', '  step pg "Postgres"', "}", "api --> pg"].join("\n"),
+    body: ['lane app "App" {', '  step api "API"', "}", 'lane data "Data" {', '  step pg "Postgres"', "}", "api --> pg"].join(
+      "\n",
+    ),
   };
   await answer(page, { ok: true, draft: FLOW, diagnostics: [], attempts: 1 });
   await open(page);

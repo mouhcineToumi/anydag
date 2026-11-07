@@ -192,7 +192,9 @@ test("a run of days is as long as it is asked, and the arrows move by that many"
   const block = page.locator(`[data-dag-cal-column="2031-03-13"] [data-dag-cal-item="${talk}"]`);
   await expect(block).toBeVisible();
   const style = await block.getAttribute("style");
-  const at = await page.evaluate(() => new Date("2031-03-13T09:00Z").getHours() * 60 + new Date("2031-03-13T09:00Z").getMinutes());
+  const at = await page.evaluate(
+    () => new Date("2031-03-13T09:00Z").getHours() * 60 + new Date("2031-03-13T09:00Z").getMinutes(),
+  );
   expect(style).toContain(`--at: ${at}`);
   expect(style).toContain("--len: 90");
 
@@ -225,7 +227,9 @@ test("a drag in the hour grid makes an event with that start and end, in the pro
   await card.locator("[data-dag-calendar-new-title]").press("Enter");
   await expect(card).toHaveCount(0);
 
-  await expect.poll(() => read("Planning")).toMatch(/^---\nstart: 2031-03-12T10:00[+-]\d{2}:\d{2}\nend: 2031-03-12T11:30[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/);
+  await expect
+    .poll(() => read("Planning"))
+    .toMatch(/^---\nstart: 2031-03-12T10:00[+-]\d{2}:\d{2}\nend: 2031-03-12T11:30[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/);
   await expect(page.locator(`[data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
 });
 
@@ -261,7 +265,9 @@ test("New event makes one at the next hour, and its bar moves it and makes it al
   const at = path.join(BOARDS, `${name}.md`);
   const text = () => fs.readFileSync(at, "utf8");
   try {
-    expect(text()).toMatch(/^---\nstart: \d{4}-\d{2}-\d{2}T\d{2}:00[+-]\d{2}:\d{2}\nend: \d{4}-\d{2}-\d{2}T\d{2}:00[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/);
+    expect(text()).toMatch(
+      /^---\nstart: \d{4}-\d{2}-\d{2}T\d{2}:00[+-]\d{2}:\d{2}\nend: \d{4}-\d{2}-\d{2}T\d{2}:00[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/,
+    );
     /* Moving the start keeps how long it is. */
     await page.locator("[data-dag-eventbar-start-day]").fill("2031-03-12");
     await page.locator("[data-dag-eventbar-start-time]").fill("14:30");
@@ -310,10 +316,15 @@ test("a project's bar opens its calendar, and an event placed on a board or view
   await showMenu(page);
   await expect(page.locator("[data-dag-calendar-project]")).toHaveValue(project);
 
-  fs.writeFileSync(path.join(dir, "board.board.md"), `---\ntitle: Trip board\n---\n\n\`\`\`md {#t1 x=0 y=0 w=360}\n![Conference](dag:${tid})\n\`\`\`\n`);
+  fs.writeFileSync(
+    path.join(dir, "board.board.md"),
+    `---\ntitle: Trip board\n---\n\n\`\`\`md {#t1 x=0 y=0 w=360}\n![Conference](dag:${tid})\n\`\`\`\n`,
+  );
   await page.goto(`/?board=${folder}/board`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
-  await expect(page.locator(`[data-dag-embed="${tid}"][data-dag-embed-kind="event"]`)).toContainText("Event · Wed, Mar 12, 2031 – Fri, Mar 14, 2031");
+  await expect(page.locator(`[data-dag-embed="${tid}"][data-dag-embed-kind="event"]`)).toContainText(
+    "Event · Wed, Mar 12, 2031 – Fri, Mar 14, 2031",
+  );
 
   await page.goto(`/?view=1&note=${encodeURIComponent(trip)}`);
   await expect(page.locator('[data-dag-eventline="2031-03-12"]')).toContainText("Mar 12, 2031");
@@ -357,7 +368,9 @@ test("a drag moves an event along the days, and a task with both its dates", asy
   await expect.poll(() => read("ship")).toContain("status: todo\nstart: 2031-03-09\ndue: 2031-03-10\n");
 });
 
-test("a drag in the hour grid moves an event by quarter hours and days, keeping its length; Escape puts it back", async ({ page }) => {
+test("a drag in the hour grid moves an event by quarter hours and days, keeping its length; Escape puts it back", async ({
+  page,
+}) => {
   /* In UTC, and every expectation read in the browser: the machine's Node and its Chromium need not
      agree about a zone's offset in 2031, and the browser's is the one the grid is drawn in. */
   const talk = write("talk", "Keynote", ["start: 2031-03-12T09:00Z", "end: 2031-03-12T10:30Z"]);
@@ -388,7 +401,9 @@ test("a drag in the hour grid moves an event by quarter hours and days, keeping 
   await drag(page, from, c13.x - c12.x, hour * 1.25, async () => {
     await expect(page.locator(`[data-dag-cal-column="2031-03-13"] [data-dag-cal-moving-to="${starts}"]`)).toBeVisible();
   });
-  await expect.poll(() => read("talk")).toMatch(new RegExp(`start: 2031-03-13T${starts}[+-]\\d{2}:\\d{2}\nend: 2031-03-13T${ends}[+-]\\d{2}:\\d{2}\n`));
+  await expect
+    .poll(() => read("talk"))
+    .toMatch(new RegExp(`start: 2031-03-13T${starts}[+-]\\d{2}:\\d{2}\nend: 2031-03-13T${ends}[+-]\\d{2}:\\d{2}\n`));
   await expect(page.locator(`[data-dag-cal-column="2031-03-13"] [data-dag-cal-item="${talk}"]`)).toBeVisible();
   expect(new URL(page.url()).searchParams.get("note")).toBeNull();
 
@@ -431,11 +446,15 @@ test("an end is pulled: a bar's by days, a task's due date, a block's by quarter
   await drag(page, await mid(`[data-dag-cal-item="${talk}"] [data-dag-cal-edge="end"]`), 0, hour / 2, async () => {
     await expect(page.locator(`[data-dag-cal-moving-end="${ends}"]`)).toBeVisible();
   });
-  await expect.poll(() => read("talk")).toMatch(new RegExp(`start: 2031-03-12T09:00Z\nend: 2031-03-12T${ends}[+-]\\d{2}:\\d{2}\n`));
+  await expect
+    .poll(() => read("talk"))
+    .toMatch(new RegExp(`start: 2031-03-12T09:00Z\nend: 2031-03-12T${ends}[+-]\\d{2}:\\d{2}\n`));
   expect(starts).toBe(await wall("2031-03-12T09:00Z"));
 });
 
-test("a timed event let go on the all-day row is all day there, and an all-day one let go in the grid is an hour", async ({ page }) => {
+test("a timed event let go on the all-day row is all day there, and an all-day one let go in the grid is an hour", async ({
+  page,
+}) => {
   const talk = write("talk", "Keynote", ["start: 2031-03-12T09:00Z", "end: 2031-03-12T10:00Z"]);
   const trip = write("trip", "Offsite", ["start: 2031-03-13"]);
   await calendar(page, "calendar=week&date=2031-03-12", talk);

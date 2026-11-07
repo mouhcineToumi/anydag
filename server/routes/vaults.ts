@@ -103,7 +103,8 @@ export function vaultRoutes(app: Hono, s: Session): void {
     for (const f of [stem, ...subfolders]) await to.mkdir(f);
     const moved: Record<string, string[]> = Object.fromEntries(Object.values(PLURAL).map((p) => [p, []]));
     for (const [kind, names] of Object.entries(byKind(tree)) as [Kind, string[]][]) {
-      for (const name of names) if (name.startsWith(inside)) moved[PLURAL[kind]]!.push(await carry(from, to, name, kind, tree.created[name]));
+      for (const name of names)
+        if (name.startsWith(inside)) moved[PLURAL[kind]]!.push(await carry(from, to, name, kind, tree.created[name]));
     }
     // Not recursive, deepest first: a file written into the folder meanwhile keeps its folder.
     for (const f of [stem, ...subfolders].sort((a, b) => b.split("/").length - a.split("/").length)) {

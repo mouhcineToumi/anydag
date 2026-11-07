@@ -68,7 +68,7 @@ describe("a code block's language", () => {
 
 describe("what the button copies", () => {
   it("is exactly what is between the fences", () => {
-    const body = "const a = 1;\n\n  indented();\n// a <tag> & an \"entity\"";
+    const body = 'const a = 1;\n\n  indented();\n// a <tag> & an "entity"';
     const { copies } = draw("Before.\n\n```js\n" + body + "\n```\n\nAfter.\n");
     expect(copies).toEqual([{ language: "js", text: body }]);
   });

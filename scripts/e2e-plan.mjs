@@ -158,7 +158,13 @@ function main(argv) {
       out({ run: true, grep: null, kinds: {}, why: "no origin/develop or origin/main to compare with → the whole suite" });
       return;
     }
-    files = [...new Set((heads.length ? heads : ["HEAD"]).flatMap((h) => git("diff", "--name-only", `${base}...${h}`).split("\n").filter(Boolean)))];
+    files = [
+      ...new Set(
+        (heads.length ? heads : ["HEAD"]).flatMap((h) =>
+          git("diff", "--name-only", `${base}...${h}`).split("\n").filter(Boolean),
+        ),
+      ),
+    ];
   }
   out(plan(files, tracedFromPlaywright(base ?? "HEAD")));
 }

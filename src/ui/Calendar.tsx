@@ -113,8 +113,10 @@ interface Moved {
   task?: Task;
   event?: NoteEvent;
 }
-const sameTask = (a: Task | undefined, b: Task): boolean => !!a && a.status === b.status && a.due === b.due && a.start === b.start;
-const sameEvent = (a: NoteEvent | undefined, b: NoteEvent | undefined): boolean => !!a && !!b && a.start === b.start && a.end === b.end;
+const sameTask = (a: Task | undefined, b: Task): boolean =>
+  !!a && a.status === b.status && a.due === b.due && a.start === b.start;
+const sameEvent = (a: NoteEvent | undefined, b: NoteEvent | undefined): boolean =>
+  !!a && !!b && a.start === b.start && a.end === b.end;
 
 /** Whether an item moves when it is dragged: an event or a task, never a note, whose day is the store's. */
 const movable = (item: CalItem): boolean => item.kind === "event" || item.kind === "task";
@@ -149,7 +151,8 @@ function applied(task: Task, change: Pick<TaskChange, "start" | "due">): Task {
 
 /** Whether a write would change nothing — a drop back where it was picked up from. */
 function idle(item: CalItem, next: Write): boolean {
-  if ("event" in next) return !!item.event && next.event.start === item.event.start && (next.event.end ?? undefined) === item.event.end;
+  if ("event" in next)
+    return !!item.event && next.event.start === item.event.start && (next.event.end ?? undefined) === item.event.end;
   return !!item.task && sameTask(applied(item.task, next.task), item.task);
 }
 
@@ -208,13 +211,22 @@ export function CalendarView({
   const projects = useMemo(
     () =>
       [...owners.values()]
-        .map((name) => ({ name, project: list.projects[name]!, title: list.titles[name] ?? name.slice(name.lastIndexOf("/") + 1) }))
-        .sort((a, b) => Number(a.project.status === "done") - Number(b.project.status === "done") || a.title.localeCompare(b.title, undefined, { numeric: true })),
+        .map((name) => ({
+          name,
+          project: list.projects[name]!,
+          title: list.titles[name] ?? name.slice(name.lastIndexOf("/") + 1),
+        }))
+        .sort(
+          (a, b) =>
+            Number(a.project.status === "done") - Number(b.project.status === "done") ||
+            a.title.localeCompare(b.title, undefined, { numeric: true }),
+        ),
     [owners, list.projects, list.titles],
   );
   const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
   const inScope = useCallback(
-    (name: string) => (scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped)),
+    (name: string) =>
+      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
     [scoped, owners],
   );
 
@@ -224,7 +236,9 @@ export function CalendarView({
   const [pending, setPending] = useState<Readonly<Record<string, Moved>>>({});
   useEffect(() => {
     setPending((had) => {
-      const left = Object.entries(had).filter(([name, m]) => (m.task ? !sameTask(list.tasks[name], m.task) : !sameEvent(list.events[name], m.event)));
+      const left = Object.entries(had).filter(([name, m]) =>
+        m.task ? !sameTask(list.tasks[name], m.task) : !sameEvent(list.events[name], m.event),
+      );
       return left.length === Object.keys(had).length ? had : Object.fromEntries(left);
     });
   }, [list.tasks, list.events]);
@@ -305,10 +319,24 @@ export function CalendarView({
               Today
             </button>
             <span className="dag-calendar__step">
-              <button type="button" className="dag-icon" aria-label="Earlier" title="Earlier" data-dag-calendar-prev="" onClick={() => onGo({ day: stepTo(view, day, -1, count) })}>
+              <button
+                type="button"
+                className="dag-icon"
+                aria-label="Earlier"
+                title="Earlier"
+                data-dag-calendar-prev=""
+                onClick={() => onGo({ day: stepTo(view, day, -1, count) })}
+              >
                 <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
               </button>
-              <button type="button" className="dag-icon" aria-label="Later" title="Later" data-dag-calendar-next="" onClick={() => onGo({ day: stepTo(view, day, 1, count) })}>
+              <button
+                type="button"
+                className="dag-icon"
+                aria-label="Later"
+                title="Later"
+                data-dag-calendar-next=""
+                onClick={() => onGo({ day: stepTo(view, day, 1, count) })}
+              >
                 <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
               </button>
             </span>
@@ -316,7 +344,15 @@ export function CalendarView({
           <span className="dag-calendar__look">
             <div className="dag-calendar__views" role="radiogroup" aria-label="Show">
               {VIEWS.map((v) => (
-                <button key={v} type="button" role="radio" aria-checked={view === v} className="dag-tasks__layout-choice" data-dag-calendar-view={v} onClick={() => onGo({ view: v })}>
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={view === v}
+                  className="dag-tasks__layout-choice"
+                  data-dag-calendar-view={v}
+                  onClick={() => onGo({ view: v })}
+                >
                   {v === "month" ? "Month" : v === "week" ? "Week" : "Days"}
                 </button>
               ))}
@@ -338,16 +374,40 @@ export function CalendarView({
                 <span>days</span>
               </label>
             ) : null}
-            <ShowMenu hidden={hidden} onHidden={onHidden} projects={projects} scope={scope} scopeValue={scopeValue} onScope={onScope} />
+            <ShowMenu
+              hidden={hidden}
+              onHidden={onHidden}
+              projects={projects}
+              scope={scope}
+              scopeValue={scopeValue}
+              onScope={onScope}
+            />
           </span>
         </div>
       </div>
       {view === "month" && phone ? (
         <DotMonth first={first} last={last} month={day.slice(0, 7)} around={day} today={today} items={items} onOpen={open} />
       ) : view === "month" ? (
-        <Month first={first} last={last} month={day.slice(0, 7)} today={today} items={items} onOpen={open} onAsk={locked ? undefined : ask} onWrite={locked ? undefined : onWrite} onDay={(d) => onGo({ view: "days", day: d, count: 1 })} />
+        <Month
+          first={first}
+          last={last}
+          month={day.slice(0, 7)}
+          today={today}
+          items={items}
+          onOpen={open}
+          onAsk={locked ? undefined : ask}
+          onWrite={locked ? undefined : onWrite}
+          onDay={(d) => onGo({ view: "days", day: d, count: 1 })}
+        />
       ) : (
-        <Columns days={daysFrom(first, last)} today={today} items={items} onOpen={open} onAsk={locked ? undefined : ask} onWrite={locked ? undefined : onWrite} />
+        <Columns
+          days={daysFrom(first, last)}
+          today={today}
+          items={items}
+          onOpen={open}
+          onAsk={locked ? undefined : ask}
+          onWrite={locked ? undefined : onWrite}
+        />
       )}
       {making ? <NewEvent making={making} onMake={make} onClose={() => setMaking(null)} /> : null}
     </main>
@@ -426,7 +486,12 @@ function ShowMenu({
         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className="dag-calendar__chev" />
       </button>
       {open ? (
-        <div className="dag-calendar__show-menu" role="dialog" aria-label="What the calendar shows" data-dag-calendar-show-menu="">
+        <div
+          className="dag-calendar__show-menu"
+          role="dialog"
+          aria-label="What the calendar shows"
+          data-dag-calendar-show-menu=""
+        >
           <p className="dag-calendar__show-head">Show</p>
           {CAL_KINDS.map((k) => (
             <button
@@ -462,7 +527,11 @@ function ShowMenu({
                 <option value="">All projects</option>
                 {projects.map((p) => (
                   <option key={p.name} value={p.name}>
-                    {p.project.status === "done" ? `${p.title} (done)` : p.project.status === "paused" ? `${p.title} (paused)` : p.title}
+                    {p.project.status === "done"
+                      ? `${p.title} (done)`
+                      : p.project.status === "paused"
+                        ? `${p.title} (paused)`
+                        : p.title}
                   </option>
                 ))}
                 <option value={NO_PROJECT}>No project</option>
@@ -476,7 +545,8 @@ function ShowMenu({
 }
 
 /** Where the arrows go — the model's `step`, with a month landing on its first rather than on a 31st that is not there. */
-const stepTo = (view: CalView, day: string, by: number, count: number): string => step(view, view === "month" ? startOfMonth(day) : day, by, count);
+const stepTo = (view: CalView, day: string, by: number, count: number): string =>
+  step(view, view === "month" ? startOfMonth(day) : day, by, count);
 
 /** Today here, which moves at midnight while the page is open — and the minute, for the line that marks now. */
 function useToday(): string {
@@ -526,7 +596,11 @@ function ItemLink({
   const moved = useRef(false);
   const canMove = !!grab && movable(item);
   const time = item.at && !item.allDay ? clock(item.at.start) : null;
-  const words = item.event ? whenWords(item.event) : item.task ? `${item.first === item.last ? item.last : `${item.first} – ${item.last}`}` : "Made that day";
+  const words = item.event
+    ? whenWords(item.event)
+    : item.task
+      ? `${item.first === item.last ? item.last : `${item.first} – ${item.last}`}`
+      : "Made that day";
   return (
     <a
       href={hrefOf(item.name)}
@@ -547,7 +621,9 @@ function ItemLink({
         moved.current = false;
         /* A finger scrolls the calendar, as it did before anything here could move. */
         if (!canMove || e.button !== 0 || e.pointerType === "touch") return;
-        const edge = (e.target as HTMLElement).closest<HTMLElement>("[data-dag-cal-edge]")?.dataset.dagCalEdge as Edge | undefined;
+        const edge = (e.target as HTMLElement).closest<HTMLElement>("[data-dag-cal-edge]")?.dataset.dagCalEdge as
+          | Edge
+          | undefined;
         grab!(item, e, () => (moved.current = true), edge);
       }}
       onClick={(e: ReactMouseEvent) => {
@@ -566,8 +642,12 @@ function ItemLink({
       <span className="dag-calendar__name">{item.title}</span>
       {/* Its ends, to pull — not an end that is off the page or cut at midnight, which is
           not where it ends. */}
-      {canMove && axis && !before ? <span className="dag-calendar__edge" data-dag-cal-edge="start" data-axis={axis} aria-hidden="true" /> : null}
-      {canMove && axis && !after ? <span className="dag-calendar__edge" data-dag-cal-edge="end" data-axis={axis} aria-hidden="true" /> : null}
+      {canMove && axis && !before ? (
+        <span className="dag-calendar__edge" data-dag-cal-edge="start" data-axis={axis} aria-hidden="true" />
+      ) : null}
+      {canMove && axis && !after ? (
+        <span className="dag-calendar__edge" data-dag-cal-edge="end" data-axis={axis} aria-hidden="true" />
+      ) : null}
     </a>
   );
 }
@@ -603,7 +683,14 @@ function Month({
   const drawRange = useDayRange(grid, (from, to, x, y) => onAsk?.(from, to === from ? null : to, x, y));
   const grab = useGrab(grid, (item, next) => onWrite?.(item, next));
   return (
-    <div className="dag-cal-month" ref={grid} role="grid" aria-label="Month" style={{ "--weeks": weeks.length } as CSSProperties} onPointerDown={onAsk ? drawRange : undefined}>
+    <div
+      className="dag-cal-month"
+      ref={grid}
+      role="grid"
+      aria-label="Month"
+      style={{ "--weeks": weeks.length } as CSSProperties}
+      onPointerDown={onAsk ? drawRange : undefined}
+    >
       <div className="dag-cal-names" role="row">
         {weeks[0]!.map((d) => (
           <div key={d} role="columnheader" className="dag-cal-names__day">
@@ -612,7 +699,16 @@ function Month({
         ))}
       </div>
       {weeks.map((week) => (
-        <MonthWeek key={week[0]} days={week} month={month} today={today} bars={lanes(items, week)} grab={onWrite ? grab : undefined} onOpen={onOpen} onDay={onDay} />
+        <MonthWeek
+          key={week[0]}
+          days={week}
+          month={month}
+          today={today}
+          bars={lanes(items, week)}
+          grab={onWrite ? grab : undefined}
+          onOpen={onOpen}
+          onDay={onDay}
+        />
       ))}
     </div>
   );
@@ -723,7 +819,14 @@ function MonthWeek({
           data-other={d.slice(0, 7) !== month ? "" : undefined}
           style={{ gridColumn: i + 1 }}
         >
-          <button type="button" className="dag-cal-day__n" data-dag-cal-day-open={d} aria-label={`Open ${d} on its own`} onPointerDown={(e) => e.stopPropagation()} onClick={() => onDay(d)}>
+          <button
+            type="button"
+            className="dag-cal-day__n"
+            data-dag-cal-day-open={d}
+            aria-label={`Open ${d} on its own`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onDay(d)}
+          >
             {d.slice(8, 10) === "01" ? `${SHORT.format(calendarDate(d))}` : Number(d.slice(8, 10))}
           </button>
         </div>
@@ -767,7 +870,8 @@ function MonthWeek({
 function useDayRange(host: RefObject<HTMLElement | null>, ask: (from: string, to: string, x: number, y: number) => void) {
   return useCallback(
     (e: ReactPointerEvent) => {
-      const at = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-dag-cal-day]")?.dataset.dagCalDay;
+      const at = (x: number, y: number) =>
+        document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-dag-cal-day]")?.dataset.dagCalDay;
       const from = at(e.clientX, e.clientY);
       if (!from || e.button !== 0) return;
       e.preventDefault();
@@ -800,7 +904,8 @@ function useDayRange(host: RefObject<HTMLElement | null>, ask: (from: string, to
         onDrop: done,
         onClick: done,
         onEnd() {
-          for (const cell of host.current?.querySelectorAll<HTMLElement>("[data-dag-cal-picked]") ?? []) delete cell.dataset.dagCalPicked;
+          for (const cell of host.current?.querySelectorAll<HTMLElement>("[data-dag-cal-picked]") ?? [])
+            delete cell.dataset.dagCalPicked;
         },
       });
     },
@@ -859,7 +964,11 @@ const minutesOf = (hhmm: string): number => {
  * them, or a ghost in the hour grid — and that is exactly what is written when it is let go. The item
  * it was picked up from is dimmed. Escape puts it back.
  */
-function useGrab(host: RefObject<HTMLElement | null>, onWrite: (item: CalItem, next: Write) => void, onGhost?: (g: Ghost | null) => void): Grab {
+function useGrab(
+  host: RefObject<HTMLElement | null>,
+  onWrite: (item: CalItem, next: Write) => void,
+  onGhost?: (g: Ghost | null) => void,
+): Grab {
   return useCallback(
     (item, e, dragged, edge) => {
       const from = spotAt(host.current, e.clientX, e.clientY);
@@ -880,12 +989,18 @@ function useGrab(host: RefObject<HTMLElement | null>, onWrite: (item: CalItem, n
           if (!inGrid) return { event: withEdge(ev, edge, s.day) };
           return s.minute === undefined ? next : { event: withEdge(ev, edge, s.day, quarter(s.minute + SNAP / 2), SNAP) };
         }
-        if (s.minute !== undefined) return { event: inGrid ? shiftEvent(ev, daysBetween(from.day, s.day), s.minute - from.minute!, SNAP) : asTimed(ev, s.day, quarter(s.minute)) };
+        if (s.minute !== undefined)
+          return {
+            event: inGrid
+              ? shiftEvent(ev, daysBetween(from.day, s.day), s.minute - from.minute!, SNAP)
+              : asTimed(ev, s.day, quarter(s.minute)),
+          };
         return { event: inGrid ? asAllDay(ev, s.day) : shiftEvent(ev, daysBetween(from.day, s.day)) };
       };
 
       const clearDays = () => {
-        for (const cell of host.current?.querySelectorAll<HTMLElement>("[data-dag-cal-picked]") ?? []) delete cell.dataset.dagCalPicked;
+        for (const cell of host.current?.querySelectorAll<HTMLElement>("[data-dag-cal-picked]") ?? [])
+          delete cell.dataset.dagCalPicked;
       };
       const paintDays = (a: string, b: string) => {
         for (const cell of host.current?.querySelectorAll<HTMLElement>("[data-dag-cal-day]") ?? []) {
@@ -907,7 +1022,14 @@ function useGrab(host: RefObject<HTMLElement | null>, onWrite: (item: CalItem, n
           const f = fieldsOf(asEvent(w.event));
           const top = minutesOf(f.startTime);
           const long = (placed.at.end - placed.at.start) / 60_000;
-          return onGhost({ day: f.startDay, top, len: Math.max(SNAP, Math.min(long, DAY_MINUTES - top)), label: f.startTime, end: f.endTime, title: item.title });
+          return onGhost({
+            day: f.startDay,
+            top,
+            len: Math.max(SNAP, Math.min(long, DAY_MINUTES - top)),
+            label: f.startTime,
+            end: f.endTime,
+            title: item.title,
+          });
         }
         onGhost?.(null);
         paintDays(placed.first, placed.last);
@@ -982,7 +1104,9 @@ function Columns({
   const deep = Math.max(1, ...bars.map((b) => b.lane + 1));
   const folded = !unfolded && deep > ALLDAY_LANES;
   const kept = folded ? bars.filter((b) => b.lane < ALLDAY_LANES) : bars;
-  const more = folded ? days.map((_, i) => bars.filter((b) => b.lane >= ALLDAY_LANES && b.col <= i && i < b.col + b.span).length) : [];
+  const more = folded
+    ? days.map((_, i) => bars.filter((b) => b.lane >= ALLDAY_LANES && b.col <= i && i < b.col + b.span).length)
+    : [];
   const count = folded ? ALLDAY_LANES + 1 : deep;
   const top = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -1012,11 +1136,23 @@ function Columns({
           </div>
         ))}
       </div>
-      <div className="dag-cal-allday" ref={top} style={{ "--lanes": count } as CSSProperties} onPointerDown={onAsk ? drawDays : undefined} data-dag-cal-allday="">
+      <div
+        className="dag-cal-allday"
+        ref={top}
+        style={{ "--lanes": count } as CSSProperties}
+        onPointerDown={onAsk ? drawDays : undefined}
+        data-dag-cal-allday=""
+      >
         <span className="dag-cal-gutter dag-cal-allday__label">
           All day
           {unfolded && deep > ALLDAY_LANES ? (
-            <button type="button" className="dag-cal-more dag-cal-allday__less" data-dag-cal-allday-less="" onPointerDown={(e) => e.stopPropagation()} onClick={() => setUnfolded(false)}>
+            <button
+              type="button"
+              className="dag-cal-more dag-cal-allday__less"
+              data-dag-cal-allday-less=""
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setUnfolded(false)}
+            >
               Less
             </button>
           ) : null}
@@ -1062,7 +1198,16 @@ function Columns({
             ))}
           </div>
           {days.map((d) => (
-            <DayColumn key={d} day={d} today={d === today} items={items} moving={moving?.day === d ? moving : null} grab={onWrite ? grab : undefined} onOpen={onOpen} onAsk={onAsk} />
+            <DayColumn
+              key={d}
+              day={d}
+              today={d === today}
+              items={items}
+              moving={moving?.day === d ? moving : null}
+              grab={onWrite ? grab : undefined}
+              onOpen={onOpen}
+              onAsk={onAsk}
+            />
           ))}
         </div>
       </div>
@@ -1106,10 +1251,12 @@ function DayColumn({
 }) {
   const placed = useMemo(() => blocks(items, day), [items, day]);
   const [ghost, setGhost] = useState<{ from: number; to: number } | null>(null);
-  const now = today ? (() => {
-    const at = wallOf(Date.now());
-    return at.hour * 60 + at.minute;
-  })() : null;
+  const now = today
+    ? (() => {
+        const at = wallOf(Date.now());
+        return at.hour * 60 + at.minute;
+      })()
+    : null;
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || !onAsk) return;
@@ -1149,7 +1296,9 @@ function DayColumn({
 
   return (
     <div className="dag-cal-column" data-dag-cal-column={day} data-today={today ? "" : undefined} onPointerDown={onPointerDown}>
-      {ghost ? <div className="dag-cal-ghost" style={{ "--at": ghost.from, "--len": ghost.to - ghost.from } as CSSProperties} /> : null}
+      {ghost ? (
+        <div className="dag-cal-ghost" style={{ "--at": ghost.from, "--len": ghost.to - ghost.from } as CSSProperties} />
+      ) : null}
       {placed.map((b) => (
         <ItemLink
           key={`${b.item.kind}:${b.item.name}`}
@@ -1188,7 +1337,15 @@ function DayColumn({
  * Placed where the drag ended and nudged back inside the window. It owns its own Escape and stops
  * it, the settings card's rule, so the window's handlers never see a key meant for it.
  */
-function NewEvent({ making, onMake, onClose }: { making: Making; onMake(title: string, start: string, end: string | null): Promise<void>; onClose(): void }) {
+function NewEvent({
+  making,
+  onMake,
+  onClose,
+}: {
+  making: Making;
+  onMake(title: string, start: string, end: string | null): Promise<void>;
+  onClose(): void;
+}) {
   const ref = useRef<HTMLFormElement>(null);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1198,7 +1355,10 @@ function NewEvent({ making, onMake, onClose }: { making: Making; onMake(title: s
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ x: Math.max(8, Math.min(making.x + 8, innerWidth - r.width - 8)), y: Math.max(8, Math.min(making.y + 8, innerHeight - r.height - 8)) });
+    setPos({
+      x: Math.max(8, Math.min(making.x + 8, innerWidth - r.width - 8)),
+      y: Math.max(8, Math.min(making.y + 8, innerHeight - r.height - 8)),
+    });
     el.querySelector<HTMLInputElement>("input")?.focus();
   }, [making]);
 
@@ -1238,7 +1398,15 @@ function NewEvent({ making, onMake, onClose }: { making: Making; onMake(title: s
         <CalendarClock size={14} strokeWidth={2} aria-hidden="true" />
         <span>{when}</span>
       </p>
-      <input type="text" placeholder="New event" aria-label="The event's title" value={title} disabled={busy} data-dag-calendar-new-title="" onChange={(e) => setTitle(e.target.value)} />
+      <input
+        type="text"
+        placeholder="New event"
+        aria-label="The event's title"
+        value={title}
+        disabled={busy}
+        data-dag-calendar-new-title=""
+        onChange={(e) => setTitle(e.target.value)}
+      />
       <div className="dag-calendar__new-acts">
         <button type="button" className="dag-calendar__new-cancel" onClick={onClose}>
           Cancel

@@ -141,7 +141,21 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
  * key added in a component and not here is a preference that silently stops following anybody.
  * `test/prefs.test.ts` holds it against the keys the app actually reads.
  */
-export const PREF_KEYS = [THEME, LIBRARY, INSPECTOR_MODE, INSPECTOR_WIDTH, SIDEBAR, SIDEBAR_WIDTH, FAVOURITES, CALENDAR_HIDE, WEEK_START, TIME_ZONE, TIME_ZONE_SEEN, ATTACHMENTS, UPDATE_LINKS] as const;
+export const PREF_KEYS = [
+  THEME,
+  LIBRARY,
+  INSPECTOR_MODE,
+  INSPECTOR_WIDTH,
+  SIDEBAR,
+  SIDEBAR_WIDTH,
+  FAVOURITES,
+  CALENDAR_HIDE,
+  WEEK_START,
+  TIME_ZONE,
+  TIME_ZONE_SEEN,
+  ATTACHMENTS,
+  UPDATE_LINKS,
+] as const;
 
 /**
  * **The half of `PREF_KEYS` that switches with the vault**: the

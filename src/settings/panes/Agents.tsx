@@ -121,7 +121,10 @@ export function AgentsPane() {
 
       <Agents />
 
-      <Reset what="the prompt card's and the Assistant's provider, model and thinking" onReset={() => resetSettings(["llm", "assistant"])} />
+      <Reset
+        what="the prompt card's and the Assistant's provider, model and thinking"
+        onReset={() => resetSettings(["llm", "assistant"])}
+      />
     </>
   );
 }
@@ -152,7 +155,8 @@ function AssistantGroup() {
       title="Assistant"
       footer={
         <Hint data-dag-setting-assistant-hint="">
-          {note ?? "The chat in the panel and on the Assistant page runs on your own Claude Code or OpenCode, signed in on this computer. Each message can pick another."}
+          {note ??
+            "The chat in the panel and on the Assistant page runs on your own Claude Code or OpenCode, signed in on this computer. Each message can pick another."}
         </Hint>
       }
     >
@@ -163,7 +167,9 @@ function AssistantGroup() {
           value={s.assistant.provider ?? ""}
           /* A model name belongs to its provider, so choosing another provider clears it back to that
              provider's own default. */
-          onChange={(e) => writeSettings({ assistant: { provider: (e.target.value || null) as "claude" | "opencode" | null, model: null } })}
+          onChange={(e) =>
+            writeSettings({ assistant: { provider: (e.target.value || null) as "claude" | "opencode" | null, model: null } })
+          }
         >
           <option value="">Whichever can answer</option>
           {(providers ?? []).map((p) => (
@@ -190,7 +196,10 @@ function AssistantGroup() {
           ))}
         </select>
       </Field>
-      <Field label="Starts in" hint="Ask answers from the vault and changes nothing. Edit may write, and every change can be undone.">
+      <Field
+        label="Starts in"
+        hint="Ask answers from the vault and changes nothing. Edit may write, and every change can be undone."
+      >
         <select
           className="dag-select"
           data-dag-setting-assistant-mode=""
@@ -242,7 +251,12 @@ function ProviderKeys({ onChange }: { onChange: () => void }) {
   return (
     <Group
       title="API keys"
-      footer={<Hint>Kept in your system&rsquo;s keyring and handed to the server when it starts. Saving restarts it. A key is never shown again.</Hint>}
+      footer={
+        <Hint>
+          Kept in your system&rsquo;s keyring and handed to the server when it starts. Saving restarts it. A key is never shown
+          again.
+        </Hint>
+      }
     >
       {KEYS.map(({ name, label }) => (
         <Field key={name} label={label} plain data-dag-setting-key={name}>
@@ -269,7 +283,12 @@ function ProviderKeys({ onChange }: { onChange: () => void }) {
               Save
             </button>
             {stored.has(name) && (
-              <button type="button" className="dag-button" disabled={busy !== null} onClick={() => void done(name, keys.unset(name))}>
+              <button
+                type="button"
+                className="dag-button"
+                disabled={busy !== null}
+                onClick={() => void done(name, keys.unset(name))}
+              >
                 Remove
               </button>
             )}
@@ -330,9 +349,7 @@ function CopyLine({ value, hook, multiline }: { value: string; hook: string; mul
   }, [done]);
   return (
     <div className={`dag-settings-modal__copy${multiline ? " dag-settings-modal__copy--block" : ""}`}>
-      <code data-dag-setting-copy-value={hook}>
-        {value}
-      </code>
+      <code data-dag-setting-copy-value={hook}>{value}</code>
       <button
         type="button"
         className="dag-icon"

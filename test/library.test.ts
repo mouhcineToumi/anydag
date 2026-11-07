@@ -3,7 +3,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { appendPart, BROWSABLE, CATEGORIES, categoryOf, find, isFragment, LIBRARY, madeOf, matches, render, SHELVES, usesOf } from "@/board/library";
+import {
+  appendPart,
+  BROWSABLE,
+  CATEGORIES,
+  categoryOf,
+  find,
+  isFragment,
+  LIBRARY,
+  madeOf,
+  matches,
+  render,
+  SHELVES,
+  usesOf,
+} from "@/board/library";
 import { TEMPLATES } from "@/board/templates";
 import { isDiagramType } from "@/board/types";
 import { parseChart } from "@/dsl/chart";
@@ -145,10 +158,7 @@ describe("the library's composition", () => {
        generic box with nothing said. A check is the only thing between that and silent drift.
        Read as text rather than imported: the map lives in a React component, and the value it
        holds is the glyph, not the name. */
-    const src = fs.readFileSync(
-      path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/edit/Library.tsx"),
-      "utf8",
-    );
+    const src = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/edit/Library.tsx"), "utf8");
     const block = /const ICONS: Record<string, [^=]*> = \{([\s\S]*?)\};/.exec(src);
     expect(block, "the ICONS map moved — this check needs its new shape").not.toBeNull();
     const known = new Set(block![1]!.split(/[,\s]+/).filter(Boolean));

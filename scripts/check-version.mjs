@@ -21,7 +21,8 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
 
 const problems = [];
 const parsed = parseVersion(file);
-if (!parsed) problems.push(`VERSION is "${file}", which is not MAJOR.MINOR.PATCH (with at most -beta.N or -nightly.YYYYMMDDHHmm after it)`);
+if (!parsed)
+  problems.push(`VERSION is "${file}", which is not MAJOR.MINOR.PATCH (with at most -beta.N or -nightly.YYYYMMDDHHmm after it)`);
 if (pkg !== file) problems.push(`package.json says ${pkg} and VERSION says ${file}`);
 const tag = process.argv[2];
 if (tag !== undefined && tag !== `v${file}`) problems.push(`the tag is ${tag} and VERSION says v${file}`);

@@ -46,7 +46,11 @@ export const GROUPS: Group[] = [
   { name: "file", title: "file", blurb: "attachments: any file, kept beside the boards and notes and referred to by id" },
   { name: "folder", title: "folder", blurb: "folders of boards, notes, tables and files" },
   { name: "trash", title: "trash", blurb: "what was deleted, kept for thirty days — restored, or deleted for good" },
-  { name: "sync", title: "sync", blurb: "this vault's link to a sync server — end-to-end encrypted, the passphrase never an argument" },
+  {
+    name: "sync",
+    title: "sync",
+    blurb: "this vault's link to a sync server — end-to-end encrypted, the passphrase never an argument",
+  },
   { name: "picture", title: "picture", blurb: "the laid-out page, in a browser: snapshots, tidy and exports" },
   { name: "app", title: "app", blurb: "preferences and logs" },
 ];

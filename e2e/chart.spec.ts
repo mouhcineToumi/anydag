@@ -351,7 +351,7 @@ slice c "Gamma" 25
     await open(page);
     await pickMark(page, "rev", "mob");
     await page.keyboard.press("Delete");
-    await expect.poll(read, { timeout: 5_000 }).not.toContain('series mob');
+    await expect.poll(read, { timeout: 5_000 }).not.toContain("series mob");
     await expect(page.locator('[data-dag-item="rev"] [data-dag-node]')).toHaveCount(1);
 
     await page.locator(".dag-viewport").focus();

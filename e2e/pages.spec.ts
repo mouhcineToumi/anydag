@@ -76,7 +76,13 @@ test("the strip is below the board, not in the toolbar", async ({ page }) => {
 
 test("a long name is one truncated line, and the whole of it is the tooltip", async ({ page }) => {
   const long = "What the office actually produces, at some length";
-  fs.writeFileSync(file, board([["docs", long], ["b", "Second"]]));
+  fs.writeFileSync(
+    file,
+    board([
+      ["docs", long],
+      ["b", "Second"],
+    ]),
+  );
   await open(page);
 
   const tab = page.locator('[data-dag-page="docs"]');

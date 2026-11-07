@@ -76,7 +76,13 @@ export interface Refs {
   name: string;
   kind: string;
   title: string | null;
-  refs: { id: string; type: "link" | "embed"; text: string; part?: string; target: { id: string; name: string; kind: string; title: string | null } | null }[];
+  refs: {
+    id: string;
+    type: "link" | "embed";
+    text: string;
+    part?: string;
+    target: { id: string; name: string; kind: string; title: string | null } | null;
+  }[];
   backlinks: { id: string; name: string; kind: string; title: string | null; type: "link" | "embed" }[];
 }
 
@@ -138,7 +144,10 @@ async function checked<T>(ctx: Ctx, p: Parsed, kind: Kind): Promise<T> {
 function quizLines(ctx: Ctx, diagnostics: readonly QuizDiagnostic[]): number {
   for (const d of diagnostics) ctx.io.out(`${d.line}:${d.col} ${d.severity} ${d.code} ${d.message}`);
   const errors = diagnostics.filter((d) => d.severity === "error").length;
-  if (diagnostics.length) ctx.io.err(`${errors} error${errors === 1 ? "" : "s"}, ${diagnostics.length - errors} warning${diagnostics.length - errors === 1 ? "" : "s"}`);
+  if (diagnostics.length)
+    ctx.io.err(
+      `${errors} error${errors === 1 ? "" : "s"}, ${diagnostics.length - errors} warning${diagnostics.length - errors === 1 ? "" : "s"}`,
+    );
   return errors > 0 ? EXIT.errors : EXIT.ok;
 }
 
@@ -147,7 +156,9 @@ function tableLines(ctx: Ctx, diagnostics: readonly TableDiagnostic[]): number {
   for (const d of diagnostics) ctx.io.out(`${d.line}:${d.col} ${d.severity} ${d.code}${d.tab ? ` [${d.tab}]` : ""} ${d.message}`);
   const errors = diagnostics.filter((d) => d.severity === "error").length;
   if (diagnostics.length)
-    ctx.io.err(`${errors} error${errors === 1 ? "" : "s"}, ${diagnostics.length - errors} warning${diagnostics.length - errors === 1 ? "" : "s"}`);
+    ctx.io.err(
+      `${errors} error${errors === 1 ? "" : "s"}, ${diagnostics.length - errors} warning${diagnostics.length - errors === 1 ? "" : "s"}`,
+    );
   return errors > 0 ? EXIT.errors : EXIT.ok;
 }
 
@@ -213,7 +224,9 @@ function docCommands(kind: Kind): Command[] {
       async run(ctx, p) {
         const base = str(p, "base");
         if (!base && !bool(p, "force")) {
-          throw new UsageError(`give --base (\`anydag ${noun} cat ${p.pos[0]} --json\` prints it), or --force to write over whatever is there`);
+          throw new UsageError(
+            `give --base (\`anydag ${noun} cat ${p.pos[0]} --json\` prints it), or --force to write over whatever is there`,
+          );
         }
         const text = await readText(ctx, str(p, "file"));
         const after = await put(ctx, p.pos[0]!, kind, text, base);
@@ -230,7 +243,11 @@ function docCommands(kind: Kind): Command[] {
       summary: `rename a ${noun}, or move it into a folder with a / — its images go with it`,
       routes: ["POST /__board/rename"],
       async run(ctx, p) {
-        const done = await ctx.api.post<{ name: string; id: string }>("/__board/rename", { name: p.pos[0], to: p.pos[1], kind: q });
+        const done = await ctx.api.post<{ name: string; id: string }>("/__board/rename", {
+          name: p.pos[0],
+          to: p.pos[1],
+          kind: q,
+        });
         emit(ctx, done, () => ctx.io.out(done.name));
       },
     },
@@ -244,7 +261,9 @@ function docCommands(kind: Kind): Command[] {
       routes: ["POST /__board/delete"],
       async run(ctx, p) {
         const done = await ctx.api.post<{ trash: { id: string } }>("/__board/delete", { name: p.pos[0], kind: q });
-        emit(ctx, done, () => ctx.io.err(`moved ${noun} ${p.pos[0]} to the trash — anydag trash restore ${done.trash.id} brings it back`));
+        emit(ctx, done, () =>
+          ctx.io.err(`moved ${noun} ${p.pos[0]} to the trash — anydag trash restore ${done.trash.id} brings it back`),
+        );
       },
     },
   ];
@@ -284,7 +303,9 @@ export const DOCS: Command[] = [
       /* The title last: it is what the person calls the file, and it has spaces in it. */
       const titled = (n: string) => listed.titles?.[n] ?? "";
       emit(ctx, narrowListed(listed, under, only), () => {
-        for (const line of table(rows.map((r) => (bool(p, "ids") ? [r.name, r.kind, r.id, titled(r.name)] : [r.name, r.kind, titled(r.name)]))))
+        for (const line of table(
+          rows.map((r) => (bool(p, "ids") ? [r.name, r.kind, r.id, titled(r.name)] : [r.name, r.kind, titled(r.name)])),
+        ))
           ctx.io.out(line);
       });
     },
@@ -299,13 +320,22 @@ export const DOCS: Command[] = [
       "`E_*` stops a diagram drawing and `W_*` does not; `EB_*` is the board file rather than the DSL in it. Branch " +
       "on the code — the message is for a person. What is wrong with the drawing rather than the text needs the " +
       "laid-out page: `anydag snapshot`. --file checks a draft that is not in the account, writing nothing.",
-    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the account; `-` is stdin" }],
+    flags: [
+      {
+        name: "file",
+        type: "string",
+        value: "<path|->",
+        help: "check this draft instead of a file in the account; `-` is stdin",
+      },
+    ],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
     async run(ctx, p) {
       const d = await checked<Diagnosed>(ctx, p, "board");
       emit(ctx, d, () => {
         for (const line of diagnosticLines(d)) ctx.io.out(line);
-        ctx.io.err(`${d.errors ?? 0} error${d.errors === 1 ? "" : "s"}, ${d.warnings ?? 0} warning${d.warnings === 1 ? "" : "s"}`);
+        ctx.io.err(
+          `${d.errors ?? 0} error${d.errors === 1 ? "" : "s"}, ${d.warnings ?? 0} warning${d.warnings === 1 ? "" : "s"}`,
+        );
       });
       return (d.errors ?? 0) > 0 ? EXIT.errors : EXIT.ok;
     },
@@ -321,7 +351,9 @@ export const DOCS: Command[] = [
       "Every problem with its line and its code — EQ_ for a question a run cannot ask, WQ_ for one that still " +
       "works — read with the page's own parser. `quiz write` prints the same after writing. " +
       "--file checks a draft that is not in the vault, writing nothing.",
-    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
+    flags: [
+      { name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" },
+    ],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
     async run(ctx, p) {
       /* The route's answer, which is the page's parser run by the grammar service — so this,
@@ -346,7 +378,9 @@ export const DOCS: Command[] = [
       "Every problem with its line and its code — ET_ for two things claiming one id, WT_ for everything that " +
       "still works: a cell its column cannot read, a row with no id yet, a sort naming a column that went. " +
       "--file checks a draft that is not in the vault, writing nothing.",
-    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
+    flags: [
+      { name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" },
+    ],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
     async run(ctx, p) {
       const got = await checked<{ tabs: number; rows: number; diagnostics: TableDiagnostic[] }>(ctx, p, "table");
@@ -355,7 +389,8 @@ export const DOCS: Command[] = [
         return got.diagnostics.some((d) => d.severity === "error") ? EXIT.errors : EXIT.ok;
       }
       const code = tableLines(ctx, got.diagnostics);
-      if (!got.diagnostics.length) ctx.io.err(`${p.pos[0] ?? str(p, "file")}: ${got.tabs} tab(s), ${got.rows} row(s), nothing wrong`);
+      if (!got.diagnostics.length)
+        ctx.io.err(`${p.pos[0] ?? str(p, "file")}: ${got.tabs} tab(s), ${got.rows} row(s), nothing wrong`);
       return code;
     },
   },
@@ -401,7 +436,12 @@ export const DOCS: Command[] = [
         ...(recursive ? { recursive: true } : {}),
       });
       emit(ctx, done, () => {
-        const went = (done.boards?.length ?? 0) + (done.notes?.length ?? 0) + (done.quizzes?.length ?? 0) + (done.tables?.length ?? 0) + (done.files?.length ?? 0);
+        const went =
+          (done.boards?.length ?? 0) +
+          (done.notes?.length ?? 0) +
+          (done.quizzes?.length ?? 0) +
+          (done.tables?.length ?? 0) +
+          (done.files?.length ?? 0);
         ctx.io.err(
           `moved ${done.folder}/${went ? ` and ${plural(went, "file")} in it` : ""} to the trash — anydag trash restore ${done.trash.id} brings it back`,
         );

@@ -82,7 +82,8 @@ for (const file of STYLES) {
 /* 3. SVG presentation attributes are style, and a diagram is mostly SVG. An `opacity="0.72"` in a
       component is the same failure as one in a stylesheet — it is how `Legend.tsx` came to draw a
       line that does not match the edges it explains. Expressions are fine; literals are not. */
-const SVG_ATTR = /\b(strokeWidth|strokeDasharray|strokeOpacity|fillOpacity|opacity|r|rx|ry|cx|cy|x1|x2|y1|y2|width|height)=(?:"[^"]*"|\{\s*-?\d+(?:\.\d+)?\s*\})/g;
+const SVG_ATTR =
+  /\b(strokeWidth|strokeDasharray|strokeOpacity|fillOpacity|opacity|r|rx|ry|cx|cy|x1|x2|y1|y2|width|height)=(?:"[^"]*"|\{\s*-?\d+(?:\.\d+)?\s*\})/g;
 for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))) {
   const text = strip(fs.readFileSync(path.join(root, file), "utf8"), ".tsx");
   for (const m of text.matchAll(SVG_ATTR)) {

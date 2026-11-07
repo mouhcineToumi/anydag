@@ -30,16 +30,63 @@
  * every inherited value. This is the set the stylesheets actually use.
  */
 const PROPS = [
-  "box-sizing", "display", "position", "top", "right", "bottom", "left",
-  "width", "height", "min-width", "min-height", "max-width", "max-height",
-  "margin", "padding", "overflow", "flex", "flex-direction", "flex-wrap",
-  "align-items", "align-self", "justify-content", "gap", "order",
-  "background", "background-color", "background-image", "border", "border-radius",
-  "box-shadow", "opacity", "color", "fill", "stroke", "stroke-width", "stroke-dasharray",
-  "stroke-linecap", "stroke-linejoin", "paint-order", "transform", "transform-origin",
-  "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing",
-  "text-align", "text-anchor", "text-decoration", "text-transform", "white-space",
-  "overflow-wrap", "vertical-align", "list-style", "dominant-baseline", "visibility",
+  "box-sizing",
+  "display",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "width",
+  "height",
+  "min-width",
+  "min-height",
+  "max-width",
+  "max-height",
+  "margin",
+  "padding",
+  "overflow",
+  "flex",
+  "flex-direction",
+  "flex-wrap",
+  "align-items",
+  "align-self",
+  "justify-content",
+  "gap",
+  "order",
+  "background",
+  "background-color",
+  "background-image",
+  "border",
+  "border-radius",
+  "box-shadow",
+  "opacity",
+  "color",
+  "fill",
+  "stroke",
+  "stroke-width",
+  "stroke-dasharray",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "paint-order",
+  "transform",
+  "transform-origin",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "font-style",
+  "line-height",
+  "letter-spacing",
+  "text-align",
+  "text-anchor",
+  "text-decoration",
+  "text-transform",
+  "white-space",
+  "overflow-wrap",
+  "vertical-align",
+  "list-style",
+  "dominant-baseline",
+  "visibility",
 ] as const;
 
 /** The four sides of `border`, for an element whose sides differ. */
@@ -133,7 +180,16 @@ async function fontFaces(): Promise<string> {
  * renderer. The only things it needs from CSS are the ones a class actually sets: edge labels get
  * their font and fill from `.dag-edge-label`, axis labels from `.dag-axis__label`.
  */
-const SVG_PROPS = ["fill", "stroke", "stroke-width", "paint-order", "font-family", "font-size", "font-weight", "opacity"] as const;
+const SVG_PROPS = [
+  "fill",
+  "stroke",
+  "stroke-width",
+  "paint-order",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "opacity",
+] as const;
 
 const isSvg = (el: Element): boolean => el.namespaceURI === "http://www.w3.org/2000/svg";
 
@@ -231,7 +287,8 @@ async function freeze(el: HTMLElement): Promise<string> {
    * serialiser makes.
    */
   inlineStyles(el, clone);
-  for (const chrome of Array.from(clone.querySelectorAll(".dag-handle, .dag-connect-handle, .dag-export, .dag-code__copy"))) chrome.remove();
+  for (const chrome of Array.from(clone.querySelectorAll(".dag-handle, .dag-connect-handle, .dag-export, .dag-code__copy")))
+    chrome.remove();
   clone.removeAttribute("data-dag-movable");
   clone.removeAttribute("data-dag-selected");
   clone.removeAttribute("data-dag-drop");

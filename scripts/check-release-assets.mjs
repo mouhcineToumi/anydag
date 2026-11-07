@@ -46,11 +46,14 @@ for (const f of feeds) {
   if (said !== version) problems.push(`${f} says version ${said ?? "(none)"}, not ${version}`);
 }
 if (ch !== "latest") {
-  for (const f of have) if (/^latest.*\.yml$/.test(f)) problems.push(`${f} is in a ${parsed.kind} release — a stable build would be offered it`);
+  for (const f of have)
+    if (/^latest.*\.yml$/.test(f)) problems.push(`${f} is in a ${parsed.kind} release — a stable build would be offered it`);
 }
 
 if (problems.length) {
   for (const p of problems) console.error(`::error::release assets — ${p}`);
   process.exit(1);
 }
-console.log(`release assets — ${version} (${parsed.kind}, channel ${ch}): ${installers.length} installers and ${feeds.join(", ")}`);
+console.log(
+  `release assets — ${version} (${parsed.kind}, channel ${ch}): ${installers.length} installers and ${feeds.join(", ")}`,
+);

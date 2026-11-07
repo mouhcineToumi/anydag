@@ -16,8 +16,7 @@ import type { Graph } from "../src/dsl/ir";
  * errors, and `detectMermaid` insists the output is no longer Mermaid.
  */
 function clean(type: string, body: string, dir?: "LR" | "TB"): Graph {
-  const model =
-    type === "sequence" ? parseSequence(body) : type === "chart" ? parseChart(body) : parseDiagram(type, body, dir);
+  const model = type === "sequence" ? parseSequence(body) : type === "chart" ? parseChart(body) : parseDiagram(type, body, dir);
   expect(model, `${type} did not parse at all`).not.toBe(null);
   const errors = model!.diagnostics.filter((d) => d.severity === "error");
   expect(errors, `errors in:\n${body}`).toEqual([]);
@@ -266,7 +265,7 @@ describe("xychart-beta", () => {
 
 describe("the door", () => {
   it("declines anything without a header it knows", () => {
-    expect(fromMermaid("service api \"x\"")).toBe(null);
+    expect(fromMermaid('service api "x"')).toBe(null);
     expect(fromMermaid("gantt\n  title A project\n  section One")).toBe(null);
     expect(fromMermaid("")).toBe(null);
   });
@@ -280,7 +279,10 @@ describe("the door", () => {
     for (const body of ['pie\nslice a "A" 3', 'pie\nslice a "A" 3\nslice b "B" 1\nlegend bottom', 'pie "62%" "share"']) {
       expect(detectMermaid(body).fatal, body).toBe(false);
       expect(fromMermaid(body), body).toBe(null);
-      expect(parseChart(body).diagnostics.filter((d) => d.severity === "error"), body).toEqual([]);
+      expect(
+        parseChart(body).diagnostics.filter((d) => d.severity === "error"),
+        body,
+      ).toEqual([]);
     }
   });
 

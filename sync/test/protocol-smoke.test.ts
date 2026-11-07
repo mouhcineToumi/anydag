@@ -2,7 +2,20 @@ import nodeCrypto from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { blobId, deriveKek, fromRecoveryCode, keyOf, keysOf, newParams, openBlob, randomKey, recoveryCode, sealBlob, unwrapKey, wrapKey } from "../protocol/crypto";
+import {
+  blobId,
+  deriveKek,
+  fromRecoveryCode,
+  keyOf,
+  keysOf,
+  newParams,
+  openBlob,
+  randomKey,
+  recoveryCode,
+  sealBlob,
+  unwrapKey,
+  wrapKey,
+} from "../protocol/crypto";
 import { openMeta, sealMeta } from "../protocol/meta";
 import type { KdfParams } from "../protocol/wire";
 
@@ -23,7 +36,9 @@ describe("the protocol's crypto, end to end", () => {
     const id = blobId(k.blob, bytes);
     expect(openBlob(k.enc, id, sealBlob(k.enc, id, bytes))).toEqual(bytes);
     const key = keyOf(k.path, "a.md");
-    expect(openMeta(k.enc, key, sealMeta(k.enc, key, { path: "a.md", kind: "file", created: null, mtime: 1, size: 5 })).path).toBe("a.md");
+    expect(
+      openMeta(k.enc, key, sealMeta(k.enc, key, { path: "a.md", kind: "file", created: null, mtime: 1, size: 5 })).path,
+    ).toBe("a.md");
     const code = recoveryCode(vk);
     expect(fromRecoveryCode(code.toLowerCase())).toEqual(vk);
     expect(fromRecoveryCode(code.replace(/^./, (c) => (c === "0" ? "1" : "0")))).toBeNull();

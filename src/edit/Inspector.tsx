@@ -319,7 +319,6 @@ export function Inspector({
     addEventListener("pointercancel", onUp);
   };
 
-
   return (
     <aside
       className="dag-inspector"
@@ -371,7 +370,12 @@ export function Inspector({
           `nodes.css` loads after this file. See the namespace note in docs/architecture/things-that-will-bite.md. */}
       {split ? (
         <div className="dag-inspector__modes" role="tablist" aria-label="Editor view">
-          {([["props", "Properties"], ["source", "Source"]] as const).map(([m, label]) => (
+          {(
+            [
+              ["props", "Properties"],
+              ["source", "Source"],
+            ] as const
+          ).map(([m, label]) => (
             <button
               key={m}
               type="button"
@@ -387,38 +391,34 @@ export function Inspector({
         </div>
       ) : null}
 
-
       {/* A Mermaid paste, and the one button that turns it into this grammar. Offered only where
           the detector is already certain — a header means the block is another language end to end
           — so nothing that merely resembles Mermaid can be rewritten by accident. In both halves,
           because it is a fact about the item rather than about the text: a person who never opens
           Source is exactly the person who most needs to be offered the conversion. */}
-      {diagram || links ? <MermaidOffer body={draft} onConvert={(type, body, dir) => {
-        flush();
-        editor.replace(item.id, { type, body, ...(dir ? { attrs: { dir } } : null) });
-        setDraft(body);
-        sent.current = body;
-      }} /> : null}
+      {diagram || links ? (
+        <MermaidOffer
+          body={draft}
+          onConvert={(type, body, dir) => {
+            flush();
+            editor.replace(item.id, { type, body, ...(dir ? { attrs: { dir } } : null) });
+            setDraft(body);
+            sent.current = body;
+          }}
+        />
+      ) : null}
 
       {/*
-        * The controls. One subject at a time: whatever is picked *inside* this item, or — with
-        * nothing picked — the item's own fields.
-        *
-        * The pick's half shows in **both** views, because it is what a person is working on in
-        * either one; the item's shows only where the item is what the panel is about, which is the
-        * Properties half or an item that has no halves at all. Every control hands the whole body
-        * back through `onChange`, so it goes through this panel's debounce, the same patch and the
-        * same undo entry as a keystroke. There is no second write path.
-        */}
-      <Props
-        item={item}
-        editor={editor}
-        pages={pages}
-        body={draft}
-        subject={subject}
-        showItem={showFields}
-        onBody={onChange}
-      />
+       * The controls. One subject at a time: whatever is picked *inside* this item, or — with
+       * nothing picked — the item's own fields.
+       *
+       * The pick's half shows in **both** views, because it is what a person is working on in
+       * either one; the item's shows only where the item is what the panel is about, which is the
+       * Properties half or an item that has no halves at all. Every control hands the whole body
+       * back through `onChange`, so it goes through this panel's debounce, the same patch and the
+       * same undo entry as a keystroke. There is no second write path.
+       */}
+      <Props item={item} editor={editor} pages={pages} body={draft} subject={subject} showItem={showFields} onBody={onChange} />
 
       {showSource ? (
         <textarea
@@ -431,12 +431,12 @@ export function Inspector({
             item.type === "prompt"
               ? "Describe the diagram to draw"
               : item.type === "image"
-              ? "A caption"
-              : item.type === "md"
-                ? "Markdown"
-                : links
-                  ? "one link per line: `a --> b \"label\"`"
-                  : `${item.type} source`
+                ? "A caption"
+                : item.type === "md"
+                  ? "Markdown"
+                  : links
+                    ? 'one link per line: `a --> b "label"`'
+                    : `${item.type} source`
           }
           aria-label={`${item.type} source`}
           onChange={(e) => onChange(e.target.value)}
@@ -505,13 +505,7 @@ export function Inspector({
  * `arch` fence is a `flow` and converting it without moving it would trade one pile of errors for
  * another.
  */
-function MermaidOffer({
-  body,
-  onConvert,
-}: {
-  body: string;
-  onConvert(type: ItemType, body: string, dir?: "LR" | "TB"): void;
-}) {
+function MermaidOffer({ body, onConvert }: { body: string; onConvert(type: ItemType, body: string, dir?: "LR" | "TB"): void }) {
   const found = useMemo(() => (detectMermaid(body).fatal ? fromMermaid(body) : null), [body]);
   if (!found) return null;
   return (

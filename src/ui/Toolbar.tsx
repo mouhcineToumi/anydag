@@ -124,7 +124,16 @@ export function Toolbar({
       onSelect: () => void copyText(appLink(id)).then((ok) => setCopied(ok ? "yes" : "no")),
       split: more.length > 0,
     });
-  if (renameable) rows.push({ key: "rename", label: "Rename", icon: Pencil, hook: "data-dag-toolbar-rename", onSelect: () => setRenaming(shown ?? ""), split: more.length > 0 && !id, disabled: locked });
+  if (renameable)
+    rows.push({
+      key: "rename",
+      label: "Rename",
+      icon: Pencil,
+      hook: "data-dag-toolbar-rename",
+      onSelect: () => setRenaming(shown ?? ""),
+      split: more.length > 0 && !id,
+      disabled: locked,
+    });
   /* The lock's switch lives here while the page is editable (the UI review): an open padlock in the
      bar said nothing about which state it was in. Locked, the bar says *Read only* in so many words. */
   if (sidebar && !locked)
@@ -187,7 +196,13 @@ export function Toolbar({
             /* The name *and* what pressing it does, because the two are not the same sentence and a
                screen reader gets only this one. */
             aria-label={boardName ? `${shown}: search everything` : "Search everything"}
-            title={renameable && !locked ? `Search (${chord ?? "Space O"}). Double-click to rename` : chord ? `Search (${chord})` : "Search"}
+            title={
+              renameable && !locked
+                ? `Search (${chord ?? "Space O"}). Double-click to rename`
+                : chord
+                  ? `Search (${chord})`
+                  : "Search"
+            }
             onClick={onBoards}
             onDoubleClick={renameable && !locked ? () => setRenaming(shown) : undefined}
           >

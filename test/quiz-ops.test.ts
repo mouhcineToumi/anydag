@@ -55,7 +55,10 @@ describe("one question at a time", () => {
   it("takes the id from the op when the heading has none, and refuses two that disagree", () => {
     const { text } = apply([{ op: "set", id: "qc", markdown: "## Three, now? \n- [ ] c\n- [x] d" }]);
     expect(text.endsWith("## Three, now? {#qc}\n- [ ] c\n- [x] d\n")).toBe(true);
-    expect(applyQuizOps(QUIZ, [{ op: "set", id: "qc", markdown: "## X {#qz}\n- [x] a\n- [ ] b" }])).toMatchObject({ ok: false, status: 400 });
+    expect(applyQuizOps(QUIZ, [{ op: "set", id: "qc", markdown: "## X {#qz}\n- [x] a\n- [ ] b" }])).toMatchObject({
+      ok: false,
+      status: 400,
+    });
   });
 
   it("adds a question at the end with an id of its own, or before or after one, one blank line apart", () => {
@@ -86,11 +89,26 @@ describe("one question at a time", () => {
   });
 
   it("refuses what names nothing, and Markdown that is not one askable question, applying none of the list", () => {
-    expect(applyQuizOps(QUIZ, [{ op: "remove", id: "nope" }])).toEqual({ ok: false, status: 404, error: "no question `nope` in this quiz" });
+    expect(applyQuizOps(QUIZ, [{ op: "remove", id: "nope" }])).toEqual({
+      ok: false,
+      status: 404,
+      error: "no question `nope` in this quiz",
+    });
     expect(applyQuizOps(QUIZ, [{ op: "move", id: "qa", before: "nope" }])).toMatchObject({ ok: false, status: 404 });
-    for (const markdown of ["Just prose.", "## A?\n- [x] a\n- [ ] b\n## B?\n- [x] a\n- [ ] b", "Intro.\n\n## A?\n- [x] a\n- [ ] b", "## A?\n- [ ] a\n- [ ] b", "---\nt: x\n---\n## A?\n- [x] a\n- [ ] b"])
+    for (const markdown of [
+      "Just prose.",
+      "## A?\n- [x] a\n- [ ] b\n## B?\n- [x] a\n- [ ] b",
+      "Intro.\n\n## A?\n- [x] a\n- [ ] b",
+      "## A?\n- [ ] a\n- [ ] b",
+      "---\nt: x\n---\n## A?\n- [x] a\n- [ ] b",
+    ])
       expect(applyQuizOps(QUIZ, [{ op: "set", markdown }])).toMatchObject({ ok: false, status: 400 });
-    expect(applyQuizOps(QUIZ, [{ op: "remove", id: "qa" }, { op: "remove", id: "nope" }])).toMatchObject({ ok: false });
+    expect(
+      applyQuizOps(QUIZ, [
+        { op: "remove", id: "qa" },
+        { op: "remove", id: "nope" },
+      ]),
+    ).toMatchObject({ ok: false });
     expect(applyQuizOps(QUIZ, [{ op: "rename", id: "qa" }])).toMatchObject({ ok: false, status: 400 });
   });
 

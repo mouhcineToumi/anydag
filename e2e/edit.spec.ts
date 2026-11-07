@@ -57,9 +57,7 @@ test("a drag pins the item it moved, and every item that was flowing", { tag: "@
   await page.mouse.move(from.x + 240, from.y + 220, { steps: 8 });
   await page.mouse.up();
 
-  await expect
-    .poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 })
-    .toMatch(/```md \{#one x=\d+ y=\d+\}/);
+  await expect.poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 }).toMatch(/```md \{#one x=\d+ y=\d+\}/);
 
   const after = fs.readFileSync(file, "utf8");
 

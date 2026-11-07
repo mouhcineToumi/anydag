@@ -60,7 +60,9 @@ describe("the manifest holds against the three surfaces", () => {
   });
 
   it("keeps the MCP column complete: no feature is outside MCP", () => {
-    const outside = (manifest.features as Record<string, unknown>[]).filter((f) => shapeOf(f.mcp).kind === "outside" || shapeOf(f.rest).kind === "outside");
+    const outside = (manifest.features as Record<string, unknown>[]).filter(
+      (f) => shapeOf(f.mcp).kind === "outside" || shapeOf(f.rest).kind === "outside",
+    );
     expect(outside.map((f) => f.id)).toEqual([]);
     const withoutTools = (manifest.features as Record<string, unknown>[]).filter((f) => shapeOf(f.mcp).kind === "gap");
     expect(withoutTools.map((f) => f.id)).toEqual([]);
@@ -82,9 +84,9 @@ describe("check", () => {
   });
 
   it("calls a missing interface a gap", () => {
-    expect(check({ features: [{ id: "a.read", area: "A", what: "x", rest: ["GET /a"], cli: ["a cat"] }] }, { ...real, mcp: [] })).toEqual([
-      expect.stringMatching(/`a.read` says nothing for MCP/),
-    ]);
+    expect(
+      check({ features: [{ id: "a.read", area: "A", what: "x", rest: ["GET /a"], cli: ["a cat"] }] }, { ...real, mcp: [] }),
+    ).toEqual([expect.stringMatching(/`a.read` says nothing for MCP/)]);
   });
 
   it("refuses a name that does not exist, and a real one no feature names", () => {
@@ -95,7 +97,9 @@ describe("check", () => {
   });
 
   it("wants a reason for a refusal and for a `via`", () => {
-    expect(check(small({ mcp: { refused: "no" } }), { ...real, mcp: [] })).toEqual([expect.stringMatching(/refusal needs a reason/)]);
+    expect(check(small({ mcp: { refused: "no" } }), { ...real, mcp: [] })).toEqual([
+      expect.stringMatching(/refusal needs a reason/),
+    ]);
     expect(check(small({ mcp: { via: ["a_read"] } }), real)).toEqual([expect.stringMatching(/`via` needs a `why`/)]);
   });
 
@@ -109,7 +113,11 @@ describe("check", () => {
   });
 
   it("counts a route no command reaches as fine only where the CLI refuses it or is outside it", () => {
-    const refusing = { features: [{ id: "a.x", area: "A", what: "x", rest: ["GET /a"], cli: { refused: "a reason long enough to count" }, mcp: ["a_read"] }] };
+    const refusing = {
+      features: [
+        { id: "a.x", area: "A", what: "x", rest: ["GET /a"], cli: { refused: "a reason long enough to count" }, mcp: ["a_read"] },
+      ],
+    };
     expect(check(refusing, { rest: ["GET /a"], cli: new Map(), mcp: ["a_read"] })).toEqual([]);
     expect(cliRefused(refusing)).toEqual({ "GET /a": "a reason long enough to count" });
     const outside = small({ cli: { admin: false } });
@@ -119,8 +127,12 @@ describe("check", () => {
   });
 
   it("calls `{admin: false}` an error on REST or MCP, which are complete", () => {
-    expect(check(small({ mcp: { admin: false } }), { ...real, mcp: [] })).toEqual([expect.stringMatching(/MCP says `\{"admin": false\}`, which only the CLI column may/)]);
-    expect(check(small({ rest: { admin: false } }), { ...real, rest: [] })).toEqual([expect.stringMatching(/REST says `\{"admin": false\}`, which only the CLI column may/)]);
+    expect(check(small({ mcp: { admin: false } }), { ...real, mcp: [] })).toEqual([
+      expect.stringMatching(/MCP says `\{"admin": false\}`, which only the CLI column may/),
+    ]);
+    expect(check(small({ rest: { admin: false } }), { ...real, rest: [] })).toEqual([
+      expect.stringMatching(/REST says `\{"admin": false\}`, which only the CLI column may/),
+    ]);
   });
 
   it("does not take a route the CLI skips for one it carries", () => {
@@ -128,7 +140,14 @@ describe("check", () => {
     const both = {
       features: [
         { id: "a.read", area: "A", what: "x", rest: ["GET /a"], cli: { admin: false }, mcp: ["a_read"] },
-        { id: "a.more", area: "A", what: "y", rest: ["GET /a"], cli: ["a cat"], mcp: { via: ["a_read"], why: "covered by the read tool above" } },
+        {
+          id: "a.more",
+          area: "A",
+          what: "y",
+          rest: ["GET /a"],
+          cli: ["a cat"],
+          mcp: { via: ["a_read"], why: "covered by the read tool above" },
+        },
       ],
     };
     expect(check(both, real)).toEqual([]);
@@ -140,7 +159,14 @@ describe("render", () => {
     const md = render({
       features: [
         { id: "a", area: "One", what: "First", rest: ["GET /a"], cli: ["a"], mcp: { refused: "the same reason, twice over" } },
-        { id: "b", area: "Two", what: "Second", rest: ["GET /b"], cli: { refused: "the same reason, twice over" }, mcp: { via: ["x"], why: "something else entirely" } },
+        {
+          id: "b",
+          area: "Two",
+          what: "Second",
+          rest: ["GET /b"],
+          cli: { refused: "the same reason, twice over" },
+          mcp: { via: ["x"], why: "something else entirely" },
+        },
         { id: "c", area: "Two", what: "Third", rest: ["GET /c"], cli: { admin: false }, mcp: ["c"] },
       ],
     });

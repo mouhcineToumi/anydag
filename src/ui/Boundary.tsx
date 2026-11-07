@@ -35,8 +35,8 @@ export class Boundary extends Component<Props, State> {
         <div className="dag-crash__card">
           <h1 className="dag-crash__title">AnyDag stopped</h1>
           <p className="dag-crash__body">
-            Something went wrong while drawing this page. Your board is saved as a file, so nothing
-            you did has been lost. Reloading usually brings it back.
+            Something went wrong while drawing this page. Your board is saved as a file, so nothing you did has been lost.
+            Reloading usually brings it back.
           </p>
           <button className="dag-crash__act" type="button" onClick={() => location.reload()}>
             Reload

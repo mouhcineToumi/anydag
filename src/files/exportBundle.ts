@@ -38,5 +38,8 @@ export async function saveWithFiles(doc: string, mdPath: string, text: string): 
   );
   if (!made.files.length) return saveFile(mdPath, text, "text/markdown");
   const zip = zipBundle(mdPath, made);
-  saveFile(`${mdPath.replace(/\.(?:board|note|quiz)\.md$|\.md$/, "")}.zip`, new Blob([zip as BlobPart], { type: "application/zip" }));
+  saveFile(
+    `${mdPath.replace(/\.(?:board|note|quiz)\.md$|\.md$/, "")}.zip`,
+    new Blob([zip as BlobPart], { type: "application/zip" }),
+  );
 }

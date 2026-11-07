@@ -39,7 +39,8 @@ export interface ChatMeta {
 
 export const grantsOf = (m: ChatMeta): Record<string, { mode: Mode; at: string }> => {
   const out: Record<string, { mode: Mode; at: string }> = {};
-  for (const [k, v] of Object.entries(m)) if (k.startsWith("grant:") && v && typeof v === "object") out[k.slice(6)] = v as { mode: Mode; at: string };
+  for (const [k, v] of Object.entries(m))
+    if (k.startsWith("grant:") && v && typeof v === "object") out[k.slice(6)] = v as { mode: Mode; at: string };
   return out;
 };
 

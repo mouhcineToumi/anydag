@@ -55,7 +55,12 @@ export const boardExports = (scale: number): ExportOption<"svg" | "png" | "md">[
  */
 export const NOTE_EXPORTS: ExportOption<"pdf" | "md">[] = [
   { value: "pdf", label: "Note as PDF", hint: "Opens the print dialog: choose Save as PDF", icon: FileDown },
-  { value: "md", label: "Note file (.note.md)", hint: "The note itself, as Markdown. With pictures or files, it comes as a .zip", icon: FileText },
+  {
+    value: "md",
+    label: "Note file (.note.md)",
+    hint: "The note itself, as Markdown. With pictures or files, it comes as a .zip",
+    icon: FileText,
+  },
 ];
 
 /**
@@ -73,7 +78,12 @@ export const QUIZ_EXPORTS: ExportOption<"md">[] = [
  */
 export const TABLE_EXPORTS: ExportOption<"csv" | "md">[] = [
   { value: "csv", label: "Tab as CSV", hint: "This tab's rows, for a spreadsheet: sorted, not filtered", icon: FileSpreadsheet },
-  { value: "md", label: "Table file (.table.md)", hint: "The table itself, every tab, which imports back with its links intact", icon: FileText },
+  {
+    value: "md",
+    label: "Table file (.table.md)",
+    hint: "The table itself, every tab, which imports back with its links intact",
+    icon: FileText,
+  },
 ];
 
 /**
@@ -81,7 +91,10 @@ export const TABLE_EXPORTS: ExportOption<"csv" | "md">[] = [
  * the button is not drawn there, so the menu carries what it would have offered. On a wider window
  * these rows are hidden and the button is the one at the top right.
  */
-export function exportRows<V extends string>(options: ExportOption<V>[], onExport: (value: V) => void | Promise<void>): MoreItem[] {
+export function exportRows<V extends string>(
+  options: ExportOption<V>[],
+  onExport: (value: V) => void | Promise<void>,
+): MoreItem[] {
   return options.map((o, i) => ({
     key: `export-${o.value}`,
     label: o.label,
@@ -169,7 +182,11 @@ export function ExportButton<V extends string>({
     e.preventDefault();
     const at = items.indexOf(document.activeElement as HTMLButtonElement);
     const next =
-      e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? items.length - 1
+          : (at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
     items[next]?.focus();
   };
 
@@ -191,7 +208,14 @@ export function ExportButton<V extends string>({
         <span className="dag-export__word">{busy ? "Exporting…" : "Export"}</span>
       </button>
       {open ? (
-        <div className="dag-export__menu" data-dag-export-menu="" role="menu" aria-label={`Export this ${what}`} ref={menu} onKeyDown={onMenuKey}>
+        <div
+          className="dag-export__menu"
+          data-dag-export-menu=""
+          role="menu"
+          aria-label={`Export this ${what}`}
+          ref={menu}
+          onKeyDown={onMenuKey}
+        >
           {options.map((o) => {
             const Icon = o.icon;
             return (

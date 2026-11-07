@@ -82,7 +82,15 @@ export async function loadVaults(): Promise<Vault[] | null> {
 export function currentOf(all: readonly Vault[] | null): Vault {
   const id = currentVault();
   return (
-    all?.find((v) => v.id === id) ?? { id, name: "Vault", path: "", opened: "", open: Boolean(id), default: false, missing: false }
+    all?.find((v) => v.id === id) ?? {
+      id,
+      name: "Vault",
+      path: "",
+      opened: "",
+      open: Boolean(id),
+      default: false,
+      missing: false,
+    }
   );
 }
 

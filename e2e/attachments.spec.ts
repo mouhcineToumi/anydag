@@ -48,7 +48,8 @@ function watch(page: Page, allowed: RegExp[] = []): void {
   page.on("pageerror", (e) => problems.push(String(e)));
 }
 
-const ready = (page: Page) => page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+const ready = (page: Page) =>
+  page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 
 /** A one-page PDF with a filled rectangle on it: real enough for pdf.js, and no font to fetch. */
 function pdf(): Buffer {
@@ -72,7 +73,10 @@ function pdf(): Buffer {
 }
 
 /** A one-pixel PNG. */
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 /** Bytes nobody draws: what a spreadsheet is to a page. */
 const SHEET = Buffer.from("PK\u0003\u0004 not really a workbook", "latin1");
@@ -98,7 +102,8 @@ async function drop(page: Page, selector: string, files: Dropped[], at?: { x: nu
       const y = at?.y ?? box.top + box.height / 2;
       const target = (at ? document.elementFromPoint(x, y) : el) ?? el;
       const dt = new DataTransfer();
-      for (const f of files) dt.items.add(new File([Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
+      for (const f of files)
+        dt.items.add(new File([Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
       for (const type of ["dragenter", "dragover", "drop"])
         target.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x, clientY: y }));
     },
@@ -129,7 +134,9 @@ async function openFolder(page: Page): Promise<void> {
   if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
 }
 
-test("files dropped on a folder in the sidebar are kept there, each with the icon of its sort, and a PDF opens drawn", { tag: "@smoke" }, async ({ page }) => {
+test("files dropped on a folder in the sidebar are kept there, each with the icon of its sort, and a PDF opens drawn", {
+  tag: "@smoke",
+}, async ({ page }) => {
   await page.goto("/");
   await openSidebar(page);
   await expect(page.locator(`[data-dag-sidebar-folder="${folder}"]`)).toBeVisible({ timeout: 10_000 });
@@ -181,16 +188,23 @@ test("a type this server does not take is refused where it was dropped, and noth
   expect(fs.readdirSync(dir)).toEqual([]);
 });
 
-test("a file dropped into a note is kept beside it and embedded there: a picture drawn, a PDF a card that previews in place", async ({ page }) => {
+test("a file dropped into a note is kept beside it and embedded there: a picture drawn, a PDF a card that previews in place", async ({
+  page,
+}) => {
   const name = writeNote("n", "The first paragraph.\n\nThe last paragraph.\n");
   await page.goto(`/?note=${encodeURIComponent(name)}`);
   const last = page.locator(".bn-editor [data-content-type='paragraph']", { hasText: "The last paragraph." });
   await expect(last).toBeVisible({ timeout: 15_000 });
   const box = (await last.boundingBox())!;
-  await drop(page, "[data-dag-note-drop]", [file("shot.png", "image/png", PNG), file("Q3 Report.pdf", "application/pdf", pdf())], {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2,
-  });
+  await drop(
+    page,
+    "[data-dag-note-drop]",
+    [file("shot.png", "image/png", PNG), file("Q3 Report.pdf", "application/pdf", pdf())],
+    {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    },
+  );
 
   const note = () => fs.readFileSync(path.join(dir, "n.note.md"), "utf8");
   await expect.poll(note, { timeout: 10_000 }).toMatch(/!\[Q3 Report\.pdf\]\(dag:[0-9a-z]{10}\)/);
@@ -211,10 +225,15 @@ test("dropped on a board, a picture is an image fence drawn from the file and an
   await page.goto(`/?board=${encodeURIComponent(`${folder}/b`)}`);
   await ready(page);
   const vp = (await page.locator(".dag-viewport").boundingBox())!;
-  await drop(page, ".dag-viewport", [file("shot.png", "image/png", PNG), file("Budget.xlsx", "application/octet-stream", SHEET)], {
-    x: vp.x + vp.width / 2,
-    y: vp.y + vp.height / 2,
-  });
+  await drop(
+    page,
+    ".dag-viewport",
+    [file("shot.png", "image/png", PNG), file("Budget.xlsx", "application/octet-stream", SHEET)],
+    {
+      x: vp.x + vp.width / 2,
+      y: vp.y + vp.height / 2,
+    },
+  );
   const board = () => fs.readFileSync(path.join(dir, "b.board.md"), "utf8");
   await expect.poll(board, { timeout: 10_000 }).toMatch(/```image \{[^}]*src="?dag:[0-9a-z]{10}"?/);
   await expect.poll(board, { timeout: 10_000 }).toMatch(/!\[Budget\.xlsx\]\(dag:[0-9a-z]{10}\)/);

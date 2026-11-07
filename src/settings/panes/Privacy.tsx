@@ -21,7 +21,11 @@ export function PrivacyPane() {
       <Group title="Logs">
         <Field
           label="Send anonymous logs"
-          hint={failed ? "That did not save. Try again in a moment." : "Errors, which features are used, and how fast pages draw. Nothing you write, and nothing that names you."}
+          hint={
+            failed
+              ? "That did not save. Try again in a moment."
+              : "Errors, which features are used, and how fast pages draw. Nothing you write, and nothing that names you."
+          }
         >
           <Switch
             data-dag-setting-telemetry=""
@@ -35,7 +39,7 @@ export function PrivacyPane() {
         </Field>
         <Field label="Where they go" plain data-dag-setting-telemetry-to="">
           <span className="dag-settings__value">
-            {status === null ? "…" : status.destination ?? "Nowhere yet: no sync server is paired and none is set"}
+            {status === null ? "…" : (status.destination ?? "Nowhere yet: no sync server is paired and none is set")}
           </span>
         </Field>
       </Group>
@@ -57,7 +61,8 @@ export function PrivacyPane() {
       </Group>
 
       <Hint>
-        Turning this off drops anything not yet sent and forgets the install id. Nothing is sent from a snapshot or a read-only page.
+        Turning this off drops anything not yet sent and forgets the install id. Nothing is sent from a snapshot or a read-only
+        page.
       </Hint>
     </>
   );

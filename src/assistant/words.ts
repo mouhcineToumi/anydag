@@ -134,7 +134,12 @@ export const waiting = (s: Step): boolean => (s.kind === "approval" || s.kind ==
 
 /** How a block conflicted, in a sentence: the files an undo left alone and why. */
 export function conflictLines(rec: UndoRecord): string[] {
-  const why = { changed: "changed since", closed: "its vault is not open", big: "too big to have been kept", refused: "not a change this chat could have made" } as const;
+  const why = {
+    changed: "changed since",
+    closed: "its vault is not open",
+    big: "too big to have been kept",
+    refused: "not a change this chat could have made",
+  } as const;
   return rec.conflicts.map((c) => `${c.paths.length ? c.paths.join(", ") : c.what}: ${why[c.why]}`);
 }
 
@@ -146,7 +151,12 @@ export function dayLabel(iso: string, now = new Date()): string {
   const diff = Math.round((day(now) - day(d)) / 86_400_000);
   if (diff <= 0) return "Today";
   if (diff === 1) return "Yesterday";
-  return d.toLocaleDateString(undefined, { weekday: diff < 7 ? "long" : undefined, month: "short", day: "numeric", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+  return d.toLocaleDateString(undefined, {
+    weekday: diff < 7 ? "long" : undefined,
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
 }
 
 /** The time of day a turn was said, for its header. */

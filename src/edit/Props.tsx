@@ -388,17 +388,7 @@ function Em({ src, onSet }: { src: string; onSet(flag: Flag, on: boolean): void 
  * would offer to write what the card is already showing; a one-node diagram has no group, but
  * the reading habit is one rule, not two — the same paragraph `PickProps` carries on its own hue.
  */
-function NodeStyle({
-  type,
-  body,
-  node,
-  onBody,
-}: {
-  type: string;
-  body: string;
-  node: Node;
-  onBody(next: string): void;
-}) {
+function NodeStyle({ type, body, node, onBody }: { type: string; body: string; node: Node; onBody(next: string): void }) {
   const src = body.split("\n")[node.line - 1] ?? "";
   const write = (next: string) => onBody(replaceLine(body, node.line, next));
   const mod = (key: ModifierKey, value: string | null) => write(setModifier(src, key, value));
@@ -414,12 +404,7 @@ function NodeStyle({
       {kinds.length > 0 && kinds.includes(kind) ? (
         <label className="dag-field dag-field--row">
           <span>Kind</span>
-          <select
-            className="dag-select"
-            data-dag-prop-kind=""
-            value={kind}
-            onChange={(e) => write(setKind(src, e.target.value))}
-          >
+          <select className="dag-select" data-dag-prop-kind="" value={kind} onChange={(e) => write(setKind(src, e.target.value))}>
             {kinds.map((k) => (
               <option key={k} value={k}>
                 {k}
@@ -598,9 +583,7 @@ function PickProps({
             reaching into a card wants first. The strings and the values below are the thing's own
             content — not chrome — so they keep their place, and keep it *under* these. */}
         <Hues hue={hue} onSet={(h) => mod("hue", h)} />
-        {isNode && !isChart && kindsOf(type).length > 0 ? (
-          <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} />
-        ) : null}
+        {isNode && !isChart && kindsOf(type).length > 0 ? <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} /> : null}
 
         {type === "mindmap" || isChart ? null : (
           <Field
@@ -681,9 +664,7 @@ function PickProps({
         </div>
       ) : null}
 
-      {isNode && layered(type, layout) ? (
-        <Column written={writtenCol} current={column} onSet={(v) => mod("col", v)} />
-      ) : null}
+      {isNode && layered(type, layout) ? <Column written={writtenCol} current={column} onSet={(v) => mod("col", v)} /> : null}
 
       {/* The one dialect with no reading for a drag at all, saying so where a person will look for
           it after the cursor has already said no. */}
@@ -711,15 +692,7 @@ function PickProps({
  * not a promise about the answer: `col=` ranks the cards that carry one against each other and ELK
  * compacts the rest, so one pin on its own changes nothing and two hold their order. See `Node.col`.
  */
-function Column({
-  written,
-  current,
-  onSet,
-}: {
-  written: string;
-  current: number | null;
-  onSet(next: string | null): void;
-}) {
+function Column({ written, current, onSet }: { written: string; current: number | null; onSet(next: string | null): void }) {
   if (written === "" && current === null) return null;
   return (
     <div className="dag-props__row" role="group" aria-label="Column">
@@ -938,10 +911,7 @@ function ItemProps({
    * the draft to `pickFromLine` and `declaredAt`. The other item fields the parse reads ride
    * along in the deps, because they are read even though the body is what usually moves.
    */
-  const lone = useMemo(
-    () => loneNode({ ...item, body }),
-    [item.id, item.type, item.dir, item.aspect, item.layout, body],
-  );
+  const lone = useMemo(() => loneNode({ ...item, body }), [item.id, item.type, item.dir, item.aspect, item.layout, body]);
 
   /* The disclosure belongs to the thing being looked at, so it closes when that thing changes.
      Plain state, and deliberately not in `localStorage`: a preference about a panel belongs in
@@ -952,15 +922,15 @@ function ItemProps({
   return (
     <div className="dag-inspector__fields" data-dag-item-props={item.id}>
       {/*
-        * Style, always first. What it is depends on what the item is:
-        *
-        * - A diagram holding one bare node: that node's own controls (`NodeStyle`), written on
-        *   the node's line in the body.
-        * - An `md`, a note or an image: the item's own hue, on the fence — F6's attribute, and
-        *   until it was shown here only writable by typing it onto the fence line.
-        * - A multi-node diagram: **no style block at all.** There is no one line a swatch could
-        *   honestly recolour, and the person picks the card they mean.
-        */}
+       * Style, always first. What it is depends on what the item is:
+       *
+       * - A diagram holding one bare node: that node's own controls (`NodeStyle`), written on
+       *   the node's line in the body.
+       * - An `md`, a note or an image: the item's own hue, on the fence — F6's attribute, and
+       *   until it was shown here only writable by typing it onto the fence line.
+       * - A multi-node diagram: **no style block at all.** There is no one line a swatch could
+       *   honestly recolour, and the person picks the card they mean.
+       */}
       {links ? null : lone ? (
         <NodeStyle type={item.type} body={body} node={lone} onBody={onBody} />
       ) : !diagram ? (
@@ -1000,20 +970,20 @@ function ItemProps({
       )}
 
       {/*
-        * The structural half, behind a disclosure collapsed by default.
-        *
-        * Everything in here is a claim about the item as a thing in the board — where it sits,
-        * what it is called, whether it draws, how it is converted — and none of it is what a
-        * person who just dropped a component came to change. It resets per item and is not
-        * remembered across them on purpose.
-        *
-        * **Title and Subtitle are moved here, not deleted.** Cutting them would leave `title=`
-        * and `subtitle=` with no control at all, and a control that is missing is a line somebody
-        * has to go and type. What moved them is where they sat: at the top of the panel as though
-        * every component should have a header, which F0 decided none should — a header is
-        * something the author asks for. A person who wants a standalone title reaches for the
-        * `Heading` atom in `src/board/library/diagrams.ts`, placed where they want it.
-        */}
+       * The structural half, behind a disclosure collapsed by default.
+       *
+       * Everything in here is a claim about the item as a thing in the board — where it sits,
+       * what it is called, whether it draws, how it is converted — and none of it is what a
+       * person who just dropped a component came to change. It resets per item and is not
+       * remembered across them on purpose.
+       *
+       * **Title and Subtitle are moved here, not deleted.** Cutting them would leave `title=`
+       * and `subtitle=` with no control at all, and a control that is missing is a line somebody
+       * has to go and type. What moved them is where they sat: at the top of the panel as though
+       * every component should have a header, which F0 decided none should — a header is
+       * something the author asks for. A person who wants a standalone title reaches for the
+       * `Heading` atom in `src/board/library/diagrams.ts`, placed where they want it.
+       */}
       <div className="dag-props__adv" data-dag-advanced="">
         <button
           type="button"
@@ -1140,14 +1110,14 @@ function ItemProps({
             ) : null}
 
             {/*
-              * The two declared conversions between an automatic layout and the author's own
-              * geometry.
-              *
-              * Both rewrite the whole body, which is why each asks first, in the row rather than
-              * through `confirm()`: a modal dialog blocks the page, cannot be styled, and cannot
-              * be driven by the checks that have to prove it works — the same argument the board
-              * list makes.
-              */}
+             * The two declared conversions between an automatic layout and the author's own
+             * geometry.
+             *
+             * Both rewrite the whole body, which is why each asks first, in the row rather than
+             * through `confirm()`: a modal dialog blocks the page, cannot be styled, and cannot
+             * be driven by the checks that have to prove it works — the same argument the board
+             * list makes.
+             */}
             {fixed || (diagram && detachable(item.type)) ? (
               <div className="dag-props__convert" data-dag-convert="">
                 {convert === null ? (

@@ -222,9 +222,7 @@ test("space released, a press on an item moves it again", async ({ page }) => {
   await page.mouse.move(at.x + 240, at.y + 220, { steps: 8 });
   await page.mouse.up();
 
-  await expect
-    .poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 })
-    .toMatch(/```md \{#one x=\d+ y=\d+\}/);
+  await expect.poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 }).toMatch(/```md \{#one x=\d+ y=\d+\}/);
 });
 
 /*

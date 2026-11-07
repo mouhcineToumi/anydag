@@ -149,10 +149,20 @@ describe("vaultFs", () => {
     write(e.root, "only/.hidden", "1");
     fs.mkdirSync(path.join(e.root, "empty"));
     const got = await vaultFs(e.vault).scan();
-    const files = got.filter((x) => x.kind === "file").map((x) => x.rel).sort();
-    expect(files).toEqual(["a.assets/p.png", ".anydag/files/x.json", ".anydag/settings.json", "attachments/a.pdf", "b.board.md", "n.md"].sort());
+    const files = got
+      .filter((x) => x.kind === "file")
+      .map((x) => x.rel)
+      .sort();
+    expect(files).toEqual(
+      ["a.assets/p.png", ".anydag/files/x.json", ".anydag/settings.json", "attachments/a.pdf", "b.board.md", "n.md"].sort(),
+    );
     expect(files).not.toContain(".anydag/vault.json");
-    expect(got.filter((x) => x.kind === "dir").map((x) => x.rel).sort()).toEqual(["empty", "only"]);
+    expect(
+      got
+        .filter((x) => x.kind === "dir")
+        .map((x) => x.rel)
+        .sort(),
+    ).toEqual(["empty", "only"]);
   });
   it("writeIf is compare-and-set and watch hears .anydag/settings.json", async () => {
     const e = env();
@@ -210,7 +220,12 @@ describe("mergeKeys", () => {
   });
   it("sets merge", () => {
     const k = SETTINGS_SETS[0];
-    const out = mergeKeys({ [k]: ["x", "y", "z"] }, { [k]: ["x", "z", "o"] }, { [k]: ["y", "x", "z", "t"] }, { sets: SETTINGS_SETS });
+    const out = mergeKeys(
+      { [k]: ["x", "y", "z"] },
+      { [k]: ["x", "z", "o"] },
+      { [k]: ["y", "x", "z", "t"] },
+      { sets: SETTINGS_SETS },
+    );
     expect(out[k]).toEqual(["x", "z", "o", "t"]);
   });
 });

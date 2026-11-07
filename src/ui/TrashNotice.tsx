@@ -23,7 +23,9 @@ function said(gone: readonly Gone[], titles: Readonly<Record<string, string>>): 
   if (gone.length > 1) return `Moved ${counted(gone.length, ["item", "items"])} to the trash.`;
   const e = gone[0]!.entry;
   if (e.kind === "folder") {
-    const inside = e.holds ? [e.holds.boards, e.holds.notes, e.holds.quizzes, e.holds.tables, e.holds.files].reduce((n, l) => n + l.length, 0) : 0;
+    const inside = e.holds
+      ? [e.holds.boards, e.holds.notes, e.holds.quizzes, e.holds.tables, e.holds.files].reduce((n, l) => n + l.length, 0)
+      : 0;
     const what = inside === 1 ? "the file" : `the ${counted(inside, ["file", "files"])}`;
     return `Moved the folder “${leaf(e.name)}”${inside ? ` and ${what} in it` : ""} to the trash.`;
   }
@@ -102,7 +104,9 @@ export function TrashNotice({
       }}
     >
       <Trash2 size={16} strokeWidth={2} aria-hidden="true" className="dag-trash-notice__mark" />
-      <p className="dag-trash-notice__text">{typeof state === "object" ? state.failed : busy ? "Putting it back…" : said(gone, titles)}</p>
+      <p className="dag-trash-notice__text">
+        {typeof state === "object" ? state.failed : busy ? "Putting it back…" : said(gone, titles)}
+      </p>
       {state === "shown" ? (
         <button type="button" className="dag-trash-notice__act" data-dag-trash-undo="" onClick={() => void undo()}>
           <Undo2 size={14} strokeWidth={2} aria-hidden="true" />
@@ -121,7 +125,14 @@ export function TrashNotice({
       >
         View trash
       </button>
-      <button type="button" className="dag-icon dag-trash-notice__close" data-dag-trash-dismiss="" aria-label="Dismiss" disabled={busy} onClick={() => close.current()}>
+      <button
+        type="button"
+        className="dag-icon dag-trash-notice__close"
+        data-dag-trash-dismiss=""
+        aria-label="Dismiss"
+        disabled={busy}
+        onClick={() => close.current()}
+      >
         <X size={14} strokeWidth={2} aria-hidden="true" />
       </button>
     </div>

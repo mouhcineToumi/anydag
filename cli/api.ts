@@ -21,7 +21,9 @@ const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me"]
 
 /** Whether a route is about one vault: the document routes, and `/api/` but the app's own. */
 function scoped(path: string): boolean {
-  return path.startsWith("/__board") || (path.startsWith("/api/") && !UNSCOPED.some((u) => path === u || path.startsWith(`${u}/`)));
+  return (
+    path.startsWith("/__board") || (path.startsWith("/api/") && !UNSCOPED.some((u) => path === u || path.startsWith(`${u}/`)))
+  );
 }
 
 export const EXIT = {

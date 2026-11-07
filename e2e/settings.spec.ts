@@ -57,7 +57,9 @@ async function saved(page: Page, act: () => Promise<void>): Promise<{ name: stri
   return { name: dl.suggestedFilename(), bytes: fs.readFileSync(p!) };
 }
 
-test("the gear and ctrl+, both open it, and Escape closes it without clearing the selection", { tag: "@smoke" }, async ({ page }) => {
+test("the gear and ctrl+, both open it, and Escape closes it without clearing the selection", { tag: "@smoke" }, async ({
+  page,
+}) => {
   await open(page);
 
   await openSettings(page);

@@ -57,7 +57,8 @@ function decode(bytes: Uint8Array): string | null {
   }
 }
 
-const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => a.byteLength === b.byteLength && Buffer.from(a).equals(Buffer.from(b));
+const sameBytes = (a: Uint8Array, b: Uint8Array): boolean =>
+  a.byteLength === b.byteLength && Buffer.from(a).equals(Buffer.from(b));
 
 function parseObject(text: string): Record<string, unknown> | null {
   try {
@@ -121,7 +122,12 @@ function suffixOf(rel: string): string {
 }
 
 /** A device's name as a part of a file name: what Windows or macOS would refuse taken out. */
-const deviceWord = (device: string): string => device.replace(/[/\\:*?"<>|\x00-\x1f]/g, "").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "") || "device";
+const deviceWord = (device: string): string =>
+  device
+    .replace(/[/\\:*?"<>|\x00-\x1f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/, "") || "device";
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
@@ -155,5 +161,10 @@ export function freshCopy(rel: string, bytes: Uint8Array, ours?: Uint8Array): Ui
     const mine = decode(ours);
     if (mine !== null && frontId(mine) !== id) return bytes;
   }
-  return encode(withId(text, mint((x) => x === id)));
+  return encode(
+    withId(
+      text,
+      mint((x) => x === id),
+    ),
+  );
 }

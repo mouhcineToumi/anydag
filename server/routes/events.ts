@@ -62,8 +62,13 @@ export function eventRoutes(app: Hono, s: Session): void {
           continue;
         }
         // A file with no `title:` is called by its name (decision 14) — what the listing says too.
-        const said: Record<string, unknown> = { name: ch.name, sha1: ch.sha1, title: ch.sha1 === null ? null : (ch.title ?? leafOf(ch.name)) };
-        if (ch.kind === "note") Object.assign(said, { task: ch.task ?? null, project: ch.project ?? null, event: ch.event ?? null });
+        const said: Record<string, unknown> = {
+          name: ch.name,
+          sha1: ch.sha1,
+          title: ch.sha1 === null ? null : (ch.title ?? leafOf(ch.name)),
+        };
+        if (ch.kind === "note")
+          Object.assign(said, { task: ch.task ?? null, project: ch.project ?? null, event: ch.event ?? null });
         if (ch.kind === "quiz") said.questions = ch.questions ?? null;
         await stream.writeSSE({ event: EVENT[ch.kind], data: JSON.stringify(said) });
       }

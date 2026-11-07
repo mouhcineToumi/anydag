@@ -171,7 +171,9 @@ test("Ask mode refuses a write", async ({ page }) => {
 });
 
 test("a vault the agent asks for is the person's to give, on an access card", async ({ page, request }) => {
-  const vaults = ((await (await request.get("/api/vaults")).json()) as { vaults: { id: string; open: boolean; default: boolean }[] }).vaults;
+  const vaults = (
+    (await (await request.get("/api/vaults")).json()) as { vaults: { id: string; open: boolean; default: boolean }[] }
+  ).vaults;
   const other = vaults.find((v) => v.open && !v.default);
   test.skip(!other, "only one vault is open here");
   await page.goto("/?chat=new");

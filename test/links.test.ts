@@ -88,7 +88,10 @@ describe("the link grammar", () => {
 
   it("gives every hop of a chain its own bend, because the modifiers belong to the hop", () => {
     const got = links('a --> b via="10,20" --> c via="30,40"').links;
-    expect(got.map((l) => l.via)).toEqual([{ x: 10, y: 20 }, { x: 30, y: 40 }]);
+    expect(got.map((l) => l.via)).toEqual([
+      { x: 10, y: 20 },
+      { x: 30, y: 40 },
+    ]);
   });
 
   it("expands a chain and a bus", () => {
@@ -161,8 +164,7 @@ const ITEMS = [
   "",
 ].join("\n");
 
-const withLinks = (...statements: string[]) =>
-  board([ITEMS, "```edges {#links}", ...statements, "```", ""].join("\n"));
+const withLinks = (...statements: string[]) => board([ITEMS, "```edges {#links}", ...statements, "```", ""].join("\n"));
 
 describe("resolving a link against the board", () => {
   it("finds the fence's own line", () => {
@@ -230,14 +232,29 @@ describe("resolving a link against the board", () => {
   it("refuses to reach across a page", () => {
     /* A page is a separate drawing, and a curve cannot leave one. */
     const b = board(
-      ["```md {#a}", "one", "```", "", "```md {#far page=page-2}", "two", "```", "", "```edges {#links}", "a --> far", "```", ""].join("\n"),
+      [
+        "```md {#a}",
+        "one",
+        "```",
+        "",
+        "```md {#far page=page-2}",
+        "two",
+        "```",
+        "",
+        "```edges {#links}",
+        "a --> far",
+        "```",
+        "",
+      ].join("\n"),
     );
     expect(codes(b.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
     expect(b.links).toEqual([]);
   });
 
   it("merges several fences in file order, with ids that cannot collide", () => {
-    const b = board([ITEMS, "```edges {#one}", "a --> b", "```", "", "```edges {#two}", "b --> a", "a --> infra", "```", ""].join("\n"));
+    const b = board(
+      [ITEMS, "```edges {#one}", "a --> b", "```", "", "```edges {#two}", "b --> a", "a --> infra", "```", ""].join("\n"),
+    );
     expect(b.errors).toEqual([]);
     expect(b.links.map((l) => l.id)).toEqual(["one-1", "two-1", "two-2"]);
   });
@@ -379,7 +396,9 @@ describe("a link that names a group", () => {
        vanish rather than dangle — the rule an unknown item has always followed. */
     const b = grouped("g1 --> c");
     expect(b.links).toHaveLength(1);
-    const gone = board(["```md {#a}", "one", "```", "", "```md {#c}", "three", "```", "", "```edges {#links}", "g1 --> c", "```", ""].join("\n"));
+    const gone = board(
+      ["```md {#a}", "one", "```", "", "```md {#c}", "three", "```", "", "```edges {#links}", "g1 --> c", "```", ""].join("\n"),
+    );
     expect(codes(gone.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
     expect(gone.links).toEqual([]);
   });

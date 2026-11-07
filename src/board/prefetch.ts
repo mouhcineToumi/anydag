@@ -94,7 +94,8 @@ export async function openDoc(kind: TextKind, name: string): Promise<Response> {
     h.until = Math.min(h.until, Date.now() + TAKEN_MS);
     const got = await h.got;
     /* A server that failed may not fail again: that answer is asked for afresh, not served. */
-    if (got && got.status < 500) return new Response(got.body, { status: got.status, headers: { "content-type": "application/json" } });
+    if (got && got.status < 500)
+      return new Response(got.body, { status: got.status, headers: { "content-type": "application/json" } });
   }
   return fetch(docUrl(kind, name));
 }

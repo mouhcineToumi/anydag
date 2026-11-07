@@ -142,7 +142,9 @@ export function Settings({
   /* The focus starts on the tab that is open, which is also where the arrow keys start from — or,
      on a narrow window showing one tab, on the way back to the list. */
   useEffect(() => {
-    const at = card.current?.querySelector<HTMLElement>(view === "list" || !narrow() ? `#${CSS.escape(tabId(tab))}` : "[data-dag-settings-back]");
+    const at = card.current?.querySelector<HTMLElement>(
+      view === "list" || !narrow() ? `#${CSS.escape(tabId(tab))}` : "[data-dag-settings-back]",
+    );
     (at ?? card.current)?.focus();
     /* Once, on open: after that the focus is the person's. */
   }, []);
@@ -247,7 +249,10 @@ export function Settings({
                           setTab(t);
                           setView("pane");
                           /* On a narrow window the list goes away under the click, and the focus with it. */
-                          if (narrow()) requestAnimationFrame(() => card.current?.querySelector<HTMLElement>("[data-dag-settings-back]")?.focus());
+                          if (narrow())
+                            requestAnimationFrame(() =>
+                              card.current?.querySelector<HTMLElement>("[data-dag-settings-back]")?.focus(),
+                            );
                         }}
                         onKeyDown={onTabKey}
                       >
@@ -262,7 +267,13 @@ export function Settings({
           })}
         </nav>
 
-        <div id={paneId} role="tabpanel" aria-labelledby={tabId(tab)} className="dag-settings-modal__pane" data-dag-settings-pane={tab}>
+        <div
+          id={paneId}
+          role="tabpanel"
+          aria-labelledby={tabId(tab)}
+          className="dag-settings-modal__pane"
+          data-dag-settings-pane={tab}
+        >
           <header className="dag-settings-modal__head">
             <button
               type="button"
@@ -306,7 +317,13 @@ export function Settings({
           </div>
         </div>
 
-        <button type="button" className="dag-icon dag-settings-modal__close" aria-label="Close settings" data-dag-settings-close="" onClick={onClose}>
+        <button
+          type="button"
+          className="dag-icon dag-settings-modal__close"
+          aria-label="Close settings"
+          data-dag-settings-close=""
+          onClick={onClose}
+        >
           <X {...ICON} aria-hidden="true" />
         </button>
       </section>

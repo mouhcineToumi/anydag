@@ -248,7 +248,10 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
        and every editor worth pasting into reads SVG source from the text flavour. */
     if (kind === "copy") return void (await navigator.clipboard?.writeText(svg));
     const size = /width="(\d+)" height="(\d+)"/.exec(svg);
-    saveFile(`${stem(one.id)}.png`, await svgToPng(svg, Number(size?.[1] ?? 0), Number(size?.[2] ?? 0), readSettings().export.scale));
+    saveFile(
+      `${stem(one.id)}.png`,
+      await svgToPng(svg, Number(size?.[1] ?? 0), Number(size?.[2] ?? 0), readSettings().export.scale),
+    );
   };
 
   return (
@@ -274,7 +277,13 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
 
           {one && !locked ? (
             <>
-              <Tool hook="edit" label="Edit: properties and source" keys="Enter" word="Edit" onClick={() => editor.ctl.open(one.id)}>
+              <Tool
+                hook="edit"
+                label="Edit: properties and source"
+                keys="Enter"
+                word="Edit"
+                onClick={() => editor.ctl.open(one.id)}
+              >
                 <PanelRightOpen {...ICON} aria-hidden="true" />
               </Tool>
               {isDiagramType(one.type) ? (
@@ -345,15 +354,33 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
               </button>
               {exporting ? (
                 <div className="dag-more__menu dag-selbar__menu" role="menu">
-                  <button type="button" role="menuitem" className="dag-more__item" data-dag-svg="" onClick={() => void exportAs("svg")}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="dag-more__item"
+                    data-dag-svg=""
+                    onClick={() => void exportAs("svg")}
+                  >
                     <Download {...SMALL} aria-hidden="true" />
                     <span>Download as SVG</span>
                   </button>
-                  <button type="button" role="menuitem" className="dag-more__item" data-dag-png="" onClick={() => void exportAs("png")}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="dag-more__item"
+                    data-dag-png=""
+                    onClick={() => void exportAs("png")}
+                  >
                     <Image {...SMALL} aria-hidden="true" />
                     <span>Download as PNG ({scale}×)</span>
                   </button>
-                  <button type="button" role="menuitem" className="dag-more__item" data-dag-copy-svg="" onClick={() => void exportAs("copy")}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="dag-more__item"
+                    data-dag-copy-svg=""
+                    onClick={() => void exportAs("copy")}
+                  >
                     <Copy {...SMALL} aria-hidden="true" />
                     <span>Copy the SVG source</span>
                   </button>
@@ -401,7 +428,13 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
                 ) : null}
               </div>
               <span className="dag-dock__rule" />
-              <Tool hook="delete" label={inside ? `Delete the picked ${inside}` : "Delete"} keys="Del" danger onClick={editor.removeSelection}>
+              <Tool
+                hook="delete"
+                label={inside ? `Delete the picked ${inside}` : "Delete"}
+                keys="Del"
+                danger
+                onClick={editor.removeSelection}
+              >
                 <Trash2 {...ICON} aria-hidden="true" />
               </Tool>
             </>
@@ -522,7 +555,14 @@ function Run({
         <span className="dag-selbar__status">
           <LoaderCircle {...SMALL} className="dag-rewrite__spin" aria-hidden="true" /> Asking the model…
         </span>
-        <button type="button" className="dag-icon" data-dag-rewrite-stop="" aria-label="Stop" title="Stop: cancel the request" onClick={onDiscard}>
+        <button
+          type="button"
+          className="dag-icon"
+          data-dag-rewrite-stop=""
+          aria-label="Stop"
+          title="Stop: cancel the request"
+          onClick={onDiscard}
+        >
           <X {...ICON} aria-hidden="true" />
         </button>
       </div>
@@ -534,10 +574,23 @@ function Run({
       <div className="dag-rewrite__fail" role="alert">
         <div className="dag-selbar__row">
           <span className="dag-rewrite__message">{run.message}</span>
-          <button type="button" className="dag-selbar__word" data-dag-rewrite-retry="" title="Change the description and ask again" onClick={onAsk}>
+          <button
+            type="button"
+            className="dag-selbar__word"
+            data-dag-rewrite-retry=""
+            title="Change the description and ask again"
+            onClick={onAsk}
+          >
             <RotateCcw {...SMALL} aria-hidden="true" /> Try again
           </button>
-          <button type="button" className="dag-icon" data-dag-rewrite-dismiss="" aria-label="Dismiss" title="Dismiss" onClick={onDiscard}>
+          <button
+            type="button"
+            className="dag-icon"
+            data-dag-rewrite-dismiss=""
+            aria-label="Dismiss"
+            title="Dismiss"
+            onClick={onDiscard}
+          >
             <X {...ICON} aria-hidden="true" />
           </button>
         </div>
@@ -568,7 +621,13 @@ function Run({
         >
           <Check {...SMALL} aria-hidden="true" /> Accept
         </button>
-        <button type="button" className="dag-selbar__word" data-dag-rewrite-discard="" title="Throw the change away: nothing has been written" onClick={onDiscard}>
+        <button
+          type="button"
+          className="dag-selbar__word"
+          data-dag-rewrite-discard=""
+          title="Throw the change away: nothing has been written"
+          onClick={onDiscard}
+        >
           <X {...SMALL} aria-hidden="true" /> Discard
         </button>
       </div>
@@ -588,8 +647,8 @@ function Run({
           ) : null}
           {run.lost.length > 0 ? (
             <p className="dag-rewrite__warn" role="alert">
-              Other items link to {run.lost.length === 1 ? "an id" : "ids"} this change drops: <code>{run.lost.join(", ")}</code>. Accepting
-              removes {run.lost.length === 1 ? "that link" : "those links"}.
+              Other items link to {run.lost.length === 1 ? "an id" : "ids"} this change drops: <code>{run.lost.join(", ")}</code>.
+              Accepting removes {run.lost.length === 1 ? "that link" : "those links"}.
             </p>
           ) : null}
         </div>

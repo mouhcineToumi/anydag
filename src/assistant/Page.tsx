@@ -17,7 +17,15 @@ export const NEW_CHAT = "new";
  * and the Changes down the right. The same chat the panel shows, in the room a long conversation
  * wants — opening the page from the panel keeps it.
  */
-export function AssistantView({ raw, onChat, onOpen }: { raw: string | null; onChat(id: string | null): void; onOpen(kind: "board" | "note" | "quiz" | "table", name: string): void }) {
+export function AssistantView({
+  raw,
+  onChat,
+  onOpen,
+}: {
+  raw: string | null;
+  onChat(id: string | null): void;
+  onOpen(kind: "board" | "note" | "quiz" | "table", name: string): void;
+}) {
   const chats = useChats();
   /* `1` is "wherever I was": the newest, or a blank one while the list is empty. It waits for the
      list rather than guessing, so a page opened on `?chat=1` does not flash a blank chat first. */
@@ -30,7 +38,13 @@ export function AssistantView({ raw, onChat, onOpen }: { raw: string | null; onC
     <div className="dag-assistant" data-dag-assistant-page="">
       <History rows={chats.rows} loaded={chats.loaded} current={id} onPick={onChat} />
       <section className="dag-assistant__main">
-        <Heading id={id} title={chat.meta?.title ?? row?.title ?? ""} missing={chat.missing} running={chat.live !== null} onGone={() => onChat(NEW_CHAT)} />
+        <Heading
+          id={id}
+          title={chat.meta?.title ?? row?.title ?? ""}
+          missing={chat.missing}
+          running={chat.live !== null}
+          onGone={() => onChat(NEW_CHAT)}
+        />
         {waiting ? null : chat.missing ? (
           <p className="dag-chat-empty" data-dag-chat-missing="">
             There is no chat with this id in this vault. It may have been deleted, or it may be in a vault that is not open.
@@ -44,7 +58,17 @@ export function AssistantView({ raw, onChat, onOpen }: { raw: string | null; onC
 }
 
 /** The chats, a day at a time, newest first; the open one marked; a running one says so. */
-function History({ rows, loaded, current, onPick }: { rows: ChatRow[]; loaded: boolean; current: string | null; onPick(id: string | null): void }) {
+function History({
+  rows,
+  loaded,
+  current,
+  onPick,
+}: {
+  rows: ChatRow[];
+  loaded: boolean;
+  current: string | null;
+  onPick(id: string | null): void;
+}) {
   const groups = useMemo(() => {
     const out: { label: string; rows: ChatRow[] }[] = [];
     for (const r of rows) {
@@ -90,7 +114,19 @@ function History({ rows, loaded, current, onPick }: { rows: ChatRow[]; loaded: b
 }
 
 /** The chat's title, which is a field when pressed, and the delete that asks first. */
-function Heading({ id, title, missing, running, onGone }: { id: string | null; title: string; missing: boolean; running: boolean; onGone(): void }) {
+function Heading({
+  id,
+  title,
+  missing,
+  running,
+  onGone,
+}: {
+  id: string | null;
+  title: string;
+  missing: boolean;
+  running: boolean;
+  onGone(): void;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const [sure, setSure] = useState(false);
@@ -139,7 +175,14 @@ function Heading({ id, title, missing, running, onGone }: { id: string | null; t
         </h1>
       )}
       {id && !missing && !editing ? (
-        <button type="button" className="dag-icon" data-dag-chat-rename="" aria-label="Rename the chat" title="Rename the chat" onClick={() => (setDraft(title), setEditing(true))}>
+        <button
+          type="button"
+          className="dag-icon"
+          data-dag-chat-rename=""
+          aria-label="Rename the chat"
+          title="Rename the chat"
+          onClick={() => (setDraft(title), setEditing(true))}
+        >
           <Pencil {...ICON} aria-hidden="true" />
         </button>
       ) : null}
@@ -172,7 +215,15 @@ function Heading({ id, title, missing, running, onGone }: { id: string | null; t
             </button>
           </span>
         ) : (
-          <button type="button" className="dag-icon" data-dag-chat-delete="" aria-label="Delete the chat" title={running ? "Stop it first" : "Delete the chat"} disabled={running} onClick={() => setSure(true)}>
+          <button
+            type="button"
+            className="dag-icon"
+            data-dag-chat-delete=""
+            aria-label="Delete the chat"
+            title={running ? "Stop it first" : "Delete the chat"}
+            disabled={running}
+            onClick={() => setSure(true)}
+          >
             <Trash2 {...ICON} aria-hidden="true" />
           </button>
         )

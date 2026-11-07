@@ -38,8 +38,26 @@ type TableOp =
   | { op: "removeRow"; tab: string; row: string }
   | { op: "moveRow"; tab: string; row: string; before: string | null }
   | { op: "rowHeight"; tab: string; row: string; h: number | null }
-  | { op: "addColumn"; tab: string; id?: string; name: string; type?: ColumnType; options?: string[]; w?: number; after?: string; before?: string }
-  | { op: "setColumn"; tab: string; column: string; name?: string; type?: ColumnType; options?: string[] | null; w?: number | null }
+  | {
+      op: "addColumn";
+      tab: string;
+      id?: string;
+      name: string;
+      type?: ColumnType;
+      options?: string[];
+      w?: number;
+      after?: string;
+      before?: string;
+    }
+  | {
+      op: "setColumn";
+      tab: string;
+      column: string;
+      name?: string;
+      type?: ColumnType;
+      options?: string[] | null;
+      w?: number | null;
+    }
   | { op: "removeColumn"; tab: string; column: string }
   | { op: "moveColumn"; tab: string; column: string; before: string | null }
   | { op: "addTab"; id?: string; name: string; after?: string }
@@ -92,18 +110,28 @@ export function opProblem(raw: unknown): string | null {
     case "cell":
       return need("tab", "row", "column", "value");
     case "addRow":
-      return need("tab") ?? (optStr(o.id) && optStr(o.after) && optStr(o.before) && isRecordOfStrings(o.values) ? null : "`addRow` takes `values` as `{column: text}`, and `id`, `after`, `before` as strings");
+      return (
+        need("tab") ??
+        (optStr(o.id) && optStr(o.after) && optStr(o.before) && isRecordOfStrings(o.values)
+          ? null
+          : "`addRow` takes `values` as `{column: text}`, and `id`, `after`, `before` as strings")
+      );
     case "removeRow":
       return need("tab", "row");
     case "moveRow":
       return need("tab", "row") ?? (nullStr(o.before) ? null : "`moveRow` needs `before`: a row's id, or null for the end");
     case "rowHeight":
-      return need("tab", "row") ?? (o.h === null || (typeof o.h === "number" && o.h > 0) ? null : "`rowHeight` needs `h`: pixels above zero, or null");
+      return (
+        need("tab", "row") ??
+        (o.h === null || (typeof o.h === "number" && o.h > 0) ? null : "`rowHeight` needs `h`: pixels above zero, or null")
+      );
     case "addColumn":
       return (
         need("tab", "name") ??
         (o.type !== undefined && !isColumnType(o.type) ? `\`${String(o.type)}\` is not a column type` : null) ??
-        (o.options !== undefined && !(Array.isArray(o.options) && o.options.every(isStr)) ? "`options` is a list of strings" : null) ??
+        (o.options !== undefined && !(Array.isArray(o.options) && o.options.every(isStr))
+          ? "`options` is a list of strings"
+          : null) ??
         (o.w !== undefined && typeof o.w !== "number" ? "`w` is a number of pixels" : null) ??
         (optStr(o.id) && optStr(o.after) && optStr(o.before) ? null : "`id`, `after` and `before` are strings")
       );
@@ -111,14 +139,18 @@ export function opProblem(raw: unknown): string | null {
       return (
         need("tab", "column") ??
         (o.type !== undefined && !isColumnType(o.type) ? `\`${String(o.type)}\` is not a column type` : null) ??
-        (o.options !== undefined && o.options !== null && !(Array.isArray(o.options) && o.options.every(isStr)) ? "`options` is a list of strings, or null" : null) ??
+        (o.options !== undefined && o.options !== null && !(Array.isArray(o.options) && o.options.every(isStr))
+          ? "`options` is a list of strings, or null"
+          : null) ??
         (o.w !== undefined && o.w !== null && typeof o.w !== "number" ? "`w` is a number of pixels, or null" : null) ??
         (optStr(o.name) ? null : "`name` is a string")
       );
     case "removeColumn":
       return need("tab", "column");
     case "moveColumn":
-      return need("tab", "column") ?? (nullStr(o.before) ? null : "`moveColumn` needs `before`: a column's id, or null for the end");
+      return (
+        need("tab", "column") ?? (nullStr(o.before) ? null : "`moveColumn` needs `before`: a column's id, or null for the end")
+      );
     case "addTab":
       return need("name") ?? (optStr(o.id) && optStr(o.after) ? null : "`id` and `after` are strings");
     case "setTab":
@@ -211,7 +243,13 @@ export function applyTableOps(text: string, ops: readonly unknown[]): Applied {
           break;
         case "importCsv": {
           const { columns, rows } = csvTab(op.csv);
-          const t = addTab(out, { ...(op.id ? { id: op.id } : {}), name: op.name, ...(op.after ? { after: op.after } : {}), columns, rows });
+          const t = addTab(out, {
+            ...(op.id ? { id: op.id } : {}),
+            name: op.name,
+            ...(op.after ? { after: op.after } : {}),
+            columns,
+            rows,
+          });
           out = t.text;
           minted.tabs.push(t.id);
           break;

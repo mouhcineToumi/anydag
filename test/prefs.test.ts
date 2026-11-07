@@ -125,7 +125,22 @@ const EVENTS = new Set([
 describe("the preference list", () => {
   it("names every stored key but the keys that are deliberately not preferences", () => {
     const stored = [...literals()].filter((k) => !EVENTS.has(k)).sort();
-    const accounted = new Set<string>([...PREF_KEYS, STORE, STAMP, SYNC, SIDEBAR_FOLDERS, TASKS_VIEW, QUIZ_MODE, QUIZ_ABOUT, SETTINGS_TAB, CALENDAR_VIEW, LAST, VAULT_STAMP, FILE_LIST, LOCKED]);
+    const accounted = new Set<string>([
+      ...PREF_KEYS,
+      STORE,
+      STAMP,
+      SYNC,
+      SIDEBAR_FOLDERS,
+      TASKS_VIEW,
+      QUIZ_MODE,
+      QUIZ_ABOUT,
+      SETTINGS_TAB,
+      CALENDAR_VIEW,
+      LAST,
+      VAULT_STAMP,
+      FILE_LIST,
+      LOCKED,
+    ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);
   });

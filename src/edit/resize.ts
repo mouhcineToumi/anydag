@@ -63,7 +63,12 @@ export function memberOf(item: BoardItem, from: Box, laid: LaidOut | null): Memb
   const node = lone ? laid?.nodes[lone.id] : undefined;
   if (lone && node) {
     /* A bare frame is its one shape plus the same padding all round. */
-    return { id: item.id, from, follows: "drawing", inner: { left: (from.w - node.w) / 2, top: (from.h - node.h) / 2, w: node.w, h: node.h } };
+    return {
+      id: item.id,
+      from,
+      follows: "drawing",
+      inner: { left: (from.w - node.w) / 2, top: (from.h - node.h) / 2, w: node.w, h: node.h },
+    };
   }
   const content = laid && fixedGraph(item) ? boxesOf(laid) : null;
   if (laid && content && content.w > 0 && content.h > 0) {
@@ -82,7 +87,9 @@ export function memberOf(item: BoardItem, from: Box, laid: LaidOut | null): Memb
 
 /** What a member draws: a drawing's shapes without the frame's padding, anything else its box. */
 const contentOf = (m: Member): Box =>
-  m.follows === "drawing" && m.inner ? { x: m.from.x + m.inner.left, y: m.from.y + m.inner.top, w: m.inner.w, h: m.inner.h } : m.from;
+  m.follows === "drawing" && m.inner
+    ? { x: m.from.x + m.inner.left, y: m.from.y + m.inner.top, w: m.inner.w, h: m.inner.h }
+    : m.from;
 
 /**
  * The box the group is scaled about: the union of what its members **draw**, not of their frames.
@@ -138,7 +145,12 @@ export function place(m: Member, g0: Box, g1: Box): Box {
   const { sx, sy } = factors(g0, g1);
   const { from } = m;
   if (m.follows === "slide") {
-    return { x: slack(from.x, from.w, g0.x, g0.w, g1.x, g1.w), y: slack(from.y, from.h, g0.y, g0.h, g1.y, g1.h), w: from.w, h: from.h };
+    return {
+      x: slack(from.x, from.w, g0.x, g0.w, g1.x, g1.w),
+      y: slack(from.y, from.h, g0.y, g0.h, g1.y, g1.h),
+      w: from.w,
+      h: from.h,
+    };
   }
   if (m.follows === "drawing" && m.inner) {
     const { left, top, w, h } = m.inner;
@@ -210,7 +222,8 @@ export function memberOps(item: BoardItem, m: Member, g0: Box, g1: Box, laid: La
         ...(sy !== 1 || both ? { h: Math.max(grid, m.inner.h * sy) } : {}),
       };
       const line = item.body.split("\n")[lone.line - 1];
-      if (line !== undefined && (geom.w !== undefined || geom.h !== undefined)) body = replaceLine(item.body, lone.line, setGeometry(line, geom));
+      if (line !== undefined && (geom.w !== undefined || geom.h !== undefined))
+        body = replaceLine(item.body, lone.line, setGeometry(line, geom));
     } else if (fixed) {
       body = scaleFixed(fixed, laid, item.body, sx, sy, grid);
     }

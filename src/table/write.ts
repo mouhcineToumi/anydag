@@ -248,7 +248,12 @@ export function setCell(text: string, tabId: string, rowId: string, columnId: st
   if (!seg) {
     const cells = [...row.cells];
     cells[index] = next;
-    return splice(text, row.span.start, row.span.end, rowLine({ ...rowInput(row), cells }, tab.columns.length) + lineEnd(text, row));
+    return splice(
+      text,
+      row.span.start,
+      row.span.end,
+      rowLine({ ...rowInput(row), cells }, tab.columns.length) + lineEnd(text, row),
+    );
   }
   let content = cellSource(next);
   if (index === 0) {
@@ -345,7 +350,13 @@ export function setRowHeight(text: string, tabId: string, rowId: string, h: numb
     row.extra,
   );
   const content = `${cellSource(row.cells[0] ?? "")}${braces(a)}`.trim();
-  if (!seg) return splice(text, row.span.start, row.span.end, rowLine({ ...rowInput(row), h: want }, tab.columns.length) + lineEnd(text, row));
+  if (!seg)
+    return splice(
+      text,
+      row.span.start,
+      row.span.end,
+      rowLine({ ...rowInput(row), h: want }, tab.columns.length) + lineEnd(text, row),
+    );
   return splice(text, seg.start, seg.end, ` ${content} `);
 }
 
@@ -372,7 +383,11 @@ export function addColumn(
   const id = c.id && /^[A-Za-z0-9_-]+$/.test(c.id) && !taken.has(c.id) ? c.id : freeId(slug(c.name), taken);
   const columns = tab.columns.map(columnInput);
   const at =
-    c.after !== undefined ? columnOf(tab, c.after).index + 1 : c.before !== undefined ? columnOf(tab, c.before).index : columns.length;
+    c.after !== undefined
+      ? columnOf(tab, c.after).index + 1
+      : c.before !== undefined
+        ? columnOf(tab, c.before).index
+        : columns.length;
   const col: ColumnInput = {
     id,
     name: c.name,
@@ -443,7 +458,12 @@ export function setColumn(
   if (change.type !== undefined && change.type !== column.type && delim[index]) {
     const d = delim[index]!;
     const now = text.slice(d.start, d.end).trim();
-    const want = change.type === "number" ? delimiterCell("number") : now.endsWith(":") && !now.startsWith(":") ? delimiterCell(undefined) : now;
+    const want =
+      change.type === "number"
+        ? delimiterCell("number")
+        : now.endsWith(":") && !now.startsWith(":")
+          ? delimiterCell(undefined)
+          : now;
     if (now !== want) out = splice(out, d.start, d.end, ` ${want} `);
   }
   if (was === cell) return out;
@@ -525,7 +545,13 @@ export function setTab(
 ): string {
   const tab = tabOf(parseTable(text), tabId);
   const sort =
-    change.sort === undefined ? tab.sortText : change.sort === null ? undefined : typeof change.sort === "string" ? change.sort : writeSort(change.sort);
+    change.sort === undefined
+      ? tab.sortText
+      : change.sort === null
+        ? undefined
+        : typeof change.sort === "string"
+          ? change.sort
+          : writeSort(change.sort);
   const filter =
     change.filter === undefined
       ? tab.filterText
@@ -618,7 +644,15 @@ export function stampTable(text: string): string {
           const id = mintRowId(rows);
           rows.add(id);
           const seg = r.segments[0];
-          const content = `${cellSource(r.cells[0] ?? "")}${braces(attrs([["id", id], ["h", r.h]], r.extra))}`.trim();
+          const content = `${cellSource(r.cells[0] ?? "")}${braces(
+            attrs(
+              [
+                ["id", id],
+                ["h", r.h],
+              ],
+              r.extra,
+            ),
+          )}`.trim();
           if (seg) edits.push({ start: seg.start, end: seg.end, by: ` ${content} ` });
         }
       }
@@ -629,7 +663,13 @@ export function stampTable(text: string): string {
         edits.push({
           start: tab.heading.start,
           end: tab.heading.start + was.length,
-          by: headingLine({ id, name: tab.name, ...(tab.sortText ? { sort: tab.sortText } : {}), ...(tab.filterText ? { filter: tab.filterText } : {}), extra: tab.extra }),
+          by: headingLine({
+            id,
+            name: tab.name,
+            ...(tab.sortText ? { sort: tab.sortText } : {}),
+            ...(tab.filterText ? { filter: tab.filterText } : {}),
+            extra: tab.extra,
+          }),
         });
       }
     }

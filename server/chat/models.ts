@@ -60,7 +60,11 @@ function opencodeModels(bin: string): Promise<ModelChoice[]> {
  * `fake`: the server runs the scripted harness, which needs neither binary — so both are available
  * whatever is installed, and the answer says so for the e2e suite to check.
  */
-export async function modelsFor(have: readonly Provider[], env: NodeJS.ProcessEnv = process.env, fake = false): Promise<{ providers: ProviderModels[]; fake?: true }> {
+export async function modelsFor(
+  have: readonly Provider[],
+  env: NodeJS.ProcessEnv = process.env,
+  fake = false,
+): Promise<{ providers: ProviderModels[]; fake?: true }> {
   const out: ProviderModels[] = [];
   const claude = fake ? { ok: true as const, bin: "fake" } : claudeReady(env);
   out.push({

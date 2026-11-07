@@ -67,20 +67,29 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
 }
 
 export function str(v: unknown, what: string, max = 4096, min = 1): string {
-  if (typeof v !== "string" || v.length < min || v.length > max) throw new HttpError("ES_BAD_REQUEST", `${what} must be a string of ${min} to ${max} characters`);
+  if (typeof v !== "string" || v.length < min || v.length > max)
+    throw new HttpError("ES_BAD_REQUEST", `${what} must be a string of ${min} to ${max} characters`);
   return v;
 }
 
 export function count(v: unknown, what: string): number {
-  if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0) throw new HttpError("ES_BAD_REQUEST", `${what} must be a whole number of at least 0`);
+  if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0)
+    throw new HttpError("ES_BAD_REQUEST", `${what} must be a whole number of at least 0`);
   return v;
 }
 
 /** A query parameter as a whole number, or `fallback` when absent. */
-export function qint(raw: string | undefined, what: string, fallback: number, min: number, max = Number.MAX_SAFE_INTEGER): number {
+export function qint(
+  raw: string | undefined,
+  what: string,
+  fallback: number,
+  min: number,
+  max = Number.MAX_SAFE_INTEGER,
+): number {
   if (raw === undefined || raw === "") return fallback;
   const n = Number(raw);
-  if (!Number.isSafeInteger(n) || n < min || n > max) throw new HttpError("ES_BAD_REQUEST", `${what} must be a whole number from ${min} to ${max}`);
+  if (!Number.isSafeInteger(n) || n < min || n > max)
+    throw new HttpError("ES_BAD_REQUEST", `${what} must be a whole number from ${min} to ${max}`);
   return n;
 }
 

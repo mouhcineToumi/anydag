@@ -28,7 +28,13 @@
  *   anybody can see to click. An empty block stays, saying so, because a block is where the caret is.
  */
 import { createExtension, type BlockNoteEditor } from "@blocknote/core";
-import { createReactBlockSpec, createReactInlineContentSpec, useBlockNoteEditor, useComponentsContext, useEditorState } from "@blocknote/react";
+import {
+  createReactBlockSpec,
+  createReactInlineContentSpec,
+  useBlockNoteEditor,
+  useComponentsContext,
+  useEditorState,
+} from "@blocknote/react";
 import { Extension, InputRule } from "@tiptap/core";
 import { Sigma } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
@@ -335,14 +341,11 @@ function MathChip({
   );
 }
 
-export const mathInline = createReactInlineContentSpec(
-  MATH_CONFIG,
-  {
-    render: ({ inlineContent, editor, getPos }) => (
-      <MathChip tex={inlineContent.props.tex} display={inlineContent.props.display} editor={editor} getPos={getPos} />
-    ),
-  },
-);
+export const mathInline = createReactInlineContentSpec(MATH_CONFIG, {
+  render: ({ inlineContent, editor, getPos }) => (
+    <MathChip tex={inlineContent.props.tex} display={inlineContent.props.display} editor={editor} getPos={getPos} />
+  ),
+});
 
 /* ------------------------------------------------------------------------------------------------ */
 /* An equation on lines of its own                                                                   */
@@ -403,7 +406,9 @@ function EquationView({ id, tex, fenced, editor }: { id: string; tex: string; fe
 export const equationBlock = createReactBlockSpec(
   EQUATION_CONFIG,
   {
-    render: ({ block, editor }) => <EquationView id={block.id} tex={block.props.tex} fenced={block.props.fenced} editor={editor} />,
+    render: ({ block, editor }) => (
+      <EquationView id={block.id} tex={block.props.tex} fenced={block.props.fenced} editor={editor} />
+    ),
     /* A paste of Markdown is turned into BlockNote's *lossy* HTML and read back (`BlockEditor`'s
        paste handler), and that HTML keeps a block's drawing but not its type: the TeX is read off
        the element, or a pasted equation would come in as the text KaTeX drew. */
@@ -419,7 +424,9 @@ export const equationBlock = createReactBlockSpec(
 export function insertEquation(editor: Editor): void {
   const at = editor.getTextCursorPosition().block;
   const empty = at.type === "paragraph" && Array.isArray(at.content) && at.content.length === 0;
-  const made = empty ? editor.replaceBlocks([at], [{ type: "equation" }]).insertedBlocks[0] : editor.insertBlocks([{ type: "equation" }], at, "after")[0];
+  const made = empty
+    ? editor.replaceBlocks([at], [{ type: "equation" }]).insertedBlocks[0]
+    : editor.insertBlocks([{ type: "equation" }], at, "after")[0];
   const id = (made as { id?: string } | undefined)?.id;
   if (id) open({ block: id });
 }
@@ -431,7 +438,10 @@ export function insertEquation(editor: Editor): void {
 export function EquationButton(): ReactNode {
   const Components = useComponentsContext();
   const editor = useBlockNoteEditor();
-  const show = useEditorState({ editor, selector: ({ editor }) => editor.isEditable && !editor.prosemirrorState.selection.empty });
+  const show = useEditorState({
+    editor,
+    selector: ({ editor }) => editor.isEditable && !editor.prosemirrorState.selection.empty,
+  });
   if (!Components || !show) return null;
   return (
     <Components.FormattingToolbar.Button

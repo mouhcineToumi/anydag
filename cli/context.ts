@@ -137,7 +137,12 @@ export function emit(ctx: Ctx, value: unknown, human: () => void): void {
 export function table(rows: readonly (readonly string[])[]): string[] {
   const widths: number[] = [];
   for (const r of rows) r.forEach((c, i) => (widths[i] = Math.max(widths[i] ?? 0, c.length)));
-  return rows.map((r) => r.map((c, i) => (i === r.length - 1 ? c : c.padEnd(widths[i]!))).join("  ").trimEnd());
+  return rows.map((r) =>
+    r
+      .map((c, i) => (i === r.length - 1 ? c : c.padEnd(widths[i]!)))
+      .join("  ")
+      .trimEnd(),
+  );
 }
 
 /** The first twelve characters of a sha1, which is enough to tell two bases apart by eye. */

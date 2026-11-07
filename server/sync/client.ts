@@ -141,7 +141,11 @@ export class HttpSyncApi implements SyncApi {
         continue;
       }
       if (parsed) throw new SyncError(res.status, parsed.code, parsed.message ?? parsed.code, parsed);
-      throw new SyncError(res.status, res.status >= 500 ? "ES_NETWORK" : "ES_BAD_REQUEST", `${method} ${route}: ${res.status} ${text.slice(0, 200)}`);
+      throw new SyncError(
+        res.status,
+        res.status >= 500 ? "ES_NETWORK" : "ES_BAD_REQUEST",
+        `${method} ${route}: ${res.status} ${text.slice(0, 200)}`,
+      );
     }
   }
 

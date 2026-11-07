@@ -693,7 +693,10 @@ function writeShim(): void {
   /* A macOS app run from the disk image, or from a quarantined download that Gatekeeper moved to a
      random read-only path (App Translocation), is not where it will live: a shim written now would
      name a path that is gone next launch. The launch from /Applications writes it. */
-  if (process.platform === "darwin" && (process.execPath.startsWith("/Volumes/") || process.execPath.includes("/AppTranslocation/"))) {
+  if (
+    process.platform === "darwin" &&
+    (process.execPath.startsWith("/Volumes/") || process.execPath.includes("/AppTranslocation/"))
+  ) {
     say(`running from \`${path.dirname(process.execPath)}\` — move AnyDag to Applications for the \`anydag\` command.`);
     return;
   }
@@ -734,7 +737,7 @@ function writeShim(): void {
       "work=$(mktemp -d) || exit 1",
       '"$app" --appimage-mount >"$work/mount" 2>/dev/null &',
       "mounter=$!",
-      "trap 'kill \"$mounter\" 2>/dev/null; rm -rf \"$work\"' EXIT",
+      'trap \'kill "$mounter" 2>/dev/null; rm -rf "$work"\' EXIT',
       "trap 'exit 130' INT TERM",
       "mount=",
       'while kill -0 "$mounter" 2>/dev/null; do',
@@ -750,7 +753,7 @@ function writeShim(): void {
       /* The binary, not `AppRun`: the AppImageKit script reads `$APPDIR` from its environment, and
          an outer AppImage launch (this one, extract-and-run, badly named env peer) can leave a
          stale one behind. Electron-as-Node wants no AppRun's work beyond this file. */
-      'unset APPDIR',
+      "unset APPDIR",
       `exec "$mount/${EXEC_NAME}" "$mount/${cliMounted}" "$@"`,
     ];
   } else {
@@ -864,7 +867,10 @@ async function whenReady(): Promise<void> {
   });
   ipcMain.handle("folders:pick", async (event: Electron.IpcMainInvokeEvent): Promise<string | null> => {
     const owner = BrowserWindow.fromWebContents(event.sender);
-    const options: Electron.OpenDialogOptions = { properties: ["openDirectory", "createDirectory"], title: "Open a vault folder" };
+    const options: Electron.OpenDialogOptions = {
+      properties: ["openDirectory", "createDirectory"],
+      title: "Open a vault folder",
+    };
     const out = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
     return out.canceled || out.filePaths.length === 0 ? null : out.filePaths[0];
   });
@@ -889,7 +895,11 @@ async function whenReady(): Promise<void> {
     await restartServer();
     return true;
   });
-  ipcMain.handle("keys:names", (): string[] => Object.keys(readKeys().keys).filter((name) => PROVIDER_KEY_ENVS.includes(name)).sort());
+  ipcMain.handle("keys:names", (): string[] =>
+    Object.keys(readKeys().keys)
+      .filter((name) => PROVIDER_KEY_ENVS.includes(name))
+      .sort(),
+  );
 
   launchFolder = folderArgOf(process.argv);
   /* Ready first: the server's spawn reads the stored keys and the home secret through

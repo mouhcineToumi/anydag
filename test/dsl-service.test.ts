@@ -71,11 +71,14 @@ describe("index", () => {
     // A quiz is a kind of its own, not a board with another suffix: a board's references live only
     // in its `md` items, and a quiz's are read straight out of its Markdown.
     const texts = {
-      "study/drill.quiz.md": "---\ntitle: Drill\n---\n\n## Why? {#a}\n- [x] [See the plan](dag:0123456789)\n- [ ] no\n\n## And? {#b}\n- [x] y\n- [ ] n\n",
+      "study/drill.quiz.md":
+        "---\ntitle: Drill\n---\n\n## Why? {#a}\n- [x] [See the plan](dag:0123456789)\n- [ ] no\n\n## And? {#b}\n- [x] y\n- [ ] n\n",
     };
     const r = await post("/index", { texts });
     expect(r.body).toEqual({ docs: indexTexts(texts) });
-    const doc = (r.body as { docs: Record<string, { title?: string; questions?: number; refs: { id: string }[] }> }).docs["study/drill.quiz.md"]!;
+    const doc = (r.body as { docs: Record<string, { title?: string; questions?: number; refs: { id: string }[] }> }).docs[
+      "study/drill.quiz.md"
+    ]!;
     expect(doc.title).toBe("Drill");
     expect(doc.questions).toBe(2);
     expect(doc.refs.map((x) => x.id)).toEqual(["0123456789"]);
@@ -96,7 +99,8 @@ describe("corpus", () => {
     const r = await post("/corpus", { texts });
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ docs: corpusTexts(texts) });
-    const docs = (r.body as { docs: Record<string, { title?: string; units: { part?: string; what: string; text: string }[] }> }).docs;
+    const docs = (r.body as { docs: Record<string, { title?: string; units: { part?: string; what: string; text: string }[] }> })
+      .docs;
     expect(docs.plan!.units).toEqual([
       { what: "title", text: "The plan" },
       { part: "a", what: "md", text: "Ship it on Friday." },
@@ -106,11 +110,14 @@ describe("corpus", () => {
 
   it("cuts a quiz into one unit per question, named by its id", async () => {
     const texts = {
-      "drill.quiz.md": "---\ntitle: Drill\n---\n\nAbout **MVCC**.\n\n## What does VACUUM reclaim? {#qvac}\n- [ ] Index bloat\n- [x] Dead tuples\n\n> They stay until it runs.\n\n## No id yet\n- [x] a\n- [ ] b\n",
+      "drill.quiz.md":
+        "---\ntitle: Drill\n---\n\nAbout **MVCC**.\n\n## What does VACUUM reclaim? {#qvac}\n- [ ] Index bloat\n- [x] Dead tuples\n\n> They stay until it runs.\n\n## No id yet\n- [x] a\n- [ ] b\n",
     };
     const r = await post("/corpus", { texts });
     expect(r.body).toEqual({ docs: corpusTexts(texts) });
-    const doc = (r.body as { docs: Record<string, { units: { part?: string; what: string; text: string }[] }> }).docs["drill.quiz.md"]!;
+    const doc = (r.body as { docs: Record<string, { units: { part?: string; what: string; text: string }[] }> }).docs[
+      "drill.quiz.md"
+    ]!;
     expect(doc.units).toEqual([
       { what: "title", text: "Drill" },
       { what: "paragraph", text: "About MVCC." },
@@ -126,7 +133,7 @@ describe("corpus", () => {
 });
 
 describe("stamp", () => {
-  const LOOSE = "Some prose.\n\n```arch\nservice a \"A\"\n```\n";
+  const LOOSE = 'Some prose.\n\n```arch\nservice a "A"\n```\n';
 
   it("is `stampItems`, and says whether it changed anything", async () => {
     const r = await post("/stamp", { text: LOOSE });
@@ -216,7 +223,7 @@ describe("patch", () => {
     });
 
     it("lands several fences and the prose between them in order, giving the unnamed an id of their own", async () => {
-      const text = "```arch {#net}\nservice gw \"Gateway\"\n```\n\nA paragraph between.\n\n```md\nNo id here.\n```";
+      const text = '```arch {#net}\nservice gw "Gateway"\n```\n\nA paragraph between.\n\n```md\nNo id here.\n```';
       const got = ok(await post("/patch", { text: BOARD, ops: [{ insert: text, after: "one" }] }));
       const ids = order(got);
       expect(ids.slice(0, 2)).toEqual(["one", "net"]);
@@ -276,7 +283,11 @@ describe("patch", () => {
       expect((r.body as { error: string }).error).toContain("op 0 is not an op: expected `ops:");
     }
     /* …and still takes every shape that is one. */
-    for (const op of [{ id: "one", move: "front" }, { id: "one", move: { after: "infra" } }, { id: "one", body: "b" }]) {
+    for (const op of [
+      { id: "one", move: "front" },
+      { id: "one", move: { after: "infra" } },
+      { id: "one", body: "b" },
+    ]) {
       expect((await post("/patch", { text: BOARD, ops: [op] })).status, JSON.stringify(op)).toBe(200);
     }
   });
@@ -328,27 +339,46 @@ describe("diagnose, for a quiz", () => {
   });
 
   it("reads a board as a board when no kind is said", async () => {
-    expect(await post("/diagnose", { name: "b", text: BOARD })).toEqual({ status: 200, body: diagnoseBoard(parseBoard("b", BOARD)) });
+    expect(await post("/diagnose", { name: "b", text: BOARD })).toEqual({
+      status: 200,
+      body: diagnoseBoard(parseBoard("b", BOARD)),
+    });
   });
 });
 
 describe("quiz", () => {
-  const QUIZ = "---\ntitle: Q\n---\n\nWhat it is about.\n\n## One? {#q1}\n\n- [x] yes\n- [ ] no\n\n> Because.\n\n## Two?\n\n- [ ] a\n- [x] b\n";
+  const QUIZ =
+    "---\ntitle: Q\n---\n\nWhat it is about.\n\n## One? {#q1}\n\n- [x] yes\n- [ ] no\n\n> Because.\n\n## Two?\n\n- [ ] a\n- [x] b\n";
 
   it("answers the questions as data, the correct options marked, without writing ids unless asked", async () => {
     const r = await post("/quiz", { text: QUIZ });
     expect(r.status).toBe(200);
-    const body = r.body as { text: string; changed: boolean; description: string; questions: { id: string | null; prompt: string; options: { text: string; correct: boolean }[]; why: string }[] };
+    const body = r.body as {
+      text: string;
+      changed: boolean;
+      description: string;
+      questions: { id: string | null; prompt: string; options: { text: string; correct: boolean }[]; why: string }[];
+    };
     expect(body.changed).toBe(false);
     expect(body.text).toBe(QUIZ);
     expect(body.description).toBe("What it is about.");
-    expect(body.questions.map((q) => [q.id, q.prompt])).toEqual([["q1", "One?"], [null, "Two?"]]);
-    expect(body.questions[0]!.options).toEqual([{ text: "yes", correct: true, pinned: false }, { text: "no", correct: false, pinned: false }]);
+    expect(body.questions.map((q) => [q.id, q.prompt])).toEqual([
+      ["q1", "One?"],
+      [null, "Two?"],
+    ]);
+    expect(body.questions[0]!.options).toEqual([
+      { text: "yes", correct: true, pinned: false },
+      { text: "no", correct: false, pinned: false },
+    ]);
     expect(body.questions[0]!.why).toBe("Because.");
   });
 
   it("with `stamp`, writes an id on every question that lacks one and on nothing else", async () => {
-    const body = (await post("/quiz", { text: QUIZ, stamp: true })).body as { text: string; changed: boolean; questions: { id: string | null }[] };
+    const body = (await post("/quiz", { text: QUIZ, stamp: true })).body as {
+      text: string;
+      changed: boolean;
+      questions: { id: string | null }[];
+    };
     expect(body.changed).toBe(true);
     expect(body.questions[0]!.id).toBe("q1");
     expect(body.questions[1]!.id).toMatch(/^q[0-9a-z]+$/);
@@ -371,7 +401,13 @@ describe("search", () => {
 
   const docsOf = async () => {
     const docs = ((await post("/corpus", { texts })).body as { docs: Record<string, { title?: string; units: unknown[] }> }).docs;
-    return Object.entries(docs).map(([key, d], i) => ({ id: `id${i}`, name: key.replace(/\.note\.md$/, ""), kind: key.endsWith(".note.md") ? "note" : "board", title: d.title, units: d.units }));
+    return Object.entries(docs).map(([key, d], i) => ({
+      id: `id${i}`,
+      name: key.replace(/\.note\.md$/, ""),
+      kind: key.endsWith(".note.md") ? "note" : "board",
+      title: d.title,
+      units: d.units,
+    }));
   };
 
   it("is the page's engine over the corpus: the same hits, in the same order, with the same marks", async () => {
@@ -389,7 +425,9 @@ describe("search", () => {
 
   it("takes a limit, and refuses one that is not a count", async () => {
     const docs = await docsOf();
-    expect(((await post("/search", { docs, q: "the", limit: 1 })).body as { hits: unknown[] }).hits.length).toBeLessThanOrEqual(1);
+    expect(((await post("/search", { docs, q: "the", limit: 1 })).body as { hits: unknown[] }).hits.length).toBeLessThanOrEqual(
+      1,
+    );
     expect((await post("/search", { docs, q: "x", limit: 0 })).status).toBe(400);
     expect((await post("/search", { docs: "no", q: "x" })).status).toBe(400);
     expect((await post("/search", { docs })).status).toBe(400);
@@ -501,7 +539,7 @@ describe("dsl", () => {
 });
 
 describe("check", () => {
-  const REPLY = "Here you go:\n\n```arch {#x}\nservice api \"API\" icon=server\n```\n";
+  const REPLY = 'Here you go:\n\n```arch {#x}\nservice api "API" icon=server\n```\n';
 
   it("finds the fence, scores it, and hands back the next turn", async () => {
     const r = await post("/check", { reply: REPLY });
@@ -513,7 +551,7 @@ describe("check", () => {
   });
 
   it("drops the attributes that say where the diagram goes", async () => {
-    const r = await post("/check", { reply: "```arch {#x x=40 y=90 page=page-2 title=\"Keep me\"}\nservice a \"A\"\n```" });
+    const r = await post("/check", { reply: '```arch {#x x=40 y=90 page=page-2 title="Keep me"}\nservice a "A"\n```' });
     const attrs = (r.body as { draft: { attrs: Record<string, unknown> } }).draft.attrs;
     expect(attrs).toHaveProperty("title");
     for (const k of ["x", "y", "page", "id"]) expect(attrs).not.toHaveProperty(k);
@@ -528,7 +566,7 @@ describe("check", () => {
   });
 
   it("separates a fixable warning from a judgement, because the loop stops on the count", async () => {
-    const r = await post("/check", { reply: "```arch {#x}\nservice api \"API\" icon=postgre-sql\n```" });
+    const r = await post("/check", { reply: '```arch {#x}\nservice api "API" icon=postgre-sql\n```' });
     const b = r.body as { errors: number; fixable: number; feedback: string };
     expect(b.errors).toBe(0);
     expect(b.fixable).toBe(1);
@@ -602,10 +640,8 @@ describe("system", () => {
   });
 
   it("says what a rewrite is, and only in rewrite mode", async () => {
-    expect(((await get("/system", "mode=rewrite")).body as { system: string }).system)
-      .toContain("Rewriting an existing diagram");
-    expect(((await get("/system")).body as { system: string }).system)
-      .not.toContain("Rewriting an existing diagram");
+    expect(((await get("/system", "mode=rewrite")).body as { system: string }).system).toContain("Rewriting an existing diagram");
+    expect(((await get("/system")).body as { system: string }).system).not.toContain("Rewriting an existing diagram");
   });
 
   it("refuses an `as` that is not a diagram type", async () => {
@@ -614,7 +650,8 @@ describe("system", () => {
 });
 
 describe("a table", () => {
-  const TABLE = "---\ntitle: T\n---\n\n## Deals {#deals}\n\n| Name {#name} | Amount {#amount number} |\n| --- | ---: |\n| Acme {#racme} | 12 |\n| [Plan](dag:0123456789) {#rplan} | x |\n";
+  const TABLE =
+    "---\ntitle: T\n---\n\n## Deals {#deals}\n\n| Name {#name} | Amount {#amount number} |\n| --- | ---: |\n| Acme {#racme} | 12 |\n| [Plan](dag:0123456789) {#rplan} | x |\n";
 
   it("is `tableData` over the text, and the ops applied when there are any", async () => {
     expect((await post("/table", { text: TABLE })).body).toEqual({ text: TABLE, changed: false, table: tableData(TABLE) });
@@ -649,10 +686,14 @@ describe("a table", () => {
   });
 
   it("reads a table's references out of its cells, and cuts it into a unit per row", async () => {
-    const index = (await post("/index", { texts: { "t.table.md": TABLE } })).body as { docs: Record<string, { title?: string; refs: { id: string }[] }> };
+    const index = (await post("/index", { texts: { "t.table.md": TABLE } })).body as {
+      docs: Record<string, { title?: string; refs: { id: string }[] }>;
+    };
     expect(index.docs["t.table.md"]!.title).toBe("T");
     expect(index.docs["t.table.md"]!.refs.map((r) => r.id)).toEqual(["0123456789"]);
-    const corpus = (await post("/corpus", { texts: { "t.table.md": TABLE } })).body as { docs: Record<string, { units: { part?: string; what: string; text: string }[] }> };
+    const corpus = (await post("/corpus", { texts: { "t.table.md": TABLE } })).body as {
+      docs: Record<string, { units: { part?: string; what: string; text: string }[] }>;
+    };
     expect(corpus.docs["t.table.md"]!.units).toEqual([
       { what: "title", text: "T" },
       { part: "deals", what: "tab", text: "Deals Name Amount" },

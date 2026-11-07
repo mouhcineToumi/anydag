@@ -101,7 +101,11 @@ function CodeBlockRead({
   const read = useCodeRead(text, language);
   const said = problemsSaid(read);
   return (
-    <div className="dag-code" data-dag-code={language} data-dag-code-read={read ? (read.checked ? "checked" : "coloured") : undefined}>
+    <div
+      className="dag-code"
+      data-dag-code={language}
+      data-dag-code-read={read ? (read.checked ? "checked" : "coloured") : undefined}
+    >
       <div className="dag-code__head">
         <span className="dag-code__lang">{language}</span>
         {said ? (
@@ -123,7 +127,12 @@ function painted(text: string, read: CodeRead): ReactNode[] {
     if (!s.cls && !s.problem) return piece;
     const cls = [s.cls, s.problem ? "dag-tok-error" : null].filter(Boolean).join(" ");
     return (
-      <span key={s.from} className={cls} title={s.problem ? problemTitle(s.problem) : undefined} data-dag-code-error={s.problem ? "" : undefined}>
+      <span
+        key={s.from}
+        className={cls}
+        title={s.problem ? problemTitle(s.problem) : undefined}
+        data-dag-code-error={s.problem ? "" : undefined}
+      >
         {piece}
       </span>
     );

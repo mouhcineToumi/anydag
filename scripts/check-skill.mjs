@@ -178,9 +178,9 @@ if (!vocabSection) {
  * hold is text an agent writes and a person's first keystroke turns into something else.
  */
 const noteSrc = fs.readFileSync(at("src/note/markdown.ts"), "utf8");
-const noteBlocks = [.../export const NOTE_BLOCKS = \[([\s\S]*?)\] as const;/.exec(noteSrc)?.[1]?.matchAll(/"([A-Za-z]+)"/g) ?? []].map(
-  (m) => m[1],
-);
+const noteBlocks = [
+  ...(/export const NOTE_BLOCKS = \[([\s\S]*?)\] as const;/.exec(noteSrc)?.[1]?.matchAll(/"([A-Za-z]+)"/g) ?? []),
+].map((m) => m[1]);
 if (noteBlocks.length === 0) {
   console.error("could not read `NOTE_BLOCKS` out of src/note/markdown.ts — this check needs updating");
   process.exit(1);
@@ -283,7 +283,9 @@ let cli = [];
 try {
   cli = JSON.parse(helped.stdout).map((c) => c.name);
 } catch {
-  console.error(`could not read the CLI's command table (\`node cli/anydag.mjs help --json\`):\n${helped.stderr || helped.stdout}`);
+  console.error(
+    `could not read the CLI's command table (\`node cli/anydag.mjs help --json\`):\n${helped.stderr || helped.stdout}`,
+  );
   process.exit(1);
 }
 const cliGroups = [...new Set(cli.filter((n) => n.includes(" ")).map((n) => n.split(" ")[0]))];
@@ -302,7 +304,13 @@ if (!cliSection) {
     const two = words.slice(0, 2).join(" ");
     /* Three words — `table row add` — where every command before was one or two. */
     const three = words.slice(0, 3).join(" ");
-    if (cli.includes(three) || cli.includes(two) || cli.includes(words[0]) || (words.length === 1 && cliGroups.includes(words[0]))) continue;
+    if (
+      cli.includes(three) ||
+      cli.includes(two) ||
+      cli.includes(words[0]) ||
+      (words.length === 1 && cliGroups.includes(words[0]))
+    )
+      continue;
     /* A group followed by a word that is not one of its commands is the rename this exists to catch. */
     note("the skill names a command the CLI has not", `anydag ${words.join(" ")}`);
   }
@@ -349,9 +357,9 @@ for (const kind of sketchKinds) {
  * `HUE_ORDER`'s reason.
  */
 const quizSrc = fs.readFileSync(at("src/quiz/codes.ts"), "utf8");
-const quizCodes = [...(/(?:export )?const QUIZ_CODES = \{([\s\S]*?)\} as const;/.exec(quizSrc)?.[1] ?? "").matchAll(/^\s*([EW]Q_[A-Z_]+):/gm)].map(
-  (m) => m[1],
-);
+const quizCodes = [
+  ...(/(?:export )?const QUIZ_CODES = \{([\s\S]*?)\} as const;/.exec(quizSrc)?.[1] ?? "").matchAll(/^\s*([EW]Q_[A-Z_]+):/gm),
+].map((m) => m[1]);
 if (quizCodes.length === 0) {
   console.error("could not read `QUIZ_CODES` out of src/quiz/codes.ts — this check needs updating");
   process.exit(1);
@@ -373,9 +381,9 @@ if (!quizSection) {
  * `TABLE_CODES` both ways.
  */
 const tableSrc = fs.readFileSync(at("src/table/codes.ts"), "utf8");
-const tableCodes = [...(/(?:export )?const TABLE_CODES = \{([\s\S]*?)\} as const;/.exec(tableSrc)?.[1] ?? "").matchAll(/^\s*([EW]T_[A-Z_]+):/gm)].map(
-  (m) => m[1],
-);
+const tableCodes = [
+  ...(/(?:export )?const TABLE_CODES = \{([\s\S]*?)\} as const;/.exec(tableSrc)?.[1] ?? "").matchAll(/^\s*([EW]T_[A-Z_]+):/gm),
+].map((m) => m[1]);
 if (tableCodes.length === 0) {
   console.error("could not read `TABLE_CODES` out of src/table/codes.ts — this check needs updating");
   process.exit(1);

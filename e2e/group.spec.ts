@@ -100,7 +100,13 @@ test("ctrl+G groups the selection, a click on a member selects the group, ctrl+s
 });
 
 test("a group moves, duplicates and deletes as one", async ({ page }) => {
-  fs.writeFileSync(file, BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace("{#b x=280 y=0 w=200}", "{#b x=280 y=0 w=200 group=g1}"));
+  fs.writeFileSync(
+    file,
+    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(
+      "{#b x=280 y=0 w=200}",
+      "{#b x=280 y=0 w=200 group=g1}",
+    ),
+  );
   await open(page);
 
   /* Drag A: B comes with it, at its distance. */
@@ -139,7 +145,13 @@ test("a group moves, duplicates and deletes as one", async ({ page }) => {
 });
 
 test("the dashed box and its handles follow the members mid-drag", async ({ page }) => {
-  fs.writeFileSync(file, BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace("{#b x=280 y=0 w=200}", "{#b x=280 y=0 w=200 group=g1}"));
+  fs.writeFileSync(
+    file,
+    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(
+      "{#b x=280 y=0 w=200}",
+      "{#b x=280 y=0 w=200 group=g1}",
+    ),
+  );
   await open(page);
   await clickItem(page, "a");
   await expect(page.locator("[data-dag-groupbox]")).toHaveCount(1);
@@ -171,8 +183,10 @@ test("a group resizes as one: eight handles on its box, every member scaled, and
   /* Two notes and a pen stroke, grouped — the report's drawing, less the flower. */
   fs.writeFileSync(
     file,
-    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace("{#b x=280 y=0 w=200}", "{#b x=280 y=0 w=200 group=g1}") +
-      '\n```sketch {#s x=0 y=200 group=g1}\nink ink1 pts="0,0 80,0 80,40"\n```\n',
+    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(
+      "{#b x=280 y=0 w=200}",
+      "{#b x=280 y=0 w=200 group=g1}",
+    ) + '\n```sketch {#s x=0 y=200 group=g1}\nink ink1 pts="0,0 80,0 80,40"\n```\n',
   );
   await open(page);
   /* At 1:1, so a screen distance is a board distance. */
@@ -226,7 +240,10 @@ test("a circle in a group pulled sideways lands as the preview drew it: wider, a
      moved though nobody pulled it. */
   fs.writeFileSync(
     file,
-    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(/```md \{#b[^]*?```\n/, '```sketch {#s x=280 y=0 group=g1}\ncircle c1 "C"\n```\n'),
+    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(
+      /```md \{#b[^]*?```\n/,
+      '```sketch {#s x=280 y=0 group=g1}\ncircle c1 "C"\n```\n',
+    ),
   );
   await open(page);
   await page.locator(".dag-viewport").focus();
@@ -256,7 +273,13 @@ test("a circle in a group pulled sideways lands as the preview drew it: wider, a
 });
 
 test("the marquee takes a whole group by touching one member, and the sheet lists the keys", async ({ page }) => {
-  fs.writeFileSync(file, BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace("{#c x=0 y=200 w=200}", "{#c x=0 y=200 w=200 group=g1}"));
+  fs.writeFileSync(
+    file,
+    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(
+      "{#c x=0 y=200 w=200}",
+      "{#c x=0 y=200 w=200 group=g1}",
+    ),
+  );
   await open(page);
   const vp = (await page.locator(".dag-viewport").boundingBox())!;
   const a = (await page.locator('[data-dag-item="a"]').boundingBox())!;

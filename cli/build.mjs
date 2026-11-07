@@ -41,7 +41,7 @@ export async function build() {
      esbuild cannot inline, and the newer edge the CLI's `--vault` half never opens. It stays
      outside like `@playwright/test` does; a machine that ships the bundle without it only breaks when a
      command opens a browser or serves in-process. */
-  external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
+    external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
     define: { __ANYDAG_VERSION__: JSON.stringify(version) },
     metafile: true,
     logLevel: "warning",

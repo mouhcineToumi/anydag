@@ -120,7 +120,9 @@ export function fileHeaders(ext: string, title: string, download: boolean): Reco
   const mime = mimeOf(ext);
   const inline = INLINE.has(mime) && !download;
   const leaf = title.toLowerCase().endsWith(`.${ext.toLowerCase()}`) ? title : `${title}.${ext}`;
-  const plain = [...leaf].map((c) => (c.charCodeAt(0) >= 32 && c.charCodeAt(0) < 127 && c !== '"' && c !== "\\" ? c : "_")).join("");
+  const plain = [...leaf]
+    .map((c) => (c.charCodeAt(0) >= 32 && c.charCodeAt(0) < 127 && c !== '"' && c !== "\\" ? c : "_"))
+    .join("");
   const out: Record<string, string> = {
     "Content-Type": mime,
     "X-Content-Type-Options": "nosniff",

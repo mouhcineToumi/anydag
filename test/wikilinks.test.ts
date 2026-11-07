@@ -92,13 +92,19 @@ describe("resolveWiki", () => {
 /* The resolution `resolveWiki` was before it kept an index: three passes over every document per
    link. Held here as the meaning the index must keep, on vaults made to collide. */
 function naive<D extends { name: string; title?: string | null }>(target: string, docs: readonly D[]): D | undefined {
-  const fold = (s: string) => s.normalize("NFC").toLowerCase().replace(/\\/g, "/").replace(/^\.?\/+/, "");
+  const fold = (s: string) =>
+    s
+      .normalize("NFC")
+      .toLowerCase()
+      .replace(/\\/g, "/")
+      .replace(/^\.?\/+/, "");
   const t = fold(target.trim());
   if (!t) return undefined;
   const bare = t.replace(/\.md$/, "").replace(/\.(?:note|board|quiz|table)$/, "");
   const wants = new Set([t, bare]);
   const leafOf = (n: string) => n.slice(n.lastIndexOf("/") + 1);
-  const pick = (hits: D[]) => hits.sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))[0];
+  const pick = (hits: D[]) =>
+    hits.sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))[0];
   const exact = docs.filter((d) => wants.has(fold(d.name)));
   if (exact.length) return pick(exact);
   const tail = docs.filter((d) => {
@@ -123,13 +129,30 @@ describe("resolveWiki's index", () => {
         const name = [...Array.from({ length: depth }, () => words[rnd(words.length)]), words[rnd(words.length)]].join("/");
         return { id: `d${round}-${i}`, name, kind: kinds[rnd(kinds.length)]!, title: rnd(3) ? null : words[rnd(words.length)] };
       });
-      const targets = [...words, ...docs.map((d) => d.name), ...docs.map((d) => d.name.toUpperCase()), "plan.md", "a/plan", "/Plan", "./notes/a", "roadmap.board", "", "  ", "nowhere"];
+      const targets = [
+        ...words,
+        ...docs.map((d) => d.name),
+        ...docs.map((d) => d.name.toUpperCase()),
+        "plan.md",
+        "a/plan",
+        "/Plan",
+        "./notes/a",
+        "roadmap.board",
+        "",
+        "  ",
+        "nowhere",
+      ];
       for (const t of targets) expect(resolveWiki(t, docs)?.id, `${t} in round ${round}`).toBe(naive(t, docs)?.id);
     }
   });
 
   it("resolves a vault's worth of links in a moment", () => {
-    const docs = Array.from({ length: 5000 }, (_, i) => ({ id: `x${i}`, name: `folder${i % 50}/note ${i}`, kind: "note", title: `Note ${i}` }));
+    const docs = Array.from({ length: 5000 }, (_, i) => ({
+      id: `x${i}`,
+      name: `folder${i % 50}/note ${i}`,
+      kind: "note",
+      title: `Note ${i}`,
+    }));
     const started = performance.now();
     for (let i = 0; i < 150_000; i++) resolveWiki(`note ${i % 5000}`, docs);
     /* Three passes per link took about five minutes for this; the index is a few lookups. */
@@ -180,7 +203,9 @@ describe("the note editor", () => {
     const body = "# Title\n\nSee **[[Plan]]** now.\n";
     const { blocks, loaded } = load(body);
     const held = settle(loaded, blocks);
-    const edited = blocks.map((b, i) => (i === 1 ? { ...b, content: [...(b.content as object[]), { type: "text", text: "!", styles: {} }] } : b));
+    const edited = blocks.map((b, i) =>
+      i === 1 ? { ...b, content: [...(b.content as object[]), { type: "text", text: "!", styles: {} }] } : b,
+    );
     expect(saved(held, edited as never).body).toBe("# Title\n\nSee **[[Plan]]** now.!\n");
   });
 });

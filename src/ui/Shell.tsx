@@ -1,5 +1,16 @@
 import { PanelLeft } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import {
   FILE_KINDS,
@@ -32,7 +43,17 @@ import { uploadFiles } from "@/files/upload";
 import { nextHourEvent, type NoteEvent } from "@/note/event";
 import { folderTitle, projectText, type Project } from "@/note/project";
 import { titleStem, type Task } from "@/note/task";
-import { FAVOURITES, SIDEBAR, SIDEBAR_FOLDERS, SIDEBAR_WIDTH, readFlag, readPref, writeFlag, writeLocal, writePref } from "@/settings/prefs";
+import {
+  FAVOURITES,
+  SIDEBAR,
+  SIDEBAR_FOLDERS,
+  SIDEBAR_WIDTH,
+  readFlag,
+  readPref,
+  writeFlag,
+  writeLocal,
+  writePref,
+} from "@/settings/prefs";
 import type { QuizzesRun } from "@/ui/quiz/Gallery";
 import { usePractice } from "@/ui/quiz/practice";
 import { openVault, transferFile, transferFolder, vaultsNow } from "@/vault/api";
@@ -119,7 +140,12 @@ const FAVOURITE_KEY = new RegExp(`^(${FILE_KINDS.join("|")}):.`);
 
 /** What a new file of each kind starts as. Keyed on the kind, so a sixth kind is a type error here. An
     attachment is uploaded rather than made, so it has no blank. */
-const BLANK: Readonly<Record<TextKind, () => string>> = { board: blankBoardText, note: blankNoteText, quiz: blankQuizText, table: blankTableText };
+const BLANK: Readonly<Record<TextKind, () => string>> = {
+  board: blankBoardText,
+  note: blankNoteText,
+  quiz: blankQuizText,
+  table: blankTableText,
+};
 
 function readFavourites(): string[] {
   try {
@@ -291,7 +317,8 @@ export function Shell({
   /* On a phone the sidebar is the home screen: with nothing open there is no page to show,
      and the files are what somebody opens the app to reach. Brought up each time the page becomes
      empty — a delete, a workspace switch, a cold load — and put away as anything is opened. */
-  const nothing = !board && !note && !quiz && !table && !file && !tasksOpen && !calendarOpen && !quizzesOpen && !trashOpen && !assistantOpen;
+  const nothing =
+    !board && !note && !quiz && !table && !file && !tasksOpen && !calendarOpen && !quizzesOpen && !trashOpen && !assistantOpen;
   useEffect(() => {
     if (narrow && nothing) setPinned(true);
   }, [narrow, nothing]);
@@ -307,7 +334,10 @@ export function Shell({
 
   /* What is open, by kind — a `Record`, so every question below asks all five and a sixth kind is
      a type error rather than a table taken for a board. */
-  const opened = useMemo<Readonly<Record<FileKind, string | null>>>(() => ({ board, note, quiz, table, file }), [board, note, quiz, table, file]);
+  const opened = useMemo<Readonly<Record<FileKind, string | null>>>(
+    () => ({ board, note, quiz, table, file }),
+    [board, note, quiz, table, file],
+  );
 
   /* How many questions are in Mistakes, for the count beside Quizzes. Asked here rather
      than in the column, which mounts again on every peek: this is up for as long as the window is. */
@@ -514,7 +544,8 @@ export function Shell({
         /* `/mkdir` is idempotent — `Untitled` asked for twice is one folder — so the number is found
            here, against every folder there is, Obsidian's way: `Untitled`, `Untitled 2`. */
         const known = new Set(folders);
-        for (const { name } of everyFile({ boards, notes, quizzes, tables, files: attachments })) for (const a of ancestors(name)) known.add(a);
+        for (const { name } of everyFile({ boards, notes, quizzes, tables, files: attachments }))
+          for (const a of ancestors(name)) known.add(a);
         const base = parent ? `${parent}/Untitled` : "Untitled";
         const lower = new Set([...known].map((k) => k.toLowerCase()));
         let path = base;
@@ -554,7 +585,9 @@ export function Shell({
         const gone: Gone[] = [];
         const was = openKind ? opened[openKind] : null;
         /* Every row goes at once, and comes back if the server refuses it. */
-        const guesses = things.map((t) => guess("folder" in t ? { op: "folder-remove", path: t.folder } : { op: "remove", kind: t.kind, name: t.name }));
+        const guesses = things.map((t) =>
+          guess("folder" in t ? { op: "folder-remove", path: t.folder } : { op: "remove", kind: t.kind, name: t.name }),
+        );
         for (const [i, t] of things.entries()) {
           if ("folder" in t) {
             const path = t.folder;
@@ -640,7 +673,9 @@ export function Shell({
         /* Gone from this vault, whichever way it went: its favourite, the folders shown open under
            it, and the page, when it was the file open here — the delete's rules, read off what the
            server says moved. It is opened in its new vault by going there, never here. */
-        const done = guess("folder" in what ? { op: "folder-remove", path: what.folder } : { op: "remove", kind: what.kind, name: what.name });
+        const done = guess(
+          "folder" in what ? { op: "folder-remove", path: what.folder } : { op: "remove", kind: what.kind, name: what.name },
+        );
         try {
           /* A vault on the recent list that is not being served is opened first. */
           const target = vaultsNow()?.find((v) => v.id === to);
@@ -651,7 +686,13 @@ export function Shell({
             moved({ kind: "folder", from: path, to: null });
             const under = (f: string) => f === path || f.startsWith(`${path}/`);
             setFolders((had) => ([...had].some(under) ? new Set([...had].filter((f) => !under(f))) : had));
-            const went: Record<FileKind, readonly string[]> = { board: gone.boards, note: gone.notes, quiz: gone.quizzes, table: gone.tables ?? [], file: gone.files ?? [] };
+            const went: Record<FileKind, readonly string[]> = {
+              board: gone.boards,
+              note: gone.notes,
+              quiz: gone.quizzes,
+              table: gone.tables ?? [],
+              file: gone.files ?? [],
+            };
             const was = openKind ? opened[openKind] : null;
             if (openKind && was !== null && went[openKind].includes(was)) open(openKind, null);
           } else {
@@ -705,11 +746,31 @@ export function Shell({
       moveFolder: held(raw.moveFolder, () => Promise.resolve("Read only: unlock to move it.")),
       transfer: held(raw.transfer, () => Promise.resolve("Read only: unlock to move it.")),
     };
-  }, [opened, boards, notes, quizzes, tables, attachments, folders, titles, favourites, open, onOpen, bring, nameNext, setFolders, moved, saveFavourites]);
+  }, [
+    opened,
+    boards,
+    notes,
+    quizzes,
+    tables,
+    attachments,
+    folders,
+    titles,
+    favourites,
+    open,
+    onOpen,
+    bring,
+    nameNext,
+    setFolders,
+    moved,
+    saveFavourites,
+  ]);
 
   const create = useCallback((kind: TextKind | "task" | "event", folder = "") => files.newFile(kind, folder), [files]);
 
-  const renamed = useCallback((kind: FileKind, from: string, to: string) => moved({ kind: "file", file: kind, from, to }), [moved]);
+  const renamed = useCallback(
+    (kind: FileKind, from: string, to: string) => moved({ kind: "file", file: kind, from, to }),
+    [moved],
+  );
 
   const retitle = useCallback((kind: FileKind, name: string, title: string) => files.retitle(kind, name, title), [files]);
 

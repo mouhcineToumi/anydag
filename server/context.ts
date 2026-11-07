@@ -150,7 +150,12 @@ export class Session {
       this.remember(vault);
       return had;
     }
-    const at: Open = { vault, index: new Parsed(grammar.index), corpus: new Parsed(grammar.corpus), practice: new Practice(this.home, vault.id) };
+    const at: Open = {
+      vault,
+      index: new Parsed(grammar.index),
+      corpus: new Parsed(grammar.corpus),
+      practice: new Practice(this.home, vault.id),
+    };
     this.open.set(vault.id, at);
     this.defaultId = vault.id;
     this.remember(vault);
@@ -160,7 +165,9 @@ export class Session {
 
   private remember(vault: Vault): void {
     this.home
-      .sql("insert into vaults (id, path, name, opened) values (?, ?, ?, ?) on conflict(id) do update set path = excluded.path, name = excluded.name, opened = excluded.opened")
+      .sql(
+        "insert into vaults (id, path, name, opened) values (?, ?, ?, ?) on conflict(id) do update set path = excluded.path, name = excluded.name, opened = excluded.opened",
+      )
       .run(vault.id, vault.root, path.basename(vault.root), new Date().toISOString());
   }
 
@@ -183,7 +190,8 @@ export class Session {
     if (!clean || /[\\/:*?"<>|]/.test(clean) || clean.startsWith(".")) throw new Refused(`\`${name}\` is not a folder name`);
     const root = path.join(path.resolve(parent), clean);
     if (fs.existsSync(root)) throw new Refused(`\`${root}\` is already there`);
-    if (!fs.statSync(path.resolve(parent), { throwIfNoEntry: false })?.isDirectory()) throw new Refused(`\`${parent}\` is not a folder`);
+    if (!fs.statSync(path.resolve(parent), { throwIfNoEntry: false })?.isDirectory())
+      throw new Refused(`\`${parent}\` is not a folder`);
     const nested = this.nesting(root);
     if (nested) throw new Refused(nested);
     fs.mkdirSync(root);
@@ -248,7 +256,10 @@ export class Session {
 
   /** The recent list, newest first. */
   recent(): Recent[] {
-    const rows = this.home.sql("select id, path, name, opened from vaults order by opened desc").all() as unknown as Omit<Recent, "open" | "default" | "missing">[];
+    const rows = this.home.sql("select id, path, name, opened from vaults order by opened desc").all() as unknown as Omit<
+      Recent,
+      "open" | "default" | "missing"
+    >[];
     return rows.map((r) => ({
       ...r,
       open: this.open.has(r.id),
@@ -269,7 +280,10 @@ export class Session {
 
   limits(): Limits {
     const mb = Number(this.env.ANYDAG_UPLOAD_MAX_MB);
-    return { maxBytes: Math.round((Number.isFinite(mb) && mb > 0 ? mb : DEFAULT_MAX_MB) * 1024 * 1024), types: [...this.vault.types].sort() };
+    return {
+      maxBytes: Math.round((Number.isFinite(mb) && mb > 0 ? mb : DEFAULT_MAX_MB) * 1024 * 1024),
+      types: [...this.vault.types].sort(),
+    };
   }
 }
 

@@ -276,7 +276,9 @@ test("New note makes one, opens it, and names it in its own title", { tag: "@smo
      create. No heading — a second copy of the title is one nothing rewrites. */
   const created = path.join(DIR, `${name}-new.md`);
   made.push(created);
-  await expect.poll(() => fs.existsSync(created) && fs.readFileSync(created, "utf8"), { timeout: 5_000 }).toMatch(/^---\nid: [0-9a-z]{10}\n---\n$/);
+  await expect
+    .poll(() => fs.existsSync(created) && fs.readFileSync(created, "utf8"), { timeout: 5_000 })
+    .toMatch(/^---\nid: [0-9a-z]{10}\n---\n$/);
   await expect(page.locator(".dag-toolbar__title")).toHaveText(`${name}-new`);
 });
 
@@ -296,7 +298,9 @@ test("the title at the top of a note is its name, and the editor stays up while 
   await title.press("Enter");
   await page.keyboard.type("Typed after the title.");
   await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toBe(named);
-  await expect.poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 }).toContain("Typed after the title.");
+  await expect
+    .poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 })
+    .toContain("Typed after the title.");
   const text = fs.readFileSync(moved, "utf8");
   expect(text.startsWith(`---\ntitle: ${named}\n---\nTyped after the title.\n\n# The plan\n`)).toBe(true);
   /* Every block nobody touched is the agent's bytes still. */
@@ -342,7 +346,9 @@ test("Escape takes the title back, and emptying it makes the note Untitled again
   await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toMatch(/^Untitled( \d+)?$/);
   const moved = path.join(DIR, `${new URL(page.url()).searchParams.get("note")}.note.md`);
   made.push(moved);
-  await expect.poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 }).toMatch(/^---\ntitle: Untitled\n---\n# The plan\n/);
+  await expect
+    .poll(() => fs.existsSync(moved) && fs.readFileSync(moved, "utf8"), { timeout: 5_000 })
+    .toMatch(/^---\ntitle: Untitled\n---\n# The plan\n/);
   await expect(title).toHaveValue("");
 });
 

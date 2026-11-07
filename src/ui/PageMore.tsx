@@ -72,11 +72,18 @@ export function PageMore({ items }: { items: MoreItem[] }) {
 
   const onMenuKey = (e: KeyEvent) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
-    const rows = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []).filter((b) => b.offsetParent !== null);
+    const rows = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []).filter(
+      (b) => b.offsetParent !== null,
+    );
     if (rows.length === 0) return;
     e.preventDefault();
     const at = rows.indexOf(document.activeElement as HTMLButtonElement);
-    const next = e.key === "Home" ? 0 : e.key === "End" ? rows.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? rows.length - 1
+          : (at + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
     rows[next]?.focus();
   };
 
@@ -96,7 +103,14 @@ export function PageMore({ items }: { items: MoreItem[] }) {
         <MoreHorizontal {...ICON} aria-hidden="true" />
       </button>
       {open ? (
-        <div className="dag-pagemore__menu" data-dag-page-more-menu="" role="menu" aria-label="More" ref={menu} onKeyDown={onMenuKey}>
+        <div
+          className="dag-pagemore__menu"
+          data-dag-page-more-menu=""
+          role="menu"
+          aria-label="More"
+          ref={menu}
+          onKeyDown={onMenuKey}
+        >
           {items.map((it) => {
             const Icon = it.icon;
             return (

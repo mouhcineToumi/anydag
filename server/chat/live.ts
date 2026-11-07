@@ -192,7 +192,14 @@ export class Assistant {
   read(chat: string, vault?: string | null): ChatRead {
     const { root, vault: at, meta } = this.locate(chat, vault);
     const live = this.live.get(chat);
-    return { chat: live?.meta ?? meta, vault: at, turns: this.store.turns(root, chat), undos: this.store.undos(root, chat), live: live ? this.snapshot(live) : null, device: this.store.device };
+    return {
+      chat: live?.meta ?? meta,
+      vault: at,
+      turns: this.store.turns(root, chat),
+      undos: this.store.undos(root, chat),
+      live: live ? this.snapshot(live) : null,
+      device: this.store.device,
+    };
   }
 
   private snapshot(l: Live): Turn {
@@ -200,7 +207,10 @@ export class Assistant {
     return { ...l.turn, steps, blocks: l.turn.blocks.map((b) => ({ ...b })) };
   }
 
-  create(vault: string | null | undefined, o: { provider: Provider; model: string; effort?: string; mode?: Mode; title?: string }): ChatMeta {
+  create(
+    vault: string | null | undefined,
+    o: { provider: Provider; model: string; effort?: string; mode?: Mode; title?: string },
+  ): ChatMeta {
     const v = this.s.pick(vault).vault;
     if (!this.opts.harnesses[o.provider]) throw err(400, `\`${o.provider}\` is not available here`, { code: "provider" });
     const meta = this.store.create(v.root, {
@@ -251,11 +261,18 @@ export class Assistant {
   /* -- a turn ------------------------------------------------------------------------------ */
 
   /** Start a turn. Answers the turn as it starts; the rest arrives on the stream. */
-  say(chat: string, text: string, o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null; mode?: Mode } = {}): Turn {
+  say(
+    chat: string,
+    text: string,
+    o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null; mode?: Mode } = {},
+  ): Turn {
     const words = text.trim();
     if (!words) throw err(400, "say something");
     if (this.live.has(chat)) throw err(409, "the chat is already answering", { code: "running" });
-    if (!this.port && !this.opts.mcp) throw err(409, "the Assistant answers in the app's own server; start it (`anydag serve`) and ask there", { code: "no-server" });
+    if (!this.port && !this.opts.mcp)
+      throw err(409, "the Assistant answers in the app's own server; start it (`anydag serve`) and ask there", {
+        code: "no-server",
+      });
     const { root } = this.locate(chat, o.vault);
     const meta = this.store.update(root, chat, (m) => {
       if (o.provider) m.provider = o.provider;
@@ -347,7 +364,11 @@ export class Assistant {
     const env = { ANYDAG_CHAT_PORT: String(this.port), ANYDAG_TOKEN: this.opts.token, ANYDAG_HOME: this.s.home.dir };
     const bin = process.env.ANYDAG_CHAT_MCP_BIN;
     if (bin) return { command: bin, args: ["mcp", "--chat", chat, "--mode", mode], env };
-    return { command: process.execPath, args: [...process.execArgv, process.argv[1]!, "mcp", "--chat", chat, "--mode", mode], env };
+    return {
+      command: process.execPath,
+      args: [...process.execArgv, process.argv[1]!, "mcp", "--chat", chat, "--mode", mode],
+      env,
+    };
   }
 
   private push(live: Live, step: Step): number {
@@ -398,14 +419,20 @@ export class Assistant {
     }
     if (live.typing.trim()) live.turn.steps.push({ kind: "text", text: live.typing });
     live.typing = "";
-    if (end.error && !live.stopping && !live.turn.steps.some((s) => s.kind === "error" && s.text === end.error)) live.turn.steps.push({ kind: "error", text: end.error });
+    if (end.error && !live.stopping && !live.turn.steps.some((s) => s.kind === "error" && s.text === end.error))
+      live.turn.steps.push({ kind: "error", text: end.error });
     live.turn.status = live.stopping ? "stopped" : end.error ? "failed" : "done";
     live.turn.ended = new Date().toISOString();
     if (end.usage) live.turn.usage = end.usage;
     live.turn.blocks = live.turn.blocks.filter((b) => b.ops.length);
     try {
       this.store.writeTurn(live.root, live.turn);
-      if (live.session) this.store.setSession(live.turn.chat, live.turn.provider, { id: live.session, model: live.turn.model, turn: live.turn.id });
+      if (live.session)
+        this.store.setSession(live.turn.chat, live.turn.provider, {
+          id: live.session,
+          model: live.turn.model,
+          turn: live.turn.id,
+        });
     } catch (e) {
       console.error(`anydag: chat ${live.turn.chat}: the turn could not be kept:`, e);
     }
@@ -476,14 +503,22 @@ export class Assistant {
     const meta = live.meta;
     const vault = c.req.query("vault") || meta.home;
     const mode = this.modeIn(meta, live.turn.mode, vault);
-    if (!mode) throw err(403, `this chat does not reach vault \`${vault}\`; ask for it with vault_request`, { code: "not-granted" });
+    if (!mode)
+      throw err(403, `this chat does not reach vault \`${vault}\`; ask for it with vault_request`, { code: "not-granted" });
     if (!reads && mode === "ask") {
-      throw err(403, live.turn.mode === "ask" ? "this chat is in Ask mode: it cannot change anything" : `vault \`${vault}\` was granted to read only`, { code: "ask-mode" });
+      throw err(
+        403,
+        live.turn.mode === "ask"
+          ? "this chat is in Ask mode: it cannot change anything"
+          : `vault \`${vault}\` was granted to read only`,
+        { code: "ask-mode" },
+      );
     }
     if (p === "/__board/transfer") {
       const body = (await c.req.json().catch(() => ({}))) as { to?: unknown };
       const to = typeof body.to === "string" ? body.to : "";
-      if (this.modeIn(meta, live.turn.mode, to) !== "edit") throw err(403, `this chat may not change vault \`${to}\``, { code: "not-granted" });
+      if (this.modeIn(meta, live.turn.mode, to) !== "edit")
+        throw err(403, `this chat may not change vault \`${to}\``, { code: "not-granted" });
     }
     return this.s.within(vault, async () => {
       if (reads) return next();
@@ -491,7 +526,12 @@ export class Assistant {
       if (what) {
         const detail = await this.detailOf(c);
         const yes = await this.ask(live, { kind: "approval", id: newId("b", this.store.device), what, detail, answer: null });
-        if (!yes) throw err(403, yes === null ? "the person did not answer in time; nothing was changed" : "the person said no; nothing was changed", { code: "declined" });
+        if (!yes)
+          throw err(
+            403,
+            yes === null ? "the person did not answer in time; nothing was changed" : "the person said no; nothing was changed",
+            { code: "declined" },
+          );
       }
       const { op } = await record({ id: vault, root: this.s.vault.root }, `${method} ${p}`, async () => {
         await next();
@@ -555,7 +595,15 @@ export class Assistant {
     if (vault === live.meta.home) return { granted: true, mode: live.turn.mode };
     const had = live.meta[`grant:${vault}`];
     if (had && (had.mode === "edit" || mode === "ask")) return { granted: true, mode: had.mode };
-    const yes = await this.ask(live, { kind: "access", id: newId("b", this.store.device), vault, name, why: why.slice(0, 500), mode, answer: null });
+    const yes = await this.ask(live, {
+      kind: "access",
+      id: newId("b", this.store.device),
+      vault,
+      name,
+      why: why.slice(0, 500),
+      mode,
+      answer: null,
+    });
     if (!yes) return { granted: false, error: yes === null ? "the person did not answer in time" : "the person said no" };
     this.grant(live.turn.chat, vault, mode, live.meta.home);
     return { granted: true, mode };

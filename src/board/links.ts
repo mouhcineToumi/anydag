@@ -102,7 +102,8 @@ export function parseLinks(body: string, baseLine: number, idPrefix: string): Pa
   let spoiled = false;
 
   const bad = (t: Token, message: string): void => {
-    if (!spoiled) diagnostics.push({ line: baseLine + t.line, col: t.col, code: CODES.EB_LINK_SYNTAX, message, severity: "error" });
+    if (!spoiled)
+      diagnostics.push({ line: baseLine + t.line, col: t.col, code: CODES.EB_LINK_SYNTAX, message, severity: "error" });
     spoiled = true;
   };
 

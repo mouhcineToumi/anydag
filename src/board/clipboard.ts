@@ -111,8 +111,7 @@ function readInsert(text: string, taken: ReadonlySet<string>): Read<{ items: New
   for (const it of located.items) {
     const wrong = it.attrErrors[0];
     if (wrong) return { ok: false, error: `${wrong.code} ${wrong.message}${where(it.line)}` };
-    if (it.duplicateOf !== undefined)
-      return { ok: false, error: `the id \`${it.duplicateOf}\` is written twice in one insert` };
+    if (it.duplicateOf !== undefined) return { ok: false, error: `the id \`${it.duplicateOf}\` is written twice in one insert` };
     const attrs: NewItem["attrs"] = { ...it.attrs.map };
     if (!str(it.attrs, "id")) attrs.id = freshId(it.type === "note" ? "md" : it.type, mine);
     mine.add(attrs.id as string);

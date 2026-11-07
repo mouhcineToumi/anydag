@@ -215,7 +215,10 @@ export class Telemetry {
     return {
       version: this.version,
       shell: this.env.ANYDAG_DESKTOP === "1" ? "desktop" : "browser",
-      os: process.platform === "linux" || process.platform === "darwin" || process.platform === "win32" ? process.platform : "other",
+      os:
+        process.platform === "linux" || process.platform === "darwin" || process.platform === "win32"
+          ? process.platform
+          : "other",
       arch: arch === "x64" || arch === "arm64" ? arch : "other",
       locale: localeOf(Intl.DateTimeFormat().resolvedOptions().locale),
       install,
@@ -226,7 +229,11 @@ export class Telemetry {
   take(): LogBatch | null {
     const now = new Date().toISOString();
     for (const [route, t] of this.timings) {
-      this.held.push({ name: "route.timing", at: now.replace(/\.\d{3}Z$/, "Z"), props: { route, count: t.count, errors: t.errors, ms: Math.round(t.ms / t.count), max: Math.round(t.max) } });
+      this.held.push({
+        name: "route.timing",
+        at: now.replace(/\.\d{3}Z$/, "Z"),
+        props: { route, count: t.count, errors: t.errors, ms: Math.round(t.ms / t.count), max: Math.round(t.max) },
+      });
     }
     this.timings.clear();
     const env = this.envOf();

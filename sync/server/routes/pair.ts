@@ -64,7 +64,8 @@ export function pairRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const b = await body(c);
     const typed = str(b.code, "code", 64);
     const dev = b.device;
-    if (typeof dev !== "object" || dev === null || Array.isArray(dev)) throw new HttpError("ES_BAD_REQUEST", "device must be {name, platform}");
+    if (typeof dev !== "object" || dev === null || Array.isArray(dev))
+      throw new HttpError("ES_BAD_REQUEST", "device must be {name, platform}");
     const name = str((dev as Record<string, unknown>).name, "device.name", 200);
     const platform = str((dev as Record<string, unknown>).platform, "device.platform", 100);
     const canonical = canonicalCode(typed);
@@ -75,7 +76,10 @@ export function pairRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     if (!account) throw new HttpError("ES_PAIR", "that pairing code's account is gone");
     const plan = await deps.meta.plan(account.plan);
     if (plan.devices !== null && live(await deps.meta.devices(account.id)) >= plan.devices) {
-      throw new HttpError("ES_QUOTA", `this account's plan allows ${plan.devices} device${plan.devices === 1 ? "" : "s"}: revoke one first`);
+      throw new HttpError(
+        "ES_QUOTA",
+        `this account's plan allows ${plan.devices} device${plan.devices === 1 ? "" : "s"}: revoke one first`,
+      );
     }
     const token = randomBytes(32).toString("base64url");
     const row = await deps.meta.addDevice(account.id, name, platform, sha256(token));

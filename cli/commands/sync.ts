@@ -12,7 +12,12 @@ import type { SyncDevices, SyncLinked, SyncPaired, SyncRemotes, SyncStatus } fro
  * only when named. The recovery code an upload makes is printed once, and kept nowhere.
  */
 
-const PASSPHRASE_FILE = { name: "passphrase-file", type: "string" as const, value: "<path>", help: "read the passphrase (or with --recovery, the recovery code) from this file; - is stdin" };
+const PASSPHRASE_FILE = {
+  name: "passphrase-file",
+  type: "string" as const,
+  value: "<path>",
+  help: "read the passphrase (or with --recovery, the recovery code) from this file; - is stdin",
+};
 
 /** The secret a link needs: a hidden prompt, or the first line of the file named. */
 async function secret(ctx: Ctx, p: Parsed, what: string, twice: boolean): Promise<string> {
@@ -28,10 +33,12 @@ async function secret(ctx: Ctx, p: Parsed, what: string, twice: boolean): Promis
     if (!line) throw new UsageError(`${file === "-" ? "stdin" : file} holds no ${what}`);
     return line;
   }
-  if (!ctx.io.stdinIsTTY) throw new UsageError(`give the ${what} with --passphrase-file <path>, or --passphrase-file - to read it from stdin`);
+  if (!ctx.io.stdinIsTTY)
+    throw new UsageError(`give the ${what} with --passphrase-file <path>, or --passphrase-file - to read it from stdin`);
   const first = await ctx.io.ask(`${what}: `, { hidden: true });
   if (!first) throw new UsageError(`no ${what} given`);
-  if (twice && (await ctx.io.ask(`the ${what} again: `, { hidden: true })) !== first) throw new UsageError(`the two ${what}s differ — nothing was linked`);
+  if (twice && (await ctx.io.ask(`the ${what} again: `, { hidden: true })) !== first)
+    throw new UsageError(`the two ${what}s differ — nothing was linked`);
   return first;
 }
 
@@ -70,11 +77,24 @@ export const SYNC: Command[] = [
     args: "<server> <code>",
     min: 2,
     summary: "pair this vault with a sync server, with the one-time code its admin made for you",
-    flags: [{ name: "device", type: "string", value: "<name>", help: "what this device is called on the server; the machine's name when left out" }],
+    flags: [
+      {
+        name: "device",
+        type: "string",
+        value: "<name>",
+        help: "what this device is called on the server; the machine's name when left out",
+      },
+    ],
     routes: ["POST /api/sync/pair"],
     async run(ctx, p) {
-      const got = await ctx.api.post<SyncPaired>("/api/sync/pair", { server: p.pos[0], code: p.pos[1], device: str(p, "device") });
-      emit(ctx, got, () => ctx.io.err(`paired with ${got.server} as ${got.device}, in ${got.account}'s account — \`anydag sync link\` next`));
+      const got = await ctx.api.post<SyncPaired>("/api/sync/pair", {
+        server: p.pos[0],
+        code: p.pos[1],
+        device: str(p, "device"),
+      });
+      emit(ctx, got, () =>
+        ctx.io.err(`paired with ${got.server} as ${got.device}, in ${got.account}'s account — \`anydag sync link\` next`),
+      );
     },
   },
   {
@@ -85,8 +105,14 @@ export const SYNC: Command[] = [
     async run(ctx) {
       const got = await ctx.api.get<SyncRemotes>("/api/sync/remotes");
       emit(ctx, got, () => {
-        if (!got.remotes.length) return ctx.io.err("the account holds no vault yet — `anydag sync link --upload` makes one of this vault");
-        const rows = got.remotes.map((r) => [r.id, `${r.seq} change${r.seq === 1 ? "" : "s"}`, when(r.created), r.keyed ? (r.mine ? "this vault" : "") : "unfinished upload"]);
+        if (!got.remotes.length)
+          return ctx.io.err("the account holds no vault yet — `anydag sync link --upload` makes one of this vault");
+        const rows = got.remotes.map((r) => [
+          r.id,
+          `${r.seq} change${r.seq === 1 ? "" : "s"}`,
+          when(r.created),
+          r.keyed ? (r.mine ? "this vault" : "") : "unfinished upload",
+        ]);
         for (const line of table(rows)) ctx.io.out(line);
       });
     },
@@ -111,9 +137,11 @@ export const SYNC: Command[] = [
       const upload = bool(p, "upload");
       const download = str(p, "download");
       const merge = str(p, "merge");
-      if ([upload, download !== undefined, merge !== undefined].filter(Boolean).length !== 1) throw new UsageError("give one of --upload, --download <remote> or --merge <remote>");
+      if ([upload, download !== undefined, merge !== undefined].filter(Boolean).length !== 1)
+        throw new UsageError("give one of --upload, --download <remote> or --merge <remote>");
       if (upload) {
-        if (bool(p, "recovery")) throw new UsageError("an upload makes the recovery code: --recovery is for --download and --merge");
+        if (bool(p, "recovery"))
+          throw new UsageError("an upload makes the recovery code: --recovery is for --download and --merge");
         const passphrase = await secret(ctx, p, "passphrase", true);
         const got = await ctx.api.post<SyncLinked>("/api/sync/link", { mode: "upload", passphrase });
         emit(ctx, got, () => {
@@ -139,7 +167,8 @@ export const SYNC: Command[] = [
   {
     name: ["sync", "unlink"],
     args: "",
-    summary: "stop syncing this vault — its files stay, and so does the remote; the device token and the key kept here are forgotten",
+    summary:
+      "stop syncing this vault — its files stay, and so does the remote; the device token and the key kept here are forgotten",
     routes: ["POST /api/sync/unlink"],
     async run(ctx) {
       const s = await ctx.api.post<SyncStatus>("/api/sync/unlink");
@@ -165,7 +194,13 @@ export const SYNC: Command[] = [
     async run(ctx) {
       const got = await ctx.api.get<SyncDevices>("/api/sync/devices");
       emit(ctx, got, () => {
-        const rows = got.devices.map((d) => [d.id, d.name, d.platform, d.revoked ? `revoked ${when(d.revoked)}` : d.seen ? `seen ${when(d.seen)}` : "", d.me ? "this device" : ""]);
+        const rows = got.devices.map((d) => [
+          d.id,
+          d.name,
+          d.platform,
+          d.revoked ? `revoked ${when(d.revoked)}` : d.seen ? `seen ${when(d.seen)}` : "",
+          d.me ? "this device" : "",
+        ]);
         for (const line of table(rows)) ctx.io.out(line);
       });
     },

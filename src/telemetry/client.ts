@@ -20,7 +20,17 @@ import { useSyncExternalStore } from "react";
 
 import { desktop } from "@/vault/desktop";
 
-import { cleanEvent, MAX_EVENTS, PAGES, scrub, MESSAGE_MAX, STACK_MAX, type EventName, type LogEvent, type Props } from "../../sync/protocol/logs";
+import {
+  cleanEvent,
+  MAX_EVENTS,
+  PAGES,
+  scrub,
+  MESSAGE_MAX,
+  STACK_MAX,
+  type EventName,
+  type LogEvent,
+  type Props,
+} from "../../sync/protocol/logs";
 
 export interface TelemetryStatus {
   consent: boolean | null;
@@ -60,7 +70,8 @@ function quietPage(): boolean {
 /** Which kind of page this is, as a log says it — never which document. */
 function pageKind(): (typeof PAGES)[number] {
   const q = new URLSearchParams(location.search);
-  for (const k of ["board", "note", "quiz", "table", "file", "tasks", "calendar", "quizzes", "trash", "chat"] as const) if (q.has(k)) return k;
+  for (const k of ["board", "note", "quiz", "table", "file", "tasks", "calendar", "quizzes", "trash", "chat"] as const)
+    if (q.has(k)) return k;
   return q.toString() === "" || q.has("vault") ? "home" : "other";
 }
 

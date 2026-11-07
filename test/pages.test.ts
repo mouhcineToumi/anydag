@@ -130,7 +130,10 @@ On the first page.
   });
 
   it("and loose prose, which has no fence line to carry an attribute, is never the error", () => {
-    const b = parseBoard("b", declared.replace("```image {#shot x=168 y=1792 w=948 src=b.assets/paste-6d5a1249.png}\n```", "Just a paragraph."));
+    const b = parseBoard(
+      "b",
+      declared.replace("```image {#shot x=168 y=1792 w=948 src=b.assets/paste-6d5a1249.png}\n```", "Just a paragraph."),
+    );
     expect(b.errors).toEqual([]);
     expect(b.items.at(-1)?.page).toBe("docs");
   });

@@ -11,10 +11,16 @@ interface Feature {
 }
 
 const outside = (v: unknown): boolean =>
-  v !== null && typeof v === "object" && !Array.isArray(v) && (v as { admin?: unknown }).admin === false && Object.keys(v).length === 1;
+  v !== null &&
+  typeof v === "object" &&
+  !Array.isArray(v) &&
+  (v as { admin?: unknown }).admin === false &&
+  Object.keys(v).length === 1;
 
 const refusal = (v: unknown): string | null =>
-  v && typeof v === "object" && !Array.isArray(v) && typeof (v as { refused?: unknown }).refused === "string" ? (v as { refused: string }).refused : null;
+  v && typeof v === "object" && !Array.isArray(v) && typeof (v as { refused?: unknown }).refused === "string"
+    ? (v as { refused: string }).refused
+    : null;
 
 /** `{route: reason}` for every route a feature refuses the CLI. */
 export function cliRefused(manifest: { features: Feature[] }): Record<string, string> {

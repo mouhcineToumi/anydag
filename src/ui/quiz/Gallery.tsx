@@ -141,9 +141,7 @@ export function QuizzesView({ list, practice, onOpen, onPractice, onMistakes, on
             Mistakes
           </h2>
           <p className="dag-quizzes__meta">
-            {inMistakes
-              ? `${inMistakes} ${inMistakes === 1 ? "question" : "questions"} to practice`
-              : "Nothing to practice"}
+            {inMistakes ? `${inMistakes} ${inMistakes === 1 ? "question" : "questions"} to practice` : "Nothing to practice"}
           </p>
           <p className="dag-quizzes__about">
             A question you get wrong comes here, and leaves once you get it right {practice?.graduate ?? 2}{" "}

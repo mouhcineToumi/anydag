@@ -159,7 +159,7 @@ function BoardFrame({ board, bar }: { board: Board | null; bar: ReactNode }) {
   const { theme } = useTheme(query.get("theme") ?? undefined, board?.theme, query.get("snapshot") === "1");
   const viewport = useRef<ViewportHandle>(null);
 
-  const shown = page && board?.pages.some((p) => p.id === page) ? page : board?.pages[0]?.id ?? "page-1";
+  const shown = page && board?.pages.some((p) => p.id === page) ? page : (board?.pages[0]?.id ?? "page-1");
   return (
     <div className="dag-app dag-app--view" data-dag-view="board">
       {bar}
@@ -217,7 +217,7 @@ function NotePage({ name }: { name: string }) {
   }, [name]);
 
   if (error) return <Missing what={error} />;
-  const title = text === null ? name : splitNote(text).title ?? name;
+  const title = text === null ? name : (splitNote(text).title ?? name);
   return (
     <NoteFrame
       name={name}
@@ -306,7 +306,7 @@ function TablePage({ name }: { name: string }) {
   const text = useTableText(name);
   const id = useIndex().docs.find((d) => d.kind === "table" && d.name === name)?.id;
   if (text === null) return <Missing what={`no table \`${name}\``} />;
-  const title = text === undefined ? name : splitNote(text).title ?? name;
+  const title = text === undefined ? name : (splitNote(text).title ?? name);
   return (
     <TableFrame
       name={name}
@@ -379,7 +379,7 @@ function QuizPage({ name }: { name: string }) {
   }, [name]);
 
   if (error) return <Missing what={error} />;
-  const title = text === null ? name : splitNote(text).title ?? name;
+  const title = text === null ? name : (splitNote(text).title ?? name);
   return (
     <QuizFrame
       name={name}
@@ -413,11 +413,13 @@ function QuizFrame({ name, text, bar }: { name: string; text: string | null; bar
   usePublishDrawn(root, text, { enabled: text !== null });
 
   const quiz = useMemo(() => (text === null ? null : parseQuiz(text)), [text]);
-  const title = text === null ? name : splitNote(text).title ?? name;
+  const title = text === null ? name : (splitNote(text).title ?? name);
   const questions = useMemo(
     () =>
       quiz
-        ? quiz.questions.filter(askable).map((question) => ({ quiz: { name, title, description: quiz.description, shuffle: quiz.shuffle }, question }))
+        ? quiz.questions
+            .filter(askable)
+            .map((question) => ({ quiz: { name, title, description: quiz.description, shuffle: quiz.shuffle }, question }))
         : [],
     [quiz, name, title],
   );

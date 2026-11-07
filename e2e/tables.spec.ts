@@ -96,7 +96,9 @@ test("a table written as a file is a grid of its first tab, and opening it write
   expect(read("pipeline")).toBe(TABLE);
 });
 
-test("typing into a cell rewrites that cell and no other byte, and Escape takes a draft back", { tag: "@smoke" }, async ({ page }) => {
+test("typing into a cell rewrites that cell and no other byte, and Escape takes a draft back", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const name = write("pipeline");
   await open(page, name);
   await page.locator('[data-dag-grid-at="1:1"]').click();
@@ -158,7 +160,9 @@ test("a new row is written with an id, its menu deletes it, and ctrl+Z brings it
   await expect(page.locator('[data-dag-grid-at="3:0"]')).toHaveAttribute("data-dag-grid-active", "");
   await page.keyboard.type("Umbrella");
   await page.keyboard.press("Enter");
-  await expect.poll(() => read("pipeline")).toMatch(/\| Initech \{#rinit\} \| 900 \| Lost \| \[ \] \|\n\| Umbrella \{#r[0-9a-z]{5}\} \| \| \| \|\n/);
+  await expect
+    .poll(() => read("pipeline"))
+    .toMatch(/\| Initech \{#rinit\} \| 900 \| Lost \| \[ \] \|\n\| Umbrella \{#r[0-9a-z]{5}\} \| \| \| \|\n/);
   const withRow = read("pipeline");
 
   await page.locator('tr[data-dag-grid-row-index="3"] .dag-grid__gutter').click();
@@ -187,7 +191,9 @@ test("the tabs are the strip along the bottom: one is added, renamed and opened"
   expect(read("pipeline").startsWith(TABLE)).toBe(true);
 });
 
-test("Source is the file, with its problems under it, and the grid will not guess between two rows with one id", async ({ page }) => {
+test("Source is the file, with its problems under it, and the grid will not guess between two rows with one id", async ({
+  page,
+}) => {
   const twice = TABLE.replace("{#rinit}", "{#rglob}");
   const name = write("pipeline", twice);
   await open(page, name);
@@ -230,9 +236,14 @@ test("an edit somebody else makes arrives on the page, and the page's next edit 
   await page.locator('[data-dag-grid-at="2:1"]').click();
   await page.keyboard.type("950");
   await page.keyboard.press("Enter");
-  await expect.poll(() => read("pipeline")).toBe(
-    TABLE.replace("| Acme {#racme} | 1200 |", "| Acme {#racme} | 1250 |").replace("| Initech {#rinit} | 900 |", "| Initech {#rinit} | 950 |"),
-  );
+  await expect
+    .poll(() => read("pipeline"))
+    .toBe(
+      TABLE.replace("| Acme {#racme} | 1200 |", "| Acme {#racme} | 1250 |").replace(
+        "| Initech {#rinit} | 900 |",
+        "| Initech {#rinit} | 950 |",
+      ),
+    );
 });
 
 test("a table on a board is a live card of its tab, and a double-click opens it", async ({ page }) => {
@@ -250,7 +261,10 @@ test("a table on a board is a live card of its tab, and a double-click opens it"
   await expect(page.locator('[data-dag-tablecard="people"]')).toContainText("Ada");
 
   /* The table changes, and the card with it — nothing on the board was written. */
-  fs.writeFileSync(tableFile("pipeline"), TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer |\n| Grace {#rgrac} | Admiral |"));
+  fs.writeFileSync(
+    tableFile("pipeline"),
+    TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer |\n| Grace {#rgrac} | Admiral |"),
+  );
   await expect(page.locator('[data-dag-tablecard="people"]')).toContainText("Grace");
 
   await page.locator('[data-dag-tablecard="people"] tbody tr').first().dblclick();
@@ -309,9 +323,13 @@ test("a CSV imported onto a board becomes a table, and its card is placed", asyn
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await openMore(page);
   const leaf = `csv-${Date.now().toString(36)}`;
-  await page.locator("[data-dag-import]").setInputFiles({ name: `${leaf}.csv`, mimeType: "text/csv", buffer: Buffer.from("City,Pop\nOslo,700000\n") });
+  await page
+    .locator("[data-dag-import]")
+    .setInputFiles({ name: `${leaf}.csv`, mimeType: "text/csv", buffer: Buffer.from("City,Pop\nOslo,700000\n") });
   await expect(page.locator("[data-dag-tablecard]")).toContainText("Oslo");
-  await expect.poll(() => fs.readFileSync(path.join(dir, "board.board.md"), "utf8")).toMatch(/```md \{#[^}]*w=560[^}]*\}\n!\[[^\]]+\]\(dag:[0-9a-z]{10}\)\n```/);
+  await expect
+    .poll(() => fs.readFileSync(path.join(dir, "board.board.md"), "utf8"))
+    .toMatch(/```md \{#[^}]*w=560[^}]*\}\n!\[[^\]]+\]\(dag:[0-9a-z]{10}\)\n```/);
   /* The table is made at the top level, named after the file; it is this check's to take away. */
   const made = path.join(BOARDS, `${leaf}.table.md`);
   try {

@@ -64,8 +64,8 @@ test("a board of pictures is ready only once every picture is drawn", async ({ p
   /* Read at the moment of readiness, before anything else can land: the emoji art is a chunk of its
      own, and a `data-dag-ready` that fired over blank squares would photograph a board that does
      not exist. Every picture holds an `<svg>` — the stick figure's is Lucide's. */
-  const blank = await page.evaluate(() =>
-    [...document.querySelectorAll(".dag-figure__pic")].filter((p) => !p.querySelector("svg")).length,
+  const blank = await page.evaluate(
+    () => [...document.querySelectorAll(".dag-figure__pic")].filter((p) => !p.querySelector("svg")).length,
   );
   expect(blank).toBe(0);
   await expect(page.locator('[data-dag-kind="figure"]')).toHaveCount(5);

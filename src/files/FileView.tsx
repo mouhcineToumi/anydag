@@ -44,7 +44,11 @@ export function FileView({
   return (
     <main className="dag-file" data-dag-file-view={name} data-dag-file-ready={ready ? "" : undefined}>
       <div className="dag-file__head">
-        {onRetitle ? <NoteTitle title={title} editable onCommit={onRetitle} onNext={() => undefined} /> : <NoteTitleRead title={title} />}
+        {onRetitle ? (
+          <NoteTitle title={title} editable onCommit={onRetitle} onNext={() => undefined} />
+        ) : (
+          <NoteTitleRead title={title} />
+        )}
         <p className="dag-file__meta" data-dag-file-meta="">
           <FileIcon name={name} size={14} strokeWidth={2} />
           <span>{fileWhat(name, bytes)}</span>

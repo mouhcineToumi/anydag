@@ -31,7 +31,10 @@ export function parseMindmap(src: string): Graph {
     }
     /* Mermaid wraps the root in `((…))` and a branch in `(…)`; accept and strip, so a pasted
        mindmap works without editing. */
-    label = label.replace(/^\(+\s*/, "").replace(/\s*\)+$/, "").replace(/^"|"$/g, "");
+    label = label
+      .replace(/^\(+\s*/, "")
+      .replace(/\s*\)+$/, "")
+      .replace(/^"|"$/g, "");
     if (!label) return;
 
     const id = `m${seq++}`;

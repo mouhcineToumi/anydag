@@ -75,7 +75,10 @@ export function layoutTimeline(graph: Graph, sizes: Record<string, SizedNode>, m
       const january = cursor.getUTCMonth() === 0;
       ticks.push({
         x: Math.round(scale(t)),
-        label: january || step === 12 ? String(cursor.getUTCFullYear()) : cursor.toLocaleString("en", { month: "short", timeZone: "UTC" }),
+        label:
+          january || step === 12
+            ? String(cursor.getUTCFullYear())
+            : cursor.toLocaleString("en", { month: "short", timeZone: "UTC" }),
         major: january || step === 12,
       });
     }

@@ -34,7 +34,10 @@ function packaged() {
   if (process.platform === "darwin") {
     /* electron-builder names the x64 build `mac` and the others by their arch; this machine's own
        arch first, so the default run is a native one (`--app` names the other). */
-    const dirs = process.arch === "arm64" ? ["mac-arm64", "mac-universal", "mac", "mac-x64"] : ["mac", "mac-x64", "mac-universal", "mac-arm64"];
+    const dirs =
+      process.arch === "arm64"
+        ? ["mac-arm64", "mac-universal", "mac", "mac-x64"]
+        : ["mac", "mac-x64", "mac-universal", "mac-arm64"];
     for (const dir of dirs) found.push(path.join(release, dir, "AnyDag.app", "Contents", "MacOS", "AnyDag"));
   }
   return found.find((f) => fs.existsSync(f));
@@ -59,7 +62,8 @@ fs.writeFileSync(path.join(vault, "Smoke.board.md"), "---\ntitle: Smoke\n---\n\n
    item one build made is a modal "allow access?" to the next build signed differently (the x64 app
    after the arm64 one, each signed ad hoc), which blocks the main thread with nobody to answer it.
    Chromium's mock keychain keeps it in the process. */
-const extra = process.platform === "linux" ? ["--no-sandbox", "--disable-gpu"] : process.platform === "darwin" ? ["--use-mock-keychain"] : [];
+const extra =
+  process.platform === "linux" ? ["--no-sandbox", "--disable-gpu"] : process.platform === "darwin" ? ["--use-mock-keychain"] : [];
 console.log(`smoke: ${command} ${[...lead, vault].join(" ")}`);
 const child = spawn(command, [...lead, vault, ...extra], {
   env: { ...process.env, ANYDAG_DESKTOP_SMOKE: "1", ANYDAG_HOME: home, ELECTRON_ENABLE_LOGGING: "1" },

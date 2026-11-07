@@ -70,7 +70,7 @@ async function writeBoard(text: string) {
   return anydag("board", "write", board, "--force", "--file", file);
 }
 
-const STACK = "```arch {#stack x=0 y=0}\nservice api \"Orders API\" hue=teal bold\ndb cache \"Cache\"\napi --> cache\n```\n";
+const STACK = '```arch {#stack x=0 y=0}\nservice api "Orders API" hue=teal bold\ndb cache "Cache"\napi --> cache\n```\n';
 
 test("a board written whole from a terminal is what the page draws", { tag: "@smoke" }, async ({ page }) => {
   const written = await writeBoard(STACK);

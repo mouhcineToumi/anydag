@@ -3,16 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Check, TextField } from "@/ui/controls";
 import { copyText } from "@/ui/clipboard";
-import {
-  SyncError,
-  syncDevices,
-  syncLink,
-  syncNow,
-  syncPair,
-  syncRemotes,
-  syncRevoke,
-  syncUnlink,
-} from "@/sync/api";
+import { SyncError, syncDevices, syncLink, syncNow, syncPair, syncRemotes, syncRevoke, syncUnlink } from "@/sync/api";
 import { hrefForPath, passphraseProblem, plural, sameRecovery, statusWords } from "@/sync/status";
 import type { SyncDevices, SyncRemote, SyncStatus } from "@/sync/types";
 import { adoptSyncStatus, useSyncStatus } from "@/sync/useSyncStatus";
@@ -24,7 +15,21 @@ import { Field, Group, Hint, ICON } from "./common";
 const say = (e: unknown): string => (e instanceof SyncError ? e.message : "It could not be done. Try again.");
 
 /** One in-row question: the button, then "Sure?" with the answer beside it. */
-function Confirm({ label, question, hook, disabled, onYes, children }: { label: ReactNode; question: string; hook: string; disabled?: boolean; onYes(): void; children?: ReactNode }) {
+function Confirm({
+  label,
+  question,
+  hook,
+  disabled,
+  onYes,
+  children,
+}: {
+  label: ReactNode;
+  question: string;
+  hook: string;
+  disabled?: boolean;
+  onYes(): void;
+  children?: ReactNode;
+}) {
   const [asking, setAsking] = useState(false);
   if (!asking) {
     return (
@@ -89,12 +94,28 @@ function Link({ status, locked, onRecovery }: { status: SyncStatus; locked: bool
       <Group title="Server">
         <PairForm status={status} locked={locked} paired={paired} onPaired={() => setPaired(true)} />
       </Group>
-      {paired ? <Choices locked={locked} onRecovery={onRecovery} /> : <Hint data-dag-sync-intro="">Sync keeps this vault on your other devices. Pair this device with a sync server to begin.</Hint>}
+      {paired ? (
+        <Choices locked={locked} onRecovery={onRecovery} />
+      ) : (
+        <Hint data-dag-sync-intro="">
+          Sync keeps this vault on your other devices. Pair this device with a sync server to begin.
+        </Hint>
+      )}
     </>
   );
 }
 
-function PairForm({ status, locked, paired, onPaired }: { status: SyncStatus; locked: boolean; paired: boolean; onPaired(): void }) {
+function PairForm({
+  status,
+  locked,
+  paired,
+  onPaired,
+}: {
+  status: SyncStatus;
+  locked: boolean;
+  paired: boolean;
+  onPaired(): void;
+}) {
   const [server, setServer] = useState(status.server ?? "");
   const [code, setCode] = useState("");
   const [device, setDevice] = useState("");
@@ -126,16 +147,42 @@ function PairForm({ status, locked, paired, onPaired }: { status: SyncStatus; lo
   return (
     <>
       <Field label="Server address" hint="Where the sync server is, such as https://sync.example.com." plain>
-        <TextField wide data-dag-sync-server-input="" spellCheck={false} autoComplete="off" value={server} onChange={(e) => setServer(e.target.value)} />
+        <TextField
+          wide
+          data-dag-sync-server-input=""
+          spellCheck={false}
+          autoComplete="off"
+          value={server}
+          onChange={(e) => setServer(e.target.value)}
+        />
       </Field>
       <Field label="One-time code" hint="From the server's admin, good for one pairing." plain>
-        <TextField wide data-dag-sync-code="" spellCheck={false} autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} />
+        <TextField
+          wide
+          data-dag-sync-code=""
+          spellCheck={false}
+          autoComplete="off"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
       </Field>
       <Field label="This device's name" hint="Optional. Shown in the device list." plain>
-        <TextField wide data-dag-sync-device-input="" autoComplete="off" value={device} onChange={(e) => setDevice(e.target.value)} />
+        <TextField
+          wide
+          data-dag-sync-device-input=""
+          autoComplete="off"
+          value={device}
+          onChange={(e) => setDevice(e.target.value)}
+        />
       </Field>
       <Field label="Pair" plain>
-        <button type="button" className="dag-button" data-dag-sync-pair="" disabled={busy || !server.trim() || !code.trim()} onClick={() => void go()}>
+        <button
+          type="button"
+          className="dag-button"
+          data-dag-sync-pair=""
+          disabled={busy || !server.trim() || !code.trim()}
+          onClick={() => void go()}
+        >
           <ShieldCheck {...ICON} aria-hidden="true" />
           <span>{busy ? "Pairing…" : "Pair this device"}</span>
         </button>
@@ -162,20 +209,46 @@ function Choices({ locked, onRecovery }: { locked: boolean; onRecovery(code: str
   return (
     <>
       <Group title="Link this vault">
-        <Field label="Upload this vault" hint="Make a new remote from the files here. You choose a passphrase and get a recovery code." plain>
-          <button type="button" className="dag-button" data-dag-sync-choose="upload" disabled={locked} onClick={() => setMode(mode === "upload" ? null : "upload")}>
+        <Field
+          label="Upload this vault"
+          hint="Make a new remote from the files here. You choose a passphrase and get a recovery code."
+          plain
+        >
+          <button
+            type="button"
+            className="dag-button"
+            data-dag-sync-choose="upload"
+            disabled={locked}
+            onClick={() => setMode(mode === "upload" ? null : "upload")}
+          >
             Upload…
           </button>
         </Field>
         {mode === "upload" ? <UploadForm onRecovery={onRecovery} /> : null}
         <Field label="Download into this vault" hint="Needs an empty vault. Opens as a new vault with the remote's files." plain>
-          <button type="button" className="dag-button" data-dag-sync-choose="download" disabled={locked || !remotes?.length} onClick={() => setMode(mode === "download" ? null : "download")}>
+          <button
+            type="button"
+            className="dag-button"
+            data-dag-sync-choose="download"
+            disabled={locked || !remotes?.length}
+            onClick={() => setMode(mode === "download" ? null : "download")}
+          >
             Download…
           </button>
         </Field>
         {mode === "download" && remotes ? <JoinForm mode="download" remotes={remotes} /> : null}
-        <Field label="Merge" hint="Join a vault that already has files to a remote. Files that differ become conflict copies." plain>
-          <button type="button" className="dag-button" data-dag-sync-choose="merge" disabled={locked || !remotes?.length} onClick={() => setMode(mode === "merge" ? null : "merge")}>
+        <Field
+          label="Merge"
+          hint="Join a vault that already has files to a remote. Files that differ become conflict copies."
+          plain
+        >
+          <button
+            type="button"
+            className="dag-button"
+            data-dag-sync-choose="merge"
+            disabled={locked || !remotes?.length}
+            onClick={() => setMode(mode === "merge" ? null : "merge")}
+          >
             Merge…
           </button>
         </Field>
@@ -207,13 +280,33 @@ function UploadForm({ onRecovery }: { onRecovery(code: string): void }) {
   return (
     <>
       <Field label="Passphrase" hint="Encrypts the vault's key. The server never sees it. At least 8 characters." plain>
-        <TextField wide type="password" data-dag-sync-pass="" autoComplete="new-password" value={a} onChange={(e) => setA(e.target.value)} />
+        <TextField
+          wide
+          type="password"
+          data-dag-sync-pass=""
+          autoComplete="new-password"
+          value={a}
+          onChange={(e) => setA(e.target.value)}
+        />
       </Field>
       <Field label="Again" plain>
-        <TextField wide type="password" data-dag-sync-pass-again="" autoComplete="new-password" value={b} onChange={(e) => setB(e.target.value)} />
+        <TextField
+          wide
+          type="password"
+          data-dag-sync-pass-again=""
+          autoComplete="new-password"
+          value={b}
+          onChange={(e) => setB(e.target.value)}
+        />
       </Field>
-      <Field label="Upload" hint={a && b ? bad ?? undefined : undefined} plain>
-        <button type="button" className="dag-button" data-dag-sync-upload="" disabled={busy || bad !== null} onClick={() => void go()}>
+      <Field label="Upload" hint={a && b ? (bad ?? undefined) : undefined} plain>
+        <button
+          type="button"
+          className="dag-button"
+          data-dag-sync-upload=""
+          disabled={busy || bad !== null}
+          onClick={() => void go()}
+        >
           {busy ? "Uploading…" : "Upload this vault"}
         </button>
       </Field>
@@ -243,7 +336,11 @@ function JoinForm({ mode, remotes }: { mode: "download" | "merge"; remotes: Sync
   };
   return (
     <>
-      {mode === "merge" ? <Hint data-dag-sync-merge-warning="">Files that differ here and on the remote are kept both ways, one as a conflict copy.</Hint> : null}
+      {mode === "merge" ? (
+        <Hint data-dag-sync-merge-warning="">
+          Files that differ here and on the remote are kept both ways, one as a conflict copy.
+        </Hint>
+      ) : null}
       <Field label="Remote" plain>
         <select className="dag-select" data-dag-sync-remote="" value={remote} onChange={(e) => setRemote(e.target.value)}>
           {remotes.map((r) => (
@@ -255,13 +352,31 @@ function JoinForm({ mode, remotes }: { mode: "download" | "merge"; remotes: Sync
         </select>
       </Field>
       <Field label={useRecovery ? "Recovery code" : "Passphrase"} plain>
-        <TextField wide type={useRecovery ? "text" : "password"} data-dag-sync-secret="" spellCheck={false} autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} />
+        <TextField
+          wide
+          type={useRecovery ? "text" : "password"}
+          data-dag-sync-secret=""
+          spellCheck={false}
+          autoComplete="off"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+        />
       </Field>
       <Field label="Use the recovery code instead" plain>
-        <Check data-dag-sync-use-recovery="" checked={useRecovery} onChange={(e) => (setUseRecovery(e.target.checked), setSecret(""))} />
+        <Check
+          data-dag-sync-use-recovery=""
+          checked={useRecovery}
+          onChange={(e) => (setUseRecovery(e.target.checked), setSecret(""))}
+        />
       </Field>
       <Field label={mode === "download" ? "Download" : "Merge"} plain>
-        <button type="button" className="dag-button" data-dag-sync-join={mode} disabled={busy || !remote || !secret} onClick={() => void go()}>
+        <button
+          type="button"
+          className="dag-button"
+          data-dag-sync-join={mode}
+          disabled={busy || !remote || !secret}
+          onClick={() => void go()}
+        >
           {busy ? "Working…" : mode === "download" ? "Download into this vault" : "Merge onto the remote"}
         </button>
       </Field>
@@ -299,7 +414,14 @@ function Recovery({ code, onDone }: { code: string; onDone(): void }) {
         <Check data-dag-sync-recovery-saved="" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
       </Field>
       <Field label="Type it back" hint="Spaces, dashes and case do not matter." plain>
-        <TextField wide data-dag-sync-recovery-typed="" spellCheck={false} autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+        <TextField
+          wide
+          data-dag-sync-recovery-typed=""
+          spellCheck={false}
+          autoComplete="off"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+        />
       </Field>
       <Field label="Done" plain>
         <button
@@ -377,7 +499,13 @@ function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {
           </span>
         </Field>
         <Field label="Sync now" plain>
-          <button type="button" className="dag-button" data-dag-sync-now="" disabled={busy || status.state === "syncing"} onClick={() => void now()}>
+          <button
+            type="button"
+            className="dag-button"
+            data-dag-sync-now=""
+            disabled={busy || status.state === "syncing"}
+            onClick={() => void now()}
+          >
             <RefreshCw {...ICON} aria-hidden="true" />
             <span>{busy ? "Syncing…" : "Sync now"}</span>
           </button>
@@ -387,7 +515,9 @@ function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {
 
       {status.conflicts.length > 0 ? (
         <Group title="Conflict copies">
-          <Hint data-dag-sync-conflicts-note="">Two devices changed these at once. Open each, keep what you want, and delete the copy.</Hint>
+          <Hint data-dag-sync-conflicts-note="">
+            Two devices changed these at once. Open each, keep what you want, and delete the copy.
+          </Hint>
           <ul className="dag-sync__conflicts" data-dag-sync-conflicts="">
             {status.conflicts.map((rel) => (
               <li key={rel}>
@@ -404,7 +534,13 @@ function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {
 
       <Group title="Unlink">
         <Field label="Unlink this vault" hint="Stops syncing here. The files here and the remote are kept." plain>
-          <Confirm label="Unlink" question="Stop syncing this vault?" hook="data-dag-sync-unlink" disabled={locked} onYes={() => void unlink()}>
+          <Confirm
+            label="Unlink"
+            question="Stop syncing this vault?"
+            hook="data-dag-sync-unlink"
+            disabled={locked}
+            onYes={() => void unlink()}
+          >
             <Link2Off {...ICON} aria-hidden="true" />
           </Confirm>
         </Field>
@@ -441,7 +577,12 @@ function Devices({ locked }: { locked: boolean }) {
           label={
             <>
               {d.name}
-              {d.me ? <em className="dag-sync__me" data-dag-sync-me=""> (this device)</em> : null}
+              {d.me ? (
+                <em className="dag-sync__me" data-dag-sync-me="">
+                  {" "}
+                  (this device)
+                </em>
+              ) : null}
             </>
           }
           hint={`${d.platform} · seen ${when(d.seen)}${d.revoked ? " · revoked" : ""}`}
@@ -449,7 +590,13 @@ function Devices({ locked }: { locked: boolean }) {
           data-dag-sync-device={d.id}
         >
           {!d.me && !d.revoked ? (
-            <Confirm label="Revoke" question="Revoke this device?" hook="data-dag-sync-revoke" disabled={locked} onYes={() => void revoke(d.id)} />
+            <Confirm
+              label="Revoke"
+              question="Revoke this device?"
+              hook="data-dag-sync-revoke"
+              disabled={locked}
+              onYes={() => void revoke(d.id)}
+            />
           ) : null}
         </Field>
       ))}

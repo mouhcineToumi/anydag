@@ -116,7 +116,10 @@ describe("the note bridge", () => {
   });
 
   it("escapes a dollar only when it would otherwise come back as an equation", () => {
-    const literal: NoteBlock = { type: "paragraph", content: [{ type: "text", text: "a literal $x$ here", styles: {} }] as never };
+    const literal: NoteBlock = {
+      type: "paragraph",
+      content: [{ type: "text", text: "a literal $x$ here", styles: {} }] as never,
+    };
     expect(blocksToMd([literal])).toBe("a literal \\$x\\$ here");
     expect(mdToBlocks(blocksToMd([literal]))[0].content).toEqual(literal.content);
   });
@@ -164,7 +167,9 @@ describe("a read-only page", () => {
   });
 
   const draw = (md: string) =>
-    renderToStaticMarkup(createElement(ReactMarkdown, { remarkPlugins: [remarkGfm, remarkMath], components: { pre: CodePre, code: MathCode } }, md));
+    renderToStaticMarkup(
+      createElement(ReactMarkdown, { remarkPlugins: [remarkGfm, remarkMath], components: { pre: CodePre, code: MathCode } }, md),
+    );
 
   it("draws an inline equation in its line and a display one as a block", () => {
     const html = draw("Let $x^2$ be.\n\n$$\n\\frac{a}{b}\n$$");

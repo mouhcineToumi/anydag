@@ -94,7 +94,16 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   app.use("/v1/admin/*", asAdmin);
   app.use("/metrics", asAdmin);
 
-  for (const sub of [pairRoutes(deps), logRoutes(deps), vaultRoutes(deps), blobRoutes(deps), commitRoutes(deps), changeRoutes(deps), pokeRoutes(deps)]) app.route("/", sub);
+  for (const sub of [
+    pairRoutes(deps),
+    logRoutes(deps),
+    vaultRoutes(deps),
+    blobRoutes(deps),
+    commitRoutes(deps),
+    changeRoutes(deps),
+    pokeRoutes(deps),
+  ])
+    app.route("/", sub);
   app.route("/", adminRoutes(deps) as unknown as Hono<{ Variables: Vars }>);
 
   app.notFound((c) => c.json({ code: "ES_NOT_FOUND", message: `no route ${c.req.method} ${c.req.path}` }, 404));

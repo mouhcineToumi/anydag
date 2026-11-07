@@ -22,7 +22,10 @@ export function useWeekStart(): [number, (day: number) => void] {
 /** The kinds switched off, stored as what is off so a kind added later is shown by default. */
 export function useCalendarHidden(): [ReadonlySet<CalKind>, (kind: CalKind, hide: boolean) => void] {
   const raw = usePref(CALENDAR_HIDE, "") ?? "";
-  const hidden = useMemo(() => new Set(raw.split(",").filter((k): k is CalKind => (CAL_KINDS as readonly string[]).includes(k))), [raw]);
+  const hidden = useMemo(
+    () => new Set(raw.split(",").filter((k): k is CalKind => (CAL_KINDS as readonly string[]).includes(k))),
+    [raw],
+  );
   const set = useCallback(
     (kind: CalKind, hide: boolean) => {
       const next = new Set(hidden);

@@ -17,10 +17,8 @@ import { parseSequence } from "@/dsl/sequence";
  * rule out, and the ones that arrive here are the ones that cannot be ruled out from the message.
  */
 
-const errors = (src: string, type = "arch") =>
-  parseDiagram(type, src)!.diagnostics.filter((d) => d.severity === "error");
-const warnings = (src: string, type = "arch") =>
-  parseDiagram(type, src)!.diagnostics.filter((d) => d.severity === "warn");
+const errors = (src: string, type = "arch") => parseDiagram(type, src)!.diagnostics.filter((d) => d.severity === "error");
+const warnings = (src: string, type = "arch") => parseDiagram(type, src)!.diagnostics.filter((d) => d.severity === "warn");
 
 describe("an unrecognised node kind", () => {
   const src = `db pg "Postgres"\ndatabase other "Other"\nservice api "API"\napi --> other`;

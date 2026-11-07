@@ -1,12 +1,4 @@
-import {
-  ArrowDownWideNarrow,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUpNarrowWide,
-  GripVertical,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, ArrowUpNarrowWide, GripVertical, Plus, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -120,7 +112,13 @@ export function Grid({
 
   /* A selection past the end — a row filtered out, a column removed — comes back inside. */
   useEffect(() => {
-    setActive((a) => (a && (a.r >= height || a.c >= cols) ? (height && cols ? { r: Math.min(a.r, height - 1), c: Math.min(a.c, cols - 1) } : null) : a));
+    setActive((a) =>
+      a && (a.r >= height || a.c >= cols)
+        ? height && cols
+          ? { r: Math.min(a.r, height - 1), c: Math.min(a.c, cols - 1) }
+          : null
+        : a,
+    );
   }, [height, cols]);
 
   useEffect(() => {
@@ -142,7 +140,9 @@ export function Grid({
 
   useLayoutEffect(() => {
     if (!active) return;
-    table.current?.querySelector(`[data-dag-grid-at="${active.r}:${active.c}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    table.current
+      ?.querySelector(`[data-dag-grid-at="${active.r}:${active.c}"]`)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [active]);
 
   const storedOf = (r: number): number => rows[r]!.index;
@@ -156,7 +156,8 @@ export function Grid({
       edit((t, at) => {
         let out = setCell(t, at.tab, at.row(stored), at.col(c), value);
         /* A new option typed into a select with declared ones joins the list, so it reads. */
-        if (declared && value.trim() && !declared.includes(value.trim())) out = setColumn(out, at.tab, at.col(c), { options: [...declared, value.trim()] });
+        if (declared && value.trim() && !declared.includes(value.trim()))
+          out = setColumn(out, at.tab, at.col(c), { options: [...declared, value.trim()] });
         return out;
       }, `cell:${tab.id}:${stored}:${c}`);
     },
@@ -171,7 +172,12 @@ export function Grid({
 
   const addRowAt = (where?: { after?: number; before?: number }) => {
     edit((t, at) => {
-      const opts = where?.after !== undefined ? { after: at.row(where.after) } : where?.before !== undefined ? { before: at.row(where.before) } : {};
+      const opts =
+        where?.after !== undefined
+          ? { after: at.row(where.after) }
+          : where?.before !== undefined
+            ? { before: at.row(where.before) }
+            : {};
       return addRow(t, at.tab, opts).text;
     });
     setPending(where?.after !== undefined ? where.after + 1 : where?.before !== undefined ? where.before : tab.rows.length);
@@ -180,7 +186,8 @@ export function Grid({
   const addColumnAt = (at_: { after?: number; before?: number } = {}) =>
     edit((t, at) => {
       const n = tab.columns.length + 1;
-      const where = at_.after !== undefined ? { after: at.col(at_.after) } : at_.before !== undefined ? { before: at.col(at_.before) } : {};
+      const where =
+        at_.after !== undefined ? { after: at.col(at_.after) } : at_.before !== undefined ? { before: at.col(at_.before) } : {};
       return addColumn(t, at.tab, { name: `Column ${n}`, ...where }).text;
     });
 
@@ -258,7 +265,14 @@ export function Grid({
     if (!a) return;
     if (readOnly) {
       /* What would have edited the cell is answered rather than ignored, and kept from the page. */
-      if (onRefused && (e.key === "Enter" || e.key === "F2" || e.key === "Delete" || e.key === "Backspace" || (e.key.length === 1 && !mod && !e.altKey))) {
+      if (
+        onRefused &&
+        (e.key === "Enter" ||
+          e.key === "F2" ||
+          e.key === "Delete" ||
+          e.key === "Backspace" ||
+          (e.key.length === 1 && !mod && !e.altKey))
+      ) {
         e.preventDefault();
         e.stopPropagation();
         onRefused();
@@ -464,7 +478,12 @@ export function Grid({
         <colgroup>
           <col className="dag-grid__col dag-grid__col--gutter" />
           {tab.columns.map((c, i) => (
-            <col key={colKeys[i]} data-dag-grid-colw="" className={`dag-grid__col dag-grid__col--${c.type}`} style={colStyle(c)} />
+            <col
+              key={colKeys[i]}
+              data-dag-grid-colw=""
+              className={`dag-grid__col dag-grid__col--${c.type}`}
+              style={colStyle(c)}
+            />
           ))}
           {readOnly ? null : <col className="dag-grid__col dag-grid__col--add" />}
         </colgroup>
@@ -489,7 +508,12 @@ export function Grid({
                     <span className="dag-grid__name">{c.name || " "}</span>
                     {by ? (
                       by.desc ? (
-                        <ArrowDownWideNarrow size={12} strokeWidth={2} aria-label="Sorted descending" className="dag-grid__sorted" />
+                        <ArrowDownWideNarrow
+                          size={12}
+                          strokeWidth={2}
+                          aria-label="Sorted descending"
+                          className="dag-grid__sorted"
+                        />
                       ) : (
                         <ArrowUpNarrowWide size={12} strokeWidth={2} aria-label="Sorted ascending" className="dag-grid__sorted" />
                       )
@@ -512,7 +536,14 @@ export function Grid({
             })}
             {readOnly ? null : (
               <th className="dag-grid__head dag-grid__head--add">
-                <button type="button" className="dag-grid__plus" data-dag-grid-add-col="" title="Add a column" aria-label="Add a column" onClick={() => addColumnAt()}>
+                <button
+                  type="button"
+                  className="dag-grid__plus"
+                  data-dag-grid-add-col=""
+                  title="Add a column"
+                  aria-label="Add a column"
+                  onClick={() => addColumnAt()}
+                >
                   <Plus {...ICON} aria-hidden="true" />
                 </button>
               </th>
@@ -531,12 +562,25 @@ export function Grid({
               <th
                 className="dag-grid__gutter"
                 scope="row"
-                title={readOnly ? undefined : sorted ? "Click for this row's menu. Clear the sort to drag rows." : "Click for this row's menu, drag to move it"}
+                title={
+                  readOnly
+                    ? undefined
+                    : sorted
+                      ? "Click for this row's menu. Clear the sort to drag rows."
+                      : "Click for this row's menu, drag to move it"
+                }
                 onPointerDown={dragRow(r)}
               >
                 <span className="dag-grid__num">{index + 1}</span>
                 {readOnly ? null : <GripVertical size={12} strokeWidth={2} className="dag-grid__grip" aria-hidden="true" />}
-                {readOnly ? null : <span className="dag-grid__rowresize" data-dag-grid-rowresize={r} title="Drag to change its height" onPointerDown={resizeRow(r)} />}
+                {readOnly ? null : (
+                  <span
+                    className="dag-grid__rowresize"
+                    data-dag-grid-rowresize={r}
+                    title="Drag to change its height"
+                    onPointerDown={resizeRow(r)}
+                  />
+                )}
               </th>
               {tab.columns.map((c, i) => {
                 const on = active?.r === r && active.c === i;
@@ -552,7 +596,8 @@ export function Grid({
                     onPointerDown={(e) => {
                       if (isEditing || e.button !== 0) return;
                       /* A tick's box toggles on a press of its own; anywhere else in the cell selects it. */
-                      if (c.type === "checkbox" && (e.target as HTMLElement).closest(".dag-grid__check") && readOnly) onRefused?.();
+                      if (c.type === "checkbox" && (e.target as HTMLElement).closest(".dag-grid__check") && readOnly)
+                        onRefused?.();
                       if (c.type === "checkbox" && (e.target as HTMLElement).closest(".dag-grid__check") && !readOnly) {
                         e.preventDefault();
                         setActive({ r, c: i });
@@ -683,7 +728,18 @@ function CellEditor({
     }
   };
 
-  if (type === "select") return <SelectEditor draft={draft} setDraft={setDraft} stored={stored} options={options} inputRef={ref} onKeys={keys} onEnd={end} />;
+  if (type === "select")
+    return (
+      <SelectEditor
+        draft={draft}
+        setDraft={setDraft}
+        stored={stored}
+        options={options}
+        inputRef={ref}
+        onKeys={keys}
+        onEnd={end}
+      />
+    );
   if (type === "link") return <LinkEditor draft={draft} setDraft={setDraft} inputRef={ref} onKeys={keys} onEnd={end} />;
   if (type === "date")
     return (
@@ -741,7 +797,15 @@ interface EditorParts {
  * arrows move through them and Enter picks the one marked — or, when nothing is, what was typed,
  * which a column with declared options then adds to them.
  */
-function SelectEditor({ draft, setDraft, options, inputRef, onKeys, onEnd, stored }: EditorParts & { options: readonly string[]; stored: string }) {
+function SelectEditor({
+  draft,
+  setDraft,
+  options,
+  inputRef,
+  onKeys,
+  onEnd,
+  stored,
+}: EditorParts & { options: readonly string[]; stored: string }) {
   const [at, setAt] = useState(() => (draft === stored ? options.indexOf(stored.trim()) : 0));
   const typed = draft === stored ? "" : draft.trim().toLowerCase();
   const shown = options.filter((o) => !typed || o.toLowerCase().includes(typed));
@@ -800,11 +864,21 @@ function SelectEditor({ draft, setDraft, options, inputRef, onKeys, onEnd, store
           </button>
         ))}
         {typed && !exact ? (
-          <button type="button" className="dag-grid__options-item dag-grid__options-new" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(draft.trim())}>
+          <button
+            type="button"
+            className="dag-grid__options-item dag-grid__options-new"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick(draft.trim())}
+          >
             Add “{draft.trim()}”
           </button>
         ) : null}
-        <button type="button" className="dag-grid__options-item dag-grid__options-clear" onMouseDown={(e) => e.preventDefault()} onClick={() => pick("")}>
+        <button
+          type="button"
+          className="dag-grid__options-item dag-grid__options-clear"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => pick("")}
+        >
           Clear
         </button>
       </div>
@@ -866,14 +940,27 @@ function LinkEditor({ draft, setDraft, inputRef, onKeys, onEnd }: EditorParts) {
 /* -- menus ---------------------------------------------------------------------------------------- */
 
 /** A small card at the pointer, shut by a press elsewhere or Escape — Export's two ways. */
-export function Pop({ at, onClose, children, label }: { at: { x: number; y: number }; onClose(): void; children: ReactNode; label: string }) {
+export function Pop({
+  at,
+  onClose,
+  children,
+  label,
+}: {
+  at: { x: number; y: number };
+  onClose(): void;
+  children: ReactNode;
+  label: string;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: at.x, top: at.y + 8 });
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ left: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)), top: Math.max(8, Math.min(at.y + 8, innerHeight - r.height - 8)) });
+    setPos({
+      left: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)),
+      top: Math.max(8, Math.min(at.y + 8, innerHeight - r.height - 8)),
+    });
   }, [at.x, at.y]);
   useEffect(() => {
     const away = (e: PointerEvent) => {
@@ -923,8 +1010,7 @@ function ColumnMenu({
   const rename = () => {
     if (name.trim() && name !== col.name) change({ name: name.trim() });
   };
-  const sortBy = (desc: boolean) =>
-    edit((t, a) => setTab(t, a.tab, { sort: [{ column: a.col(c), desc }] }));
+  const sortBy = (desc: boolean) => edit((t, a) => setTab(t, a.tab, { sort: [{ column: a.col(c), desc }] }));
   const filled = tab.rows.filter((r) => (r.cells[c] ?? "").trim()).length;
   return (
     <Pop at={at} onClose={onClose} label={`Column ${col.name}`}>
@@ -973,7 +1059,10 @@ function ColumnMenu({
             data-dag-grid-col-options=""
             onChange={(e) => setOpts(e.target.value)}
             onBlur={() => {
-              const list = opts.split(",").map((s) => s.trim()).filter(Boolean);
+              const list = opts
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
               change({ options: list.length ? list : null });
             }}
           />
@@ -1007,7 +1096,9 @@ function ColumnMenu({
         className="dag-grid__menu-item"
         disabled={c === tab.columns.length - 1}
         data-dag-grid-move="right"
-        onClick={() => (edit((t, a) => moveColumn(t, a.tab, a.col(c), c + 2 < tab.columns.length ? a.col(c + 2) : null)), onClose())}
+        onClick={() => (
+          edit((t, a) => moveColumn(t, a.tab, a.col(c), c + 2 < tab.columns.length ? a.col(c + 2) : null)), onClose()
+        )}
       >
         <ArrowRight {...ICON} aria-hidden="true" /> Move right
       </button>
@@ -1022,7 +1113,12 @@ function ColumnMenu({
           <Trash2 {...ICON} aria-hidden="true" /> Delete it{filled ? ` and ${filled} ${filled === 1 ? "value" : "values"}` : ""}
         </button>
       ) : (
-        <button type="button" className="dag-grid__menu-item dag-grid__menu-item--danger" data-dag-grid-delete-col="" onClick={() => setSure(true)}>
+        <button
+          type="button"
+          className="dag-grid__menu-item dag-grid__menu-item--danger"
+          data-dag-grid-delete-col=""
+          onClick={() => setSure(true)}
+        >
           <Trash2 {...ICON} aria-hidden="true" /> Delete column…
         </button>
       )}
@@ -1043,17 +1139,31 @@ function RowMenu({
 }) {
   return (
     <Pop at={at} onClose={onClose} label="Row">
-      <button type="button" className="dag-grid__menu-item" data-dag-grid-row-insert="above" onClick={() => (onInsert("above"), onClose())}>
+      <button
+        type="button"
+        className="dag-grid__menu-item"
+        data-dag-grid-row-insert="above"
+        onClick={() => (onInsert("above"), onClose())}
+      >
         <Plus {...ICON} aria-hidden="true" /> Insert above
       </button>
-      <button type="button" className="dag-grid__menu-item" data-dag-grid-row-insert="below" onClick={() => (onInsert("below"), onClose())}>
+      <button
+        type="button"
+        className="dag-grid__menu-item"
+        data-dag-grid-row-insert="below"
+        onClick={() => (onInsert("below"), onClose())}
+      >
         <Plus {...ICON} aria-hidden="true" /> Insert below
       </button>
       <div className="dag-grid__menu-sep" />
-      <button type="button" className="dag-grid__menu-item dag-grid__menu-item--danger" data-dag-grid-row-delete="" onClick={() => (onDelete(), onClose())}>
+      <button
+        type="button"
+        className="dag-grid__menu-item dag-grid__menu-item--danger"
+        data-dag-grid-row-delete=""
+        onClick={() => (onDelete(), onClose())}
+      >
         <Trash2 {...ICON} aria-hidden="true" /> Delete row
       </button>
     </Pop>
   );
 }
-

@@ -20,7 +20,7 @@ const BOARD = [
   "Hello",
   "```",
   "",
-  '```prompt {#ask x=40 y=320 w=420 page=page-2 group=g1 as=arch}',
+  "```prompt {#ask x=40 y=320 w=420 page=page-2 group=g1 as=arch}",
   "A web app talking to an API and a database.",
   "```",
   "",
@@ -34,7 +34,12 @@ describe("the prompt item", () => {
   it("parses as its own type, carrying the type it asks for and its text", () => {
     const b = parseBoard("t", BOARD);
     const card = b.items.find((it) => it.id === "ask")!;
-    expect(card).toMatchObject({ type: "prompt", as: "arch", body: "A web app talking to an API and a database.", page: "page-2" });
+    expect(card).toMatchObject({
+      type: "prompt",
+      as: "arch",
+      body: "A web app talking to an API and a database.",
+      page: "page-2",
+    });
     expect(b.errors).toEqual([]);
   });
 

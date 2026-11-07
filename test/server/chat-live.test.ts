@@ -44,7 +44,12 @@ function watched(provider: "claude" | "opencode"): Harness {
   return { ...fake, run: (o, on) => (runs.push(o), fake.run(o, on)) };
 }
 
-async function api(method: string, route: string, body?: unknown, headers: Record<string, string> = {}): Promise<{ status: number; json: any }> {
+async function api(
+  method: string,
+  route: string,
+  body?: unknown,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; json: any }> {
   const res = await fetch(`http://127.0.0.1:${port}${route}`, {
     method,
     headers: { "x-anydag-token": TOKEN, ...(body ? { "content-type": "application/json" } : {}), ...headers },
@@ -63,7 +68,11 @@ async function api(method: string, route: string, body?: unknown, headers: Recor
 const q = (vault: string) => `?vault=${encodeURIComponent(vault)}`;
 
 async function newChat(o: { mode?: "ask" | "edit"; provider?: "claude" | "opencode"; vault?: string } = {}): Promise<ChatMeta> {
-  const r = await api("POST", `/__board/chat${q(o.vault ?? env.vault.id)}`, { provider: o.provider ?? "claude", model: "m", mode: o.mode ?? "edit" });
+  const r = await api("POST", `/__board/chat${q(o.vault ?? env.vault.id)}`, {
+    provider: o.provider ?? "claude",
+    model: "m",
+    mode: o.mode ?? "edit",
+  });
   expect(r.status).toBe(200);
   return r.json.chat;
 }
@@ -96,7 +105,12 @@ beforeEach(async () => {
   env = makeEnv();
   runs = [];
   session = new Session(env.home, env.vault, "test");
-  assistant = new Assistant({ session, token: TOKEN, harnesses: { claude: watched("claude"), opencode: watched("opencode") }, scratch: os.tmpdir() });
+  assistant = new Assistant({
+    session,
+    token: TOKEN,
+    harnesses: { claude: watched("claude"), opencode: watched("opencode") },
+    scratch: os.tmpdir(),
+  });
   const app = createApp({ session, token: TOKEN, page: null, assistant });
   await new Promise<void>((resolve) => {
     server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 }, () => resolve());
@@ -185,7 +199,8 @@ describe("the guard", () => {
     const chat = await newChat();
     await say(chat.id, "note log hi");
     const no = await say(chat.id, "delete log", {}, (s) => {
-      if (s.kind === "approval" && s.answer === null) void api("POST", "/__board/chat/approve", { id: chat.id, step: s.id, yes: false });
+      if (s.kind === "approval" && s.answer === null)
+        void api("POST", "/__board/chat/approve", { id: chat.id, step: s.id, yes: false });
     });
     expect(said(no)).toMatch(/Did not delete log: the person said no/);
     expect(exists(env.root, "log.md")).toBe(true);
@@ -194,7 +209,8 @@ describe("the guard", () => {
     expect(approval.detail).toContain("log");
 
     const yes = await say(chat.id, "delete log", {}, (s) => {
-      if (s.kind === "approval" && s.answer === null) void api("POST", "/__board/chat/approve", { id: chat.id, step: s.id, yes: true });
+      if (s.kind === "approval" && s.answer === null)
+        void api("POST", "/__board/chat/approve", { id: chat.id, step: s.id, yes: true });
     });
     expect(said(yes)).toMatch(/Deleted log/);
     expect(exists(env.root, "log.md")).toBe(false);
@@ -211,7 +227,8 @@ describe("the guard", () => {
     expect(exists(other, "far.md")).toBe(false);
 
     const granted = await say(chat.id, `vault ${v2} edit\nnote@${v2} far hi`, {}, (s) => {
-      if (s.kind === "access" && s.answer === null) void api("POST", "/__board/chat/approve", { id: chat.id, step: s.id, yes: true });
+      if (s.kind === "access" && s.answer === null)
+        void api("POST", "/__board/chat/approve", { id: chat.id, step: s.id, yes: true });
     });
     expect(said(granted)).toMatch(/Granted/);
     expect(exists(other, "far.md")).toBe(true);
@@ -278,7 +295,20 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
     fs.mkdirSync(path.dirname(path.join(dir(), rel)), { recursive: true });
     fs.writeFileSync(path.join(dir(), rel), JSON.stringify(v));
   };
-  const turnOf = (id: string, blocks: Turn["blocks"]): Turn => ({ v: 1, id, chat: chatId, device: "zzzz", at: "2026-11-07T00:00:00.000Z", text: "tidy my notes", provider: "claude", model: "m", mode: "edit", status: "done", steps: [], blocks });
+  const turnOf = (id: string, blocks: Turn["blocks"]): Turn => ({
+    v: 1,
+    id,
+    chat: chatId,
+    device: "zzzz",
+    at: "2026-11-07T00:00:00.000Z",
+    text: "tidy my notes",
+    provider: "claude",
+    model: "m",
+    mode: "edit",
+    status: "done",
+    steps: [],
+    blocks,
+  });
   /** Every way out a record could name: a path, a folder's file and subfolder, a folder moved in. */
   const escapes = (vault = env.vault.id): Op => ({
     what: "POST /__board/patch",
@@ -288,7 +318,15 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
     images: [
       { rel: out("", "planted.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" },
       { rel: path.join(outside, "absolute.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" },
-      { rel: "notes-old", before: { t: "dir", dirs: [out("notes-old", "made")], files: { [out("notes-old", "autostart.desktop")]: b64("[Desktop Entry]\n") } }, after: "-" },
+      {
+        rel: "notes-old",
+        before: {
+          t: "dir",
+          dirs: [out("notes-old", "made")],
+          files: { [out("notes-old", "autostart.desktop")]: b64("[Desktop Entry]\n") },
+        },
+        after: "-",
+      },
       { rel: "attachments/notes.txt", before: { t: "moved", to: out("", "id_ed25519") }, after: "-" },
     ],
   });
@@ -300,7 +338,16 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
     temps.push(outside);
     fs.writeFileSync(path.join(outside, "id_ed25519"), "PRIVATE-KEY-DUMMY\n");
     chatId = newId("c", "zzzz");
-    plant("chat.json", { v: 1, id: chatId, title: "Tidy", created: "2026-11-07T00:00:00.000Z", home: env.vault.id, provider: "claude", model: "m", mode: "edit" });
+    plant("chat.json", {
+      v: 1,
+      id: chatId,
+      title: "Tidy",
+      created: "2026-11-07T00:00:00.000Z",
+      home: env.vault.id,
+      provider: "claude",
+      model: "m",
+      mode: "edit",
+    });
   });
 
   it("refuses an undo whose turn names a path outside the vault, and touches nothing", async () => {
@@ -318,7 +365,18 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
     const t = newId("t", "zzzz");
     plant(`${t}.json`, turnOf(t, [{ id: "bplanted02", title: "Tidy", ops: [] }]));
     const u = newId("u", "zzzz");
-    const rec: UndoRecord = { v: 1, id: u, chat: chatId, turn: t, block: "bplanted02", redo: false, device: "zzzz", at: "2026-11-07T00:00:00.000Z", ops: [escapes()], conflicts: [] };
+    const rec: UndoRecord = {
+      v: 1,
+      id: u,
+      chat: chatId,
+      turn: t,
+      block: "bplanted02",
+      redo: false,
+      device: "zzzz",
+      at: "2026-11-07T00:00:00.000Z",
+      ops: [escapes()],
+      conflicts: [],
+    };
     plant(`undo/${u}.json`, rec);
     const r = await api("POST", "/__board/chat/redo", { id: chatId, turn: t, block: "bplanted02" });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
@@ -332,7 +390,13 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
     const v2 = session.openFolder(other).id;
     fs.writeFileSync(path.join(other, "theirs.md"), "keep\n");
     const t = newId("t", "zzzz");
-    const op: Op = { what: "POST /__board/patch", vault: v2, at: "2026-11-07T00:00:00.000Z", undoable: true, images: [{ rel: "theirs.md", before: { t: "absent" }, after: `f:${createHash("sha1").update("keep\n").digest("hex")}` }] };
+    const op: Op = {
+      what: "POST /__board/patch",
+      vault: v2,
+      at: "2026-11-07T00:00:00.000Z",
+      undoable: true,
+      images: [{ rel: "theirs.md", before: { t: "absent" }, after: `f:${createHash("sha1").update("keep\n").digest("hex")}` }],
+    };
     plant(`${t}.json`, turnOf(t, [{ id: "bplanted03", title: "Tidy", ops: [op] }]));
     const r = await api("POST", "/__board/chat/undo", { id: chatId, turn: t, block: "bplanted03" });
     expect(r.json.record.conflicts.map((c: { why: string }) => c.why)).toEqual(["refused"]);
@@ -341,7 +405,10 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
 
   it("does not read a turn file without a turn's shape", async () => {
     const t = newId("t", "zzzz");
-    plant(`${t}.json`, { ...turnOf(t, []), blocks: [{ id: "b1", title: "x", ops: [{ what: "x", vault: env.vault.id, undoable: true, images: [{ rel: 1 }] }] }] });
+    plant(`${t}.json`, {
+      ...turnOf(t, []),
+      blocks: [{ id: "b1", title: "x", ops: [{ what: "x", vault: env.vault.id, undoable: true, images: [{ rel: 1 }] }] }],
+    });
     expect((await api("GET", `/__board/chat?id=${chatId}`)).json.turns).toEqual([]);
     expect((await api("POST", "/__board/chat/undo", { id: chatId, turn: t, block: "b1" })).json.code).toBe("block");
   });
@@ -397,8 +464,21 @@ describe("the chat's MCP tools", () => {
   it("hands a doc_* call to the kind's own tool, held to that tool's arguments", async () => {
     const read = chatTools("ask").find((t) => t.name === "doc_read")!;
     const calls: unknown[] = [];
-    const kit = { readOnly: true, via: "test", needWrite() {}, async url() { return "anydag://x"; }, async bytes() { throw new Error("no"); },
-      async api(method: string, route: string, o?: unknown) { calls.push([method, route, o]); return { text: "# hi", base: "b" }; } };
+    const kit = {
+      readOnly: true,
+      via: "test",
+      needWrite() {},
+      async url() {
+        return "anydag://x";
+      },
+      async bytes() {
+        throw new Error("no");
+      },
+      async api(method: string, route: string, o?: unknown) {
+        calls.push([method, route, o]);
+        return { text: "# hi", base: "b" };
+      },
+    };
     await expect(read.run({ kind: "note" }, kit as never)).rejects.toThrow(/doc_read for a note: name/);
     expect(calls).toEqual([]);
     await read.run({ kind: "note", name: "plan" }, kit as never);
@@ -409,13 +489,20 @@ describe("the chat's MCP tools", () => {
 describe("the chat's MCP server", () => {
   it("reaches the app with the chat's header, so the guard holds it to the turn", async () => {
     const chat = await newChat({ mode: "ask" });
-    const server = buildMcp(remote(port, TOKEN, { "x-anydag-chat": chat.id }), { readOnly: true, chat: { id: chat.id, mode: "ask", home: env.vault.id } });
+    const server = buildMcp(remote(port, TOKEN, { "x-anydag-chat": chat.id }), {
+      readOnly: true,
+      chat: { id: chat.id, mode: "ask", home: env.vault.id },
+    });
     const [a, b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test", version: "0" });
     await Promise.all([server.connect(a), client.connect(b)]);
     try {
       const names = (await client.listTools()).tools.map((t) => t.name).sort();
-      expect(names).toEqual(chatTools("ask").map((t) => t.name).sort());
+      expect(names).toEqual(
+        chatTools("ask")
+          .map((t) => t.name)
+          .sort(),
+      );
       // No turn is running: everything the tool reaches is refused.
       const res: any = await client.callTool({ name: "doc_list", arguments: { kind: "note" } });
       expect(res.isError).toBe(true);

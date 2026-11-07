@@ -2,15 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import {
-  check,
-  echoesSource,
-  extract,
-  feedback,
-  generate,
-  request,
-  rewriteRequest,
-} from "../plugins/generate/generate";
+import { check, echoesSource, extract, feedback, generate, request, rewriteRequest } from "../plugins/generate/generate";
 import type { Complete, Message } from "../plugins/generate/llm";
 import { systemPrompt } from "../plugins/generate/system";
 import { libraryList } from "../src/board/library/serve";
@@ -65,7 +57,7 @@ describe("extract", () => {
   });
 
   it("lets a chart keep its size, because a chart's size is a choice", () => {
-    const found = extract(fence("chart", "bar\nx A B\nseries s \"S\" 1 2", "w=640 h=420 x=3"));
+    const found = extract(fence("chart", 'bar\nx A B\nseries s "S" 1 2', "w=640 h=420 x=3"));
     expect("draft" in found && found.draft.attrs).toEqual({ w: 640, h: 420 });
   });
 
@@ -93,7 +85,7 @@ describe("rewriteRequest", () => {
   });
 
   it("reads like request() when no type was pinned", () => {
-    const text = rewriteRequest("split the api", "service api \"API\"");
+    const text = rewriteRequest("split the api", 'service api "API"');
     expect(text.startsWith("Rewrite")).toBe(true);
     expect(text).not.toContain("`undefined`");
   });
@@ -212,7 +204,9 @@ describe("generate", () => {
   it("stops when cancelled", async () => {
     const cancel = new AbortController();
     cancel.abort();
-    await expect(generate({ prompt: "p", system: "S", complete: scripted(GOOD_ARCH).complete, signal: cancel.signal })).rejects.toThrow();
+    await expect(
+      generate({ prompt: "p", system: "S", complete: scripted(GOOD_ARCH).complete, signal: cancel.signal }),
+    ).rejects.toThrow();
   });
 });
 
@@ -232,7 +226,13 @@ describe("generate in rewrite mode", () => {
   it("takes an answer in another type when only `from` was given", async () => {
     const flow = fence("flow", 'lane u "User" {\n  step web "Browser"\n  step api "API"\n}\nweb --> api');
     const model = scripted(flow);
-    const r = await generate({ prompt: "show this as a flowchart", source: SOURCE, from: "arch", system: "S", complete: model.complete });
+    const r = await generate({
+      prompt: "show this as a flowchart",
+      source: SOURCE,
+      from: "arch",
+      system: "S",
+      complete: model.complete,
+    });
     expect(r).toMatchObject({ ok: true, attempts: 1, draft: { type: "flow" } });
     expect(model.calls[0]![1]!.content).toBe(rewriteRequest("show this as a flowchart", SOURCE, undefined, "arch"));
   });

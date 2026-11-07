@@ -143,14 +143,21 @@ async function differing(
         const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
         const g = canvas.getContext("2d")!;
         g.drawImage(img, 0, 0);
-        return { w: img.naturalWidth, h: img.naturalHeight, data: g.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data };
+        return {
+          w: img.naturalWidth,
+          h: img.naturalHeight,
+          data: g.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data,
+        };
       };
       const [p, q] = await Promise.all([pixels(a), pixels(b)]);
       const size = { before: [p.w, p.h] as [number, number], after: [q.w, q.h] as [number, number] };
       if (p.w !== q.w || p.h !== q.h) return { size, ratio: 1 };
       let off = 0;
       for (let i = 0; i < p.data.length; i += 4) {
-        const d = Math.abs(p.data[i]! - q.data[i]!) + Math.abs(p.data[i + 1]! - q.data[i + 1]!) + Math.abs(p.data[i + 2]! - q.data[i + 2]!);
+        const d =
+          Math.abs(p.data[i]! - q.data[i]!) +
+          Math.abs(p.data[i + 1]! - q.data[i + 1]!) +
+          Math.abs(p.data[i + 2]! - q.data[i + 2]!);
         if (d > 153) off++;
       }
       return { size, ratio: off / (p.w * p.h) };

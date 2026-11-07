@@ -137,18 +137,20 @@ export interface ChartModel {
 const CHART_WORDS: readonly string[] = [...FORMS, "x", "series", "slice", "legend", "values", "unit", "min", "max"];
 
 /** A statement's trailing `hue=` / `icon=`. A `Series` is not a `Node`, so it never sees `modifiers()`. */
-function readModifiers(
-  cur: Cursor,
-  push: (d: Diagnostic) => void,
-  line: number,
-): { hue?: Hue; icon?: string } {
+function readModifiers(cur: Cursor, push: (d: Diagnostic) => void, line: number): { hue?: Hue; icon?: string } {
   const out: { hue?: Hue; icon?: string } = {};
   while (cur.peek().kind === "word" && cur.peek(1).kind === "punct" && cur.peek(1).value === "=") {
     const key = cur.next().value;
     cur.next();
     const v = cur.peek();
     if (v.kind !== "word" && v.kind !== "string") {
-      push({ line: v.line, col: v.col, code: CODES.E_EXPECTED_VALUE, message: `expected a value after \`${key}=\``, severity: "error" });
+      push({
+        line: v.line,
+        col: v.col,
+        code: CODES.E_EXPECTED_VALUE,
+        message: `expected a value after \`${key}=\``,
+        severity: "error",
+      });
       break;
     }
     cur.next();
@@ -182,9 +184,7 @@ function readModifiers(
         push({
           line,
           code: CODES.W_UNKNOWN_ICON,
-          message:
-            `no icon named "${value}"; the legend draws its swatch alone` +
-            (guess ? `. Did you mean \`${guess}\`?` : ""),
+          message: `no icon named "${value}"; the legend draws its swatch alone` + (guess ? `. Did you mean \`${guess}\`?` : ""),
           severity: "warn",
         });
       }
@@ -487,9 +487,7 @@ export function parseChart(src: string): ChartModel {
       col: t.col,
       code: CODES.E_UNKNOWN_KIND,
       message:
-        `\`${head}\` is not a chart statement` +
-        (guess ? `. Did you mean \`${guess}\`?` : "") +
-        ` (${CHART_WORDS.join(" · ")})`,
+        `\`${head}\` is not a chart statement` + (guess ? `. Did you mean \`${guess}\`?` : "") + ` (${CHART_WORDS.join(" · ")})`,
       severity: "error",
     });
     abandon();

@@ -23,7 +23,11 @@ export async function report(ctx: Ctx, name: string): Promise<number> {
 
 export interface Diagnosed {
   board?: { code: string; line?: number; col?: number; message: string; severity: string }[];
-  items?: { id: string; type: string; diagnostics: { code: string; line?: number; col?: number; message: string; severity: string }[] }[];
+  items?: {
+    id: string;
+    type: string;
+    diagnostics: { code: string; line?: number; col?: number; message: string; severity: string }[];
+  }[];
   errors?: number;
   warnings?: number;
 }
@@ -33,6 +37,7 @@ export function diagnosticLines(d: Diagnosed): string[] {
   const out: string[] = [];
   const at = (line?: number, col?: number) => (line ? ` ${line}${col ? `:${col}` : ""}` : "");
   for (const x of d.board ?? []) out.push(`${x.code}  board${at(x.line, x.col)}  ${x.message}`);
-  for (const it of d.items ?? []) for (const x of it.diagnostics) out.push(`${x.code}  ${it.id}${at(x.line, x.col)}  ${x.message}`);
+  for (const it of d.items ?? [])
+    for (const x of it.diagnostics) out.push(`${x.code}  ${it.id}${at(x.line, x.col)}  ${x.message}`);
   return out;
 }

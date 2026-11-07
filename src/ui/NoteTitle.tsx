@@ -158,7 +158,11 @@ export function NoteTitle({
 export function NoteTitleRead({ title }: { title: string | undefined }) {
   if (title === undefined) return null;
   return (
-    <h1 className="dag-note-title dag-note-title--read" data-dag-note-title-read="" data-untitled={title === UNTITLED ? "" : undefined}>
+    <h1
+      className="dag-note-title dag-note-title--read"
+      data-dag-note-title-read=""
+      data-untitled={title === UNTITLED ? "" : undefined}
+    >
       {title}
     </h1>
   );

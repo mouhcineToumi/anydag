@@ -214,7 +214,11 @@ function passes(column: Column, text: string, rule: FilterRule, options: readonl
     return rule.op === "=" ? empty : !empty;
   }
   const r = readCell(column.type, cell, options);
-  const words = (r.ok && r.value !== null && typeof r.value === "object" ? (r.value as LinkValue).text + " " + (r.value as LinkValue).url : cell).toLowerCase();
+  const words = (
+    r.ok && r.value !== null && typeof r.value === "object"
+      ? (r.value as LinkValue).text + " " + (r.value as LinkValue).url
+      : cell
+  ).toLowerCase();
   const target = want.toLowerCase();
   switch (rule.op) {
     case "~":

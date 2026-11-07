@@ -41,7 +41,10 @@ interface IndexDoc {
 }
 
 /** The documents whose text names the attachment `id` — what a delete would leave pointing at nothing. */
-async function usesOf(ctx: Ctx, name: string): Promise<{ id: string | null; used: { name: string; kind: string; title: string | null }[] }> {
+async function usesOf(
+  ctx: Ctx,
+  name: string,
+): Promise<{ id: string | null; used: { name: string; kind: string; title: string | null }[] }> {
   try {
     const me = await ctx.api.get<Refs>("/__board/refs", { name, kind: "file" });
     return { id: me.id, used: me.backlinks.map((d) => ({ name: d.name, kind: d.kind, title: d.title })) };
@@ -60,7 +63,8 @@ function deliver(ctx: Ctx, bytes: Uint8Array, out: string | undefined): void {
 }
 
 /** A size a person reads. */
-const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const kb = (n: number) =>
+  n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 const fileStem = (s: string) => s.replace(/[^\w.-]+/g, "-");
 
@@ -70,7 +74,13 @@ const fileStem = (s: string) => s.replace(/[^\w.-]+/g, "-");
  * attachments beside it, and every pasted picture at the path its text gives it. Written to `out`,
  * or to `<name>.zip`; the path is printed.
  */
-export async function exportZip(ctx: Ctx, name: string, kind: "board" | "note", text: string, out: string | undefined): Promise<void> {
+export async function exportZip(
+  ctx: Ctx,
+  name: string,
+  kind: "board" | "note",
+  text: string,
+  out: string | undefined,
+): Promise<void> {
   const { docs } = await ctx.api.get<{ docs: IndexDoc[] }>("/__board/index");
   const byId = new Map(docs.map((d) => [d.id, d]));
   const folder = name.includes("/") ? `${name.slice(0, name.lastIndexOf("/"))}/` : "";
@@ -112,7 +122,7 @@ export const FILES: Command[] = [
       "Each file is sent as it is and listed with the boards and notes, under a name made from its own (`Q3 " +
       "Report.pdf` is `q3-report.pdf`, numbered if taken) and titled what it was called. Prints each name and " +
       "its permanent id: a note refers to it as `![Title](dag:<id>)`, which draws a picture inline and anything " +
-      "else as a card, and a board draws a picture with an `image` fence whose `src=\"dag:<id>\"`. The largest " +
+      'else as a card, and a board draws a picture with an `image` fence whose `src="dag:<id>"`. The largest ' +
       "file and the types this deployment takes are `anydag file ls`'s last line; anything else is refused, with why.",
     flags: [
       { name: "folder", type: "string", value: "<folder>", help: "where they go (default: the top level)" },
@@ -154,9 +164,15 @@ export const FILES: Command[] = [
       const under = p.pos[0]?.replace(/\/+$/, "");
       const rows = got.files.filter((f) => !under || f.name.startsWith(`${under}/`));
       emit(ctx, { ...got, files: rows }, () => {
-        for (const line of table(rows.map((f) => (bool(p, "ids") ? [f.name, f.id ?? "", kb(f.bytes), f.title ?? ""] : [f.name, kb(f.bytes), f.title ?? ""]))))
+        for (const line of table(
+          rows.map((f) =>
+            bool(p, "ids") ? [f.name, f.id ?? "", kb(f.bytes), f.title ?? ""] : [f.name, kb(f.bytes), f.title ?? ""],
+          ),
+        ))
           ctx.io.out(line);
-        ctx.io.err(`${rows.length} file${rows.length === 1 ? "" : "s"}; up to ${kb(got.limits.maxBytes)} each, of: ${got.limits.types.join(" ")}`);
+        ctx.io.err(
+          `${rows.length} file${rows.length === 1 ? "" : "s"}; up to ${kb(got.limits.maxBytes)} each, of: ${got.limits.types.join(" ")}`,
+        );
       });
     },
   },
@@ -184,7 +200,11 @@ export const FILES: Command[] = [
     help: "`<to>` without an extension keeps the file's: `work/final` for `deck.pptx` is `work/final.pptx`. Its id, and every reference to it, survive.",
     routes: ["POST /__board/rename"],
     async run(ctx, p) {
-      const done = await ctx.api.post<{ name: string; id: string }>("/__board/rename", { name: p.pos[0], to: p.pos[1], kind: "file" });
+      const done = await ctx.api.post<{ name: string; id: string }>("/__board/rename", {
+        name: p.pos[0],
+        to: p.pos[1],
+        kind: "file",
+      });
       emit(ctx, done, () => ctx.io.out(done.name));
     },
   },
@@ -203,7 +223,9 @@ export const FILES: Command[] = [
       const { used } = await usesOf(ctx, name);
       const done = await ctx.api.post<{ trash: { id: string } }>("/__board/delete", { name, kind: "file" });
       emit(ctx, { name, kind: "file", was_used_in: used, trash: done.trash }, () => {
-        const where = used.length ? `; ${used.length} document${used.length === 1 ? "" : "s"} use${used.length === 1 ? "s" : ""} it: ${used.map((u) => u.name).join(", ")}` : "";
+        const where = used.length
+          ? `; ${used.length} document${used.length === 1 ? "" : "s"} use${used.length === 1 ? "s" : ""} it: ${used.map((u) => u.name).join(", ")}`
+          : "";
         ctx.io.err(`moved ${name} to the trash${where} — anydag trash restore ${done.trash.id} brings it back`);
       });
     },

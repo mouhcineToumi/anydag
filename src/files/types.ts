@@ -87,7 +87,8 @@ export function extOf(name: string): string {
 }
 
 /** Which of the ten a file is, by its name or its extension. */
-export const sortOf = (nameOrExt: string): FileSort => SORT_OF[nameOrExt.includes(".") ? extOf(nameOrExt) : nameOrExt.toLowerCase()] ?? "other";
+export const sortOf = (nameOrExt: string): FileSort =>
+  SORT_OF[nameOrExt.includes(".") ? extOf(nameOrExt) : nameOrExt.toLowerCase()] ?? "other";
 
 /**
  * How the app draws a file itself, or `null` when all it can do is offer it to save. The pictures a

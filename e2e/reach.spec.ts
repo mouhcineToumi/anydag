@@ -49,7 +49,8 @@ test.beforeEach(({}, info) => {
 test.afterEach(() => {
   fs.rmSync(file, { force: true });
   /* A rename or a duplicate leaves a second file behind, named after this one. */
-  for (const f of fs.readdirSync(DIR)) if (f.startsWith(`${name}-`) || f.startsWith(`renamed-${name}`)) fs.rmSync(path.join(DIR, f), { force: true });
+  for (const f of fs.readdirSync(DIR))
+    if (f.startsWith(`${name}-`) || f.startsWith(`renamed-${name}`)) fs.rmSync(path.join(DIR, f), { force: true });
 });
 
 const read = () => fs.readFileSync(file, "utf8");
@@ -277,7 +278,6 @@ test("New board makes one, opens it, and names it where it is drawn", async ({ p
 
 /** The theme lives in Settings now, so every read of it opens the dialog first. */
 const theme = (page: Page) => page.locator("[data-dag-setting-theme]");
-
 
 test("a theme picked in settings survives a reload", async ({ page }) => {
   await open(page);

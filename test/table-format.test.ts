@@ -188,7 +188,9 @@ describe("the writers", () => {
     const after = out.split("\n");
     expect(after.length).toBe(before.length);
     for (let i = 0; i < before.length; i++) if (i !== 11) expect(after[i]).toBe(before[i]);
-    expect(after[11]).toBe("| Globex {#rglo} | 950 |                     | [ ]                 | Lead                                          | [Pricing](dag:7q2m9xk4tb) |");
+    expect(after[11]).toBe(
+      "| Globex {#rglo} | 950 |                     | [ ]                 | Lead                                          | [Pricing](dag:7q2m9xk4tb) |",
+    );
     expect(parseTable(out).tabs[0]!.rows[1]!.cells[1]).toBe("950");
   });
 
@@ -267,7 +269,9 @@ describe("the writers", () => {
     const numbered = setColumn(text, "contacts", "phone-number", { type: "number", name: "Phone" });
     expect(numbered).toContain("| Name {#name} | Phone {#phone-number number} | Email {#email link} |\n| --- | ---: | --- |");
     const removed = removeColumn(text, "contacts", "phone-number");
-    expect(removed.split("## Contacts {#contacts}")[1]).toBe("\n\n| Name {#name} | Email {#email link} |\n| --- | --- |\n| Ada {#rada} | mailto:ada@example.com |\n");
+    expect(removed.split("## Contacts {#contacts}")[1]).toBe(
+      "\n\n| Name {#name} | Email {#email link} |\n| --- | --- |\n| Ada {#rada} | mailto:ada@example.com |\n",
+    );
   });
 
   it("give a select its options and a column its width on the header cell only", () => {
@@ -301,7 +305,9 @@ describe("the writers", () => {
     const removed = removeTab(SAMPLE, "contacts");
     expect(parseTable(removed).tabs.map((t) => t.id)).toEqual(["deals"]);
     expect(removed.endsWith("| nope |\n")).toBe(true);
-    expect(removeTab(SAMPLE, "deals").startsWith("---\ntitle: Q3 pipeline\n---\n\nThe deals we are chasing.\n\n## Contacts")).toBe(true);
+    expect(
+      removeTab(SAMPLE, "deals").startsWith("---\ntitle: Q3 pipeline\n---\n\nThe deals we are chasing.\n\n## Contacts"),
+    ).toBe(true);
   });
 
   it("stamp every missing id, and nothing else", () => {
@@ -363,7 +369,11 @@ describe("applyTableOps", () => {
   });
 
   it("refuses the whole list on a shape it cannot read, or a thing that is not there", () => {
-    expect(applyTableOps(SAMPLE, [{ op: "cell", tab: "deals" }])).toEqual({ ok: false, status: 400, error: "`cell` needs `row`, a string" });
+    expect(applyTableOps(SAMPLE, [{ op: "cell", tab: "deals" }])).toEqual({
+      ok: false,
+      status: 400,
+      error: "`cell` needs `row`, a string",
+    });
     expect(applyTableOps(SAMPLE, [{ op: "explode" }])).toMatchObject({ ok: false, status: 400 });
     expect(applyTableOps(SAMPLE, [{ op: "removeRow", tab: "deals", row: "nope" }])).toEqual({
       ok: false,

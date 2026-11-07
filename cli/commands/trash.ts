@@ -37,7 +37,11 @@ function held(e: TrashEntry): string {
   if (!e.holds) return "";
   const files = ["boards", "notes", "quizzes", "tables", "files"].reduce((n, k) => n + (e.holds?.[k]?.length ?? 0), 0);
   const folders = Math.max(0, (e.holds.folders?.length ?? 1) - 1);
-  return [files ? `${files} file${files === 1 ? "" : "s"}` : "", folders ? `${folders} folder${folders === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ") || "empty";
+  return (
+    [files ? `${files} file${files === 1 ? "" : "s"}` : "", folders ? `${folders} folder${folders === 1 ? "" : "s"}` : ""]
+      .filter(Boolean)
+      .join(", ") || "empty"
+  );
 }
 
 /** The entry an argument names: its id, or the name the thing had — refused when that names two. */
@@ -47,7 +51,10 @@ async function entryFor(ctx: Ctx, said: string): Promise<TrashEntry> {
   if (byId) return byId;
   const named = entries.filter((e) => e.name === said.replace(/\/+$/, ""));
   if (named.length === 1) return named[0]!;
-  if (named.length > 1) throw new UsageError(`${named.length} things in the trash were \`${said}\` — name one by its id: ${named.map((e) => e.id).join(", ")}`);
+  if (named.length > 1)
+    throw new UsageError(
+      `${named.length} things in the trash were \`${said}\` — name one by its id: ${named.map((e) => e.id).join(", ")}`,
+    );
   throw new UsageError(`nothing in the trash is \`${said}\` — \`anydag trash ls\` says what is`);
 }
 
@@ -63,7 +70,8 @@ export const TRASH: Command[] = [
         if (!got.entries.length) return ctx.io.err(`the trash is empty — what is deleted stays there for ${got.days} days`);
         const rows = got.entries.map((e) => {
           const left = daysLeft(e.expires);
-          const what = e.kind === "folder" ? `${e.name}/ (${held(e)})` : e.title && e.title !== e.name ? `${e.name} (${e.title})` : e.name;
+          const what =
+            e.kind === "folder" ? `${e.name}/ (${held(e)})` : e.title && e.title !== e.name ? `${e.name} (${e.title})` : e.name;
           return [e.id, e.kind, e.deleted.slice(0, 10), left ? `${left} day${left === 1 ? "" : "s"} left` : "goes today", what];
         });
         for (const line of table(rows)) ctx.io.out(line);
@@ -113,7 +121,11 @@ export const TRASH: Command[] = [
         emit(ctx, { ids: [] }, () => ctx.io.err("the trash is already empty"));
         return;
       }
-      await confirm(ctx, `delete the ${entries.length} thing${entries.length === 1 ? "" : "s"} in the trash for good?`, bool(p, "yes"));
+      await confirm(
+        ctx,
+        `delete the ${entries.length} thing${entries.length === 1 ? "" : "s"} in the trash for good?`,
+        bool(p, "yes"),
+      );
       const done = await ctx.api.post<{ ids: string[] }>("/__board/trash/empty");
       emit(ctx, done, () => ctx.io.err(`deleted ${done.ids.length} thing${done.ids.length === 1 ? "" : "s"} for good`));
     },

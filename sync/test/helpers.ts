@@ -68,7 +68,12 @@ async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<v
 
 export async function harness(backend: Backend = "pglite", env: Record<string, string> = {}): Promise<Harness> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-sync-test-"));
-  const config = configFrom({ ANYDAG_SYNC_DATA: root, ANYDAG_SYNC_ADMIN_TOKEN: ADMIN, ANYDAG_SYNC_PUBLIC_URL: "http://sync.test", ...env });
+  const config = configFrom({
+    ANYDAG_SYNC_DATA: root,
+    ANYDAG_SYNC_ADMIN_TOKEN: ADMIN,
+    ANYDAG_SYNC_PUBLIC_URL: "http://sync.test",
+    ...env,
+  });
   const { db, drop } = await openDb(backend);
   const meta = new PgMeta(db);
   await meta.migrate();

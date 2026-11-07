@@ -21,7 +21,8 @@ const INSTRUCTIONS =
 
 /** A tool's answer as MCP content: text for data, image content for a picture. */
 function content(out: unknown) {
-  if (out instanceof Picture) return [{ type: "image" as const, data: Buffer.from(out.data).toString("base64"), mimeType: out.mime }];
+  if (out instanceof Picture)
+    return [{ type: "image" as const, data: Buffer.from(out.data).toString("base64"), mimeType: out.mime }];
   return [{ type: "text" as const, text: JSON.stringify(out ?? null, null, 2) }];
 }
 
@@ -71,13 +72,24 @@ export function buildMcp(backend: Backend, opts: { readOnly: boolean; version?: 
   );
   server.registerResource("AnyDag boards", "anydag://boards", { mimeType: "application/json" }, async (uri) => {
     const got = await kit.api("GET", "/__board/list");
-    return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ boards: got.boards, folders: got.folders }, null, 2) }] };
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify({ boards: got.boards, folders: got.folders }, null, 2),
+        },
+      ],
+    };
   });
   return server;
 }
 
 /** Serve over stdio until the client goes away. */
-export async function startMcp(backend: Backend, opts: { readOnly: boolean; version?: string; chat?: ChatMode }): Promise<McpServer> {
+export async function startMcp(
+  backend: Backend,
+  opts: { readOnly: boolean; version?: string; chat?: ChatMode },
+): Promise<McpServer> {
   const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
   const server = buildMcp(backend, opts);
   await server.connect(new StdioServerTransport());

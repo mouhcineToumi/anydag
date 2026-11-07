@@ -375,17 +375,11 @@ function dropLinks(text: string, gone: ReadonlySet<string>): string {
  * means there is nothing to reorder against: a solo item on its page, or a named target that is
  * not (any more) on the board.
  */
-function moveTarget(
-  move: MoveTarget,
-  page: string,
-  candidates: Located[],
-): { item: Located; side: "before" | "after" } | null {
+function moveTarget(move: MoveTarget, page: string, candidates: Located[]): { item: Located; side: "before" | "after" } | null {
   if (typeof move === "string") {
     const onPage = candidates.filter((it) => (str(it.attrs, "page") ?? "page-1") === page);
     if (onPage.length === 0) return null;
-    return move === "front"
-      ? { item: onPage[onPage.length - 1]!, side: "after" }
-      : { item: onPage[0]!, side: "before" };
+    return move === "front" ? { item: onPage[onPage.length - 1]!, side: "after" } : { item: onPage[0]!, side: "before" };
   }
   if ("before" in move) {
     const item = candidates.find((it) => it.id === move.before);

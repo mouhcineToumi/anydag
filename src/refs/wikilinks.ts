@@ -31,7 +31,13 @@ export const WIKILINK = /(!?)\[\[([^[\]\n]+?)\]\]/g;
 function parseInner(inner: string): { target: string; part?: string; alias?: string } {
   const bar = inner.search(/\\?\|/);
   const head = bar < 0 ? inner : inner.slice(0, bar);
-  const alias = bar < 0 ? undefined : inner.slice(bar).replace(/^\\?\|/, "").trim();
+  const alias =
+    bar < 0
+      ? undefined
+      : inner
+          .slice(bar)
+          .replace(/^\\?\|/, "")
+          .trim();
   const hash = head.indexOf("#");
   const target = (hash < 0 ? head : head.slice(0, hash)).trim();
   const part = hash < 0 ? undefined : head.slice(hash + 1).trim();
@@ -88,7 +94,12 @@ function split(value: string): PhrasingContent[] | null {
     out.push(
       w.embed
         ? { type: "image", url, alt: w.alias ?? w.target, data: { hProperties: { "data-dag-wiki": w.raw } } }
-        : { type: "link", url, children: [{ type: "text", value: wikiLabel(w) }], data: { hProperties: { "data-dag-wiki": w.raw } } },
+        : {
+            type: "link",
+            url,
+            children: [{ type: "text", value: wikiLabel(w) }],
+            data: { hProperties: { "data-dag-wiki": w.raw } },
+          },
     );
     at = w.index + w.raw.length;
   }
@@ -135,7 +146,12 @@ export interface WikiCandidate {
   title?: string | null;
 }
 
-const fold = (s: string): string => s.normalize("NFC").toLowerCase().replace(/\\/g, "/").replace(/^\.?\/+/, "");
+const fold = (s: string): string =>
+  s
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/\\/g, "/")
+    .replace(/^\.?\/+/, "");
 
 /** What resolution reads off one document, folded once. */
 interface Entry<D> {
@@ -178,7 +194,8 @@ function wikiIndex<D extends WikiCandidate>(docs: readonly D[]): WikiIndex<D> {
       for (const e of m.get(w) ?? []) {
         if (!best) best = e;
         else {
-          const a = e.doc.name, b = best.doc.name;
+          const a = e.doc.name,
+            b = best.doc.name;
           if (a.length < b.length || (a.length === b.length && (a < b || (a === b && e.at < best.at)))) best = e;
         }
       }

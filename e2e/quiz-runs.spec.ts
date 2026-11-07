@@ -58,7 +58,8 @@ async function idOf(page: Page, name: string): Promise<string> {
 function recording(page: Page): { quiz: string; question: string; correct: boolean; run: string }[] {
   const sent: { quiz: string; question: string; correct: boolean; run: string }[] = [];
   page.on("request", (r) => {
-    if (r.method() === "POST" && new URL(r.url()).pathname === "/api/practice") sent.push(...(JSON.parse(r.postData() ?? "{}").events ?? []));
+    if (r.method() === "POST" && new URL(r.url()).pathname === "/api/practice")
+      sent.push(...(JSON.parse(r.postData() ?? "{}").events ?? []));
   });
   return sent;
 }
@@ -124,7 +125,9 @@ test("an open question is answered in words, the model answer shown, and the per
   await expect.poll(() => sent.filter((a) => a.quiz === id)).toEqual([{ quiz: id, question: "qo", correct: false, run: "quiz" }]);
 });
 
-test("shuffled options keep their order through Previous and Next, pinned ones their place, and Again draws afresh", async ({ page }) => {
+test("shuffled options keep their order through Previous and Next, pinned ones their place, and Again draws afresh", async ({
+  page,
+}) => {
   const name = write(
     "joins",
     [
@@ -212,9 +215,16 @@ test("a folder of quizzes is one run, every answer recorded against its own quiz
 });
 
 test("a board embedded in a quiz is drawn, survives a pick, and a snapshot waits for it", async ({ page }) => {
-  const board = write("schema", "---\ntitle: Schema\n---\n\n```erd {#erd}\nentity members \"Members\" {\n  memid int pk\n}\n```\n", "board");
+  const board = write(
+    "schema",
+    '---\ntitle: Schema\n---\n\n```erd {#erd}\nentity members "Members" {\n  memid int pk\n}\n```\n',
+    "board",
+  );
   const id = await idOf(page, board);
-  const name = write("with-board", `The schema:\n\n![The schema](dag:${id})\n\n## Which table? {#qt}\n\n![The schema](dag:${id})\n\n- [x] members\n- [ ] bookings\n`);
+  const name = write(
+    "with-board",
+    `The schema:\n\n![The schema](dag:${id})\n\n## Which table? {#qt}\n\n![The schema](dag:${id})\n\n- [x] members\n- [ ] bookings\n`,
+  );
   await page.goto(`/?quiz=${encodeURIComponent(name)}&snapshot=1`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   const embeds = page.locator('[data-dag-embed-kind="board"]');

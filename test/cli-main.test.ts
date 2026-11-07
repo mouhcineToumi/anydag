@@ -49,7 +49,11 @@ function server(answer: (s: Seen) => Response): Seen[] {
   const seen: Seen[] = [];
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
     const u = new URL(url);
-    const s: Seen = { method: init.method ?? "GET", path: `${u.pathname}${u.search}`, body: init.body ? JSON.parse(String(init.body)) : undefined };
+    const s: Seen = {
+      method: init.method ?? "GET",
+      path: `${u.pathname}${u.search}`,
+      body: init.body ? JSON.parse(String(init.body)) : undefined,
+    };
     seen.push(s);
     return answer(s);
   });
@@ -112,7 +116,15 @@ describe("ls", () => {
     quizzes: ["work/drill"],
     tables: [],
     files: ["work/spec.pdf"],
-    ids: { plan: "aaaaaaaaaa", "work/flow": "bbbbbbbbbb", "work/deep/map": "cccccccccc", "work/todo": "dddddddddd", "home/list": "eeeeeeeeee", "work/drill": "ffffffffff", "work/spec.pdf": "gggggggggg" },
+    ids: {
+      plan: "aaaaaaaaaa",
+      "work/flow": "bbbbbbbbbb",
+      "work/deep/map": "cccccccccc",
+      "work/todo": "dddddddddd",
+      "home/list": "eeeeeeeeee",
+      "work/drill": "ffffffffff",
+      "work/spec.pdf": "gggggggggg",
+    },
     shared: ["plan", "work/todo"],
     titles: { "work/todo": "To do", "home/list": "List" },
     tasks: { "work/todo": { status: "todo" } },
@@ -153,7 +165,8 @@ describe("a write that meets another writer", () => {
 
   it("is refused with exit 3, naming the base it lost to, and is not sent again", async () => {
     const seen = server((s) => {
-      if (s.path.startsWith("/__board/put")) return json(409, { error: "the board changed underneath this edit", base: "base-9", text: v2 });
+      if (s.path.startsWith("/__board/put"))
+        return json(409, { error: "the board changed underneath this edit", base: "base-9", text: v2 });
       return json(404, { error: "no route" });
     });
     fs.writeFileSync(path.join(dir, "mine.md"), v1);
@@ -167,7 +180,19 @@ describe("a write that meets another writer", () => {
   it("writes under --force with no base, and prints the diagnostics after", async () => {
     server((s) => {
       if (s.path.startsWith("/__board/put")) return json(200, { base: "base-2", text: v1 });
-      if (s.path.startsWith("/__board/diagnostics")) return json(200, { board: [], items: [{ id: "stack", type: "arch", diagnostics: [{ code: "E_UNKNOWN_KIND", line: 2, col: 1, message: "x", severity: "error" }] }], errors: 1, warnings: 0 });
+      if (s.path.startsWith("/__board/diagnostics"))
+        return json(200, {
+          board: [],
+          items: [
+            {
+              id: "stack",
+              type: "arch",
+              diagnostics: [{ code: "E_UNKNOWN_KIND", line: 2, col: 1, message: "x", severity: "error" }],
+            },
+          ],
+          errors: 1,
+          warnings: 0,
+        });
       return json(404, { error: "no route" });
     });
     fs.writeFileSync(path.join(dir, "mine.md"), v1);
@@ -200,7 +225,9 @@ describe("folder rm", () => {
   it("sends `recursive: true` — the boolean — and asks nothing, since it goes to the trash", async () => {
     const r = recorder();
     const trash = { id: "0123456789", name: "plan", kind: "folder" };
-    const seen = server(() => json(200, { folder: "plan", boards: ["plan/a", "plan/b"], notes: ["plan/sub/n"], folders: ["plan", "plan/sub"], trash }));
+    const seen = server(() =>
+      json(200, { folder: "plan", boards: ["plan/a", "plan/b"], notes: ["plan/sub/n"], folders: ["plan", "plan/sub"], trash }),
+    );
     expect(await main(["folder", "rm", "plan/", "-r"], r.io, env)).toBe(0);
     expect(seen.map((s) => s.path)).toEqual(["/__board/rmdir"]);
     expect(seen[0]!.body).toEqual({ name: "plan", recursive: true });
@@ -209,7 +236,9 @@ describe("folder rm", () => {
 
   it("still takes --yes, which an old script passes, and does nothing with it", async () => {
     const r = recorder();
-    const seen = server(() => json(200, { folder: "empty", boards: [], notes: [], folders: ["empty"], trash: { id: "abcdefghjk" } }));
+    const seen = server(() =>
+      json(200, { folder: "empty", boards: [], notes: [], folders: ["empty"], trash: { id: "abcdefghjk" } }),
+    );
     expect(await main(["folder", "rm", "empty", "-r", "-y"], r.io, env)).toBe(0);
     expect(seen.at(-1)!.body).toEqual({ name: "empty", recursive: true });
   });
@@ -232,7 +261,9 @@ describe("trash", () => {
     days: 30,
     entries: [
       entry("aaaaaaaaaa", "plan"),
-      entry("bbbbbbbbbb", "work", "folder", { holds: { boards: ["work/a"], notes: [], quizzes: [], tables: [], files: [], folders: ["work", "work/x"] } }),
+      entry("bbbbbbbbbb", "work", "folder", {
+        holds: { boards: ["work/a"], notes: [], quizzes: [], tables: [], files: [], folders: ["work", "work/x"] },
+      }),
       entry("cccccccccc", "dup"),
       entry("dddddddddd", "dup"),
     ],
@@ -248,7 +279,9 @@ describe("trash", () => {
 
   it("restores by name or by id, and needs the id when a name was two things", async () => {
     const r = recorder();
-    const seen = server((s) => (s.path === "/__board/trash" ? json(200, listed) : json(200, { ...entry("aaaaaaaaaa", "plan-2") })));
+    const seen = server((s) =>
+      s.path === "/__board/trash" ? json(200, listed) : json(200, { ...entry("aaaaaaaaaa", "plan-2") }),
+    );
     expect(await main(["trash", "restore", "plan"], r.io, env)).toBe(0);
     expect(seen.at(-1)!.body).toEqual({ id: "aaaaaaaaaa" });
     expect(r.out.at(-1)).toBe("plan-2");
@@ -260,7 +293,11 @@ describe("trash", () => {
   it("deletes for good only once asked, and empties the same way", async () => {
     const r = recorder();
     const seen = server((s) =>
-      s.path === "/__board/trash" ? json(200, listed) : s.path === "/__board/trash/empty" ? json(200, { ids: ["a", "b", "c", "d"] }) : json(200, { id: "aaaaaaaaaa" }),
+      s.path === "/__board/trash"
+        ? json(200, listed)
+        : s.path === "/__board/trash/empty"
+          ? json(200, { ids: ["a", "b", "c", "d"] })
+          : json(200, { id: "aaaaaaaaaa" }),
     );
     expect(await main(["trash", "rm", "plan"], r.io, env)).toBe(2);
     expect(r.err.at(-1)).toMatch(/delete board plan for good\? — pass --yes/);

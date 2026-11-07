@@ -73,7 +73,7 @@ describe("membership", () => {
     /* A second project note in one folder: the first by name owns it. */
     "work/pricing/zz-other": { status: "active" },
     /* At the top level a project note has no folder and holds nothing. */
-    "loose": { status: "active" },
+    loose: { status: "active" },
   };
   const folders = projectFolders(projects);
 

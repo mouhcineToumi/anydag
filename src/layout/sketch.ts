@@ -180,8 +180,14 @@ export function layoutSketch(
   const clipped = graph.nodes.filter((n) => sizes[n.id]?.clipped).map((n) => n.id);
 
   /* …and the lines and labels, which no box accounts for. */
-  const w = Math.max(reach.right, all.reduce((acc, b) => Math.max(acc, b.x + b.w), 0));
-  const h = Math.max(reach.bottom, all.reduce((acc, b) => Math.max(acc, b.y + b.h), 0));
+  const w = Math.max(
+    reach.right,
+    all.reduce((acc, b) => Math.max(acc, b.x + b.w), 0),
+  );
+  const h = Math.max(
+    reach.bottom,
+    all.reduce((acc, b) => Math.max(acc, b.y + b.h), 0),
+  );
 
   return {
     kind: "graph",

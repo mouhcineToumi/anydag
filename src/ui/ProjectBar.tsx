@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ChevronDown, CircleCheck, CircleDot, CirclePause, FolderKanban, ListTodo, Palette, X, type LucideIcon } from "lucide-react";
+import {
+  ChevronDown,
+  CircleCheck,
+  CircleDot,
+  CirclePause,
+  FolderKanban,
+  ListTodo,
+  Palette,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 
 import { HUE_ORDER, type Hue } from "@/dsl/ir";
 import { PROJECT_LABEL, PROJECT_STATUSES, type Project, type ProjectChange, type ProjectStatus } from "@/note/project";
@@ -37,7 +47,9 @@ export interface ProjectMembers {
 
 /** The project's colour as a small mark — the folder glyph, tinted, on the chrome's colour rule. */
 export function ProjectGlyph({ project, size = 14 }: { project: Project; size?: number }) {
-  return <FolderKanban size={size} strokeWidth={2} className="dag-project-glyph" style={hueVars(project.hue)} aria-hidden="true" />;
+  return (
+    <FolderKanban size={size} strokeWidth={2} className="dag-project-glyph" style={hueVars(project.hue)} aria-hidden="true" />
+  );
 }
 
 /**
@@ -120,7 +132,12 @@ export function ProjectBar({
               </button>
             ) : null}
             {members.onCalendar && !members.why ? (
-              <button type="button" className="dag-projectbar__tasks" data-dag-projectbar-calendar="" onClick={members.onCalendar}>
+              <button
+                type="button"
+                className="dag-projectbar__tasks"
+                data-dag-projectbar-calendar=""
+                onClick={members.onCalendar}
+              >
                 Open calendar
               </button>
             ) : null}
@@ -146,7 +163,12 @@ export function ProjectLine({ project }: { project: Project }) {
 /** The project a task belongs to, on its row: the glyph in its colour and its title. */
 export function ProjectChip({ project, title }: { project: Project; title: string }) {
   return (
-    <span className="dag-project-chip" data-dag-project-chip={title} style={hueVars(project.hue)} title={`In the project ${title}`}>
+    <span
+      className="dag-project-chip"
+      data-dag-project-chip={title}
+      style={hueVars(project.hue)}
+      title={`In the project ${title}`}
+    >
       <ProjectGlyph project={project} size={12} />
       <span>{title}</span>
     </span>

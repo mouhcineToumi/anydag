@@ -219,7 +219,10 @@ export async function layoutGraph(
     const bary = new Map<string, number>();
     for (const e of graph.edges) {
       const [a, b] = [e.from.node, e.to.node];
-      for (const [self, other] of [[a, b], [b, a]] as const) {
+      for (const [self, other] of [
+        [a, b],
+        [b, a],
+      ] as const) {
         if (groupOf.get(self) !== g || inside(other, g) || !declared.has(other)) continue;
         const so = bary.get(self);
         const at = declared.get(other)!;
@@ -358,18 +361,24 @@ export async function layoutGraph(
          barycentre above), and an «include» between two of them is drawn between the pills. Fed
          to ELK it would layer the column into columns, which is a chain of arrows a reader has
          to follow sideways while every actor's line comes in from the left across it. */
-      .filter((e) => !(graph.type === "usecase" && groupOf.get(e.from.node) !== undefined && groupOf.get(e.from.node) === groupOf.get(e.to.node)))
+      .filter(
+        (e) =>
+          !(
+            graph.type === "usecase" &&
+            groupOf.get(e.from.node) !== undefined &&
+            groupOf.get(e.from.node) === groupOf.get(e.to.node)
+          ),
+      )
       .map((e) => {
         let [from, to] = hoist(e.from.node, e.to.node);
         if (from !== e.from.node || to !== e.to.node) hoisted.add(e.id);
         /* A secondary actor stands on the far side of the system, as UML draws it. ELK reads the
            edge's direction as "left of"; an association has no direction of its own, so the
            external actor's is turned round for layout only. */
-        if (graph.type === "usecase" && external.has(e.from.node) && from === e.from.node && to !== e.to.node) [from, to] = [to, from];
-        const usePort =
-          from === e.from.node && hasPorts.has(from) && e.from.row && rowsOf.get(e.from.node)?.has(e.from.row);
-        const useTargetPort =
-          to === e.to.node && hasPorts.has(to) && e.to.row && rowsOf.get(e.to.node)?.has(e.to.row);
+        if (graph.type === "usecase" && external.has(e.from.node) && from === e.from.node && to !== e.to.node)
+          [from, to] = [to, from];
+        const usePort = from === e.from.node && hasPorts.has(from) && e.from.row && rowsOf.get(e.from.node)?.has(e.from.row);
+        const useTargetPort = to === e.to.node && hasPorts.has(to) && e.to.row && rowsOf.get(e.to.node)?.has(e.to.row);
         return {
           id: e.id,
           sources: [usePort ? `${from}::${e.from.row}` : from],

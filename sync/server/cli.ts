@@ -93,10 +93,21 @@ function limit(raw: string, name: string): number | null {
 
 function table(rows: string[][]): string {
   const widths = rows[0]!.map((_, i) => Math.max(...rows.map((r) => r[i]!.length)));
-  return rows.map((r) => r.map((c, i) => c.padEnd(widths[i]!)).join("  ").trimEnd()).join("\n");
+  return rows
+    .map((r) =>
+      r
+        .map((c, i) => c.padEnd(widths[i]!))
+        .join("  ")
+        .trimEnd(),
+    )
+    .join("\n");
 }
 
-export async function main(argv: string[], env: Record<string, string | undefined> = process.env, out: (s: string) => void = console.log): Promise<number> {
+export async function main(
+  argv: string[],
+  env: Record<string, string | undefined> = process.env,
+  out: (s: string) => void = console.log,
+): Promise<number> {
   let p: Parsed;
   try {
     p = parse(argv);
@@ -166,7 +177,8 @@ export async function main(argv: string[], env: Record<string, string | undefine
       case "account": {
         if (sub === "add") {
           const name = need(rest[0], "the account's name");
-          if (!/^[A-Za-z0-9_.@-]{1,100}$/.test(name)) throw new Usage("an account name is letters, digits, dots, dashes, underscores and @");
+          if (!/^[A-Za-z0-9_.@-]{1,100}$/.test(name))
+            throw new Usage("an account name is letters, digits, dots, dashes, underscores and @");
           if (await meta.accountByName(name)) throw new HttpError("ES_BAD_REQUEST", `an account called ${name} exists`);
           const plan = flag(p, "plan");
           if (plan && !(await planExists(meta, plan))) throw new HttpError("ES_NOT_FOUND", `no plan ${plan}`);
@@ -178,7 +190,13 @@ export async function main(argv: string[], env: Record<string, string | undefine
           const all = await Promise.all((await meta.accounts()).map((a) => adminAccount(meta, a)));
           if (json) out(JSON.stringify(all, null, 2));
           else if (!all.length) out("no accounts");
-          else out(table([["ID", "NAME", "PLAN", "DEVICES", "VAULTS", "CREATED"], ...all.map((a) => [a.id, a.name, a.plan, String(a.devices), String(a.vaults), a.created])]));
+          else
+            out(
+              table([
+                ["ID", "NAME", "PLAN", "DEVICES", "VAULTS", "CREATED"],
+                ...all.map((a) => [a.id, a.name, a.plan, String(a.devices), String(a.vaults), a.created]),
+              ]),
+            );
           return 0;
         }
         throw new Usage("account add <name> | account ls");
@@ -198,13 +216,20 @@ export async function main(argv: string[], env: Record<string, string | undefine
           const devices = (await meta.devices(a.id)).map((d) => wireDevice(d));
           if (json) out(JSON.stringify(devices, null, 2));
           else if (!devices.length) out("no devices");
-          else out(table([["ID", "NAME", "PLATFORM", "CREATED", "SEEN", "REVOKED"], ...devices.map((d) => [d.id, d.name, d.platform, d.created, d.seen ?? "-", d.revoked ?? "-"])]));
+          else
+            out(
+              table([
+                ["ID", "NAME", "PLATFORM", "CREATED", "SEEN", "REVOKED"],
+                ...devices.map((d) => [d.id, d.name, d.platform, d.created, d.seen ?? "-", d.revoked ?? "-"]),
+              ]),
+            );
           return 0;
         }
         if (sub === "revoke") {
           const a = await account(need(rest[0], "an account"));
           const id = need(rest[1], "a device id");
-          if (!(await meta.revokeDevice(a.id, id, new Date().toISOString()))) throw new HttpError("ES_NOT_FOUND", `no device ${id} in ${a.name}`);
+          if (!(await meta.revokeDevice(a.id, id, new Date().toISOString())))
+            throw new HttpError("ES_NOT_FOUND", `no device ${id} in ${a.name}`);
           out(`revoked ${id}`);
           return 0;
         }
@@ -212,7 +237,10 @@ export async function main(argv: string[], env: Record<string, string | undefine
       }
 
       case "plan": {
-        if (sub !== "set") throw new Usage("plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]");
+        if (sub !== "set")
+          throw new Usage(
+            "plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]",
+          );
         const id = need(rest[0], "a plan id");
         const current = await meta.plan(id);
         const base: Record<string, unknown> = current.id === id ? { ...current } : {};
@@ -229,7 +257,11 @@ export async function main(argv: string[], env: Record<string, string | undefine
         await meta.putPlan(plan);
         const onto = flag(p, "account");
         if (onto) await meta.setAccountPlan((await account(onto)).id, plan.id);
-        out(json ? JSON.stringify(plan) : `plan ${plan.id}: ${["storage_bytes", "history_days", "max_file_bytes", "devices"].map((k) => `${k}=${plan[k as keyof typeof plan] ?? "unlimited"}`).join(" ")}${onto ? ` — ${onto} is on it` : ""}`);
+        out(
+          json
+            ? JSON.stringify(plan)
+            : `plan ${plan.id}: ${["storage_bytes", "history_days", "max_file_bytes", "devices"].map((k) => `${k}=${plan[k as keyof typeof plan] ?? "unlimited"}`).join(" ")}${onto ? ` — ${onto} is on it` : ""}`,
+        );
         return 0;
       }
 
@@ -246,12 +278,22 @@ export async function main(argv: string[], env: Record<string, string | undefine
         const rows = (await meta.usage(filter)).map((r) => ({ ...r, value: Number(r.value) }));
         if (json) out(JSON.stringify(rows, null, 2));
         else if (!rows.length) out("no usage recorded");
-        else out(table([["DAY", "ACCOUNT", "VAULT", "METRIC", "VALUE"], ...rows.map((r) => [r.day, r.account, r.vault ?? "-", r.metric, String(r.value)])]));
+        else
+          out(
+            table([
+              ["DAY", "ACCOUNT", "VAULT", "METRIC", "VALUE"],
+              ...rows.map((r) => [r.day, r.account, r.vault ?? "-", r.metric, String(r.value)]),
+            ]),
+          );
         return 0;
       }
 
       case "gc": {
-        const r = await collect(meta, store.blobs, { historyDays: config.historyDays, now: new Date(), ageOf: diskAge(store.blobRoot) });
+        const r = await collect(meta, store.blobs, {
+          historyDays: config.historyDays,
+          now: new Date(),
+          ageOf: diskAge(store.blobRoot),
+        });
         out(json ? JSON.stringify(r) : `${r.compacted} log rows compacted, ${r.blobs} blobs (${r.bytes} bytes) removed`);
         return 0;
       }

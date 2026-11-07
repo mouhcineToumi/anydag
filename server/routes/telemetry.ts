@@ -20,7 +20,8 @@ export function telemetryRoutes(app: Hono, s: Session): void {
 
   app.put("/api/telemetry", async (c) => {
     const { enabled } = await bodyOf(c);
-    if (enabled !== true && enabled !== false && enabled !== null) throw err(400, "`enabled` is true, false, or null to be asked again");
+    if (enabled !== true && enabled !== false && enabled !== null)
+      throw err(400, "`enabled` is true, false, or null to be asked again");
     return c.json(s.telemetry.setConsent(enabled));
   });
 

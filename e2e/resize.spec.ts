@@ -169,10 +169,8 @@ async function pullItem(page: Page, id: string, dir: string, dx: number, dy: num
   await page.mouse.up();
 }
 
-const itemW = async (page: Page, id: string) =>
-  Math.round((await page.locator(`[data-dag-item="${id}"]`).boundingBox())!.width);
-const itemH = async (page: Page, id: string) =>
-  Math.round((await page.locator(`[data-dag-item="${id}"]`).boundingBox())!.height);
+const itemW = async (page: Page, id: string) => Math.round((await page.locator(`[data-dag-item="${id}"]`).boundingBox())!.width);
+const itemH = async (page: Page, id: string) => Math.round((await page.locator(`[data-dag-item="${id}"]`).boundingBox())!.height);
 
 test("a sketch of two shapes scales its drawing, one axis at a time", async ({ page }) => {
   fs.writeFileSync(file, SKETCH);

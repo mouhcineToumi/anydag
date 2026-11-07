@@ -69,9 +69,7 @@ async function fetchNote(name: string, opening = false): Promise<{ text: string;
  * network, or a 5xx — which is what the dev proxy answers while the api restarts. A 4xx other than
  * a 409 is an answer about the request, and sending it again gets the same one.
  */
-type Put =
-  | { ok: true; base: string }
-  | { ok: false; conflict?: { text: string; base: string }; retry?: boolean };
+type Put = { ok: true; base: string } | { ok: false; conflict?: { text: string; base: string }; retry?: boolean };
 
 /**
  * How long a save that failed waits before it goes again, doubling from the first to the last. The
@@ -341,69 +339,72 @@ export function NoteView({
     return next;
   }, []);
 
-  const flush = useCallback((leaving = false): Promise<void> => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    const run = async () => {
-      const ed = editor.current;
-      const l = loaded.current;
-      const h = held.current;
-      /* Read when the save runs, not when it was asked for: a title written in between moved the file. */
-      const name = nameRef.current;
-      if (!ed || !l || !h) return;
-      const next = saved(l, ed.document());
-      const text = joinNote(h.front, next.body);
-      if (text === h.text) return;
-      /* A save that failed with nothing wrong with it goes again on its own, on the same timer a
+  const flush = useCallback(
+    (leaving = false): Promise<void> => {
+      if (timer.current) {
+        clearTimeout(timer.current);
+        timer.current = null;
+      }
+      const run = async () => {
+        const ed = editor.current;
+        const l = loaded.current;
+        const h = held.current;
+        /* Read when the save runs, not when it was asked for: a title written in between moved the file. */
+        const name = nameRef.current;
+        if (!ed || !l || !h) return;
+        const next = saved(l, ed.document());
+        const text = joinNote(h.front, next.body);
+        if (text === h.text) return;
+        /* A save that failed with nothing wrong with it goes again on its own, on the same timer a
          keystroke sets — so typing in the meantime simply brings it forward, and the outside-write
          listener, which holds off while that timer is set, holds off for a retry too. Not while
          leaving: the page is gone, and whatever `keepalive` could carry has been sent. */
-      const failed = (p: Put) => {
-        const retry = !p.ok && p.retry === true && !leaving;
-        setStatus({ kind: "failed", retrying: retry });
-        if (!retry || timer.current) return;
-        const wait = backoff.current;
-        backoff.current = Math.min(wait * 2, RETRY_LAST_MS);
-        timer.current = setTimeout(() => void again.current(false), wait);
-      };
-      const put = await putNote(name, text, h.base, leaving);
-      if (put.ok) {
-        backoff.current = RETRY_FIRST_MS;
-        /* The frontmatter the page holds *now*, not the one this save started from: a bar pressed
+        const failed = (p: Put) => {
+          const retry = !p.ok && p.retry === true && !leaving;
+          setStatus({ kind: "failed", retrying: retry });
+          if (!retry || timer.current) return;
+          const wait = backoff.current;
+          backoff.current = Math.min(wait * 2, RETRY_LAST_MS);
+          timer.current = setTimeout(() => void again.current(false), wait);
+        };
+        const put = await putNote(name, text, h.base, leaving);
+        if (put.ok) {
+          backoff.current = RETRY_FIRST_MS;
+          /* The frontmatter the page holds *now*, not the one this save started from: a bar pressed
            while the save was out rewrote `held.front` and queued a save of its own, and putting the
            old front back here made that save find nothing to write — the second of two quick changes
            to an event's time was dropped, and so was a task's. */
-        held.current = { ...h, text, base: put.base, front: held.current?.front ?? h.front };
-        /* What was just written is the file now, so it is what the next save and the next outside
+          held.current = { ...h, text, base: put.base, front: held.current?.front ?? h.front };
+          /* What was just written is the file now, so it is what the next save and the next outside
            write are measured against — unless the person has typed since, in which case the map
            of this save still describes the blocks that were saved and the next save rewrites the
            rest. */
-        loaded.current = next.loaded;
-        /* A save that lands takes back the notice an earlier failure left. */
-        setStatus((st) => (st.kind === "failed" ? { kind: "ready" } : st));
-        return;
-      }
-      if (!put.conflict) return failed(put);
-      const theirs = put.conflict;
-      /* The editor holds ours, and this map describes ours: measured against it, the blocks the
+          loaded.current = next.loaded;
+          /* A save that lands takes back the notice an earlier failure left. */
+          setStatus((st) => (st.kind === "failed" ? { kind: "ready" } : st));
+          return;
+        }
+        if (!put.conflict) return failed(put);
+        const theirs = put.conflict;
+        /* The editor holds ours, and this map describes ours: measured against it, the blocks the
          person wrote are unchanged in the merge and keep their place, and the caret with them. */
-      loaded.current = next.loaded;
-      const merged = merge3(h.text, text, theirs.text);
-      if (merged === null) {
-        setStatus({ kind: "conflict", theirs: { ...theirs, front: splitNote(theirs.text).front }, mine: text });
-        return;
-      }
-      const second = await putNote(name, merged, theirs.base);
-      /* Retried from the top: `held` still names the base before theirs, so the next attempt meets
+        loaded.current = next.loaded;
+        const merged = merge3(h.text, text, theirs.text);
+        if (merged === null) {
+          setStatus({ kind: "conflict", theirs: { ...theirs, front: splitNote(theirs.text).front }, mine: text });
+          return;
+        }
+        const second = await putNote(name, merged, theirs.base);
+        /* Retried from the top: `held` still names the base before theirs, so the next attempt meets
          the same 409 and merges again, against whatever the file holds by then. */
-      if (!second.ok) return failed(second);
-      backoff.current = RETRY_FIRST_MS;
-      adopt(merged, second.base);
-    };
-    return serial(run);
-  }, [serial, adopt]);
+        if (!second.ok) return failed(second);
+        backoff.current = RETRY_FIRST_MS;
+        adopt(merged, second.base);
+      };
+      return serial(run);
+    },
+    [serial, adopt],
+  );
   again.current = flush;
 
   /**
@@ -453,7 +454,9 @@ export function NoteView({
           movingFrom.current = null;
         }
       });
-      setStatus((st) => (ok ? (st.kind === "failed" && st.title ? { kind: "ready" } : st) : { kind: "failed", retrying: false, title: true }));
+      setStatus((st) =>
+        ok ? (st.kind === "failed" && st.title ? { kind: "ready" } : st) : { kind: "failed", retrying: false, title: true },
+      );
       return ok;
     },
     [flush, serial, adopt, named, tell, tellProject, tellEvent],
@@ -570,24 +573,21 @@ export function NoteView({
     setReady(true);
   }, []);
 
-  const upload = useCallback(
-    async (file: File): Promise<string> => {
-      const dataUrl = await new Promise<string>((ok, fail) => {
-        const reader = new FileReader();
-        reader.onload = () => ok(String(reader.result));
-        reader.onerror = () => fail(reader.error);
-        reader.readAsDataURL(file);
-      });
-      const r = await fetch(`/__board/upload?${q(nameRef.current)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
-      });
-      if (!r.ok) throw new Error(`the image was refused (${r.status})`);
-      return ((await r.json()) as { src: string }).src;
-    },
-    [],
-  );
+  const upload = useCallback(async (file: File): Promise<string> => {
+    const dataUrl = await new Promise<string>((ok, fail) => {
+      const reader = new FileReader();
+      reader.onload = () => ok(String(reader.result));
+      reader.onerror = () => fail(reader.error);
+      reader.readAsDataURL(file);
+    });
+    const r = await fetch(`/__board/upload?${q(nameRef.current)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dataUrl }),
+    });
+    if (!r.ok) throw new Error(`the image was refused (${r.status})`);
+    return ((await r.json()) as { src: string }).src;
+  }, []);
 
   /*
    * Typing at a locked note. The editor is read-only, so it takes no caret and the keys go
@@ -748,10 +748,17 @@ export function NoteView({
             onNext={(newLine) => editor.current?.focusStart(newLine)}
           />
           {project ? (
-            <ProjectBar project={project} members={members} onChange={changeProject} editable={!locked && ready && status.kind !== "conflict"} />
+            <ProjectBar
+              project={project}
+              members={members}
+              onChange={changeProject}
+              editable={!locked && ready && status.kind !== "conflict"}
+            />
           ) : null}
           {task ? <TaskBar task={task} onChange={changeTask} editable={!locked && ready && status.kind !== "conflict"} /> : null}
-          {event ? <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"} /> : null}
+          {event ? (
+            <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"} />
+          ) : null}
           <Suspense fallback={null}>
             <BlockEditor
               key={opened.seq}
@@ -812,16 +819,37 @@ function TaskBar({ task, onChange, editable }: { task: Task; onChange(change: Ta
         Starts
       </span>
       <span className="dag-facts__value">
-        <DateField value={task.start} max={task.due} editable={editable} hook="data-dag-taskbar-start" label="Start date" onChange={(start) => onChange({ start })} />
+        <DateField
+          value={task.start}
+          max={task.due}
+          editable={editable}
+          hook="data-dag-taskbar-start"
+          label="Start date"
+          onChange={(start) => onChange({ start })}
+        />
       </span>
       <span className="dag-facts__label">
         <Calendar size={14} strokeWidth={2} aria-hidden="true" />
         Due
       </span>
       <span className="dag-facts__value">
-        <DateField value={task.due} editable={editable} hook="data-dag-taskbar-due" label="Due date" late={overdue(task)} onChange={(due) => onChange({ due })} />
+        <DateField
+          value={task.due}
+          editable={editable}
+          hook="data-dag-taskbar-due"
+          label="Due date"
+          late={overdue(task)}
+          onChange={(due) => onChange({ due })}
+        />
         {task.due ? (
-          <button type="button" className="dag-taskbar__clear" data-dag-taskbar-clear-due="" aria-label="Take the due date off" disabled={!editable} onClick={() => onChange({ due: null })}>
+          <button
+            type="button"
+            className="dag-taskbar__clear"
+            data-dag-taskbar-clear-due=""
+            aria-label="Take the due date off"
+            disabled={!editable}
+            onClick={() => onChange({ due: null })}
+          >
             <X size={14} strokeWidth={2} aria-hidden="true" />
           </button>
         ) : null}

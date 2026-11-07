@@ -57,7 +57,13 @@ test.beforeAll(async () => {
   await run("node", [path.join(ROOT, "sync", "build.mjs")], { cwd: ROOT });
   const port = await freePort();
   url = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, ANYDAG_SYNC_DATA: path.join(tmp, "server"), ANYDAG_SYNC_PORT: String(port), ANYDAG_SYNC_HOST: "127.0.0.1", ANYDAG_SYNC_PUBLIC_URL: url };
+  const env = {
+    ...process.env,
+    ANYDAG_SYNC_DATA: path.join(tmp, "server"),
+    ANYDAG_SYNC_PORT: String(port),
+    ANYDAG_SYNC_HOST: "127.0.0.1",
+    ANYDAG_SYNC_PUBLIC_URL: url,
+  };
   await run("node", [SYNC_BIN, "account", "add", "e2e"], { env });
   for (let i = 0; i < 2; i++) {
     const out = (await run("node", [SYNC_BIN, "pair", "e2e"], { env })).stdout;
@@ -93,7 +99,9 @@ const device = (...args: string[]) => {
   });
 };
 
-test("pair, upload and watch the status in the browser; a second device downloads, edits, and the open note follows", async ({ page }) => {
+test("pair, upload and watch the status in the browser; a second device downloads, edits, and the open note follows", async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   const heard: string[] = [];
   page.on("console", (m) => {

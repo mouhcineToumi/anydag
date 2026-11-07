@@ -32,7 +32,20 @@ export const MESSAGE_MAX = 300;
 export const STACK_MAX = 1500;
 
 /** Which page of the app something happened on — a kind of page, never which document. */
-export const PAGES = ["board", "note", "quiz", "table", "file", "tasks", "calendar", "quizzes", "trash", "chat", "home", "other"] as const;
+export const PAGES = [
+  "board",
+  "note",
+  "quiz",
+  "table",
+  "file",
+  "tasks",
+  "calendar",
+  "quizzes",
+  "trash",
+  "chat",
+  "home",
+  "other",
+] as const;
 
 /** What is running the page. */
 const SHELLS = ["desktop", "browser"] as const;
@@ -210,7 +223,8 @@ export function cleanEvent(raw: unknown): LogEvent | null {
   return { name: raw.name, at: at.toISOString().replace(/\.\d{3}Z$/, "Z"), props };
 }
 
-const oneOf = <T extends string>(list: readonly T[], v: unknown, fallback: T): T => (typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : fallback);
+const oneOf = <T extends string>(list: readonly T[], v: unknown, fallback: T): T =>
+  typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : fallback;
 
 /** Who sent it, or `null` when it does not say enough to be counted. */
 function cleanEnv(raw: unknown): LogEnv | null {
@@ -232,7 +246,10 @@ export function cleanBatch(raw: unknown): LogBatch | null {
   if (!isObject(raw) || raw.v !== LOGS_VERSION || !Array.isArray(raw.events)) return null;
   const env = cleanEnv(raw.env);
   if (!env) return null;
-  const events = raw.events.slice(0, MAX_EVENTS).map(cleanEvent).filter((e): e is LogEvent => e !== null);
+  const events = raw.events
+    .slice(0, MAX_EVENTS)
+    .map(cleanEvent)
+    .filter((e): e is LogEvent => e !== null);
   return events.length ? { v: LOGS_VERSION, env, events } : null;
 }
 

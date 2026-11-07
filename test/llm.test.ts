@@ -55,8 +55,14 @@ function fakeFetch(status: number, body: unknown): { fetchImpl: typeof fetch; se
 
 describe("httpComplete", () => {
   it("posts an OpenAI chat completion with the key as a bearer token", async () => {
-    const f = fakeFetch(200, { choices: [{ message: { content: "```arch\nservice a \"A\"\n```" } }] });
-    const complete = httpComplete({ baseURL: "https://example.test/v1", key: KEY, model: "m-1", extra: { temperature: 0.2 }, fetchImpl: f.fetchImpl });
+    const f = fakeFetch(200, { choices: [{ message: { content: '```arch\nservice a "A"\n```' } }] });
+    const complete = httpComplete({
+      baseURL: "https://example.test/v1",
+      key: KEY,
+      model: "m-1",
+      extra: { temperature: 0.2 },
+      fetchImpl: f.fetchImpl,
+    });
     expect(await complete(TALK)).toContain("service a");
     expect(f.seen[0]!.url).toBe("https://example.test/v1/chat/completions");
     expect((f.seen[0]!.init.headers as Record<string, string>).Authorization).toBe(`Bearer ${KEY}`);
@@ -64,13 +70,26 @@ describe("httpComplete", () => {
   });
 
   it("reads content that arrives as an array of parts", async () => {
-    const f = fakeFetch(200, { choices: [{ message: { content: [{ type: "text", text: "a" }, { type: "text", text: "b" }] } }] });
+    const f = fakeFetch(200, {
+      choices: [
+        {
+          message: {
+            content: [
+              { type: "text", text: "a" },
+              { type: "text", text: "b" },
+            ],
+          },
+        },
+      ],
+    });
     expect(await httpComplete({ baseURL: "https://x.test", model: "m", fetchImpl: f.fetchImpl })(TALK)).toBe("ab");
   });
 
   it("says what the provider said, and never the key, when it refuses", async () => {
     const f = fakeFetch(401, [{ error: { message: `API key ${KEY} not valid` } }]);
-    const err = await httpComplete({ baseURL: "https://x.test", key: KEY, model: "m", fetchImpl: f.fetchImpl })(TALK).catch((e: unknown) => e);
+    const err = await httpComplete({ baseURL: "https://x.test", key: KEY, model: "m", fetchImpl: f.fetchImpl })(TALK).catch(
+      (e: unknown) => e,
+    );
     expect(err).toBeInstanceOf(LlmError);
     expect((err as LlmError).status).toBe(401);
     expect((err as LlmError).message).toContain("not valid");
@@ -86,7 +105,9 @@ describe("parseOpencodeEvents", () => {
 
   it("takes the last message's text when a run spoke more than once", () => {
     const ev = (id: string, text: string) => JSON.stringify({ type: "text", part: { messageID: id, text } });
-    expect(parseOpencodeEvents([ev("m1", "thinking out loud"), ev("m2", "```arch"), ev("m2", "\n```")].join("\n"))).toBe("```arch\n```");
+    expect(parseOpencodeEvents([ev("m1", "thinking out loud"), ev("m2", "```arch"), ev("m2", "\n```")].join("\n"))).toBe(
+      "```arch\n```",
+    );
   });
 
   it("throws an error event rather than returning nothing", () => {
@@ -118,7 +139,12 @@ function fakeSpawn(stdout: string, code = 0, hang = false) {
   const started: { bin: string; args: string[]; opts: { cwd: string; env: Record<string, string> }; stdin: () => string }[] = [];
   let killed = false;
   const spawnImpl = ((bin: string, args: string[], opts: { cwd: string; env: Record<string, string> }) => {
-    const child = new EventEmitter() as EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill: () => void };
+    const child = new EventEmitter() as EventEmitter & {
+      stdin: PassThrough;
+      stdout: PassThrough;
+      stderr: PassThrough;
+      kill: () => void;
+    };
     child.stdin = new PassThrough();
     let input = "";
     child.stdin.on("data", (b: Buffer) => (input += b.toString("utf8")));
@@ -140,19 +166,41 @@ function fakeSpawn(stdout: string, code = 0, hang = false) {
 }
 
 describe("opencodeComplete", () => {
-  const answer = JSON.stringify({ type: "text", sessionID: "ses_abc", part: { messageID: "m", text: "```arch\nservice a \"A\"\n```" } });
+  const answer = JSON.stringify({
+    type: "text",
+    sessionID: "ses_abc",
+    part: { messageID: "m", text: '```arch\nservice a "A"\n```' },
+  });
 
   it("runs a tool-less agent on a private server in an empty directory, and deletes its session", async () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dag-cli-test-"));
     try {
       const fake = fakeSpawn(answer);
       const env = { PATH: "/bin", ANYDAG_TOKEN: "t", OPENCODE_CONFIG: "/elsewhere.json" };
-      const text = await opencodeComplete({ model: "opencode-go/glm-5.3-flash", variant: "high", env, bin: "/x/opencode", spawnImpl: fake.spawnImpl, tmpRoot })(TALK);
+      const text = await opencodeComplete({
+        model: "opencode-go/glm-5.3-flash",
+        variant: "high",
+        env,
+        bin: "/x/opencode",
+        spawnImpl: fake.spawnImpl,
+        tmpRoot,
+      })(TALK);
       expect(text).toContain("service a");
 
       const { bin, args, opts, stdin } = fake.started[0]!;
       expect(bin).toBe("/x/opencode");
-      expect(args).toEqual(["run", "--standalone", "-m", "opencode-go/glm-5.3-flash#high", "--agent", "dag-diagram", "--title", "dag-generate", "--format", "json"]);
+      expect(args).toEqual([
+        "run",
+        "--standalone",
+        "-m",
+        "opencode-go/glm-5.3-flash#high",
+        "--agent",
+        "dag-diagram",
+        "--title",
+        "dag-generate",
+        "--format",
+        "json",
+      ]);
       expect(args).not.toContain("--auto");
       /* The request goes in on stdin, never as an argument. */
       expect(stdin()).toBe(TALK[1]!.content);
@@ -160,7 +208,9 @@ describe("opencodeComplete", () => {
       expect(opts.env.XDG_CONFIG_HOME.startsWith(opts.cwd)).toBe(true);
       expect(opts.env.ANYDAG_TOKEN).toBeUndefined();
       expect(opts.env.OPENCODE_CONFIG).toBeUndefined();
-      const config = JSON.parse(opts.env.OPENCODE_CONFIG_CONTENT) as { agent: { "dag-diagram": { prompt: string; permission: Record<string, string> } } };
+      const config = JSON.parse(opts.env.OPENCODE_CONFIG_CONTENT) as {
+        agent: { "dag-diagram": { prompt: string; permission: Record<string, string> } };
+      };
       const agent = config.agent["dag-diagram"];
       expect(agent.prompt).toMatch(/^\{file:.*system\.md\}$/);
       expect(agent.permission).toEqual({ "*": "deny" });
@@ -177,12 +227,18 @@ describe("opencodeComplete", () => {
   it("says what OpenCode said when it refuses, ahead of the exit code", async () => {
     const refused = fs.readFileSync(path.join(__dirname, "fixtures/opencode-error.jsonl"), "utf8");
     const fake = fakeSpawn(refused, 1);
-    await expect(opencodeComplete({ model: "m", env: {}, spawnImpl: fake.spawnImpl })(TALK)).rejects.toThrow("Variant unavailable");
+    await expect(opencodeComplete({ model: "m", env: {}, spawnImpl: fake.spawnImpl })(TALK)).rejects.toThrow(
+      "Variant unavailable",
+    );
   });
 
   it("reports a run that printed nothing with its exit code, and an empty answer as such", async () => {
-    await expect(opencodeComplete({ model: "m", env: {}, spawnImpl: fakeSpawn("", 1).spawnImpl })(TALK)).rejects.toThrow("opencode exited 1");
-    await expect(opencodeComplete({ model: "m", env: {}, spawnImpl: fakeSpawn("", 0).spawnImpl })(TALK)).rejects.toThrow("no text");
+    await expect(opencodeComplete({ model: "m", env: {}, spawnImpl: fakeSpawn("", 1).spawnImpl })(TALK)).rejects.toThrow(
+      "opencode exited 1",
+    );
+    await expect(opencodeComplete({ model: "m", env: {}, spawnImpl: fakeSpawn("", 0).spawnImpl })(TALK)).rejects.toThrow(
+      "no text",
+    );
   });
 
   it("kills the child when the request is cancelled, or when it takes too long", async () => {
@@ -195,7 +251,9 @@ describe("opencodeComplete", () => {
     expect(fake.killed()).toBe(true);
 
     const slow = fakeSpawn("", 0, true);
-    await expect(opencodeComplete({ model: "m", env: {}, timeout: 10, spawnImpl: slow.spawnImpl })(TALK)).rejects.toThrow("did not answer in");
+    await expect(opencodeComplete({ model: "m", env: {}, timeout: 10, spawnImpl: slow.spawnImpl })(TALK)).rejects.toThrow(
+      "did not answer in",
+    );
     expect(slow.killed()).toBe(true);
   });
 
@@ -210,7 +268,11 @@ describe("resolveProvider", () => {
   it("defaults to Gemini, and needs its key", () => {
     expect(resolveProvider({})).toMatchObject({ ok: false, error: expect.stringContaining("GEMINI_API_KEY") });
     const r = resolveProvider({ GEMINI_API_KEY: KEY });
-    expect(r.ok && r.value).toMatchObject({ model: "gemini-3.8-flash", key: KEY, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai" });
+    expect(r.ok && r.value).toMatchObject({
+      model: "gemini-3.8-flash",
+      key: KEY,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+    });
   });
 
   it("lets the environment choose the default provider and its model", () => {
@@ -225,7 +287,10 @@ describe("resolveProvider", () => {
   });
 
   it("takes a custom endpoint entirely from the environment, key optional", () => {
-    const r = resolveProvider({ ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1/", ANYDAG_LLM_MODEL: "qwen" }, { provider: "custom" });
+    const r = resolveProvider(
+      { ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1/", ANYDAG_LLM_MODEL: "qwen" },
+      { provider: "custom" },
+    );
     expect(r.ok && r.value).toMatchObject({ baseURL: "http://localhost:11434/v1", model: "qwen", key: undefined });
   });
 
@@ -240,7 +305,10 @@ describe("describeProviders", () => {
     expect(JSON.stringify(d)).not.toContain(KEY);
     expect(d.default).toBe("gemini");
     expect(d.providers.find((p) => p.id === "gemini")!.ready).toBe(true);
-    expect(d.providers.find((p) => p.id === "opencode")).toMatchObject({ ready: false, reason: expect.stringContaining("not installed") });
+    expect(d.providers.find((p) => p.id === "opencode")).toMatchObject({
+      ready: false,
+      reason: expect.stringContaining("not installed"),
+    });
   });
 });
 
@@ -256,7 +324,10 @@ describe("extraFor", () => {
   });
 
   it("lets the environment choose, or ask for the model's own default", () => {
-    expect(extraFor(gemini(), { ANYDAG_LLM_REASONING: "high", ANYDAG_LLM_TEMPERATURE: "0.3" })).toEqual({ reasoning_effort: "high", temperature: 0.3 });
+    expect(extraFor(gemini(), { ANYDAG_LLM_REASONING: "high", ANYDAG_LLM_TEMPERATURE: "0.3" })).toEqual({
+      reasoning_effort: "high",
+      temperature: 0.3,
+    });
     expect(extraFor(gemini(), { ANYDAG_LLM_REASONING: "default" })).toEqual({});
   });
 
@@ -287,7 +358,6 @@ describe("variantFor", () => {
   });
 });
 
-
 /* ---- Claude Code ---- */
 
 const claudeSaid = (result: string, isError = false) =>
@@ -297,15 +367,31 @@ describe("claudeComplete", () => {
   it("runs `claude -p` answer-only, with the system prompt as a file and the request on stdin", async () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dag-claude-test-"));
     try {
-      const fake = fakeSpawn(claudeSaid("```arch\nservice a \"A\"\n```"));
-      const env = { PATH: "/bin", HOME: "/h", ANTHROPIC_API_KEY: KEY, ELECTRON_RUN_AS_NODE: "1", ANYDAG_TOKEN: "t", CLAUDECODE: "1" };
-      const text = await claudeComplete({ model: "sonnet", effort: "low", env, bin: "/opt/claude", spawnImpl: fake.spawnImpl, tmpRoot })(TALK);
+      const fake = fakeSpawn(claudeSaid('```arch\nservice a "A"\n```'));
+      const env = {
+        PATH: "/bin",
+        HOME: "/h",
+        ANTHROPIC_API_KEY: KEY,
+        ELECTRON_RUN_AS_NODE: "1",
+        ANYDAG_TOKEN: "t",
+        CLAUDECODE: "1",
+      };
+      const text = await claudeComplete({
+        model: "sonnet",
+        effort: "low",
+        env,
+        bin: "/opt/claude",
+        spawnImpl: fake.spawnImpl,
+        tmpRoot,
+      })(TALK);
       expect(text).toContain("service a");
 
       const { bin, args, opts, stdin } = fake.started[0]!;
       expect(bin).toBe("/opt/claude");
       expect(args.slice(0, 2)).toEqual(["-p", "--safe-mode"]);
-      expect(args).toEqual(expect.arrayContaining(["--strict-mcp-config", "--no-session-persistence", "--model", "sonnet", "--effort", "low"]));
+      expect(args).toEqual(
+        expect.arrayContaining(["--strict-mcp-config", "--no-session-persistence", "--model", "sonnet", "--effort", "low"]),
+      );
       /* No tool at all: the empty list, not the default set. */
       expect(args[args.indexOf("--tools") + 1]).toBe("");
       expect(args[args.indexOf("--output-format") + 1]).toBe("json");
@@ -317,7 +403,8 @@ describe("claudeComplete", () => {
 
       /* The subscription answers, not a key that happens to be in the server's environment. */
       expect(opts.env).toMatchObject({ PATH: "/bin", HOME: "/h" });
-      for (const k of ["ANTHROPIC_API_KEY", "ELECTRON_RUN_AS_NODE", "ANYDAG_TOKEN", "CLAUDECODE"]) expect(opts.env[k]).toBeUndefined();
+      for (const k of ["ANTHROPIC_API_KEY", "ELECTRON_RUN_AS_NODE", "ANYDAG_TOKEN", "CLAUDECODE"])
+        expect(opts.env[k]).toBeUndefined();
       expect(fs.existsSync(opts.cwd)).toBe(false);
     } finally {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -332,13 +419,19 @@ describe("claudeComplete", () => {
 
   it("says Claude Code's own refusal, which arrives as JSON and an exit of 1", async () => {
     const fake = fakeSpawn(claudeSaid("Not logged in · Please run /login", true), 1);
-    await expect(claudeComplete({ model: "m", env: {}, spawnImpl: fake.spawnImpl })(TALK)).rejects.toThrow("Claude Code: Not logged in");
+    await expect(claudeComplete({ model: "m", env: {}, spawnImpl: fake.spawnImpl })(TALK)).rejects.toThrow(
+      "Claude Code: Not logged in",
+    );
   });
 
   it("reports a run that printed no answer with its exit code", async () => {
     const fake = fakeSpawn("boom", 2);
-    await expect(claudeComplete({ model: "m", env: {}, spawnImpl: fake.spawnImpl })(TALK)).rejects.toThrow("claude exited 2: boom");
-    await expect(claudeComplete({ model: "m", env: {}, spawnImpl: fakeSpawn(claudeSaid("")).spawnImpl })(TALK)).rejects.toThrow("no text");
+    await expect(claudeComplete({ model: "m", env: {}, spawnImpl: fake.spawnImpl })(TALK)).rejects.toThrow(
+      "claude exited 2: boom",
+    );
+    await expect(claudeComplete({ model: "m", env: {}, spawnImpl: fakeSpawn(claudeSaid("")).spawnImpl })(TALK)).rejects.toThrow(
+      "no text",
+    );
   });
 
   it("kills the child when the request is cancelled, or when it takes too long", async () => {
@@ -351,7 +444,9 @@ describe("claudeComplete", () => {
     expect(fake.killed()).toBe(true);
 
     const slow = fakeSpawn("", 0, true);
-    await expect(claudeComplete({ model: "m", env: {}, timeout: 10, spawnImpl: slow.spawnImpl })(TALK)).rejects.toThrow("did not answer");
+    await expect(claudeComplete({ model: "m", env: {}, timeout: 10, spawnImpl: slow.spawnImpl })(TALK)).rejects.toThrow(
+      "did not answer",
+    );
     expect(slow.killed()).toBe(true);
   });
 });
@@ -400,7 +495,9 @@ describe.skipIf(process.platform === "win32")("finding Claude Code", () => {
 
   it("takes the PATH first, and ANYDAG_CLAUDE_BIN before either", () => {
     const h = home("bin/claude");
-    expect(findClaude({ PATH: path.join(h, "bin"), HOME: "/nonexistent-home" })).toMatchObject({ bin: path.join(h, "bin/claude") });
+    expect(findClaude({ PATH: path.join(h, "bin"), HOME: "/nonexistent-home" })).toMatchObject({
+      bin: path.join(h, "bin/claude"),
+    });
     expect(findClaude({ ANYDAG_CLAUDE_BIN: path.join(h, "nope"), PATH: path.join(h, "bin") })).toMatchObject({
       ok: false,
       error: expect.stringContaining("ANYDAG_CLAUDE_BIN"),
@@ -447,7 +544,11 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
       const bin = path.join(root, rel);
       fs.mkdirSync(path.dirname(bin), { recursive: true });
       const list = JSON.stringify(logins.map((id) => ({ id, connections: [{ type: "credential" }] })));
-      fs.writeFileSync(bin, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "opencode v${version}"; exit 0; fi\necho '${list}'\n`, { mode: 0o755 });
+      fs.writeFileSync(
+        bin,
+        `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "opencode v${version}"; exit 0; fi\necho '${list}'\n`,
+        { mode: 0o755 },
+      );
     }
     return root;
   };
@@ -461,7 +562,9 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
 
   it("takes the PATH first, and ANYDAG_OPENCODE_BIN before either", () => {
     const h = home("bin/opencode");
-    expect(findOpencode({ PATH: path.join(h, "bin"), HOME: "/nonexistent-home" })).toMatchObject({ bin: path.join(h, "bin/opencode") });
+    expect(findOpencode({ PATH: path.join(h, "bin"), HOME: "/nonexistent-home" })).toMatchObject({
+      bin: path.join(h, "bin/opencode"),
+    });
     expect(findOpencode({ ANYDAG_OPENCODE_BIN: path.join(h, "nope"), PATH: path.join(h, "bin") })).toMatchObject({
       ok: false,
       error: expect.stringContaining("ANYDAG_OPENCODE_BIN"),
@@ -470,7 +573,10 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
 
   it("says why not: not installed, too old, or not signed in to the model's provider", () => {
     const want = { provider: "opencode" };
-    expect(resolveProvider({ PATH: "", HOME: home(null) }, want)).toMatchObject({ ok: false, error: expect.stringContaining("not installed") });
+    expect(resolveProvider({ PATH: "", HOME: home(null) }, want)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("not installed"),
+    });
     expect(resolveProvider({ PATH: "", HOME: home(".opencode/bin/opencode", "1.18.3") }, want)).toMatchObject({
       ok: false,
       error: expect.stringContaining("too old"),
@@ -491,7 +597,9 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     const h = home(".opencode/bin/opencode");
     expect(describeProviders({ PATH: "", HOME: h }).default).toBe("gemini");
     expect(describeProviders({ PATH: "", HOME: h, ANYDAG_DESKTOP: "1" }).default).toBe("opencode");
-    expect(describeProviders({ PATH: "", HOME: home(".opencode/bin/opencode", "2.2.5", []), ANYDAG_DESKTOP: "1" }).default).toBe("gemini");
+    expect(describeProviders({ PATH: "", HOME: home(".opencode/bin/opencode", "2.2.5", []), ANYDAG_DESKTOP: "1" }).default).toBe(
+      "gemini",
+    );
     /* With Claude Code there too, Claude goes first. */
     const both = home(".opencode/bin/opencode");
     fs.mkdirSync(path.join(both, ".local/bin"), { recursive: true });
@@ -500,6 +608,8 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
   });
 
   it("does not let the server's own config or token reach the run", () => {
-    expect(opencodeEnv({ OPENCODE_CONFIG: "/c.json", OPENCODE_CONFIG_DIR: "/d", ANYDAG_TOKEN: "t", HOME: "/h" })).toEqual({ HOME: "/h" });
+    expect(opencodeEnv({ OPENCODE_CONFIG: "/c.json", OPENCODE_CONFIG_DIR: "/d", ANYDAG_TOKEN: "t", HOME: "/h" })).toEqual({
+      HOME: "/h",
+    });
   });
 });

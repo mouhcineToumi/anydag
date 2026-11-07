@@ -40,7 +40,13 @@ export function parseVersion(version) {
 function validStamp(s) {
   const [y, mo, d, h, mi] = [s.slice(0, 4), s.slice(4, 6), s.slice(6, 8), s.slice(8, 10), s.slice(10, 12)].map(Number);
   const t = new Date(Date.UTC(y, mo - 1, d, h, mi));
-  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d && t.getUTCHours() === h && t.getUTCMinutes() === mi;
+  return (
+    t.getUTCFullYear() === y &&
+    t.getUTCMonth() === mo - 1 &&
+    t.getUTCDate() === d &&
+    t.getUTCHours() === h &&
+    t.getUTCMinutes() === mi
+  );
 }
 
 /** The nightly's stamp for a moment: `YYYYMMDDHHmm`, UTC. */

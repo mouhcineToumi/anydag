@@ -32,7 +32,10 @@ export function openId(text: string): { text: string; id?: string } {
   if (!m) return { text };
   const found = ID_LINE.exec(m[1]!);
   if (!found) return { text };
-  const yaml = m[1]!.replace(ID_LINE, "").replace(/^\s*\n/, "").replace(/\n\s*$/, "");
+  const yaml = m[1]!
+    .replace(ID_LINE, "")
+    .replace(/^\s*\n/, "")
+    .replace(/\n\s*$/, "");
   const rest = text.slice(m[0].length);
   if (!yaml.trim()) return { text: rest.replace(/^\r?\n/, ""), id: found[1] };
   return { text: `---\n${yaml}\n---${m[2] || "\n"}${rest}`, id: found[1] };

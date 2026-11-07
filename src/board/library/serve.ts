@@ -92,7 +92,7 @@ export function libraryServed(opts: { type?: string; q?: string } = {}): ServedL
       ),
       how:
         "Each object is one sketch `figure` — a picture with its caption under it. Search them with q= " +
-        "(`q=truck`), or write one yourself: `figure <id> \"<caption>\" icon=emoji:<name>`, " +
+        '(`q=truck`), or write one yourself: `figure <id> "<caption>" icon=emoji:<name>`, ' +
         "where /__board/icons?q= finds the name.",
     },
   };

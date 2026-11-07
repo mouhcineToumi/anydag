@@ -42,12 +42,14 @@ export async function planExists(meta: Meta, id: string): Promise<boolean> {
 const LIMITS = ["storage_bytes", "history_days", "max_file_bytes", "devices"] as const;
 
 export function parsePlan(id: string, v: Record<string, unknown>): Plan {
-  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(id)) throw new HttpError("ES_BAD_REQUEST", "a plan id is 1 to 64 letters, digits, dots, dashes or underscores");
+  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(id))
+    throw new HttpError("ES_BAD_REQUEST", "a plan id is 1 to 64 letters, digits, dots, dashes or underscores");
   const plan: Plan = { id, storage_bytes: null, history_days: null, max_file_bytes: null, devices: null };
   for (const k of LIMITS) {
     const x = v[k];
     if (x === undefined || x === null) continue;
-    if (typeof x !== "number" || !Number.isSafeInteger(x) || x < 0) throw new HttpError("ES_BAD_REQUEST", `${k} must be a whole number of at least 0, or null for unlimited`);
+    if (typeof x !== "number" || !Number.isSafeInteger(x) || x < 0)
+      throw new HttpError("ES_BAD_REQUEST", `${k} must be a whole number of at least 0, or null for unlimited`);
     plan[k] = x;
   }
   return plan;
@@ -66,7 +68,8 @@ export function adminRoutes(deps: Deps): Hono {
   app.post("/v1/admin/accounts", async (c) => {
     const b = await body(c);
     const name = str(b.name, "name", 100);
-    if (!/^[A-Za-z0-9_.@-]+$/.test(name)) throw new HttpError("ES_BAD_REQUEST", "an account name is letters, digits, dots, dashes, underscores and @");
+    if (!/^[A-Za-z0-9_.@-]+$/.test(name))
+      throw new HttpError("ES_BAD_REQUEST", "an account name is letters, digits, dots, dashes, underscores and @");
     const plan = b.plan === undefined || b.plan === null ? undefined : str(b.plan, "plan", 64);
     if (plan !== undefined && !(await planExists(deps.meta, plan))) throw new HttpError("ES_NOT_FOUND", `no plan ${plan}`);
     if (await deps.meta.accountByName(name)) throw new HttpError("ES_BAD_REQUEST", `an account called ${name} exists`);

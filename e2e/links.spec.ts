@@ -68,7 +68,10 @@ test("a lone node draws bare, and stays bare until its author names it", async (
   await expect(page.locator('[data-dag-item="stack"] .dag-frame__head')).toHaveCount(1);
 
   /* A second node changes nothing (F0): node count plays no part in whether a header draws. */
-  fs.writeFileSync(file, read().replace('actor person "Someone"', 'actor person "Someone"\nusecase uc "Do a thing"\nperson --> uc'));
+  fs.writeFileSync(
+    file,
+    read().replace('actor person "Someone"', 'actor person "Someone"\nusecase uc "Do a thing"\nperson --> uc'),
+  );
   await expect(who.locator(".dag-frame__head")).toHaveCount(0);
 
   /* A title is what grows it. */
@@ -336,7 +339,7 @@ test("a group of pen strokes has handles, and the link it draws names the group"
     await expect(page.locator("[data-dag-group-connect]")).toHaveCount(4);
     /* And the item's own are not also up, which would be two sets of handles with nothing saying
        which thing either acted on. */
-    await expect(page.locator('.dag-item .dag-connect-handle')).toHaveCount(0);
+    await expect(page.locator(".dag-item .dag-connect-handle")).toHaveCount(0);
 
     const handle = (await page.locator('[data-dag-group-connect][data-dag-connect="e"]').boundingBox())!;
     const target = (await page.locator('[data-dag-item="target"]').boundingBox())!;
@@ -346,9 +349,7 @@ test("a group of pen strokes has handles, and the link it draws names the group"
     await page.mouse.up();
 
     /* The group's name, not a member's: the drawing is what was linked. */
-    await expect
-      .poll(() => fs.readFileSync(gfile, "utf8"), { timeout: 5_000 })
-      .toContain("group-ink --> target");
+    await expect.poll(() => fs.readFileSync(gfile, "utf8"), { timeout: 5_000 }).toContain("group-ink --> target");
     /* And it resolves, so it is actually drawn rather than sitting in the file as a diagnostic. */
     await expect(page.locator(".dag-board-edges path.dag-edge-line")).toHaveCount(1);
     await expect(page.locator("[data-dag-error]")).toHaveCount(0);
@@ -377,9 +378,7 @@ test("dropping on a member of a group names the group, as a click selects it", a
     await page.mouse.move(s2.x + s2.width / 2, s2.y + s2.height / 2, { steps: 12 });
     await page.mouse.up();
 
-    await expect
-      .poll(() => fs.readFileSync(gfile, "utf8"), { timeout: 5_000 })
-      .toContain("target --> group-ink");
+    await expect.poll(() => fs.readFileSync(gfile, "utf8"), { timeout: 5_000 }).toContain("target --> group-ink");
   } finally {
     fs.rmSync(gfile, { force: true });
   }

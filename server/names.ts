@@ -128,10 +128,17 @@ export function refusal(name: string): string | null {
  */
 export function cleanSegment(raw: string): string {
   let s = raw.replace(ILLEGAL_ALL, " ").replace(/\s+/g, " ").trim();
-  s = s.replace(/^\.+/, "").replace(/[. ]+$/, "").trim();
+  s = s
+    .replace(/^\.+/, "")
+    .replace(/[. ]+$/, "")
+    .trim();
   if (s.length > SEGMENT_MAX) s = s.slice(0, SEGMENT_MAX).replace(/[. ]+$/, "");
   if (DEVICE.test(s)) s += "_";
-  if (ignored(s)) s = s.replace(/\.assets$/i, " assets").replace(/\.sync-conflict-/gi, " sync-conflict-").replace(/\.icloud$/i, " icloud");
+  if (ignored(s))
+    s = s
+      .replace(/\.assets$/i, " assets")
+      .replace(/\.sync-conflict-/gi, " sync-conflict-")
+      .replace(/\.icloud$/i, " icloud");
   return s === "node_modules" ? "node modules" : s;
 }
 
@@ -142,7 +149,9 @@ const KIND_SUFFIX = /\.board\.md$|\.note\.md$|\.quiz\.md$|\.table\.md$|\.md$/i;
  * empty segments dropped — so `a//b` and `a/b` are one name. `fallback` when nothing is left.
  */
 export function nameFrom(raw: unknown, fallback = "Untitled"): string {
-  const text = String(raw ?? "").replace(/\\/g, "/").replace(KIND_SUFFIX, "");
+  const text = String(raw ?? "")
+    .replace(/\\/g, "/")
+    .replace(KIND_SUFFIX, "");
   const segs = text.split("/").map(cleanSegment).filter(Boolean);
   return segs.length ? segs.join("/") : fallback;
 }
@@ -167,11 +176,16 @@ export const folderOf = (name: string): string => (name.includes("/") ? name.sli
  * `null` when it has none this vault could list.
  */
 export function fileNameFrom(raw: unknown, types: ReadonlySet<string> = DEFAULT_SET): string | null {
-  const text = String(raw ?? "").replace(/\\/g, "/").trim();
+  const text = String(raw ?? "")
+    .replace(/\\/g, "/")
+    .trim();
   const leaf = text.slice(text.lastIndexOf("/") + 1);
   const dot = leaf.lastIndexOf(".");
   if (dot <= 0 && !(dot === 0 && leaf.length > 1)) return null;
-  const ext = leaf.slice(dot + 1).trim().toLowerCase();
+  const ext = leaf
+    .slice(dot + 1)
+    .trim()
+    .toLowerCase();
   if (!/^[a-z0-9]{1,12}$/.test(ext) || ext === "md" || ext === "assets" || !types.has(ext)) return null;
   const folder = text.slice(0, text.lastIndexOf("/") + 1);
   const stem = cleanSegment(leaf.slice(0, dot)) || "file";
@@ -194,7 +208,10 @@ export function fileTarget(name: string, to: string, types: ReadonlySet<string> 
  * refusal: a hidden folder, or a document's legacy picture folder, is not a folder a person may make.
  */
 export function folderFrom(raw: unknown): string | null {
-  const asked = String(raw ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
+  const asked = String(raw ?? "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter(Boolean);
   if (asked.some((p) => p.startsWith(".") || /\.assets$/i.test(p) || p === "node_modules")) return null;
   return asked.map(cleanSegment).filter(Boolean).join("/");
 }

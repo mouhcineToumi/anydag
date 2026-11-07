@@ -95,7 +95,9 @@ export async function until<T>(fn: () => T | Promise<T>, ms = 5000, what = "cond
 }
 
 /** A subscription that remembers what it heard. */
-export async function listen(vault: Vault): Promise<{ events: Change[]; stop: () => void; docs: (name: string) => Extract<Change, { type: "doc" }>[] }> {
+export async function listen(
+  vault: Vault,
+): Promise<{ events: Change[]; stop: () => void; docs: (name: string) => Extract<Change, { type: "doc" }>[] }> {
   const events: Change[] = [];
   const stop = await vault.subscribe((c) => events.push(c));
   return {

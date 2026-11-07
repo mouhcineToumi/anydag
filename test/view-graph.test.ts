@@ -28,7 +28,10 @@ function resolve(from: string, spec: string): string | null {
 
 /** Every static, value-carrying import or re-export in a file: module paths, and bare packages. */
 function staticImports(file: string): string[] {
-  const text = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const text = fs
+    .readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
   const out: string[] = [];
   const re = /^\s*(import|export)\s+(type\s+)?([^'";]*?)\s*from\s*["']([^"']+)["']|^\s*import\s+["']([^"']+)["']/gm;
   for (const m of text.matchAll(re)) {

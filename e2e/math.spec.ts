@@ -89,7 +89,9 @@ const drawn = (page: Page) =>
     pending: document.querySelectorAll('[data-dag-math="pending"]').length,
   }));
 
-test("a note drawn read-only has every equation drawn when it is ready, and a price is a price", { tag: "@smoke" }, async ({ page }) => {
+test("a note drawn read-only has every equation drawn when it is ready, and a price is a price", { tag: "@smoke" }, async ({
+  page,
+}) => {
   await ready(page, `/?note=${note}&view=1`);
   expect(await drawn(page)).toEqual({ tex: ["W_Q", "Q = X W_Q", "\\frac{a}{b}"], pending: 0 });
   /* `$$` mid-line is display, centred on a line of its own, inside the paragraph it was written in. */
@@ -158,7 +160,8 @@ test("a board's text card is ready only once its equations are drawn", async ({ 
   /* An export carries KaTeX's faces, and a fraction's bar — a bottom border and nothing else, which
      the `border` shorthand reads as nothing. */
   const svg = await page.evaluate(
-    () => new Promise<string>((reply) => document.dispatchEvent(new CustomEvent("dag:export", { detail: { kind: "svg", reply } }))),
+    () =>
+      new Promise<string>((reply) => document.dispatchEvent(new CustomEvent("dag:export", { detail: { kind: "svg", reply } }))),
   );
   expect(svg).toContain("font-family:'KaTeX_Main'");
   expect(svg).toMatch(/class="frac-line" style="[^"]*border-bottom:[^"]*solid/);

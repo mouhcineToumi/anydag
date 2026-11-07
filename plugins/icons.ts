@@ -62,9 +62,7 @@ export interface IconVocabulary {
 /* The whole set, once, at plugin load — one pass over ~4,500 names, so a request is a filter and
    never a rebuild. Sorted because truncation and `?q=` are only readable when the order is stable
    whatever the generated file did. */
-const VOCABULARY: ServedIcon[] = [...ICON_NAMES]
-  .sort()
-  .map((name) => ({ name, mode: modeOf(name) }));
+const VOCABULARY: ServedIcon[] = [...ICON_NAMES].sort().map((name) => ({ name, mode: modeOf(name) }));
 
 /** The cap on an unfiltered answer: enough to see the shape of the vocabulary, small enough to read. */
 export const ICON_LIMIT = 500;
