@@ -71,12 +71,17 @@ function ignored(rel: string): boolean {
   return /^\..+\.\d+\.tmp$/.test(path.posix.basename(rel));
 }
 
-function relOf(r: Recording, p: unknown): string | null {
-  if (typeof p !== "string") return null;
-  const rel = path.relative(r.root, path.resolve(p));
+/** `abs` relative to the vault, with `/` — or null for the root itself, anything outside it, or a path `ignored`. */
+function vaultRel(root: string, abs: string): string | null {
+  const rel = path.relative(root, abs);
   if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return null;
   const posix = rel.split(path.sep).join("/");
   return ignored(posix) ? null : posix;
+}
+
+function relOf(r: Recording, p: unknown): string | null {
+  if (typeof p !== "string") return null;
+  return vaultRel(r.root, path.resolve(p));
 }
 
 function sizeOf(abs: string, st: fs.Stats): number {
@@ -232,16 +237,151 @@ function close(r: Recording): Op | null {
 
 /* -- undo ------------------------------------------------------------------------------------ */
 
+const BEFORE = new Set(["absent", "file", "dir", "moved", "big"]);
+
+/** Whether `x` has an op's shape, as a turn or an undo file read back from a vault must. Its paths are `undo`'s to check. */
+export function isOp(x: unknown): x is Op {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  if (typeof o.what !== "string" || typeof o.vault !== "string" || typeof o.undoable !== "boolean" || !Array.isArray(o.images)) return false;
+  return o.images.every((i: unknown) => {
+    if (!i || typeof i !== "object") return false;
+    const { rel, before, after } = i as Record<string, unknown>;
+    return typeof rel === "string" && typeof after === "string" && !!before && typeof before === "object" && BEFORE.has((before as { t?: unknown }).t as string);
+  });
+}
+
 export interface Undone {
   /** The ops the undo itself made — reversed by a redo. */
   ops: Op[];
-  /** What was left alone, and why: a path changed since, a vault not open, an op too large. */
-  conflicts: { what: string; vault: string; paths: string[]; why: "changed" | "closed" | "big" }[];
+  /** What was left alone, and why. */
+  conflicts: Conflict[];
 }
 
-function restore(root: string, img: Image): void {
-  const abs = path.join(root, img.rel);
+/** An op left alone: a path changed since, a vault not open, an op too large, or one undo may not touch. */
+export interface Conflict {
+  what: string;
+  vault: string;
+  paths: string[];
+  why: "changed" | "closed" | "big" | "refused";
+}
+
+/*
+ * An op is read back from the vault (`<vault>/.anydag/chats/`), and anybody who can write the vault — a
+ * synced device, a shared or downloaded folder — can write one. So nothing in it is trusted: every path
+ * an undo uses is confined again here, by the rule `relOf` records with, and an op holding one path
+ * that fails is left alone whole.
+ */
+
+/** `rel` joined onto `base`, if it stays strictly inside it and inside the vault by `vaultRel`'s rule. */
+function confined(root: string, base: string, rel: unknown): string | null {
+  if (typeof rel !== "string" || !rel || rel.includes("\0") || path.isAbsolute(rel) || path.win32.isAbsolute(rel)) return null;
+  const abs = path.resolve(base, rel);
+  const inBase = path.relative(base, abs);
+  if (!inBase || inBase.startsWith("..") || path.isAbsolute(inBase)) return null;
+  return vaultRel(root, abs) === null ? null : abs;
+}
+
+/**
+ * Whether the folder `abs` would be written in is really in the vault: the nearest one that exists,
+ * with its links resolved. A link inside the vault to a folder outside it is lexically inside.
+ */
+function reallyIn(realRoot: string, abs: string): boolean {
+  let dir = path.dirname(abs);
+  while (!fs.existsSync(dir)) {
+    const up = path.dirname(dir);
+    if (up === dir) return false;
+    dir = up;
+  }
+  let real: string;
+  try {
+    real = fs.realpathSync(dir);
+  } catch {
+    return false;
+  }
+  const rel = path.relative(realRoot, real);
+  return !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+/** An image as undo will use it: every path it touches, already confined. */
+interface Plan {
+  img: Image;
+  /** The vault's folder with its links resolved, to check again as each path is written. */
+  realRoot: string;
+  abs: string;
+  /** A folder's entries, joined onto `abs`. */
+  dirs?: string[];
+  files?: [string, Buffer][];
+  /** Where a `moved` image is now. */
+  from?: string;
+}
+
+const isStr = (v: unknown): v is string => typeof v === "string";
+
+/** Plan every image of `op`, or null if any one path in it is not one undo may touch. */
+function planOf(root: string, op: Op): Plan[] | null {
+  if (!Array.isArray(op.images)) return null;
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch {
+    return null;
+  }
+  const plans: Plan[] = [];
+  const real = (abs: string) => reallyIn(realRoot, abs);
+  for (const img of op.images as unknown[]) {
+    if (!img || typeof img !== "object") return null;
+    const { rel, before: b, after } = img as Image;
+    if (!isStr(after) || !b || typeof b !== "object") return null;
+    const abs = confined(root, root, rel);
+    if (!abs || !real(abs)) return null;
+    const plan: Plan = { img: img as Image, realRoot, abs };
+    switch (b.t) {
+      case "absent":
+      case "big":
+        break;
+      case "file":
+        if (!isStr(b.b64)) return null;
+        break;
+      case "dir": {
+        if (!Array.isArray(b.dirs) || !b.files || typeof b.files !== "object" || Array.isArray(b.files)) return null;
+        plan.dirs = [];
+        for (const d of b.dirs as unknown[]) {
+          const at = confined(root, abs, d);
+          if (!at) return null;
+          plan.dirs.push(at);
+        }
+        plan.files = [];
+        for (const [k, b64] of Object.entries(b.files as Record<string, unknown>)) {
+          const at = confined(root, abs, k);
+          if (!at || !isStr(b64)) return null;
+          plan.files.push([at, Buffer.from(b64, "base64")]);
+        }
+        break;
+      }
+      case "moved": {
+        const from = confined(root, root, b.to);
+        // The recorder follows only a folder or a large file it saw renamed, never a link.
+        if (!from || !real(from) || fs.lstatSync(from, { throwIfNoEntry: false })?.isSymbolicLink()) return null;
+        plan.from = from;
+        break;
+      }
+      default:
+        return null;
+    }
+    plans.push(plan);
+  }
+  return plans;
+}
+
+function restore(plan: Plan): void {
+  const { img, abs } = plan;
   const b = img.before;
+  // Checked again as it is written: an image restored before this one may have put a folder where it was not.
+  const check = (at: string) => {
+    if (!reallyIn(plan.realRoot, at)) throw new Error(`\`${img.rel}\` is not in the vault`);
+  };
+  check(abs);
   switch (b.t) {
     case "absent":
       fs.rmSync(abs, { recursive: true, force: true });
@@ -257,14 +397,19 @@ function restore(root: string, img: Image): void {
     case "dir":
       fs.rmSync(abs, { recursive: true, force: true });
       fs.mkdirSync(abs, { recursive: true });
-      for (const d of b.dirs) fs.mkdirSync(path.join(abs, d), { recursive: true });
-      for (const [rel, b64] of Object.entries(b.files)) {
-        fs.mkdirSync(path.dirname(path.join(abs, rel)), { recursive: true });
-        fs.writeFileSync(path.join(abs, rel), Buffer.from(b64, "base64"));
+      for (const d of plan.dirs!) {
+        check(d);
+        fs.mkdirSync(d, { recursive: true });
+      }
+      for (const [at, bytes] of plan.files!) {
+        check(at);
+        fs.mkdirSync(path.dirname(at), { recursive: true });
+        fs.writeFileSync(at, bytes);
       }
       return;
     case "moved": {
-      const from = path.join(root, b.to);
+      const from = plan.from!;
+      check(from);
       if (!fs.existsSync(from)) return;
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.renameSync(from, abs);
@@ -277,27 +422,45 @@ function restore(root: string, img: Image): void {
 
 /**
  * Put back what `ops` replaced, newest op first, each only if every path it touched still holds what
- * it left. `roots` finds a vault's folder by id; a vault that is not open is a conflict.
+ * it left. `roots` finds a vault's folder by id; a vault that is not open is a conflict, and so is
+ * one `reaches` says the ops' owner may not touch.
  */
-export async function undo(ops: readonly Op[], roots: (vault: string) => string | null): Promise<Undone> {
+export async function undo(ops: readonly Op[], roots: (vault: string) => string | null, reaches: (vault: string) => boolean = () => true): Promise<Undone> {
   const out: Undone = { ops: [], conflicts: [] };
+  const pathsOf = (op: Op): string[] => (Array.isArray(op.images) ? op.images.map((i) => String(i?.rel)) : []);
   for (const op of [...ops].reverse()) {
+    if (!op || typeof op !== "object") {
+      out.conflicts.push({ what: "", vault: "", paths: [], why: "refused" });
+      continue;
+    }
+    const what = String(op.what);
+    if (!isStr(op.vault) || !reaches(op.vault)) {
+      out.conflicts.push({ what, vault: String(op.vault), paths: pathsOf(op), why: "refused" });
+      continue;
+    }
     const root = roots(op.vault);
     if (!root) {
-      out.conflicts.push({ what: op.what, vault: op.vault, paths: op.images.map((i) => i.rel), why: "closed" });
+      out.conflicts.push({ what, vault: op.vault, paths: pathsOf(op), why: "closed" });
       continue;
     }
-    if (!op.undoable) {
-      out.conflicts.push({ what: op.what, vault: op.vault, paths: op.images.filter((i) => i.before.t === "big").map((i) => i.rel), why: "big" });
+    // Every path in the op is checked before any of it is restored: an op is put back whole or not at all.
+    const plans = planOf(root, op);
+    if (!plans) {
+      out.conflicts.push({ what, vault: op.vault, paths: pathsOf(op), why: "refused" });
       continue;
     }
-    const moved = op.images.filter((i) => hashOf(path.join(root, i.rel)) !== i.after).map((i) => i.rel);
+    // `undoable` is the file's word; a big image is never restored whatever it says.
+    if (op.undoable !== true || plans.some((p) => p.img.before.t === "big")) {
+      out.conflicts.push({ what, vault: op.vault, paths: op.images.filter((i) => i.before.t === "big").map((i) => i.rel), why: "big" });
+      continue;
+    }
+    const moved = plans.filter((p) => hashOf(p.abs) !== p.img.after).map((p) => p.img.rel);
     if (moved.length) {
-      out.conflicts.push({ what: op.what, vault: op.vault, paths: moved, why: "changed" });
+      out.conflicts.push({ what, vault: op.vault, paths: moved, why: "changed" });
       continue;
     }
-    const { op: made } = await record({ id: op.vault, root }, `undo ${op.what}`, async () => {
-      for (const img of [...op.images].reverse()) restore(root, img);
+    const { op: made } = await record({ id: op.vault, root }, `undo ${what}`, async () => {
+      for (const p of [...plans].reverse()) restore(p);
     });
     if (made) out.ops.push(made);
   }
