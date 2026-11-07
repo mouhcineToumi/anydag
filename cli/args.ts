@@ -137,13 +137,6 @@ export function num(p: Parsed, name: string): number | undefined {
   return n;
 }
 
-/** `x,y` — the one shape a point takes on this command line. */
-export function point(raw: string, what = "--at"): { x: number; y: number } {
-  const m = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(raw);
-  if (!m) throw new UsageError(`${what} wants \`x,y\` in board pixels, not \`${raw}\``);
-  return { x: Math.round(Number(m[1])), y: Math.round(Number(m[2])) };
-}
-
 /**
  * `key=value` pairs, the way a board file writes attributes.
  *

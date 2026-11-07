@@ -6,7 +6,6 @@ import { bundle, zipBundle } from "../../src/export/bundle";
 import { ApiError, type Api } from "../api";
 import { UsageError, bool, str } from "../args";
 import { emit, table, type Command, type Ctx } from "../context";
-import { kb } from "./assets";
 import type { Refs } from "./docs";
 
 /**
@@ -15,8 +14,8 @@ import type { Refs } from "./docs";
  *
  * `upload` sends the bytes as the request body, the one route in the API that takes something other
  * than JSON, because a PDF of twenty megabytes is twenty-seven as base64. The rest are the operations
- * every document has — list, get, move, copy, title, delete — through the routes the sidebar calls,
- * with `kind=file`; `rm` says what uses a file before it asks, as the sidebar's modal does.
+ * every document has — list, get, move, delete — through the routes the sidebar calls, with
+ * `kind=file`; `rm` says what uses a file, as the sidebar used to ask.
  */
 
 interface FileRow {
@@ -59,6 +58,9 @@ function deliver(ctx: Ctx, bytes: Uint8Array, out: string | undefined): void {
     ctx.io.err(`wrote ${out} (${kb(bytes.length)})`);
   } else ctx.io.write(bytes);
 }
+
+/** A size a person reads. */
+export const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
 const fileStem = (s: string) => s.replace(/[^\w.-]+/g, "-");
 
@@ -184,53 +186,6 @@ export const FILES: Command[] = [
     async run(ctx, p) {
       const done = await ctx.api.post<{ name: string; id: string }>("/__board/rename", { name: p.pos[0], to: p.pos[1], kind: "file" });
       emit(ctx, done, () => ctx.io.out(done.name));
-    },
-  },
-  {
-    name: ["file", "cp"],
-    args: "<name> [<to>]",
-    min: 1,
-    summary: "copy an attachment; the copy is a new file with an id of its own",
-    routes: ["POST /__board/duplicate"],
-    async run(ctx, p) {
-      const done = await ctx.api.post<{ name: string; id: string }>("/__board/duplicate", { name: p.pos[0], to: p.pos[1] ?? p.pos[0], kind: "file" });
-      emit(ctx, done, () => ctx.io.out(done.name));
-    },
-  },
-  {
-    name: ["file", "title"],
-    args: "<name> <title>",
-    min: 2,
-    summary: "call an attachment something — what the sidebar, its page and every card show",
-    help: "With --follow its name follows the title, keeping its extension; prints the name it has afterwards.",
-    flags: [{ name: "follow", type: "boolean", help: "rename the file to match the title" }],
-    routes: ["POST /__board/retitle"],
-    async run(ctx, p) {
-      const done = await ctx.api.post<{ name: string; id: string; title: string }>("/__board/retitle", {
-        name: p.pos[0],
-        title: p.pos.slice(1).join(" "),
-        kind: "file",
-        follow: bool(p, "follow"),
-      });
-      emit(ctx, done, () => {
-        ctx.io.out(done.name);
-        ctx.io.err(`file ${done.name} is called “${done.title}”`);
-      });
-    },
-  },
-  {
-    name: ["file", "refs"],
-    args: "<name>",
-    min: 1,
-    summary: "every board and note that uses an attachment",
-    routes: ["GET /__board/refs"],
-    async run(ctx, p) {
-      const got = await usesOf(ctx, p.pos[0]!);
-      if (!got.id) throw new UsageError(`no file \`${p.pos[0]}\``);
-      emit(ctx, { name: p.pos[0], ...got }, () => {
-        if (!got.used.length) ctx.io.err(`nothing uses ${p.pos[0]}`);
-        for (const line of table(got.used.map((u) => [u.name, u.kind, u.title ?? ""]))) ctx.io.out(line);
-      });
     },
   },
   {

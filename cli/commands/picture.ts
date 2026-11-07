@@ -2,19 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { importKind, openId, sealId } from "../../src/board/envelope";
+import { sealId } from "../../src/board/envelope";
 
 import { ApiError, EXIT } from "../api";
 import { UsageError, bool, list, num, str } from "../args";
 import { diagnosticLines, type Diagnosed } from "../board";
-import { emit, readText, type Command, type Ctx } from "../context";
-import { ITEMS } from "./items";
-import { ASSETS } from "./assets";
+import { emit, type Command, type Ctx } from "../context";
 import { exportZip } from "./files";
 
 /**
  * The three things only a laid-out page can answer — what a board looks like, whether it is tidy,
- * and what its export is — and the two ways a file comes in.
+ * and what its export is.
  *
  * The first three open the page in Playwright against the server this command reaches (the
  * running app's, or one this process listens with), carrying its token — which is what closes the
@@ -56,7 +54,7 @@ async function launch(ctx: Ctx): Promise<Browser> {
     chromium = mod.chromium ?? mod.default!.chromium;
   } catch {
     throw new ApiError(
-      "this needs Playwright and a browser, which an AnyDag checkout has after `npm install` — everything else works without it; `anydag open` shows the board in yours",
+      "this needs Playwright and a browser, which an AnyDag checkout has after `npm install` — everything else works without it; open it in the app to see it",
       EXIT.failed,
     );
   }
@@ -397,53 +395,4 @@ export const PICTURE: Command[] = [
       }
     },
   },
-  {
-    name: ["board", "import"],
-    args: "<file>",
-    min: 1,
-    summary: "bring a file in: a .board.md becomes a board, an image or text lands on --into",
-    help:
-      "A .board.md becomes a new board, keeping the permanent id its export carried when that id is free — so the " +
-      "references to it keep working — and named after the file unless --name says otherwise. An image or a text " +
-      "file needs a board to land on: --into, with --at for where.",
-    flags: [
-      { name: "name", type: "string", value: "<name>", help: "the new board's name" },
-      { name: "into", type: "string", value: "<board>", help: "the board an image or text lands on" },
-      { name: "at", type: "string", value: "<x,y>", help: "where it lands" },
-    ],
-    routes: ["POST /__board/create", "POST /__board/asset", "POST /__board/patch"],
-    async run(ctx, p) {
-      const file = p.pos[0]!;
-      const ext = path.extname(file).toLowerCase();
-      const into = str(p, "into");
-      if (/\.(png|jpe?g|gif|webp|svg)$/.test(ext)) {
-        if (!into) throw new UsageError("an image lands on a board: --into <board>");
-        const add = ASSETS.find((c) => c.name.join(" ") === "image add")!;
-        return add.run(ctx, { pos: [into, file], flags: { ...p.flags } });
-      }
-      const text = await readText(ctx, file);
-      /* The kind its name says, the canvas's own rule (`importKind`): a `.note.md` is a note and a
-         `.quiz.md` a quiz and a `.table.md` a table, where this used to take any frontmatter for a board. */
-      const kind = importKind(file, text);
-      if (kind && !into) {
-        const opened = openId(text);
-        const name = str(p, "name") ?? path.basename(file).replace(/\.(?:board|note|quiz|table)\.md$|\.md$/i, "");
-        const made = await ctx.api.post<{ name: string; id: string }>("/__board/create", {
-          name,
-          text: opened.text,
-          id: opened.id,
-          ...(kind === "board" ? {} : { kind }),
-        });
-        emit(ctx, made, () => {
-          ctx.io.out(made.name);
-          ctx.io.err(`imported ${file} as ${kind} ${made.name}${opened.id && made.id === opened.id ? `, keeping its id ${made.id}` : ""}`);
-        });
-        return;
-      }
-      if (!into) throw new UsageError("text lands on a board as notes: --into <board>");
-      const add = ITEMS.find((c) => c.name.join(" ") === "item add")!;
-      return add.run(ctx, { pos: [into], flags: { file, ...(str(p, "at") ? { at: str(p, "at") } : {}) } });
-    },
-  },
 ];
-

@@ -81,7 +81,7 @@ Write your best guess, then let the page settle it rather than guessing twice:
 
 ```bash
 anydag tidy <board>        # stacks, rows and grids one gap apart, measured in the real fonts
-anydag item ls <board>     # where every item now is
+anydag board cat <board>   # the file again, to read where every item now is
 ```
 
 `tidy` reads the arrangement you meant off the rough positions and writes exact ones, so a column
