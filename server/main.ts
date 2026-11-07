@@ -28,8 +28,13 @@ function arg(name: string): string | undefined {
   return at >= 0 ? process.argv[at + 1] : undefined;
 }
 
-// One request that went wrong must not take every open vault with it: said, and survived.
-process.on("unhandledRejection", (e) => console.error("anydag: unhandled", e));
+// One request that went wrong must not take every open vault with it: said, and survived — and
+// logged, once somebody said yes (`server/telemetry.ts`).
+let logged: ((e: unknown) => void) | null = null;
+process.on("unhandledRejection", (e) => {
+  console.error("anydag: unhandled", e);
+  logged?.(e);
+});
 
 async function main(): Promise<void> {
   const takes = new Set(["--port", "--page", "--token"]);
@@ -58,6 +63,9 @@ async function main(): Promise<void> {
   }
   const assistant = new Assistant({ session, token, harnesses: defaultHarnesses(process.env) });
   const app = createApp({ session, token, page, assistant });
+  // A server that stays up sends its logs; the CLI's in-process one never starts this.
+  session.telemetry.start();
+  logged = (e) => session.telemetry.fail(e);
   const runtime = path.join(home.dir, "server.json");
   const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: Number(arg("port") ?? 0) }, (info) => {
     assistant.listening(info.port);
@@ -75,6 +83,7 @@ async function main(): Promise<void> {
       /* already gone */
     }
     void assistant.close();
+    void session.telemetry.stop();
     void session.closeAll();
     server.close();
     process.exit(0);

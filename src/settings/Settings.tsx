@@ -7,6 +7,7 @@ import {
   Info,
   PackageOpen,
   RefreshCw,
+  ShieldCheck,
   SlidersHorizontal,
   X,
   type LucideIcon,
@@ -25,6 +26,7 @@ import { CalendarPane } from "./panes/Calendar";
 import { ICON } from "./panes/common";
 import { ExportPane } from "./panes/Export";
 import { PreferencesPane } from "./panes/Preferences";
+import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
 import { VaultPane } from "./panes/Vault";
 import { GROUPS, TAB_LABEL, lastTab, rememberTab, stepTab, type SettingsTab } from "./tabs";
@@ -32,6 +34,7 @@ import { GROUPS, TAB_LABEL, lastTab, rememberTab, stepTab, type SettingsTab } fr
 const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   calendar: CalendarDays,
   shortcuts: Keyboard,
+  privacy: ShieldCheck,
   about: Info,
   preferences: SlidersHorizontal,
   vault: Briefcase,
@@ -280,6 +283,8 @@ export function Settings({
               <CalendarPane />
             ) : tab === "shortcuts" ? (
               <ShortcutList />
+            ) : tab === "privacy" ? (
+              <PrivacyPane />
             ) : tab === "about" ? (
               <AboutPane
                 onShortcuts={() => {

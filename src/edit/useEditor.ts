@@ -92,6 +92,7 @@ import { lost } from "@/board/survive";
 import { refuseLocked } from "@/settings/lock";
 import { INSPECTOR_MODE, readPref, writePref } from "@/settings/prefs";
 import { readSettings } from "@/settings/store";
+import { track } from "@/telemetry/client";
 
 /**
  * Everything a person can do to the items on a board, in one place.
@@ -1160,6 +1161,7 @@ export function useEditor({
       }
       const done = moves.size > 0 && !dry ? await move(moves, "tidy") : true;
       const moved = done ? moves.size : 0;
+      if (!dry) track("feature.use", { what: "tidy" });
       document.documentElement.dataset.dagTidy = JSON.stringify({ moved, of: boxes.length, ids: [...moves.keys()], dry });
       return moved;
     },
@@ -1862,6 +1864,7 @@ export function useEditor({
     /* The text comes from the card rather than the board: what a person just typed may be a quarter
        of a second ahead of the file, and ctrl+Enter is pressed the moment they stop. */
     async (id, req, signal) => {
+      track("feature.use", { what: "generate" });
       const { llm } = readSettings();
       const result = await requestDiagram(
         { prompt: req.prompt, as: req.as, provider: llm.provider, model: llm.model, reasoning: llm.reasoning },
@@ -3411,8 +3414,9 @@ export function useEditor({
       /* The Settings modal owns every key aimed at it. This handler runs first, in the
          capture phase, and a click on a blank part of the modal leaves the focus on the modal
          itself rather than on a control — so without this an arrow or a Delete pressed there moved
-         or deleted what is selected on the board behind it. Its Escape and `ctrl+,` are its own. */
-      if (e.target instanceof Element && e.target.closest("[data-dag-settings]")) return;
+         or deleted what is selected on the board behind it. Its Escape and `ctrl+,` are its own.
+         The logs question (`telemetry/Prompt.tsx`) is the same kind of card, and the same rule. */
+      if (e.target instanceof Element && e.target.closest("[data-dag-settings],[data-dag-telemetry-ask]")) return;
       if (typing(e.target)) {
         /* Focus reached a control while a chord was open. The chord was never meant for it, and
            leaving it open would make the next letter typed in there mean two things at once —

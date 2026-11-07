@@ -4,7 +4,7 @@
  * stored value falls back to are unit tests rather than a browser.
  *
  * **Two groups, Notion's**, and the line between them is where a thing is kept. What belongs to the
- * person — their calendar, the keys, what this is — is under *App* and is the
+ * person — their calendar, the keys, whether logs are sent, what this is — is under *App* and is the
  * same in every vault. What belongs to the vault this tab is in — the look, its files, which model draws its prompt cards, how it exports — is under the vault's own name, and
  * switches when the vault does. The one setting that crosses the line (a quiz threshold, kept
  * with the practice records in the app's home) says so where it is drawn.
@@ -15,13 +15,13 @@
 
 import { SETTINGS_TAB, readPref, writeLocal } from "./prefs";
 
-export type SettingsTab = "calendar" | "shortcuts" | "about" | "preferences" | "vault" | "agents" | "export" | "sync";
+export type SettingsTab = "calendar" | "shortcuts" | "privacy" | "about" | "preferences" | "vault" | "agents" | "export" | "sync";
 
 export type SettingsGroup = "account" | "vault";
 
 /** The tabs in the order they are drawn, which is also the order the arrow keys walk. */
 export const GROUPS: readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[] = [
-  { group: "account", tabs: ["calendar", "shortcuts", "about"] },
+  { group: "account", tabs: ["calendar", "shortcuts", "privacy", "about"] },
   { group: "vault", tabs: ["preferences", "vault", "sync", "agents", "export"] },
 ];
 
@@ -30,6 +30,7 @@ export const TABS: readonly SettingsTab[] = GROUPS.flatMap((g) => g.tabs);
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   calendar: "Calendar",
   shortcuts: "Shortcuts",
+  privacy: "Privacy",
   about: "About",
   preferences: "Preferences",
   vault: "Vault",

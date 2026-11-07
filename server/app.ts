@@ -12,6 +12,7 @@ import path from "node:path";
 
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
+import { routePath } from "hono/route";
 
 import { Assistant } from "./chat/live";
 import { defaultHarnesses } from "./chat/harnesses";
@@ -24,6 +25,7 @@ import { fileRoutes } from "./routes/files";
 import { folderRoutes } from "./routes/folders";
 import { metaRoutes } from "./routes/meta";
 import { syncRoutes } from "./routes/sync";
+import { telemetryRoutes } from "./routes/telemetry";
 import { vaultRoutes } from "./routes/vaults";
 import { trashRoutes } from "./routes/trash";
 
@@ -41,7 +43,7 @@ export interface ServerOptions {
 const COOKIE = "anydag_token";
 
 /** The routes about the app rather than one vault: they answer with no vault open. */
-const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me"];
+const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me", "/api/telemetry"];
 
 export function createApp(opts: ServerOptions): Hono {
   const s = opts.session;
@@ -68,6 +70,18 @@ export function createApp(opts: ServerOptions): Hono {
     await next();
   });
 
+  /* -- logs: how each route answered, by its template, and only once somebody said yes ---------- */
+
+  const logs = s.telemetry;
+  app.use("*", async (c, next) => {
+    if (logs.consent() !== true) return next();
+    const start = performance.now();
+    await next();
+    const template = routePath(c, -1);
+    if (!template || template === "*" || template.endsWith("/*") || !(template.startsWith("/__board") || template.startsWith("/api"))) return;
+    logs.routeDone(`${c.req.method} ${template}`, c.res.status, performance.now() - start);
+  });
+
   /* -- a chat's own requests: its vault, its mode, its approvals, the recorder (`chat/live.ts`) -- */
 
   const assistant = opts.assistant ?? new Assistant({ session: s, token: opts.token, harnesses: defaultHarnesses(s.env) });
@@ -90,6 +104,7 @@ export function createApp(opts: ServerOptions): Hono {
   vaultRoutes(app, s);
   trashRoutes(app, s);
   syncRoutes(app, s);
+  telemetryRoutes(app, s);
   chatRoutes(app, assistant);
 
   /* -- the page ---------------------------------------------------------------------------- */
@@ -122,7 +137,16 @@ export function createApp(opts: ServerOptions): Hono {
     });
   }
 
-  app.onError((e, c) => failure(c, e));
+  app.onError((e, c) => {
+    try {
+      return failure(c, e);
+    } catch (unknown) {
+      /* Not a refusal any route meant: a defect, and the one kind of error worth a log. */
+      const template = routePath(c, -1);
+      logs.fail(unknown, template && template !== "*" ? `${c.req.method} ${template}` : undefined);
+      throw unknown;
+    }
+  });
   app.notFound((c) => c.json({ error: `no route ${c.req.method} ${c.req.path}` }, 404));
 
   return app;
