@@ -44,7 +44,7 @@ export async function drawn(el: HTMLElement, { index = true }: { index?: boolean
   await Promise.all(
     Array.from(el.querySelectorAll("img")).map((img) =>
       img.complete
-        ? undefined
+        ? Promise.resolve()
         : new Promise<void>((r) => {
             img.addEventListener("load", () => r(), { once: true });
             img.addEventListener("error", () => r(), { once: true });

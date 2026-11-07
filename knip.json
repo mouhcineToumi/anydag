@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "server/main.ts",
+    "server/grammar-worker.ts",
+    "cli/main.ts",
+    "desktop/main.ts",
+    "desktop/preload.ts",
+    "desktop/*.mjs",
+    "sync/server/main.ts",
+    "sync/server/cli.ts",
+    "sync/*.mjs",
+    "scripts/**/*.mjs",
+    "e2e/**/*.ts",
+    "test/**/*.ts",
+    "sync/test/**/*.ts",
+    "plugins/**/*.ts"
+  ],
+  "project": ["**/*.{ts,tsx,mjs}", "!icons/data/**", "!boards/**", "!**/dist/**"],
+  "ignoreDependencies": [
+    "@biomejs/biome",
+    "electron-builder",
+    "@iconify-json/fluent-emoji-flat",
+    "@iconify-json/fluent-emoji-high-contrast",
+    "@iconify-json/logos",
+    "@iconify-json/simple-icons"
+  ],
+  "ignoreUnresolved": ["/src/export/svg.ts"]
+}

@@ -265,6 +265,14 @@ export function CalendarView({
       settle(got ? { task: got } : null);
     }
   }, []);
+  /* The page hands the grid a handler that returns nothing: what a drop writes is the page's to
+     settle, and a refused one is already told through `pending`. */
+  const onWrite = useCallback(
+    (item: CalItem, next: Write) => {
+      void write(item, next);
+    },
+    [write],
+  );
 
   /* A new event is made in the folder of the project the page is showing, as a task typed into the
      Tasks page is. */
@@ -337,9 +345,9 @@ export function CalendarView({
       {view === "month" && phone ? (
         <DotMonth first={first} last={last} month={day.slice(0, 7)} around={day} today={today} items={items} onOpen={open} />
       ) : view === "month" ? (
-        <Month first={first} last={last} month={day.slice(0, 7)} today={today} items={items} onOpen={open} onAsk={locked ? undefined : ask} onWrite={locked ? undefined : write} onDay={(d) => onGo({ view: "days", day: d, count: 1 })} />
+        <Month first={first} last={last} month={day.slice(0, 7)} today={today} items={items} onOpen={open} onAsk={locked ? undefined : ask} onWrite={locked ? undefined : onWrite} onDay={(d) => onGo({ view: "days", day: d, count: 1 })} />
       ) : (
-        <Columns days={daysFrom(first, last)} today={today} items={items} onOpen={open} onAsk={locked ? undefined : ask} onWrite={locked ? undefined : write} />
+        <Columns days={daysFrom(first, last)} today={today} items={items} onOpen={open} onAsk={locked ? undefined : ask} onWrite={locked ? undefined : onWrite} />
       )}
       {making ? <NewEvent making={making} onMake={make} onClose={() => setMaking(null)} /> : null}
     </main>

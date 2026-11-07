@@ -161,7 +161,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
           setText(e.target.value);
           pending.current = e.target.value;
           if (timer.current) clearTimeout(timer.current);
-          timer.current = setTimeout(flush, WRITE_AFTER_MS);
+          timer.current = setTimeout(() => void flush(), WRITE_AFTER_MS);
         }}
         onKeyDown={onKeyDown}
       />
@@ -173,7 +173,9 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
           disabled={running}
           title="Which kind of diagram, or let the model choose"
           aria-label="Diagram type"
-          onChange={(e) => (writing.current = ctl.write(item.id, { as: (e.target.value || null) as DiagramType | null }))}
+          onChange={(e) => {
+            writing.current = ctl.write(item.id, { as: (e.target.value || null) as DiagramType | null });
+          }}
         >
           <option value="">Any type</option>
           {DIAGRAM_TYPES.map((t) => (

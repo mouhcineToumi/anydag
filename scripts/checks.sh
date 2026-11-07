@@ -27,6 +27,12 @@ cd "$(dirname "$0")/.."
 # not cost that.
 step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 
+# Biome's linter: half a second over the whole tree, so it goes first. The type-aware promise checks
+# are `npm run lint:promises` (typescript-eslint, ~40 s) and run in CI as their own job; they are too
+# slow for a commit hook.
+step "lint"
+npx biome lint .
+
 step "typecheck"
 npx tsc --noEmit
 npx tsc --noEmit -p tsconfig.worker.json

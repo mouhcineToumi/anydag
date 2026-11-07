@@ -44,7 +44,7 @@ const ALL_DIRS = ["src"];
  */
 function strip(text, ext) {
   let out = text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-  if (ext !== ".css") out = out.replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + " ");
+  if (ext !== ".css") out = out.replace(/(^|[^:])\/\/[^\n]*/g, (_m, p) => p + " ");
   return out;
 }
 

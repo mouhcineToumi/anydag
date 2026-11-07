@@ -1,0 +1,11 @@
+# Commits `git blame` should look through: whole-repository mechanical changes that say nothing about
+# who wrote a line or why.
+#
+# GitHub reads this file by name. For a local checkout, once:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# The first entry will be the commit that applies the Biome formatter to the whole tree
+# (`npm run format`). It is made once, in a commit of its own, after the branches that touch source
+# have merged, and its full 40-character hash goes below on its own line with a comment saying what it
+# was. Nothing is listed yet.

@@ -267,7 +267,7 @@ describe("HttpSyncApi", () => {
     const seen: string[] = [];
     const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
       const u = String(url);
-      seen.push(`${init?.method} ${u.replace("https://s.example", "")} ${(init?.headers as Record<string, string>).authorization ?? ""}`);
+      seen.push(`${init?.method} ${u.replace("https://s.example", "")} ${(init?.headers as Record<string, string> | undefined)?.authorization ?? ""}`);
       if (u.endsWith("/commit")) return new Response(JSON.stringify({ code: "ES_STALE", message: "stale", conflicts: [] }), { status: 409 });
       if (init?.method === "HEAD") return new Response(null, { status: 404 });
       if (u.includes("/changes")) return new Response(JSON.stringify({ changes: [], next: 7, more: false, head: 7, horizon: 1 }));
