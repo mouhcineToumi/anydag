@@ -565,7 +565,7 @@ export class Assistant {
 
   /** Undo a block, or redo one that was undone. */
   async undo(chat: string, turnId: string, blockId: string, redo: boolean, vault?: string | null): Promise<UndoRecord> {
-    const { root } = this.locate(chat, vault);
+    const { root, meta } = this.locate(chat, vault);
     if (this.live.has(chat)) throw err(409, "the chat is answering; undo once it has finished", { code: "running" });
     const turn = this.store.turns(root, chat).find((t) => t.id === turnId);
     const block = turn?.blocks.find((b) => b.id === blockId);
@@ -578,7 +578,11 @@ export class Assistant {
       const last = undos.filter((u) => u.block === blockId).sort((a, b) => (a.id < b.id ? 1 : -1))[0];
       ops = last?.ops ?? [];
     }
-    const done = await undo(ops, (v) => this.rootOf(v));
+    // An op names its vault, and the turn file it came from is anybody's who can write this vault: an
+    // undo reaches only the chat's own vault and the ones it was granted — taken back since or not,
+    // since undoing what a grant once allowed is the person's act, not the agent's.
+    const reaches = (v: string) => v === meta.home || Object.prototype.hasOwnProperty.call(meta, `grant:${v}`);
+    const done = await undo(ops, (v) => this.rootOf(v), reaches);
     const rec: UndoRecord = {
       v: 1,
       id: newId("u", this.store.device),

@@ -3,9 +3,9 @@
  * the CLI, so it imports nothing.
  */
 
-import type { Op } from "./record";
+import type { Conflict, Op } from "./record";
 
-export type { Before, Image, Op } from "./record";
+export type { Before, Conflict, Image, Op } from "./record";
 
 export type Provider = "claude" | "opencode";
 export const PROVIDERS: readonly Provider[] = ["claude", "opencode"];
@@ -103,7 +103,7 @@ export interface UndoRecord {
   at: string;
   /** What this undo or redo itself wrote — what the next redo reverses. */
   ops: Op[];
-  conflicts: { what: string; vault: string; paths: string[]; why: "changed" | "closed" | "big" }[];
+  conflicts: Conflict[];
 }
 
 /** A chat read whole: what `GET /__board/chat` answers, and the page and the CLI hold. */
