@@ -13,7 +13,7 @@
 import type { Context, Hono } from "hono";
 
 import { HUE_ORDER } from "../../src/dsl/ir";
-import { hasOffset, isDay, eventOf, withEvent } from "../../src/note/event";
+import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
 import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
@@ -24,7 +24,7 @@ import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../
 import { OPS_SHAPE } from "../handle";
 import { grammar, type Parsed } from "../grammar";
 import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
-import { extOf, folderOf, leafOf, same, titleName, type Kind, type TextKind } from "../names";
+import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { mimeOf } from "../uploads";
 import { Conflict, NotFound, Refused, byKind, sha1, textKey, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
@@ -619,5 +619,3 @@ async function retitleFile(s: Session, name: string, title: string, follow: bool
   await s.vault.titleFile(settled, title);
   return { name: settled, id: await s.vault.peekId(settled, "file"), title };
 }
-
-export { sha1, same, hasOffset };

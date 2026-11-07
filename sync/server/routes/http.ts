@@ -52,8 +52,6 @@ export interface Vars {
   vault: VaultRow;
 }
 
-export type Ctx = Context<{ Variables: Vars }>;
-
 export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** The JSON body, or `ES_BAD_REQUEST` — never a 500 for a client that sent nonsense. */

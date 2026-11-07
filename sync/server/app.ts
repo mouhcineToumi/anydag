@@ -38,8 +38,6 @@ import { PokeHub, pokeRoutes } from "./routes/poke";
 import { vaultRoutes } from "./routes/vaults";
 import { Usage } from "./usage";
 
-export { HttpError } from "./routes/http";
-
 declare const __ANYDAG_SYNC_VERSION__: string;
 export const VERSION = typeof __ANYDAG_SYNC_VERSION__ === "string" ? __ANYDAG_SYNC_VERSION__ : "dev";
 

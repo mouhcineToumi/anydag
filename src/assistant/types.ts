@@ -4,7 +4,7 @@
  * them — from it rather than keeping a second copy that could drift from what `GET /__board/chat`
  * answers.
  */
-export { PROVIDERS, blockUndone, grantsOf } from "../../server/chat/types";
+export { blockUndone, grantsOf } from "../../server/chat/types";
 export type {
   Block,
   ChatEvent,

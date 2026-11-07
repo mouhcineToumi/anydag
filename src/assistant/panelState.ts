@@ -33,7 +33,6 @@ export const usePanel = (): State => useSyncExternalStore(subscribe, () => state
 
 /** `space A`, and the sparkle. */
 export const toggleAssistant = (): void => set({ ...state, open: !state.open });
-export const openAssistant = (chat?: string | null): void => set({ open: true, chat: chat === undefined ? state.chat : chat });
 export const closeAssistant = (): void => set({ ...state, open: false });
 /** The panel's chat, once it has made or chosen one — so the page it opens onto is the same chat. */
 export const showChat = (chat: string | null): void => set({ ...state, chat });

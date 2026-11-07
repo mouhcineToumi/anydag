@@ -270,13 +270,6 @@ function lineEnd(text: string, row: Row): string {
   return s.endsWith("\r\n") ? "\r\n" : s.endsWith("\n") ? "\n" : "";
 }
 
-/** Several cells of one row at once, by column id — what a paste, an agent's row and an import write. */
-export function setCells(text: string, tabId: string, rowId: string, values: Readonly<Record<string, string>>): string {
-  let out = text;
-  for (const [column, value] of Object.entries(values)) out = setCell(out, tabId, rowId, column, value);
-  return out;
-}
-
 // -- rows ---------------------------------------------------------------------------------------
 
 export interface AddedRow {

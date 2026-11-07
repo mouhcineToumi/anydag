@@ -21,7 +21,7 @@
 
 import { Hono } from "hono";
 
-import { BLOB_ID, KEY, MAX_CHANGES, MAX_PAGE, type CommitResponse } from "../../protocol/wire";
+import { BLOB_ID, MAX_CHANGES, MAX_PAGE, type CommitResponse } from "../../protocol/wire";
 import type { NewChange } from "../meta/types";
 import { body, HttpError, isObject, type Deps, type Vars } from "./http";
 
@@ -35,7 +35,7 @@ function parseChanges(raw: unknown): NewChange[] {
   return raw.map((ch, i): NewChange => {
     if (!isObject(ch)) throw new HttpError("ES_BAD_REQUEST", `change ${i} must be an object`);
     const { key, parent, blob, meta } = ch;
-    if (typeof key !== "string" || !KEY.test(key)) throw new HttpError("ES_BAD_REQUEST", `change ${i}: a key is 43 base64url characters`);
+    if (typeof key !== "string" || !BLOB_ID.test(key)) throw new HttpError("ES_BAD_REQUEST", `change ${i}: a key is 43 base64url characters`);
     if (seen.has(key)) throw new HttpError("ES_BAD_REQUEST", `change ${i}: key ${key} is changed twice in one commit`);
     seen.add(key);
     if (parent !== null && (typeof parent !== "number" || !Number.isSafeInteger(parent) || parent < 1)) throw new HttpError("ES_BAD_REQUEST", `change ${i}: parent must be a seq or null`);

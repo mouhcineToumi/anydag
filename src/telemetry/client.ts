@@ -64,11 +64,6 @@ function pageKind(): (typeof PAGES)[number] {
   return q.toString() === "" || q.has("vault") ? "home" : "other";
 }
 
-/** The answer as last heard, or `null` before the server has said. */
-export function telemetryStatus(): TelemetryStatus | null {
-  return status;
-}
-
 export function useTelemetry(): TelemetryStatus | null {
   return useSyncExternalStore(
     (on) => {

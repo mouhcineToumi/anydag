@@ -169,8 +169,6 @@ export interface PutVaultKey {
 
 /** A blob id: 43 base64url characters (an HMAC-SHA256). */
 export const BLOB_ID = /^[A-Za-z0-9_-]{43}$/;
-/** A key: the same shape. */
-export const KEY = BLOB_ID;
 
 // -- the log --------------------------------------------------------------------------------------
 
@@ -190,12 +188,7 @@ export interface Change {
   meta: string;
 }
 
-/** `POST /v1/vaults/{v}/commit`. */
-export interface CommitRequest {
-  changes: Change[];
-}
-
-/** The `seq` given to each change, in order. */
+/** The answer to `POST /v1/vaults/{v}/commit`, whose body is `{ changes: Change[] }`: the `seq` given to each change, in order. */
 export interface CommitResponse {
   seqs: number[];
 }
@@ -256,10 +249,7 @@ export interface HeadsResponse {
   seq: number;
 }
 
-/** `GET /v1/vaults/{v}/poke`: `text/event-stream`, `data: {"seq":N}` per commit, `: ping` every 20 s. */
-export interface Poke {
-  seq: number;
-}
+/* `GET /v1/vaults/{v}/poke` is `text/event-stream`: `data: {"seq":N}` per commit, `: ping` every 20 s. */
 
 /** `POST /v1/vaults/{v}/report` — counts a client saw, for the usage ledger only. */
 export interface Report {

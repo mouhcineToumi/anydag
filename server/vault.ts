@@ -1706,8 +1706,6 @@ export function writeAtomic(file: string, text: string | Uint8Array): void {
   }
 }
 
-export { KINDS };
-
 /** `${size}:${sha1}` of an attachment's bytes. */
 function digestOf(data: Uint8Array): string {
   return `${data.byteLength}:${sha1(data)}`;

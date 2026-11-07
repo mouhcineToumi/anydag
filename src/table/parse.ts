@@ -620,8 +620,3 @@ const trimBlank = (lines: string[]): string[] => {
   while (b > a && lines[b - 1]!.trim() === "") b--;
   return lines.slice(a, b);
 };
-
-/** A tab by its id. */
-export function findTab(table: Table, id: string): Tab | undefined {
-  return table.tabs.find((t) => t.id === id);
-}

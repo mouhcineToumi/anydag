@@ -106,8 +106,6 @@ export const openBlob = (kEnc: Uint8Array, id: string, sealed: Uint8Array): Uint
 
 /** A short text (a vault's name), bound to a label. */
 export const sealText = (kEnc: Uint8Array, label: string, text: string): string => b64(seal(kEnc, Buffer.from(text, "utf8"), `text:${label}`));
-export const openText = (kEnc: Uint8Array, label: string, sealed: string): string =>
-  Buffer.from(open(kEnc, unb64(sealed), `text:${label}`, label)).toString("utf8");
 
 // -- the vault key, wrapped -----------------------------------------------------------------------
 
