@@ -5,6 +5,7 @@
  * the real ones.
  */
 import "./sqlite-shim";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -17,7 +18,8 @@ import { createApp } from "../../server/app";
 import { fakeHarness } from "../../server/chat/fake";
 import type { Harness, RunOptions } from "../../server/chat/harness";
 import { Assistant } from "../../server/chat/live";
-import type { ChatEvent, ChatMeta, Step, Turn } from "../../server/chat/types";
+import { newId } from "../../server/chat/store";
+import type { ChatEvent, ChatMeta, Op, Step, Turn, UndoRecord } from "../../server/chat/types";
 import { Session } from "../../server/context";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -261,6 +263,87 @@ describe("undo", () => {
     const undone = await api("POST", "/__board/chat/undo", { id: chat.id, turn: turn.id, block: turn.blocks[0]!.id });
     expect(undone.json.record.conflicts.length).toBeGreaterThan(0);
     expect(fs.readFileSync(path.join(env.root, "a.md"), "utf8")).toBe("the person changed it\n");
+  });
+});
+
+describe("undo, on a chat somebody else wrote into the vault", () => {
+  // What a synced device, a shared folder or a downloaded vault can deliver: the chat's files, written
+  // straight into `.anydag/chats/` without one call to the chat api.
+  const b64 = (text: string) => Buffer.from(text).toString("base64");
+  let outside: string;
+  let chatId: string;
+  const out = (from: string, name: string) => path.relative(path.join(env.root, from), path.join(outside, name));
+  const dir = () => path.join(env.root, ".anydag/chats", chatId);
+  const plant = (rel: string, v: unknown) => {
+    fs.mkdirSync(path.dirname(path.join(dir(), rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir(), rel), JSON.stringify(v));
+  };
+  const turnOf = (id: string, blocks: Turn["blocks"]): Turn => ({ v: 1, id, chat: chatId, device: "zzzz", at: "2026-11-07T00:00:00.000Z", text: "tidy my notes", provider: "claude", model: "m", mode: "edit", status: "done", steps: [], blocks });
+  /** Every way out a record could name: a path, a folder's file and subfolder, a folder moved in. */
+  const escapes = (vault = env.vault.id): Op => ({
+    what: "POST /__board/patch",
+    vault,
+    at: "2026-11-07T00:00:00.000Z",
+    undoable: true,
+    images: [
+      { rel: out("", "planted.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" },
+      { rel: path.join(outside, "absolute.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" },
+      { rel: "notes-old", before: { t: "dir", dirs: [out("notes-old", "made")], files: { [out("notes-old", "autostart.desktop")]: b64("[Desktop Entry]\n") } }, after: "-" },
+      { rel: "attachments/notes.txt", before: { t: "moved", to: out("", "id_ed25519") }, after: "-" },
+    ],
+  });
+  const listing = () => fs.readdirSync(outside).sort();
+
+  beforeEach(() => {
+    // Beside the vault, as a person's home folder would be.
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-victim-"));
+    temps.push(outside);
+    fs.writeFileSync(path.join(outside, "id_ed25519"), "PRIVATE-KEY-DUMMY\n");
+    chatId = newId("c", "zzzz");
+    plant("chat.json", { v: 1, id: chatId, title: "Tidy", created: "2026-11-07T00:00:00.000Z", home: env.vault.id, provider: "claude", model: "m", mode: "edit" });
+  });
+
+  it("refuses an undo whose turn names a path outside the vault, and touches nothing", async () => {
+    const t = newId("t", "zzzz");
+    plant(`${t}.json`, turnOf(t, [{ id: "bplanted01", title: "Tidy the notes", ops: [escapes()] }]));
+    const r = await api("POST", "/__board/chat/undo", { id: chatId, turn: t, block: "bplanted01" });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.record.conflicts.map((c: { why: string }) => c.why)).toEqual(["refused"]);
+    expect(r.json.record.ops).toEqual([]);
+    expect(listing()).toEqual(["id_ed25519"]);
+    expect(exists(env.root, "notes-old") || exists(env.root, "attachments/notes.txt")).toBe(false);
+  });
+
+  it("refuses a redo whose undo record names a path outside the vault", async () => {
+    const t = newId("t", "zzzz");
+    plant(`${t}.json`, turnOf(t, [{ id: "bplanted02", title: "Tidy", ops: [] }]));
+    const u = newId("u", "zzzz");
+    const rec: UndoRecord = { v: 1, id: u, chat: chatId, turn: t, block: "bplanted02", redo: false, device: "zzzz", at: "2026-11-07T00:00:00.000Z", ops: [escapes()], conflicts: [] };
+    plant(`undo/${u}.json`, rec);
+    const r = await api("POST", "/__board/chat/redo", { id: chatId, turn: t, block: "bplanted02" });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.record.conflicts.map((c: { why: string }) => c.why)).toEqual(["refused"]);
+    expect(listing()).toEqual(["id_ed25519"]);
+  });
+
+  it("refuses an op in an open vault the chat was never granted", async () => {
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-other-"));
+    temps.push(other);
+    const v2 = session.openFolder(other).id;
+    fs.writeFileSync(path.join(other, "theirs.md"), "keep\n");
+    const t = newId("t", "zzzz");
+    const op: Op = { what: "POST /__board/patch", vault: v2, at: "2026-11-07T00:00:00.000Z", undoable: true, images: [{ rel: "theirs.md", before: { t: "absent" }, after: `f:${createHash("sha1").update("keep\n").digest("hex")}` }] };
+    plant(`${t}.json`, turnOf(t, [{ id: "bplanted03", title: "Tidy", ops: [op] }]));
+    const r = await api("POST", "/__board/chat/undo", { id: chatId, turn: t, block: "bplanted03" });
+    expect(r.json.record.conflicts.map((c: { why: string }) => c.why)).toEqual(["refused"]);
+    expect(fs.readFileSync(path.join(other, "theirs.md"), "utf8")).toBe("keep\n");
+  });
+
+  it("does not read a turn file without a turn's shape", async () => {
+    const t = newId("t", "zzzz");
+    plant(`${t}.json`, { ...turnOf(t, []), blocks: [{ id: "b1", title: "x", ops: [{ what: "x", vault: env.vault.id, undoable: true, images: [{ rel: 1 }] }] }] });
+    expect((await api("GET", `/__board/chat?id=${chatId}`)).json.turns).toEqual([]);
+    expect((await api("POST", "/__board/chat/undo", { id: chatId, turn: t, block: "b1" })).json.code).toBe("block");
   });
 });
 

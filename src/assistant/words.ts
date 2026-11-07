@@ -134,7 +134,7 @@ export const waiting = (s: Step): boolean => (s.kind === "approval" || s.kind ==
 
 /** How a block conflicted, in a sentence: the files an undo left alone and why. */
 export function conflictLines(rec: UndoRecord): string[] {
-  const why = { changed: "changed since", closed: "its vault is not open", big: "too big to have been kept" } as const;
+  const why = { changed: "changed since", closed: "its vault is not open", big: "too big to have been kept", refused: "not a change this chat could have made" } as const;
   return rec.conflicts.map((c) => `${c.paths.length ? c.paths.join(", ") : c.what}: ${why[c.why]}`);
 }
 

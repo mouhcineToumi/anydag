@@ -4924,7 +4924,11 @@ Nine things are load-bearing:
   `grant:<vaultId>` key and a revoke sets it to `null`, so neither side's grant is lost.
 - **A block undoes to its before-images if each file is still what the block left**; a file changed
   since is listed as a conflict and left alone, the rest undone. A deleted file comes back from the
-  trash, and undo is itself recorded, so it redoes.
+  trash, and undo is itself recorded, so it redoes. **A block is read back from the vault, so nothing
+  in it is trusted**: every path it names — an image, a folder's entries, where a folder moved to — is
+  confined again by the rule the recorder used (`planOf` in `server/chat/record.ts`, links resolved),
+  its vault must be the chat's own or one it was granted, and one path that fails leaves the whole op
+  alone as a `refused` conflict. A turn or undo file without the shape is not read at all.
 - **OpenCode's `serve` is keyed per system prompt and MCP command**, because `{file:system.md}` is
   read once when it starts: a chat whose prompt changed (a new grant) needs another. The prompt goes
   in on stdin, and a turn is cancelled with `POST /api/session/<id>/interrupt`.

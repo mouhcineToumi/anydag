@@ -18,6 +18,7 @@ import path from "node:path";
 import type { Home } from "../home";
 import { ALPHABET } from "../ids";
 import { writeAtomic } from "../vault";
+import { isOp } from "./record";
 import type { ChatMeta, ChatRow, Provider, Turn, UndoRecord } from "./types";
 
 export const CHATS = ".anydag/chats";
@@ -60,6 +61,31 @@ function readJson<T>(file: string): T | null {
   } catch {
     return null;
   }
+}
+
+/*
+ * A turn or an undo file is read back from the vault, and anybody who can write the vault can write
+ * one: one without the shape the page and undo rely on is not read at all. The paths in its ops are
+ * checked again by `undo`, whatever the shape.
+ */
+const str = (v: unknown): v is string => typeof v === "string";
+const ops = (v: unknown): boolean => Array.isArray(v) && v.every(isOp);
+
+function isTurn(t: unknown, id: string, chat: string): t is Turn {
+  if (!t || typeof t !== "object") return false;
+  const o = t as Record<string, unknown>;
+  if (o.id !== id || o.chat !== chat || !Array.isArray(o.steps) || !Array.isArray(o.blocks)) return false;
+  return o.blocks.every((b: unknown) => {
+    if (!b || typeof b !== "object") return false;
+    const k = b as Record<string, unknown>;
+    return str(k.id) && str(k.title) && ops(k.ops);
+  });
+}
+
+function isUndo(u: unknown, id: string, chat: string): u is UndoRecord {
+  if (!u || typeof u !== "object") return false;
+  const o = u as Record<string, unknown>;
+  return o.id === id && o.chat === chat && str(o.turn) && str(o.block) && typeof o.redo === "boolean" && ops(o.ops) && Array.isArray(o.conflicts);
 }
 
 const json = (v: unknown): string => `${JSON.stringify(v, null, 1)}\n`;
@@ -111,8 +137,8 @@ export class ChatStore {
     const out: Turn[] = [];
     for (const n of names.sort()) {
       if (!n.endsWith(".json") || !STEP_ID.test(n.slice(0, -5)) || !n.startsWith("t")) continue;
-      const t = readJson<Turn>(path.join(dir, n));
-      if (t && t.id === n.slice(0, -5)) out.push(t);
+      const t = readJson<unknown>(path.join(dir, n));
+      if (isTurn(t, n.slice(0, -5), chat)) out.push(t);
     }
     return out;
   }
@@ -128,8 +154,8 @@ export class ChatStore {
     const out: UndoRecord[] = [];
     for (const n of names.sort()) {
       if (!n.endsWith(".json") || !STEP_ID.test(n.slice(0, -5))) continue;
-      const u = readJson<UndoRecord>(path.join(dir, n));
-      if (u && u.id === n.slice(0, -5)) out.push(u);
+      const u = readJson<unknown>(path.join(dir, n));
+      if (isUndo(u, n.slice(0, -5), chat)) out.push(u);
     }
     return out;
   }
