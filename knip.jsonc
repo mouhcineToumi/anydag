@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Entries are everything started by a path string or run by a tool rather than imported: the
+  // bundled processes (their build scripts name them), the tests, e2e specs and scripts that
+  // consume the library surface, and plugins/ (loaded by the server and vite.config.ts by path).
+  "entry": [
+    "server/main.ts",
+    "server/grammar-worker.ts",
+    "cli/main.ts",
+    "desktop/main.ts",
+    "desktop/preload.ts",
+    "desktop/*.mjs",
+    "sync/server/main.ts",
+    "sync/server/cli.ts",
+    "sync/*.mjs",
+    "scripts/**/*.mjs",
+    "e2e/**/*.ts",
+    "test/**/*.ts",
+    "sync/test/**/*.ts",
+    "plugins/**/*.ts"
+  ],
+  "project": ["**/*.{ts,tsx,mjs}", "!icons/data/**", "!boards/**", "!**/dist/**"],
+  // Packages knip cannot see being used, each for a reason it cannot read:
+  "ignoreDependencies": [
+    // desktop/package.mjs runs it through its `electron-builder` binary, spawned by name — no import.
+    "electron-builder",
+    // scripts/icons/emoji.mjs and build.mjs read these packages' JSON off
+    // node_modules/<name>/ by path to generate icons/data/*; nothing imports them.
+    "@iconify-json/fluent-emoji-flat",
+    "@iconify-json/fluent-emoji-high-contrast",
+    "@iconify-json/logos",
+    "@iconify-json/simple-icons"
+  ],
+  // e2e/export.spec.ts imports "/src/export/svg.ts" inside page.evaluate(): a URL the Vite dev
+  // server answers in the browser, not a file path Node resolves.
+  "ignoreUnresolved": ["/src/export/svg.ts"]
+}
