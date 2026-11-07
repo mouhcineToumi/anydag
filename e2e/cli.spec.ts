@@ -10,8 +10,12 @@ import { expect, test, type Page } from "@playwright/test";
  * The CLI against the running server, and the page drawing what it wrote.
  *
  * The one check in the suite that goes **only through the routes**: every write here is a command,
- * and every read is a command or the page — never `boards/` on disk. It is the proof the unit tests'
- * stubbed `fetch` points at, that the shapes the CLI expects are the shapes the routes answer.
+ * and every read is a command or the page — never `boards/` on disk.
+ *
+ * **What needs a page is all that is left here**: the board a terminal wrote is what the page draws,
+ * and `snapshot` and `export` are pictures of it. The shapes the CLI expects of the routes — the
+ * refused write and its exit 3, `--base`, exit 4 on an error, the quiz check — are asserted against
+ * the real routes in `test/server/cli-wire.test.ts`, which needs no browser.
  *
  * The CLI is an admin tool (`docs/architecture/cli.md`): whole files, never a card at a time — so a
  * board here is written whole, the way an agent without MCP or a script would.
@@ -85,21 +89,7 @@ test("a board written whole from a terminal is what the page draws", { tag: "@sm
   await expect(page.locator('[data-dag-item="stack"] [data-dag-node="api"]')).toContainText("Orders API");
 });
 
-test("a write against a moved board is refused with exit 3, and --base carries it", async () => {
-  const read = JSON.parse((await anydag("board", "cat", board, "--json")).out) as { text: string; base: string };
-  /* Somebody else writes in between — the page, or another terminal. */
-  expect((await writeBoard("```md {#meanwhile}\nmeanwhile\n```\n")).code).toBe(0);
-  fs.writeFileSync(path.join(config, "x.md"), "```md {#mine}\nmine\n```\n");
-  const refused = await anydag("board", "write", board, "--base", read.base, "--file", path.join(config, "x.md"));
-  expect(refused.code).toBe(3);
-  expect(refused.err).toMatch(/base is now/);
-  const now = JSON.parse((await anydag("board", "cat", board, "--json")).out) as { base: string };
-  const written = await anydag("board", "write", board, "--base", now.base, "--file", path.join(config, "x.md"));
-  expect(written.code, written.err).toBe(0);
-  expect((await anydag("board", "cat", board)).out).toContain("mine");
-});
-
-test("snapshot and export see the drawing, and diagnose exits 4 on an error", async () => {
+test("snapshot and export see the drawing", async () => {
   expect((await writeBoard(STACK)).code).toBe(0);
   const shot = await anydag("snapshot", board, "--item", "stack", "-o", path.join(config, "stack.png"));
   expect(shot.code, shot.err + shot.out).toBe(0);
@@ -109,28 +99,4 @@ test("snapshot and export see the drawing, and diagnose exits 4 on an error", as
   const svg = await anydag("board", "export", board, "--format", "svg", "-o", path.join(config, "board.svg"));
   expect(svg.code, svg.err).toBe(0);
   expect(fs.readFileSync(path.join(config, "board.svg"), "utf8")).toMatch(/^<svg[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
-
-  /* A write that breaks the diagram still lands — a person may be halfway through — and says so. */
-  const broke = await writeBoard("```arch {#stack}\nservce api\n```\n");
-  expect(broke.code).toBe(4);
-  expect(broke.out + broke.err).toMatch(/E_UNKNOWN_KIND/);
-  const diagnosed = await anydag("board", "diagnose", board);
-  expect(diagnosed.code).toBe(4);
-  expect(diagnosed.out + diagnosed.err).toMatch(/E_UNKNOWN_KIND/);
-});
-
-test("a quiz's check is the route's answer, through the server's grammar", async () => {
-  /* It was answered inside the CLI until it became a route, and the unit tests stub the route — so
-     this is where the wire shape is proved, against the real parser. */
-  const quiz = `e2e-cli-quiz-${Date.now().toString(36)}`;
-  fs.writeFileSync(path.join(config, "q.md"), "## One? {#qa}\n\n- [ ] y\n- [ ] n\n");
-  const made = await anydag("quiz", "new", quiz, "--file", path.join(config, "q.md"));
-  expect(made.code, made.err).toBe(0);
-  try {
-    const checked = await anydag("quiz", "check", made.out.trim(), "--json");
-    expect(checked.code).toBe(4);
-    expect(JSON.parse(checked.out)).toMatchObject({ questions: 1, diagnostics: [{ code: "EQ_NO_ANSWER" }] });
-  } finally {
-    await anydag("quiz", "rm", made.out.trim(), "--yes");
-  }
 });

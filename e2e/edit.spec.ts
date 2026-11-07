@@ -86,26 +86,6 @@ test("a click is not a drag", async ({ page }) => {
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
 
-test("a write against a version that has moved is refused", { tag: "@smoke" }, async ({ page }) => {
-  await open(page);
-
-  const stale = await page.evaluate(async (name) => {
-    const r = await fetch(`/__board/patch?name=${name}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ base: "0000000000000000000000000000000000000000", ops: [{ id: "one", attrs: { x: 8 } }] }),
-    });
-    return { status: r.status, body: (await r.json()) as { base?: string; text?: string } };
-  }, name);
-
-  expect(stale.status).toBe(409);
-  /* The refusal carries what replaced it, so the client can retry against real content rather than
-     refetching and guessing. */
-  expect(stale.body.text).toBe(BOARD);
-  expect(stale.body.base).toHaveLength(40);
-  expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
-});
-
 test("the snapshot view cannot be edited", async ({ page }) => {
   await open(page, "&snapshot=1");
   await expect(page.locator("[data-dag-movable]")).toHaveCount(0);
