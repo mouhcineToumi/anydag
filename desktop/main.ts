@@ -39,6 +39,17 @@ const VERSION: string = typeof __ANYDAG_VERSION__ === "string" ? __ANYDAG_VERSIO
 declare const __ANYDAG_SIGNED__: boolean;
 const SIGNED: boolean = typeof __ANYDAG_SIGNED__ === "boolean" ? __ANYDAG_SIGNED__ : false;
 
+/** The update channel is the version's own: `0.2.0` is `latest`, `0.2.0-beta.1` is `beta` and
+ *  `0.2.0-nightly.202611070230` is `nightly`. electron-builder names the update files after it
+ *  (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`) and electron-updater reads the same word
+ *  back off the running version, so a stable build only ever asks for the newest *stable* release
+ *  (GitHub's "latest", which no pre-release is), a beta follows betas and what is stable, and a
+ *  nightly follows nightlies. `allowPrerelease` is what lets the last two see a pre-release; it is
+ *  set where the updater runs from the same word, rather than left to electron-updater's identical
+ *  default, so the rule is readable there. `autoUpdater.channel` is deliberately never set: its
+ *  setter turns on `allowDowngrade`, which a stable user must not get. */
+const UPDATE_CHANNEL: string = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(VERSION)?.[1] ?? "latest";
+
 /** Where the built page (`dist/`) is. `__dirname` is `desktop/dist` in dev and
  *  `<app.asar>/desktop/dist` packaged, so two levels up is the app's root in both — a real folder
  *  in dev, a path inside the asar packaged, and the main process reads its own asar. */
@@ -922,6 +933,8 @@ async function whenReady(): Promise<void> {
   say(`${VERSION} ready — ${serverPort}`);
 
   if (app.isPackaged && (process.platform !== "darwin" || SIGNED)) {
+    autoUpdater.allowPrerelease = UPDATE_CHANNEL !== "latest";
+    say(`updates: channel ${UPDATE_CHANNEL}`);
     autoUpdater.checkForUpdatesAndNotify().catch((e) => say(`update check failed: ${(e as Error).message ?? e}`));
   }
 }
