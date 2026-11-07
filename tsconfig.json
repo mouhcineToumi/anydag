@@ -16,9 +16,8 @@
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsc/app.tsbuildinfo",
     "types": ["vite/client"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src", "test", "plugins", "cli", "server", "sync", "vite.config.ts", "vitest.config.ts"],
