@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { ServerBlockNoteEditor } from "@blocknote/server-util";
 
@@ -30,7 +31,7 @@ describe("references in a note", () => {
 
   it("goes through the editor's own schema unchanged", async () => {
     const server = ServerBlockNoteEditor.create({ schema: noteSchema });
-    const back = await server._withJSDOM(async () => {
+    const back = await server._withDOM(async () => {
       server.editor.replaceBlocks(server.editor.document, mdToBlocks(NOTE) as never);
       return server.editor.document as unknown as NoteBlock[];
     });

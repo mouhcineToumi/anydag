@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { getDefaultSlashMenuItems } from "@blocknote/core/extensions";
 import { ServerBlockNoteEditor } from "@blocknote/server-util";
@@ -20,7 +21,7 @@ describe("the schema", () => {
 
   it("lets code sit inside bold, which BlockNote's own code mark refuses", async () => {
     const server = ServerBlockNoteEditor.create({ schema: noteSchema });
-    const blocks = await server._withJSDOM(async () => {
+    const blocks = await server._withDOM(async () => {
       server.editor.replaceBlocks(server.editor.document, [
         { type: "paragraph", content: [{ type: "text", text: "x", styles: { bold: true, code: true } }] },
       ] as never);

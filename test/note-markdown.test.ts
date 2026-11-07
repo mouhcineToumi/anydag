@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeAll, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -43,7 +44,7 @@ const editor = server.editor;
 
 /** Put blocks into the editor and read back what it actually holds — its ids, its defaults, its refusals. */
 const hold = (blocks: NoteBlock[]): Promise<NoteBlock[]> =>
-  server._withJSDOM(async () => {
+  server._withDOM(async () => {
     /* An editor is never empty: it holds one empty paragraph, which is also what an empty note opens as. */
     editor.replaceBlocks(editor.document, (blocks.length ? blocks : [{ type: "paragraph" }]) as never);
     return JSON.parse(JSON.stringify(editor.document)) as NoteBlock[];
@@ -360,7 +361,7 @@ describe("an outside write", () => {
 
   /* `BlockEditor`'s `apply`, on the real editor: what an outside write leaves the note holding. */
   const applied = (doc: NoteBlock[], steps: Step[]): Promise<string> =>
-    server._withJSDOM(async () => {
+    server._withDOM(async () => {
       editor.replaceBlocks(editor.document, doc as never);
       const top = editor.document.map((b) => b.id);
       editor.transact(() =>

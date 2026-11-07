@@ -31,7 +31,9 @@ import { codeLanguage } from "@/render/code";
 import { CodeCopy } from "@/render/CodeBlock";
 
 type Spec = ReturnType<typeof codeBlockSpec>;
-type Render = Spec["implementation"]["render"];
+/* `implementation.render` is optional in the type since 0.57 (core's first `createBlockSpec` overload
+   cannot see `layoutOnly`), but a code block always draws it. */
+type Render = NonNullable<Spec["implementation"]["render"]>;
 
 /** The plain text of a block whose content is `plain`: its runs of text, joined. */
 function plainText(content: unknown): string {
@@ -41,7 +43,7 @@ function plainText(content: unknown): string {
 
 export function codeBlock(): Spec {
   const spec = codeBlockSpec();
-  const render: Render = spec.implementation.render;
+  const render: Render = spec.implementation.render as Render;
   const wrapped: Render = function (this: ThisParameterType<Render>, block, editor) {
     const view = render.call(this, block, editor);
     if (!this || !("renderType" in this) || this.renderType !== "nodeView") return view;

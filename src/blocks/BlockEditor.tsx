@@ -291,7 +291,7 @@ export default function BlockEditor(props: BlockEditorProps) {
 
   const typeItems = useMemo(
     () =>
-      blockTypeSelectItems(editor.dictionary).filter(
+      blockTypeSelectItems(editor).filter(
         (i) => !i.props?.isToggleable && (i.type !== "heading" || Number(i.props?.level) <= 3) && i.type !== "toggleListItem",
       ),
     [editor],
