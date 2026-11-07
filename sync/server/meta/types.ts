@@ -93,8 +93,12 @@ export interface Meta {
   putKey(vault: string, put: PutVaultKey): Promise<VaultKey | false>;
 
   // -- blobs (the index; the bytes are `Blobs`')
-  /** Record a blob the store now holds. A second call for one id is nothing. */
-  addBlob(vault: string, id: string, size: number): Promise<void>;
+  /**
+   * Record a blob the store now holds. A second call for one id is nothing. `at` is the server's
+   * clock (the route passes `deps.now()`), the clock the log's `at` and the collector's window are
+   * read on; absent, the database's own `now()`.
+   */
+  addBlob(vault: string, id: string, size: number, at?: string): Promise<void>;
   blobSize(vault: string, id: string): Promise<number | null>;
 
   // -- the log

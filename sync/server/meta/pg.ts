@@ -340,10 +340,10 @@ export class PgMeta implements Meta {
   // -- blobs (the index; the bytes are `Blobs`') ----------------------------------------------------
 
   /** Two devices uploading one id race harmlessly: the first row stands, the second is nothing. */
-  async addBlob(vault: string, id: string, size: number): Promise<void> {
+  async addBlob(vault: string, id: string, size: number, at?: string): Promise<void> {
     await this.db.query(
-      "insert into blobs (vault, id, size) values ($1, $2, $3) on conflict (vault, id) do nothing",
-      [vault, id, size],
+      "insert into blobs (vault, id, size, created) values ($1, $2, $3, coalesce($4::timestamptz, now())) on conflict (vault, id) do nothing",
+      [vault, id, size, at ?? null],
     );
   }
 
