@@ -45,7 +45,7 @@ async function open(page: import("@playwright/test").Page, query = "") {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
-test("a drag pins the item it moved, and every item that was flowing", async ({ page }) => {
+test("a drag pins the item it moved, and every item that was flowing", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
 
   const one = page.locator('[data-dag-item="one"]');
@@ -88,7 +88,7 @@ test("a click is not a drag", async ({ page }) => {
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
 
-test("a write against a version that has moved is refused", async ({ page }) => {
+test("a write against a version that has moved is refused", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
 
   const stale = await page.evaluate(async (name) => {

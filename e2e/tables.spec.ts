@@ -96,7 +96,7 @@ test("a table written as a file is a grid of its first tab, and opening it write
   expect(read("pipeline")).toBe(TABLE);
 });
 
-test("typing into a cell rewrites that cell and no other byte, and Escape takes a draft back", async ({ page }) => {
+test("typing into a cell rewrites that cell and no other byte, and Escape takes a draft back", { tag: "@smoke" }, async ({ page }) => {
   const name = write("pipeline");
   await open(page, name);
   await page.locator('[data-dag-grid-at="1:1"]').click();

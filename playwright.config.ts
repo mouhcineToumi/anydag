@@ -13,20 +13,24 @@ import { defineConfig } from "@playwright/test";
    second checkout has to be able to move the port. */
 const origin = `http://localhost:${Number(process.env.ANYDAG_PORT) || 3500}`;
 
-/* **A run started by hand is told, once, that its screenshots will not hold** — the hook's
-   refusal in `scripts/e2e-local.sh`, as a line rather than a stop, because somebody running one spec
-   in the system browser may be after something other than its pixels. Once: the config is loaded
-   again in every worker, and a worker has an index. */
+/* **A run on the host is told, once, that its screenshots are not compared** — they are the Docker
+   image's (`npm run e2e:docker`: `mcr.microsoft.com/playwright:v<version>-noble`), and CI runs the
+   same one. `scripts/e2e-local.sh` sets `ANYDAG_NO_SNAPSHOTS` itself; a run started by hand with a
+   system browser (`ANYDAG_CHROMIUM`) and without it gets this line instead of a refusal, because
+   somebody running one spec may be after something other than its pixels. Once: the config is
+   loaded again in every worker, and a worker has an index. */
 if (process.env.ANYDAG_CHROMIUM && !process.env.ANYDAG_NO_SNAPSHOTS && process.env.TEST_WORKER_INDEX === undefined) {
   console.warn(
-    `playwright: ANYDAG_CHROMIUM=${process.env.ANYDAG_CHROMIUM} — the committed screenshots are Playwright's own ` +
-      "Chromium's, so a screenshot check may fail on the browser rather than the change; ANYDAG_NO_SNAPSHOTS=1 compares none",
+    `playwright: ANYDAG_CHROMIUM=${process.env.ANYDAG_CHROMIUM} — the committed screenshots are the Docker image's ` +
+      "(npm run e2e:docker), so a screenshot check may fail on the browser rather than the change; ANYDAG_NO_SNAPSHOTS=1 compares none",
   );
 }
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  /* A `test.only` left in a spec would make CI run one test and call it green. */
+  forbidOnly: !!process.env.CI,
   reporter: [["list"]],
   /**
    * **One retry, because this suite now decides whether a push happens.**
@@ -54,11 +58,14 @@ export default defineConfig({
        carries and a page script could not set. */
     storageState: "./e2e/.auth/state.json",
     viewport: { width: 1600, height: 1200 },
-    /* A machine with a Chromium already on it — a CI image, a sandbox — can point here instead of
-       downloading the pinned build. Unset, Playwright uses its own — **which is the only browser the
-       committed screenshots hold for**: another draws text a few pixels wider or narrower, so with
-       this set `ANYDAG_NO_SNAPSHOTS=1` belongs beside it, and `scripts/e2e-local.sh` refuses to run
-       the dev suite without it. A run started by hand gets the warning at the top. */
+    /* A failed CI run is read from its artifacts, so a test that had to be retried keeps its trace.
+       Off elsewhere: it costs a second on every retry and a laptop has the browser to look at. */
+    trace: process.env.CI ? "on-first-retry" : "off",
+    /* A machine with a Chromium already on it — a sandbox — can point here instead of downloading
+       the pinned build. The committed screenshots hold for **the Docker image's Chromium and no
+       other**: another draws text a few pixels wider or narrower, so with this set
+       `ANYDAG_NO_SNAPSHOTS=1` belongs beside it (`scripts/e2e-local.sh` sets it). A run started by
+       hand gets the warning at the top. */
     ...(process.env.ANYDAG_CHROMIUM ? { launchOptions: { executablePath: process.env.ANYDAG_CHROMIUM } } : {}),
   },
   expect: {

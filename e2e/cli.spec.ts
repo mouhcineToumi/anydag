@@ -60,7 +60,7 @@ test.afterEach(async () => {
   await anydag("board", "rm", board, "--yes");
 });
 
-test("a diagram built card by card from a terminal is what the page draws", async ({ page }) => {
+test("a diagram built card by card from a terminal is what the page draws", { tag: "@smoke" }, async ({ page }) => {
   expect((await anydag("item", "add", board, "arch", "--id", "stack", "--at", "0,0")).code).toBe(0);
   const grown = await anydag("node", "add", board, "stack", "--from", "api", "--id", "cache", "--title", "Cache");
   expect(grown.code, grown.err).toBe(0);

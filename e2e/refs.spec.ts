@@ -64,7 +64,7 @@ async function ids(page: Page): Promise<{ board: string; note: string }> {
 const ready = (page: Page) =>
   page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 
-test("a link shows the target's live title, and survives the target being renamed and moved", async ({ page }) => {
+test("a link shows the target's live title, and survives the target being renamed and moved", { tag: "@smoke" }, async ({ page }) => {
   const { board } = await ids(page);
   fs.writeFileSync(noteFile(), `---\ntitle: The linking note\n---\nSee [an old title](dag:${board}).\n`);
   await page.goto(`/?view=1&note=${stem}-n`);

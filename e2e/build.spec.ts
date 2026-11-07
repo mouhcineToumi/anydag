@@ -75,7 +75,7 @@ const centreOf = async (page: Page, selector: string) => {
 
 /* --------------------------------------------------------------------------- inline rename */
 
-test("double-clicking a card renames it where it is drawn", async ({ page }) => {
+test("double-clicking a card renames it where it is drawn", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await page.locator('[data-dag-node="api"]').dblclick();
 

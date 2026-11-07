@@ -82,7 +82,7 @@ test("the leader chord opens the library, the toolbar closes it, and the search 
   await expect(page.locator("[data-dag-library]")).toHaveCount(0);
 });
 
-test("a click adds the component in the middle of the view and opens it for editing", async ({ page }) => {
+test("a click adds the component in the middle of the view and opens it for editing", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await lead(page, "l");
   await card(page, "table").click();

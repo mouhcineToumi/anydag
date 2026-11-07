@@ -74,7 +74,7 @@ const pickedNodes = (page: Page) =>
 
 /* ------------------------------------------------------------------------------ the gesture */
 
-test("the first click takes the diagram and the second picks the card out of it", async ({ page }) => {
+test("the first click takes the diagram and the second picks the card out of it", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
 
   await tap(page, '[data-dag-node="api"]');

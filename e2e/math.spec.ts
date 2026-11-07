@@ -89,7 +89,7 @@ const drawn = (page: Page) =>
     pending: document.querySelectorAll('[data-dag-math="pending"]').length,
   }));
 
-test("a note drawn read-only has every equation drawn when it is ready, and a price is a price", async ({ page }) => {
+test("a note drawn read-only has every equation drawn when it is ready, and a price is a price", { tag: "@smoke" }, async ({ page }) => {
   await ready(page, `/?note=${note}&view=1`);
   expect(await drawn(page)).toEqual({ tex: ["W_Q", "Q = X W_Q", "\\frac{a}{b}"], pending: 0 });
   /* `$$` mid-line is display, centred on a line of its own, inside the paragraph it was written in. */

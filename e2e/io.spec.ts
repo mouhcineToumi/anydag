@@ -72,7 +72,7 @@ async function saved(page: Page, act: () => Promise<void>): Promise<{ name: stri
   return { name: dl.suggestedFilename(), bytes: fs.readFileSync(p!) };
 }
 
-test("the board exports as one SVG with every item and the fonts once", async ({ page }) => {
+test("the board exports as one SVG with every item and the fonts once", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   const { name: fname, bytes } = await saved(page, () => exportAs(page, "svg"));
   expect(fname).toBe(`${name}.svg`);

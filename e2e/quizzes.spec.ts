@@ -131,7 +131,7 @@ async function mistakesRun(page: Page, ours: string, right: number) {
   expect(met, `the Mistakes run asked ${ours}`).toBe(true);
 }
 
-test("a quiz written as a file is a card on the Quizzes page, and its questions are cards in the form", async ({ page }) => {
+test("a quiz written as a file is a card on the Quizzes page, and its questions are cards in the form", { tag: "@smoke" }, async ({ page }) => {
   const name = write("pg");
   await page.goto("/?quizzes=1");
   await page.locator("[data-dag-quizzes-filter]").fill(folder);
@@ -188,7 +188,7 @@ test("a question the runner cannot ask says so, and Source shows the whole file 
   await expect(page.locator('[data-dag-quiz-problem="EQ_NO_ANSWER"]')).toContainText("line 6");
 });
 
-test("a run records a miss into Mistakes, and two right in a row in the Mistakes run take it out", async ({ page }) => {
+test("a run records a miss into Mistakes, and two right in a row in the Mistakes run take it out", { tag: "@smoke" }, async ({ page }) => {
   const name = write("pg");
   const id = await idOf(page, name);
   await page.goto(`/?quiz=${name}`);

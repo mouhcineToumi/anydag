@@ -83,7 +83,7 @@ test("the ✨ opens a dialog with the caret in it, and Escape closes only the di
   expect(read()).toBe(BOARD);
 });
 
-test("ctrl+Enter sends the change with the diagram's source; the answer is a preview until Accept, which is one undo", async ({ page }) => {
+test("ctrl+Enter sends the change with the diagram's source; the answer is a preview until Accept, which is one undo", { tag: "@smoke" }, async ({ page }) => {
   const asked = await answer(page, { ok: true, draft: DRAFT, diagnostics: [], attempts: 1 }, 300);
   await open(page);
   await select(page, "svc");

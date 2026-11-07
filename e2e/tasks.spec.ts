@@ -76,7 +76,7 @@ async function idOf(page: Page, name: string): Promise<string> {
   return id!;
 }
 
-test("a note with a status is on the Tasks page, in its group, and its status moves on from there", async ({ page }) => {
+test("a note with a status is on the Tasks page, in its group, and its status moves on from there", { tag: "@smoke" }, async ({ page }) => {
   const late = write("late", "Send the invoice", ["status: todo", `due: ${day(-2)}`]);
   const doing = write("doing", "Ship the pricing page", ["status: in-progress", `due: ${day(1)}`]);
   const finished = write("finished", "Redraw the favicon", ["status: done"]);

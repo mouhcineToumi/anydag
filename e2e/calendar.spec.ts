@@ -83,7 +83,7 @@ async function calendar(page: Page, query: string, expectItem?: string) {
   if (expectItem) await expect(page.locator(`[data-dag-cal-item="${expectItem}"]`).first()).toBeVisible({ timeout: 15_000 });
 }
 
-test("a month draws each thing on its days, and a click opens it", async ({ page }) => {
+test("a month draws each thing on its days, and a click opens it", { tag: "@smoke" }, async ({ page }) => {
   const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
   const talk = write("talk", "Keynote", ["start: 2031-03-13T09:00Z", "end: 2031-03-13T10:00Z"]);
   const ship = write("ship", "Ship it", ["status: in-progress", "start: 2031-03-10", "due: 2031-03-11"]);

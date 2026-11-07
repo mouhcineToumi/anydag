@@ -129,7 +129,7 @@ async function openFolder(page: Page): Promise<void> {
   if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
 }
 
-test("files dropped on a folder in the sidebar are kept there, each with the icon of its sort, and a PDF opens drawn", async ({ page }) => {
+test("files dropped on a folder in the sidebar are kept there, each with the icon of its sort, and a PDF opens drawn", { tag: "@smoke" }, async ({ page }) => {
   await page.goto("/");
   await openSidebar(page);
   await expect(page.locator(`[data-dag-sidebar-folder="${folder}"]`)).toBeVisible({ timeout: 10_000 });

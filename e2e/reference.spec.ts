@@ -12,9 +12,26 @@ const boards = fs
 
 const THEMES = ["paper", "neutral", "paper-dark"];
 
+/* **The smoke tier's share of the 45.** One board per way of laying a diagram out — ELK's layered
+   graph (`architecture`, `erd`), swimlanes (`workflow`), the five layouts of our own (`sequence`,
+   `timeline`, `gitgraph`, `sketch`, `chart`) and the mind map's tree — under the default theme, and
+   the dark theme once. The rest run in the full suite. */
+const SMOKE = new Set([
+  "paper reference/architecture",
+  "paper reference/erd",
+  "paper reference/workflow",
+  "paper reference/sequence",
+  "paper reference/timeline",
+  "paper reference/gitgraph",
+  "paper reference/sketch",
+  "paper reference/chart",
+  "paper reference/mindmap",
+  "paper-dark reference/architecture",
+]);
+
 for (const theme of THEMES) {
   for (const board of boards) {
-    test(`${board} · ${theme}`, async ({ page }) => {
+    test(`${board} · ${theme}`, SMOKE.has(`${theme} ${board}`) ? { tag: "@smoke" } : {}, async ({ page }) => {
       const problems: string[] = [];
       page.on("console", (msg) => {
         if (msg.type() === "error" || msg.type() === "warning") problems.push(msg.text());
@@ -36,15 +53,15 @@ for (const theme of THEMES) {
       /* The size assertion and the token audit both report here. */
       expect(problems, `console output on ${board}`).toEqual([]);
 
-      /* **The baseline is this machine's font rasterisation, and only this machine's.** A GitHub
-         runner measures text a shade narrower, so every card is smaller, the layout shrinks with
-         them, and the image arrives 1091x818 against a 1117x837 baseline — a uniform 2.3%, which
-         is a size mismatch rather than something the 1% tolerance could absorb. 17 of the 45
-         failed the first time CI ran them. So CI sets `ANYDAG_NO_SNAPSHOTS` and compares no pixels;
-         everything above this line still runs there — the board still has to become ready, draw
-         no error card and leave the console silent, which is where the dev size assertion
-         reports. The pixel gate is `npm run gate`, on the machine the baselines were made on.
-         `CLAUDE.md` already says these are `-linux` and not portable; this is that, enforced. */
+      /* **The baselines are the Docker image's, and only the image's.** They are taken and compared
+         in `mcr.microsoft.com/playwright:v<version>-noble` (`npm run e2e:docker`, and CI runs the
+         same image), because the same page rasterises differently in another Chromium build and
+         with other system fonts — and the `neutral` theme *is* `system-ui`, so its cards are
+         measured, and its whole layout sized, by whatever the machine has installed: a GitHub
+         runner's came out 2.3% smaller than a laptop's. A host run (`npm run e2e:local`) sets
+         `ANYDAG_NO_SNAPSHOTS` and compares no pixels; everything above this line still runs there —
+         the board still has to become ready, draw no error card and leave the console silent,
+         which is where the dev size assertion reports. */
       if (!process.env.ANYDAG_NO_SNAPSHOTS) {
         await expect(page.locator(".dag-layer")).toHaveScreenshot(`${board.replace("/", "-")}-${theme}.png`);
       }

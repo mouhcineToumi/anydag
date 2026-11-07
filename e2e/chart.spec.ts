@@ -200,7 +200,7 @@ slice c "Gamma" 25
     return (JSON.parse(raw ?? "{}") as { nodes: Record<string, { x: number; y: number; w: number; h: number }> }).nodes;
   }
 
-  test("a picked series takes its values from the panel, and the bars move", async ({ page }) => {
+  test("a picked series takes its values from the panel, and the bars move", { tag: "@smoke" }, async ({ page }) => {
     await open(page);
     await pickMark(page, "rev", "web");
 

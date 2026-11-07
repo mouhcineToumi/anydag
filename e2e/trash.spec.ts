@@ -67,7 +67,7 @@ async function trashed(page: Page, ws: string, name: string): Promise<void> {
 
 const entry = (page: Page, name: string) => page.locator(`[data-dag-trash-entry="${name}"]`);
 
-test("a board deleted from the sidebar is in the trash, and Restore puts it back to open", async ({ page }) => {
+test("a board deleted from the sidebar is in the trash, and Restore puts it back to open", { tag: "@smoke" }, async ({ page }) => {
   const ws = await workspace(page);
   const plan = await make(page, ws, "plan", "Q3 plan");
   expect(plan).toBe("Q3 plan");

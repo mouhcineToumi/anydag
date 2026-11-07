@@ -77,7 +77,7 @@ async function endOf(page: Page, text: string) {
   await page.keyboard.press("End");
 }
 
-test("typing rewrites the block it is in and leaves every other byte alone", async ({ page }) => {
+test("typing rewrites the block it is in and leaves every other byte alone", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await endOf(page, "The second paragraph.");
   await page.keyboard.type(" Typed by a person.");
@@ -207,7 +207,7 @@ test("an outside write to a note of one paragraph lands, and leaving does not pu
   expect(read()).toBe("---\ntitle: One line\n---\nWritten elsewhere.\n\nAnd a second.\n");
 });
 
-test("two writers on different blocks are merged", async ({ page }) => {
+test("two writers on different blocks are merged", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await endOf(page, "The second paragraph.");
   /* Typed, and the file changed on disk before the quarter-second save goes out: the save meets a
@@ -259,7 +259,7 @@ test("the list shows a note beside the boards, and opens either", async ({ page 
   await expect(block(page, "The second paragraph.")).toBeVisible();
 });
 
-test("New note makes one, opens it, and names it in its own title", async ({ page }) => {
+test("New note makes one, opens it, and names it in its own title", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await newFile(page, "note", { top: true });
   /* Named at the top of its page, Notion's way — not in a box in its sidebar row. */

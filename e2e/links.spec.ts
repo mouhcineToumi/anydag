@@ -85,7 +85,7 @@ test("`frame=` overrules the rule in both directions", async ({ page }) => {
   await expect(page.locator('[data-dag-item="stack"] .dag-frame__head')).toHaveCount(0);
 });
 
-test("the link is drawn, over the items, and lands on the card rather than the frame", async ({ page }) => {
+test("the link is drawn, over the items, and lands on the card rather than the frame", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   const layer = page.locator(".dag-board-edges");
   await expect(layer).toHaveCount(1);

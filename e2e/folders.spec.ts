@@ -157,7 +157,7 @@ test("a board moved to the folder it is already in is left alone", async ({ page
   expect(there(parent, "b", "plan-2.board.md")).toBe(false);
 });
 
-test("a folder goes to the trash at once, empty or full, and the notice says what went", async ({ page }) => {
+test("a folder goes to the trash at once, empty or full, and the notice says what went", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   const notice = page.locator("[data-dag-trash-notice]");
   /* `b` is empty: nothing is asked, in the row or anywhere. */

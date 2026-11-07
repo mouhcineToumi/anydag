@@ -109,7 +109,7 @@ test("the top bar's switch and ctrl+shift+L lock and unlock, every tab of the br
   await other.close();
 });
 
-test("a locked board is selected and panned, never moved, deleted, pasted onto or typed into", async ({ page }) => {
+test("a locked board is selected and panned, never moved, deleted, pasted onto or typed into", { tag: "@smoke" }, async ({ page }) => {
   const { name, file } = board();
   const before = fs.readFileSync(file, "utf8");
   await lockFirst(page);

@@ -54,7 +54,7 @@ async function ready(page: Page, url: string) {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
-test("a note read-only colours each block by its language and counts what Python cannot read", async ({ page }) => {
+test("a note read-only colours each block by its language and counts what Python cannot read", { tag: "@smoke" }, async ({ page }) => {
   await ready(page, `/?note=${note}&view=1`);
   const blocks = page.locator(".dag-code");
   await expect(blocks).toHaveCount(3);
