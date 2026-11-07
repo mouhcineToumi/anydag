@@ -661,7 +661,9 @@ export class Vault {
             id: own,
             path: d.file,
             kind: d.kind,
-            created: was?.created ?? row?.created ?? this.bornAt(d.file),
+            // A document renamed before this walk is its id's created, not the rename's birth: the
+            // tie-break above and `createdOf` read it so, and the row must too (seed 2, loaded).
+            created: was?.created ?? row?.created ?? this.createdOfId(own, d.file, was) ?? this.bornAt(d.file),
             minted: 1,
             title: d.kind === "file" ? (fileIds.get(own)?.title ?? null) : null,
           };
