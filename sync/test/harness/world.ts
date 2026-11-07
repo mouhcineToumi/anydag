@@ -37,6 +37,15 @@ import { Rng } from "./prng";
 
 /** What every conflict copy is dated with: the engine's clock is pinned, so names replay. */
 const AT = new Date(2026, 10, 6, 14, 30);
+/**
+ * Where a seed's own clock starts, and how far it moves between steps (ms, at most). A file's birth
+ * is a second-resolution instant that decides which of two documents keeps a duplicate id, so which
+ * seconds the births land in is part of the schedule: read from the disk it was the machine's speed,
+ * and a seed that held with every birth in one second (an idle machine) failed once a slow one
+ * spread them over several. Drawn from the seed, the same schedule makes the same births every run.
+ */
+const T0 = Date.parse("2026-11-06T14:30:00Z");
+const TICK_MS = 900;
 const WORDS = ["plan", "ideas", "log", "todo", "draft", "spec", "inbox", "notes"];
 const FOLDERS = ["", "notes/", "work/deep/"];
 const TOKEN = /tok-\d+-\d+/g;
@@ -149,6 +158,10 @@ export class World {
   readonly log: string[] = [];
   /** Commits the server accepted. */
   commits = 0;
+  /** The seed's clock — what every vault reads as a file's birth once steps run. */
+  private readonly time: Rng;
+  private at = T0;
+  private ticking = false;
   readonly written = new Map<string, number>();
   readonly deletable = new Set<string>();
   readonly deletedIds = new Set<string>();
@@ -161,6 +174,7 @@ export class World {
     this.h = h;
     this.seed = seed;
     this.rng = new Rng(seed);
+    this.time = new Rng(seed ^ 0x5eed5eed);
   }
 
   static async create(h: Harness, seed: number, devices: number): Promise<World> {
@@ -333,8 +347,16 @@ export class World {
 
   // -- steps --------------------------------------------------------------------------------------
 
+  /** Move the seed's clock on, every device reading the same one (a separate stream: the schedule is the seed's). */
+  private tick(): void {
+    this.ticking = true;
+    this.at += this.time.int(0, TICK_MS);
+    for (const d of this.devs) d.clock = this.at;
+  }
+
   async step(): Promise<void> {
     this.stepNo++;
+    this.tick();
     const kind = this.rng.weighted(WEIGHTS);
     const d = this.rng.pick(this.devs);
     await this.run(kind, d);
@@ -634,6 +656,7 @@ export class World {
     const moved: string[] = [];
     let last = await this.fingerprint();
     for (let round = 0; round < SETTLE_ROUNDS; round++) {
+      if (this.ticking) this.tick();
       const before = this.commits;
       for (const d of this.devs) {
         await d.vault.tree();
