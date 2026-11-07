@@ -14,9 +14,8 @@
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsc/worker.tsbuildinfo",
     "types": [],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/layout/route.ts", "src/layout/types.ts"]
