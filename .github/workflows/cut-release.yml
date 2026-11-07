@@ -1,0 +1,56 @@
+# Cut `release/X.Y.Z` from `develop` — the first step of docs/RELEASING.md, and the one that is easy
+# to get slightly wrong by hand.
+#
+# It makes the branch from `develop`'s head and nothing else: `develop`'s `VERSION` is *always the
+# next version to be released*, so the branch is born saying the version it is for. It refuses when
+# `VERSION` is not a plain `X.Y.Z`, or the branch or the tag already exists. Open the pull request
+# into `main` yourself afterwards (the summary has the link): a pull request made by this workflow's
+# token would start none of the checks it has to pass.
+#
+# The branch is kept after the release, for history; nothing deletes it.
+name: cut-release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cut:
+    name: cut the release branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Cut it
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          node scripts/check-version.mjs
+          version=$(tr -d '[:space:]' < VERSION)
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*-*) echo "::error::develop's VERSION is $version. A release is cut from a plain X.Y.Z."; exit 1 ;;
+          esac
+          if git ls-remote --exit-code --heads origin "release/$version" >/dev/null; then
+            echo "::error::release/$version already exists."; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already tagged, so $version is released. Bump develop's VERSION first (docs/RELEASING.md)."; exit 1
+          fi
+          git push origin "HEAD:refs/heads/release/$version"
+          {
+            echo "### release/$version cut from develop at \`$(git rev-parse --short HEAD)\`"
+            echo
+            echo "Next: [open the pull request into main](https://github.com/$REPO/compare/main...release/$version?expand=1&title=chore(release):%20$version)."
+            echo "Betas are tagged on this branch as \`v$version-beta.N\`; the steps are in docs/RELEASING.md."
+          } >> "$GITHUB_STEP_SUMMARY"

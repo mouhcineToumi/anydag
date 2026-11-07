@@ -1,0 +1,139 @@
+# The desktop app, packaged and opened — one definition for every caller.
+#
+# Called by `ci.yml` (a pull request that touches what the app is made of; Linux alone into
+# `develop`, all three systems into `main` and the release branches), `nightly.yml` and
+# `release.yml` (all three, signed when a certificate is there). It used to be written out twice,
+# in `desktop.yml` and `release.yml`, and a step added to one was a step the other did not have.
+#
+# Each leg builds the page, the server, the CLI and the shell, packages them
+# (`desktop/package.mjs`: an AppImage; an NSIS installer; a dmg and a zip for arm64 and for x64),
+# then opens the packaged app on a temp vault (`desktop/smoke.mjs`) and passes only when the page
+# reports `data-dag-ready`. macOS opens both of its builds: the arm64 one natively and the x64 one
+# under Rosetta. What was built is kept as the artifact `<artifact>-<OS>`.
+#
+# **Signing is the caller's decision, and the only place a certificate can reach.** With `sign`
+# false (every pull request) the signing secrets are not even put in the environment: the macOS
+# app is signed ad hoc and the Windows installer is not signed — exactly what a release without
+# signing secrets ships. A pull request's code never runs next to a signing key. With `sign` true
+# the caller passes its secrets (`secrets: inherit`), `desktop/package.mjs` signs with the ones
+# that are there and skips cleanly without them.
+name: desktop-build
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: 'The runners to build on, as a JSON array: ["ubuntu-latest"] or all three.'
+        type: string
+        default: '["ubuntu-latest","windows-latest","macos-latest"]'
+      sign:
+        description: "Put the signing secrets in the packaging step's environment."
+        type: boolean
+        default: false
+      artifact:
+        description: "Artifact name prefix; each leg uploads <artifact>-<Linux|Windows|macOS>."
+        type: string
+        default: anydag
+      ref:
+        description: "The commit or tag to build. Empty is the caller's own."
+        type: string
+        default: ""
+      tag:
+        description: "When set, the version in the tree must be this tag (scripts/check-version.mjs)."
+        type: string
+        default: ""
+      retention-days:
+        type: number
+        default: 7
+    secrets:
+      CSC_LINK:
+        required: false
+      CSC_KEY_PASSWORD:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      WIN_CSC_LINK:
+        required: false
+      WIN_CSC_KEY_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        # Git's bash on Windows, so one spelling of every step serves the three.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: The tag is the version
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: node scripts/check-version.mjs "$TAG"
+      - run: npm ci
+      - run: npm run desktop:build
+      - name: Package
+        run: node desktop/package.mjs
+        env:
+          # Empty unless the caller asked for signing; an empty value counts as absent
+          # (`desktop/package.mjs`), so an unsigned build and a build without secrets are one thing.
+          CSC_LINK: ${{ inputs.sign && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ inputs.sign && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ inputs.sign && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.sign && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.sign && secrets.APPLE_TEAM_ID || '' }}
+          WIN_CSC_LINK: ${{ inputs.sign && secrets.WIN_CSC_LINK || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ inputs.sign && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+      - name: Open it (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node desktop/smoke.mjs
+      - name: Open it
+        if: runner.os != 'Linux'
+        run: node desktop/smoke.mjs
+      - name: Open the x64 build too (macOS, under Rosetta)
+        if: runner.os == 'macOS'
+        run: |
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            # The arm64 run's keychain item belongs to a differently signed app, and reading it
+            # would be an "allow access?" prompt nobody answers. The runner is thrown away after.
+            perl -e 'alarm 20; exec @ARGV' security delete-generic-password -s "AnyDag Safe Storage" >/dev/null 2>&1 || true
+            node desktop/smoke.mjs --app release/mac/AnyDag.app/Contents/MacOS/AnyDag
+          else
+            echo "::warning::no Rosetta on this runner — the x64 build was packaged but not opened"
+          fi
+      - name: What was built
+        run: ls -la release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-${{ runner.os }}
+          retention-days: ${{ inputs.retention-days }}
+          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/*.yml
+            !release/builder-debug.yml
+            !release/builder-effective-config.yaml

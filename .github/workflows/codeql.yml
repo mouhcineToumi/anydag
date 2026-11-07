@@ -1,0 +1,45 @@
+# CodeQL over the TypeScript: on every pull request into develop or main, on every push to develop,
+# and weekly, so a new query finds what was already merged. Results are in the repository's
+# Security → Code scanning.
+#
+# Needs the repository's *default setup* for code scanning switched off — the two cannot both
+# upload — and Advanced Security's code scanning, which is free for a public repository.
+name: codeql
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop, main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  schedule:
+    - cron: "23 4 * * 1"
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: javascript-typescript
+          # TypeScript needs no build; the extractor reads the sources.
+          build-mode: none
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: "/language:javascript-typescript"

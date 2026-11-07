@@ -15,7 +15,13 @@
  *    allow. An empty variable — a secret the repository does not have — counts as absent.
  * 2. **Whether the shell may update itself on macOS**: the shell is rebuilt with `ANYDAG_SIGNED`,
  *    because Squirrel.Mac refuses an update to an ad-hoc-signed app (`desktop/main.ts`).
- * 3. **The second macOS architecture's watcher.** `npm ci` installs the prebuilt
+ * 3. **The update channel.** electron-builder reads it off the version (`0.2.0-nightly.…` is the
+ *    `nightly` channel, `0.2.0-beta.1` the `beta` one, a plain `0.2.0` is `latest`), names the files
+ *    the updater reads for it (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`) and writes the
+ *    channel into the app's own `app-update.yml`; electron-updater reads it back off the running
+ *    version. Nothing is configured, which is why it is *checked* here: a build whose version says
+ *    one channel and whose update files say another would be an app that never finds its updates.
+ * 4. **The second macOS architecture's watcher.** `npm ci` installs the prebuilt
  *    `@parcel/watcher-darwin-<arch>` of the machine it runs on; the x64 app built on an arm64 runner
  *    needs the other one, fetched with `npm pack` and checked against the lockfile's integrity.
  *
@@ -60,7 +66,23 @@ await build();
 
 const bin = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "electron-builder.cmd" : "electron-builder");
 const run = spawnSync(bin, args, { cwd: root, env, stdio: "inherit", shell: process.platform === "win32" });
+if (run.status === 0) checkChannelFiles();
 process.exit(run.status ?? 1);
+
+/** The update files electron-builder wrote are the ones this version's channel names. */
+function checkChannelFiles() {
+  const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
+  const pre = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(version)?.[1];
+  const channel = pre ?? "latest";
+  const file = process.platform === "darwin" ? `${channel}-mac.yml` : process.platform === "win32" ? `${channel}.yml` : `${channel}-linux.yml`;
+  const out = path.join(root, "release");
+  const wrong = fs.readdirSync(out).filter((f) => /^[a-z]+(-linux|-mac)?\.yml$/.test(f) && f !== file && f !== "builder-debug.yml");
+  if (!fs.existsSync(path.join(out, file)) || wrong.length > 0) {
+    console.error(`package: version ${version} is the ${channel} channel, so ${file} is the update file — release/ has ${fs.readdirSync(out).filter((f) => f.endsWith(".yml")).join(", ") || "none"}`);
+    process.exit(1);
+  }
+  console.log(`package: update channel ${channel} (${file})`);
+}
 
 /** `@parcel/watcher-darwin-<the other arch>`, at the version and integrity the lockfile pins. */
 function otherWatcher() {
