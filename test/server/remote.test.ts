@@ -127,7 +127,8 @@ describe("the remote door", () => {
       expect([url, got.body.code]).toEqual([url, "local-only"]);
     }
     /* Reading the same things is the phone's too. */
-    expect((await d.phone("GET", "/api/telemetry", { headers })).status).toBe(200);
+    const logs = await d.phone("GET", "/api/telemetry", { headers });
+    expect([logs.status, logs.body.answerable]).toEqual([200, false]);
     expect((await d.phone("GET", "/api/vaults", { headers })).status).toBe(200);
   });
 

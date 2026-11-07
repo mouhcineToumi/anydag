@@ -19,7 +19,7 @@ export function TelemetryPrompt() {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const card = useRef<HTMLDivElement>(null);
-  const asking = status?.consent === null;
+  const asking = status?.consent === null && status.answerable !== false;
 
   useEffect(() => {
     if (asking) card.current?.focus();

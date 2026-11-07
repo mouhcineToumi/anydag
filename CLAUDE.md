@@ -4695,6 +4695,8 @@ Nine things are load-bearing:
 - **What only the desktop may do** — the `/api/remote` routes, opening, making or closing a vault,
   linking sync, answering the logs question — is a 403 `local-only` on the remote door, so a phone
   never pairs another phone or closes the door it stands in. A chat's `x-anydag-chat` there is a 400.
+  The logs question is therefore not asked there: `GET /api/telemetry` answers `answerable: false`
+  on the remote door, and a question a phone cannot answer is a modal it cannot close.
 - **Revoking cuts now**: the device's next request is a 401 and every socket it holds — the change
   feed's included — is destroyed (`hold`, through `c.env.incoming.socket`). Off closes the listener
   and every connection on it.

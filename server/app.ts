@@ -120,7 +120,7 @@ export function createApp(opts: ServerOptions): Hono {
   vaultRoutes(app, s);
   trashRoutes(app, s);
   syncRoutes(app, s);
-  telemetryRoutes(app, s);
+  telemetryRoutes(app, s, remote);
   remoteRoutes(app, s);
   if (remote) deviceRoutes(app, s);
   else localDeviceRoute(app);

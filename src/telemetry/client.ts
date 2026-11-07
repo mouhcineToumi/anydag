@@ -25,6 +25,8 @@ import { cleanEvent, MAX_EVENTS, PAGES, scrub, MESSAGE_MAX, STACK_MAX, type Even
 export interface TelemetryStatus {
   consent: boolean | null;
   destination: string | null;
+  /** False on a paired phone: the answer is the desktop's to give. Absent from an older server. */
+  answerable?: boolean;
 }
 
 /** Dispatched on `window` whenever the answer is known or changes. */

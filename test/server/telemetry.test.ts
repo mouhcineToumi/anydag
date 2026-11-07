@@ -38,7 +38,7 @@ function appOf(vars: NodeJS.ProcessEnv = {}) {
 describe("/api/telemetry", () => {
   it("is never asked until somebody answers, and the answer is the home's", async () => {
     const { call } = appOf({ ANYDAG_LOGS_URL: "https://logs.example/" });
-    expect((await call("GET", "/api/telemetry")).body).toEqual({ consent: null, destination: "logs.example" });
+    expect((await call("GET", "/api/telemetry")).body).toEqual({ consent: null, destination: "logs.example", answerable: true });
     expect((await call("PUT", "/api/telemetry", { enabled: true })).body.consent).toBe(true);
     expect(env.home.get("telemetry.install")).toMatch(/^[0-9a-f-]{36}$/);
     /* A new server on the same home reads it back. */

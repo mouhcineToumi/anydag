@@ -15,18 +15,25 @@ export function PrivacyPane() {
   const status = useTelemetry();
   const [failed, setFailed] = useState(false);
   const on = status?.consent === true;
+  const here = status?.answerable !== false;
 
   return (
     <>
       <Group title="Logs">
         <Field
           label="Send anonymous logs"
-          hint={failed ? "That did not save. Try again in a moment." : "Errors, which features are used, and how fast pages draw. Nothing you write, and nothing that names you."}
+          hint={
+            failed
+              ? "That did not save. Try again in a moment."
+              : here
+                ? "Errors, which features are used, and how fast pages draw. Nothing you write, and nothing that names you."
+                : "Answered on the computer this device is paired with, for everything that runs there."
+          }
         >
           <Switch
             data-dag-setting-telemetry=""
             checked={on}
-            disabled={status === null}
+            disabled={status === null || !here}
             onChange={(e) => {
               setFailed(false);
               void setConsent(e.target.checked).then((ok) => !ok && setFailed(true));
