@@ -2170,7 +2170,7 @@ export function useEditor({
         addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
         const moves = new Map<string, Point>();
         for (const p of parts) moves.set(p.id, { x: p.from.x + at.dx, y: p.from.y + at.dy });
-        move(moves);
+        void move(moves);
       };
 
       /*

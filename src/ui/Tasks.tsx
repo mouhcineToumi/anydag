@@ -157,6 +157,14 @@ export function TasksView({
     },
     [],
   );
+  /* The columns and the groups take a handler that returns nothing; the status button's answer
+     arrives through `pending`. */
+  const onChange = useCallback(
+    (row: Row, next: TaskChange) => {
+      void change(row, next);
+    },
+    [change],
+  );
 
   const total = Object.keys(list.tasks).length;
   /* The count says what is in the scope, before the words filter it. */
@@ -210,11 +218,11 @@ export function TasksView({
         </p>
       ) : null}
       {layout === "board" ? (
-        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : change} chip={chip} into={into} />
+        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} />
       ) : (
         <div className="dag-tasks__groups">
           {LIST_ORDER.map((status) => (
-            <Group key={status} status={status} rows={by(status)} onOpen={onOpen} onChange={locked ? undefined : change} chip={chip} into={into} />
+            <Group key={status} status={status} rows={by(status)} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} />
           ))}
         </div>
       )}
