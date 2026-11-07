@@ -78,6 +78,24 @@ async function until(what: string, ok: () => boolean | Promise<boolean>, ms = 80
   throw new Error(`timed out waiting for ${what}`);
 }
 
+/**
+ * The status once the loop has gone quiet: idle with nothing pending, as one observation.
+ *
+ * A status is a moment, and the loop makes moments the caller did not ask for. The watcher starts
+ * with the loop and reports the files a link or a pull has just written *afterwards* — late, and
+ * later still on a busy machine — each batch is touched, debounced (`quietMs`) and run, and the run
+ * finds the disk equal to the base and pushes nothing. Reading `GET /api/sync` straight after the
+ * call that caused it asserts a state that run has every right to be in the middle of.
+ */
+async function settled(a: App, what = "the loop"): Promise<SyncStatus> {
+  let seen: SyncStatus | null = null;
+  await until(`${what} to be idle with nothing pending`, async () => {
+    seen = (await a.call("GET", "/api/sync")).json as SyncStatus;
+    return seen.state === "idle" && seen.pending === 0;
+  });
+  return seen!;
+}
+
 const has = (root: string, rel: string): boolean => fs.existsSync(path.join(root, ...rel.split("/")));
 
 beforeAll(async () => {
@@ -161,7 +179,7 @@ describe("linking two vaults through /api/sync", () => {
     expect(readText(B.env.root, "attachments/ref.pdf")).toBe("%PDF-1.4\n");
     expect(fs.existsSync(path.join(B.env.homeDir, "sync", old))).toBe(false);
     expect(fs.existsSync(path.join(B.env.homeDir, "sync", remote, "key"))).toBe(true);
-    expect((await B.call("GET", "/api/sync")).json).toMatchObject({ linked: true, state: "idle", remote });
+    expect(await settled(B, "B")).toMatchObject({ linked: true, remote });
   });
 
   it("refuses a download into a vault that holds documents, and opens the key with the recovery code", {
@@ -191,14 +209,14 @@ describe("linking two vaults through /api/sync", () => {
     await C.call("POST", "/api/sync/unlink");
   });
 
-  it("a write in A reaches B through `now`", async () => {
+  it("a write in A reaches B through `now`", { timeout: 30_000 }, async () => {
     write(A.env.root, "news.md", "---\ntitle: News\n---\nFrom A.\n");
     const a = (await A.call("POST", "/api/sync/now")).json as SyncStatus;
     expect(a.state).toBe("idle");
     // `pending` counts watcher events not yet pushed, and on a slow machine the event for the
     // write above can land after `now` has already pushed it: a read straight after `now` races
     // the watcher. What is meant is that A has nothing left to push once the loop has heard it.
-    await until("A to have nothing pending", async () => ((await A.call("GET", "/api/sync")).json as SyncStatus).pending === 0);
+    await settled(A, "A");
     const b = (await B.call("POST", "/api/sync/now")).json as SyncStatus;
     expect(b.state).toBe("idle");
     expect(readText(B.env.root, "news.md")).toContain("From A.");
@@ -214,15 +232,22 @@ describe("linking two vaults through /api/sync", () => {
     B.s.sync.tune = TUNED;
   });
 
-  it("a change B's watcher reports is pushed after the debounce, and says so on the feed", { timeout: 15_000 }, async () => {
+  it("a change B's watcher reports is pushed after the debounce, and says so on the feed", { timeout: 30_000 }, async () => {
+    // Quiet first: B's loop may still be hearing the files the last two tests had it write, and a
+    // run that is no more than that echo would answer every "pending, then idle" below without
+    // `from-b.md` having been seen, let alone pushed.
+    await settled(B, "B");
+    const before = (await h.meta.heads(remote, "", 1)).seq;
     const said: SyncStatus[] = [];
     const off = await B.s.vault.subscribe((c: Change) => {
       if (c.type === "sync") said.push(c.status);
     });
     write(B.env.root, "from-b.md", "---\ntitle: From B\n---\nWritten in B.\n");
     await until("B to see the change", () => said.some((s) => s.pending > 0));
+    // The push is what the debounce is for, and the server is where it can be seen to have happened.
+    await until("B to push it", async () => (await h.meta.heads(remote, "", 1)).seq > before);
     await until(
-      "B to push it",
+      "B to say it is done",
       () => said.some((s) => s.state === "syncing") && said.at(-1)!.state === "idle" && said.at(-1)!.pending === 0,
     );
     await A.call("POST", "/api/sync/now");
@@ -246,7 +271,7 @@ describe("linking two vaults through /api/sync", () => {
     expect(listed.json.code).toBe("ES_AUTH");
   });
 
-  it("unlink forgets the link and keeps every file", async () => {
+  it("unlink forgets the link and keeps every file", { timeout: 30_000 }, async () => {
     const id = A.s.vault.id;
     const got = (await A.call("POST", "/api/sync/unlink")).json as SyncStatus;
     expect(got).toMatchObject({ linked: false, state: "unlinked", server: null });
@@ -295,7 +320,7 @@ describe("what a process that is not the app does with a linked vault", () => {
     }
   });
 
-  it("a link this process could not keep the key of is refused before the server is asked", async () => {
+  it("a link this process could not keep the key of is refused before the server is asked", { timeout: 30_000 }, async () => {
     const F = app();
     await paired(F);
     await F.s.closeAll();

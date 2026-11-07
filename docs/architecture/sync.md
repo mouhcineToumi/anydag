@@ -47,7 +47,11 @@ Eleven things are load-bearing:
   because one document has one created on every device: it travels in the sealed metadata, every pull
   that ends on the committed bytes adopts it (`adoptCreated`), a conflict copy included, a birth
   `createdOf` reports is remembered until the index walks the file, and a document renamed before the
-  walk keeps its id's created rather than its new file's birth (`movedCreated`). The first download
+  walk keeps its id's created rather than its new file's birth (`movedCreated` for a push,
+  `createdOfId` for the tie-break **and for the index row the walk writes** — the row was the one
+  place that read the birth, and a device whose first walk met a renamed copy alone dated it by the
+  rename and then kept the other device's copy: seed 2, only when a second boundary fell between the
+  two births). The first download
   holds id fixes (`holdFixes`) until it has every file. **Run the harness loaded** — four batches at
   once — before believing a change to any of this: its timing defects do not show on an idle machine.
 - **One name is one document.** `ideas.md` from one device and `ideas.board.md` from another are two
@@ -88,6 +92,18 @@ Eleven things are load-bearing:
   outside writes, stale page saves, offline spells and dropped answers; every seed must end with the
   same bytes everywhere, no token anybody wrote lost, and no dangling or duplicated id. It found
   every defect in the client the unit tests missed. A printed seed replays with `ANYDAG_SYNC_SEED`.
+  **It runs on its own clock, not the machine's.** A file's birth is a second-resolution instant and
+  decides which duplicate keeps an id, so a seed read from the disk was a function of how fast the
+  machine ran it: seed 2 held with every birth in one second and failed once a slow run spread them.
+  `World` now advances one seeded clock (up to 900 ms a step, a separate stream so the schedule is
+  unchanged) that every vault reads as a birth, so a seed makes the same births every run, idle or
+  loaded. A scripted case that pins `Dev.clock` keeps it.
+
+**A test of the loop reads a status only once the loop is quiet.** The watcher starts with the loop and
+reports what a link or a pull wrote *after* the call returned; each batch is debounced into a run that
+finds nothing to push, and reads `syncing` while it goes. `test/server/sync-loop.test.ts` takes the
+status through `settled()` (idle, nothing pending, one observation) and sees a push on the server
+(`heads().seq`), never on the feed's `pending` and `idle` alone, which a stale echo satisfies.
 
 The unit suite loads `node:sqlite` through an alias in `vitest.config.ts` (`test/node-sqlite.ts`):
 Vite strips the `node:` prefix from a built-in it does not know, and the sync client's tests failed

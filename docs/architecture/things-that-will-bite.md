@@ -740,3 +740,16 @@
   `test/code-block.test.ts` pinned a Python block's exact HTML and failed whenever `syntax.test.ts` had
   run first in its worker, because Python had landed and the block came out coloured. Pin exact HTML
   in a language nothing colours.
+
+- **A sync test that reads the machine's clock passes on an idle machine and fails on a busy one.**
+  The convergence harness dated every file by its disk birth, a second-resolution instant that picks
+  the winner of a duplicate id, so a seed whose births all fell in one second held and the same seed
+  spread over two failed — seed 2, two runs in three on a loaded machine, none on an idle one, and
+  the defect behind it (a renamed copy's index row dated by the rename, not its id's created) was the
+  engine's. #14 was the same mistake in the collector (the database's `now()`). Give the test
+  the clock. **And the other half: a status is a moment.** The sync loop's watcher reports a pull's
+  own writes late, and each batch runs once more and finds nothing to push, so `GET /api/sync` right
+  after a link answered `syncing` in six runs of fifteen on two starved cores. Wait for the loop to be
+  quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state, and prove a push
+  where it lands, on the server. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
+  which starves a run far harder than the same loops spread over every core.
