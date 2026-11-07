@@ -5,7 +5,7 @@
 #
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 #
-# The first entry will be the commit that applies the Biome formatter to the whole tree
-# (`npm run format`). It is made once, in a commit of its own, after the branches that touch source
-# have merged, and its full 40-character hash goes below on its own line with a comment saying what it
-# was. Nothing is listed yet.
+# Each entry is one such commit, by its full hash, with a line above it saying what it was.
+
+# style: format the code with Biome (the first `npm run format` over the whole tree)
+238870489da061a8cffcc9cb82c3e0ca52887454

@@ -39,7 +39,7 @@ the app's home).
 
 - `npm ci` — install (Node ≥ 24.7); it also installs the git hooks.
 - `npm run dev` — Vite + the local server. `npm run desktop:dev` — the Electron app.
-- `npm run checks` — the fast tier: Biome lint, knip, typechecks, the `check:*` contracts, parity, the
+- `npm run checks` — the fast tier: Biome lint and format check, knip, typechecks, the `check:*` contracts, parity, the
   unit suite. No browser, about half a minute. **Run it before every push**; it is also the pre-commit hook.
 - `npm run e2e:smoke` / `npm run e2e:docker` — the Playwright suite's smoke tier / all of it, in the
   pinned Playwright Docker image, screenshots compared. `npm run e2e:local` is the host browser and
@@ -154,7 +154,7 @@ card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/`
 
 ## Gate
 
-`npm run checks` is the fast tier (Biome lint, knip, typecheck of all three tsconfigs, `check:version`,
+`npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
 `check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `test/parity.test.ts`,
 vitest). It needs no browser and is the pre-commit hook; CI also runs `npm run lint:promises`. The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)

@@ -61,7 +61,7 @@ file the release does not have.
 
 ## Gate
 
-**`npm run checks` is the fast tier** (`scripts/checks.sh`): `biome lint` → knip → typecheck →
+**`npm run checks` is the fast tier** (`scripts/checks.sh`): `biome lint` → `biome format` (check only) → knip → typecheck →
 `check:version` → `check:case` → `check:theme` → `check:literals` → `check:icons` → `check:skill` →
 vitest (parity included). It has three readers — the pre-commit hook, CI's `checks.yml`, and
 `scripts/gate.sh` — one list, so a check added is added everywhere. It needs no browser and no
@@ -73,8 +73,9 @@ browser suite.
 **Lint is Biome, and promises are typescript-eslint.** `biome.jsonc` holds Biome's recommended
 *correctness* and *suspicious* rules, with every rule turned off or narrowed carrying its reason;
 `useExhaustiveDependencies` is off on purpose (effects here deliberately have no dependency lists).
-`npm run format` and `format:check` are Biome's formatter over `ts/tsx/mjs/cjs/js`; a reformat is
-its own commit, listed in `.git-blame-ignore-revs`. `npm run lint:promises` is typescript-eslint's
+`npm run format` and `format:check` are Biome's formatter over `ts/tsx/mjs/cjs/js`; the fast tier
+fails on a file it would change, so run `npm run format` before committing (or let your editor's
+Biome extension do it). A whole-tree reformat is its own commit, listed in `.git-blame-ignore-revs`. `npm run lint:promises` is typescript-eslint's
 three promise rules (`no-floating-promises`, `no-misused-promises`, `await-thenable`) over one program
 that includes `e2e/` and `desktop/`, which no `tsc` step checks — about 40 s, so it is CI's `promises`
 job and not in the hook. Biome's own promise rules are not used: they infer types without `tsc`, and

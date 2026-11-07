@@ -44,7 +44,7 @@ TypeScript, React, Hono and Electron, in one repository.
 
 ## Before you push
 
-Run **`npm run checks`** (Biome lint, knip, typecheck, the `check:*` contracts, `docs/parity.json`, unit tests).
+Run **`npm run checks`** (Biome lint and format check, knip, typecheck, the `check:*` contracts, `docs/parity.json`, unit tests).
 It is also the pre-commit hook; do not skip it with `--no-verify`, and do not push on red. Then:
 
 - **Add or update tests** for the behaviour you changed: unit tests in `test/`, browser checks in `e2e/`.

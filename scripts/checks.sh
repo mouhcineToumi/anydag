@@ -33,6 +33,11 @@ step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 step "lint"
 npx biome lint .
 
+# Biome's formatter, checking only: a file it would change is a failure, and `npm run format` is the
+# fix. A whole-tree reformat is its own commit, listed in `.git-blame-ignore-revs`.
+step "format"
+npx biome format .
+
 # Unused exports, files and dependencies, and imports of packages `package.json` does not list: the
 # count is zero and stays zero, so any finding is a regression. Its exceptions, each with its
 # reason, are in `knip.jsonc`. About two seconds over the whole tree.
