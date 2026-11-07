@@ -111,6 +111,14 @@ Fourteen things are load-bearing:
   bottom scrolls it on a frame loop, faster the closer, and aims again after every frame that moved,
   since what is under a still pointer changed. A folder move says *Moving “name”…* under the tree
   while it runs and the server's reason there when it is refused.
+- **The open file's row is brought into view once per open file, not on every change in the list.**
+  The effect that shows it (`"center"`, and only when it is out of view) depends on `lines.length` so
+  that it can find the row when the list arrives after the file does, and `lines.length` is also
+  every file or folder anyone makes or removes anywhere in the vault. Run on each of those it pulled
+  the list back to the open row whenever a person had scrolled away from it — and undid a drag's
+  glide a few pixels a frame as fast as another writer added a row. `shownKey` remembers which file
+  it has shown. `e2e/folders.spec.ts` holds it (*a file somebody else makes does not bring the list
+  back to the open board*), and the glide's own check passed under load only after it.
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
 `dag-toolbar__crumb*`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and

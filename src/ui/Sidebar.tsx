@@ -641,11 +641,21 @@ export function Sidebar({
      Scrolling a row somebody has just clicked to the middle of the list would move it out from
      under their pointer, which a column that is up all day cannot afford the way a dialog could.
      `"center"` when it does scroll, because `"nearest"` leaves it
-     flush against the edge with nothing around it. */
+     flush against the edge with nothing around it.
+
+     **Once per open file.** `lines.length` is a dependency so that the row can be found when the list
+     arrives after the file does, and it is also every other file or folder made or removed anywhere
+     in the vault — by an agent, the CLI, another tab. Each of those brought the open row back to
+     the middle whenever it was out of view, which is the whole time somebody has scrolled away from
+     it: the list was pulled back under their hand, and a drag held at the tree's edge, whose glide
+     scrolls it a few pixels a frame, was undone as fast as another writer added a row. The row is
+     shown the first time it exists for this file, and not again until the open file is another. */
+  const shownKey = useRef<string | null>(null);
   useEffect(() => {
     const list = listRef.current;
     const row = list?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!list || !row) return;
+    if (!list || !row || shownKey.current === currentKey) return;
+    shownKey.current = currentKey;
     const a = list.getBoundingClientRect();
     const b = row.getBoundingClientRect();
     if (b.top < a.top || b.bottom > a.bottom) row.scrollIntoView({ block: "center" });
