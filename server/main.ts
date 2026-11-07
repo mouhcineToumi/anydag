@@ -81,6 +81,9 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", quit);
   process.on("SIGTERM", quit);
+  /* Started by the desktop app, which holds an IPC channel to this process: the channel closing —
+     the app asking, or the app gone — is the stop. Windows has no SIGTERM to send, only a hard kill. */
+  if (process.send) process.on("disconnect", quit);
 }
 
 /**

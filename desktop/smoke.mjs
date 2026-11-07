@@ -32,7 +32,10 @@ function packaged() {
   if (process.platform === "linux") found.push(path.join(release, "linux-unpacked", "anydag"));
   if (process.platform === "win32") found.push(path.join(release, "win-unpacked", "AnyDag.exe"));
   if (process.platform === "darwin") {
-    for (const dir of ["mac", "mac-arm64", "mac-universal", "mac-x64"]) found.push(path.join(release, dir, "AnyDag.app", "Contents", "MacOS", "AnyDag"));
+    /* electron-builder names the x64 build `mac` and the others by their arch; this machine's own
+       arch first, so the default run is a native one (`--app` names the other). */
+    const dirs = process.arch === "arm64" ? ["mac-arm64", "mac-universal", "mac", "mac-x64"] : ["mac", "mac-x64", "mac-universal", "mac-arm64"];
+    for (const dir of dirs) found.push(path.join(release, dir, "AnyDag.app", "Contents", "MacOS", "AnyDag"));
   }
   return found.find((f) => fs.existsSync(f));
 }

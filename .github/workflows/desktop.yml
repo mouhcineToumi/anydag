@@ -1,13 +1,16 @@
-# The desktop app, built and opened on a pull request that touches what it is made of.
+# The desktop app, built and opened on a pull request that touches what it is made of — on Linux,
+# Windows and macOS.
 #
-# The job builds the page, the server, the CLI and the shell, packages them with electron-builder
-# — an AppImage, unsigned — then opens the packaged app on a temp vault (`desktop/smoke.mjs`) and
-# passes only when the page reports `data-dag-ready`. The AppImage is kept as the run's artifact
-# for a week. A tagged release is `release.yml`, which runs the same steps and then publishes.
+# Each leg builds the page, the server, the CLI and the shell, packages them
+# (`desktop/package.mjs`: an AppImage; an NSIS installer; a dmg and a zip for arm64 and for x64),
+# then opens the packaged app on a temp vault (`desktop/smoke.mjs`) and passes only when the page
+# reports `data-dag-ready`. macOS opens both of its builds: the arm64 one natively and the x64 one
+# under Rosetta. What was built is kept as the run's artifact for a week.
 #
-# **Linux only, for now.** Everything here is written for all three systems: adding
-# `windows-latest` and `macos-latest` to the matrix is the whole of turning them on, and
-# `check:case` keeps the tree buildable on their case-insensitive disks.
+# **No certificate reaches this workflow**, so nothing it builds is signed with one: the macOS app
+# is signed ad hoc and the Windows installer is not signed — exactly what a release without signing
+# secrets ships. A pull request's code never runs next to a signing key. A tagged release is
+# `release.yml`, which runs the same steps, signs when it can, and publishes.
 name: desktop
 
 on:
@@ -35,8 +38,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # Git's bash on Windows, so one spelling of every step serves the three.
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
@@ -46,15 +53,23 @@ jobs:
       - run: npm ci
       - run: npm run desktop:build
       - name: Package
-        run: npx electron-builder --config desktop/electron-builder.yml --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: node desktop/package.mjs
       - name: Open it (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a node desktop/smoke.mjs
       - name: Open it
         if: runner.os != 'Linux'
         run: node desktop/smoke.mjs
+      - name: Open the x64 build too (macOS, under Rosetta)
+        if: runner.os == 'macOS'
+        run: |
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            node desktop/smoke.mjs --app release/mac/AnyDag.app/Contents/MacOS/AnyDag
+          else
+            echo "::warning::no Rosetta on this runner — the x64 build was packaged but not opened"
+          fi
+      - name: What was built
+        run: ls -la release
       - uses: actions/upload-artifact@v4
         with:
           name: anydag-${{ runner.os }}
@@ -62,6 +77,8 @@ jobs:
           if-no-files-found: error
           path: |
             release/*.AppImage
+            release/*.exe
             release/*.dmg
             release/*.zip
-            release/*.exe
+            release/*.blockmap
+            release/latest*.yml

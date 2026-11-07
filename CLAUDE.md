@@ -5000,8 +5000,10 @@ everywhere. It needs no browser and no network and takes seconds, which is what 
 commit hook: `tsc` is incremental (its build info under `node_modules/.cache/tsc/`) and the unit
 suite shares modules between the files each worker runs. `.githooks/pre-commit` is the hook, and
 `npm run prepare` installs it with `git config core.hooksPath .githooks` — relative on purpose, so one
-setting serves every worktree. `prepare` is guarded with `command -v git`, because `npm ci` runs it
-where there may be no repository. `ANYDAG_NO_HOOK=1` skips the hooks.
+setting serves every worktree. `prepare` is `scripts/hooks.mjs`, which does nothing without git or a
+repository, because `npm ci` runs it where there may be neither — and is Node, because npm runs a
+script line with `cmd.exe` on Windows, where `command -v` and `true` are not commands and the shell
+form failed `npm ci` there. `ANYDAG_NO_HOOK=1` skips the hooks.
 
 **CI runs the fast tier and no Playwright.** The screenshot baselines are compared against one pinned
 Chromium, and a runner's fonts rasterise differently, so a green tick on GitHub does not mean the app
