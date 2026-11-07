@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 #
-# The Playwright suite, before anything leaves this machine. CI stopped running them — the header
-# of `.github/workflows/ci.yml` says why — so this is the only thing between a browser and `main`,
-# and it is worth knowing that it is one `--no-verify` deep.
+# The browser suite, before a push — but only the part of it the push can have changed.
 #
-# It is the dev suite against `npm run dev`, at low priority (`scripts/e2e-local.sh`) — the only
-# run that compares the 45 visual baselines and that can fire the dev size assertion.
+# CI runs the same image on every pull request (`.github/workflows/e2e.yml`: the `@smoke` tier on a
+# PR, everything on `develop`), so this is the early, cheap look, and it is one `--no-verify` deep.
+# What it does not do is run five minutes of browser checks for a push that cannot have broken one:
 #
-# **A deleted branch is not something to test.** Git writes an all-zero local sha for one, and
-# running five minutes of browser checks to delete a remote branch is the kind of thing that
-# makes somebody reach for `--no-verify` once and never put it back.
+#   1. **Nothing new** — every pushed commit is already on a remote (`git rev-list <sha> --not
+#      --remotes` is empty: a new branch pointing at an existing commit, a tag) → skipped, with a line.
+#   2. **A deleted branch** — git writes an all-zero sha for it → nothing to test.
+#   3. **Otherwise** `scripts/e2e-plan.mjs` reads what the push changes against `origin/develop`
+#      (else `origin/main`; neither → the whole suite) and answers with the tests it needs — the rule
+#      is written at the top of that file: prose and CI config run nothing; application code the
+#      `@smoke` tier; what can move pixels also the 45 reference screenshots; and a change under
+#      `e2e/` the specs Playwright's `--only-changed` traces it to.
 #
-# `ANYDAG_NO_HOOK=1` is the escape hatch beside `--no-verify`, and a checkout with no
-# `node_modules` is skipped with a word rather than refused — the same argument
-# `.githooks/pre-commit` and `check-skill.mjs` make.
+# The tests run in Playwright's own Docker image (`scripts/e2e-docker.sh`), because the screenshots
+# are only valid there, so local and CI agree. No Docker running → the host's browser runs the same
+# selection (`scripts/e2e-local.sh`) with no screenshots compared, and says so. `ANYDAG_E2E_HOST=1`
+# asks for that on purpose. Workers are chosen from the machine's cores and free memory
+# (`scripts/e2e-lib.sh`); `ANYDAG_E2E_WORKERS` overrides.
+#
+# `ANYDAG_NO_HOOK=1` is the escape hatch beside `--no-verify`, and a checkout with no `node_modules`
+# is skipped with a word rather than refused — the same argument `.githooks/pre-commit` and
+# `check-skill.mjs` make. The tests run on the working tree, as they always have: push the branch you
+# are standing on.
 set -euo pipefail
 
 if [ -n "${ANYDAG_NO_HOOK:-}" ]; then
@@ -27,17 +38,50 @@ if [ ! -d node_modules ]; then
 fi
 
 zero="0000000000000000000000000000000000000000"
-anything=
+heads=()
+pushing=
 
 while read -r _local_ref local_sha _remote_ref _remote_sha; do
   [ "$local_sha" = "$zero" ] && continue
-  anything=yes
+  pushing=yes
+  # A commit is new if no remote-tracking branch has it.
+  if [ -n "$(git rev-list --max-count=1 "$local_sha" --not --remotes 2>/dev/null)" ]; then
+    heads+=(--head "$local_sha")
+  fi
 done
 
-if [ -z "$anything" ]; then
+if [ -z "$pushing" ]; then
   echo "pre-push: nothing being pushed"
   exit 0
 fi
 
-echo "pre-push: the Playwright suite against the dev server"
-exec bash scripts/e2e-local.sh
+if [ "${#heads[@]}" -eq 0 ]; then
+  echo "pre-push: nothing new — every pushed commit is already on a remote; no tests"
+  exit 0
+fi
+
+plan="$(node scripts/e2e-plan.mjs "${heads[@]}")"
+field() { printf '%s' "$plan" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s)[process.argv[1]];process.stdout.write(v==null?"":String(v))})' "$1"; }
+
+if [ "$(field run)" != "true" ]; then
+  echo "pre-push: $(field why); no tests"
+  exit 0
+fi
+
+selection=()
+grep="$(field grep)"
+[ -n "$grep" ] && selection=(--grep "$grep")
+echo "pre-push: $(field why)"
+
+use_docker=yes
+if [ -n "${ANYDAG_E2E_HOST:-}" ]; then
+  use_docker=
+elif ! docker info >/dev/null 2>&1; then
+  echo "pre-push: docker is not running — the host's browser runs this selection, comparing no screenshots (start docker for the real thing)"
+  use_docker=
+fi
+
+if [ -n "$use_docker" ]; then
+  exec bash scripts/e2e-docker.sh "${selection[@]+"${selection[@]}"}"
+fi
+exec bash scripts/e2e-local.sh "${selection[@]+"${selection[@]}"}"
