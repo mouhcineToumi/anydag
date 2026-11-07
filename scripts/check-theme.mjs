@@ -24,6 +24,22 @@ const UNITLESS = new Set([
   "donutInner", "minLabelPct", "maxTicks", "markerMax",
 ]);
 
+/* The mirror above was declared and never read, so the drift CLAUDE.md says it guards against was
+   guarded by nothing. Read the real set out of `applyTheme.ts` and fail when the two differ. */
+{
+  const source = fs.readFileSync(path.join(root, "src", "theme", "applyTheme.ts"), "utf8");
+  const body = /const UNITLESS = new Set\(\[([\s\S]*?)\]\);/.exec(source)?.[1] ?? "";
+  const actual = new Set([...body.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  const drift = [
+    ...[...actual].filter((k) => !UNITLESS.has(k)).map((k) => `\`${k}\` is in applyTheme.ts and not here`),
+    ...[...UNITLESS].filter((k) => !actual.has(k)).map((k) => `\`${k}\` is here and not in applyTheme.ts`),
+  ];
+  if (actual.size === 0 || drift.length > 0) {
+    console.error(`UNITLESS has drifted from src/theme/applyTheme.ts:\n  ${drift.join("\n  ") || "could not read it"}`);
+    process.exit(1);
+  }
+}
+
 function walk(prefix, value, out) {
   if (value === null || value === undefined) return;
   if (typeof value === "string" || typeof value === "number") {
