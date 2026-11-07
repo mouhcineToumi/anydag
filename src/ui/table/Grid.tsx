@@ -787,7 +787,7 @@ function CellEditor({
 interface EditorParts {
   draft: string;
   setDraft(v: string): void;
-  inputRef: RefObject<HTMLInputElement & HTMLTextAreaElement>;
+  inputRef: RefObject<(HTMLInputElement & HTMLTextAreaElement) | null>;
   onKeys(e: KeyboardEvent<HTMLElement>, value?: string): void;
   onEnd(value: string | null, then: Then): void;
 }

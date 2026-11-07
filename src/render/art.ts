@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { type JSX, useEffect, useSyncExternalStore } from "react";
 
 /**
  * The art every glyph on a diagram is drawn from, fetched the first time something draws one.

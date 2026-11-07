@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { JSX, PointerEvent as ReactPointerEvent } from "react";
 
 import type { MarkerAt, RoutedEdge } from "@/layout/types";
 import type { Theme } from "@/theme/contract";
