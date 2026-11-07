@@ -331,7 +331,7 @@ export const PICTURE: Command[] = [
       "md is the board's own text carrying its permanent id, so importing it elsewhere keeps every reference to it " +
       "working; it needs no browser. zip is that text with every picture and attachment it names beside it, each " +
       "`dag:` naming an attachment rewritten to the file's path — what the menu saves for a board that " +
-      "names any. svg and png are the page's own export, fonts embedded, at the account's export settings — laid " +
+      "names any. svg and png are the page's own export, fonts embedded, at the vault's export settings — laid " +
       "out in a browser, which this opens.",
     flags: [
       { name: "format", type: "string", value: "<md|zip|svg|png>", help: "default: from --out's extension, else md" },

@@ -28,6 +28,9 @@ import { blankTable } from "../table/write";
  * replaced it.
  */
 
+/** What the page says when a write never reached the server — the sentence `UploadNotice` draws. */
+const UNREACHABLE = "The AnyDag server did not answer, so that change was not saved.";
+
 /** A version of the file: the text and the sha1 the server knows it by. */
 interface Version {
   text: string;
@@ -141,19 +144,33 @@ export function useBoard(name: string | null): BoardHandle {
    *
    * `retry` is false for a whole-text put: putting an old snapshot over a file that has moved is
    * precisely the thing a base check exists to refuse.
+   *
+   * **A server that cannot be reached is a refusal too.** `fetch` rejects rather than answering, and
+   * every caller fires and forgets (`void commit(…)`, a nudge, a drag's release), so the rejection
+   * was unhandled and the drag's painted position was never taken back. `post` resolves `null` for
+   * it, the write resolves `null` like any that did not land, and the person is told through the
+   * notice a refused drop already uses. Only the `fetch` is guarded: a bug in `adopt` is not an
+   * unreachable server and must not be worded as one.
    */
   const write = useCallback(
     async (route: string, payload: object, retry: boolean): Promise<Write | null> => {
       if (!name) return null;
-      const post = (against: Version | null) =>
-        fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ base: against?.base, ...payload }),
-        });
+      const post = async (against: Version | null): Promise<Response | null> => {
+        try {
+          return await fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ base: against?.base, ...payload }),
+          });
+        } catch {
+          document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: UNREACHABLE }));
+          return null;
+        }
+      };
 
       let before = held.current;
       let r = await post(before);
+      if (!r) return null;
       if (r.status === 409) {
         const stale = (await r.json()) as { base?: string; text?: string };
         if (stale.text !== undefined) adopt(name, { text: stale.text, base: stale.base ?? "" });
@@ -162,6 +179,7 @@ export function useBoard(name: string | null): BoardHandle {
            against — an undo must put *that* back, not the version this client held before. */
         before = held.current;
         r = await post(before);
+        if (!r) return null;
       }
       if (!r.ok || !before) return null;
       const done = (await r.json()) as { base?: string; text?: string };

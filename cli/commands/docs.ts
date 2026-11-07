@@ -38,7 +38,7 @@ const LIST_KINDS: readonly ListKind[] = ["boards", "notes", "quizzes", "tables",
 /**
  * The listing narrowed to what `ls` prints: the names under `under` and the kinds in `only` (every
  * kind when it is empty), with every per-name map — `ids`, `titles`, `tasks`, `shared` — cut to the
- * same names. `--json` printed the route's answer whole, so `ls <folder> --json` was the account
+ * same names. `--json` printed the route's answer whole, so `ls <folder> --json` was the vault
  * while the text was the folder; a field the route grows later is cut by its shape, an
  * array of names or a map keyed by one, without a line here.
  */
@@ -125,7 +125,7 @@ function quizReport(ctx: Ctx, text: string): number {
 }
 
 /**
- * What the parser says about a file in the account, or with `--file` about a draft that is not
+ * What the parser says about a file in the vault, or with `--file` about a draft that is not
  *: the same route either way, so the two answers are one answer. A name beside `--file`
  * only labels it.
  */
@@ -319,13 +319,13 @@ export const DOCS: Command[] = [
     help:
       "`E_*` stops a diagram drawing and `W_*` does not; `EB_*` is the board file rather than the DSL in it. Branch " +
       "on the code — the message is for a person. What is wrong with the drawing rather than the text needs the " +
-      "laid-out page: `anydag snapshot`. --file checks a draft that is not in the account, writing nothing.",
+      "laid-out page: `anydag snapshot`. --file checks a draft that is not in the vault, writing nothing.",
     flags: [
       {
         name: "file",
         type: "string",
         value: "<path|->",
-        help: "check this draft instead of a file in the account; `-` is stdin",
+        help: "check this draft instead of a file in the vault; `-` is stdin",
       },
     ],
     routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
