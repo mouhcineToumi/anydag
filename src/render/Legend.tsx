@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import type { LegendEntry } from "@/dsl/ir";
 import type { Theme } from "@/theme/contract";
 

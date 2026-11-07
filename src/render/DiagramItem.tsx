@@ -338,7 +338,11 @@ function Failed({ onSize, children }: { onSize: DiagramProps["onSize"]; children
  * the canvas zoom, and shout when it disagrees. The Playwright run fails on a dirty console, so it
  * is a real gate rather than a note.
  */
-function useSizeAssertion(ref: React.RefObject<HTMLDivElement>, placed: Extract<Layout, { kind: "graph" }>, id: string): void {
+function useSizeAssertion(
+  ref: React.RefObject<HTMLDivElement | null>,
+  placed: Extract<Layout, { kind: "graph" }>,
+  id: string,
+): void {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const root = ref.current;
@@ -414,7 +418,7 @@ function useSizeAssertion(ref: React.RefObject<HTMLDivElement>, placed: Extract<
  * diagram as a board opened and again on each write while somebody typed into one.
  */
 function useQualityReport(
-  ref: React.RefObject<HTMLDivElement>,
+  ref: React.RefObject<HTMLDivElement | null>,
   graph: Graph,
   placed: Extract<Layout, { kind: "graph" }>,
   theme: Theme,
@@ -442,7 +446,10 @@ function useQualityReport(
  * in the *item's* coordinates, with the frame's padding and the header already folded in, and a
  * conversion has to write the layout's own numbers or the drawing shifts as it lands.
  */
-function usePublishedLayout(ref: React.RefObject<HTMLDivElement>, placed: Extract<Layout, { kind: "graph" | "chart" }>): void {
+function usePublishedLayout(
+  ref: React.RefObject<HTMLDivElement | null>,
+  placed: Extract<Layout, { kind: "graph" | "chart" }>,
+): void {
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
@@ -489,7 +496,7 @@ function ChartBody({ placed, theme, id }: { placed: Extract<Layout, { kind: "cha
 
 /** The same check `useSizeAssertion` makes, on the one box a chart's layout decided: its own. */
 function useChartSizeAssertion(
-  ref: React.RefObject<HTMLDivElement>,
+  ref: React.RefObject<HTMLDivElement | null>,
   placed: Extract<Layout, { kind: "chart" }>,
   id: string,
 ): void {
