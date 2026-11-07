@@ -386,13 +386,20 @@ test("select all, then delete, empties the board; undo fills it again", async ({
   await expect.poll(read, { timeout: 5_000 }).toBe(BOARD);
 });
 
-test("the snapshot view has no editing chrome", async ({ page }) => {
+test("the snapshot view cannot be edited: nothing movable or selectable, and neither a key nor a drag writes", async ({
+  page,
+}) => {
   await open(page, "&snapshot=1");
   await expect(page.locator("[data-dag-movable]")).toHaveCount(0);
   await clickItem(page, "one");
   await expect(page.locator("[data-dag-selected]")).toHaveCount(0);
   await page.keyboard.press("Delete");
-  await page.waitForTimeout(400);
+  const at = (await page.locator('[data-dag-item="one"]').boundingBox())!;
+  await page.mouse.move(at.x + 40, at.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 240, at.y + 220, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
   expect(read()).toBe(BOARD);
 });
 

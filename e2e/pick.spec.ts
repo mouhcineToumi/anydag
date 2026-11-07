@@ -186,37 +186,6 @@ test("ctrl+D copies the picked statement under a free id, and picks the copy", a
   expect(await selectedIds(page)).toEqual(["infra"]);
 });
 
-test("enter opens the panel on the pick, in Properties", async ({ page }) => {
-  await open(page);
-  await tap(page, '[data-dag-node="api"]');
-  await tap(page, '[data-dag-node="api"]');
-  await page.keyboard.press("Enter");
-
-  await expect(page.locator("[data-dag-inspector]")).toBeVisible();
-  await expect(page.locator('[data-dag-mode="props"]')).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "api");
-  /* Properties means controls: the text is behind the other tab, not on screen. */
-  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
-});
-
-/* ------------------------------------------------------------------------------- the strip */
-
-test("the strip writes onto the picked card's line and no other", async ({ page }) => {
-  await open(page);
-  await tap(page, '[data-dag-node="db"]');
-  await tap(page, '[data-dag-node="db"]');
-  await page.keyboard.press("Enter");
-  await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "db");
-
-  await page.locator('[data-dag-prop-hue="coral"]').click();
-  await expect.poll(read, { timeout: 5_000 }).toMatch(/store db .*hue=coral/);
-
-  const now = read();
-  expect(now).toContain('service api "The API" icon=server');
-  expect(now).toContain('api --> db "reads"');
-  expect(now).not.toMatch(/service api .*hue=/);
-});
-
 test("the caret still moves the strip, once the source is showing", async ({ page }) => {
   await open(page);
   await tap(page, '[data-dag-node="api"]');

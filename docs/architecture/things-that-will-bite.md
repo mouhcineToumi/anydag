@@ -428,6 +428,33 @@
   shifts every row down while the pointer is between press and release, so the drop lands on
   whatever slid into the target's place. `folders.spec.ts`'s `drag` re-aims until the target itself
   is marked: the hover-control rule above, met by a drag.
+- **A press aimed from a box read a moment ago can land on nothing.** The same hazard as the drop
+  target above, met by the *source* of a drag. `folders.spec.ts`'s glide check scrolled a row to the
+  middle, read its box, and pressed there; with other workers adding folders above and the page
+  slow to lay them out, the row was off the page by the time the button went down (a box at
+  `y: -268` was seen), no drag began, and the wait for the tree to scroll could only time out. Put
+  the pointer over the row, ask `elementFromPoint` what is under it, press only when it is the row,
+  and let go of a press that did not lift it before making another — a release over a folder row is
+  a click, which collapses it. Read a scroll position to compare against only once the thing that
+  was moving it has stopped: a number taken mid-glide is out of date when it is used.
+- **A page that names no vault lands in the server's default, and the default moves.** Opening a
+  vault makes it the default; `vaults.spec.ts` and `sync.spec.ts` open others as the point of their
+  checks and put the suite's own back a request later — a window of milliseconds when the machine is
+  quiet and more when it is not. A page that starts inside it pins the wrong vault for good
+  (`settleVault`), so the file its test wrote is in another one: every document request answers 404,
+  the page says *Nothing open*, and Chromium prints each 404 on the console, which the suite counts as
+  a failure (two `Failed to load resource` lines, from a `tables.spec.ts` run, are what it looks like).
+  A spec that loads a page and cannot afford that uses `vaulted(page, url)` from `e2e/vault.ts`, which
+  names the suite's vault in the address as a settled tab does; `tables.spec.ts`, `folders.spec.ts`
+  and `export.spec.ts` do, and the rest of the suite is exposed to it still.
+- **Parking the canvas by writing its transform is not moving the view.** `export.spec.ts` set
+  `.dag-layer`'s style and `data-zoom` by hand to get the item at 1:1. That paints the glass and not
+  the `Viewport`'s record of it: `touched` stays false, so a later `fit()` — any change of the
+  content's bounds or of the canvas's box, neither of which `data-dag-ready` rules out, since it stays
+  `1` while a board re-lays out — puts the fit view back. On `reference/architecture` that is
+  `0.606011`, and 2429 × 0.606 is the 1472 a failed run measured. Take the view over with the zoom
+  bar's `[data-dag-zoom-actual]`, which calls `actual()` (paint, `data-zoom` in the same statement,
+  `touched = true`); the `0` key calls `commit` and does not set `touched`.
 - **A script that hands its browser the token has not handed it to its own `fetch`.** `snapshot.mjs`
   put the session into Playwright's context and then asked `/__board/diagnostics` with a bare
   `fetch` — a 401, whose body has no `board` and no `items`, so it printed no diagnostic and exited 0
