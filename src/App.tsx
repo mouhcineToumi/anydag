@@ -97,6 +97,7 @@ import { saveWithFiles } from "@/files/exportBundle";
 import { placedWidth } from "@/edit/image";
 import { readSettings } from "@/settings/store";
 import { refuseLocked, useLocked } from "@/settings/lock";
+import { track } from "@/telemetry/client";
 
 /* The library's open state lives in `settings/prefs.ts`, which is the one place that knows what
    the whole set of preferences is — because since accounts, the whole set is what follows a person
@@ -1509,6 +1510,22 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const boardName = query.get("board");
   const handle = useBoard(boardName);
   const { board, error } = handle;
+
+  /* A board opened, for the logs when somebody said yes: its size and how many of each diagram it
+     holds — counts, never a name. Once per board per page load; `track` does nothing on a snapshot. */
+  const counted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!board || !boardName || counted.current === boardName) return;
+    counted.current = boardName;
+    const kinds: Record<string, number> = {};
+    let diagrams = 0;
+    for (const it of board.items) {
+      if (!isDiagramType(it.type)) continue;
+      diagrams++;
+      kinds[it.type] = (kinds[it.type] ?? 0) + 1;
+    }
+    track("board.open", { items: board.items.length, diagrams, pages: board.pages.length, ...kinds });
+  }, [board, boardName]);
 
   /* Opening a *different* board lands on its first page. The page id is the previous document's
      — `page-2` on a board that has one page is a blank canvas with no tab selected — so the two
