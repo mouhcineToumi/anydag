@@ -90,7 +90,7 @@ export function plan(files, tracedSpecs = () => []) {
   const run = smoke || specs.size > 0 || all;
   const parts = [];
   if (smoke) parts.push("@smoke");
-  for (const s of [...specs].sort()) parts.push(s.replace(/\./g, "\\."));
+  for (const s of [...specs].sort()) parts.push(s.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&"));
   const why = [...kinds].map(([k, fs]) => `${fs.length} ${k}`).join(", ") || "no changes";
   const asks = all ? ["the whole suite"] : [smoke ? "the @smoke tier" : "", ...[...specs].sort()].filter(Boolean);
   return {
