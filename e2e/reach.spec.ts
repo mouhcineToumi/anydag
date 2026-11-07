@@ -84,8 +84,11 @@ test("picking a card and pressing enter opens the panel on that card", async ({ 
   /* F1 changed what this gesture means. It used to open the *text* with the declaring line
      selected; it now opens the controls for the thing that was clicked, and the line is one tab
      away — the DSL is for the reader who wants it, which is the whole of the milestone. */
+  await expect(page.locator("[data-dag-inspector]")).toBeVisible();
   await expect(page.locator('[data-dag-mode="props"]')).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "api");
+  /* Properties means controls: the text is behind the other tab, not on screen. */
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
 
   await page.locator('[data-dag-mode="source"]').click();
   const picked = await page.locator(".dag-inspector textarea").evaluate((el) => {

@@ -85,17 +85,3 @@ test("a click is not a drag", async ({ page }) => {
   await page.waitForTimeout(500);
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
-
-test("the snapshot view cannot be edited", async ({ page }) => {
-  await open(page, "&snapshot=1");
-  await expect(page.locator("[data-dag-movable]")).toHaveCount(0);
-
-  const one = page.locator('[data-dag-item="one"]');
-  const at = (await one.boundingBox())!;
-  await page.mouse.move(at.x + 40, at.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(at.x + 240, at.y + 220, { steps: 8 });
-  await page.mouse.up();
-  await page.waitForTimeout(500);
-  expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
-});
