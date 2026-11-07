@@ -401,6 +401,15 @@
   `timer` a keystroke sets, so typing brings it forward and the outside-write listener holds off
   for it; a 4xx other than a 409 is an answer about the request and still waits for a change.
 
+- **A board write the server cannot receive is a refusal, not an exception.** `useBoard`'s `write`
+  called `fetch` with no `catch`, and every caller fires and forgets (`void commit(…)`, a nudge, a
+  drag's release), so with the server down the rejection was unhandled and `commit` never reached
+  `setOverrides(new Map())`: the item stayed drawn where it was dropped while the file said
+  otherwise. Only the `fetch` is guarded, so a bug in `adopt` is not worded as a dead server; the
+  write resolves `null` and `dag:upload-problem` tells the person. Unlike a note's save, a board
+  write is not retried: the file is the document and the person can see what it says.
+  `e2e/offline-write.spec.ts` fails `/__board/patch` with `page.route` and reads `pageerror`.
+
 - **A peek that slides over the control that summoned it swallows the click meant for it.** The
   sidebar's hover peek first ran the full height of the window, so it arrived on top of the toolbar
   toggle under the pointer, and the click that should have docked it landed on the sidebar's own

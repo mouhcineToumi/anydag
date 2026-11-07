@@ -44,7 +44,8 @@ Nine things are load-bearing:
   need. The size is checked as it streams in, so an oversized file is refused at its first megabyte
   over. The page checks the same two limits before it sends anything (`refusal` in
   `src/files/upload.ts`, the server's sentences word for word), and a board says a refused drop in
-  `UploadNotice`, off the `dag:upload-problem` document event.
+  `UploadNotice`, off the `dag:upload-problem` document event, which a board write the server never
+  received raises as well (`useBoard`, *Editing*).
 - **A reference is an id**, as to anything: a rename or a move changes no file that names it, and one
   stored file serves every note and board that does. `attachmentOf` in `src/render/assets.ts` is how
   an image fence's `src` becomes `/__board/file?id=`; `ownAssets` is the one place a page decides

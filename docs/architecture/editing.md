@@ -83,7 +83,10 @@ Six things about that are load-bearing:
 
 - **`base` is a sha1 of the whole file**, sent with every write, and a write against a version that
   has moved is refused with 409 plus the text that replaced it. The file has two writers who cannot
-  take a lock between them, so refusing a stale write is the entire concurrency story.
+  take a lock between them, so refusing a stale write is the entire concurrency story. A write the
+  server never receives is a refusal too: `useBoard`'s `write` resolves `null` when `fetch` rejects
+  (so `commit` returns `false` and clears the painted overrides) and raises `dag:upload-problem`,
+  the notice a refused drop already uses. Board writes are not retried (`e2e/offline-write.spec.ts`).
 - **Undo is a version of the file, not an inverse op.** `src/edit/history.ts` keeps the text from
   before and after each edit and `POST /__board/put` puts one back — under the same `base` rule,
   and with one more check on top: an entry whose *after* is no longer what the file holds is not
