@@ -55,7 +55,7 @@ async function open(page: Page, text: string) {
 const toast = (page: Page) => page.locator("[data-dag-problems-toast]");
 const pill = (page: Page) => page.locator("[data-dag-problems-pill]");
 
-test("a board error is a notification, never a card on the canvas", async ({ page }) => {
+test("a board error is a notification, never a card on the canvas", { tag: "@smoke" }, async ({ page }) => {
   await open(page, STRAY);
   await expect(page.locator(".dag-viewport .dag-error, .dag-viewport [data-dag-error]")).toHaveCount(0);
   await expect(toast(page)).toHaveAttribute("data-dag-problems-toast", "EB_LINK_SYNTAX");

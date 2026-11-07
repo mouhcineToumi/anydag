@@ -113,7 +113,7 @@ async function recordPrint(page: Page): Promise<void> {
 
 const printed = (page: Page) => page.evaluate(() => (window as unknown as { __printed: Printed[] }).__printed);
 
-test("a note saves as its own file, and as a PDF in the light theme, under its title", async ({ page }) => {
+test("a note saves as its own file, and as a PDF in the light theme, under its title", { tag: "@smoke" }, async ({ page }) => {
   const name = `${stem}-note`;
   const file = write(name, "note", NOTE);
   await ready(page, `note=${name}&theme=paper-dark`);

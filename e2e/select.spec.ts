@@ -157,7 +157,7 @@ test("dragging one selected item moves every selected item, keeping their distan
   expect(await selectedIds(page)).toEqual(["one", "two"]);
 });
 
-test("delete removes the item from the file, and undo puts it back byte for byte", async ({ page }) => {
+test("delete removes the item from the file, and undo puts it back byte for byte", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await clickItem(page, "one");
   await page.keyboard.press("Delete");
@@ -212,7 +212,7 @@ test("duplicate adds a copy beside the original", async ({ page }) => {
   await expect(page.locator("[data-dag-selected]")).toHaveAttribute("data-dag-item", copy[1]);
 });
 
-test("copy puts the item's own source on the clipboard, and paste reads it back", async ({ page, context }) => {
+test("copy puts the item's own source on the clipboard, and paste reads it back", { tag: "@smoke" }, async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await open(page);
   await clickItem(page, "one");

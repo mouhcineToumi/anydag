@@ -67,7 +67,7 @@ async function fresh(page: Page, url = `/?board=${board()}`): Promise<void> {
   if (url.includes("board=")) await ready(page);
 }
 
-test("it is open by default, and one key puts it away and remembers", async ({ page }) => {
+test("it is open by default, and one key puts it away and remembers", { tag: "@smoke" }, async ({ page }) => {
   await fresh(page);
   await expect(docked(page)).toBeVisible();
   /* The mark is in the sidebar's header while it is docked, and never in two places. */

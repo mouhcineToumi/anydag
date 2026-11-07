@@ -85,7 +85,7 @@ const found = (page: Page) =>
     return h ? [...h].map((r) => r.toString()).join(" ") : "";
   });
 
-test("one list holds matches from boards and notes, each where the words are", async ({ page }) => {
+test("one list holds matches from boards and notes, each where the words are", { tag: "@smoke" }, async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await ready(page);
   await searchFor(page, word);
@@ -98,7 +98,7 @@ test("one list holds matches from boards and notes, each where the words are", a
   await expect(page.locator(".dag-panel__count")).toContainText("3 in the text");
 });
 
-test("a board result opens the board centred on the matching item, selected", async ({ page }) => {
+test("a board result opens the board centred on the matching item, selected", { tag: "@smoke" }, async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await ready(page);
   await searchFor(page, word);

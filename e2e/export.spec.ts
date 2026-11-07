@@ -26,7 +26,7 @@ const TOLERANCE = 0.02;
  */
 const PIXELS = !process.env.ANYDAG_NO_SNAPSHOTS;
 
-test("an exported item renders the same as the item", async ({ page }) => {
+test("an exported item renders the same as the item", { tag: "@smoke" }, async ({ page }) => {
   /*
    * Only against the dev server, and that is a property of this check rather than a gap.
    *
