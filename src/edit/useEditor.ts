@@ -556,7 +556,7 @@ interface Options {
   /** What the flow decided, before any gesture. */
   laidOut: Map<string, Placement>;
   handle: BoardHandle;
-  viewport: RefObject<ViewportHandle>;
+  viewport: RefObject<ViewportHandle | null>;
   grid: number;
   /** False under `?snapshot=1`, where the page is being photographed rather than used. */
   enabled: boolean;
