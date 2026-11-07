@@ -150,14 +150,14 @@ jobs:
           npx playwright test "${args[@]}"
       # The blob is what the report is merged from, and it holds a failed screenshot's expected,
       # actual and diff images; `test-results` is what a failed run leaves beside it.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: blob-report-${{ needs.plan.outputs.scope }}-${{ matrix.shard }}
           path: blob-report
           retention-days: 7
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ failure() }}
         with:
           name: test-results-${{ needs.plan.outputs.scope }}-${{ matrix.shard }}
@@ -187,7 +187,7 @@ jobs:
           # A shard that died before Playwright started uploaded no blob, and there is nothing to merge.
           if [ ! -d all-blob-reports ]; then echo "no shard left a report"; exit 0; fi
           npx --yes -p @playwright/test@1.65.0 playwright merge-reports --reporter=html ./all-blob-reports
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ needs.plan.outputs.scope }}
           path: playwright-report
