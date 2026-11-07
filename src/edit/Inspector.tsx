@@ -368,7 +368,7 @@ export function Inspector({
       </header>
 
       {/* `dag-inspector__mode`, not `dag-tab`: the page tabs have owned that name since M27 and
-          `nodes.css` loads after this file. See the namespace note in CLAUDE.md. */}
+          `nodes.css` loads after this file. See the namespace note in docs/architecture/things-that-will-bite.md. */}
       {split ? (
         <div className="dag-inspector__modes" role="tablist" aria-label="Editor view">
           {([["props", "Properties"], ["source", "Source"]] as const).map(([m, label]) => (

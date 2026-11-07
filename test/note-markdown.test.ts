@@ -69,7 +69,7 @@ const corpus: Body[] = walk(ROOT).flatMap((file) => {
 
 /**
  * The repository's own Markdown, a body per `##` or `###` section — the size of a note somebody writes.
- * `SKILL.md` and `CLAUDE.md` are left out: each holds a list whose items carry more than one
+ * `SKILL.md` and the files under `docs/architecture/` are left out: each holds a list whose items carry more than one
  * block — a table and then a paragraph, a bullet with a second paragraph under it — and the house
  * form of those changes again on a second save. A defect of the bridge, not of the corpus, and its
  * own change; until then the "stable" check below would fail on them.

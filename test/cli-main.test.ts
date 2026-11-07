@@ -15,7 +15,7 @@ import { handle } from "../server/handle";
  *
  * `fetch` is stubbed here, and every answer is copied from the route in `server/routes/`
  * that gives it — `{base, text}` from `/patch`, `{error, base, text}` for its 409, `{error, code}`
- * for the 401 `identity.require` raises. `CLAUDE.md` records what a stub invented from the caller's
+ * for the 401 `identity.require` raises. `docs/architecture/things-that-will-bite.md` records what a stub invented from the caller's
  * expectations costs (`test_mcp.py`'s `StubDsl`); these are the routes' own shapes, and the wire
  * itself is proven against the running stack by `e2e/cli.spec.ts`.
  */

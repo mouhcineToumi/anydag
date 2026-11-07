@@ -6,7 +6,7 @@
  * Load-bearing:
  * - **Nothing is stubbed**: the routes are tested through the same `Meta` adapter the server ships,
  *   so a stub cannot agree with a route about a shape the database never returns (the rule
- *   CLAUDE.md states about the hosted api's stubs).
+ *   docs/architecture/things-that-will-bite.md states about the hosted api's stubs).
  * - **The Postgres backend is skipped with a word when no server is named**, and when one is, every
  *   run gets a fresh schema (`search_path` through `pgDb`'s `schema`), dropped at the end, so runs
  *   never see each other's rows.

@@ -796,7 +796,7 @@
 .dag-sketch--ink[data-dag-node]:hover { box-shadow: none; }
 .dag-sketch--ink:hover .dag-sketch__stroke { stroke: var(--dag-color-accent); }
 /* Picked, same answer as hover. The generic `[data-dag-node][data-dag-picked]` outline is chrome's,
-   and a rectangle round a squiggle is the defect CLAUDE.md records for `outline` on an SVG mark —
+   and a rectangle round a squiggle is the defect docs/architecture/things-that-will-bite.md records for `outline` on an SVG mark —
    the mark carries its own ring. These load after chrome.css, so at equal specificity they win. */
 .dag-sketch--ink[data-dag-picked] { outline: none; }
 .dag-sketch--ink[data-dag-picked] .dag-sketch__stroke { stroke: var(--dag-color-accent); }

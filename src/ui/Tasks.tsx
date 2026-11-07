@@ -317,7 +317,7 @@ function QuickAdd({ status, into }: { status: TaskStatus; into: string }) {
  *
  * The card is the ghost, moved by `translate` and made `pointer-events: none` for the length of the
  * drag, so `elementFromPoint` finds the column under it rather than the card in the hand — the rule
- * `CLAUDE.md` records for the page tabs. A press that never moves far enough is a click, and opens.
+ * `docs/architecture/things-that-will-bite.md` records for the page tabs. A press that never moves far enough is a click, and opens.
  */
 function Columns({
   by,

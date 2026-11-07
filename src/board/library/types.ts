@@ -29,7 +29,7 @@ import type { ItemType } from "../types";
  * for exactly that reason: a children-slot plus a wiring block fits the first eight dialects and
  * cannot express the next four. `sketch` is the third: coordinates carry the meaning, so a part is
  * placed rather than nested or sequenced, and its children are relative to the `group` that holds
- * them (see `CLAUDE.md` → *The free canvas*).
+ * them (see `docs/architecture/free-canvas.md` → *The free canvas*).
  *
  * **Browser-free and alias-free**, like everything else in `src/board/`: the Vite plugin can reach
  * this folder, and it loads in plain Node before Vite's `@/` aliases exist.

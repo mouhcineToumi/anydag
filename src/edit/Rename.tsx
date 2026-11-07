@@ -145,7 +145,7 @@ export function Rename({
       className="dag-rename"
       /* Not `data-dag-rename`: the board list has owned that since M27 for the button that renames a
          *file*, and a selector meant to find one input found forty buttons. The exact hazard
-         CLAUDE.md names, and it does not need CSS to bite. */
+         docs/architecture/things-that-will-bite.md names, and it does not need CSS to bite. */
       data-dag-rename-box={renaming.id}
       aria-label={`Rename ${renaming.id}`}
       defaultValue={renaming.text}

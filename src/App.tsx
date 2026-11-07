@@ -383,7 +383,7 @@ export function App() {
  * The cards stay rendered by the page because the page is what knows the theme and the board; the
  * sidebar is above both pages and knows neither. So it asks with a document event, the way
  * `dag:tidy` reaches the page from a script. `dag:chrome` and not `dag:settings`, which is the
- * settings-changed event: one name meaning two things is the hazard `CLAUDE.md` records.
+ * settings-changed event: one name meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  */
 function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void }) {
   const ref = useRef(on);
@@ -651,7 +651,7 @@ function readCalendarView(): { view: CalView; days: number } {
  * the view (`month`, `week`, `days`; `1` is this browser's last), with the day and the count beside
  * it (`date=`, `days=`) so a reload and a link land where they were, and `project=` the Tasks page's
  * filter, by the project note's id. **Not `view=`**, which is the read-only page's key: one name
- * meaning two things is the hazard `CLAUDE.md` records.
+ * meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  *
  * A page without a canvas, for the Tasks page's reason. **What it shows and where a week starts are
  * the account's** (`CALENDAR_HIDE`, `WEEK_START`), read through `usePref` so the

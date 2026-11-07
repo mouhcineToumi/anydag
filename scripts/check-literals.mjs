@@ -4,7 +4,7 @@
  *
  * `check-theme.mjs` proves every `--dag-*` the code reads exists in every theme. That is only half
  * the layer rule: it says nothing about a value written straight into the stylesheet, which is
- * invisible to a theme by construction. `CLAUDE.md` claimed this file's job
+ * invisible to a theme by construction. `docs/architecture/layers.md` claimed this file's job
  * was already being done — it was not, and 99 px literals had accumulated on the diagram surface,
  * including two font sizes bypassing the type ramp entirely and a legend drawing the wrong stroke
  * under `neutral`.

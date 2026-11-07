@@ -31,7 +31,7 @@ export interface TelemetryStatus {
 export const TELEMETRY_EVENT = "dag:telemetry";
 
 const EVERY_MS = 30_000;
-/** A `keepalive` body over 64 KB is refused before it is sent (CLAUDE.md, *Things that will bite*). */
+/** A `keepalive` body over 64 KB is refused before it is sent (`docs/architecture/things-that-will-bite.md`). */
 const KEEPALIVE_MAX = 60_000;
 
 let status: TelemetryStatus | null = null;

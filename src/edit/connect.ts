@@ -43,7 +43,7 @@ export interface Target {
  * the group could be reached only in the gaps between its strokes.
  *
  * `data-dag-group` is on `.dag-item` for the board-level group *and* on a boundary inside a
- * diagram — the collision `CLAUDE.md` records — so it is read off the item element itself here
+ * diagram — the collision `docs/architecture/things-that-will-bite.md` records — so it is read off the item element itself here
  * rather than through a `closest()` that could escape the item and find the wrong one.
  */
 export function targetAt(el: Element | null): Target | null {
