@@ -21,7 +21,6 @@ chat's change blocks in a Changes column.
 | `server/mcp/chat.ts` | chat mode for `anydag-server mcp --chat <id> --mode ask\|edit`: the tool list, `change_block`, `vault_request` |
 | `server/routes/chat.ts` | the routes, the guard's registration, the SSE stream |
 | `src/assistant/` | the panel, the page, the composer and its picker, the steps, the approval, access and block cards |
-| `cli/commands/chat.ts` | `anydag chat ls\|models\|new\|cat\|say\|stop\|approve\|grant\|undo\|redo\|rename\|rm` |
 
 Nine things are load-bearing:
 

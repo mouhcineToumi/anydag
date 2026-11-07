@@ -26,8 +26,9 @@ workflow (issues, branches, PRs) is in [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTI
   **sync** server, a read-only **lock**, **opt-in anonymous logs**.
 - **Prompt cards** and the **Assistant** run a model through the person's own Claude Code, OpenCode
   login or API key; the real parser checks what comes back before it lands.
-- **Everything is reachable three ways** — the page's routes, the `anydag` CLI, and the MCP server
-  (`anydag mcp`) — held in step by `docs/parity.json`.
+- **Everything the page can do, an agent can do through the MCP server** (`anydag mcp`), held in step
+  by `docs/parity.json`. The `anydag` CLI is an admin tool — vaults, whole files, sync, trash,
+  snapshots and exports — not a second copy of the app (`docs/architecture/cli.md`).
 
 **Three ways to run it:** the desktop app (`desktop/`, Electron, spawns the server and loads the page
 through `anydag://`); `anydag serve <folder>` (a browser on this machine); and `npm run dev` →

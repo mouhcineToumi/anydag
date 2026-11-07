@@ -52,8 +52,9 @@ It is also the pre-commit hook; do not skip it with `--no-verify`, and do not pu
 - **Update the docs** that describe what you changed: the matching file in `docs/architecture/`,
   `docs/dsl/` for grammar, `skills/anydag/` for anything an agent drawing on the canvas must know
   (`npm run check:skill` holds the skill to the code).
-- **A new route, `anydag` command or MCP tool is a line in `docs/parity.json`** in the same commit;
-  run `npm run parity` to redraw `docs/PARITY.md`. The checks fail otherwise.
+- **A new route or MCP tool is a line in `docs/parity.json`** in the same commit, and so is a new
+  `anydag` command — which is added only for admin work; every other feature marks the CLI column
+  `{"admin": false}`. Run `npm run parity` to redraw `docs/PARITY.md`. The checks fail otherwise.
 - The browser suite runs in CI in the Playwright Docker image. To run it yourself use
   `npm run e2e:docker`. Run only the specs for the area you changed when iterating, and measure
   flakiness at no more workers than the machine has cores.

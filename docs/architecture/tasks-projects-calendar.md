@@ -181,7 +181,7 @@ Nine things are load-bearing:
   event and note of the kinds shown; `lanes` packs a run of days' bars lowest-lane-first; `blocks`
   cuts timed events to a day and splits overlapping ones into columns; `fieldsOf`, `eventFrom`,
   `withStart` (which keeps an event's length), `withEnd` and `withAllDay` are what the event bar
-  writes. `anydag event ls` narrows by the same spans.
+  writes.
 - **A timed event of a day or more goes in the all-day row**, as every calendar draws a trip; shorter,
   it is in the hour grid, cut at midnight into each day it touches. A month caps a week at four lanes
   and says how many more a day holds, which opens that day on its own.
@@ -251,8 +251,7 @@ gets that date's offset.
   reads a year under a hundred as 19xx, so `utc()` sets the full year.
 - **The server reads the preferences, never writes them.** `zoneIn` in `server/frontmatter.ts`: the
   vault's choice, else the app's, else the seen zone, each checked against `Intl`.
-  `/api/auth/me` answers `zone`, `event_list` answers `time_zone`, and the CLI's `event`
-  commands read `/api/auth/me` first and write and print in that zone.
+  `/api/auth/me` answers `zone` and `event_list` answers `time_zone`.
 
 Names claimed, grepped first: `data-dag-setting-time-zone` and the storage keys `dag:time-zone` and
 `dag:time-zone-seen`.

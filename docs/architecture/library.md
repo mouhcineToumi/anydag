@@ -21,7 +21,7 @@ why that is the shape. Three things about the panel itself:
   naming a glyph it does not hold — without it a typo falls back to a generic box and says nothing.
 
 **The Objects shelves are not in a plain listing**. `libraryList` — and so
-`GET /__board/library`, the MCP `library` tool and `anydag library` — leaves the 1,724 pictures out
+`GET /__board/library`, and the MCP `library` tool — leaves the 1,724 pictures out
 and `objects` says how many there are and on which shelves; `q` searches everything, the pictures
 included, the way the panel's box does, and lists at most `OBJECT_LIMIT` of them. Seventeen hundred
 entries of one statement shape is a third of a context window spent saying one thing, and an agent
