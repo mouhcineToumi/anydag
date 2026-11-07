@@ -258,9 +258,14 @@ if (!mcpSection) {
 
 /*
  * The eighth closed set, and the same argument as the seventh one surface over: the skill tells an
- * agent to type `anydag node set …`, and a command renamed in `cli/commands/` is one it goes on
- * typing — a usage error the agent then has to reason its way out of, with nothing to say the skill
- * was the thing that was wrong.
+ * agent to type `anydag board write …`, and a command renamed or removed in `cli/commands/` is one it
+ * goes on typing — a usage error the agent then has to reason its way out of, with nothing to say the
+ * skill was the thing that was wrong.
+ *
+ * **The CLI is the admin tool now** (vaults, whole files, the trash, sync, logs, pictures and exports;
+ * `docs/parity.json` marks the rest `{"admin": false}`), so this set stays strict for what remains and
+ * is what catches the skill still teaching a command that was dropped — `anydag node set`, `anydag task
+ * ls` and the other gestures are MCP tools now, and the skill's CLI section says so.
  *
  * The table is read from the CLI itself, `anydag help --json`, rather than by regex over the
  * source: half the names are made by a function (`board cat` and `note cat` are one definition
@@ -270,7 +275,7 @@ if (!mcpSection) {
  * Two directions, as for the MCP tools, but not the same two. Every `anydag …` the section writes
  * has to be a command that exists — the drift that bites. And every *group* has to be named at
  * least once, so a whole capability cannot go missing from the one document an agent reads; the
- * ninety individual commands are `anydag help`'s to list, not the skill's.
+ * individual commands are `anydag help`'s to list, not the skill's.
  */
 const { spawnSync } = await import("node:child_process");
 const helped = spawnSync(process.execPath, [at("cli/anydag.mjs"), "help", "--json"], { encoding: "utf8" });

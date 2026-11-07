@@ -1,23 +1,19 @@
-import { spawn } from "node:child_process";
-
-import { merge3 } from "../../src/note/merge";
 import type { QuizDiagnostic } from "../../src/quiz/codes";
 import { parseQuiz } from "../../src/quiz/parse";
-import type { SearchDoc } from "../../src/search/engine";
 import type { TableDiagnostic } from "../../src/table/codes";
 
-import { Conflict, EXIT } from "../api";
+import { EXIT } from "../api";
 import { UsageError, bool, str, type Parsed } from "../args";
 import { diagnosticLines, kindQuery, report, type Diagnosed, type Kind } from "../board";
-import { editInEditor, emit, keepAside, readText, short, table, type Command, type Ctx } from "../context";
+import { emit, readText, short, table, type Command, type Ctx } from "../context";
 
 /**
- * The files: boards, notes and folders, and the routes that list, read, write, move and watch them.
+ * The files, as an admin reaches them: list, make, read, replace, move and delete a board, a note, a
+ * quiz or a table — and check one for problems. Everything finer than the whole file (an item, a
+ * card, a question, a cell, a task's status) is the page's and MCP's, never this command's.
  *
- * A board and a note share every operation but one — the notes have no grammar, so `diagnose` is a
- * board's alone — and they share one namespace, because both keep their images in
- * `<name>.assets/` (`CLAUDE.md` → *Notes*). So both groups are made by one function from the kind,
- * which is also what keeps `kind=note` on every route a note reaches and off every one it does not.
+ * Every kind has the same five commands, made by one function from the kind, which is also what
+ * keeps `kind=…` on every route a quiz, a note or a table reaches and off every one a board does.
  */
 
 interface Listed {
@@ -74,19 +70,6 @@ interface Got {
   base: string;
 }
 
-/** One hit as `GET /__board/search` answers it. */
-interface SearchHit {
-  id: string;
-  name: string;
-  kind: Kind;
-  title: string | null;
-  part: string | null;
-  what: string;
-  score: number;
-  terms: string[];
-  snippet: string;
-}
-
 /** `GET /__board/refs`: one document's references out, and what points at it. */
 export interface Refs {
   id: string;
@@ -95,14 +78,6 @@ export interface Refs {
   title: string | null;
   refs: { id: string; type: "link" | "embed"; text: string; part?: string; target: { id: string; name: string; kind: string; title: string | null } | null }[];
   backlinks: { id: string; name: string; kind: string; title: string | null; type: "link" | "embed" }[];
-}
-
-interface IndexDoc {
-  id: string;
-  name: string;
-  kind: Kind;
-  title?: string | null;
-  refs: { id: string; type: "link" | "embed"; part?: string; text: string }[];
 }
 
 /**
@@ -122,35 +97,10 @@ export async function appBase(ctx: Ctx): Promise<string> {
 export const docUrl = (base: string, name: string, kind: Kind | "file", view = false): string =>
   `${base}${base.includes("?") ? "&" : "?"}${kind}=${encodeURIComponent(name)}${view ? "&view=1" : ""}`;
 
-/** Hand a URL to whatever this machine opens URLs with, and never fail because there is nothing. */
-export function launch(url: string): void {
-  const [cmd, args] =
-    process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
-  try {
-    const child = spawn(cmd, args, { stdio: "ignore", detached: true });
-    child.on("error", () => {});
-    child.unref();
-  } catch {
-    /* No opener on this machine — the URL is printed either way. */
-  }
-}
-
 const get = (ctx: Ctx, name: string, kind: Kind) => ctx.api.get<Got>("/__board/get", { name, kind: kindQuery(kind) });
 
 const put = (ctx: Ctx, name: string, kind: Kind, text: string, base: string | undefined) =>
   ctx.api.post<{ base: string; text: string }>("/__board/put", { text, base }, { name, kind: kindQuery(kind) });
-
-const kindFlag = { name: "note", type: "boolean" as const, help: "a note rather than a board" };
-const quizFlag = { name: "quiz", type: "boolean" as const, help: "a quiz rather than a board" };
-const tableFlag = { name: "table", type: "boolean" as const, help: "a table rather than a board" };
-const fileFlag = { name: "file", type: "boolean" as const, help: "an attachment rather than a board" };
-
-/** The kind `--note`, `--quiz` or `--table` names, a board when none does. */
-const kindOf = (p: { flags: Record<string, unknown> }): Kind =>
-  p.flags.table ? "table" : p.flags.quiz ? "quiz" : p.flags.note ? "note" : "board";
-
-/** What each kind of file is stored under. */
-const SUFFIX: Record<Kind, string> = { board: ".board.md", note: ".note.md", quiz: ".quiz.md", table: ".table.md" };
 
 /** A table's problems after a write, off the route every interface asks, and exit 4 on an error. */
 async function tableReport(ctx: Ctx, name: string): Promise<number> {
@@ -192,9 +142,17 @@ export function quizLines(ctx: Ctx, diagnostics: readonly QuizDiagnostic[]): num
   return errors > 0 ? EXIT.errors : EXIT.ok;
 }
 
+/** A table's diagnostics printed one a line, and the exit code they make. */
+function tableLines(ctx: Ctx, diagnostics: readonly TableDiagnostic[]): number {
+  for (const d of diagnostics) ctx.io.out(`${d.line}:${d.col} ${d.severity} ${d.code}${d.tab ? ` [${d.tab}]` : ""} ${d.message}`);
+  const errors = diagnostics.filter((d) => d.severity === "error").length;
+  if (diagnostics.length)
+    ctx.io.err(`${errors} error${errors === 1 ? "" : "s"}, ${diagnostics.length - errors} warning${diagnostics.length - errors === 1 ? "" : "s"}`);
+  return errors > 0 ? EXIT.errors : EXIT.ok;
+}
+
 function docCommands(kind: Kind): Command[] {
   const noun = kind;
-  const suffix = SUFFIX[kind];
   const q = kindQuery(kind);
   return [
     {
@@ -207,10 +165,7 @@ function docCommands(kind: Kind): Command[] {
         `prints. A \`/\` puts the ${noun} in that folder, making it. The text comes from --file (\`-\` is stdin); ` +
         `without one the ${noun} starts empty.` +
         (kind === "board" ? " Every item in it is given an id if it has none." : ""),
-      flags: [
-        { name: "file", type: "string", value: "<path|->", help: "what to put in it" },
-        { name: "open", type: "boolean", help: "open it in the browser afterwards" },
-      ],
+      flags: [{ name: "file", type: "string", value: "<path|->", help: "what to put in it" }],
       routes: ["POST /__board/create"],
       async run(ctx, p) {
         const file = str(p, "file");
@@ -225,7 +180,6 @@ function docCommands(kind: Kind): Command[] {
           ctx.io.out(made.name);
           ctx.io.err(`made ${noun} ${made.name}${made.name !== p.pos[0] ? ` (\`${p.pos[0]}\` was taken)` : ""} — ${url}`);
         });
-        if (bool(p, "open")) launch(url);
       },
     },
     {
@@ -270,50 +224,6 @@ function docCommands(kind: Kind): Command[] {
       },
     },
     {
-      name: [noun, "edit"],
-      args: "<name>",
-      min: 1,
-      summary: `edit a ${noun} in $EDITOR, merging with anything written meanwhile`,
-      help:
-        `Opens the text in $VISUAL or $EDITOR and writes it back under the base it was read at. If somebody wrote ` +
-        `the ${noun} while you were editing, the two are merged line by line — a note's own merge — and when you both ` +
-        `changed the same lines nothing is written: your text is kept in a file this prints, and it exits 3.`,
-      routes: ["GET /__board/get", "POST /__board/put", "GET /__board/diagnostics"],
-      async run(ctx, p) {
-        const name = p.pos[0]!;
-        const was = await get(ctx, name, kind);
-        const mine = editInEditor(ctx, was.text, `${name}${suffix}`);
-        if (mine === was.text) {
-          ctx.io.err(`${noun} ${name} unchanged`);
-          return;
-        }
-        let after: { base: string };
-        try {
-          after = await put(ctx, name, kind, mine, was.base);
-        } catch (e) {
-          if (!(e instanceof Conflict)) throw e;
-          const merged = merge3(was.text, mine, e.text);
-          if (merged === null) {
-            const kept = keepAside(mine, `${name}${suffix}`);
-            ctx.io.err(`${name} changed while you were editing, on the same lines — nothing written; your text is in ${kept}`);
-            return EXIT.conflict;
-          }
-          try {
-            after = await put(ctx, name, kind, merged, e.base);
-          } catch (again) {
-            if (!(again instanceof Conflict)) throw again;
-            ctx.io.err(`${name} is changing under this edit — nothing written; your text is in ${keepAside(mine, `${name}${suffix}`)}`);
-            return EXIT.conflict;
-          }
-          ctx.io.err(`merged with a change made to ${name} while you were editing`);
-        }
-        emit(ctx, after, () => ctx.io.err(`wrote ${noun} ${name} — base ${short(after.base)}`));
-        if (kind === "board") return (await report(ctx, name)) > 0 ? EXIT.errors : EXIT.ok;
-        if (kind === "quiz") return quizReport(ctx, (await get(ctx, name, kind)).text);
-        if (kind === "table") return tableReport(ctx, name);
-      },
-    },
-    {
       name: [noun, "mv"],
       args: "<name> <to>",
       min: 2,
@@ -321,42 +231,6 @@ function docCommands(kind: Kind): Command[] {
       routes: ["POST /__board/rename"],
       async run(ctx, p) {
         const done = await ctx.api.post<{ name: string; id: string }>("/__board/rename", { name: p.pos[0], to: p.pos[1], kind: q });
-        emit(ctx, done, () => ctx.io.out(done.name));
-      },
-    },
-    {
-      name: [noun, "title"],
-      args: "<name> <title>",
-      min: 2,
-      summary: `call a ${noun} something — the title the sidebar shows and a reference is tagged with`,
-      help:
-        `Sets the \`title:\` in the ${noun}'s frontmatter, one line of it, and changes nothing else in the file. ` +
-        `With --follow the file's name follows the title as well — \`Q3 plan\` is \`q3-plan\`, numbered if taken, ` +
-        `in the folder it is already in — which is what the sidebar does; prints the name it has afterwards. ` +
-        `Its id does not change either way, so no reference to it notices.`,
-      flags: [{ name: "follow", type: "boolean", help: "rename the file to match the title" }],
-      routes: ["POST /__board/retitle"],
-      async run(ctx, p) {
-        const done = await ctx.api.post<{ name: string; id: string; title: string }>("/__board/retitle", {
-          name: p.pos[0],
-          title: p.pos.slice(1).join(" "),
-          kind: q,
-          follow: bool(p, "follow"),
-        });
-        emit(ctx, done, () => {
-          ctx.io.out(done.name);
-          ctx.io.err(`${noun} ${done.name} is called “${done.title}”${done.name !== p.pos[0] ? ` (it was ${p.pos[0]})` : ""}`);
-        });
-      },
-    },
-    {
-      name: [noun, "cp"],
-      args: "<name> <to>",
-      min: 2,
-      summary: `copy a ${noun} with its images; the copy is a new document with an id of its own`,
-      routes: ["POST /__board/duplicate"],
-      async run(ctx, p) {
-        const done = await ctx.api.post<{ name: string; id: string }>("/__board/duplicate", { name: p.pos[0], to: p.pos[1], kind: q });
         emit(ctx, done, () => ctx.io.out(done.name));
       },
     },
@@ -371,25 +245,6 @@ function docCommands(kind: Kind): Command[] {
       async run(ctx, p) {
         const done = await ctx.api.post<{ trash: { id: string } }>("/__board/delete", { name: p.pos[0], kind: q });
         emit(ctx, done, () => ctx.io.err(`moved ${noun} ${p.pos[0]} to the trash — anydag trash restore ${done.trash.id} brings it back`));
-      },
-    },
-    {
-      name: [noun, "refs"],
-      args: "<name>",
-      min: 1,
-      summary: `what a ${noun} points at by id, and what points at it`,
-      routes: ["GET /__board/refs"],
-      async run(ctx, p) {
-        const me = await ctx.api.get<Refs>("/__board/refs", { name: p.pos[0]!, kind });
-        const out = me.refs.map(({ target, ...r }) => ({ ...r, name: target?.name ?? null, kind: target?.kind ?? null }));
-        const back = me.backlinks.map(({ id, name, kind, type }) => ({ id, name, kind, type }));
-        emit(ctx, { id: me.id, name: me.name, refs: out, backlinks: back }, () => {
-          ctx.io.out(`${me.name}  ${me.id}`);
-          ctx.io.out(out.length ? "points at:" : "points at nothing");
-          for (const line of table(out.map((r) => ["  " + r.type, r.name ?? `(no document ${r.id})`, r.part ? `#${r.part}` : ""]))) ctx.io.out(line);
-          ctx.io.out(back.length ? "pointed at by:" : "pointed at by nothing");
-          for (const line of table(back.map((b) => ["  " + b.type, `${b.name}`, b.kind]))) ctx.io.out(line);
-        });
       },
     },
   ];
@@ -434,161 +289,6 @@ export const DOCS: Command[] = [
       });
     },
   },
-  {
-    name: ["open"],
-    group: "files",
-    args: "<name>",
-    min: 1,
-    summary: "open a board, a note, a quiz, a table or a file in the browser, or print where it is",
-    flags: [
-      kindFlag,
-      quizFlag,
-      tableFlag,
-      fileFlag,
-      { name: "view", type: "boolean", help: "the read-only view, which loads no editor" },
-      { name: "id", type: "boolean", help: "<name> is a permanent id rather than a name" },
-      { name: "print", type: "boolean", help: "print the URL and open nothing" },
-    ],
-    routes: ["GET /__board/resolve"],
-    async run(ctx, p) {
-      let name = p.pos[0]!;
-      let kind: Kind | "file" = bool(p, "file") ? "file" : kindOf(p);
-      if (bool(p, "id")) {
-        const found = await ctx.api.get<{ name: string; kind: Kind | "file" }>("/__board/resolve", { id: name });
-        name = found.name;
-        kind = found.kind;
-      }
-      const url = docUrl(await appBase(ctx), name, kind, bool(p, "view"));
-      emit(ctx, { url }, () => ctx.io.out(url));
-      if (!bool(p, "print") && !ctx.json) launch(url);
-    },
-  },
-  {
-    name: ["resolve"],
-    group: "files",
-    args: "<id>",
-    min: 1,
-    summary: "what a permanent id names now — a reference survives every rename, and this is how",
-    routes: ["GET /__board/resolve"],
-    async run(ctx, p) {
-      const found = await ctx.api.get<{ id: string; name: string; kind: Kind }>("/__board/resolve", { id: p.pos[0] });
-      emit(ctx, found, () => ctx.io.out(`${found.name}  ${found.kind}`));
-    },
-  },
-  {
-    name: ["index"],
-    group: "files",
-    args: "",
-    summary: "every document with its id, its title and how many references it makes",
-    routes: ["GET /__board/index"],
-    async run(ctx) {
-      const { docs } = await ctx.api.get<{ docs: IndexDoc[] }>("/__board/index");
-      emit(ctx, { docs }, () => {
-        for (const line of table(docs.map((d) => [d.id, d.kind, d.name, d.title ?? "", d.refs.length ? `${d.refs.length} ref${d.refs.length === 1 ? "" : "s"}` : ""])))
-          ctx.io.out(line);
-      });
-    },
-  },
-  {
-    name: ["search"],
-    group: "files",
-    args: "<words…>",
-    min: 1,
-    summary: "every place in every board, note, quiz and table the words appear — the search card's list, ranked",
-    help:
-      "The page's own search, asked of `/__board/search` — the same engine over the same " +
-      "units, so a terminal, an agent and the search card rank a query alike: every word must appear, every word is " +
-      "a prefix, and a long word forgives one typo. Each hit is `<name>#<part>`, the part a `dag:` reference or " +
-      "`anydag open` goes to: an item id, a `^anchor`, `L<line>`, or a table's `<tab>/<row>`. Matched words are marked with `**`.",
-    flags: [{ name: "limit", type: "string", help: "at most this many hits (default 40)" }],
-    routes: ["GET /__board/search"],
-    async run(ctx, p) {
-      const query = p.pos.join(" ");
-      const raw = str(p, "limit");
-      const limit = raw === undefined ? undefined : Number(raw);
-      if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) throw new UsageError("--limit wants a whole number above zero");
-      const got = await ctx.api.get<{ hits: SearchHit[] }>("/__board/search", { q: query, limit: limit === undefined ? undefined : String(limit) });
-      const out = got.hits.map((h) => ({
-        id: h.id,
-        name: h.name,
-        kind: h.kind,
-        title: h.title,
-        part: h.part,
-        what: h.what,
-        score: h.score,
-        terms: h.terms,
-        snippet: h.snippet,
-      }));
-      emit(ctx, { query, hits: out }, () => {
-        for (const line of table(out.map((h) => [h.part ? `${h.name}#${h.part}` : h.name, h.what, h.snippet]))) ctx.io.out(line);
-        ctx.io.err(out.length ? `${out.length} hit${out.length === 1 ? "" : "s"}` : "no hits");
-      });
-    },
-  },
-  {
-    name: ["corpus"],
-    group: "files",
-    args: "[<name>]",
-    summary: "the pieces a search is made over: every board item, note block, quiz question and table row, with its words",
-    help:
-      "What `/__board/corpus` cuts the account's texts into — the units `search` matches and a result opens onto. " +
-      "One line per unit, `<name>#<part>  <what>  <words>`; name a document to see only its own. --json is the " +
-      "route's answer.",
-    routes: ["GET /__board/corpus"],
-    async run(ctx, p) {
-      const only = p.pos[0];
-      const got = await ctx.api.get<{ docs: SearchDoc[] }>("/__board/corpus");
-      const docs = only ? got.docs.filter((d) => d.name === only) : got.docs;
-      if (only && docs.length === 0) throw new UsageError(`no board, note, quiz or table \`${only}\``);
-      emit(ctx, { docs }, () => {
-        const rows = docs.flatMap((d) =>
-          d.units.map((u) => [u.part ? `${d.name}#${u.part}` : d.name, u.what, u.text.replace(/\s+/g, " ").slice(0, 100)]),
-        );
-        for (const line of table(rows)) ctx.io.out(line);
-        ctx.io.err(`${rows.length} unit${rows.length === 1 ? "" : "s"} in ${docs.length} document${docs.length === 1 ? "" : "s"}`);
-      });
-    },
-  },
-  {
-    name: ["watch"],
-    group: "files",
-    args: "[<name>]",
-    summary: "print each change to this account's boards, notes, quizzes and tables as it happens",
-    help:
-      "The change feed the page listens to — one line per write, `board <name> <sha1>`, `note <name> <sha1>` (and " +
-      "`quiz …`, `table …`), or " +
-      "`tree` when a file or folder appeared or went. Name one to hear about that one only. --once exits at the " +
-      "first change, which is how a script waits for a person to finish an edit. It reconnects on its own.",
-    flags: [{ name: "once", type: "boolean", help: "exit after the first change" }],
-    routes: ["GET /__board/events"],
-    async run(ctx, p) {
-      const only = p.pos[0];
-      let wait = 1000;
-      for (;;) {
-        try {
-          const res = await ctx.api.raw("/__board/events", { headers: { accept: "text/event-stream" } });
-          wait = 1000;
-          for await (const ev of events(res)) {
-            let line: string | null = null;
-            const data = parseData(ev.data);
-            if (ev.event === "dag:boards") line = only ? null : "tree";
-            else if (ev.event === "dag:board" || ev.event === "dag:note" || ev.event === "dag:quiz" || ev.event === "dag:table") {
-              if (!only || data?.name === only) line = `${ev.event.slice("dag:".length)} ${data?.name} ${short(data?.sha1)}`;
-            }
-            if (line === null) continue;
-            if (ctx.json) ctx.io.out(JSON.stringify({ event: ev.event, ...(data ?? {}) }));
-            else ctx.io.out(line);
-            if (bool(p, "once")) return;
-          }
-        } catch (e) {
-          if (!(e instanceof Error) || !("exit" in e) || (e as { exit: number }).exit !== EXIT.noServer) throw e;
-        }
-        ctx.io.err(`the feed closed — reconnecting in ${wait / 1000}s`);
-        await new Promise((r) => setTimeout(r, wait));
-        wait = Math.min(wait * 2, 15_000);
-      }
-    },
-  },
   ...docCommands("board"),
   {
     name: ["board", "diagnose"],
@@ -612,7 +312,53 @@ export const DOCS: Command[] = [
   },
   ...docCommands("note"),
   ...docCommands("quiz"),
+  {
+    name: ["quiz", "check"],
+    args: "[name]",
+    min: 0,
+    summary: "what the parser says about a quiz, without writing it; exit 4 on an error",
+    help:
+      "Every problem with its line and its code — EQ_ for a question a run cannot ask, WQ_ for one that still " +
+      "works — read with the page's own parser. `quiz write` prints the same after writing. " +
+      "--file checks a draft that is not in the vault, writing nothing.",
+    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
+    routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
+    async run(ctx, p) {
+      /* The route's answer, which is the page's parser run by the grammar service — so this,
+         `quiz_check` over MCP and the quiz's own page cannot disagree about a quiz. */
+      const got = await checked<{ questions: number; diagnostics: QuizDiagnostic[] }>(ctx, p, "quiz");
+      if (ctx.json) {
+        ctx.io.out(JSON.stringify(got, null, 2));
+        return got.diagnostics.some((d) => d.severity === "error") ? EXIT.errors : EXIT.ok;
+      }
+      const code = quizLines(ctx, got.diagnostics);
+      if (code === 0) ctx.io.err(`${p.pos[0] ?? str(p, "file")}: ${got.questions} question(s), nothing wrong`);
+      return code;
+    },
+  },
   ...docCommands("table"),
+  {
+    name: ["table", "check"],
+    args: "[name]",
+    min: 0,
+    summary: "what the parser says about a table, without writing it; exit 4 on an error",
+    help:
+      "Every problem with its line and its code — ET_ for two things claiming one id, WT_ for everything that " +
+      "still works: a cell its column cannot read, a row with no id yet, a sort naming a column that went. " +
+      "--file checks a draft that is not in the vault, writing nothing.",
+    flags: [{ name: "file", type: "string", value: "<path|->", help: "check this draft instead of a file in the vault; `-` is stdin" }],
+    routes: ["GET /__board/diagnostics", "POST /__board/diagnostics"],
+    async run(ctx, p) {
+      const got = await checked<{ tabs: number; rows: number; diagnostics: TableDiagnostic[] }>(ctx, p, "table");
+      if (ctx.json) {
+        ctx.io.out(JSON.stringify(got, null, 2));
+        return got.diagnostics.some((d) => d.severity === "error") ? EXIT.errors : EXIT.ok;
+      }
+      const code = tableLines(ctx, got.diagnostics);
+      if (!got.diagnostics.length) ctx.io.err(`${p.pos[0] ?? str(p, "file")}: ${got.tabs} tab(s), ${got.rows} row(s), nothing wrong`);
+      return code;
+    },
+  },
   {
     name: ["folder", "new"],
     args: "<name>",
@@ -677,35 +423,3 @@ export const DOCS: Command[] = [
 
 /** `3 boards`, `1 note`, or nothing for none — what the recursive delete's question lists. */
 const plural = (n: number, what: string, many = `${what}s`): string => (n ? `${n} ${n === 1 ? what : many}` : "");
-
-/** An event's `data:` as the object the feed sends, or `null` for `dag:boards`'s bare `null`. */
-export function parseData(raw: string): { name?: string; sha1?: string } | null {
-  try {
-    const v: unknown = JSON.parse(raw);
-    return v && typeof v === "object" ? (v as { name?: string; sha1?: string }) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Server-sent events off a response body: `event:` and `data:` lines, a blank line between. */
-export async function* events(res: Response): AsyncGenerator<{ event: string; data: string }> {
-  if (!res.body) return;
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-    buffer += decoder.decode(chunk, { stream: true });
-    for (let cut = buffer.indexOf("\n\n"); cut >= 0; cut = buffer.indexOf("\n\n")) {
-      const block = buffer.slice(0, cut);
-      buffer = buffer.slice(cut + 2);
-      let event = "message";
-      const data: string[] = [];
-      for (const line of block.split("\n")) {
-        if (line.startsWith(":")) continue;
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
-      }
-      if (data.length) yield { event, data: data.join("\n") };
-    }
-  }
-}

@@ -84,7 +84,7 @@ A link with an end that does not resolve is dropped rather than drawn half-way. 
 the report, and it names the fence's line.
 
 Deleting an item takes every link that named it, or a card inside it, in the same write — from the
-canvas, `anydag item rm`, or a `remove` op — so an `EB_LINK_UNKNOWN_ITEM` means a link was written to
+canvas, a `remove` op over MCP (`board_patch`) — so an `EB_LINK_UNKNOWN_ITEM` means a link was written to
 something that was never there, not that something was deleted.
 
 ## Bare nodes
