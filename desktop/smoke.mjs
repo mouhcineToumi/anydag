@@ -54,8 +54,12 @@ const vault = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-smoke-vault-"));
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-smoke-home-"));
 fs.writeFileSync(path.join(vault, "Smoke.board.md"), "---\ntitle: Smoke\n---\n\n```md\nIt opens.\n```\n");
 
-/* Linux CI has no GPU and an unprivileged sandbox the runner may refuse; neither is what is tested. */
-const extra = process.platform === "linux" ? ["--no-sandbox", "--disable-gpu"] : [];
+/* Linux CI has no GPU and an unprivileged sandbox the runner may refuse; neither is what is tested.
+   On macOS `safeStorage` is the login keychain, which the smoke has no business writing — and an
+   item one build made is a modal "allow access?" to the next build signed differently (the x64 app
+   after the arm64 one, each signed ad hoc), which blocks the main thread with nobody to answer it.
+   Chromium's mock keychain keeps it in the process. */
+const extra = process.platform === "linux" ? ["--no-sandbox", "--disable-gpu"] : process.platform === "darwin" ? ["--use-mock-keychain"] : [];
 console.log(`smoke: ${command} ${[...lead, vault].join(" ")}`);
 const child = spawn(command, [...lead, vault, ...extra], {
   env: { ...process.env, ANYDAG_DESKTOP_SMOKE: "1", ANYDAG_HOME: home, ELECTRON_ENABLE_LOGGING: "1" },
@@ -73,6 +77,8 @@ child.stderr.on("data", hear);
 const timer = setTimeout(() => {
   console.error("smoke: no answer in 240 s");
   child.kill();
+  /* A main thread that is stuck never runs its SIGTERM handler. */
+  setTimeout(() => child.kill("SIGKILL"), 10_000).unref();
 }, 240_000);
 child.on("exit", (code) => {
   clearTimeout(timer);

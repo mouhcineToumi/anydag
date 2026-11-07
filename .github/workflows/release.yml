@@ -54,6 +54,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -87,6 +88,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            # The arm64 run's keychain item belongs to a differently signed app, and reading it
+            # would be an "allow access?" prompt nobody answers. The runner is thrown away after.
+            perl -e 'alarm 20; exec @ARGV' security delete-generic-password -s "AnyDag Safe Storage" >/dev/null 2>&1 || true
             node desktop/smoke.mjs --app release/mac/AnyDag.app/Contents/MacOS/AnyDag
           else
             echo "::warning::no Rosetta on this runner — the x64 build was packaged but not opened"
