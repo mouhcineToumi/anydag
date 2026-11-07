@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
@@ -142,7 +143,7 @@ describe("the note bridge", () => {
 
   it("keeps the equations through the editor's own schema", async () => {
     const server = ServerBlockNoteEditor.create({ schema: noteSchema });
-    const held = await server._withJSDOM(async () => {
+    const held = await server._withDOM(async () => {
       server.editor.replaceBlocks(server.editor.document, mdToBlocks(md) as never);
       return JSON.parse(JSON.stringify(server.editor.document)) as NoteBlock[];
     });
