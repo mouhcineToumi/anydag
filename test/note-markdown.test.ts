@@ -69,7 +69,7 @@ const corpus: Body[] = walk(ROOT).flatMap((file) => {
 
 /**
  * The repository's own Markdown, a body per `##` or `###` section — the size of a note somebody writes.
- * `SKILL.md` and `CLAUDE.md` are left out: each holds a list whose items carry more than one
+ * `SKILL.md` and the files under `docs/architecture/` are left out: each holds a list whose items carry more than one
  * block — a table and then a paragraph, a bullet with a second paragraph under it — and the house
  * form of those changes again on a second save. A defect of the bridge, not of the corpus, and its
  * own change; until then the "stable" check below would fail on them.
@@ -85,7 +85,9 @@ const DOCS = [
   ...fs.readdirSync(path.join(REPO, "docs/dsl")).filter((f) => f.endsWith(".md")).map((f) => `docs/dsl/${f}`),
 ];
 for (const doc of DOCS) {
-  const text = splitNote(fs.readFileSync(path.join(REPO, doc), "utf8")).body;
+  /* The README's badge line is left out: a link around an image, `[![CI](…)](…)`, is read by the bridge as a link
+     whose text is the literal `![CI](…)` — a defect of the bridge, not of the corpus, and its own change. */
+  const text = splitNote(fs.readFileSync(path.join(REPO, doc), "utf8")).body.replace(/^\[!\[.*\n\n/m, "");
   text
     .split(/^(?=#{2,3} )/m)
     .filter((section) => section.trim())

@@ -313,7 +313,7 @@ export function Viewport({
    * press through. `useEditor`'s key handler runs in the capture phase and could stop it dead; it
    * calls `preventDefault` on the leader and never `stopPropagation`, for exactly this. The other
    * half is that a pointer going down while Space is held takes the chord back over there, so a
-   * pan is a pan and never also a command. See `CLAUDE.md` → *The leader key*.
+   * pan is a pan and never also a command. See `docs/architecture/editing.md` → *The leader key*.
    */
   useEffect(() => {
     let on = false;

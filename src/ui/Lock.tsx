@@ -14,7 +14,7 @@ const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  * key in the tooltip, which is the only place a key is written down.
  *
  * The class names are `dag-readonly*` rather than `dag-lock*`: `dag-lockup` is the logo's, and a name
- * one suffix from another is the namespace hazard `CLAUDE.md` has recorded five times.
+ * one suffix from another is the namespace hazard `docs/architecture/things-that-will-bite.md` has recorded five times.
  */
 export function LockButton() {
   const locked = useLocked();

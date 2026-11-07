@@ -337,7 +337,7 @@ export type Thing = { kind: FileKind; name: string } | { folder: string };
  *
  * **Its rows are not the search's rows.** The search keeps `data-dag-board` and `.dag-board`, which
  * every spec that finds a board in the list already reads. A second element answering to either would be the namespace
- * hazard `CLAUDE.md` records, so these are `data-dag-sidebar-file` and `.dag-sidebar__row`.
+ * hazard `docs/architecture/things-that-will-bite.md` records, so these are `data-dag-sidebar-file` and `.dag-sidebar__row`.
  *
  * Every row is a button, so `typing()` in `useEditor` stands the canvas's keys aside while focus is
  * anywhere in here — which is right, and which means the tree owns its own keys, Escape included.

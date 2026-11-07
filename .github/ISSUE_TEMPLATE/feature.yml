@@ -1,0 +1,102 @@
+name: Feature request
+description: Propose a new capability or an improvement
+title: "feat: "
+labels: ["status: triage", "type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. A new issue starts as `status: triage`; the maintainer marks it
+        `status: ready` when it meets the
+        [Definition of Ready](https://github.com/mouhcineToumi/anydag/blob/develop/CONTRIBUTING.md#definition-of-ready-for-an-issue).
+        **Nobody starts building before that**, so the clearer the scope, the sooner it can start.
+
+        Not sure yet, or want to talk it over first? Use
+        [Discussions](https://github.com/mouhcineToumi/anydag/discussions). Several things are refused on
+        purpose; the *Deliberately out* sections of
+        [`docs/architecture/`](https://github.com/mouhcineToumi/anydag/tree/develop/docs/architecture)
+        say which and why.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and discussions and this has not been proposed.
+          required: true
+        - label: I checked that it is not listed as *Deliberately out* in the architecture docs.
+          required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: The problem or need
+      description: Who is this for, and what can they not do today? Describe the need rather than only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Expected behaviour
+      description: What would it do, from the point of view of the person using it? A small example or sketch is welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is in this issue, and **what is explicitly out of it**. A pull request will stop where the scope stops.
+      placeholder: |
+        In scope:
+        - ...
+
+        Out of scope:
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: A short checklist a reviewer can tick to say it is done.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+        - [ ] Tests cover ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part is it in?
+      description: Your best guess; the maintainer sets the `area:` label.
+      options:
+        - Canvas, boards and layout
+        - DSL and diagrams
+        - Notes, equations, search
+        - Tables
+        - Quizzes
+        - Tasks and calendar
+        - Sync
+        - Desktop app and installers
+        - CLI and MCP
+        - Assistant and prompt cards
+        - Docs, CI or tooling
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and open questions
+      description: Other ways to meet the need, and anything still undecided. An issue with an open design question is not ready, so say it here and it will be settled first.
+    validations:
+      required: false
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to build it?
+      options:
+        - "No, I am only suggesting it"
+        - "Yes, once it is ready"
+        - "Maybe, I would want some guidance"
+    validations:
+      required: false

@@ -60,7 +60,7 @@ function literals(): Set<string> {
 /**
  * The `dag:` names that are events rather than storage.
  *
- * They share the prefix because they share a namespace — which `CLAUDE.md` records as a hazard that
+ * They share the prefix because they share a namespace — which `docs/architecture/things-that-will-bite.md` records as a hazard that
  * has bitten three times — so telling them apart has to be done by hand. Each is dispatched on
  * `window` or `document` and none is ever written to `localStorage`.
  */

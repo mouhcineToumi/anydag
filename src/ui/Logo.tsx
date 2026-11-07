@@ -70,7 +70,7 @@ export function Logo({
  * which is right
  * for an asset somebody drops into a slide and wrong here: a path could not be selected, could not
  * be read out, would not take the theme's ink, and would be a fourth drawing to keep in step with
- * the three `CLAUDE.md` already warns about. What is worth carrying over from that drawing is not the
+ * the three `docs/architecture/overview.md` already warns about. What is worth carrying over from that drawing is not the
  * outlines but the two numbers that make it a lockup rather than a logo with a word after it — the
  * size of the name against the mark, and the air between them. Both are written as fractions of
  * the mark in `chrome.css`, off its own 64-unit box: the name is its `font-size: 44`, the
