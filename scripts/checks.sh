@@ -33,6 +33,12 @@ step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 step "lint"
 npx biome lint .
 
+# Unused exports, files and dependencies, and imports of packages `package.json` does not list: the
+# count is zero and stays zero, so any finding is a regression. Its exceptions, each with its
+# reason, are in `knip.jsonc`. About two seconds over the whole tree.
+step "knip"
+npx knip
+
 step "typecheck"
 npx tsc --noEmit
 npx tsc --noEmit -p tsconfig.worker.json
