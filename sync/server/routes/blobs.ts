@@ -61,7 +61,7 @@ export function blobRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.byteLength !== length) throw new HttpError("ES_BAD_REQUEST", `the body was ${bytes.byteLength} bytes, not the ${length} Content-Length said`);
     await deps.blobs.put(v.id, id, bytes);
-    await deps.meta.addBlob(v.id, id, length);
+    await deps.meta.addBlob(v.id, id, length, deps.now().toISOString());
     await deps.usage.bump(v.account, v.id, "bytes_up", length);
     return c.json({ ok: true, size: length });
   });
