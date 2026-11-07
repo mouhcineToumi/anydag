@@ -120,7 +120,7 @@
     "@iconify-json/simple-icons": "^1.2.94",
     "@playwright/test": "1.65.0",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
