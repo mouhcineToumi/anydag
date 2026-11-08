@@ -22,7 +22,7 @@ chat's change blocks in a Changes column.
 | `server/routes/chat.ts` | the routes, the guard's registration, the SSE stream |
 | `src/assistant/` | the panel, the page, the composer and its picker, the steps, the approval, access and block cards |
 
-Nine things are load-bearing:
+Ten things are load-bearing:
 
 - **The app owns the conversation; the harness owns one turn.** A turn is one process (or, for
   OpenCode, one request to a `serve` the chat keeps), parsed into steps and written to disk when it
@@ -34,6 +34,20 @@ Nine things are load-bearing:
   config naming one server; OpenCode with every permission denied but `anydag_*`. That server reaches
   this one over loopback with the launch token and `x-anydag-chat: <id>` on every call, so every
   write goes through the route the page uses — the base sha1, the 409 and `merge3` included.
+- **The MCP child is this process as Node, and in the desktop app that means keeping
+  `ELECTRON_RUN_AS_NODE`.** `Live.mcpFor` starts it as `process.execPath` + `process.argv[1]` +
+  `mcp --chat`, with the port, token and home in its environment, and the switch too when the parent
+  has it. The desktop app runs the server as Electron-as-Node, so `process.execPath` is Electron;
+  without the switch the child starts as an Electron app, cannot open a window (its env has no
+  display) and dies before it answers MCP — which Claude Code records as `CONNECTION_CLOSED` and
+  OpenCode as a server that never attached.
+- **A turn that cannot use its tools fails, and nothing it guessed survives.** Claude Code's
+  `system/init` is read for the `anydag` server's status and the `mcp__anydag__*` tools; OpenCode's
+  `GET /api/mcp` is waited on for the same. Missing, failed or toolless fails the turn with one clear
+  error. A reply holding `<invoke name=` or `<parameter name=` while no tool ran is logged (raw text
+  only) and shown as that error, never stored as the answer. A failed turn keeps the person's
+  message and the chat, is not seeded as an assistant answer, and drops its session so the next turn
+  starts fresh.
 - **The guard is the server's, never the prompt's.** Every request carrying `x-anydag-chat` passes
   `Assistant.guard` **before** the vault scoping: no running turn is 409 `no-turn`; a write route not
   on its list is 403 `chat-refused`; a vault the chat was not granted, 403 `not-granted`; a write in

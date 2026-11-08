@@ -74,6 +74,9 @@ export function seeded(prior: readonly Turn[], text: string): string {
   const out = ["This conversation started earlier, possibly with another model. Here it is so far:", ""];
   for (const t of prior) {
     out.push(`<person>\n${t.text}\n</person>`);
+    /* A failed turn's words are the model guessing without its tools, not an answer: they are kept
+       in the chat for the person, and never seeded as something the Assistant said. */
+    if (t.status === "failed") continue;
     const said = t.steps.map(stepLine).filter((l): l is string => !!l);
     if (said.length) out.push(`<assistant>\n${said.join("\n")}\n</assistant>`);
   }

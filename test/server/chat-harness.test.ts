@@ -35,8 +35,13 @@ const INIT = {
   subtype: "init",
   session_id: "53901487-be01-4a2e-8bd4-b73691ca3143",
   mcp_servers: [{ name: "anydag", status: "connected", source: "dynamic" }],
+  tools: ["mcp__anydag__doc_create", "mcp__anydag__doc_list", "mcp__anydag__change_block", "Read"],
   model: "claude-opus-5-5",
 };
+/** The same line when the chat's MCP server is missing, failed, or connected with no tools of ours. */
+const INIT_NO_SERVER = { ...INIT, mcp_servers: [] };
+const INIT_FAILED = { ...INIT, mcp_servers: [{ name: "anydag", status: "failed", source: "dynamic" }] };
+const INIT_NO_TOOLS = { ...INIT, tools: ["Read", "Bash"] };
 const TEXT_DELTA = {
   type: "stream_event",
   event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "The vault has two notes." } },
@@ -209,6 +214,25 @@ describe("Claude Code's stream", () => {
   it("opens a session on init, and says nothing of the other system lines", () => {
     expect(claudeEvents(INIT).events).toEqual([{ kind: "session", id: INIT.session_id }]);
     expect(claudeEvents({ type: "system", subtype: "status", status: "requesting", session_id: "x" }).events).toEqual([]);
+  });
+
+  it("fails the turn from init when anydag is missing, not connected, or has no tool", () => {
+    const absent = claudeEvents(INIT_NO_SERVER);
+    expect(absent.events).toEqual([
+      { kind: "session", id: INIT.session_id },
+      { kind: "error", text: expect.stringContaining("without the anydag MCP server") },
+    ]);
+    expect(absent.st.failed).toContain("Nothing was changed");
+
+    const failed = claudeEvents(INIT_FAILED);
+    expect(failed.events.at(-1)).toEqual({ kind: "error", text: expect.stringContaining("did not connect (failed)") });
+    expect(failed.st.failed).toContain("no tools");
+
+    const toolLess = claudeEvents(INIT_NO_TOOLS);
+    expect(toolLess.events.at(-1)).toEqual({ kind: "error", text: expect.stringContaining("listed no tools") });
+    expect(toolLess.st.failed).toContain("Nothing was changed");
+
+    expect(claudeEvents(INIT).st.failed).toBeUndefined();
   });
 
   it("turns text deltas into deltas and ignores a tool input arriving in pieces", () => {
@@ -444,6 +468,20 @@ describe("the Claude harness", () => {
     });
     const end = await claudeHarness({ bin: "claude", spawnImpl: sp.impl }).run(runOptions(), () => undefined).done;
     expect(end.error).toBe("API Error: 529 overloaded");
+  });
+
+  it("stops a run whose init says the MCP server is not usable, and keeps its guess out of the turn", async () => {
+    const sp = fakeSpawn(({ child }) => {
+      /* The model goes on and writes the call as text: none of it may reach the page. */
+      emit(child, INIT_FAILED, ASSISTANT_TEXT, RESULT);
+    });
+    const events: HarnessEvent[] = [];
+    const end = await claudeHarness({ bin: "claude", spawnImpl: sp.impl }).run(runOptions(), (e) => events.push(e)).done;
+    expect(end.error).toContain("did not connect (failed)");
+    expect(end.error).toContain("Nothing was changed");
+    expect(events.filter((e) => e.kind === "error")).toHaveLength(1);
+    expect(events.some((e) => e.kind === "text")).toBe(false);
+    expect(sp.calls[0]!.child.signals).toContain("SIGTERM");
   });
 
   it("reports an exit with no result, with the end of stderr", async () => {
@@ -779,6 +817,23 @@ describe("the OpenCode harness", () => {
     expect(events).toEqual([{ kind: "error", text: end.error! }]);
     await new Promise((r) => setTimeout(r, 20));
     expect(fs.readdirSync(tmp).filter((d) => d.startsWith("dag-opencode-"))).toEqual([]);
+  });
+
+  it("fails the turn when OpenCode reports the anydag MCP server failed to start", async () => {
+    const w = opencodeWorld([]);
+    const fetchImpl = (async (url: string, init: { method: string; headers: Record<string, string> }) => {
+      if (url.endsWith("/api/mcp"))
+        return { json: async () => ({ data: [{ name: "anydag", status: { status: "failed", error: "boom" } }] }) };
+      return w.fetchCall(url, init);
+    }) as never;
+    const h = opencodeHarness({ bin: "opencode", env: {}, spawnImpl: w.sp.impl, fetchImpl, tmpRoot: tmp });
+    const events: HarnessEvent[] = [];
+    const end = await h.run(runOptions(), (e) => events.push(e)).done;
+    expect(end.error).toContain("the anydag MCP server failed to start: boom");
+    expect(events).toEqual([{ kind: "error", text: end.error! }]);
+    expect(w.runs).toEqual([]);
+    expect(w.serves[0]!.child.signals).toContain("SIGTERM");
+    await h.close();
   });
 
   it("stops by interrupting the session, never by killing the client, and settles done with no error", async () => {

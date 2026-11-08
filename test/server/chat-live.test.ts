@@ -12,11 +12,11 @@ import os from "node:os";
 import path from "node:path";
 
 import { serve, type ServerType } from "@hono/node-server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../server/app";
 import { fakeHarness } from "../../server/chat/fake";
-import type { Harness, RunOptions } from "../../server/chat/harness";
+import type { Harness, HarnessEvent, RunOptions } from "../../server/chat/harness";
 import { Assistant } from "../../server/chat/live";
 import { newId } from "../../server/chat/store";
 import type { ChatEvent, ChatMeta, Op, Step, Turn, UndoRecord } from "../../server/chat/types";
@@ -42,6 +42,19 @@ const temps: string[] = [];
 function watched(provider: "claude" | "opencode"): Harness {
   const fake = fakeHarness(provider);
   return { ...fake, run: (o, on) => (runs.push(o), fake.run(o, on)) };
+}
+
+/** A harness that says exactly the events a test hands it, then finishes successfully. */
+function scripted(provider: "claude" | "opencode", events: HarnessEvent[]): Harness {
+  return {
+    provider,
+    run(_o, on) {
+      for (const e of events) on(e);
+      return { done: Promise.resolve({}), stop: async () => undefined };
+    },
+    async forget() {},
+    async close() {},
+  };
 }
 
 async function api(
@@ -161,12 +174,53 @@ describe("a turn", () => {
     expect((await ended).status).toBe("stopped");
   });
 
-  it("keeps a failure as a failed turn", async () => {
+  it("keeps a failure as a failed turn, never a done one", async () => {
     const chat = await newChat();
     const turn = await say(chat.id, "fail it broke");
     expect(turn.status).toBe("failed");
     expect(turn.steps.some((s) => s.kind === "error" && s.text === "it broke")).toBe(true);
+
+    const read = await api("GET", `/__board/chat?id=${chat.id}`);
+    expect(read.json.turns).toHaveLength(1);
+    expect(read.json.turns[0].status).toBe("failed");
+    expect(read.json.turns[0].text).toBe("fail it broke");
   });
+});
+
+describe("a reply that wrote its tool call as text", () => {
+  const RAW = '<invoke name="change_block"> <parameter name="title">Write a note on merge queues</parameter> </invoke>';
+
+  it.each(["claude", "opencode"] as const)(
+    "fails the %s turn, shows one error, and keeps the raw text in the log only",
+    async (provider) => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const a = new Assistant({
+        session,
+        token: TOKEN,
+        harnesses: { [provider]: scripted(provider, [{ kind: "text", text: RAW }]) },
+        scratch: os.tmpdir(),
+      });
+      a.listening(port);
+      try {
+        const chat = await newChat();
+        const ended = new Promise<Turn>((resolve) => {
+          a.listen(chat.id, (e) => e.type === "end" && resolve(e.turn));
+        });
+        a.say(chat.id, "write me a small doc about merge queues", { provider, mode: "edit" });
+        const turn = await ended;
+
+        expect(turn.status).toBe("failed");
+        expect(turn.steps.filter((s) => s.kind === "error")).toHaveLength(1);
+        expect(turn.steps.some((s) => s.kind === "text")).toBe(false);
+        expect(said(turn)).toBe("");
+        expect(JSON.stringify(turn)).not.toContain("invoke name");
+        expect(log.mock.calls.flat().join("\n")).toContain(RAW);
+      } finally {
+        log.mockRestore();
+        await a.close();
+      }
+    },
+  );
 });
 
 describe("the guard", () => {
@@ -440,6 +494,32 @@ describe("sessions", () => {
     expect(runs[0]!.system).toContain(env.vault.id);
     expect(runs[0]!.mcp.args).toEqual(expect.arrayContaining(["mcp", "--chat", chat.id, "--mode", "ask"]));
     expect(runs[0]!.mcp.env.ANYDAG_CHAT_PORT).toBe(String(port));
+  });
+
+  it("does not seed a failed turn's answer or resume its session", async () => {
+    const chat = await newChat();
+    await say(chat.id, "fail it broke");
+    expect(runs[0]!.fresh).toBeTruthy();
+
+    await say(chat.id, "again");
+    expect(runs[1]!.resume).toBeUndefined();
+    expect(runs[1]!.fresh).toBeTruthy();
+    expect(runs[1]!.prompt).toContain("<person>\nfail it broke\n</person>");
+    expect(runs[1]!.prompt).not.toContain("<assistant>");
+    expect(runs[1]!.prompt.endsWith("The person now says:\n\nagain")).toBe(true);
+  });
+
+  it("keeps the Electron-as-Node marker in the MCP child's env when the server has it", async () => {
+    const was = process.env.ELECTRON_RUN_AS_NODE;
+    process.env.ELECTRON_RUN_AS_NODE = "1";
+    try {
+      const chat = await newChat();
+      await say(chat.id, "hello");
+      expect(runs[0]!.mcp.env.ELECTRON_RUN_AS_NODE).toBe("1");
+    } finally {
+      if (was === undefined) delete process.env.ELECTRON_RUN_AS_NODE;
+      else process.env.ELECTRON_RUN_AS_NODE = was;
+    }
   });
 });
 
