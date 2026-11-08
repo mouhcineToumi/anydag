@@ -4,6 +4,7 @@ import {
   clampPan,
   clampZoom,
   DRAG_SLOP,
+  firstFit,
   fitTo,
   PAN_STEP,
   stepZoom,
@@ -161,6 +162,7 @@ export function Viewport({
 
   const viewSize = useCallback(() => ({ w: boxRef.current?.clientWidth ?? 1, h: boxRef.current?.clientHeight ?? 1 }), []);
 
+  /** The explicit Fit action: frames the content, magnifying it if that is what filling the glass takes. */
   const fit = useCallback(
     (target?: Rect) => {
       const { zoom: z, off: o } = fitTo(target ?? contentRef.current, viewSize());
@@ -169,6 +171,19 @@ export function Viewport({
     },
     [commit, viewSize],
   );
+
+  /**
+   * The automatic fit a board opens with, and the one a resize makes while the view is still the
+   * automatic one. It may shrink a board but never magnifies it, because a single small item — the
+   * prompt card a new board arrives with — used to be fitted to 215%, which reads as "too much
+   * zoom" rather than as "here is your board". The person takes the view over from there with any
+   * gesture, and the explicit `fit` above keeps its full range.
+   */
+  const autoFit = useCallback(() => {
+    const { zoom: z, off: o } = firstFit(contentRef.current, viewSize());
+    commit(z, o);
+    touched.current = false;
+  }, [commit, viewSize]);
 
   const show = useCallback(
     (box: Rect) => {
@@ -650,14 +665,15 @@ export function Viewport({
   };
 
   /* Fit on the first real content, and again whenever the content changes shape — unless the user
-     has taken over, in which case leave their view exactly where they put it. */
+     has taken over, in which case leave their view exactly where they put it. This is the
+     automatic view, so it is `autoFit` and not the explicit `fit`: opening at 100% is enough. */
   const fitted = useRef("");
   useEffect(() => {
     const key = `${content.x},${content.y},${content.w},${content.h}`;
     if (key === fitted.current || content.w <= 1) return;
     fitted.current = key;
-    if (!touched.current) fit(content);
-  }, [content, fit]);
+    if (!touched.current) autoFit();
+  }, [content, autoFit]);
 
   useEffect(() => {
     const box = boxRef.current;
@@ -673,7 +689,7 @@ export function Viewport({
          the window's first resize left an empty plane reading **400%**. That was reachable before
          only on a board with no items; now it is the first screen anybody sees, and a zoom figure
          about nothing is worse than no figure at all. */
-      if (!touched.current && contentRef.current.w > 1) return fit();
+      if (!touched.current && contentRef.current.w > 1) return autoFit();
       /*
        * **The drawing does not move when the chrome beside it does.**
        *
@@ -690,7 +706,7 @@ export function Viewport({
     });
     ro.observe(box);
     return () => ro.disconnect();
-  }, [fit, commit]);
+  }, [autoFit, commit]);
 
   return (
     <div

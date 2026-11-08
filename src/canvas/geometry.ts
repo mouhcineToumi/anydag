@@ -25,6 +25,8 @@ const WHEEL_PAGE = 400;
 export const PAN_STEP = 88;
 export const DRAG_SLOP = 4;
 const FIT_MARGIN = 64;
+/** The most the view a board opens with may magnify — see `firstFit`. */
+const FIRST_FIT_MAX = 1;
 
 /**
  * **Deliberately does not round.** A trackpad sends deltas of one or two pixels; rounded, each one
@@ -54,10 +56,16 @@ export function clampPan(off: Point, content: Rect, zoom: number, view: { w: num
   };
 }
 
-/** The zoom and offset that put `content` in the middle of `view` with a margin. */
-export function fitTo(content: Rect, view: { w: number; h: number }): { zoom: number; off: Point } {
-  const zoom = clampZoom(
-    Math.min((view.w - FIT_MARGIN * 2) / Math.max(content.w, 1), (view.h - FIT_MARGIN * 2) / Math.max(content.h, 1)),
+/**
+ * The zoom and offset that put `content` in the middle of `view` with a margin.
+ *
+ * `maxZoom` is the automatic fit's ceiling. The explicit Fit action leaves it at the range's own
+ * top: a person asking to frame one small card means to look at it closely.
+ */
+export function fitTo(content: Rect, view: { w: number; h: number }, maxZoom: number = ZOOM_MAX): { zoom: number; off: Point } {
+  const zoom = Math.min(
+    maxZoom,
+    clampZoom(Math.min((view.w - FIT_MARGIN * 2) / Math.max(content.w, 1), (view.h - FIT_MARGIN * 2) / Math.max(content.h, 1))),
   );
   return {
     zoom,
@@ -67,6 +75,18 @@ export function fitTo(content: Rect, view: { w: number; h: number }): { zoom: nu
     },
   };
 }
+
+/**
+ * **The view a board opens with never magnifies past 100%.**
+ *
+ * Fitting answers "show me everything on the board", and on a small one that means blowing it up
+ * until it fills the glass. A new board's prompt card came up at 215% — the person read it as "too
+ * much zoom", not as a fitted board, and the note a blank board used to carry did the same before
+ * it. So the automatic fit shrinks a large board and leaves a small one at 100%, with the paper
+ * around it. The person still reaches every zoom above 100% with `+`, the wheel or the bar, and
+ * the explicit Fit action still frames content of any size.
+ */
+export const firstFit = (content: Rect, view: { w: number; h: number }) => fitTo(content, view, FIRST_FIT_MAX);
 
 /**
  * A wheel delta in CSS pixels, whatever unit the browser chose to report it in.

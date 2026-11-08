@@ -95,9 +95,8 @@ test("the zoom figure follows the board, and the percentage is a button back to 
   await expect(pct).toBeVisible();
 
   /* It arrives on a `dag:zoom` event rather than as state, so the check that matters is that it
-     moved at all — a figure wired to nothing would sit at whatever it first rendered.
-     Out rather than in: a board this small fits at the 400% ceiling, where `stepZoom` returns the
-     zoom it was given and `zoomBy` commits nothing, so zooming *in* is a no-op here by design. */
+     moved at all — a figure wired to nothing would sit at whatever it first rendered. The board
+     opens at 100% (the automatic fit never magnifies), so either step moves it. */
   const first = await pct.innerText();
   await page.locator("[data-dag-zoombar] button[aria-label^='Zoom out']").click();
   await expect(pct).not.toHaveText(first);
