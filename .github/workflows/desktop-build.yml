@@ -64,6 +64,13 @@ on:
 permissions:
   contents: read
 
+# Electron and electron-builder's tools come from npmmirror, not GitHub's release downloads,
+# which once returned 504 for a whole morning (#46). Nothing is trusted for the mirror's own checksum:
+# see "Electron and electron-builder's tools come from npmmirror" in docs/architecture/desktop.md.
+env:
+  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+  ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+
 jobs:
   build:
     name: build (${{ matrix.os }})
