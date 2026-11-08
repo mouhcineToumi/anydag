@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
-import { BOARDS } from "./boards";
+import { BOARDS, boardId } from "./boards";
 
 /**
  * The read-only view — `?view=1`.
@@ -108,8 +108,8 @@ test("zooms and fits", async ({ page }) => {
 });
 
 test("opens a board by its permanent id", async ({ page }) => {
-  const list = (await (await page.request.get("/__board/list")).json()) as { ids: Record<string, string> };
-  const id = list.ids[stem];
+  /* The id index is fed by the file watcher, not by the write: poll the list until it names the file. */
+  const id = await boardId(page, stem);
   expect(id).toMatch(/^[0-9a-z]{10}$/);
   await page.goto(`/?view=1&ref=${id}`);
   await ready(page);

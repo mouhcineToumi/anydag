@@ -61,3 +61,23 @@ export async function openBoards(page: Page): Promise<void> {
     await expect(page.locator("[data-dag-boards]")).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
 }
+
+/**
+ * A board's permanent id, once the server's list names the file.
+ *
+ * A spec writes its fixture with `fs` and the server's id index is fed by the file watcher, so one
+ * `GET /__board/list` straight after the write is a race: under load the answer does not have the
+ * file yet and `ids[name]` is `undefined`. The index is eventually consistent by design, so poll the
+ * list until it names the file, then read the id.
+ */
+export async function boardId(page: Page, name: string): Promise<string> {
+  let id: string | undefined;
+  await expect
+    .poll(async () => {
+      const list = (await (await page.request.get("/__board/list")).json()) as { ids: Record<string, string> };
+      id = list.ids[name];
+      return id;
+    })
+    .toBeTruthy();
+  return id!;
+}
