@@ -55,9 +55,12 @@ jobs:
           PROJECT_NUMBER: "3"
           REPOSITORY: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_PATH: ${{ github.event_path }}
         run: |
           set -euo pipefail
+
+          # `GITHUB_EVENT_PATH` is set by the runner; `github.event_path` comes through empty in an
+          # `env:` block, which is how the first run with the token died on a `jq` with no file.
+          EVENT_PATH="${GITHUB_EVENT_PATH:-}"
 
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::warning title=Project status not synced::PROJECT_TOKEN is not set. Add a classic personal access token with the project scope as the PROJECT_TOKEN secret."
