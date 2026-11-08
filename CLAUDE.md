@@ -150,7 +150,7 @@ Section names in italics inside those files (*Picking a node*, *The time zone*) 
 file in the index at the foot of [`docs/architecture/README.md`](docs/architecture/README.md).
 Other reference material: `docs/dsl/` (the grammar, one sheet per type), `docs/generate/` (the prompt
 card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/` (the agent skill),
-`icons/README.md`, `desktop/README.md`.
+`icons/README.md`, `desktop/README.md`, `site/README.md` (the landing page at anydag.com).
 
 ## Gate
 

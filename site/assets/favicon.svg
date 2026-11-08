@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AnyDag">
+  <style>
+    :root { --fg: #1E2430; }
+    @media (prefers-color-scheme: dark) { :root { --fg: #FBF8F3; } }
+  </style>
+  <g fill="none" stroke="var(--fg)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 32 13 L 16 13 Q 5 13 5 24 L 5 42 Q 5 53 16 53 L 34 53 Q 45 53 45 42 L 45 26"/>
+    <path d="M 16 45 C 16 32 26 27 32 32 C 36 36 31 42 27 39 C 23 35 31 27 38 21 C 43 17 49 13 53 10"/>
+  </g>
+  <circle cx="56" cy="8" r="5.5" fill="#2F6BF0"/>
+</svg>
