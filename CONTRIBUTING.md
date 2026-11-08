@@ -106,13 +106,18 @@ they are finished. It has:
       to stop.
 - [ ] **Acceptance criteria** — a short checklist a reviewer can tick.
 - [ ] **An `area:` label** (the maintainer sets it if you do not know).
+- [ ] **A `size:` label** — `S`, `M` or `L`: how much of a person's time the change takes, not how
+      much reasoning an agent needs.
 - [ ] **An `agent:` label**, set by the maintainer at triage: which model an AI agent should work on
       it with. See *Agent tier*.
 - [ ] **No open design question.** If the issue still needs a decision — which of two approaches, whether
       the feature should exist — it is not ready; that discussion happens first, in the issue or in
       Discussions.
 
-The issue forms ask for exactly these.
+The issue forms ask for exactly these. The three labels are not a suggestion: `issue-policy` comments
+on an issue labelled `status: ready` while any of `area:`, `size:` or `agent:` is missing (or while
+`size:`/`agent:` is doubled), and `pr-policy` fails a pull request whose ready issue is still missing
+one. An issue cannot reach `develop` around them.
 
 ## Agent tier
 
