@@ -171,6 +171,19 @@ test("the slash menu offers only what a Markdown file can say", async ({ page })
   await page.keyboard.press("Escape");
 });
 
+test("the drag handle menu's Delete has a trash icon and keeps its name", async ({ page }) => {
+  await open(page);
+  await clickOnHover(page, '.bn-block-content:has-text("The last paragraph.")', '[data-test="dragHandle"]');
+  const menu = page.locator(".bn-drag-handle-menu");
+  const item = menu.getByRole("menuitem", { name: "Delete" });
+  await expect(item).toBeVisible();
+  /* The glyph is decorative — `aria-hidden` — so the item is still announced, and found by a
+     keyboard, as the word. */
+  await expect(item.locator("svg")).toHaveCount(1);
+  /* And it is still the only action: a note has no colours, alignment or header to offer. */
+  await expect(menu.getByRole("menuitem")).toHaveCount(1);
+});
+
 test("a Markdown shortcut makes a block, and the file says it in Markdown", async ({ page }) => {
   await open(page);
   await endOf(page, "The last paragraph.");
