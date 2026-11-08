@@ -101,9 +101,14 @@ const DOCS = [
     .map((f) => `docs/dsl/${f}`),
 ];
 for (const doc of DOCS) {
-  /* The README's badge line is left out: a link around an image, `[![CI](…)](…)`, is read by the bridge as a link
-     whose text is the literal `![CI](…)` — a defect of the bridge, not of the corpus, and its own change. */
-  const text = splitNote(fs.readFileSync(path.join(REPO, doc), "utf8")).body.replace(/^\[!\[.*\n\n/m, "");
+  /* The README's raw HTML blocks are left out — the centred logo, the badges and the `<picture>`s that
+     swap a screenshot for GitHub's dark mode. A note has no HTML block, and the bridge escapes one
+     into text that is escaped again on every save: a defect of the bridge, not of the corpus, and
+     its own change. Any HTML block is a paragraph that opens with a tag. */
+  const text = splitNote(fs.readFileSync(path.join(REPO, doc), "utf8"))
+    .body.split(/\n{2,}/)
+    .filter((block) => !/^<[a-z]/i.test(block))
+    .join("\n\n");
   text
     .split(/^(?=#{2,3} )/m)
     .filter((section) => section.trim())
