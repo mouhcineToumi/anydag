@@ -222,19 +222,59 @@ test("while it peeks, the toggle is still there to press, and pressing it keeps 
 
 test("the drawing does not move when the column opens or closes", async ({ page }) => {
   await fresh(page);
-  /* Move the view first: a view nobody has touched is refitted on a resize, as it always was. */
-  await page.locator(".dag-viewport").focus();
-  await page.keyboard.press("ArrowDown");
+  const viewport = page.locator(".dag-viewport");
+  const pct = page.locator("[data-dag-zoom-actual]");
   const item = page.locator('[data-dag-item="a"]');
-  const x0 = (await item.boundingBox())!.x;
+  const x = async () => Math.round((await item.boundingBox())!.x);
+  const close = async () => {
+    await page.keyboard.press("Control+Backslash");
+    await expect(sidebar(page)).toHaveCount(0);
+  };
+  const reopen = async () => {
+    await page.keyboard.press("Control+Backslash");
+    await expect(docked(page)).toBeVisible();
+  };
 
-  await page.keyboard.press("Control+Backslash");
-  await expect(sidebar(page)).toHaveCount(0);
-  await expect.poll(async () => Math.round((await item.boundingBox())!.x)).toBe(Math.round(x0));
+  /*
+   * Take the view over with `0`: a view nobody has touched is refitted on a resize, as it always
+   * was, and `0` is a choice like the zoom bar's 100% — the ResizeObserver a sidebar toggle fires
+   * must leave both the zoom and the drawing where it put them. `data-zoom` alone would miss a
+   * refit that kept the zoom and moved the paper; the item's place on the glass and the zoom bar's
+   * own readout are read as well.
+   */
+  await viewport.focus();
+  await page.keyboard.press("0");
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+  const x0 = await x();
 
-  await page.keyboard.press("Control+Backslash");
-  await expect(docked(page)).toBeVisible();
-  await expect.poll(async () => Math.round((await item.boundingBox())!.x)).toBe(Math.round(x0));
+  await close();
+  await expect.poll(x).toBe(x0);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  await reopen();
+  await expect.poll(x).toBe(x0);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  /* The button is the same choice from the same place: `f` hands the view back to the fit, then
+     the zoom bar's 100% claims it exactly as the key did. */
+  await viewport.focus();
+  await page.keyboard.press("f");
+  await pct.click();
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  await close();
+  await expect.poll(x).toBe(x0);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  await reopen();
+  await expect.poll(x).toBe(x0);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
 });
 
 test("a laptop window keeps it docked, narrower, and a phone's is a sheet over the whole window", async ({ page }) => {

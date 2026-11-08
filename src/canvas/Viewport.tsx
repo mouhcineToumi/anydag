@@ -197,6 +197,15 @@ export function Viewport({
     [commit, viewSize],
   );
 
+  /* Back to 100%, keeping the corner where it is. A choice like `show` and `zoomBy`, so it claims
+     the view: a later change of the content's bounds or of the box must not refit it. The `0` key
+     and the zoom bar's percentage call this one function — the same gesture in two places rather
+     than two commits that can drift. */
+  const actual = useCallback(() => {
+    commit(1, applied.current.off);
+    touched.current = true;
+  }, [commit]);
+
   const toBoard = useCallback((clientX: number, clientY: number): Point => {
     const box = boxRef.current?.getBoundingClientRect();
     const { zoom: z, off } = applied.current;
@@ -213,10 +222,7 @@ export function Viewport({
       show,
       zoomBy,
       reset: () => fit(),
-      actual: () => {
-        commit(1, applied.current.off);
-        touched.current = true;
-      },
+      actual,
       toBoard,
       zoom: () => applied.current.zoom,
       center: () => {
@@ -225,7 +231,7 @@ export function Viewport({
       },
       focus: () => boxRef.current?.focus({ preventScroll: true }),
     }),
-    [commit, fit, show, zoomBy, toBoard],
+    [actual, commit, fit, show, zoomBy, toBoard],
   );
 
   /* React registers `onWheel` passively at the root, so `preventDefault` inside a synthetic handler
@@ -637,7 +643,7 @@ export function Viewport({
         return fit();
       case "0":
         e.preventDefault();
-        return commit(1, applied.current.off);
+        return actual();
       case "+":
       case "=":
         e.preventDefault();

@@ -453,8 +453,10 @@
   content's bounds or of the canvas's box, neither of which `data-dag-ready` rules out, since it stays
   `1` while a board re-lays out — puts the fit view back. On `reference/architecture` that is
   `0.606011`, and 2429 × 0.606 is the 1472 a failed run measured. Take the view over with the zoom
-  bar's `[data-dag-zoom-actual]`, which calls `actual()` (paint, `data-zoom` in the same statement,
-  `touched = true`); the `0` key calls `commit` and does not set `touched`.
+  bar's `[data-dag-zoom-actual]` or the `0` key, which both call `actual()` (paint, `data-zoom` in
+  the same statement, `touched = true`). The `0` key used to commit alone and leave `touched` false,
+  so the next sidebar toggle refitted over it and the two controls disagreed about whose view it
+  was (`#41` made them one handler).
 - **A script that hands its browser the token has not handed it to its own `fetch`.** `snapshot.mjs`
   put the session into Playwright's context and then asked `/__board/diagnostics` with a bare
   `fetch` — a 401, whose body has no `board` and no `items`, so it printed no diagnostic and exited 0
