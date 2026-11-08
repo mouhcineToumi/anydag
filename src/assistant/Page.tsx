@@ -33,6 +33,11 @@ export function AssistantView({
   const chat = useChat(id);
   const row = chats.rows.find((r) => r.id === id);
   const waiting = (raw === "1" || raw === null) && !chats.loaded;
+  /* A chat deleted while this page is on it — here or in another tab — leaves for New chat, not a
+     stale shell. */
+  useEffect(() => {
+    if (chat.gone) onChat(NEW_CHAT);
+  }, [chat.gone, onChat]);
 
   return (
     <div className="dag-assistant" data-dag-assistant-page="">
@@ -45,7 +50,7 @@ export function AssistantView({
           running={chat.live !== null}
           onGone={() => onChat(NEW_CHAT)}
         />
-        {waiting ? null : chat.missing ? (
+        {waiting || chat.gone ? null : chat.missing ? (
           <p className="dag-chat-empty" data-dag-chat-missing="">
             There is no chat with this id in this vault. It may have been deleted, or it may be in a vault that is not open.
           </p>
