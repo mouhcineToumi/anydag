@@ -68,6 +68,9 @@ jobs:
           fi
 
           # Quoted here-documents: `$owner` and friends are GraphQL variables, not shell ones.
+          owner_name="${REPOSITORY%%/*}"
+          repo_name="${REPOSITORY##*/}"
+
           project_query="$(cat <<'GQL'
           query ($owner: String!, $number: Int!) {
             user(login: $owner) { projectV2(number: $number) { id } }
@@ -126,6 +129,15 @@ jobs:
           GQL
           )"
 
+          closing_query="$(cat <<'GQL'
+          query ($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) { closingIssuesReferences(first: 50) { nodes { number } } }
+            }
+          }
+          GQL
+          )"
+
           project_id=$(gh api graphql -f query="$project_query" \
             -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
             --jq '.data.user.projectV2.id')
@@ -168,10 +180,14 @@ jobs:
             action=$(jq -r '.action' "$EVENT_PATH")
             draft=$(jq -r '.pull_request.draft' "$EVENT_PATH")
             merged=$(jq -r '.pull_request.merged' "$EVENT_PATH")
-            body=$(jq -r '.pull_request.body // ""' "$EVENT_PATH")
+            pr_number=$(jq -r '.pull_request.number' "$EVENT_PATH")
 
-            numbers=$(grep -oiE '(closes|fixes|resolves)[[:space:]]+#[0-9]+([[:space:]]*,[[:space:]]*#[0-9]+)*' <<<"$body" \
-              | grep -oE '[0-9]+' | sort -u || true)
+            # GitHub's own list of what this pull request will close — the same one the merge uses.
+            # Reading it beats a regex over the body, which matched an example in this very PR's
+            # prose ("Closes #1, #2") and sent the run hunting for issue 1.
+            numbers=$(gh api graphql -f query="$closing_query" \
+              -f owner="$owner_name" -f name="$repo_name" -F number="$pr_number" \
+              --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number' | sort -u)
 
             case "$action" in
               opened | reopened | ready_for_review)
@@ -197,9 +213,6 @@ jobs:
           # `gh project item-list` resolves the owner through REST, which a token with only the
           # `project` scope cannot do ("unknown owner type"). The GraphQL calls below need nothing
           # else, and `... on Issue` keeps a pull request from matching an issue of the same number.
-          owner_name="${REPOSITORY%%/*}"
-          repo_name="${REPOSITORY##*/}"
-
           for number in $numbers; do
             item_id=$(gh api graphql --paginate --slurp -f query="$items_query" \
               -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
