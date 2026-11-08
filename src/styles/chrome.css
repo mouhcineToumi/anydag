@@ -190,6 +190,20 @@
 .dag-button:disabled { opacity: 0.5; cursor: default; }
 .dag-button--danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
 .dag-button--danger:hover:not(:disabled) { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-danger); }
+/*
+ * The one action a card is asking for: filled in the accent. It used to be spelled twice, scoped to
+ * the telemetry question and the chat card; it is the same button everywhere, so it lives here now.
+ * Disabled is a soft tint rather than the quiet button's half-opacity: the shape of the action stays
+ * on the card, and it reads as *not yet* instead of as a second secondary.
+ */
+.dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); border-color: var(--dag-color-accent); opacity: 0.9; }
+.dag-button--primary:disabled {
+  color: var(--dag-color-slate);
+  background: var(--dag-color-accentSoft);
+  border-color: var(--dag-color-accentSoft);
+  opacity: 1;
+}
 
 /*
  * The toolbar sits above a row: the board list, then the plane. `min-height` and `min-width` are
@@ -837,8 +851,6 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-telemetry-ask__hint { margin: 12px 0 0; font-size: 12px; color: var(--dag-color-slate); }
 .dag-telemetry-ask__failed { margin: 8px 0 0; font-size: 12px; color: var(--dag-color-dangerText); }
 .dag-telemetry-ask__foot { gap: 8px; }
-.dag-telemetry-ask .dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
-.dag-telemetry-ask .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); opacity: 0.9; }
 /* The Privacy tab's two lists. */
 .dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); }
 .dag-sidebar__menu-who {
@@ -909,10 +921,19 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-vault__line:hover .dag-vault__forget,
 .dag-vault__line:focus-within .dag-vault__forget { opacity: 1; }
 .dag-vault__path { margin-left: auto; padding-left: 8px; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-muted); }
-.dag-vault__form { display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 6px; }
-.dag-vault__form label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--dag-color-slate); }
+/*
+ * The two first-run forms. The card centres its prose, but a label is not prose: it starts at its
+ * field's left edge and sits directly above the control it names, so the two fields read as a form
+ * rather than as two captions. The error is always in the flow with its line reserved, so a refusal
+ * from the server never moves the actions under the person's pointer.
+ */
+.dag-vault__form { display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; padding: 4px 8px 6px; text-align: left; }
+.dag-vault__form label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 500; color: var(--dag-color-slate); }
 .dag-vault__form .dag-sidebar__name-input { height: 30px; font-family: var(--dag-font-sans); font-size: 13px; }
+.dag-vault__field-row { display: flex; align-items: center; gap: 6px; }
+.dag-vault__field-row > .dag-sidebar__name-input { flex: 1; min-width: 0; }
 .dag-vault__form-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.dag-vault__form-error { min-height: 17px; margin: 0; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); }
 /* The page when no vault is open: the picker alone, on the paper. */
 .dag-novault {
   position: fixed;
@@ -6359,8 +6380,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-card__text > span { color: var(--dag-color-slate); font-size: 12px; }
 .dag-chat-card__buttons { flex: none; display: flex; align-items: center; gap: 6px; }
 .dag-chat-card__answer { flex: none; font-size: 12px; color: var(--dag-color-slate); }
-.dag-chat-card .dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
-.dag-chat-card .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); opacity: 0.9; }
 .dag-chat-card--block[data-dag-chat-block-state="undone"] .dag-chat-card__text strong { text-decoration: line-through; color: var(--dag-color-muted); }
 .dag-chat-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; font-family: var(--dag-font-mono); color: var(--dag-color-slate); }
 .dag-chat-files li { display: flex; align-items: center; gap: 6px; min-width: 0; }

@@ -116,6 +116,10 @@ export function EmptyBoard({ onNote, onLibrary, onPrompt }: { onNote(): void; on
  * a folder to open, a folder to make, or one from the recent list. There is no canvas behind it,
  * because every request a canvas makes is about a vault; this is the whole page.
  *
+ * **The card says which half it is showing**: *Create a vault* over the create form, *Open a vault*
+ * over the chooser and the open form. It used to keep the open title while the create form was up,
+ * so the form a person had just asked for sat under a heading for the other one.
+ *
  * Opening asks the desktop shell's folder dialog when there is one, and otherwise for a path typed
  * in a field. **Neither ever removes a folder**: a vault is a folder the person already owns.
  */
@@ -139,9 +143,11 @@ export function NoVault() {
     <div className="dag-novault" data-dag-novault="">
       <section className="dag-welcome" aria-label="No vault open">
         <Logo size={28} />
-        <h1 className="dag-welcome__title">Open a vault</h1>
+        <h1 className="dag-welcome__title">{asking === "create" ? "Create a vault" : "Open a vault"}</h1>
         <p className="dag-welcome__hint">
-          A vault is a folder of boards, notes and files. Open one you have, or start a new one.
+          {asking === "create"
+            ? "Give it a name and say which folder it lives in. A vault is that folder — its boards, notes and files."
+            : "A vault is a folder of boards, notes and files. Open one you have, or start a new one."}
         </p>
         {asking === "open" ? (
           <OpenFolderForm onCancel={() => setAsking(null)} />

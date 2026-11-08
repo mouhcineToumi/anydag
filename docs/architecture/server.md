@@ -53,6 +53,11 @@ A **vault** is a folder — Obsidian's word and Obsidian's model. The sidebar's 
 names the open one and opens the switcher: the recent vaults, *Open folder…*, *Create vault* and
 *Close vault*. Settings → Vault says where it is, where its attachments go, and closes it.
 
+The first screen before there is a vault at all is `src/ui/Welcome.tsx`'s `NoVault`:
+the recent list, *Open folder…* and *Create vault*, each opening a form that names itself —
+**Open a vault** or **Create a vault** — with its labels above their fields and one filled primary
+action. A refusal from the server is drawn under the form without moving its buttons.
+
 | Route | Does |
 |---|---|
 | `GET /api/vaults` | the recent vaults, the open ones first |
