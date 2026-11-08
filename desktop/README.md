@@ -11,7 +11,7 @@ npm run desktop:dist    # release/: an AppImage, a .dmg + .zip, or an NSIS .exe 
 npm run desktop:smoke   # the packaged app on a fresh vault; `-- --dev` for desktop/dist, `-- --app <path>` for one
 ```
 
-`desktop:smoke` is what `.github/workflows/desktop.yml` runs on Linux, macOS and Windows. By hand,
+`desktop:smoke` is what `.github/workflows/desktop-build.yml` runs on Linux, macOS and Windows. By hand,
 the same check — load the first board of the folder given, wait for `data-dag-ready`, print one
 line and quit:
 

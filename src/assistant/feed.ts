@@ -27,7 +27,9 @@ export function subscribeChat(key: string, on: (e: ChatEvent) => void, onOpen?: 
   if (typeof EventSource === "undefined") return () => undefined;
   let ch = channels.get(key);
   if (!ch) {
-    const source = new EventSource(scopeUrl(key === "*" ? "/__board/chat/events" : `/__board/chat/events?id=${encodeURIComponent(key)}`));
+    const source = new EventSource(
+      scopeUrl(key === "*" ? "/__board/chat/events" : `/__board/chat/events?id=${encodeURIComponent(key)}`),
+    );
     ch = { source, listeners: new Set(), opens: new Set() };
     const made = ch;
     for (const t of TYPES) {

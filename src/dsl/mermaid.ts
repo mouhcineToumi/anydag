@@ -70,7 +70,7 @@ const HEADERS: [RegExp, string, ((lines: string[], at: number) => boolean)?][] =
 const INLINE: [RegExp, string][] = [
   [
     /(-->|---|-\.->|-\.-)\s*\|[^|]+\|/,
-    "Mermaid puts an edge label between pipes. Here it is the next quoted string: `a --> b \"label\"`.",
+    'Mermaid puts an edge label between pipes. Here it is the next quoted string: `a --> b "label"`.',
   ],
   /*
    * Anchored to the start of the statement, and that anchor is load-bearing rather than tidy.

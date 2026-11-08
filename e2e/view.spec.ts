@@ -80,7 +80,7 @@ const ready = (page: Page) =>
 /** Anything that is the canvas or the editor: the lazy `App` chunk, `src/edit/`, BlockNote. */
 const editorFetched = () => fetched.filter((p) => /\/src\/App\.tsx|\/src\/edit\/|blocknote|mantine|BlockEditor/i.test(p));
 
-test("draws a board without fetching the editor, and pages it", async ({ page }) => {
+test("draws a board without fetching the editor, and pages it", { tag: "@smoke" }, async ({ page }) => {
   await page.goto(`/?view=1&board=${stem}`);
   await ready(page);
   await expect(page.locator("[data-dag-view-title]")).toHaveText("A board to look at");

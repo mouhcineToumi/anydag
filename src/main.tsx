@@ -130,7 +130,10 @@ async function start(): Promise<void> {
        names its vault whatever another tab or the terminal opens next. With none open there is no
        app to show: the picker is the page. */
     const vaults = (await loadVaults()) ?? [];
-    id = settleVault(vaults.filter((v) => v.open).map((v) => v.id), vaults.find((v) => v.default)?.id ?? null);
+    id = settleVault(
+      vaults.filter((v) => v.open).map((v) => v.id),
+      vaults.find((v) => v.default)?.id ?? null,
+    );
     if (id) await pull();
     /* The account's time zone is read before anything draws a time. */
     watchZone();

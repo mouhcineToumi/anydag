@@ -7,7 +7,12 @@ import { describe, expect, it } from "vitest";
 import { changeOf, relinkText, type LinkKind } from "../src/refs/relink";
 import type { WikiCandidate } from "../src/refs/wikilinks";
 
-const doc = (id: string, name: string, kind = "note", title?: string): WikiCandidate => ({ id, name, kind, title: title ?? name.slice(name.lastIndexOf("/") + 1) });
+const doc = (id: string, name: string, kind = "note", title?: string): WikiCandidate => ({
+  id,
+  name,
+  kind,
+  title: title ?? name.slice(name.lastIndexOf("/") + 1),
+});
 
 /** `relinkText` over `text`, for a vault that went from `before` to `after`. */
 function relink(text: string, before: WikiCandidate[], after: WikiCandidate[], kind: LinkKind = "note") {
@@ -56,7 +61,7 @@ describe("relinkText", () => {
   it("leaves code, maths, frontmatter and an ordinary link's text alone", () => {
     const text = [
       "---",
-      "related: \"[[Plan]]\"",
+      'related: "[[Plan]]"',
       "---",
       "`[[Plan]]` and $[[Plan]]$ and [see [[Plan]]](https://example.com) and [[Plan]].",
       "",
@@ -122,7 +127,9 @@ describe("relinkText", () => {
   it("rewrites every document under a moved folder", () => {
     const b = [doc("plan000001", "Work/Plan"), doc("budget0001", "Work/sub/Budget"), OTHER];
     const a = [doc("plan000001", "Done/Plan"), doc("budget0001", "Done/sub/Budget"), OTHER];
-    expect(relink("[[Work/Plan]] [[Work/sub/Budget#x]] [[sub/Budget]] [[Budget]]\n", b, a).text).toBe("[[Done/Plan]] [[Done/sub/Budget#x]] [[sub/Budget]] [[Budget]]\n");
+    expect(relink("[[Work/Plan]] [[Work/sub/Budget#x]] [[sub/Budget]] [[Budget]]\n", b, a).text).toBe(
+      "[[Done/Plan]] [[Done/sub/Budget#x]] [[sub/Budget]] [[Budget]]\n",
+    );
     // Moved deeper, a path that is still the tail of the new one still names it, and is left.
     const deeper = [doc("plan000001", "Done/Work/Plan"), doc("budget0001", "Done/Work/sub/Budget"), OTHER];
     expect(relink("[[Work/Plan]]\n", b, deeper).links).toBe(0);
@@ -158,7 +165,10 @@ describe("relinkText", () => {
     const got = relink(text, before, renamed, "board");
     expect(got.links).toBe(3);
     expect(got.text).toBe(
-      text.replace("See [[Plan]].", "See [[Budget plan]].").replace("prose: [[Plan#x]]", "prose: [[Budget plan#x]]").replace("` [[Plan|p]]", "` [[Budget plan|p]]"),
+      text
+        .replace("See [[Plan]].", "See [[Budget plan]].")
+        .replace("prose: [[Plan#x]]", "prose: [[Budget plan#x]]")
+        .replace("` [[Plan|p]]", "` [[Budget plan|p]]"),
     );
   });
 

@@ -62,7 +62,9 @@ async function ready(page: Page) {
 async function tasksPage(page: Page, expectRow: string) {
   await page.goto("/?tasks=1");
   await page.locator("[data-dag-tasks-filter]").fill(folder);
-  await expect(page.locator(`[data-dag-task-row="${expectRow}"], [data-dag-task-card="${expectRow}"]`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(`[data-dag-task-row="${expectRow}"], [data-dag-task-card="${expectRow}"]`)).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 async function idOf(page: Page, name: string): Promise<string> {
@@ -76,7 +78,9 @@ async function idOf(page: Page, name: string): Promise<string> {
   return id!;
 }
 
-test("a note with a status is on the Tasks page, in its group, and its status moves on from there", async ({ page }) => {
+test("a note with a status is on the Tasks page, in its group, and its status moves on from there", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const late = write("late", "Send the invoice", ["status: todo", `due: ${day(-2)}`]);
   const doing = write("doing", "Ship the pricing page", ["status: in-progress", `due: ${day(1)}`]);
   const finished = write("finished", "Redraw the favicon", ["status: done"]);
@@ -98,7 +102,9 @@ test("a note with a status is on the Tasks page, in its group, and its status mo
 
   /* The status button moves it on — to do, in progress — and writes that one line. */
   await row.locator("[data-dag-task-status]").click();
-  await expect.poll(() => read("late")).toBe(`---\ntitle: "Send the invoice"\nstatus: in-progress\ndue: ${day(-2)}\n---\nWhat it is about.\n`);
+  await expect
+    .poll(() => read("late"))
+    .toBe(`---\ntitle: "Send the invoice"\nstatus: in-progress\ndue: ${day(-2)}\n---\nWhat it is about.\n`);
   await expect(page.locator(`[data-dag-tasks-group="in-progress"] [data-dag-task-row="${late}"]`)).toBeVisible();
 });
 
@@ -136,13 +142,17 @@ test("a title typed into a group is a task named after it, in that status", asyn
   const box = page.locator('[data-dag-task-add="in-progress"]');
   await box.fill(title);
   await box.press("Enter");
-  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "")).toMatch(/^---\nstatus: in-progress\nid: [0-9a-z]{10}\n---\n$/);
+  await expect
+    .poll(() => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""))
+    .toMatch(/^---\nstatus: in-progress\nid: [0-9a-z]{10}\n---\n$/);
   /* The box is empty for the next one, and the page is where it was. */
   await expect(box).toHaveValue("");
   await expect(page).toHaveURL(/tasks=1/);
 });
 
-test("a task's own page sets its status and its date through the note's save, and Not a task makes it a note", async ({ page }) => {
+test("a task's own page sets its status and its date through the note's save, and Not a task makes it a note", async ({
+  page,
+}) => {
   const name = write("own", "Plan the launch", ["status: todo"], "The launch plan.\n\n- [ ] book the room\n");
   await page.goto(`/?note=${name}`);
   await ready(page);
@@ -150,7 +160,9 @@ test("a task's own page sets its status and its date through the note's save, an
   await expect(bar).toHaveAttribute("data-dag-taskbar", "todo");
 
   await bar.locator('[data-dag-taskbar-status="in-progress"]').click();
-  await expect.poll(() => read("own")).toBe('---\ntitle: "Plan the launch"\nstatus: in-progress\n---\nThe launch plan.\n\n- [ ] book the room\n');
+  await expect
+    .poll(() => read("own"))
+    .toBe('---\ntitle: "Plan the launch"\nstatus: in-progress\n---\nThe launch plan.\n\n- [ ] book the room\n');
   await bar.locator("[data-dag-taskbar-due]").fill(day(3));
   await expect.poll(() => read("own")).toContain(`\nstatus: in-progress\ndue: ${day(3)}\n---\n`);
   await page.locator("[data-dag-taskbar-clear-due]").click();
@@ -178,7 +190,10 @@ test("a task's card on a board changes the task's file", async ({ page }) => {
   const name = write("carded", "Ship the pricing page", ["status: in-progress"]);
   const id = await idOf(page, name);
   const board = path.join(dir, "board.board.md");
-  fs.writeFileSync(board, `---\ntitle: Launch\n---\n\n\`\`\`md {#t1 x=0 y=0 w=360}\n![Ship the pricing page](dag:${id})\n\`\`\`\n`);
+  fs.writeFileSync(
+    board,
+    `---\ntitle: Launch\n---\n\n\`\`\`md {#t1 x=0 y=0 w=360}\n![Ship the pricing page](dag:${id})\n\`\`\`\n`,
+  );
   await page.goto(`/?board=${folder}/board`);
   await ready(page);
   const card = page.locator(`[data-dag-embed="${id}"][data-dag-embed-kind="task"]`);

@@ -67,7 +67,11 @@ export async function collect(meta: Meta, blobs: Blobs, opts: CollectOptions): P
       }
       const before = new Date(opts.now.getTime() - days * 86_400_000).toISOString();
       const done = await meta.collect(v.id, before);
-      if (done.blobs.length) await blobs.delete(v.id, done.blobs.map((b) => b.id));
+      if (done.blobs.length)
+        await blobs.delete(
+          v.id,
+          done.blobs.map((b) => b.id),
+        );
       result.compacted += done.compacted;
       result.blobs += done.blobs.length;
       for (const b of done.blobs) result.bytes += Number(b.size);

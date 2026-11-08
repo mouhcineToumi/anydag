@@ -7,7 +7,6 @@
  * whose time zone is the vault's or the app's. The vault a request names is `?vault=<id>`.
  */
 
-
 import type { Hono } from "hono";
 import YAML from "yaml";
 
@@ -28,7 +27,7 @@ const SOURCE_MAX = 16000;
 const RUNNING_MAX = 4;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
-export const LOCAL_ACCOUNT = { uid: "local", handle: "local", email: "", name: "You" };
+const LOCAL_ACCOUNT = { uid: "local", handle: "local", email: "", name: "You" };
 
 /** The person's saved components, with what their frontmatter says each is. */
 async function savedComponents(s: Session) {
@@ -54,7 +53,15 @@ export function metaRoutes(app: Hono, s: Session): void {
   /* -- who, and where ----------------------------------------------------------------------- */
 
   app.get("/api/health", (c) =>
-    c.json({ ok: true, service: "anydag", version: s.version, store: "vault", vault: s.any ? s.vault.root : null, mcp: "", app: "" }),
+    c.json({
+      ok: true,
+      service: "anydag",
+      version: s.version,
+      store: "vault",
+      vault: s.any ? s.vault.root : null,
+      mcp: "",
+      app: "",
+    }),
   );
 
   app.get("/api/auth/me", (c) =>
@@ -114,14 +121,19 @@ export function metaRoutes(app: Hono, s: Session): void {
     const body = await bodyOf(c);
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     if (!prompt) throw err(400, "describe the diagram first");
-    if (prompt.length > PROMPT_MAX) throw err(413, `a description is at most ${PROMPT_MAX} characters, this one is ${prompt.length}`);
+    if (prompt.length > PROMPT_MAX)
+      throw err(413, `a description is at most ${PROMPT_MAX} characters, this one is ${prompt.length}`);
     const source = body.source;
-    if (source !== undefined && source !== null && typeof source !== "string") throw err(400, "the source must be a string holding the diagram's DSL");
+    if (source !== undefined && source !== null && typeof source !== "string")
+      throw err(400, "the source must be a string holding the diagram's DSL");
     if (typeof source === "string" && source.length > SOURCE_MAX) {
       throw err(413, `the diagram's source is at most ${SOURCE_MAX} characters, this one is ${source.length}`);
     }
     const as = typeof body.as === "string" && isDiagramType(body.as) ? (body.as as DiagramType) : undefined;
-    const from = typeof body.from === "string" && /^[a-z]{1,16}$/.test(body.from) && isDiagramType(body.from) ? (body.from as DiagramType) : undefined;
+    const from =
+      typeof body.from === "string" && /^[a-z]{1,16}$/.test(body.from) && isDiagramType(body.from)
+        ? (body.from as DiagramType)
+        : undefined;
     const reasoning = typeof body.reasoning === "string" && body.reasoning ? body.reasoning : undefined;
     const resolved = resolveProvider(s.env, {
       provider: typeof body.provider === "string" ? body.provider : null,
@@ -151,7 +163,8 @@ export function metaRoutes(app: Hono, s: Session): void {
         }),
       );
     } catch (e) {
-      if (stop.signal.aborted && (stop.signal.reason as Error)?.message === "timeout") throw err(504, "the model did not answer in time");
+      if (stop.signal.aborted && (stop.signal.reason as Error)?.message === "timeout")
+        throw err(504, "the model did not answer in time");
       if (e instanceof LlmError) throw err(502, e.message);
       throw e;
     } finally {
@@ -194,7 +207,8 @@ export function metaRoutes(app: Hono, s: Session): void {
   app.put("/api/practice", async (c) => {
     const body = await bodyOf(c);
     const graduate = body.graduate;
-    if (graduateOf(graduate) !== graduate) throw err(400, `\`graduate\` is a whole number from ${GRADUATE_MIN} to ${GRADUATE_MAX}`);
+    if (graduateOf(graduate) !== graduate)
+      throw err(400, `\`graduate\` is a whole number from ${GRADUATE_MIN} to ${GRADUATE_MAX}`);
     s.practice.setGraduate(graduate as number);
     return c.json({ graduate });
   });

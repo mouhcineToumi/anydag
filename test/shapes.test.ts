@@ -188,8 +188,7 @@ describe("a link to a shape", () => {
 });
 
 describe("a lone shape", () => {
-  const item = (body: string, attrs = "") =>
-    parseBoard("t", `\`\`\`sketch {#s x=0 y=0${attrs}}\n${body}\n\`\`\`\n`).items[0]!;
+  const item = (body: string, attrs = "") => parseBoard("t", `\`\`\`sketch {#s x=0 y=0${attrs}}\n${body}\n\`\`\`\n`).items[0]!;
 
   it("is one bare sketch node and nothing else", () => {
     expect(loneShape(item('circle c "C"'))?.id).toBe("c");

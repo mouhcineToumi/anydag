@@ -116,15 +116,27 @@ export class FakeServer {
 
   headsPage(v: string, after = "", limit = MAX_PAGE): HeadsResponse {
     this.checkVault(v);
-    const all = [...this.heads.values()].filter((h) => h.key > after).sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    const all = [...this.heads.values()]
+      .filter((h) => h.key > after)
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     const page = all.slice(0, limit);
-    return { heads: page.map((h) => ({ ...h })), next: all.length > page.length ? page[page.length - 1]!.key : null, seq: this.seq };
+    return {
+      heads: page.map((h) => ({ ...h })),
+      next: all.length > page.length ? page[page.length - 1]!.key : null,
+      seq: this.seq,
+    };
   }
 
   /** One device's view of this server. */
   as(device: string): SyncApi {
     const self = this;
-    const vaultRow = (): RemoteVault => ({ id: self.vault, name: "sealed", seq: self.seq, created: "2026-11-06T00:00:00.000Z", keyed: self.key !== null });
+    const vaultRow = (): RemoteVault => ({
+      id: self.vault,
+      name: "sealed",
+      seq: self.seq,
+      created: "2026-11-06T00:00:00.000Z",
+      keyed: self.key !== null,
+    });
     return {
       async health(): Promise<Health> {
         return { version: "test", protocol: PROTOCOL, mode: "single" };

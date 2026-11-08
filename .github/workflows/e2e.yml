@@ -1,0 +1,229 @@
+# The browser suite, in Playwright's own Docker image — the one place the screenshots are valid.
+#
+#   pull request into develop, release/** or main   the `@smoke` tier: every surface, in minutes
+#   push to develop or release/**                   the whole suite, sharded four ways
+#   workflow_call / workflow_dispatch               `scope: smoke | full`, for the nightly and
+#                                                   release workflows (`uses: ./.github/workflows/e2e.yml`)
+#
+# **The image is the pin.** `mcr.microsoft.com/playwright:v<version>-noble` carries one Chromium
+# build and one set of system fonts, so a baseline taken in `npm run e2e:docker` on a laptop is the
+# baseline compared here. The version is `package.json`'s `@playwright/test`, exactly, and
+# `test/e2e-image.test.ts` fails the fast tier if this file, the lockfile and `package.json`
+# disagree — bump all three together, then regenerate the baselines
+# (`npm run e2e:docker -- --update-snapshots=all`).
+#
+# **`e2e` is the check to require.** It runs whatever happened — a change to nothing but prose skips
+# the browsers (`scripts/e2e-plan.mjs`, the same rule `.githooks/pre-push` uses) and the check still
+# reports, green, so a protected branch is never waiting on a job that was never started. It fails if
+# any shard failed, was cancelled, or never ran.
+name: e2e
+
+on:
+  pull_request:
+    branches: [develop, "release/**", main]
+  push:
+    branches: [develop, "release/**"]
+  workflow_call:
+    inputs:
+      scope:
+        description: "smoke (the @smoke tier) or full (every test)"
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "smoke (the @smoke tier) or full (every test)"
+        type: choice
+        options: [smoke, full]
+        default: smoke
+        required: true
+
+# One run per pull request, the superseded one cancelled. A push, a dispatch or a call gets a group
+# of its own: a reusable workflow that shared its caller's group would wait on it for ever.
+concurrency:
+  group: e2e-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+# Electron and electron-builder's tools come from npmmirror, not GitHub's release downloads,
+# which once returned 504 for a whole morning (#46). Nothing is trusted for the mirror's own checksum:
+# see "Electron and electron-builder's tools come from npmmirror" in docs/architecture/desktop.md.
+env:
+  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+  ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+
+jobs:
+  # What is to be run, and whether anything is. Cheap, and not in the image: it needs git and node.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      scope: ${{ steps.plan.outputs.scope }}
+      shards: ${{ steps.plan.outputs.shards }}
+      total: ${{ steps.plan.outputs.total }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_SCOPE: ${{ inputs.scope }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+          # Browsers shared out across the jobs: smoke is one job (it is minutes), the full suite is
+          # four (about a fifth of it each; Playwright shards by test, not by file).
+          SMOKE_SHARDS: "1"
+          FULL_SHARDS: "4"
+        run: |
+          scope="$INPUT_SCOPE"
+          if [ -z "$scope" ]; then
+            if [ "$EVENT" = pull_request ]; then scope=smoke; else scope=full; fi
+          fi
+          case "$scope" in
+            smoke | full) ;;
+            *) echo "::error::scope must be smoke or full, not '$scope'"; exit 1 ;;
+          esac
+
+          # Somebody asked (dispatch, call): run. A pull request or a push: run unless every changed
+          # path is one the browser suite cannot see.
+          run=true
+          base=; head=
+          case "$EVENT" in
+            pull_request) base="$PR_BASE"; head="$PR_HEAD" ;;
+            push) base="$PUSH_BEFORE"; head="$PUSH_HEAD" ;;
+          esac
+          if [ -n "$base" ] && [[ ! "$base" =~ ^0+$ ]] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            plan="$(ANYDAG_E2E_PLAN_TRACE=0 node scripts/e2e-plan.mjs --base "$base" --head "$head")"
+            echo "$plan"
+            run="$(printf '%s' "$plan" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).run)))')"
+          fi
+
+          if [ "$scope" = smoke ]; then total="$SMOKE_SHARDS"; else total="$FULL_SHARDS"; fi
+          shards="$(node -e 'console.log(JSON.stringify(Array.from({length:+process.argv[1]},(_,i)=>i+1)))' "$total")"
+          {
+            echo "run=$run"
+            echo "scope=$scope"
+            echo "total=$total"
+            echo "shards=$shards"
+          } >> "$GITHUB_OUTPUT"
+          echo "e2e: scope=$scope run=$run shards=$total"
+
+  shard:
+    name: shard ${{ matrix.shard }}/${{ needs.plan.outputs.total }} (${{ needs.plan.outputs.scope }})
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+      # Chromium's shared memory, as Playwright's own documentation asks of a container.
+      options: --ipc=host
+    # A container job's default shell is `sh` (dash), which has no arrays.
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    env:
+      # `tsc -p desktop` is not run here, so Electron's 100 MB binary is not wanted either.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      npm_config_cache: /tmp/npm-cache
+      PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
+        with:
+          path: /tmp/npm-cache
+          key: npm-e2e-${{ hashFiles('package-lock.json') }}
+          restore-keys: npm-e2e-
+      # Scripts are off: `prepare` installs git hooks, and the native modules arrive prebuilt.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: playwright test
+        env:
+          SCOPE: ${{ needs.plan.outputs.scope }}
+          SHARD: ${{ matrix.shard }}/${{ needs.plan.outputs.total }}
+        run: |
+          args=(--shard="$SHARD" --reporter='blob,line' --workers=3)
+          [ "$SCOPE" = smoke ] && args+=(--grep "@smoke")
+          npx playwright test "${args[@]}"
+      # The blob is what the report is merged from, and it holds a failed screenshot's expected,
+      # actual and diff images; `test-results` is what a failed run leaves beside it.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-report-${{ needs.plan.outputs.scope }}-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 7
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: ${{ failure() }}
+        with:
+          name: test-results-${{ needs.plan.outputs.scope }}-${{ matrix.shard }}
+          path: test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  report:
+    name: report
+    needs: [plan, shard]
+    if: ${{ !cancelled() && needs.plan.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+      - name: Merge the shards into one HTML report
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+        run: |
+          # A shard that died before Playwright started uploaded no blob, and there is nothing to merge.
+          if [ ! -d all-blob-reports ]; then echo "no shard left a report"; exit 0; fi
+          npx --yes -p @playwright/test@1.65.0 playwright merge-reports --reporter=html ./all-blob-reports
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ needs.plan.outputs.scope }}
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # The one to require. Always runs, and says what happened.
+  e2e:
+    name: e2e
+    needs: [plan, shard, report]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          PLAN: ${{ needs.plan.result }}
+          RUN: ${{ needs.plan.outputs.run }}
+          SCOPE: ${{ needs.plan.outputs.scope }}
+          SHARD: ${{ needs.shard.result }}
+        run: |
+          if [ "$PLAN" != success ]; then
+            echo "::error::the plan job did not succeed ($PLAN)"; exit 1
+          fi
+          if [ "$RUN" != true ]; then
+            echo "e2e: no change the browser suite could see — nothing was run, and that is green"
+            exit 0
+          fi
+          if [ "$SHARD" != success ]; then
+            echo "::error::the $SCOPE browser suite did not pass ($SHARD) — the merged report is in this run's artifacts"
+            exit 1
+          fi
+          echo "e2e: the $SCOPE browser suite passed"

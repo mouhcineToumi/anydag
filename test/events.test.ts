@@ -2,7 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { allDay, dayOf, eventOf, hasOffset, isDay, momentOf, offsetAt, timeOf, whenOf, withEvent, withZone, type EventChange } from "@/note/event";
+import {
+  allDay,
+  dayOf,
+  eventOf,
+  hasOffset,
+  isDay,
+  momentOf,
+  offsetAt,
+  timeOf,
+  whenOf,
+  withEvent,
+  withZone,
+  type EventChange,
+} from "@/note/event";
 import { splitNote } from "@/note/format";
 import { taskOf } from "@/note/task";
 import { indexTexts } from "@/refs/extract";

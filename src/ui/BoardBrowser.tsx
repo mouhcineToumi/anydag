@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { File as FileGlyph, FileText, Folder as FolderIcon, GraduationCap, Search, Table2, Workflow, X, type LucideIcon } from "lucide-react";
+import {
+  File as FileGlyph,
+  FileText,
+  Folder as FolderIcon,
+  GraduationCap,
+  Search,
+  Table2,
+  Workflow,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 
 import { itemName } from "@/board/types";
 import type { FileKind } from "@/board/useBoard";
@@ -80,7 +90,10 @@ const NO_FILES: string[] = [];
 const NO_TITLES: Readonly<Record<string, string>> = {};
 
 /** What each kind wears before its name, in a row and in a hit. A board wears none in a row, as it never has. */
-const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<FileKind, LucideIcon>;
+const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<
+  FileKind,
+  LucideIcon
+>;
 
 /** A kind's mark — an attachment's by its type, a PDF's and a video's apart. */
 function KindMark({ kind, name, className }: { kind: FileKind; name?: string; className?: string }) {
@@ -156,7 +169,7 @@ export function BoardBrowser({
      them — otherwise a folder somebody has just made is unreachable the moment anything is typed. */
   const terms = useMemo(() => tokens(query), [query]);
   const root = useMemo(
-    () => (terms.length === 0 ? all : prune(all, terms) ?? { ...all, folders: [], files: [] }),
+    () => (terms.length === 0 ? all : (prune(all, terms) ?? { ...all, folders: [], files: [] })),
     [all, terms],
   );
 
@@ -196,7 +209,11 @@ export function BoardBrowser({
 
   /** Move focus along the rendered rows. The DOM is the list, so nothing has to be kept in step. */
   const step = useCallback((from: EventTarget | null, dir: 1 | -1) => {
-    const rows = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>("[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit]") ?? []);
+    const rows = Array.from(
+      listRef.current?.querySelectorAll<HTMLButtonElement>(
+        "[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit]",
+      ) ?? [],
+    );
     if (rows.length === 0) return;
     const i = rows.indexOf(from as HTMLButtonElement);
     const next = i === -1 ? (dir === 1 ? 0 : rows.length - 1) : Math.min(Math.max(i + dir, 0), rows.length - 1);
@@ -373,7 +390,9 @@ export function BoardBrowser({
                     <span className="dag-hit__what">{WHAT[h.unit.what] ?? kindWord(h.unit.what)}</span>
                   </span>
                   <span className="dag-hit__text">
-                    {snippet(h.unit.text, h.terms).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>))}
+                    {snippet(h.unit.text, h.terms).map((r, i) =>
+                      r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>,
+                    )}
                   </span>
                 </button>
               ))}
@@ -391,7 +410,9 @@ export function BoardBrowser({
         </div>
 
         <p className="dag-panel__count">
-          {shown.length === entries.length ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length) : `${shown.length} of ${entries.length}`}
+          {shown.length === entries.length
+            ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
+            : `${shown.length} of ${entries.length}`}
           {terms.length > 0 ? ` · ${hits.length} in the text` : null}
         </p>
       </section>
@@ -425,7 +446,13 @@ function kindWord(what: string): string {
 
 /** What the search box says it looks through: only the kinds there are any of, in the sentence's own order. */
 function searchLabel(notes: number, quizzes: number, tables = 0, files = 0): string {
-  const kinds = ["boards", ...(notes ? ["notes"] : []), ...(quizzes ? ["quizzes"] : []), ...(tables ? ["tables"] : []), ...(files ? ["files"] : [])];
+  const kinds = [
+    "boards",
+    ...(notes ? ["notes"] : []),
+    ...(quizzes ? ["quizzes"] : []),
+    ...(tables ? ["tables"] : []),
+    ...(files ? ["files"] : []),
+  ];
   return `Search ${kinds.length < 2 ? kinds.join("") : `${kinds.slice(0, -1).join(", ")} and ${kinds[kinds.length - 1]}`}`;
 }
 

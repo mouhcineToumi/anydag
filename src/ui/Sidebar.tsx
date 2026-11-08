@@ -137,7 +137,10 @@ const NO_SIZES: Readonly<Record<string, number>> = {};
  * Each kind of file's mark. A `Record` over `FileKind`, never `kind === "note" ? … : board`: that
  * shape drew a quiz as a board, and a fourth kind left out of this is a type error.
  */
-const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<FileKind, LucideIcon>;
+const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<
+  FileKind,
+  LucideIcon
+>;
 
 /**
  * A file's mark: a board's, a note's, a quiz's — or, for a note that is a task, its status
@@ -148,7 +151,8 @@ const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table:
 function FileIcon({ entry, task, project, event }: { entry: Entry; task?: Task; project?: Project; event?: NoteEvent }) {
   /* An attachment wears its type's — a PDF, a spreadsheet, a video. */
   if (entry.kind === "file") return <AttachmentIcon name={entry.name} {...SMALL} />;
-  if (entry.kind === "note" && project) return <Briefcase {...SMALL} className="dag-sidebar__project" style={hueVars(project.hue)} aria-hidden="true" />;
+  if (entry.kind === "note" && project)
+    return <Briefcase {...SMALL} className="dag-sidebar__project" style={hueVars(project.hue)} aria-hidden="true" />;
   if (entry.kind === "note" && task) return <TaskGlyph status={task.status} />;
   if (entry.kind === "note" && event) return <CalendarClock {...SMALL} className="dag-sidebar__event" aria-hidden="true" />;
   const Icon = KIND_ICON[entry.kind];
@@ -159,7 +163,11 @@ function FileIcon({ entry, task, project, event }: { entry: Entry; task?: Task; 
  * What a row's tooltip says: the file's name, and its kind when that is not a board. A quiz says how
  * many questions it asks when the list has said.
  */
-function hintOf(e: Entry, questions: Readonly<Record<string, number>>, sizes: Readonly<Record<string, number>> = NO_SIZES): string {
+function hintOf(
+  e: Entry,
+  questions: Readonly<Record<string, number>>,
+  sizes: Readonly<Record<string, number>> = NO_SIZES,
+): string {
   switch (e.kind) {
     /* An attachment says what it is and how big: `specs/q3.pdf (PDF · 2.3 MB)`. */
     case "file":
@@ -337,7 +345,7 @@ export type Thing = { kind: FileKind; name: string } | { folder: string };
  *
  * **Its rows are not the search's rows.** The search keeps `data-dag-board` and `.dag-board`, which
  * every spec that finds a board in the list already reads. A second element answering to either would be the namespace
- * hazard `CLAUDE.md` records, so these are `data-dag-sidebar-file` and `.dag-sidebar__row`.
+ * hazard `docs/architecture/things-that-will-bite.md` records, so these are `data-dag-sidebar-file` and `.dag-sidebar__row`.
  *
  * Every row is a button, so `typing()` in `useEditor` stands the canvas's keys aside while focus is
  * anywhere in here — which is right, and which means the tree owns its own keys, Escape included.
@@ -505,7 +513,12 @@ export function Sidebar({
   /* Every file of every kind — `everyFile`, so a kind added to `FILE_KINDS` is listed here with no
      line of this changed, and a quiz is not missing from the tree the way it was from `boards + notes`. */
   const entries = useMemo<Entry[]>(
-    () => everyFile({ boards, notes, quizzes, tables, files: attachments }).map(({ name, kind }) => ({ kind, name, title: titles[name] })),
+    () =>
+      everyFile({ boards, notes, quizzes, tables, files: attachments }).map(({ name, kind }) => ({
+        kind,
+        name,
+        title: titles[name],
+      })),
     [boards, notes, quizzes, tables, attachments, titles],
   );
   const store = useAttachmentsFolder();
@@ -550,7 +563,7 @@ export function Sidebar({
           ? keyOf({ kind: "table", name: table })
           : file
             ? keyOf({ kind: "file", name: file })
-          : null;
+            : null;
   /* The open file, whichever kind — where the New menu offers to make the next one. */
   const currentName = board ?? note ?? quiz ?? table ?? file;
   const keys = useMemo(() => new Set(lines.map(rowKey)), [lines]);
@@ -615,7 +628,8 @@ export function Sidebar({
    * the first row, until somebody focuses another.
    */
   const [stop, setStop] = useState<string | null>(null);
-  const stopKey = stop && keys.has(stop) ? stop : currentKey && keys.has(currentKey) ? currentKey : lines[0] ? rowKey(lines[0]) : null;
+  const stopKey =
+    stop && keys.has(stop) ? stop : currentKey && keys.has(currentKey) ? currentKey : lines[0] ? rowKey(lines[0]) : null;
 
   /* A question about a row that has since gone — deleted in another tab, renamed by an agent — is a
      question about nothing, and is let go. */
@@ -627,11 +641,21 @@ export function Sidebar({
      Scrolling a row somebody has just clicked to the middle of the list would move it out from
      under their pointer, which a column that is up all day cannot afford the way a dialog could.
      `"center"` when it does scroll, because `"nearest"` leaves it
-     flush against the edge with nothing around it. */
+     flush against the edge with nothing around it.
+
+     **Once per open file.** `lines.length` is a dependency so that the row can be found when the list
+     arrives after the file does, and it is also every other file or folder made or removed anywhere
+     in the vault — by an agent, the CLI, another tab. Each of those brought the open row back to
+     the middle whenever it was out of view, which is the whole time somebody has scrolled away from
+     it: the list was pulled back under their hand, and a drag held at the tree's edge, whose glide
+     scrolls it a few pixels a frame, was undone as fast as another writer added a row. The row is
+     shown the first time it exists for this file, and not again until the open file is another. */
+  const shownKey = useRef<string | null>(null);
   useEffect(() => {
     const list = listRef.current;
     const row = list?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!list || !row) return;
+    if (!list || !row || shownKey.current === currentKey) return;
+    shownKey.current = currentKey;
     const a = list.getBoundingClientRect();
     const b = row.getBoundingClientRect();
     if (b.top < a.top || b.bottom > a.bottom) row.scrollIntoView({ block: "center" });
@@ -644,7 +668,8 @@ export function Sidebar({
   }, []);
 
   const rowFor = useCallback(
-    (key: string) => listRef.current?.querySelector<HTMLElement>(`[data-dag-sidebar-row][data-dag-sidebar-key="${CSS.escape(key)}"]`) ?? null,
+    (key: string) =>
+      listRef.current?.querySelector<HTMLElement>(`[data-dag-sidebar-row][data-dag-sidebar-key="${CSS.escape(key)}"]`) ?? null,
     [],
   );
 
@@ -730,7 +755,8 @@ export function Sidebar({
         if (line?.type !== "folder") return;
         e.preventDefault();
         if (!line.open) onFolder(line.path, true);
-        else if (els[at + 1] && lines.find((r) => rowKey(r) === els[at + 1]!.dataset.dagSidebarKey)?.depth === line.depth + 1) els[at + 1]!.focus();
+        else if (els[at + 1] && lines.find((r) => rowKey(r) === els[at + 1]!.dataset.dagSidebarKey)?.depth === line.depth + 1)
+          els[at + 1]!.focus();
         return;
       case "ArrowLeft": {
         if (!line) return;
@@ -917,7 +943,10 @@ export function Sidebar({
     setBulk(null);
     setBulkProblems([]);
     setWorking(`Moving ${counted(pickedCount(p), ["item", "items"])} to the trash…`);
-    const left = await files.trash([...p.folders.map((folder) => ({ folder })), ...p.files.map((e) => ({ kind: e.kind, name: e.name }))]);
+    const left = await files.trash([
+      ...p.folders.map((folder) => ({ folder })),
+      ...p.files.map((e) => ({ kind: e.kind, name: e.name })),
+    ]);
     setWorking(null);
     setSel(left.length ? new Set(left.map((t) => ("folder" in t ? folderKey(t.folder) : keyOf(t)))) : NO_KEYS);
     setBulkProblems(left.length ? [`${counted(left.length, ["item", "items"])} could not be moved to the trash.`] : []);
@@ -980,7 +1009,9 @@ export function Sidebar({
       const mark = group ? null : rowEl.querySelector("svg:not(.dag-sidebar__chev)");
       if (mark) ghost.append(mark.cloneNode(true));
       const label = document.createElement("span");
-      label.textContent = group ? counted(pickedCount(group), ["item", "items"]) : (rowEl.querySelector(".dag-sidebar__name")?.textContent ?? leaf(from));
+      label.textContent = group
+        ? counted(pickedCount(group), ["item", "items"])
+        : (rowEl.querySelector(".dag-sidebar__name")?.textContent ?? leaf(from));
       ghost.append(label);
       document.body.append(ghost);
       const keys = new Set(group ? [...group.folders.map(folderKey), ...group.files.map(keyOf)] : [key]);
@@ -1046,55 +1077,59 @@ export function Sidebar({
       over.dataset.dagSidebarOver = "";
       to = target;
     };
-    startDrag(e, {
-      onMove(ev, first) {
-        /* A locked row is opened and selected, never carried anywhere: the drop says why. */
-        if (lockedRef.current) return;
-        at = { x: ev.clientX, y: ev.clientY };
-        if (first) {
-          document.documentElement.dataset.dagSidebarDrag = "";
-          setMode(null);
-          lift();
-        }
-        trail();
-        aim();
-        if (!gliding) gliding = requestAnimationFrame(glide);
-      },
-      onDrop() {
-        if (lockedRef.current) {
+    startDrag(
+      e,
+      {
+        onMove(ev, first) {
+          /* A locked row is opened and selected, never carried anywhere: the drop says why. */
+          if (lockedRef.current) return;
+          at = { x: ev.clientX, y: ev.clientY };
+          if (first) {
+            document.documentElement.dataset.dagSidebarDrag = "";
+            setMode(null);
+            lift();
+          }
+          trail();
+          aim();
+          if (!gliding) gliding = requestAnimationFrame(glide);
+        },
+        onDrop() {
+          if (lockedRef.current) {
+            dragged.current = true;
+            return void refuseLocked();
+          }
+          if (onto && placing.length) {
+            dragged.current = true;
+            const detail: PlaceFile = { files: placing.map((f) => ({ kind: f.kind, name: f.name })), ...onto };
+            document.dispatchEvent(new CustomEvent("dag:place-file", { detail }));
+            return;
+          }
+          if (to === null) return;
           dragged.current = true;
-          return void refuseLocked();
-        }
-        if (onto && placing.length) {
-          dragged.current = true;
-          const detail: PlaceFile = { files: placing.map((f) => ({ kind: f.kind, name: f.name })), ...onto };
-          document.dispatchEvent(new CustomEvent("dag:place-file", { detail }));
-          return;
-        }
-        if (to === null) return;
-        dragged.current = true;
-        if (group) void moveChosen(to);
-        else if (line.type === "folder") void moveOneFolder(from, filedAt(from, to));
-        else void files.move(line.entry.kind, from, to);
-      },
-      /* A finger held still: the row joins the selection, and a move from here
+          if (group) void moveChosen(to);
+          else if (line.type === "folder") void moveOneFolder(from, filedAt(from, to));
+          else void files.move(line.entry.kind, from, to);
+        },
+        /* A finger held still: the row joins the selection, and a move from here
          carries the selection it joined — lifting the finger instead leaves it begun. */
-      onHold() {
-        hold(key);
-        navigator.vibrate?.(10);
-        const joined = new Set([...sel, key]);
-        group = joined.size > 1 ? pickedOf(joined, entries) : null;
-        placing = carried(group);
+        onHold() {
+          hold(key);
+          navigator.vibrate?.(10);
+          const joined = new Set([...sel, key]);
+          group = joined.size > 1 ? pickedOf(joined, entries) : null;
+          placing = carried(group);
+        },
+        onEnd() {
+          unspring();
+          clearMarks();
+          cancelAnimationFrame(gliding);
+          ghost?.remove();
+          for (const el of lifted) delete el.dataset.dagSidebarLifted;
+          delete document.documentElement.dataset.dagSidebarDrag;
+        },
       },
-      onEnd() {
-        unspring();
-        clearMarks();
-        cancelAnimationFrame(gliding);
-        ghost?.remove();
-        for (const el of lifted) delete el.dataset.dagSidebarLifted;
-        delete document.documentElement.dataset.dagSidebarDrag;
-      },
-    }, HOLD);
+      HOLD,
+    );
   };
 
   const searchChord = chordFor("boards");
@@ -1129,7 +1164,13 @@ export function Sidebar({
       {sheet ? (
         <div className="dag-sidebar__sheethead">
           <VaultSwitcher onSettings={() => ask("settings", "vault")} />
-          <button type="button" className="dag-icon dag-sidebar__close" data-dag-sidebar-close="" aria-label="Close the sidebar" onClick={onDismiss}>
+          <button
+            type="button"
+            className="dag-icon dag-sidebar__close"
+            data-dag-sidebar-close=""
+            aria-label="Close the sidebar"
+            onClick={onDismiss}
+          >
             <X size={22} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
           </button>
         </div>
@@ -1195,7 +1236,11 @@ export function Sidebar({
             <GraduationCap {...ICON} aria-hidden="true" />
             <span>Quizzes</span>
             {mistakes ? (
-              <span className="dag-sidebar__badge" data-dag-sidebar-quizzes-open={mistakes} aria-label={`${mistakes} in Mistakes`}>
+              <span
+                className="dag-sidebar__badge"
+                data-dag-sidebar-quizzes-open={mistakes}
+                aria-label={`${mistakes} in Mistakes`}
+              >
                 {mistakes}
               </span>
             ) : null}
@@ -1239,7 +1284,11 @@ export function Sidebar({
               const key = keyOf(e);
               const current = key === currentKey;
               return (
-                <div key={key} role="listitem" className={current ? "dag-sidebar__line dag-sidebar__line--on" : "dag-sidebar__line"}>
+                <div
+                  key={key}
+                  role="listitem"
+                  className={current ? "dag-sidebar__line dag-sidebar__line--on" : "dag-sidebar__line"}
+                >
                   <button
                     type="button"
                     className={current ? "dag-sidebar__row dag-sidebar__row--on" : "dag-sidebar__row"}
@@ -1252,7 +1301,7 @@ export function Sidebar({
                   >
                     <FileIcon entry={e} task={tasks[e.name]} project={projects[e.name]} event={events[e.name]} />
                     <span className="dag-sidebar__name">{labelOf(e)}</span>
-                                      </button>
+                  </button>
                   <span className="dag-sidebar__tools">
                     <button
                       type="button"
@@ -1286,7 +1335,11 @@ export function Sidebar({
           aria-haspopup="menu"
           aria-expanded={making !== null}
           aria-label="New"
-          title={locked ? "Read only: unlock to make something" : "New board, note, task, event, quiz, table or folder, or upload files"}
+          title={
+            locked
+              ? "Read only: unlock to make something"
+              : "New board, note, task, event, quiz, table or folder, or upload files"
+          }
           aria-disabled={locked || undefined}
           onClick={(e) => {
             if (locked) return void refuseLocked();
@@ -1443,7 +1496,9 @@ export function Sidebar({
                itself — and the top level. A real `<select>`, which is the keyboard's way in and one
                Playwright can drive. */
             const here = parentOf(where);
-            const choices = [...known].filter((f) => line.type !== "folder" || (f !== where && !f.startsWith(`${where}/`))).sort();
+            const choices = [...known]
+              .filter((f) => line.type !== "folder" || (f !== where && !f.startsWith(`${where}/`)))
+              .sort();
             return (
               <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth}>
                 <select
@@ -1564,7 +1619,11 @@ export function Sidebar({
                 </button>
                 {tools}
                 {line.open && line.empty ? (
-                  <p className="dag-sidebar__empty" data-dag-sidebar-drop={line.path} style={{ "--depth": line.depth + 1 } as CSSProperties}>
+                  <p
+                    className="dag-sidebar__empty"
+                    data-dag-sidebar-drop={line.path}
+                    style={{ "--depth": line.depth + 1 } as CSSProperties}
+                  >
                     Empty
                   </p>
                 ) : null}
@@ -1597,7 +1656,7 @@ export function Sidebar({
                 <span className="dag-sidebar__chev" aria-hidden="true" />
                 <FileIcon entry={line.entry} task={tasks[where]} project={projects[where]} event={events[where]} />
                 <span className="dag-sidebar__name">{name}</span>
-                              </button>
+              </button>
               {tools}
             </div>
           );
@@ -1682,11 +1741,13 @@ export function Sidebar({
               ? (tasks[menuLine.entry.name] ?? (events[menuLine.entry.name] ? undefined : null))
               : undefined
           }
-          event={menuLine.type === "file" && menuLine.entry.kind === "note" && !tasks[menuLine.entry.name] ? (events[menuLine.entry.name] ?? null) : undefined}
-          project={menuLine.type === "folder" ? (owners.get(menuLine.path) ?? null) : undefined}
-          practise={
-            menuLine.type === "folder" && !!onPracticeFolder && quizzes.some((q) => q.startsWith(`${menuLine.path}/`))
+          event={
+            menuLine.type === "file" && menuLine.entry.kind === "note" && !tasks[menuLine.entry.name]
+              ? (events[menuLine.entry.name] ?? null)
+              : undefined
           }
+          project={menuLine.type === "folder" ? (owners.get(menuLine.path) ?? null) : undefined}
+          practise={menuLine.type === "folder" && !!onPracticeFolder && quizzes.some((q) => q.startsWith(`${menuLine.path}/`))}
           elsewhere={elsewhere.length > 0}
           locked={locked}
           onClose={() => settle(mode.key)}
@@ -1725,7 +1786,8 @@ export function Sidebar({
             if (what === "rename" || what === "move" || what === "transfer") return setMode({ kind: what, key });
             settle(key);
             if (what === "copy-link" && menuLine.type === "file") void copyAppLink(menuLine.entry);
-            else if (menuLine.type === "file" && (what === "favourite" || what === "unfavourite")) files.favourite(menuLine.entry.kind, where, what === "favourite");
+            else if (menuLine.type === "file" && (what === "favourite" || what === "unfavourite"))
+              files.favourite(menuLine.entry.kind, where, what === "favourite");
             else if (what === "duplicate" && menuLine.type === "file") files.duplicate(menuLine.entry.kind, where);
             else if (what === "new-board") files.newFile("board", where);
             else if (what === "new-note") files.newFile("note", where);
@@ -1772,7 +1834,6 @@ export function Sidebar({
           }}
         />
       ) : null}
-
 
       <div className="dag-sidebar__foot">
         {/* What was deleted — at the foot, Notion's place for
@@ -1855,7 +1916,10 @@ function NewMenu({
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ x: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(at.y, innerHeight - r.height - 8)) });
+    setPos({
+      x: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)),
+      y: Math.max(8, Math.min(at.y, innerHeight - r.height - 8)),
+    });
     el.querySelector<HTMLElement>("[role=menuitem]")?.focus();
   }, [at]);
 
@@ -1887,12 +1951,34 @@ function NewMenu({
   };
 
   return (
-    <div ref={ref} className="dag-sidebar__menu dag-sidebar__menu--row dag-sidebar__menu--new" role="menu" aria-label="New" data-dag-sidebar-new-menu="" style={{ left: pos.x, top: pos.y }} onKeyDown={onKey}>
+    <div
+      ref={ref}
+      className="dag-sidebar__menu dag-sidebar__menu--row dag-sidebar__menu--new"
+      role="menu"
+      aria-label="New"
+      data-dag-sidebar-new-menu=""
+      style={{ left: pos.x, top: pos.y }}
+      onKeyDown={onKey}
+    >
       <p className="dag-sidebar__menu-where" data-dag-sidebar-new-where={folder}>
         <FolderIcon {...SMALL} aria-hidden="true" />
-        <span>{folder ? <>New in <strong>{leaf(folder)}</strong></> : "New at the top level"}</span>
+        <span>
+          {folder ? (
+            <>
+              New in <strong>{leaf(folder)}</strong>
+            </>
+          ) : (
+            "New at the top level"
+          )}
+        </span>
         {here ? (
-          <button type="button" className="dag-sidebar__menu-switch" data-dag-sidebar-new-top="" title={top ? here : "Make it at the top level instead"} onClick={() => setTop((v) => !v)}>
+          <button
+            type="button"
+            className="dag-sidebar__menu-switch"
+            data-dag-sidebar-new-top=""
+            title={top ? here : "Make it at the top level instead"}
+            onClick={() => setTop((v) => !v)}
+          >
             {top ? `In ${leaf(here)}` : "Top level"}
           </button>
         ) : null}
@@ -1912,7 +1998,13 @@ function NewMenu({
         </button>
       ))}
       <hr className="dag-vault__rule" />
-      <button type="button" role="menuitem" className="dag-more__item" data-dag-sidebar-new-kind="folder" onClick={() => onPick("folder", folder)}>
+      <button
+        type="button"
+        role="menuitem"
+        className="dag-more__item"
+        data-dag-sidebar-new-kind="folder"
+        onClick={() => onPick("folder", folder)}
+      >
         <FolderPlus {...ICON} aria-hidden="true" />
         <span>Folder</span>
       </button>
@@ -1934,7 +2026,14 @@ function NewMenu({
 }
 
 /** What a row's menu may still do while the app is locked: nothing in it changes a file. */
-const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>(["favourite", "unfavourite", "copy-link", "download", "open-project", "practise"]);
+const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>([
+  "favourite",
+  "unfavourite",
+  "copy-link",
+  "download",
+  "open-project",
+  "practise",
+]);
 
 type Pick =
   | "rename"
@@ -2058,7 +2157,14 @@ function RowMenu({
     );
 
   return (
-    <div ref={ref} className="dag-sidebar__menu dag-sidebar__menu--row" role="menu" data-dag-sidebar-menu="" style={{ left: pos.x, top: pos.y }} onKeyDown={onKey}>
+    <div
+      ref={ref}
+      className="dag-sidebar__menu dag-sidebar__menu--row"
+      role="menu"
+      data-dag-sidebar-menu=""
+      style={{ left: pos.x, top: pos.y }}
+      onKeyDown={onKey}
+    >
       {add ? (
         <>
           {item("new-board", "New board", <FilePlus2 {...ICON} aria-hidden="true" />)}
@@ -2105,7 +2211,9 @@ function RowMenu({
           {/* The app's link, on every file: it opens for whoever is signed in here. */}
           {line.type === "file" ? item("copy-link", "Copy link", <LinkMark {...ICON} aria-hidden="true" />) : null}
           {/* An attachment is saved as the file it was uploaded as, under what it is called now. */}
-          {line.type === "file" && line.entry.kind === "file" ? item("download", "Download", <Download {...ICON} aria-hidden="true" />) : null}
+          {line.type === "file" && line.entry.kind === "file"
+            ? item("download", "Download", <Download {...ICON} aria-hidden="true" />)
+            : null}
           {item("rename", "Rename", <Pencil {...ICON} aria-hidden="true" />)}
           {line.type === "file" ? item("duplicate", "Duplicate", <Copy {...ICON} aria-hidden="true" />) : null}
           {item("move", "Move to…", <FolderInput {...ICON} aria-hidden="true" />)}
@@ -2227,7 +2335,14 @@ function SelectionBar({
       <span className="dag-sidebar__bulk-count">{count} selected</span>
       <span className="dag-sidebar__bulk-acts">
         {locked ? null : (
-          <button type="button" className="dag-sidebar__tool" data-dag-sidebar-bulk-act="move" aria-label={`Move ${count} to a folder`} title="Move to…" onClick={() => onAsk("move")}>
+          <button
+            type="button"
+            className="dag-sidebar__tool"
+            data-dag-sidebar-bulk-act="move"
+            aria-label={`Move ${count} to a folder`}
+            title="Move to…"
+            onClick={() => onAsk("move")}
+          >
             <FolderInput {...SMALL} aria-hidden="true" />
           </button>
         )}
@@ -2255,7 +2370,14 @@ function SelectionBar({
             <Trash2 {...SMALL} aria-hidden="true" />
           </button>
         )}
-        <button type="button" className="dag-sidebar__tool" data-dag-sidebar-bulk-act="clear" aria-label="Clear the selection" title="Clear the selection (Escape)" onClick={onClear}>
+        <button
+          type="button"
+          className="dag-sidebar__tool"
+          data-dag-sidebar-bulk-act="clear"
+          aria-label="Clear the selection"
+          title="Clear the selection (Escape)"
+          onClick={onClear}
+        >
           <X {...SMALL} aria-hidden="true" />
         </button>
       </span>
@@ -2286,7 +2408,10 @@ function BulkMenu({
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ x: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(at.y, innerHeight - r.height - 8)) });
+    setPos({
+      x: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)),
+      y: Math.max(8, Math.min(at.y, innerHeight - r.height - 8)),
+    });
     el.querySelector<HTMLElement>("[role=menuitem]")?.focus();
   }, [at]);
   useEffect(() => {

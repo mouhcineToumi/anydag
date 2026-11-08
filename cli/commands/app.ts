@@ -1,7 +1,16 @@
-import { CALENDAR_HIDE, FAVOURITES, ATTACHMENTS, INSPECTOR_MODE, LIBRARY, SIDEBAR, THEME, WEEK_START, VAULT_PREF_KEYS } from "../../src/settings/prefs";
+import {
+  CALENDAR_HIDE,
+  FAVOURITES,
+  ATTACHMENTS,
+  INSPECTOR_MODE,
+  LIBRARY,
+  SIDEBAR,
+  THEME,
+  WEEK_START,
+  VAULT_PREF_KEYS,
+} from "../../src/settings/prefs";
 import { DEFAULTS, normalise, type Settings } from "../../src/settings/store";
 
-import { ApiError, EXIT } from "../api";
 import { UsageError, pairs } from "../args";
 import { emit, table, type Command, type Ctx } from "../context";
 
@@ -35,16 +44,6 @@ async function readBundle(ctx: Ctx): Promise<Bundle | null> {
 async function readVaultBundle(ctx: Ctx): Promise<Bundle> {
   const got = await ctx.api.get<{ settings: Bundle | null }>("/api/vault/settings");
   return got.settings ?? {};
-}
-
-/** The vault's settings, checked the way the page checks them — defaults for anything never chosen. */
-export async function accountSettings(ctx: Ctx): Promise<Settings> {
-  try {
-    return normalise((await readVaultBundle(ctx)).settings);
-  } catch (e) {
-    if (e instanceof ApiError && e.exit === EXIT.noServer) throw e;
-    return DEFAULTS;
-  }
 }
 
 /** The preferences the card and the sidebar hold, by the name a person would use. */
@@ -118,7 +117,11 @@ export const APP: Command[] = [
       }
       emit(ctx, status, () => {
         ctx.io.out(status.consent === null ? "not asked yet" : status.consent ? "on" : "off");
-        ctx.io.err(status.destination ? `logs go to ${status.destination}` : "no destination: no sync server is paired and ANYDAG_LOGS_URL is not set");
+        ctx.io.err(
+          status.destination
+            ? `logs go to ${status.destination}`
+            : "no destination: no sync server is paired and ANYDAG_LOGS_URL is not set",
+        );
       });
     },
   },
@@ -151,21 +154,34 @@ export const APP: Command[] = [
         for (const [key, v] of Object.entries(given)) {
           if (key in PREFS) {
             let value = v === null ? null : String(v);
-            if (key === "theme" && value !== null && !THEMES.includes(value)) throw new UsageError(`a theme is one of ${THEMES.join(", ")}`);
+            if (key === "theme" && value !== null && !THEMES.includes(value))
+              throw new UsageError(`a theme is one of ${THEMES.join(", ")}`);
             if (key === "calendar.weekStart" && value !== null) {
               if (!/^[0-6]$/.test(value)) throw new UsageError("calendar.weekStart is 0 (Sunday) to 6 (Saturday)");
               /* Monday is the default and is stored as nothing, as the page stores it. */
               if (value === "1") value = null;
             }
             if (key === "calendar.hide" && value !== null) {
-              const kinds = value.split(",").map((s) => s.trim()).filter(Boolean);
+              const kinds = value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
               const wrong = kinds.find((k) => !CAL_KINDS.includes(k));
               if (wrong) throw new UsageError(`calendar.hide is a comma list of ${CAL_KINDS.join(", ")} — not \`${wrong}\``);
               value = kinds.length ? [...new Set(kinds)].sort().join(",") : null;
             }
             if (key === "favourites" && value !== null) {
-              const names = value.split(",").map((s) => s.trim()).filter(Boolean);
-              const listed = await ctx.api.get<{ boards: string[]; notes: string[]; quizzes?: string[]; tables?: string[]; files?: string[] }>("/__board/list");
+              const names = value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+              const listed = await ctx.api.get<{
+                boards: string[];
+                notes: string[];
+                quizzes?: string[];
+                tables?: string[];
+                files?: string[];
+              }>("/__board/list");
               value = JSON.stringify(
                 names.map((n) => {
                   if (listed.boards.includes(n)) return `board:${n}`;
@@ -214,14 +230,17 @@ export const APP: Command[] = [
       /* Favourites are stored as a JSON list of `kind:name`; a person reads them as names. */
       if (typeof prefs.favourites === "string") {
         try {
-          prefs.favourites = (JSON.parse(prefs.favourites) as string[]).map((f) => f.replace(/^(board|note|quiz|table|file):/, "")).join(", ");
+          prefs.favourites = (JSON.parse(prefs.favourites) as string[])
+            .map((f) => f.replace(/^(board|note|quiz|table|file):/, ""))
+            .join(", ");
         } catch {
           /* Left as stored. */
         }
       }
       emit(ctx, { ...prefs, ...flat }, () => {
         const shown = (v: unknown) => (v === null || v === undefined ? "—" : String(v));
-        for (const line of table([...Object.entries(prefs), ...Object.entries(flat)].map(([k, v]) => [k, shown(v)]))) ctx.io.out(line);
+        for (const line of table([...Object.entries(prefs), ...Object.entries(flat)].map(([k, v]) => [k, shown(v)])))
+          ctx.io.out(line);
       });
     },
   },

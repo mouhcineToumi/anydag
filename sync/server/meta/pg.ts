@@ -171,10 +171,9 @@ export class PgMeta implements Meta {
 
   /** The plan asked for, or `free` when `plans(id)` has nothing — every limit null is unlimited. */
   async plan(id: string): Promise<Plan> {
-    const rows = await this.db.query(
-      "select id, storage_bytes, history_days, max_file_bytes, devices from plans where id = $1",
-      [id],
-    );
+    const rows = await this.db.query("select id, storage_bytes, history_days, max_file_bytes, devices from plans where id = $1", [
+      id,
+    ]);
     if (rows.length > 0) return planOf(rows[0]!);
     const free = await this.db.query(
       "select id, storage_bytes, history_days, max_file_bytes, devices from plans where id = 'free'",
@@ -203,10 +202,11 @@ export class PgMeta implements Meta {
   // -- pairing and devices --------------------------------------------------------------------------
 
   async addPairCode(account: string, codeHash: string, expires: string): Promise<void> {
-    await this.db.query(
-      "insert into pair_codes (code_sha256, account, expires) values ($1, $2, $3::timestamptz)",
-      [codeHash, account, expires],
-    );
+    await this.db.query("insert into pair_codes (code_sha256, account, expires) values ($1, $2, $3::timestamptz)", [
+      codeHash,
+      account,
+      expires,
+    ]);
   }
 
   /** One code, one use: claiming sets `used` and a second claimer finds it gone. */
@@ -324,15 +324,21 @@ export class PgMeta implements Meta {
     const current = await this.db.query("select etag from vault_keys where vault = $1", [vault]);
     if (current.length > 0 && put.etag !== current[0]!.etag) return false;
     if (current.length === 0) {
-      await this.db.query(
-        "insert into vault_keys (vault, wrapped, recovery, params, etag) values ($1, $2, $3, $4::jsonb, $5)",
-        [vault, put.wrapped, put.recovery, put.params, etag],
-      );
+      await this.db.query("insert into vault_keys (vault, wrapped, recovery, params, etag) values ($1, $2, $3, $4::jsonb, $5)", [
+        vault,
+        put.wrapped,
+        put.recovery,
+        put.params,
+        etag,
+      ]);
     } else {
-      await this.db.query(
-        "update vault_keys set wrapped = $2, recovery = $3, params = $4::jsonb, etag = $5 where vault = $1",
-        [vault, put.wrapped, put.recovery, put.params, etag],
-      );
+      await this.db.query("update vault_keys set wrapped = $2, recovery = $3, params = $4::jsonb, etag = $5 where vault = $1", [
+        vault,
+        put.wrapped,
+        put.recovery,
+        put.params,
+        etag,
+      ]);
     }
     return { wrapped: put.wrapped, recovery: put.recovery, params: put.params, etag };
   }
@@ -340,10 +346,10 @@ export class PgMeta implements Meta {
   // -- blobs (the index; the bytes are `Blobs`') ----------------------------------------------------
 
   /** Two devices uploading one id race harmlessly: the first row stands, the second is nothing. */
-  async addBlob(vault: string, id: string, size: number): Promise<void> {
+  async addBlob(vault: string, id: string, size: number, at?: string): Promise<void> {
     await this.db.query(
-      "insert into blobs (vault, id, size) values ($1, $2, $3) on conflict (vault, id) do nothing",
-      [vault, id, size],
+      "insert into blobs (vault, id, size, created) values ($1, $2, $3, coalesce($4::timestamptz, now())) on conflict (vault, id) do nothing",
+      [vault, id, size, at ?? null],
     );
   }
 
@@ -376,10 +382,13 @@ export class PgMeta implements Meta {
           [vault, change.key],
         );
         const head = rows.length === 0 ? null : rows[0]!;
-        const based = head === null
-          ? change.parent === null
-          : change.parent === head.seq;
-        if (!based) stale.push({ key: change.key, head: head === null ? null : Number(head.seq), blob: (head?.blob as string | null) ?? null });
+        const based = head === null ? change.parent === null : change.parent === head.seq;
+        if (!based)
+          stale.push({
+            key: change.key,
+            head: head === null ? null : Number(head.seq),
+            blob: (head?.blob as string | null) ?? null,
+          });
       }
       if (stale.length > 0) return { ok: false, stale };
 
@@ -388,20 +397,17 @@ export class PgMeta implements Meta {
       const missing: string[] = [];
       for (const change of changes) {
         if (change.blob === null || missing.includes(change.blob) || sizeOf.has(change.blob)) continue;
-        const rows = await q.query<{ size: number }>("select size from blobs where vault = $1 and id = $2", [
-          vault,
-          change.blob,
-        ]);
+        const rows = await q.query<{ size: number }>("select size from blobs where vault = $1 and id = $2", [vault, change.blob]);
         if (rows.length === 0) missing.push(change.blob);
         else sizeOf.set(change.blob, Number(rows[0]!.size));
       }
       if (missing.length > 0) return { ok: false, missing };
 
       // `for update` above holds the row: seq + n lands whole, and the last seq answers after it.
-      const landed = await q.query<{ seq: number }>(
-        "update vaults set seq = seq + $2 where id = $1 returning seq",
-        [vault, changes.length],
-      );
+      const landed = await q.query<{ seq: number }>("update vaults set seq = seq + $2 where id = $1 returning seq", [
+        vault,
+        changes.length,
+      ]);
       const last = Number(landed[0]!.seq);
       const seqs: number[] = [];
       for (let i = 0; i < changes.length; i += 1) {
@@ -561,15 +567,14 @@ export class PgMeta implements Meta {
 
       return {
         compacted: dropped.length,
-        blobs: forgotten
-          .map((r) => ({ id: String(r.id), size: Number(r.size) }))
-          .sort((a, b) => (a.id < b.id ? -1 : 1)),
+        blobs: forgotten.map((r) => ({ id: String(r.id), size: Number(r.size) })).sort((a, b) => (a.id < b.id ? -1 : 1)),
       };
     });
   }
 }
 
 /** The vault row every vault query reads: its key's presence is the fact the port calls `keyed`. */
-const VAULT_COLUMNS = "v.id, v.account, v.name_sealed as name, v.seq, v.horizon, v.created, exists (select 1 from vault_keys k where k.vault = v.id) as keyed";
+const VAULT_COLUMNS =
+  "v.id, v.account, v.name_sealed as name, v.seq, v.horizon, v.created, exists (select 1 from vault_keys k where k.vault = v.id) as keyed";
 const VAULT_SELECT_BY = `select ${VAULT_COLUMNS} from vaults v where v.account = $1 order by v.created, v.id`;
 const VAULT_SELECT_ALL = `select ${VAULT_COLUMNS} from vaults v order by v.id`;

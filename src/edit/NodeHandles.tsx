@@ -46,8 +46,7 @@ export function NodeHandles({
 }) {
   const onConnect = (side: ConnectSide) => (e: ReactPointerEvent<HTMLDivElement>) =>
     ctl.connect(item, e, e.currentTarget, side, { node, box });
-  const onGrow = (side: ConnectSide) => (e: ReactPointerEvent<HTMLDivElement>) =>
-    ctl.grow(item, e, e.currentTarget, side);
+  const onGrow = (side: ConnectSide) => (e: ReactPointerEvent<HTMLDivElement>) => ctl.grow(item, e, e.currentTarget, side);
 
   if (!growable(type)) return null;
 

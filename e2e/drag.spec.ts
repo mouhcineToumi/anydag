@@ -104,7 +104,7 @@ async function at(page: Page, selector: string, fx: number, fy: number) {
  */
 test("two states in one layer swap, and the drawing follows the file", async ({ page }) => {
   write(
-    '```state {#s x=0 y=0 aspect=0}\n' +
+    "```state {#s x=0 y=0 aspect=0}\n" +
       'state start "Start"\nstate a "Approve"\nstate b "Reject"\n\nstart --> a\nstart --> b\n```\n',
   );
   await open(page);
@@ -122,11 +122,9 @@ test("two states in one layer swap, and the drawing follows the file", async ({ 
   /* Both read inside the poll: the relayout lands some renders after the file does, and a `b`
      measured before it is `b` where it used to be. */
   await expect
-    .poll(
-      async () =>
-        (await boxOf(page, '[data-dag-node="a"]')).y > (await boxOf(page, '[data-dag-node="b"]')).y,
-      { timeout: 10_000 },
-    )
+    .poll(async () => (await boxOf(page, '[data-dag-node="a"]')).y > (await boxOf(page, '[data-dag-node="b"]')).y, {
+      timeout: 10_000,
+    })
     .toBe(true);
   await expect(page.locator("[data-dag-error]")).toHaveCount(0);
 });
@@ -137,13 +135,13 @@ const ARCH =
   '```arch {#infra x=0 y=0 title="Infra"}\n' +
   'service api "The API"\n' +
   'store db "Database"\n' +
-  '\n' +
+  "\n" +
   'group gcp "Google Cloud" {\n' +
   '  service jobs "Jobs"\n' +
-  '}\n' +
-  '\n' +
-  'api --> db\n' +
-  '```\n';
+  "}\n" +
+  "\n" +
+  "api --> db\n" +
+  "```\n";
 
 test("a service dropped on a group's box moves between brace blocks", async ({ page }) => {
   write(ARCH);
@@ -205,10 +203,10 @@ test("alt drags the diagram instead, which is the escape hatch", async ({ page }
 
 test("a step dropped on another band moves into that lane's block", async ({ page }) => {
   write(
-    '```flow {#f x=0 y=0}\n' +
+    "```flow {#f x=0 y=0}\n" +
       'lane person "Person" {\n  step ask "Ask"\n}\n\n' +
       'lane system "System" {\n  step parse "Parse"\n}\n\n' +
-      'ask --> parse\n```\n',
+      "ask --> parse\n```\n",
   );
   await open(page);
   await pick(page, '[data-dag-node="ask"]');
@@ -224,7 +222,7 @@ test("a step dropped on another band moves into that lane's block", async ({ pag
 /* -------------------------------------------------------------------------------- mindmap */
 
 test("a topic dropped on another is re-indented under it, with its subtree", async ({ page }) => {
-  write('```mindmap {#m x=0 y=0}\nroot Board\n  Dialects\n    Arch\n  Editing\n```\n');
+  write("```mindmap {#m x=0 y=0}\nroot Board\n  Dialects\n    Arch\n  Editing\n```\n");
   await open(page);
   /* `m1` is Dialects and `m5` is Editing — the ids are the parser's, and its counter is shared
      with the edges it invents. */

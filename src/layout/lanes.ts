@@ -65,7 +65,11 @@ export function layoutLanes(
   };
   for (const n of nodes) if ((incoming.get(n.id) ?? []).length === 0) walk(n.id);
   for (const n of nodes) walk(n.id);
-  for (const [id, list] of incoming) incoming.set(id, list.filter((from) => !back.has(`${from}\0${id}`)));
+  for (const [id, list] of incoming)
+    incoming.set(
+      id,
+      list.filter((from) => !back.has(`${from}\0${id}`)),
+    );
 
   const depth = new Map<string, number>();
   const depthOf = (id: string): number => {

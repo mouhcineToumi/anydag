@@ -216,8 +216,7 @@ export function scoreGraph(
      still the item's, so that much overhang is drawn; past it, the page clips. A finding and no
      total: the totals are frozen per reference board, and none of them reaches past its frame. */
   const slack = theme.metric.frame.barePad;
-  const outside = (x: number, y: number) =>
-    x < -slack || y < -slack || x > placed.size.w + slack || y > placed.size.h + slack;
+  const outside = (x: number, y: number) => x < -slack || y < -slack || x > placed.size.w + slack || y > placed.size.h + slack;
   for (const e of placed.edges) {
     const segs = paths.get(e.id) ?? [];
     let out = segs.some((s) => outside(s.a.x, s.a.y) || outside(s.b.x, s.b.y));

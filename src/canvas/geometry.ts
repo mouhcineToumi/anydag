@@ -33,8 +33,7 @@ const FIT_MARGIN = 64;
 export const clampZoom = (z: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 
 /** The button and keyboard path, where a tidy number is worth more than precision. */
-export const stepZoom = (z: number, dir: 1 | -1): number =>
-  clampZoom(Math.round((z + dir * ZOOM_STEP) * 100) / 100);
+export const stepZoom = (z: number, dir: 1 | -1): number => clampZoom(Math.round((z + dir * ZOOM_STEP) * 100) / 100);
 
 /**
  * Keep the content reachable without pinning it.

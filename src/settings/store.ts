@@ -120,8 +120,7 @@ const SHOWS: readonly ProblemsShow[] = ["notify", "badge", "off"];
 export const REASONING = ["none", "low", "medium", "high"] as const;
 
 /** A short id-like string, or `null`. The server says whether it names anything. */
-const ident = (v: unknown): string | null =>
-  typeof v === "string" && v.trim() !== "" && v.length <= 200 ? v.trim() : null;
+const ident = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" && v.length <= 200 ? v.trim() : null);
 
 const num = (v: unknown, lo: number, hi: number, fallback: number): number =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;

@@ -176,7 +176,8 @@ function inline(nodes: PhrasingContent[], ctx: Ctx, styles: Styles = {}, out: In
         inline(n.children, ctx, { ...styles, strike: true }, out);
         break;
       case "link":
-        if (isDag(n.url)) out.push({ type: "ref", props: { href: n.url, title: plainOf(textOnly(inline(n.children, ctx, {}, []))) } });
+        if (isDag(n.url))
+          out.push({ type: "ref", props: { href: n.url, title: plainOf(textOnly(inline(n.children, ctx, {}, []))) } });
         else out.push({ type: "link", href: n.url, content: textOnly(inline(n.children, ctx, styles, [])) });
         break;
       case "linkReference": {
@@ -218,7 +219,13 @@ function textWithWikilinks(value: string, styles: Styles, out: Inline[]): void {
 /** A link holds text; a link inside a link (which remark cannot produce) would flatten to its words. */
 function textOnly(xs: Inline[]): TextRun[] {
   return xs.flatMap((x) =>
-    x.type === "text" ? [x] : x.type === "ref" ? [run(x.props.title, {})] : x.type === "math" ? [run(mathSource(x), {})] : x.content,
+    x.type === "text"
+      ? [x]
+      : x.type === "ref"
+        ? [run(x.props.title, {})]
+        : x.type === "math"
+          ? [run(mathSource(x), {})]
+          : x.content,
   );
 }
 
@@ -394,7 +401,11 @@ type Piece =
   | { kind: "math"; tex: string; display: boolean; styles: Styles };
 
 const lengthOf = (p: Piece): number =>
-  p.kind === "text" || p.kind === "raw" ? p.text.length : p.kind === "math" ? p.tex.length : p.runs.reduce((n, r) => n + r.text.length, 0);
+  p.kind === "text" || p.kind === "raw"
+    ? p.text.length
+    : p.kind === "math"
+      ? p.tex.length
+      : p.runs.reduce((n, r) => n + r.text.length, 0);
 
 function piecesOf(content: Inline[], table: boolean): Piece[] {
   const out: Piece[] = [];
@@ -439,7 +450,10 @@ function leaves(pieces: Piece[]): PhrasingContent[] {
       out.push({
         type: "link",
         url: p.href,
-        children: phrasing(p.runs.map((r) => ({ kind: "text", text: r.text, styles: r.styles })), MARKS),
+        children: phrasing(
+          p.runs.map((r) => ({ kind: "text", text: r.text, styles: r.styles })),
+          MARKS,
+        ),
       });
     } else if (p.kind === "raw") {
       out.push({ type: "html", value: p.text });
@@ -480,7 +494,13 @@ function phrasing(pieces: Piece[], marks: readonly Mark[]): PhrasingContent[] {
   const flush = () => {
     if (!group.length) return;
     if (!on) out.push(...phrasing(group, rest));
-    else wrap(group.map((p) => without(p, style)), node, rest, out);
+    else
+      wrap(
+        group.map((p) => without(p, style)),
+        node,
+        rest,
+        out,
+      );
     group = [];
   };
   for (const p of pieces) {
@@ -535,7 +555,13 @@ const plain = (content: NoteBlock["content"]): string =>
     : Array.isArray(content)
       ? content
           .map((c) =>
-            c.type === "text" ? c.text : c.type === "ref" ? c.props.title : c.type === "math" ? mathSource(c) : c.content.map((r) => r.text).join(""),
+            c.type === "text"
+              ? c.text
+              : c.type === "ref"
+                ? c.props.title
+                : c.type === "math"
+                  ? mathSource(c)
+                  : c.content.map((r) => r.text).join(""),
           )
           .join("")
       : "";
@@ -579,7 +605,10 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
           type: "listItem",
           spread: false,
           checked: it.type === "checkListItem" ? !!it.props?.checked : null,
-          children: [...(para.length ? [{ type: "paragraph" as const, children: para }] : []), ...(toMdast(it.children ?? []) as BlockContent[])],
+          children: [
+            ...(para.length ? [{ type: "paragraph" as const, children: para }] : []),
+            ...(toMdast(it.children ?? []) as BlockContent[]),
+          ],
         });
       }
       const start = typeof b.props?.start === "number" ? (b.props.start as number) : 1;
@@ -597,7 +626,10 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
         const para = inlineMd(b.content);
         out.push({
           type: "blockquote",
-          children: [...(para.length ? [{ type: "paragraph" as const, children: para }] : []), ...(toMdast(b.children ?? []) as BlockContent[])],
+          children: [
+            ...(para.length ? [{ type: "paragraph" as const, children: para }] : []),
+            ...(toMdast(b.children ?? []) as BlockContent[]),
+          ],
         });
         continue; /* its children are inside it, not after it */
       }

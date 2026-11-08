@@ -239,8 +239,7 @@ export function IconPicker({
     const opts = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>("[data-dag-iconpick-opt]") ?? []);
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      const i =
-        document.activeElement instanceof HTMLButtonElement ? opts.indexOf(document.activeElement) : -1;
+      const i = document.activeElement instanceof HTMLButtonElement ? opts.indexOf(document.activeElement) : -1;
       const d = e.key === "ArrowDown" ? 1 : -1;
       opts[Math.min(Math.max(i + d, 0), opts.length - 1)]?.focus();
     } else if (e.key === "Escape") {

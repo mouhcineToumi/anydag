@@ -52,13 +52,29 @@ export function FilePreview(props: PreviewProps) {
     case "audio":
       return (
         <Played onReady={onReady}>
-          <audio className="dag-file__audio" controls preload="metadata" src={url} data-dag-file-audio="" onLoadedMetadata={onReady} onError={onReady} />
+          <audio
+            className="dag-file__audio"
+            controls
+            preload="metadata"
+            src={url}
+            data-dag-file-audio=""
+            onLoadedMetadata={onReady}
+            onError={onReady}
+          />
         </Played>
       );
     case "video":
       return (
         <Played onReady={onReady}>
-          <video className="dag-file__video" controls preload="metadata" src={url} data-dag-file-video="" onLoadedMetadata={onReady} onError={onReady} />
+          <video
+            className="dag-file__video"
+            controls
+            preload="metadata"
+            src={url}
+            data-dag-file-video=""
+            onLoadedMetadata={onReady}
+            onError={onReady}
+          />
         </Played>
       );
     case "text":
@@ -102,7 +118,7 @@ function TextPreview(props: PreviewProps) {
 }
 
 /** A file the app cannot draw: what it is, how big, and the way to save it. */
-export function FileBlock({ name, title, bytes, download, onReady }: PreviewProps) {
+function FileBlock({ name, title, bytes, download, onReady }: PreviewProps) {
   useEffect(() => onReady?.(), [onReady]);
   const Icon = SORT_ICON[sortOf(name)];
   return (

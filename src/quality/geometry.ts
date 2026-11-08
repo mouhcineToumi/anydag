@@ -167,5 +167,4 @@ export function distanceTo(p: Point, path: Segment[]): number {
 }
 
 /** Axis-aligned overlap, corner-based — the same test `test/layout.test.ts` uses on node boxes. */
-export const overlaps = (a: Rect, b: Rect): boolean =>
-  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+export const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;

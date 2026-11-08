@@ -83,7 +83,14 @@ export function refItems(
     const twins = same.get(titleOf(d))!;
     const apart = new Set(twins.map(folderOf)).size === twins.length;
     const at = twins.indexOf(d);
-    const title = twins.length === 1 ? titleOf(d) : apart ? `${titleOf(d)} (${folderOf(d) || "top level"})` : at ? `${titleOf(d)} (${at + 1})` : titleOf(d);
+    const title =
+      twins.length === 1
+        ? titleOf(d)
+        : apart
+          ? `${titleOf(d)} (${folderOf(d) || "top level"})`
+          : at
+            ? `${titleOf(d)} (${at + 1})`
+            : titleOf(d);
     const where = twins.length > 1 && !apart ? d.name : folderOf(d);
     /* A project is tagged by naming its note, so the picker says which notes are projects;
        an attachment says what it is, a PDF from a spreadsheet. */
@@ -102,8 +109,17 @@ export function refItems(
  * What the picker says each kind of document is, and its mark. Keyed on the kind, so a quiz is
  * labelled a quiz rather than the board `kind === "note" ? … : "Board"` made of it.
  */
-const KIND_LABEL = { board: "Board", note: "Note", quiz: "Quiz", table: "Table", file: "File" } satisfies Record<FileKind, string>;
-const KIND_ICON = { board: LayoutDashboard, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<FileKind, LucideIcon>;
+const KIND_LABEL = { board: "Board", note: "Note", quiz: "Quiz", table: "Table", file: "File" } satisfies Record<
+  FileKind,
+  string
+>;
+const KIND_ICON = {
+  board: LayoutDashboard,
+  note: FileText,
+  quiz: GraduationCap,
+  table: Table2,
+  file: FileGlyph,
+} satisfies Record<FileKind, LucideIcon>;
 
 /** The folder a document is in, `""` for the top level — where a person put it, which they chose. */
 const folderOf = (d: IndexDoc): string => (d.name.includes("/") ? d.name.slice(0, d.name.lastIndexOf("/")) : "");

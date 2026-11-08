@@ -1,149 +1,163 @@
-# AnyDag
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg">
+    <img src="docs/assets/wordmark-light.svg" alt="AnyDag" width="300">
+  </picture>
+</p>
 
-A local desktop app for notes, boards, quizzes, tables, tasks and attachments, with no account and
-no cloud. Open a folder — a **vault** — and everything in it is a plain file: AnyDag lists it,
-edits it, links it and searches it, and keeps only rebuildable indexes outside it.
+<p align="center">
+  <strong>A private workspace to learn, grow and create.</strong><br>
+  Notes, mind maps, quizzes, tables, tasks and a calendar, all in one desktop app.<br>
+  Your work stays in a folder on your computer, as plain files. No account, no cloud.
+</p>
 
-The heart of it is an infinite canvas that renders technical diagrams from a DSL — fourteen types:
-`erd · flow · arch · state · activity · class · usecase · sequence · c4 · mindmap · timeline ·
-gitgraph · sketch · chart` — twelve laid out for you, one where the coordinates are yours, and one
-that draws data. **An agent drives it by writing a file**, `<vault>/<name>.board.md`, which the app
-watches and re-renders. A person edits the same board on the canvas — select, move, resize, group,
-connect, type into a card, drag a component from the library, tidy the board with one chord, undo —
-and every one of those is written back to that same file: a board is a document, and both writers
-edit it. `space ?` lists every key.
+<p align="center">
+  <a href="https://github.com/mouhcineToumi/anydag/releases/latest"><strong>Download</strong></a> ·
+  <a href="docs/guide/getting-started.md">Getting started</a> ·
+  <a href="docs/guide/README.md">Guide</a>
+</p>
 
-Beside the boards: **notes** (any `.md`, in a block editor that rewrites only the block it touched,
-with `[[wikilinks]]` and `$equations$`), **quizzes** (`.quiz.md`), **tables** (`.table.md`),
-**tasks**, **projects** and **events** (a note with a `status:`, a `project:` or a `start:`), and
-**attachments** in `attachments/`. Every document has a permanent `id:` in its frontmatter, so a
-link survives a rename, and nothing is deleted at once: it goes to the vault's trash for thirty days.
+<p align="center">
+  <a href="https://github.com/mouhcineToumi/anydag/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/mouhcineToumi/anydag"></a>
+  <a href="https://github.com/mouhcineToumi/anydag/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mouhcineToumi/anydag/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/mouhcineToumi/anydag"></a>
+</p>
 
-You need not write the DSL at all: a **prompt card** takes a description on the canvas and has a
-model write it — your own Claude Code or OpenCode login, or your own API key — checked by the real
-parser before it lands. And the **Assistant** is a chat about the vault, beside any page, on the
-same logins. All styling lives in a swappable theme (`themes/<name>/theme.json`) — three of them,
-one dark.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/note-dark.png">
+  <img src="docs/assets/screenshots/note-light.png" alt="A study note in AnyDag, with a sidebar listing notes, a mind map, a quiz and a reading list">
+</picture>
 
-````md
-```arch {#shop title="What runs where" dir=LR}
-group cloud "Cloud" hue=indigo {
-  service api "orders-api" "node · fastify" { content "orders · payments" }
-  store db "Postgres" "orders"
-}
-client browser "Customer's browser" "react"
-browser --> api "https"
-api.content --> db
-```
-````
+## Why AnyDag
 
-## Status
+Learning something, or making something, takes more than one kind of page. You read and take notes,
+map out how the ideas connect, test yourself until they stick, track what to do next, and keep the
+sources together. Most people spread that across four or five apps.
 
-**0.1.0 shipped for Linux only; the next release ships for Linux, Windows and macOS.** Each release
-has an AppImage for x64 Linux, an installer for x64 Windows, and a disk image (and a zip) for macOS
-on Apple Silicon (`arm64`) and on Intel (`x64`). **None of them is signed with a certificate yet**,
-so Windows and macOS each ask once before they open the app — the steps are below. The Linux and
-Windows builds update themselves; an unsigned macOS build cannot (macOS refuses to install an
-update to an app without a developer signature), so on a Mac you download the next release yourself.
+AnyDag keeps it in one place, and every piece links to every other:
+
+- **Write** notes, with headings, checklists, equations, pictures and PDFs.
+- **Connect** them with `[[links]]` that survive renames, and see what links back to each page.
+- **Think visually** on an infinite canvas: mind maps, timelines, flowcharts and charts that lay
+  themselves out.
+- **Remember** what you learn with quizzes made from your notes and a Mistakes list that brings back
+  what you got wrong.
+- **Organise** reading lists and trackers in tables, and plans in tasks, projects and a calendar.
+- **Bring your own AI**, if you want it: ask questions about your notes, or have it draft a quiz or
+  a diagram, using your own Claude Code, OpenCode or API key.
+
+It is for students, self-learners, researchers, writers, and anyone who keeps notes and wants them to
+add up to something.
+
+## A look around
+
+**Map out a subject.** A board holds mind maps, timelines, notes and pictures side by side, and
+the diagrams arrange themselves.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/board-dark.png">
+  <img src="docs/assets/screenshots/board-light.png" alt="A board with a mind map of how to learn and a study-plan timeline">
+</picture>
+
+**Test yourself.** Turn notes into a quiz, practise it, and let Mistakes bring back the questions you
+missed until you get them right.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/quiz-dark.png">
+  <img src="docs/assets/screenshots/quiz-light.png" alt="Practising a quiz: a question answered correctly, with its explanation">
+</picture>
+
+**Keep track.** Tables for reading lists and trackers; tasks, projects and a calendar for what comes next.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/table-light.png" alt="A reading-list table"></td>
+    <td width="50%"><img src="docs/assets/screenshots/tasks-light.png" alt="The Tasks page"></td>
+  </tr>
+</table>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/calendar-dark.png">
+  <img src="docs/assets/screenshots/calendar-light.png" alt="The week view of the calendar, with lectures, a study group and tasks that are due">
+</picture>
+
+**Light or dark.** Three themes: paper, paper-dark and neutral.
+
+<table>
+  <tr>
+    <th width="50%">Light</th>
+    <th width="50%">Dark</th>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/board-light.png" alt="A board in the light theme"></td>
+    <td><img src="docs/assets/screenshots/board-dark.png" alt="A board in the dark theme"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/note-light.png" alt="A note in the light theme"></td>
+    <td><img src="docs/assets/screenshots/note-dark.png" alt="A note in the dark theme"></td>
+  </tr>
+</table>
+
+## Your work, your files
+
+- **Everything is a plain file** in a folder you choose: notes are Markdown, and so are boards,
+  quizzes and tables. Back it up, put it in git, open it in another editor, or leave and keep it all.
+- **Nothing leaves your computer** unless you ask. There is no account and no cloud. The optional
+  sync runs on a server you host, and it is end-to-end encrypted.
+- **Nothing is lost by accident.** Deleted files wait thirty days in the trash, and a read-only lock
+  stops stray edits.
 
 ## Install
 
-Download the file for your system from [Releases](https://github.com/mouhcineToumi/anydag/releases).
+Download the file for your system from the [latest release](https://github.com/mouhcineToumi/anydag/releases/latest):
 
-**Linux** — `AnyDag-<version>.AppImage`:
+| System | File |
+|---|---|
+| Linux (x64) | `AnyDag-<version>.AppImage` |
+| Windows (x64) | `AnyDag-Setup-<version>.exe` |
+| macOS, Apple Silicon | `AnyDag-<version>-arm64.dmg` |
+| macOS, Intel | `AnyDag-<version>-x64.dmg` |
 
-```bash
-chmod +x AnyDag-*.AppImage
-./AnyDag-*.AppImage
-```
+**0.1.0 shipped for Linux only; the next release adds Windows and macOS.** The builds are not signed with a certificate yet, so Windows and macOS ask once before they open the
+app. [Getting started](docs/guide/getting-started.md#install) has the steps for each system.
 
-**Windows** — `AnyDag-Setup-<version>.exe`. Run it. Because the installer is not signed, Windows
-SmartScreen says *Windows protected your PC*: click **More info**, then **Run anyway**. It installs
-for your user only, with no administrator prompt.
+## Learn more
 
-**macOS** — `AnyDag-<version>-arm64.dmg` on an Apple Silicon Mac (M1 and later),
-`AnyDag-<version>-x64.dmg` on an Intel one. Open the disk image and drag AnyDag to Applications.
-Because the app is not signed by an Apple developer, macOS will not open it with a double-click the
-first time. Either:
+The [guide](docs/guide/README.md) has one page per topic:
 
-- **right-click** (or control-click) AnyDag in Applications, choose **Open**, then **Open** again —
-  on macOS 15 and later, if there is no Open button, go to **System Settings → Privacy & Security**,
-  scroll down to the message about AnyDag and click **Open Anyway**; or
-- in Terminal, take the download's quarantine flag off, then open it normally:
+| Topic | Read |
+|---|---|
+| Install, your first folder, search and shortcuts | [Getting started](docs/guide/getting-started.md) |
+| Writing, linking, equations, attachments | [Notes](docs/guide/notes.md) |
+| Mind maps, timelines, flowcharts, charts, sketches | [Boards and diagrams](docs/guide/boards.md) |
+| Practising and the Mistakes run | [Quizzes](docs/guide/quizzes.md) |
+| Reading lists, trackers, CSV | [Tables](docs/guide/tables.md) |
+| To-dos, projects, events | [Tasks, projects and the calendar](docs/guide/tasks-and-calendar.md) |
+| The Assistant, prompt cards, AI agents and the `anydag` command | [AI and agents](docs/guide/ai.md) |
+| Your files, the trash, the lock, sync, anonymous logs | [Your files, sync and privacy](docs/guide/files-and-sync.md) |
 
-  ```bash
-  xattr -dr com.apple.quarantine /Applications/AnyDag.app
-  ```
+## For developers
 
-Run it from Applications rather than from the disk image, or the `anydag` command below is not
-written.
-
-On first launch it puts an `anydag` command on your machine — `~/.local/bin/anydag` on Linux and
-macOS, `%APPDATA%\AnyDag\bin\anydag.cmd` on Windows — so the CLI and the MCP server below work from
-a terminal. Settings → AI and agents shows its exact path, for a folder that is not on your `PATH`.
-
-## Use it from a terminal or an agent
-
-```bash
-anydag serve ~/Notes             # serve a vault to a browser on this machine
-anydag ls --vault ~/Notes        # every command is a client of the app's own routes
-anydag help                      # the whole table; `anydag help --json` for machines
-anydag mcp --vault ~/Notes       # an MCP server over stdio
-```
-
-To give Claude Code the MCP tools:
-
-```bash
-claude mcp add anydag -- anydag mcp --vault ~/Notes
-```
-
-`skills/anydag/` is a skill that teaches an agent the board format and the DSL; link it into your
-agent's skills folder (for Claude Code, `~/.claude/skills/anydag`).
-
-## Build from source
-
-Node 24.7 or later.
+AnyDag is TypeScript, React, Hono and Electron, in one repository. With Node 24.7 or later:
 
 ```bash
 npm install
-
-npm run dev                 # Vite + the local server on boards/local/:  http://localhost:3500/?board=demo
-npm run desktop:dev         # the Electron app on the same code
-npm run desktop:dist        # package it for the system you are on, into release/
-
-npm run checks              # typechecks, the check:* scripts, the unit suite — what every commit runs
-npm run gate                # the same, then the Playwright suite
-
-npm link                    # puts `anydag` on the PATH from this checkout
+npm run dev          # the app on a development vault: http://localhost:3500/?board=demo
+npm run desktop:dev  # the desktop app on the same code
+npm run checks       # lint, typechecks, contracts and unit tests (what every commit runs)
 ```
 
-## Where to look
+- [CONTRIBUTING.md](CONTRIBUTING.md): set-up, branches, the issue workflow and what a pull request
+  needs. [AGENTS.md](AGENTS.md) is the short version for AI coding agents.
+- [`docs/architecture/`](docs/architecture/README.md): how the code is built, one file per area.
+- [`docs/dsl/`](docs/dsl/): the diagram language, one page per diagram type.
+- [`docs/RELEASING.md`](docs/RELEASING.md): how releases and nightlies are cut.
+- [SECURITY.md](SECURITY.md): report a vulnerability privately, not in an issue.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): how we treat each other.
 
-| Path | For |
-|---|---|
-| `CLAUDE.md` (also `AGENTS.md`) | the contributor guide: layer boundaries, rules, and the things that will bite |
-| `server/` | the one Node process: the vault store, every route, the MCP tools |
-| `desktop/` | the Electron shell around it |
-| `cli/` | `anydag`, the command line |
-| `src/` | the page: the canvas, the editors, the grammar, the layouts |
-| `docs/dsl/` | the grammar, one sheet per diagram type |
-| `docs/parity.json` | every feature against its route, its command and its MCP tool |
-| `boards/local/` | the development vault; `reference/` has one board per diagram type |
-| `skills/anydag/` | the agent skill |
-| `sync/` | an optional, end-to-end encrypted sync server you can run yourself |
-
-## Contributing
-
-Issues and pull requests are welcome. `npm install` sets up the git hooks: `npm run checks` runs
-before every commit, and the Playwright suite before every push (`npm run e2e:local`). A new route,
-CLI command or MCP tool needs a line in `docs/parity.json` — the checks say so if it is missing.
-`CLAUDE.md` is long; read the section for the part you are changing.
-
-## Releases
-
-A release is a tag: bump `VERSION` and `package.json` together, merge, and push `v<version>`.
-`.github/workflows/release.yml` checks, builds, smoke-tests and publishes it.
+Issues and pull requests are welcome. Open an issue first and wait for it to be marked
+`status: ready`.
 
 ## Licence
 
-[MIT](LICENSE). The vendored icon sets keep their own licences; see `icons/NOTICE`.
+[MIT](LICENSE). The bundled icon sets keep their own licences; see `icons/NOTICE`.

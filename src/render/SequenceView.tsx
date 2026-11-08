@@ -17,15 +17,7 @@ import { Icon, iconFor, tileClass } from "./Icon";
  * Messages reuse `Edges` unchanged: a message is a path with a marker and a label, which is exactly
  * what that component already draws.
  */
-export function SequenceView({
-  placed,
-  participants,
-  theme,
-}: {
-  placed: SeqPlaced;
-  participants: Participant[];
-  theme: Theme;
-}) {
+export function SequenceView({ placed, participants, theme }: { placed: SeqPlaced; participants: Participant[]; theme: Theme }) {
   const s = theme.metric.seq;
   const hair = theme.metric.line.hair;
 
@@ -117,18 +109,13 @@ export function SequenceView({
             style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           >
             <div className="dag-node__head">
-              <span
-                className={tileClass(icon, round ? "dag-tile--round" : undefined)}
-                style={hueVars(p.hue)}
-              >
-                <Icon
-                  icon={icon}
-                  size={theme.metric.tile.icon}
-                  stroke={theme.metric.tile.stroke}
-                />
+              <span className={tileClass(icon, round ? "dag-tile--round" : undefined)} style={hueVars(p.hue)}>
+                <Icon icon={icon} size={theme.metric.tile.icon} stroke={theme.metric.tile.stroke} />
               </span>
               <span className="dag-node__text">
-                <span className="dag-node__title" data-dag-title="">{p.title}</span>
+                <span className="dag-node__title" data-dag-title="">
+                  {p.title}
+                </span>
                 {p.meta ? <span className="dag-node__meta">{p.meta}</span> : null}
               </span>
             </div>

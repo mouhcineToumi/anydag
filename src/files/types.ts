@@ -66,7 +66,7 @@ const SORT_OF: Readonly<Record<string, FileSort>> = {
 };
 
 /** What each sort is called where a card says what a file is: `PDF · 2.3 MB`. */
-export const SORT_LABEL: Readonly<Record<FileSort, string>> = {
+const SORT_LABEL: Readonly<Record<FileSort, string>> = {
   pdf: "PDF",
   image: "Image",
   doc: "Document",
@@ -87,7 +87,8 @@ export function extOf(name: string): string {
 }
 
 /** Which of the ten a file is, by its name or its extension. */
-export const sortOf = (nameOrExt: string): FileSort => SORT_OF[nameOrExt.includes(".") ? extOf(nameOrExt) : nameOrExt.toLowerCase()] ?? "other";
+export const sortOf = (nameOrExt: string): FileSort =>
+  SORT_OF[nameOrExt.includes(".") ? extOf(nameOrExt) : nameOrExt.toLowerCase()] ?? "other";
 
 /**
  * How the app draws a file itself, or `null` when all it can do is offer it to save. The pictures a

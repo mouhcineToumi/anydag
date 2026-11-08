@@ -30,10 +30,13 @@ export async function build() {
     outdir: path.dirname(BUNDLE),
     outExtension: { ".js": ".mjs" },
     banner: { js: "import{createRequire as __acr}from'node:module';const require=__acr(import.meta.url);" },
-    external: ["@parcel/watcher", "playwright", "playwright-core", "esbuild"],
+    external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
     /* Where logs go when nothing at run time says (`server/telemetry.ts`): a release names its own
        collector with `ANYDAG_LOGS_BUILD_URL`; a checkout's build names none. */
-    define: { __ANYDAG_VERSION__: JSON.stringify(version), __ANYDAG_LOGS_URL__: JSON.stringify(process.env.ANYDAG_LOGS_BUILD_URL ?? "") },
+    define: {
+      __ANYDAG_VERSION__: JSON.stringify(version),
+      __ANYDAG_LOGS_URL__: JSON.stringify(process.env.ANYDAG_LOGS_BUILD_URL ?? ""),
+    },
     logLevel: "warning",
   });
   return BUNDLE;

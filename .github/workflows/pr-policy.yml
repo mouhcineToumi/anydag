@@ -1,0 +1,182 @@
+# The rules about a pull request itself, as opposed to its code (that is `ci.yml`).
+#
+#   PR title      a Conventional Commit — `feat(canvas): …`, `fix: …`, `chore(release): 0.2.0` — because
+#                 a squash merge turns the title into the commit on `develop`, and the changelog and
+#                 the release notes read it.
+#   PR target     `main` takes a pull request only from `release/*` or `hotfix/*` of this repository.
+#   Linked issue  a pull request into `develop` must close an issue labelled `status: ready` — the
+#                 maintainers have agreed it is wanted before anybody writes it. The maintainer,
+#                 bots and a PR a maintainer labelled `no-issue` are exempt.
+#
+# Its own workflow, and cheap: it runs again when a title or a body is edited or a label changes,
+# and a required check that reads stale text is a red tick nobody can explain. Each job always
+# reports (a job that does not apply says so and passes), so all three can be required.
+name: pr-policy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review]
+    branches: [develop, main, "release/**", "hotfix/**"]
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6.1.2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          # A subject that starts with a capital or ends in a full stop is not wrong, only untidy.
+          # The type is what the changelog needs.
+
+  target:
+    name: PR target
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Only a release or a hotfix goes into main
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+        run: |
+          if [ "$BASE" != "main" ]; then
+            echo "The base is $BASE, not main — nothing to check."
+            exit 0
+          fi
+          case "$HEAD" in
+            release/* | hotfix/*)
+              if [ "$HEAD_REPO" = "$THIS_REPO" ]; then
+                echo "main takes $HEAD."
+                exit 0
+              fi
+              echo "::error::$HEAD is a branch of $HEAD_REPO. A release or hotfix branch must be one of this repository's."
+              ;;
+            *)
+              echo "::error::A pull request into main must come from a release/* or hotfix/* branch, not from $HEAD."
+              echo "::error::main only ever holds released code. Target develop instead: see docs/RELEASING.md and CONTRIBUTING.md."
+              ;;
+          esac
+          exit 1
+
+  issue:
+    name: Linked issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/github-script@v9
+        env:
+          EXEMPT: mouhcineToumi
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const READY = "status: ready";
+            const guide = `https://github.com/${owner}/${repo}/blob/develop/CONTRIBUTING.md`;
+
+            if (pr.base.ref !== "develop") {
+              core.info(`The base is ${pr.base.ref}, not develop — no issue is required.`);
+              return;
+            }
+            const author = pr.user.login;
+            const exempt = process.env.EXEMPT.split(",").map((s) => s.trim().toLowerCase());
+            if (pr.user.type === "Bot" || author.endsWith("[bot]") || exempt.includes(author.toLowerCase())) {
+              core.info(`${author} does not need a linked issue.`);
+              return;
+            }
+            // A maintainer can wave the rule through for a change nobody needs to agree to first (a typo,
+            // a dependency bump by hand). Only somebody with write access can add a label.
+            if (pr.labels.some((l) => l.name === "no-issue")) {
+              core.info("Labelled `no-issue` by a maintainer — no issue is required.");
+              return;
+            }
+
+            // The issues this pull request closes: a closing keyword in its body (HTML comments are
+            // the template's own prompts, not the author's words), and GitHub's own list of what
+            // would close on merge — the "Development" sidebar counts too.
+            const body = (pr.body ?? "").replace(/<!--[\s\S]*?-->/g, "");
+            const keyword = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b:?\s+((?:[\w.-]+\/[\w.-]+)?#\d+|https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+)/gi;
+            const found = new Set();
+            for (const m of body.matchAll(keyword)) {
+              const ref = m[1];
+              const url = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/issues\/(\d+)$/.exec(ref);
+              if (url) found.add(`${url[1]}/${url[2]}#${url[3]}`.toLowerCase());
+              else if (ref.startsWith("#")) found.add(`${owner}/${repo}${ref}`.toLowerCase());
+              else found.add(ref.toLowerCase());
+            }
+            try {
+              const g = await github.graphql(
+                `query($owner: String!, $repo: String!, $n: Int!) {
+                   repository(owner: $owner, name: $repo) {
+                     pullRequest(number: $n) {
+                       closingIssuesReferences(first: 25) { nodes { number repository { nameWithOwner } } }
+                     }
+                   }
+                 }`,
+                { owner, repo, n: pr.number },
+              );
+              for (const n of g.repository.pullRequest.closingIssuesReferences.nodes) {
+                found.add(`${n.repository.nameWithOwner}#${n.number}`.toLowerCase());
+              }
+            } catch (e) {
+              core.warning(`Could not read GitHub's list of closing references: ${e.message}`);
+            }
+
+            const here = `${owner}/${repo}`.toLowerCase();
+            const mine = [...found].filter((r) => r.startsWith(`${here}#`)).map((r) => Number(r.slice(here.length + 1)));
+            const problems = [];
+            const ready = [];
+            for (const number of mine) {
+              const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: number }).catch(() => ({ data: null }));
+              if (!issue || issue.pull_request) { problems.push(`#${number} is not an issue of this repository`); continue; }
+              const labels = issue.labels.map((l) => (typeof l === "string" ? l : l.name));
+              if (issue.state !== "open") problems.push(`#${number} is closed`);
+              else if (!labels.includes(READY)) problems.push(`#${number} is not labelled \`${READY}\``);
+              else ready.push(number);
+            }
+            if (ready.length > 0) {
+              core.info(`Closes ${ready.map((n) => `#${n}`).join(", ")}, labelled ${READY}.`);
+              return;
+            }
+
+            const why = mine.length === 0
+              ? "This pull request does not close an issue of this repository."
+              : `None of the issues it closes can be worked on yet: ${problems.join("; ")}.`;
+            const message = [
+              why,
+              `A pull request into develop must close an issue labelled \`${READY}\` — that label means a maintainer agreed the change is wanted.`,
+              `1. Open an issue (or find one) and wait for a maintainer to label it \`${READY}\`.`,
+              `2. Put "Closes #<number>" in this pull request's description. Editing it re-runs this check.`,
+              `Details: ${guide}`,
+            ].join("\n");
+            await core.summary.addHeading("A linked, ready issue is required").addRaw(message.replace(/\n/g, "\n\n"), true).write();
+            core.setFailed(message);

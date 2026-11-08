@@ -45,7 +45,13 @@ export function chatRoutes(app: Hono, a: Assistant): void {
     const b = await bodyOf(c);
     const p = provider(b.provider);
     if (!p) throw err(400, "`provider` is required");
-    const chat = a.create(c.req.query("vault"), { provider: p, model: str(b.model, "model"), effort: typeof b.effort === "string" ? b.effort : undefined, mode: mode(b.mode), title: typeof b.title === "string" ? b.title : undefined });
+    const chat = a.create(c.req.query("vault"), {
+      provider: p,
+      model: str(b.model, "model"),
+      effort: typeof b.effort === "string" ? b.effort : undefined,
+      mode: mode(b.mode),
+      title: typeof b.title === "string" ? b.title : undefined,
+    });
     return c.json({ chat });
   });
 
@@ -95,7 +101,9 @@ export function chatRoutes(app: Hono, a: Assistant): void {
 
   const undo = (redo: boolean) => async (c: Context) => {
     const b = await bodyOf(c);
-    return c.json({ record: await a.undo(str(b.id, "id"), str(b.turn, "turn"), str(b.block, "block"), redo, c.req.query("vault")) });
+    return c.json({
+      record: await a.undo(str(b.id, "id"), str(b.turn, "turn"), str(b.block, "block"), redo, c.req.query("vault")),
+    });
   };
   // Written out, not looped: `scripts/parity.mjs` reads the routes off the literal calls.
   app.post("/__board/chat/undo", undo(false));

@@ -90,13 +90,7 @@ export interface GrowOpts {
  * a mindmap topic and a sequence participant have no kind word to copy, and inventing one would
  * write a statement in a grammar that does not have it.
  */
-export function grow(
-  type: string,
-  body: string,
-  dir: "LR" | "TB" | undefined,
-  from: string,
-  opts: GrowOpts,
-): Grown | null {
+export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, from: string, opts: GrowOpts): Grown | null {
   const line = declaredAt(type, body, from, dir);
   if (line === null) return null;
 
@@ -375,7 +369,9 @@ export function clearSpot(laid: LaidOut, node: string, side: Side, gap: number):
   if (!from) return null;
   const inside = (o: LaidBox, b: LaidBox) => o.x <= b.x && o.y <= b.y && o.x + o.w >= b.x + b.w && o.y + o.h >= b.y + b.h;
   const blocks = [
-    ...Object.entries(laid.nodes).filter(([id]) => id !== node).map(([, b]) => b),
+    ...Object.entries(laid.nodes)
+      .filter(([id]) => id !== node)
+      .map(([, b]) => b),
     ...Object.values(laid.groups).filter((g) => !inside(g, from)),
   ];
   const hit = (s: LaidBox) => blocks.find((b) => s.x < b.x + b.w && b.x < s.x + s.w && s.y < b.y + b.h && b.y < s.y + s.h);

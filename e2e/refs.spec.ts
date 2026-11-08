@@ -64,7 +64,9 @@ async function ids(page: Page): Promise<{ board: string; note: string }> {
 const ready = (page: Page) =>
   page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 
-test("a link shows the target's live title, and survives the target being renamed and moved", async ({ page }) => {
+test("a link shows the target's live title, and survives the target being renamed and moved", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const { board } = await ids(page);
   fs.writeFileSync(noteFile(), `---\ntitle: The linking note\n---\nSee [an old title](dag:${board}).\n`);
   await page.goto(`/?view=1&note=${stem}-n`);
@@ -158,7 +160,10 @@ test("![ embeds a live board in the note, drawn read-only", async ({ page }) => 
 
 test("a note placed on a board is drawn as a card, and a backlink goes back to it", async ({ page }) => {
   const { note, board } = await ids(page);
-  fs.writeFileSync(noteFile(), `---\ntitle: The linking note\n---\n# Linking\n\nA paragraph in the note, pointing at [the board](dag:${board}).\n`);
+  fs.writeFileSync(
+    noteFile(),
+    `---\ntitle: The linking note\n---\n# Linking\n\nA paragraph in the note, pointing at [the board](dag:${board}).\n`,
+  );
   fs.writeFileSync(boardFile(), `${boardText()}\n\`\`\`md {#card x=0 y=240 w=420}\n![The linking note](dag:${note})\n\`\`\`\n`);
   await page.goto(`/?board=${stem}-b`);
   await ready(page);

@@ -137,7 +137,13 @@ describe("undo, on an op somebody else wrote into the vault", () => {
   const b64 = (text: string) => Buffer.from(text).toString("base64");
   /** `outside`, as a path from somewhere inside the vault. */
   const out = (from: string, name: string) => path.relative(path.join(root, from), path.join(outside, name));
-  const planted = (...images: Image[]): Op => ({ what: "POST /__board/patch", vault: "v1", at: "2026-11-07T00:00:00.000Z", images, undoable: true });
+  const planted = (...images: Image[]): Op => ({
+    what: "POST /__board/patch",
+    vault: "v1",
+    at: "2026-11-07T00:00:00.000Z",
+    images,
+    undoable: true,
+  });
 
   beforeEach(() => {
     fs.writeFileSync(path.join(outside, "id_ed25519"), "PRIVATE-KEY-DUMMY\n");
@@ -146,17 +152,52 @@ describe("undo, on an op somebody else wrote into the vault", () => {
   });
 
   const cases: [string, () => Image][] = [
-    ["a path that climbs out", () => ({ rel: out("", "planted.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" })],
-    ["an absolute path", () => ({ rel: path.join(outside, "planted.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" })],
-    ["a deletion of an outside file whose hash is known", () => ({ rel: out("", "keepme.txt"), before: { t: "absent" }, after: hashOf(path.join(outside, "keepme.txt")) })],
-    ["a folder's file that climbs out", () => ({ rel: "notes-old", before: { t: "dir", dirs: [], files: { [out("notes-old", "autostart.desktop")]: b64("[Desktop Entry]\n") } }, after: "-" })],
-    ["a folder's file given as an absolute path", () => ({ rel: "notes-old", before: { t: "dir", dirs: [], files: { [path.join(outside, "abs.desktop")]: b64("x") } }, after: "-" })],
-    ["a folder's subfolder that climbs out", () => ({ rel: "notes-old", before: { t: "dir", dirs: [out("notes-old", "made")], files: {} }, after: "-" })],
-    ["a folder moved in from outside", () => ({ rel: "attachments/notes.txt", before: { t: "moved", to: out("", "id_ed25519") }, after: "-" })],
-    ["a folder moved in from an absolute path", () => ({ rel: "attachments/notes.txt", before: { t: "moved", to: path.join(outside, "id_ed25519") }, after: "-" })],
+    [
+      "a path that climbs out",
+      () => ({ rel: out("", "planted.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" }),
+    ],
+    [
+      "an absolute path",
+      () => ({ rel: path.join(outside, "planted.sh"), before: { t: "file", b64: b64("echo planted\n") }, after: "-" }),
+    ],
+    [
+      "a deletion of an outside file whose hash is known",
+      () => ({ rel: out("", "keepme.txt"), before: { t: "absent" }, after: hashOf(path.join(outside, "keepme.txt")) }),
+    ],
+    [
+      "a folder's file that climbs out",
+      () => ({
+        rel: "notes-old",
+        before: { t: "dir", dirs: [], files: { [out("notes-old", "autostart.desktop")]: b64("[Desktop Entry]\n") } },
+        after: "-",
+      }),
+    ],
+    [
+      "a folder's file given as an absolute path",
+      () => ({
+        rel: "notes-old",
+        before: { t: "dir", dirs: [], files: { [path.join(outside, "abs.desktop")]: b64("x") } },
+        after: "-",
+      }),
+    ],
+    [
+      "a folder's subfolder that climbs out",
+      () => ({ rel: "notes-old", before: { t: "dir", dirs: [out("notes-old", "made")], files: {} }, after: "-" }),
+    ],
+    [
+      "a folder moved in from outside",
+      () => ({ rel: "attachments/notes.txt", before: { t: "moved", to: out("", "id_ed25519") }, after: "-" }),
+    ],
+    [
+      "a folder moved in from an absolute path",
+      () => ({ rel: "attachments/notes.txt", before: { t: "moved", to: path.join(outside, "id_ed25519") }, after: "-" }),
+    ],
     ["the chat's own record", () => ({ rel: ".anydag/chats/c1/t1.json", before: { t: "file", b64: b64("{}") }, after: "-" })],
     ["a writer's temp file", () => ({ rel: "notes/.a.md.123.tmp", before: { t: "file", b64: b64("x") }, after: "-" })],
-    ["a path with a NUL in it", () => ({ rel: "notes/a.md\0../../x", before: { t: "absent" }, after: hashOf(path.join(root, "notes/a.md")) })],
+    [
+      "a path with a NUL in it",
+      () => ({ rel: "notes/a.md\0../../x", before: { t: "absent" }, after: hashOf(path.join(root, "notes/a.md")) }),
+    ],
     ["an empty path", () => ({ rel: "", before: { t: "absent" }, after: "-" })],
     ["a path that is not a string", () => ({ rel: 7 as unknown as string, before: { t: "absent" }, after: "-" })],
   ];
@@ -204,7 +245,10 @@ describe("undo, on an op somebody else wrote into the vault", () => {
 
   it("never restores a big image, whatever the op says of itself", async () => {
     const vaultBefore = tree(root);
-    const u = await undo([planted({ rel: "notes/a.md", before: { t: "big", size: 1e9 }, after: hashOf(path.join(root, "notes/a.md")) })], roots);
+    const u = await undo(
+      [planted({ rel: "notes/a.md", before: { t: "big", size: 1e9 }, after: hashOf(path.join(root, "notes/a.md")) })],
+      roots,
+    );
     expect(u.conflicts[0]?.why).toBe("big");
     expect(tree(root)).toEqual(vaultBefore);
   });

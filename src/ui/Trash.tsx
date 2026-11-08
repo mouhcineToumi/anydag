@@ -13,9 +13,19 @@ const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
 const SMALL = { ...ICON, size: 14 } as const;
 
 /* An attachment wears its type's own mark (`AttachmentIcon`), as it does in the sidebar. */
-const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2 } satisfies Record<Exclude<FileKind, "file">, LucideIcon>;
+const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2 } satisfies Record<
+  Exclude<FileKind, "file">,
+  LucideIcon
+>;
 
-const KIND_WORD: Record<FileKind | "folder", string> = { board: "Board", note: "Note", quiz: "Quiz", table: "Table", file: "File", folder: "Folder" };
+const KIND_WORD: Record<FileKind | "folder", string> = {
+  board: "Board",
+  note: "Note",
+  quiz: "Quiz",
+  table: "Table",
+  file: "File",
+  folder: "Folder",
+};
 
 const DAY = 86_400_000;
 
@@ -55,7 +65,9 @@ function holding(e: TrashEntry): string {
   if (!e.holds) return "";
   const files = [e.holds.boards, e.holds.notes, e.holds.quizzes, e.holds.tables, e.holds.files].reduce((n, l) => n + l.length, 0);
   const folders = Math.max(0, e.holds.folders.length - 1);
-  const parts = [files ? counted(files, ["file", "files"]) : "", folders ? counted(folders, ["folder", "folders"]) : ""].filter(Boolean);
+  const parts = [files ? counted(files, ["file", "files"]) : "", folders ? counted(folders, ["folder", "folders"]) : ""].filter(
+    Boolean,
+  );
   return parts.length ? parts.join(" and ") : "Empty";
 }
 
@@ -166,7 +178,13 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
           onChange={(e) => setFilter(e.target.value)}
         />
         {count && !locked ? (
-          <button type="button" className="dag-trash__empty" data-dag-trash-empty="" disabled={busy.has("empty")} onClick={() => setAsking("empty")}>
+          <button
+            type="button"
+            className="dag-trash__empty"
+            data-dag-trash-empty=""
+            disabled={busy.has("empty")}
+            onClick={() => setAsking("empty")}
+          >
             <Trash2 {...SMALL} aria-hidden="true" />
             Empty trash
           </button>
@@ -188,7 +206,13 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
       {asking === "empty" && !locked ? (
         <div className="dag-trash__ask" role="alertdialog" aria-label="Empty the trash" data-dag-trash-empty-ask="">
           <span>Delete the {counted(count, ["item", "items"])} in the trash for good? This cannot be undone.</span>
-          <button type="button" className="dag-trash__danger" data-dag-trash-empty-confirm="" autoFocus onClick={() => void empty()}>
+          <button
+            type="button"
+            className="dag-trash__danger"
+            data-dag-trash-empty-confirm=""
+            autoFocus
+            onClick={() => void empty()}
+          >
             Delete for good
           </button>
           <button type="button" className="dag-trash__plain" onClick={() => setAsking(null)}>
@@ -201,7 +225,12 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
         <p className="dag-trash__said" role="status" data-dag-trash-restored={said.back.name}>
           Restored “{nameOf(said.back)}”{parentOf(said.back.name) ? ` to ${parentOf(said.back.name)}` : ""}.
           {said.back.kind !== "folder" ? (
-            <button type="button" className="dag-trash__link" data-dag-trash-open="" onClick={() => onOpen(said.back!.kind as FileKind, said.back!.name)}>
+            <button
+              type="button"
+              className="dag-trash__link"
+              data-dag-trash-open=""
+              onClick={() => onOpen(said.back!.kind as FileKind, said.back!.name)}
+            >
               Open it
             </button>
           ) : null}
@@ -237,7 +266,13 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
                   const what = e.kind === "folder" ? holding(e) : KIND_WORD[e.kind];
                   const pending = busy.has(e.id);
                   return (
-                    <li key={e.id} className="dag-trash__row" data-dag-trash-entry={e.name} data-dag-trash-id={e.id} data-dag-trash-kind={e.kind}>
+                    <li
+                      key={e.id}
+                      className="dag-trash__row"
+                      data-dag-trash-entry={e.name}
+                      data-dag-trash-id={e.id}
+                      data-dag-trash-kind={e.kind}
+                    >
                       <span className="dag-trash__mark">
                         <Mark entry={e} />
                       </span>
@@ -251,7 +286,11 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
                         </span>
                       </span>
                       {locked ? null : asking === e.id ? (
-                        <span className="dag-trash__ask dag-trash__ask--row" role="alertdialog" aria-label={`Delete ${nameOf(e)} for good`}>
+                        <span
+                          className="dag-trash__ask dag-trash__ask--row"
+                          role="alertdialog"
+                          aria-label={`Delete ${nameOf(e)} for good`}
+                        >
                           <span>Delete for good?</span>
                           <button
                             type="button"
@@ -269,7 +308,13 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
                         </span>
                       ) : (
                         <span className="dag-trash__acts">
-                          <button type="button" className="dag-trash__plain" data-dag-trash-restore="" disabled={pending} onClick={() => void restore(e)}>
+                          <button
+                            type="button"
+                            className="dag-trash__plain"
+                            data-dag-trash-restore=""
+                            disabled={pending}
+                            onClick={() => void restore(e)}
+                          >
                             <RotateCcw {...SMALL} aria-hidden="true" />
                             Restore
                           </button>

@@ -94,7 +94,9 @@ export function EmptyBoard({ onNote, onLibrary, onPrompt }: { onNote(): void; on
             <button
               key={key}
               type="button"
-              className={lead ? "dag-welcome__act dag-welcome__act--tile dag-welcome__act--go" : "dag-welcome__act dag-welcome__act--tile"}
+              className={
+                lead ? "dag-welcome__act dag-welcome__act--tile dag-welcome__act--go" : "dag-welcome__act dag-welcome__act--tile"
+              }
               data-dag-empty-board-act={key}
               onClick={go}
             >
@@ -138,18 +140,30 @@ export function NoVault() {
       <section className="dag-welcome" aria-label="No vault open">
         <Logo size={28} />
         <h1 className="dag-welcome__title">Open a vault</h1>
-        <p className="dag-welcome__hint">A vault is a folder of boards, notes and files. Open one you have, or start a new one.</p>
+        <p className="dag-welcome__hint">
+          A vault is a folder of boards, notes and files. Open one you have, or start a new one.
+        </p>
         {asking === "open" ? (
           <OpenFolderForm onCancel={() => setAsking(null)} />
         ) : asking === "create" ? (
           <CreateVaultForm onCancel={() => setAsking(null)} />
         ) : (
           <div className="dag-welcome__acts">
-            <button type="button" className="dag-welcome__act dag-welcome__act--go" data-dag-welcome-open-folder="" onClick={() => void open()}>
+            <button
+              type="button"
+              className="dag-welcome__act dag-welcome__act--go"
+              data-dag-welcome-open-folder=""
+              onClick={() => void open()}
+            >
               <FolderOpen {...ICON} aria-hidden="true" />
               <span>Open folder…</span>
             </button>
-            <button type="button" className="dag-welcome__act" data-dag-welcome-create-vault="" onClick={() => setAsking("create")}>
+            <button
+              type="button"
+              className="dag-welcome__act"
+              data-dag-welcome-create-vault=""
+              onClick={() => setAsking("create")}
+            >
               <FolderPlus {...ICON} aria-hidden="true" />
               <span>Create vault…</span>
             </button>

@@ -8,7 +8,17 @@ import { emOf } from "./em";
 import { ServiceCard } from "./ServiceCard";
 import { isShape } from "@/layout/shapes";
 
-import { SketchBox, SketchButton, SketchFigure, SketchImg, SketchInk, SketchInput, SketchShape, SketchText, Sticky } from "./Sketch";
+import {
+  SketchBox,
+  SketchButton,
+  SketchFigure,
+  SketchImg,
+  SketchInk,
+  SketchInput,
+  SketchShape,
+  SketchText,
+  Sticky,
+} from "./Sketch";
 
 /**
  * One component per node kind, and the dispatcher that picks it.
@@ -43,8 +53,7 @@ const statusClass = (node: Node): string =>
           ? " dag-node--muted"
           : "";
 
-const frame = (node: Node, extra: string) =>
-  `dag-node ${extra}${statusClass(node)}${node.external ? " dag-node--external" : ""}`;
+const frame = (node: Node, extra: string) => `dag-node ${extra}${statusClass(node)}${node.external ? " dag-node--external" : ""}`;
 
 const place = (box: Box) => ({ left: box.x, top: box.y, width: box.w, height: box.h });
 
@@ -59,11 +68,18 @@ function EntityCard({ node, box, theme }: NodeProps) {
     >
       <div className="dag-node__head dag-node__head--entity" style={{ height: theme.metric.node.headerEntity }}>
         <span className="dag-group__dot" />
-        <span className="dag-entity__name" data-dag-title="" {...emOf(node)}>{node.title}</span>
+        <span className="dag-entity__name" data-dag-title="" {...emOf(node)}>
+          {node.title}
+        </span>
       </div>
       <div className="dag-node__rows">
         {node.rows.map((row) => (
-          <div className="dag-row dag-row--entity" key={row.id} data-dag-row={row.id} style={{ height: theme.metric.node.rowEntity }}>
+          <div
+            className="dag-row dag-row--entity"
+            key={row.id}
+            data-dag-row={row.id}
+            style={{ height: theme.metric.node.rowEntity }}
+          >
             {row.kind === "more" ? (
               <span className="dag-row__more">{row.name}</span>
             ) : (
@@ -72,10 +88,7 @@ function EntityCard({ node, box, theme }: NodeProps) {
                 {row.detail ? <span className="dag-row__type">{row.detail}</span> : null}
                 {row.tags.includes("pk") ? <span className="dag-key dag-key--pk">pk</span> : null}
                 {row.tags.includes("fk") ? (
-                  <span
-                    className="dag-key dag-key--fk"
-                    style={hueVars(row.fkHue ?? node.hue)}
-                  >
+                  <span className="dag-key dag-key--fk" style={hueVars(row.fkHue ?? node.hue)}>
                     fk
                   </span>
                 ) : null}
@@ -97,12 +110,19 @@ function ClassBox({ node, box, theme }: NodeProps) {
         style={{ height: node.stereotype ? theme.metric.node.headerClassStereo : theme.metric.node.headerClass }}
       >
         {node.stereotype ? <span className="dag-class__stereo">{node.stereotype}</span> : null}
-        <span className="dag-node__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+        <span className="dag-node__title" data-dag-title="" {...emOf(node)}>
+          {node.title}
+        </span>
       </div>
       {(node.compartments ?? []).map((rows, i) => (
         <div className="dag-class__comp" key={i}>
           {rows.map((row) => (
-            <div className="dag-row dag-row--class" key={row.id} data-dag-row={row.id} style={{ height: theme.metric.node.rowClass }}>
+            <div
+              className="dag-row dag-row--class"
+              key={row.id}
+              data-dag-row={row.id}
+              style={{ height: theme.metric.node.rowClass }}
+            >
               <span className="dag-vis">{row.vis ?? ""}</span>
               <span className="dag-row__member">{row.name}</span>
               {row.detail ? <span className="dag-row__type">{row.kind === "attr" ? `: ${row.detail}` : row.detail}</span> : null}
@@ -118,7 +138,9 @@ function ClassBox({ node, box, theme }: NodeProps) {
 function StateCard({ node, box }: NodeProps) {
   return (
     <div className={frame(node, "dag-node--state")} data-dag-node={node.id} data-dag-kind={node.kind} style={place(box)}>
-      <span className="dag-node__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-node__title" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
       {node.meta ? <span className="dag-state__value">{node.meta}</span> : null}
     </div>
   );
@@ -152,7 +174,9 @@ function StepCard({ node, box, theme }: NodeProps) {
           </svg>
         ) : null}
       </span>
-      <span className="dag-step__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-step__title" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
       {node.meta ? (
         <span className="dag-step__foot">
           <span className="dag-group__dot" />
@@ -173,7 +197,9 @@ function DecisionPill({ node, box }: NodeProps) {
       style={{ ...place(box), ...hueVars(node.hue) }}
     >
       <span className="dag-step__id">{node.id}</span>
-      <span className="dag-decision__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-decision__title" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
     </div>
   );
 }
@@ -183,7 +209,9 @@ function UseCasePill({ node, box }: NodeProps) {
   return (
     <div className={frame(node, "dag-node--usecase")} data-dag-node={node.id} data-dag-kind={node.kind} style={place(box)}>
       <span className="dag-uc__id">{node.id}</span>
-      <span className="dag-uc__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-uc__title" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
     </div>
   );
 }
@@ -210,7 +238,9 @@ function C4Box({ node, box, theme }: NodeProps) {
         <span className={tileClass(icon, node.kind === "person" ? "dag-tile--round dag-tile--c4" : "dag-tile--c4")}>
           <Icon icon={icon} size={theme.metric.tile.iconC4} stroke={theme.metric.tile.stroke} />
         </span>
-        <span className="dag-c4__name" data-dag-title="" {...emOf(node)}>{node.title}</span>
+        <span className="dag-c4__name" data-dag-title="" {...emOf(node)}>
+          {node.title}
+        </span>
       </div>
       <span className="dag-c4__type">{type}</span>
       {node.desc ? <span className="dag-c4__desc">{node.desc}</span> : null}
@@ -266,7 +296,9 @@ function CommitChip({ node, box }: NodeProps) {
       style={{ ...place(box), ...hueVars(node.hue) }}
     >
       <span className="dag-group__dot" />
-      <span className="dag-commit__label" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-commit__label" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
       {node.meta ? <span className="dag-commit__tag">{node.meta}</span> : null}
     </div>
   );

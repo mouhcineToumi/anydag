@@ -95,7 +95,7 @@ type Read<T> = ({ ok: true } & T) | { ok: false; error: string };
  * which is what every other way an item arrives does; one whose id is taken is left for
  * `applyPatch` to refuse, as it refuses the object form.
  */
-export function readInsert(text: string, taken: ReadonlySet<string>): Read<{ items: NewItem[] }> {
+function readInsert(text: string, taken: ReadonlySet<string>): Read<{ items: NewItem[] }> {
   const trimmed = text.replace(/\r\n/g, "\n").trim();
   if (!trimmed) return { ok: false, error: "an insert's text holds no item" };
   const located = locateItems(trimmed, isItemType);
@@ -111,8 +111,7 @@ export function readInsert(text: string, taken: ReadonlySet<string>): Read<{ ite
   for (const it of located.items) {
     const wrong = it.attrErrors[0];
     if (wrong) return { ok: false, error: `${wrong.code} ${wrong.message}${where(it.line)}` };
-    if (it.duplicateOf !== undefined)
-      return { ok: false, error: `the id \`${it.duplicateOf}\` is written twice in one insert` };
+    if (it.duplicateOf !== undefined) return { ok: false, error: `the id \`${it.duplicateOf}\` is written twice in one insert` };
     const attrs: NewItem["attrs"] = { ...it.attrs.map };
     if (!str(it.attrs, "id")) attrs.id = freshId(it.type === "note" ? "md" : it.type, mine);
     mine.add(attrs.id as string);

@@ -190,7 +190,9 @@ function slashItems(editor: Editor, pickFiles?: () => void) {
       onItemClick: () => insertEquation(editor),
     },
   };
-  const out: { key?: string; group?: string }[] = getDefaultReactSlashMenuItems(editor).filter((item) => allowed.has((item as { key?: string }).key ?? ""));
+  const out: { key?: string; group?: string }[] = getDefaultReactSlashMenuItems(editor).filter((item) =>
+    allowed.has((item as { key?: string }).key ?? ""),
+  );
   /* Each of ours after the last of its own group: the menu draws a group's heading wherever the group
      starts, so an Equation after the Embeds would head "Basic blocks" twice — under one React key. */
   for (const [key, item] of Object.entries(own)) {
@@ -258,7 +260,9 @@ export default function BlockEditor(props: BlockEditorProps) {
        said — in the order they were given. */
     const embedFiles = async (files: readonly File[], after?: string) => {
       const kept = (await attach.current?.(files)) ?? [];
-      const blocks = kept.flatMap((k) => ("id" in k ? [embedFor({ id: k.id, title: k.title, name: k.title, kind: "file", refs: [] })] : []));
+      const blocks = kept.flatMap((k) =>
+        "id" in k ? [embedFor({ id: k.id, title: k.title, name: k.title, kind: "file", refs: [] })] : [],
+      );
       if (!blocks.length) return;
       const at = after ? editor.getBlock(after) : editor.getTextCursorPosition().block;
       const anchor = at ?? editor.document[editor.document.length - 1];
@@ -287,7 +291,7 @@ export default function BlockEditor(props: BlockEditorProps) {
 
   const typeItems = useMemo(
     () =>
-      blockTypeSelectItems(editor.dictionary).filter(
+      blockTypeSelectItems(editor).filter(
         (i) => !i.props?.isToggleable && (i.type !== "heading" || Number(i.props?.level) <= 3) && i.type !== "toggleListItem",
       ),
     [editor],
@@ -351,43 +355,43 @@ export default function BlockEditor(props: BlockEditorProps) {
         void pickers.embedFiles(Array.from(e.dataTransfer.files), blockAt(e.clientX, e.clientY));
       }}
     >
-    <BlockNoteView
-      editor={editor}
-      className="dag-blocks"
-      theme={props.scheme}
-      editable={props.editable !== false}
-      onChange={onChange}
-      slashMenu={false}
-      formattingToolbar={false}
-      sideMenu={false}
-      emojiPicker={false}
-      data-dag-note-editor=""
-    >
-      <SuggestionMenuController triggerCharacter="/" getItems={pickers.slash} />
-      {REF_TRIGGERS.map((trigger) => (
-        <SuggestionMenuController key={trigger} triggerCharacter={trigger} getItems={pickers.ref} />
-      ))}
-      <SuggestionMenuController triggerCharacter={EMBED_TRIGGER} getItems={pickers.embed} />
-      <FormattingToolbarController
-        formattingToolbar={() => (
-          <FormattingToolbar>
-            <BlockTypeSelect key="type" items={typeItems} />
-            <FileCaptionButton key="caption" />
-            <FileReplaceButton key="replace" />
-            <FileDeleteButton key="delete" />
-            <BasicTextStyleButton key="bold" basicTextStyle="bold" />
-            <BasicTextStyleButton key="italic" basicTextStyle="italic" />
-            <BasicTextStyleButton key="strike" basicTextStyle="strike" />
-            <BasicTextStyleButton key="code" basicTextStyle="code" />
-            <EquationButton key="equation" />
-            <NestBlockButton key="nest" />
-            <UnnestBlockButton key="unnest" />
-            <CreateLinkButton key="link" />
-          </FormattingToolbar>
-        )}
-      />
-      <SideMenuController sideMenu={(p) => <SideMenu {...p} dragHandleMenu={NoteDragHandleMenu} />} />
-    </BlockNoteView>
+      <BlockNoteView
+        editor={editor}
+        className="dag-blocks"
+        theme={props.scheme}
+        editable={props.editable !== false}
+        onChange={onChange}
+        slashMenu={false}
+        formattingToolbar={false}
+        sideMenu={false}
+        emojiPicker={false}
+        data-dag-note-editor=""
+      >
+        <SuggestionMenuController triggerCharacter="/" getItems={pickers.slash} />
+        {REF_TRIGGERS.map((trigger) => (
+          <SuggestionMenuController key={trigger} triggerCharacter={trigger} getItems={pickers.ref} />
+        ))}
+        <SuggestionMenuController triggerCharacter={EMBED_TRIGGER} getItems={pickers.embed} />
+        <FormattingToolbarController
+          formattingToolbar={() => (
+            <FormattingToolbar>
+              <BlockTypeSelect key="type" items={typeItems} />
+              <FileCaptionButton key="caption" />
+              <FileReplaceButton key="replace" />
+              <FileDeleteButton key="delete" />
+              <BasicTextStyleButton key="bold" basicTextStyle="bold" />
+              <BasicTextStyleButton key="italic" basicTextStyle="italic" />
+              <BasicTextStyleButton key="strike" basicTextStyle="strike" />
+              <BasicTextStyleButton key="code" basicTextStyle="code" />
+              <EquationButton key="equation" />
+              <NestBlockButton key="nest" />
+              <UnnestBlockButton key="unnest" />
+              <CreateLinkButton key="link" />
+            </FormattingToolbar>
+          )}
+        />
+        <SideMenuController sideMenu={(p) => <SideMenu {...p} dragHandleMenu={NoteDragHandleMenu} />} />
+      </BlockNoteView>
     </div>
   );
 }

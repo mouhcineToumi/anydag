@@ -10,8 +10,15 @@ import { expect, test, type Page } from "@playwright/test";
  * The CLI against the running server, and the page drawing what it wrote.
  *
  * The one check in the suite that goes **only through the routes**: every write here is a command,
- * and every read is a command or the page — never `boards/` on disk. It is the proof the unit tests'
- * stubbed `fetch` points at, that the shapes the CLI expects are the shapes the routes answer.
+ * and every read is a command or the page — never `boards/` on disk.
+ *
+ * **What needs a page is all that is left here**: the board a terminal wrote is what the page draws,
+ * and `snapshot` and `export` are pictures of it. The shapes the CLI expects of the routes — the
+ * refused write and its exit 3, `--base`, exit 4 on an error, the quiz check — are asserted against
+ * the real routes in `test/server/cli-wire.test.ts`, which needs no browser.
+ *
+ * The CLI is an admin tool (`docs/architecture/cli.md`): whole files, never a card at a time — so a
+ * board here is written whole, the way an agent without MCP or a script would.
  *
  * It finds the dev server the way a terminal finds the app: through `server.json` in the app's home,
  * which `npm run dev` keeps in `.dev-home/`. Its pictures are taken of the Vite page (`ANYDAG_WEB`),
@@ -60,65 +67,30 @@ test.afterEach(async () => {
   await anydag("board", "rm", board, "--yes");
 });
 
-test("a diagram built card by card from a terminal is what the page draws", async ({ page }) => {
-  expect((await anydag("item", "add", board, "arch", "--id", "stack", "--at", "0,0")).code).toBe(0);
-  const grown = await anydag("node", "add", board, "stack", "--from", "api", "--id", "cache", "--title", "Cache");
-  expect(grown.code, grown.err).toBe(0);
-  expect((await anydag("node", "set", board, "stack", "api", "title=Orders API", "hue=teal", "bold")).code).toBe(0);
+/** Write `text` as the board's whole text, over whatever is there. */
+async function writeBoard(text: string) {
+  const file = path.join(config, "board.md");
+  fs.writeFileSync(file, text);
+  return anydag("board", "write", board, "--force", "--file", file);
+}
 
-  const shown = await anydag("item", "show", board, "stack");
-  expect(shown.out).toContain('service api "Orders API"');
-  expect(shown.out).toContain("hue=teal bold");
+const STACK = '```arch {#stack x=0 y=0}\nservice api "Orders API" hue=teal bold\ndb cache "Cache"\napi --> cache\n```\n';
+
+test("a board written whole from a terminal is what the page draws", { tag: "@smoke" }, async ({ page }) => {
+  const written = await writeBoard(STACK);
+  expect(written.code, written.err).toBe(0);
+
+  const shown = await anydag("board", "cat", board);
+  expect(shown.out).toContain('service api "Orders API" hue=teal bold');
   expect(shown.out).toContain("api --> cache");
 
   await ready(page, board);
-  const card = page.locator('[data-dag-item="stack"] [data-dag-node="cache"]');
-  await expect(card).toBeVisible();
+  await expect(page.locator('[data-dag-item="stack"] [data-dag-node="cache"]')).toBeVisible();
   await expect(page.locator('[data-dag-item="stack"] [data-dag-node="api"]')).toContainText("Orders API");
 });
 
-test("pages, links and z-order are written the way the canvas writes them", async ({ page }) => {
-  await anydag("item", "add", board, "md", "--id", "a", "--at", "0,0");
-  await anydag("item", "add", board, "md", "--id", "b", "--at", "400,0");
-  const linked = await anydag("link", "add", board, "a", "b", "--label", "then");
-  expect(linked.code, linked.err).toBe(0);
-  const links = JSON.parse((await anydag("link", "ls", board, "--json")).out) as { links: { label?: string }[] };
-  expect(links.links.map((l) => l.label)).toEqual(["then"]);
-  const added = await anydag("page", "add", board, "Later");
-  expect(added.out.trim()).toBe("page-2");
-  expect((await anydag("item", "set", board, "b", "page=Later")).code).toBe(0);
-  expect((await anydag("item", "front", board, "a")).code).toBe(0);
-
-  const listed = JSON.parse((await anydag("item", "ls", board, "--json")).out) as { items: { id: string; page: string }[] };
-  expect(listed.items.map((i) => [i.id, i.page]).filter(([id]) => id === "a" || id === "b")).toEqual([
-    ["b", "page-2"],
-    ["a", "page-1"],
-  ]);
-  /* A link joins two things on one page — an `edges` fence belongs to a page — so `b` leaving
-     takes the line with it, exactly as it does when the page's own select moves it. */
-  expect((JSON.parse((await anydag("link", "ls", board, "--json")).out) as { links: unknown[] }).links).toEqual([]);
-
-  await ready(page, board);
-  await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
-  /* `b` is on the other page now, so the first page does not draw it. */
-  await expect(page.locator('[data-dag-item="b"]')).toHaveCount(0);
-});
-
-test("a write against a moved board is refused with exit 3, and --base carries it", async () => {
-  const read = JSON.parse((await anydag("board", "cat", board, "--json")).out) as { text: string; base: string };
-  await anydag("item", "add", board, "md", "--id", "meanwhile");
-  fs.writeFileSync(path.join(config, "x.md"), "```md {#mine}\nmine\n```\n");
-  const refused = await anydag("board", "write", board, "--base", read.base, "--file", path.join(config, "x.md"));
-  expect(refused.code).toBe(3);
-  expect(refused.err).toMatch(/base is now/);
-  const now = JSON.parse((await anydag("board", "cat", board, "--json")).out) as { base: string };
-  const written = await anydag("board", "write", board, "--base", now.base, "--file", path.join(config, "x.md"));
-  expect(written.code, written.err).toBe(0);
-  expect((await anydag("board", "cat", board)).out).toContain("mine");
-});
-
-test("snapshot and export see the drawing, and diagnose exits 4 on an error", async () => {
-  await anydag("item", "add", board, "arch", "--id", "stack", "--at", "0,0");
+test("snapshot and export see the drawing", async () => {
+  expect((await writeBoard(STACK)).code).toBe(0);
   const shot = await anydag("snapshot", board, "--item", "stack", "-o", path.join(config, "stack.png"));
   expect(shot.code, shot.err + shot.out).toBe(0);
   expect(fs.readFileSync(path.join(config, "stack.png")).subarray(1, 4).toString()).toBe("PNG");
@@ -127,40 +99,4 @@ test("snapshot and export see the drawing, and diagnose exits 4 on an error", as
   const svg = await anydag("board", "export", board, "--format", "svg", "-o", path.join(config, "board.svg"));
   expect(svg.code, svg.err).toBe(0);
   expect(fs.readFileSync(path.join(config, "board.svg"), "utf8")).toMatch(/^<svg[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
-
-  expect((await anydag("node", "add", board, "stack", "database", "pg")).err).toMatch(/did you mean `db`/);
-  fs.writeFileSync(path.join(config, "bad.txt"), "servce api");
-  const broke = await anydag("item", "body", board, "stack", "--file", path.join(config, "bad.txt"));
-  expect(broke.code).toBe(4);
-  expect(broke.err).toMatch(/E_UNKNOWN_KIND/);
-  expect((await anydag("board", "diagnose", board)).code).toBe(4);
-});
-
-test("search, the corpus and a quiz's check are the routes' answers, through the server's grammar", async () => {
-  /* All three were answered inside the CLI until they became routes, and the unit tests stub
-     the routes — so this is where the wire shape is proved, against the real parser. */
-  const word = `zyxquist${Date.now().toString(36)}`;
-  fs.writeFileSync(path.join(config, "s.md"), `\`\`\`md {#said}\nThe ${word} settles overnight.\n\`\`\`\n`);
-  expect((await anydag("board", "write", board, "--force", "--file", path.join(config, "s.md"))).code).toBe(0);
-  const found = await anydag("search", word, "--json");
-  expect(found.code, found.err).toBe(0);
-  const hits = (JSON.parse(found.out) as { hits: { name: string; part: string | null; snippet: string }[] }).hits;
-  expect(hits.map((h) => [h.name, h.part])).toEqual([[board, "said"]]);
-  expect(hits[0]!.snippet).toContain(`**${word}**`);
-
-  const corpus = await anydag("corpus", board);
-  expect(corpus.code, corpus.err).toBe(0);
-  expect(corpus.out).toContain(`${board}#said`);
-
-  const quiz = `e2e-cli-quiz-${Date.now().toString(36)}`;
-  fs.writeFileSync(path.join(config, "q.md"), "## One? {#qa}\n\n- [ ] y\n- [ ] n\n");
-  const made = await anydag("quiz", "new", quiz, "--file", path.join(config, "q.md"));
-  expect(made.code, made.err).toBe(0);
-  try {
-    const checked = await anydag("quiz", "check", made.out.trim(), "--json");
-    expect(checked.code).toBe(4);
-    expect(JSON.parse(checked.out)).toMatchObject({ questions: 1, diagnostics: [{ code: "EQ_NO_ANSWER" }] });
-  } finally {
-    await anydag("quiz", "rm", made.out.trim(), "--yes");
-  }
 });

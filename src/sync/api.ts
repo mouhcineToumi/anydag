@@ -1,12 +1,4 @@
-import type {
-  SyncDevices,
-  SyncLinkRequest,
-  SyncLinked,
-  SyncPairRequest,
-  SyncPaired,
-  SyncRemotes,
-  SyncStatus,
-} from "./types";
+import type { SyncDevices, SyncLinkRequest, SyncLinked, SyncPairRequest, SyncPaired, SyncRemotes, SyncStatus } from "./types";
 
 /**
  * Typed calls to every `/api/sync/*` route. The page's `fetch` wrapper adds `?vault=`; a failure is

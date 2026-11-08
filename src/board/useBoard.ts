@@ -28,6 +28,9 @@ import { blankTable } from "../table/write";
  * replaced it.
  */
 
+/** What the page says when a write never reached the server — the sentence `UploadNotice` draws. */
+const UNREACHABLE = "The AnyDag server did not answer, so that change was not saved.";
+
 /** A version of the file: the text and the sha1 the server knows it by. */
 interface Version {
   text: string;
@@ -141,19 +144,33 @@ export function useBoard(name: string | null): BoardHandle {
    *
    * `retry` is false for a whole-text put: putting an old snapshot over a file that has moved is
    * precisely the thing a base check exists to refuse.
+   *
+   * **A server that cannot be reached is a refusal too.** `fetch` rejects rather than answering, and
+   * every caller fires and forgets (`void commit(…)`, a nudge, a drag's release), so the rejection
+   * was unhandled and the drag's painted position was never taken back. `post` resolves `null` for
+   * it, the write resolves `null` like any that did not land, and the person is told through the
+   * notice a refused drop already uses. Only the `fetch` is guarded: a bug in `adopt` is not an
+   * unreachable server and must not be worded as one.
    */
   const write = useCallback(
     async (route: string, payload: object, retry: boolean): Promise<Write | null> => {
       if (!name) return null;
-      const post = (against: Version | null) =>
-        fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ base: against?.base, ...payload }),
-        });
+      const post = async (against: Version | null): Promise<Response | null> => {
+        try {
+          return await fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ base: against?.base, ...payload }),
+          });
+        } catch {
+          document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: UNREACHABLE }));
+          return null;
+        }
+      };
 
       let before = held.current;
       let r = await post(before);
+      if (!r) return null;
       if (r.status === 409) {
         const stale = (await r.json()) as { base?: string; text?: string };
         if (stale.text !== undefined) adopt(name, { text: stale.text, base: stale.base ?? "" });
@@ -162,6 +179,7 @@ export function useBoard(name: string | null): BoardHandle {
            against — an undo must put *that* back, not the version this client held before. */
         before = held.current;
         r = await post(before);
+        if (!r) return null;
       }
       if (!r.ok || !before) return null;
       const done = (await r.json()) as { base?: string; text?: string };
@@ -269,7 +287,7 @@ const NO_BOARDS: BoardTree = {
 export type KindLists = Pick<BoardTree, "boards" | "notes" | "quizzes" | "tables" | "files">;
 
 /** The names of one kind of file in a tree. The one place a kind picks its list. */
-export function namesOf(tree: KindLists, kind: FileKind): string[] {
+function namesOf(tree: KindLists, kind: FileKind): string[] {
   switch (kind) {
     case "board":
       return tree.boards;
@@ -290,7 +308,8 @@ export function namesOf(tree: KindLists, kind: FileKind): string[] {
 export const everyFile = (tree: KindLists): { name: string; kind: FileKind }[] =>
   FILE_KINDS.flatMap((kind) => namesOf(tree, kind).map((name) => ({ name, kind })));
 
-const sameTask = (a: Task | undefined, b: Task | undefined): boolean => a?.status === b?.status && a?.due === b?.due && a?.start === b?.start;
+const sameTask = (a: Task | undefined, b: Task | undefined): boolean =>
+  a?.status === b?.status && a?.due === b?.due && a?.start === b?.start;
 const sameEvent = (a: NoteEvent | undefined, b: NoteEvent | undefined): boolean => a?.start === b?.start && a?.end === b?.end;
 const sameProject = (a: Project | undefined, b: Project | undefined): boolean => a?.status === b?.status && a?.hue === b?.hue;
 
@@ -646,7 +665,7 @@ export const createQuiz = async (name: string, text?: string): Promise<string | 
  */
 export const blankTableText = (): string => blankTable(UNTITLED);
 
-export const createTable = async (name: string, text?: string): Promise<string | null> =>
+const createTable = async (name: string, text?: string): Promise<string | null> =>
   (await boardCall("create", { name, text: text ?? blankTableText(), kind: "table" }))?.name ?? null;
 
 /** Make a file of any kind with a text, as the sidebar's New does. An attachment is uploaded, never made. */
@@ -751,7 +770,7 @@ export const deleteBoard = async (name: string, kind: FileKind = "board"): Promi
  * is exactly the case that can be missed, and a folder that does not appear until the next reload
  * reads as a button that did nothing.
  */
-const toldTheList = <T,>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
+const toldTheList = <T>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
 
 export const createFolder = async (name: string): Promise<string | null> =>
   toldTheList(((await boardCall("mkdir", { name })) as { folder?: string } | null)?.folder ?? null);

@@ -159,9 +159,11 @@ series b "B" 4`);
       [4, null, null],
     ]);
     /* The pad is warned; the parse is not refused. */
-    expect(codes(`pie
+    expect(
+      codes(`pie
 series a "A" 1 2 3
-series b "B" 4`)).toEqual(["3:W_CHART_LENGTH"]);
+series b "B" 4`),
+    ).toEqual(["3:W_CHART_LENGTH"]);
   });
 });
 
@@ -227,9 +229,11 @@ series long "Long" 1 2 3 4 5`);
     const model = parseChart(`line
 series a "A" 1 2 3 4
 series b "B" 1 2`);
-    expect(codes(`line
+    expect(
+      codes(`line
 series a "A" 1 2 3 4
-series b "B" 1 2`)).toEqual(["3:W_CHART_LENGTH"]);
+series b "B" 1 2`),
+    ).toEqual(["3:W_CHART_LENGTH"]);
     expect(model.series[1]!.values).toEqual([1, 2, null, null]);
     /* And the categories stay empty, which is what makes the ticks blank rather than invented. */
     expect(model.categories).toEqual([]);
@@ -325,9 +329,7 @@ legend solid "in sync"`);
 
   it("tells a placement from a glyph legend by whether a string follows", () => {
     expect(parseChart("bar\nlegend none").legendAt).toBe("none");
-    expect(parseChart('bar\nlegend bottom "the two lines"').legend).toEqual([
-      { glyph: "bottom", text: "the two lines" },
-    ]);
+    expect(parseChart('bar\nlegend bottom "the two lines"').legend).toEqual([{ glyph: "bottom", text: "the two lines" }]);
   });
 
   it("does not sniff for Mermaid, because `pie` is its own form word", () => {
@@ -458,7 +460,7 @@ describe("valuesText", () => {
 });
 
 describe("Delete and ctrl+D on a picked series", () => {
-  const BODY = ['bar', 'x Q1 Q2', 'series web "Web" 12 30', 'series mob "Mobile" 4 6', 'unit "k"'].join("\n");
+  const BODY = ["bar", "x Q1 Q2", 'series web "Web" 12 30', 'series mob "Mobile" 4 6', 'unit "k"'].join("\n");
   const errors = (body: string) => parseChart(body).diagnostics.filter((d) => d.severity === "error");
 
   it("takes the whole statement, and there is nothing else naming it to take", () => {
@@ -671,7 +673,8 @@ const labelBox = (l: ChartLabel): Box => {
   };
   const [size, weight] = face[l.token];
   const w = M.width(l.text, fontOf(T, size, weight));
-  const h = l.token === "hero" ? (l.size ?? T.type.chartHero) : l.token === "heroLabel" ? T.type.chartHeroLabel : T.metric.chart.lineH;
+  const h =
+    l.token === "hero" ? (l.size ?? T.type.chartHero) : l.token === "heroLabel" ? T.type.chartHeroLabel : T.metric.chart.lineH;
   const x = l.anchor === "middle" ? l.x - w / 2 : l.anchor === "end" ? l.x - w : l.x;
   return { x, y: l.y - h / 2, w, h };
 };
@@ -883,7 +886,10 @@ describe("layoutChart · pie and donut", () => {
     const placed = run(DONUT);
     expect(placed.hero).toBeDefined();
     expect(placed.hero!.size).toBeLessThanOrEqual(T.type.chartHero);
-    expect(placed.labels.filter((l) => l.token === "hero" || l.token === "heroLabel").map((l) => l.text)).toEqual(["1.2M", "users"]);
+    expect(placed.labels.filter((l) => l.token === "hero" || l.token === "heroLabel").map((l) => l.text)).toEqual([
+      "1.2M",
+      "users",
+    ]);
     /* A wide value in a small donut shrinks rather than spilling out of the ring. */
     const tight = run(`donut "1,284,993,001"\nslice a "A" 1\nslice b "B" 1`, { w: 240, h: 160 });
     expect(tight.hero!.size).toBeLessThan(T.type.chartHero);
@@ -939,8 +945,16 @@ describe("layoutChart · what it says, and where", () => {
     const asked = run(`${GROUPED}\nvalues`);
     expect(asked.labels.filter((l) => l.token === "value").length).toBeGreaterThan(0);
     /* A pie labels its wedges whether or not anybody asked — that is what a percentage is for. */
-    expect(run(DONUT).labels.filter((l) => l.token === "value").map((l) => l.text)).toEqual(["62%", "28%", "10%"]);
-    expect(run(`${DONUT}\nvalues`).labels.filter((l) => l.token === "value").map((l) => l.text)).toEqual(["62", "28", "10"]);
+    expect(
+      run(DONUT)
+        .labels.filter((l) => l.token === "value")
+        .map((l) => l.text),
+    ).toEqual(["62%", "28%", "10%"]);
+    expect(
+      run(`${DONUT}\nvalues`)
+        .labels.filter((l) => l.token === "value")
+        .map((l) => l.text),
+    ).toEqual(["62", "28", "10"]);
   });
 
   it("puts a box round each series' marks, so a link can land on one", () => {
@@ -1015,7 +1029,13 @@ const GOLDEN = path.resolve(__dirname, "__golden__/chart-layout.txt");
 
 function dump(name: string, placed: ChartPlaced): string {
   const round = (v: unknown): unknown =>
-    typeof v === "number" ? Math.round(v * 100) / 100 : Array.isArray(v) ? v.map(round) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)])) : v;
+    typeof v === "number"
+      ? Math.round(v * 100) / 100
+      : Array.isArray(v)
+        ? v.map(round)
+        : v && typeof v === "object"
+          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)]))
+          : v;
   return `## ${name}\n${JSON.stringify(round(placed), null, 1)}\n`;
 }
 

@@ -2,16 +2,18 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**132 features, 0 gaps.** Each row is one thing the backend can do, and what reaches it
+**132 features, 0 gaps, 71 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
-done; ↳ is covered by something more general in that interface; ✗ is refused on purpose. The reason for
-every ↳ and ✗ is numbered under the tables.
+done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
+admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
+exports, and everything finer is the page's and MCP's, whose columns are complete. The reason for every ↳
+and ✗ is numbered under the tables.
 
 ## Account
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| The time zone times are read and written in (and the app's one local "account") | `GET /api/auth/me` | `event ls` `event new` `event set` | `whoami` |
+| The time zone times are read and written in (and the app's one local "account") | `GET /api/auth/me` | · | `whoami` |
 | What is answering: its version, the vault it serves, and whether it is the app or this process | `GET /api/health` | `whoami` | `whoami` |
 | The app's preferences — how the window is laid out | `GET /api/settings` `PUT /api/settings` | `settings` | `settings` |
 | Whether this install sends anonymous logs, and where they go — off until the person says yes | `GET /api/telemetry` `PUT /api/telemetry` | `telemetry` | ✗ [1] |
@@ -35,10 +37,10 @@ every ↳ and ✗ is numbered under the tables.
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | Every board, note, quiz, table, attachment and folder, with titles, ids, tasks and projects | `GET /__board/list` | `ls` | `board_list` `note_list` `quiz_list` `table_list` |
-| Hear each change as it happens | `GET /__board/events` | `watch` | ✗ [8] |
-| What a permanent id names | `GET /__board/resolve` | `resolve` `open` | `resolve` |
-| What refers to what: references and backlinks | `GET /__board/index` `GET /__board/refs` | `index` `board refs` `note refs` `quiz refs` `table refs` `file refs` | `refs` |
-| Every place some words appear, ranked | `GET /__board/search` `GET /__board/corpus` | `search` `corpus` | `search` |
+| Hear each change as it happens | `GET /__board/events` | · | ✗ [8] |
+| What a permanent id names | `GET /__board/resolve` | · | `resolve` |
+| What refers to what: references and backlinks | `GET /__board/index` `GET /__board/refs` | · | `refs` |
+| Every place some words appear, ranked | `GET /__board/search` `GET /__board/corpus` | · | `search` |
 
 ## Boards
 
@@ -46,15 +48,15 @@ every ↳ and ✗ is numbered under the tables.
 |---|---|---|---|
 | A board's text and its base | `GET /__board/get` | `board cat` | `board_read` |
 | Make a board | `POST /__board/create` | `board new` | `board_create` |
-| Replace a board's whole text | `POST /__board/put` | `board write` `board edit` | `board_write` |
-| Change one item and leave the rest of the file alone | `POST /__board/patch` | `item set` `item body` `item rm` `item add` | `board_patch` |
+| Replace a board's whole text | `POST /__board/put` | `board write` | `board_write` |
+| Change one item and leave the rest of the file alone | `POST /__board/patch` | · | `board_patch` |
 | Rename or move a board | `POST /__board/rename` | `board mv` | `board_rename` |
-| Copy a board | `POST /__board/duplicate` | `board cp` | `board_duplicate` |
+| Copy a board | `POST /__board/duplicate` | · | `board_duplicate` |
 | Move a board to the trash | `POST /__board/delete` | `board rm` | `board_delete` |
-| Call a board something, and let its name follow | `POST /__board/retitle` | `board title` | `board_title` |
+| Call a board something, and let its name follow | `POST /__board/retitle` | · | `board_title` |
 | What is wrong with a board's text — or a draft's — as codes | `GET /__board/diagnostics` `POST /__board/diagnostics` | `board diagnose` | `board_diagnose` |
-| What items are on a board, without its whole text | `GET /__board/fences` | `item ls` | `board_fences` |
-| Bring a `.board.md` file in as a new board | `POST /__board/create` `POST /__board/asset` | `board import` | ↳ `board_create` `image_add` [9] |
+| What items are on a board, without its whole text | `GET /__board/fences` | · | `board_fences` |
+| Bring a `.board.md` file in as a new board | `POST /__board/create` `POST /__board/asset` | · | ↳ `board_create` `image_add` [9] |
 
 ## Notes
 
@@ -62,71 +64,71 @@ every ↳ and ✗ is numbered under the tables.
 |---|---|---|---|
 | A note's text and its base | `GET /__board/get` | `note cat` | `note_read` |
 | Make a note | `POST /__board/create` | `note new` | `note_create` |
-| Replace a note's whole text | `POST /__board/put` | `note write` `note edit` | `note_write` |
+| Replace a note's whole text | `POST /__board/put` | `note write` | `note_write` |
 | Rename or move a note | `POST /__board/rename` | `note mv` | `note_rename` |
-| Copy a note | `POST /__board/duplicate` | `note cp` | `note_duplicate` |
+| Copy a note | `POST /__board/duplicate` | · | `note_duplicate` |
 | Move a note to the trash | `POST /__board/delete` | `note rm` | `note_delete` |
-| Call a note something, and let its name follow | `POST /__board/retitle` | `note title` | `note_title` |
+| Call a note something, and let its name follow | `POST /__board/retitle` | · | `note_title` |
 
 ## Tasks
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every task, with its status, due date and project | `GET /__board/list` | `task ls` | `task_list` |
-| Make a task | `POST /__board/create` | `task new` | `task_create` |
-| Change a task's status, due date or start date, or make a note a task and back | `POST /__board/task` | `task set` `task done` | `task_set` |
+| Every task, with its status, due date and project | `GET /__board/list` | · | `task_list` |
+| Make a task | `POST /__board/create` | · | `task_create` |
+| Change a task's status, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
 
 ## Events
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every event, with when it starts and ends, soonest first | `GET /__board/list` | `event ls` | `event_list` |
-| Make an event: a note with a start and an end | `POST /__board/create` | `event new` | `event_create` |
-| Move an event, or make a note an event and back | `POST /__board/event` | `event set` | `event_set` |
+| Every event, with when it starts and ends, soonest first | `GET /__board/list` | · | `event_list` |
+| Make an event: a note with a start and an end | `POST /__board/create` | · | `event_create` |
+| Move an event, or make a note an event and back | `POST /__board/event` | · | `event_set` |
 
 ## Projects
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every project, with its status, colour and task counts | `GET /__board/list` | `project ls` | `project_list` |
-| Make a folder a project | `GET /__board/list` `POST /__board/create` | `project new` | `project_create` |
-| Change a project's status or colour, or make it a plain folder | `POST /__board/project` | `project set` | `project_set` |
+| Every project, with its status, colour and task counts | `GET /__board/list` | · | `project_list` |
+| Make a folder a project | `GET /__board/list` `POST /__board/create` | · | `project_create` |
+| Change a project's status or colour, or make it a plain folder | `POST /__board/project` | · | `project_set` |
 
 ## Quizzes
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every quiz, with how many questions each asks | `GET /__board/list` | `quiz ls` | `quiz_list` |
+| Every quiz, with how many questions each asks | `GET /__board/list` | · | `quiz_list` |
 | A quiz's text and its base | `GET /__board/get` | `quiz cat` | `quiz_read` |
 | Make a quiz | `POST /__board/create` | `quiz new` | `quiz_create` |
-| Replace a quiz's whole text | `POST /__board/put` | `quiz write` `quiz edit` | `quiz_write` |
-| Write, remove or move one question by its id, and no other byte of the quiz | `POST /__board/quiz` | `quiz question set` `quiz question rm` `quiz question mv` | `quiz_question_set` `quiz_question_remove` `quiz_question_move` |
+| Replace a quiz's whole text | `POST /__board/put` | `quiz write` | `quiz_write` |
+| Write, remove or move one question by its id, and no other byte of the quiz | `POST /__board/quiz` | · | `quiz_question_set` `quiz_question_remove` `quiz_question_move` |
 | Rename or move a quiz | `POST /__board/rename` | `quiz mv` | `quiz_rename` |
-| Copy a quiz | `POST /__board/duplicate` | `quiz cp` | `quiz_duplicate` |
+| Copy a quiz | `POST /__board/duplicate` | · | `quiz_duplicate` |
 | Move a quiz to the trash | `POST /__board/delete` | `quiz rm` | `quiz_delete` |
-| Call a quiz something, and let its name follow | `POST /__board/retitle` | `quiz title` | `quiz_title` |
+| Call a quiz something, and let its name follow | `POST /__board/retitle` | · | `quiz_title` |
 | What is wrong with a quiz — or a draft — as codes | `GET /__board/diagnostics` `POST /__board/diagnostics` | `quiz check` | `quiz_check` |
-| Run a quiz a question at a time, and record the answers | `GET /__board/get` `POST /api/practice` | `quiz practice` | `quiz_questions` `quiz_answer` |
-| Every question still in Mistakes | `GET /api/practice` | `quiz mistakes` | `quiz_mistakes` |
-| How many right in a row take a question out of Mistakes | `GET /api/practice` `PUT /api/practice` | `quiz threshold` | `quiz_threshold` |
+| Run a quiz a question at a time, and record the answers | `GET /__board/get` `POST /api/practice` | · | `quiz_questions` `quiz_answer` |
+| Every question still in Mistakes | `GET /api/practice` | · | `quiz_mistakes` |
+| How many right in a row take a question out of Mistakes | `GET /api/practice` `PUT /api/practice` | · | `quiz_threshold` |
 
 ## Tables
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every table, with its title and id | `GET /__board/list` | `table ls` | `table_list` |
+| Every table, with its title and id | `GET /__board/list` | · | `table_list` |
 | A table's text and its base | `GET /__board/get` | `table cat` | `table_read` |
 | Make a table | `POST /__board/create` | `table new` | `table_create` |
-| Replace a table's whole text | `POST /__board/put` | `table write` `table edit` | `table_write` |
+| Replace a table's whole text | `POST /__board/put` | `table write` | `table_write` |
 | Rename or move a table | `POST /__board/rename` | `table mv` | `table_rename` |
-| Copy a table | `POST /__board/duplicate` | `table cp` | `table_duplicate` |
+| Copy a table | `POST /__board/duplicate` | · | `table_duplicate` |
 | Move a table to the trash | `POST /__board/delete` | `table rm` | `table_delete` |
-| Call a table something, and let its name follow | `POST /__board/retitle` | `table title` | `table_title` |
+| Call a table something, and let its name follow | `POST /__board/retitle` | · | `table_title` |
 | What is wrong with a table — or a draft — as codes | `GET /__board/diagnostics` `POST /__board/diagnostics` | `table check` | `table_check` |
-| A table's tabs, columns and rows as data, each addressed by id | `GET /__board/table` | `table show` | `table_get` |
-| Set cells; add, remove, move and size rows and columns; add, rename, sort, filter, remove and move tabs | `POST /__board/table` | `table set` `table row add` `table row rm` `table row mv` `table row height` `table col add` `table col set` `table col rm` `table col mv` `table tab add` `table tab set` `table tab rm` `table tab mv` | `table_edit` |
-| A CSV as a new table, or as a new tab of one | `POST /__board/create` `POST /__board/table` | `table import` | ↳ `table_create` `table_edit` [10] |
-| A tab as CSV | `GET /__board/get` | `table export` | ↳ `table_get` [11] |
+| A table's tabs, columns and rows as data, each addressed by id | `GET /__board/table` | · | `table_get` |
+| Set cells; add, remove, move and size rows and columns; add, rename, sort, filter, remove and move tabs | `POST /__board/table` | · | `table_edit` |
+| A CSV as a new table, or as a new tab of one | `POST /__board/create` `POST /__board/table` | · | ↳ `table_create` `table_edit` [10] |
+| A tab as CSV | `GET /__board/get` | · | ↳ `table_get` [11] |
 
 ## Folders
 
@@ -162,23 +164,23 @@ every ↳ and ✗ is numbered under the tables.
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| One item's fence line and body | `GET /__board/get` | `item show` | `board_read` |
-| Duplicate, restack, group, rename, convert or re-lay-out items | `POST /__board/patch` `POST /__board/put` | `item dup` `item front` `item back` `item rename` `item group` `item ungroup` `item convert` `item relayout` | ↳ `board_patch` `board_write` [17] |
-| A board's pages: list, add, rename, remove, reorder | `GET /__board/get` `POST /__board/patch` | `page ls` `page add` `page rename` `page rm` `page move` | ↳ `board_patch` [18] |
-| Lines between items: list, add, change, remove | `GET /__board/get` `POST /__board/patch` | `link ls` `link add` `link set` `link rm` | ↳ `board_patch` [19] |
-| The cards inside one diagram | `GET /__board/get` `POST /__board/patch` | `node ls` `node add` `node set` `node rm` `node rename` `node dup` `node move` | ↳ `board_patch` [17] |
-| The edges inside one diagram | `POST /__board/patch` | `edge add` `edge set` `edge rm` | ↳ `board_patch` [17] |
-| A card's rows: columns, members | `GET /__board/get` `POST /__board/patch` | `row ls` `row add` `row set` `row rm` | ↳ `board_patch` [17] |
-| A chart's own statements: form, legend, scale, categories | `POST /__board/patch` | `chart set` | ↳ `board_patch` [17] |
+| One item's fence line and body | `GET /__board/get` | · | `board_read` |
+| Duplicate, restack, group, rename, convert or re-lay-out items | `POST /__board/patch` `POST /__board/put` | · | ↳ `board_patch` `board_write` [17] |
+| A board's pages: list, add, rename, remove, reorder | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [18] |
+| Lines between items: list, add, change, remove | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [19] |
+| The cards inside one diagram | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [17] |
+| The edges inside one diagram | `POST /__board/patch` | · | ↳ `board_patch` [17] |
+| A card's rows: columns, members | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [17] |
+| A chart's own statements: form, legend, scale, categories | `POST /__board/patch` | · | ↳ `board_patch` [17] |
 
 ## Images
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Keep a picture beside a board, a note or a quiz — its bytes, or over MCP an https URL the server fetches | `POST /__board/asset` `POST /__board/upload` | `image add` | `image_add` |
-| A picture a document keeps | `GET /__board/assets/{path:path}` | `image get` | `image_get` |
-| Pictures beside a board that no board names | `GET /__board/assets/unused` | `image unused` | `image_unused` |
-| Remove those pictures | `POST /__board/assets/sweep` | `image sweep` | `image_sweep` |
+| Keep a picture beside a board, a note or a quiz — its bytes, or over MCP an https URL the server fetches | `POST /__board/asset` `POST /__board/upload` | · | `image_add` |
+| A picture a document keeps | `GET /__board/assets/{path:path}` | · | `image_get` |
+| Pictures beside a board that no board names | `GET /__board/assets/unused` | · | `image_unused` |
+| Remove those pictures | `POST /__board/assets/sweep` | · | `image_sweep` |
 
 ## Attachments
 
@@ -188,35 +190,35 @@ every ↳ and ✗ is numbered under the tables.
 | Every attachment, its size, and what the deployment accepts | `GET /__board/files` | `file ls` | `file_list` |
 | An attachment's bytes, by name or id — drawn, or saved | `GET /__board/file` | `file get` | `file_get` |
 | Rename or move an attachment; its extension stays its own | `POST /__board/rename` | `file mv` | `file_rename` |
-| Copy an attachment | `POST /__board/duplicate` | `file cp` | `file_duplicate` |
-| Call an attachment something, and let its name follow | `POST /__board/retitle` | `file title` | `file_title` |
+| Copy an attachment | `POST /__board/duplicate` | · | `file_duplicate` |
+| Call an attachment something, and let its name follow | `POST /__board/retitle` | · | `file_title` |
 | Move an attachment to the trash, saying what uses it | `GET /__board/refs` `POST /__board/delete` | `file rm` | `file_delete` |
 
 ## Components
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| The person's saved components | `GET /__board/components` | `component ls` | `library` |
-| Keep items as a component | `POST /__board/create` | `component keep` | ↳ `board_create` [20] |
-| Put a saved component on a board | `GET /__board/components` `POST /__board/patch` | `component place` | ↳ `library` `board_patch` [21] |
-| Delete a saved component | `POST /__board/components/delete` | `component rm` | `component_delete` |
+| The person's saved components | `GET /__board/components` | · | `library` |
+| Keep items as a component | `POST /__board/create` | · | ↳ `board_create` [20] |
+| Put a saved component on a board | `GET /__board/components` `POST /__board/patch` | · | ↳ `library` `board_patch` [21] |
+| Delete a saved component | `POST /__board/components/delete` | · | `component_delete` |
 
 ## Grammar
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| The cheat sheets | `GET /__board/dsl` | `dsl` | `dsl_reference` |
-| Ready-made pieces, rendered | `GET /__board/library` | `library` | `library` |
-| What `icon=` may say | `GET /__board/icons` | `icons` | `icons` |
+| The cheat sheets | `GET /__board/dsl` | · | `dsl_reference` |
+| Ready-made pieces, rendered | `GET /__board/library` | · | `library` |
+| What `icon=` may say | `GET /__board/icons` | · | `icons` |
 
 ## Models
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Which model providers could answer | `GET /__board/llm` | `llm` | `llm` |
-| Ask a model to draw a diagram | `POST /__board/generate` | `generate` | `generate` |
-| Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | `prompt run` | ↳ `generate` `board_patch` [22] |
-| Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | `rewrite` | ↳ `generate` `board_patch` [23] |
+| Which model providers could answer | `GET /__board/llm` | · | `llm` |
+| Ask a model to draw a diagram | `POST /__board/generate` | · | `generate` |
+| Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [22] |
+| Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [23] |
 
 ## Pictures
 
@@ -230,17 +232,17 @@ every ↳ and ✗ is numbered under the tables.
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| The chats in a vault, newest first | `GET /__board/chats` | `chat ls` | ✗ [26] |
-| The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | `chat models` | ✗ [26] |
-| Start a chat | `POST /__board/chat` | `chat new` | ✗ [26] |
-| A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | `chat cat` | ✗ [26] |
-| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | `chat say` | ✗ [26] |
-| Stop the turn that is answering | `POST /__board/chat/stop` | `chat stop` | ✗ [26] |
-| Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | `chat approve` | ✗ [26] |
-| Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | `chat grant` | ✗ [26] |
-| Take back, or put back, one block of changes a turn made | `POST /__board/chat/undo` `POST /__board/chat/redo` | `chat undo` `chat redo` | ✗ [26] |
-| Give a chat a title | `POST /__board/chat/rename` | `chat rename` | ✗ [26] |
-| Delete a chat and its turns | `POST /__board/chat/delete` | `chat rm` | ✗ [26] |
+| The chats in a vault, newest first | `GET /__board/chats` | · | ✗ [26] |
+| The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | · | ✗ [26] |
+| Start a chat | `POST /__board/chat` | · | ✗ [26] |
+| A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | · | ✗ [26] |
+| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [26] |
+| Stop the turn that is answering | `POST /__board/chat/stop` | · | ✗ [26] |
+| Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | · | ✗ [26] |
+| Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | · | ✗ [26] |
+| Take back, or put back, one block of changes a turn made | `POST /__board/chat/undo` `POST /__board/chat/redo` | · | ✗ [26] |
+| Give a chat a title | `POST /__board/chat/rename` | · | ✗ [26] |
+| Delete a chat and its turns | `POST /__board/chat/delete` | · | ✗ [26] |
 | The chat's own recorder: group the writes that follow into one undoable block | `POST /__board/chat/block` | ✗ [27] | ✗ [28] |
 | The chat's own request to reach another vault, put to the person | `POST /__board/chat/access` | ✗ [29] | ✗ [30] |
 

@@ -22,7 +22,17 @@ export interface ChatState {
   missing: boolean;
 }
 
-const EMPTY: ChatState = { meta: null, vault: "", turns: [], undos: [], live: null, typing: "", device: "", loaded: false, missing: false };
+const EMPTY: ChatState = {
+  meta: null,
+  vault: "",
+  turns: [],
+  undos: [],
+  live: null,
+  typing: "",
+  device: "",
+  loaded: false,
+  missing: false,
+};
 
 type Act = { t: "reset" } | { t: "loaded"; read: ChatRead } | { t: "missing" } | { t: "event"; e: ChatEvent };
 
@@ -45,7 +55,17 @@ function reduce(s: ChatState, a: Act): ChatState {
       /* The read's turn in flight is newer than what the stream built before it answered; a turn the
          stream already ended is in `turns` and is not in flight any more. */
       const live = a.read.live && !done.has(a.read.live.id) ? a.read.live : s.live && !done.has(s.live.id) ? s.live : null;
-      return { meta: a.read.chat, vault: a.read.vault, turns, undos: union(s.undos, a.read.undos), live, typing: live && live === s.live ? s.typing : "", device: a.read.device, loaded: true, missing: false };
+      return {
+        meta: a.read.chat,
+        vault: a.read.vault,
+        turns,
+        undos: union(s.undos, a.read.undos),
+        live,
+        typing: live && live === s.live ? s.typing : "",
+        device: a.read.device,
+        loaded: true,
+        missing: false,
+      };
     }
     case "event": {
       const e = a.e;
@@ -69,7 +89,12 @@ function reduce(s: ChatState, a: Act): ChatState {
         case "blocks":
           return s.live && s.live.id === e.turn ? { ...s, live: { ...s.live, blocks: e.blocks } } : s;
         case "end":
-          return { ...s, turns: union(s.turns, [e.turn]), live: s.live?.id === e.turn.id ? null : s.live, typing: s.live?.id === e.turn.id ? "" : s.typing };
+          return {
+            ...s,
+            turns: union(s.turns, [e.turn]),
+            live: s.live?.id === e.turn.id ? null : s.live,
+            typing: s.live?.id === e.turn.id ? "" : s.typing,
+          };
         case "undo":
           return { ...s, undos: union(s.undos, [e.record]) };
       }

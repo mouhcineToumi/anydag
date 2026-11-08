@@ -21,10 +21,13 @@ export interface Meta {
   size: number;
 }
 
-export const sealMeta = (kEnc: Uint8Array, key: string, meta: Meta): string => b64(seal(kEnc, Buffer.from(JSON.stringify(meta), "utf8"), `meta:${key}`));
+export const sealMeta = (kEnc: Uint8Array, key: string, meta: Meta): string =>
+  b64(seal(kEnc, Buffer.from(JSON.stringify(meta), "utf8"), `meta:${key}`));
 
 export function openMeta(kEnc: Uint8Array, key: string, sealed: string): Meta {
-  const raw = JSON.parse(Buffer.from(open(kEnc, unb64(sealed), `meta:${key}`, "a path's metadata")).toString("utf8")) as Partial<Meta>;
+  const raw = JSON.parse(
+    Buffer.from(open(kEnc, unb64(sealed), `meta:${key}`, "a path's metadata")).toString("utf8"),
+  ) as Partial<Meta>;
   if (typeof raw.path !== "string" || (raw.kind !== "file" && raw.kind !== "dir")) throw new Error("metadata of the wrong shape");
   return {
     path: raw.path,

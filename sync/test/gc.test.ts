@@ -40,10 +40,16 @@ describe.each(BACKENDS)("the collector on $name", ({ name, skip }) => {
     const [key, other] = [wid("g-key"), wid("g-otherkey")];
     let parent: number | null = null;
     for (const blob of ids.slice(0, 3)) {
-      const res = await call(h, "POST", `/v1/vaults/${v}/commit`, { token, json: { changes: [{ key, parent, blob, meta: "m" }] } });
+      const res = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token,
+        json: { changes: [{ key, parent, blob, meta: "m" }] },
+      });
       parent = ((await res.json()) as { seqs: number[] }).seqs[0]!;
     }
-    await call(h, "POST", `/v1/vaults/${v}/commit`, { token, json: { changes: [{ key: other, parent: null, blob: ids[3], meta: "m" }] } });
+    await call(h, "POST", `/v1/vaults/${v}/commit`, {
+      token,
+      json: { changes: [{ key: other, parent: null, blob: ids[3], meta: "m" }] },
+    });
     return { ids, key, other };
   }
 
@@ -74,7 +80,11 @@ describe.each(BACKENDS)("the collector on $name", ({ name, skip }) => {
     ]);
 
     // A second run finds nothing more to do.
-    expect(await collect(h.meta, h.blobs, { historyDays: 30, now: new Date(h.clock.now.getTime() + 32 * DAY) })).toEqual({ compacted: 0, blobs: 0, bytes: 0 });
+    expect(await collect(h.meta, h.blobs, { historyDays: 30, now: new Date(h.clock.now.getTime() + 32 * DAY) })).toEqual({
+      compacted: 0,
+      blobs: 0,
+      bytes: 0,
+    });
   });
 
   it.skipIf(skip)("a plan's history window beats the server's", async () => {
@@ -118,8 +128,11 @@ describe.each(BACKENDS)("the collector on $name", ({ name, skip }) => {
     const now = h.clock.now;
     await collect(h.meta, h.blobs, { historyDays: 30, now });
     await collect(h.meta, h.blobs, { historyDays: 30, now });
-    const rows = (await h.meta.usage({ account })).filter((r) => ["storage_live", "storage_history", "blobs", "files"].includes(r.metric));
-    const at = (metric: string, vaultId: string | null) => Number(rows.find((r) => r.metric === metric && r.vault === vaultId)?.value);
+    const rows = (await h.meta.usage({ account })).filter((r) =>
+      ["storage_live", "storage_history", "blobs", "files"].includes(r.metric),
+    );
+    const at = (metric: string, vaultId: string | null) =>
+      Number(rows.find((r) => r.metric === metric && r.vault === vaultId)?.value);
     const live = Buffer.byteLength(`${wid("g-3")}-bytes`) + Buffer.byteLength(`${wid("g-other")}-bytes`);
     for (const scope of [v, null]) {
       expect(at("storage_live", scope)).toBe(live);

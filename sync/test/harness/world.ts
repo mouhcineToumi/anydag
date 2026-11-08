@@ -37,6 +37,15 @@ import { Rng } from "./prng";
 
 /** What every conflict copy is dated with: the engine's clock is pinned, so names replay. */
 const AT = new Date(2026, 10, 6, 14, 30);
+/**
+ * Where a seed's own clock starts, and how far it moves between steps (ms, at most). A file's birth
+ * is a second-resolution instant that decides which of two documents keeps a duplicate id, so which
+ * seconds the births land in is part of the schedule: read from the disk it was the machine's speed,
+ * and a seed that held with every birth in one second (an idle machine) failed once a slow one
+ * spread them over several. Drawn from the seed, the same schedule makes the same births every run.
+ */
+const T0 = Date.parse("2026-11-06T14:30:00Z");
+const TICK_MS = 900;
 const WORDS = ["plan", "ideas", "log", "todo", "draft", "spec", "inbox", "notes"];
 const FOLDERS = ["", "notes/", "work/deep/"];
 const TOKEN = /tok-\d+-\d+/g;
@@ -149,6 +158,10 @@ export class World {
   readonly log: string[] = [];
   /** Commits the server accepted. */
   commits = 0;
+  /** The seed's clock — what every vault reads as a file's birth once steps run. */
+  private readonly time: Rng;
+  private at = T0;
+  private ticking = false;
   readonly written = new Map<string, number>();
   readonly deletable = new Set<string>();
   readonly deletedIds = new Set<string>();
@@ -161,6 +174,7 @@ export class World {
     this.h = h;
     this.seed = seed;
     this.rng = new Rng(seed);
+    this.time = new Rng(seed ^ 0x5eed5eed);
   }
 
   static async create(h: Harness, seed: number, devices: number): Promise<World> {
@@ -333,8 +347,16 @@ export class World {
 
   // -- steps --------------------------------------------------------------------------------------
 
+  /** Move the seed's clock on, every device reading the same one (a separate stream: the schedule is the seed's). */
+  private tick(): void {
+    this.ticking = true;
+    this.at += this.time.int(0, TICK_MS);
+    for (const d of this.devs) d.clock = this.at;
+  }
+
   async step(): Promise<void> {
     this.stepNo++;
+    this.tick();
     const kind = this.rng.weighted(WEIGHTS);
     const d = this.rng.pick(this.devs);
     await this.run(kind, d);
@@ -402,7 +424,11 @@ export class World {
   }
 
   /** One edit to one line of `text`; `null` when there is nothing to edit. */
-  private async editText(d: Dev, text: string, kind: "append" | "editLine" | "insertLine" | "deleteLine"): Promise<{ text: string; what: string; dropped?: string } | null> {
+  private async editText(
+    d: Dev,
+    text: string,
+    kind: "append" | "editLine" | "insertLine" | "deleteLine",
+  ): Promise<{ text: string; what: string; dropped?: string } | null> {
     const lines = text.split("\n");
     const body = bodyLines(lines);
     // Line 1 half the time, so two devices often edit the same line.
@@ -630,6 +656,7 @@ export class World {
     const moved: string[] = [];
     let last = await this.fingerprint();
     for (let round = 0; round < SETTLE_ROUNDS; round++) {
+      if (this.ticking) this.tick();
       const before = this.commits;
       for (const d of this.devs) {
         await d.vault.tree();
@@ -639,7 +666,9 @@ export class World {
       trail.push(this.commits - before);
       const now = await this.fingerprint();
       const diff = [...new Set([...last.keys(), ...now.keys()])].filter((k) => last.get(k) !== now.get(k));
-      moved.push(`round ${round + 1}: ${diff.length ? diff.map((k) => `${k} ${now.get(k)?.slice(0, 8) ?? "gone"}`).join(", ") : "nothing on disk"}`);
+      moved.push(
+        `round ${round + 1}: ${diff.length ? diff.map((k) => `${k} ${now.get(k)?.slice(0, 8) ?? "gone"}`).join(", ") : "nothing on disk"}`,
+      );
       last = now;
       if (this.commits === before && this.devs.every((d) => d.engine.pending() === 0)) {
         this.say(null, `settled in ${round + 1} round(s): commits per round ${trail.join(",")}`);
@@ -656,17 +685,24 @@ export class World {
       for (const p of paths) {
         if (!late.includes(p)) continue;
         const st = d.state.entryAt(p);
-        const disk = (await d.fs.scan()).filter((e) => e.rel.toLowerCase() === p).map((e) => `${e.rel}=${JSON.stringify(this.read(d, e.rel)?.toString("utf8"))}`);
-        detail.push(`${d.name} ${p}: disk [${disk.join(", ")}] state ${st ? `${st.rel} seq ${st.seq} sha1 ${st.sha1?.slice(0, 8)}` : "none"}`);
+        const disk = (await d.fs.scan())
+          .filter((e) => e.rel.toLowerCase() === p)
+          .map((e) => `${e.rel}=${JSON.stringify(this.read(d, e.rel)?.toString("utf8"))}`);
+        detail.push(
+          `${d.name} ${p}: disk [${disk.join(", ")}] state ${st ? `${st.rel} seq ${st.seq} sha1 ${st.sha1?.slice(0, 8)}` : "none"}`,
+        );
       }
     }
-    throw new Error(`did not settle in ${SETTLE_ROUNDS} rounds: commits per round ${trail.join(",")}, pending ${pending}\n${moved.slice(-4).join("\n")}\n${detail.join("\n")}`);
+    throw new Error(
+      `did not settle in ${SETTLE_ROUNDS} rounds: commits per round ${trail.join(",")}, pending ${pending}\n${moved.slice(-4).join("\n")}\n${detail.join("\n")}`,
+    );
   }
 
   /** `<device>:<path>` → the sha1 of what is there, over every device. */
   private async fingerprint(): Promise<Map<string, string>> {
     const out = new Map<string, string>();
-    for (const d of this.devs) for (const [rel, v] of await this.snapshot(d)) out.set(`${d.name}:${rel}`, v === "<dir>" ? "<dir>" : sha1Of(v));
+    for (const d of this.devs)
+      for (const [rel, v] of await this.snapshot(d)) out.set(`${d.name}:${rel}`, v === "<dir>" ? "<dir>" : sha1Of(v));
     return out;
   }
 
@@ -684,7 +720,8 @@ export class World {
         const b = other.get(rel);
         const same = a === b || (a instanceof Buffer && b instanceof Buffer && a.equals(b));
         if (same) continue;
-        const show = (x: Buffer | "<dir>" | undefined): string => (x === undefined ? "absent" : x === "<dir>" ? "<dir>" : JSON.stringify(latin1(x).slice(0, 300)));
+        const show = (x: Buffer | "<dir>" | undefined): string =>
+          x === undefined ? "absent" : x === "<dir>" ? "<dir>" : JSON.stringify(latin1(x).slice(0, 300));
         failures.push(`converge: ${rel} differs — ${this.devs[0]!.name}: ${show(a)} · ${this.devs[i]!.name}: ${show(b)}`);
       }
     }
@@ -693,14 +730,16 @@ export class World {
     const found = new Set<string>();
     for (const v of first.values()) if (v !== "<dir>") for (const t of tokensIn(v)) found.add(t);
     for (const [t, step] of this.written) {
-      if (!found.has(t) && !this.deletable.has(t)) failures.push(`lost: ${t} (written at step #${step}) is in no file, and no step removed it`);
+      if (!found.has(t) && !this.deletable.has(t))
+        failures.push(`lost: ${t} (written at step #${step}) is in no file, and no step removed it`);
     }
 
     // 3. No two documents share an id, and no `dag:` link names an id no file carries.
     // One name is one document: two files giving one name two kinds (`ideas.md` beside
     // `ideas.board.md`, made on two devices) are settled by the engine, never left for the vault.
     const names = new Map<string, string[]>();
-    for (const [rel, v] of first) if (v !== "<dir>" && isDoc(rel)) names.set(docName(rel), [...(names.get(docName(rel)) ?? []), rel]);
+    for (const [rel, v] of first)
+      if (v !== "<dir>" && isDoc(rel)) names.set(docName(rel), [...(names.get(docName(rel)) ?? []), rel]);
     for (const rels of names.values()) if (rels.length > 1) failures.push(`one name, two kinds: ${rels.join(", ")}`);
     const carriers = new Map<string, string[]>();
     const anyCarrier = new Set<string>();
@@ -717,7 +756,8 @@ export class World {
       if (v === "<dir>" || rel.startsWith(".anydag/") || !isDoc(rel)) continue;
       for (const m of v.toString("utf8").matchAll(REF)) {
         const id = m[1]!;
-        if (!anyCarrier.has(id) && !this.deletedIds.has(id)) failures.push(`dangling: ${rel} links dag:${id}, which no file carries and no step deleted`);
+        if (!anyCarrier.has(id) && !this.deletedIds.has(id))
+          failures.push(`dangling: ${rel} links dag:${id}, which no file carries and no step deleted`);
       }
     }
     return failures;

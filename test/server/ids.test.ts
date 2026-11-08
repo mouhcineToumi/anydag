@@ -308,7 +308,7 @@ describe("SQLite deleted", () => {
     const created = (await env.vault.tree()).created[name]!;
     expect(created).not.toBe("2001-01-01T00:00:00Z");
     const stamp = Date.parse(created);
-    const expected = (st.birthtimeMs || st.mtimeMs);
+    const expected = st.birthtimeMs || st.mtimeMs;
     expect(Math.abs(stamp - expected)).toBeLessThan(2000);
   });
 
@@ -364,7 +364,10 @@ describe("an attachment", () => {
     write(env.root, ".anydag/files/abcdefghjk.json", "{ half");
     const tree = await env.vault.tree();
     expect(tree.ids["scan.pdf"]).not.toBe("abcdefghjk");
-    fs.writeFileSync(path.join(env.root, ".anydag", "files", "abcdefghjk.json"), JSON.stringify({ path: "scan.pdf", title: "Scan" }));
+    fs.writeFileSync(
+      path.join(env.root, ".anydag", "files", "abcdefghjk.json"),
+      JSON.stringify({ path: "scan.pdf", title: "Scan" }),
+    );
     const again = await env.vault.tree();
     expect(again.ids["scan.pdf"]).toBe("abcdefghjk");
     expect(again.titles["scan.pdf"]).toBe("Scan");

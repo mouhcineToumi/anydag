@@ -18,11 +18,46 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /* Mirrors `UNITLESS` in `src/theme/applyTheme.ts`. Keys are leaf names — the last path segment. */
 const UNITLESS = new Set([
-  "tintMix", "edge", "marker", "edgeQuiet", "markerQuiet", "bus", "junction", "stripRule",
-  "fanSpan", "along", "across", "t0", "t1", "base", "c4DescLeading", "mdLeading", "mdCodeLeading",
-  "weightBold", "grid",
-  "donutInner", "minLabelPct", "maxTicks", "markerMax",
+  "tintMix",
+  "edge",
+  "marker",
+  "edgeQuiet",
+  "markerQuiet",
+  "bus",
+  "junction",
+  "stripRule",
+  "fanSpan",
+  "along",
+  "across",
+  "t0",
+  "t1",
+  "base",
+  "c4DescLeading",
+  "mdLeading",
+  "mdCodeLeading",
+  "weightBold",
+  "grid",
+  "donutInner",
+  "minLabelPct",
+  "maxTicks",
+  "markerMax",
 ]);
+
+/* The mirror above was declared and never read, so the drift CLAUDE.md says it guards against was
+   guarded by nothing. Read the real set out of `applyTheme.ts` and fail when the two differ. */
+{
+  const source = fs.readFileSync(path.join(root, "src", "theme", "applyTheme.ts"), "utf8");
+  const body = /const UNITLESS = new Set\(\[([\s\S]*?)\]\);/.exec(source)?.[1] ?? "";
+  const actual = new Set([...body.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  const drift = [
+    ...[...actual].filter((k) => !UNITLESS.has(k)).map((k) => `\`${k}\` is in applyTheme.ts and not here`),
+    ...[...UNITLESS].filter((k) => !actual.has(k)).map((k) => `\`${k}\` is here and not in applyTheme.ts`),
+  ];
+  if (actual.size === 0 || drift.length > 0) {
+    console.error(`UNITLESS has drifted from src/theme/applyTheme.ts:\n  ${drift.join("\n  ") || "could not read it"}`);
+    process.exit(1);
+  }
+}
 
 function walk(prefix, value, out) {
   if (value === null || value === undefined) return;
@@ -149,7 +184,9 @@ if (DIAGRAM_TYPES.size < 5 || HUE_ORDER.length < 5) {
    is where the dataviz validator stops finding a set that separates, and it is a constant there so
    `W_CHART_MANY` can count to it without a theme. A literal here would be the eighth copy of a
    number whose whole value is that there is one. */
-const chartHuesMax = Number(/export const CHART_HUES_MAX\s*=\s*(\d+)/.exec(fs.readFileSync(path.join(root, "src", "dsl", "chart.ts"), "utf8"))?.[1]);
+const chartHuesMax = Number(
+  /export const CHART_HUES_MAX\s*=\s*(\d+)/.exec(fs.readFileSync(path.join(root, "src", "dsl", "chart.ts"), "utf8"))?.[1],
+);
 if (!(chartHuesMax > 0)) {
   console.error("could not read CHART_HUES_MAX out of src/dsl/chart.ts — has its shape changed?");
   process.exit(1);

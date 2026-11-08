@@ -8,9 +8,9 @@ const ids = (text: string) => parseBoard("b", text).items.map((it) => it.id);
 
 describe("stampItems", () => {
   it("writes an anonymous fence's own id onto it, and changes nothing else", () => {
-    const text = "```md {x=10 y=20}\nhello\n```\n\n```arch\nservice a \"A\"\n```\n";
+    const text = '```md {x=10 y=20}\nhello\n```\n\n```arch\nservice a "A"\n```\n';
     const out = stampItems(text);
-    expect(out).toBe("```md {#md-1 x=10 y=20}\nhello\n```\n\n```arch {#arch-1}\nservice a \"A\"\n```\n");
+    expect(out).toBe('```md {#md-1 x=10 y=20}\nhello\n```\n\n```arch {#arch-1}\nservice a "A"\n```\n');
     expect(ids(out)).toEqual(ids(text));
   });
 
@@ -38,9 +38,11 @@ describe("stampItems", () => {
   it("is a fixed point, and keeps every id, over every board in the repository", () => {
     const root = path.resolve(import.meta.dirname, "../boards");
     const walk = (d: string): string[] =>
-      fs.readdirSync(d, { withFileTypes: true }).flatMap((e) =>
-        e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith(".board.md") ? [path.join(d, e.name)] : [],
-      );
+      fs
+        .readdirSync(d, { withFileTypes: true })
+        .flatMap((e) =>
+          e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith(".board.md") ? [path.join(d, e.name)] : [],
+        );
     const files = walk(root);
     expect(files.length).toBeGreaterThan(10);
     for (const f of files) {

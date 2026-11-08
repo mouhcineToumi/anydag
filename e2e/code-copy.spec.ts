@@ -139,7 +139,8 @@ test("on a board the button copies without selecting the card, and an export lea
   await expect(page.locator("[data-dag-selected]")).toHaveCount(0);
 
   const svg = await page.evaluate(
-    () => new Promise<string>((reply) => document.dispatchEvent(new CustomEvent("dag:export", { detail: { kind: "svg", reply } }))),
+    () =>
+      new Promise<string>((reply) => document.dispatchEvent(new CustomEvent("dag:export", { detail: { kind: "svg", reply } }))),
   );
   expect(svg).toContain("dag-code__lang");
   expect(svg).not.toContain("dag-code__copy");

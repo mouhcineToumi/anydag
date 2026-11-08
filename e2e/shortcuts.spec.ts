@@ -89,7 +89,7 @@ test("the leader survives being held past the keyboard's repeat delay", async ({
   await expect(library(page)).toBeVisible();
 });
 
-test("the bare letters no longer do anything on their own", async ({ page }) => {
+test("the bare letters no longer do anything on their own, and the chord still does", async ({ page }) => {
   await open(page);
   /* Proven visible under a chord first, then taken away again, so the absence below is an absence
      this locator can actually see — the `[data-dag-error]` lesson, asserted rather than assumed. */
@@ -104,14 +104,11 @@ test("the bare letters no longer do anything on their own", async ({ page }) => 
   await expect(library(page)).toHaveCount(0);
   /* `t` and `k` write to the file when they land, so the bytes are the other half of the answer. */
   expect(read()).toBe(BOARD);
-});
 
-test("a bare n no longer makes a note, and the chord still does", async ({ page }) => {
-  await open(page);
+  /* `n` made a note on its own, which is the one that would be missed: not now, and the chord does. */
   await page.keyboard.press("n");
   await expect(page.locator("[data-dag-inspector]")).toHaveCount(0);
   expect(read()).toBe(BOARD);
-
   await lead(page, "n");
   await expect.poll(read, { timeout: 5_000 }).toMatch(/```md \{#md-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nNew note\n```/);
 });

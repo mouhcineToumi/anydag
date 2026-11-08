@@ -75,7 +75,8 @@ function tabFor(table: Table, key: string | null): Tab | undefined {
 /** An id a writer may address: one that names exactly one thing — two, and a write would land on the first. */
 function only(id: string | undefined, all: readonly { id?: string }[], what: string): string {
   if (!id) throw new TableError(`that ${what} is not here any more`);
-  if (all.filter((x) => x.id === id).length > 1) throw new TableError(`two ${what}s share the id \`${id}\`: give one another in Source`);
+  if (all.filter((x) => x.id === id).length > 1)
+    throw new TableError(`two ${what}s share the id \`${id}\`: give one another in Source`);
   return id;
 }
 
@@ -224,7 +225,11 @@ export function TablePage({
   useEffect(() => {
     if (!target || !ready) return;
     const part = tablePart(target);
-    const tab = part.tab ? table.tabs.find((t) => t.id === part.tab) : part.line !== undefined ? table.tabs.find((t) => t.rows.some((r) => r.line === part.line)) : undefined;
+    const tab = part.tab
+      ? table.tabs.find((t) => t.id === part.tab)
+      : part.line !== undefined
+        ? table.tabs.find((t) => t.rows.some((r) => r.line === part.line))
+        : undefined;
     if (tab) {
       const key = tabKeys[table.tabs.indexOf(tab)]!;
       if (key !== currentKey) onTab(key);
@@ -244,7 +249,11 @@ export function TablePage({
           const names = new Set(stamped.tabs.map((t) => t.name));
           let n = stamped.tabs.length + 1;
           while (names.has(`Tab ${n}`)) n++;
-          const added = addTab(text, { name: `Tab ${n}`, columns: [{ name: "Name" }], rows: [{ cells: [""] }, { cells: [""] }, { cells: [""] }] });
+          const added = addTab(text, {
+            name: `Tab ${n}`,
+            columns: [{ name: "Name" }],
+            rows: [{ cells: [""] }, { cells: [""] }, { cells: [""] }],
+          });
           made = added.id;
           return added.text;
         });
@@ -259,7 +268,11 @@ export function TablePage({
       },
       reorder(key: string, before: string | null) {
         write((text, stamped) =>
-          moveTab(text, only(tabIdIn(stamped, key), stamped.tabs, "tab"), before === null ? null : only(tabIdIn(stamped, before), stamped.tabs, "tab")),
+          moveTab(
+            text,
+            only(tabIdIn(stamped, key), stamped.tabs, "tab"),
+            before === null ? null : only(tabIdIn(stamped, before), stamped.tabs, "tab"),
+          ),
         );
       },
     }),
@@ -369,7 +382,14 @@ export function TablePage({
   else
     body = (
       <div className="dag-tablepage__scroll">
-        <Grid key={table.tabs.indexOf(current)} tab={current} edit={edit} readOnly={locked} onRefused={refuseLocked} mark={mark && mark.tab === currentKey ? mark.index : null} />
+        <Grid
+          key={table.tabs.indexOf(current)}
+          tab={current}
+          edit={edit}
+          readOnly={locked}
+          onRefused={refuseLocked}
+          mark={mark && mark.tab === currentKey ? mark.index : null}
+        />
       </div>
     );
 
@@ -383,7 +403,17 @@ export function TablePage({
         more={[
           /* A tab from a CSV file, beside the exports it is the other half of. */
           ...(ready
-            ? [{ key: "import-csv", label: "Import CSV", icon: Upload, hook: "data-dag-tablepage-import", title: "Add a tab from a CSV file", onSelect: () => picker.current?.click(), disabled: locked }]
+            ? [
+                {
+                  key: "import-csv",
+                  label: "Import CSV",
+                  icon: Upload,
+                  hook: "data-dag-tablepage-import",
+                  title: "Add a tab from a CSV file",
+                  onSelect: () => picker.current?.click(),
+                  disabled: locked,
+                },
+              ]
             : []),
           ...(id ? exportRows(TABLE_EXPORTS, exportTable) : []),
         ]}
@@ -535,7 +565,12 @@ function SortButton({ tab, write }: { tab: Tab; write: Edit }) {
   const save = (keys: SortKey[]) => write((t, a) => setTab(t, a.tab, { sort: keys.length ? keys : null }));
   const cols = tab.columns.filter((c) => c.id);
   return (
-    <BarPop icon={<ArrowDownWideNarrow {...ICON} aria-hidden="true" />} label="Sort" count={tab.sort.length} attr="data-dag-tablepage-sort">
+    <BarPop
+      icon={<ArrowDownWideNarrow {...ICON} aria-hidden="true" />}
+      label="Sort"
+      count={tab.sort.length}
+      attr="data-dag-tablepage-sort"
+    >
       {() => (
         <div className="dag-tablepage__rules" data-dag-tablepage-sorts="">
           {tab.sort.length === 0 ? <p className="dag-tablepage__hint">Rows show in the order they are in the file.</p> : null}
@@ -560,7 +595,12 @@ function SortButton({ tab, write }: { tab: Tab; write: Edit }) {
                 <option value="asc">Ascending</option>
                 <option value="desc">Descending</option>
               </select>
-              <button type="button" className="dag-icon" aria-label="Remove this sort" onClick={() => save(tab.sort.filter((_, j) => j !== i))}>
+              <button
+                type="button"
+                className="dag-icon"
+                aria-label="Remove this sort"
+                onClick={() => save(tab.sort.filter((_, j) => j !== i))}
+              >
                 <X {...ICON} aria-hidden="true" />
               </button>
             </div>
@@ -594,7 +634,8 @@ function SortButton({ tab, write }: { tab: Tab; write: Edit }) {
 /** What a filter line offers besides the eight operators: a test for emptiness, which is `=` or `!=` with nothing after it. */
 type Test = FilterOp | "empty" | "filled";
 
-const testOf = (r: FilterRule): Test => (r.value === "" && r.op === "=" ? "empty" : r.value === "" && r.op === "!=" ? "filled" : r.op);
+const testOf = (r: FilterRule): Test =>
+  r.value === "" && r.op === "=" ? "empty" : r.value === "" && r.op === "!=" ? "filled" : r.op;
 
 /** The tab's filter: one line per rule, every rule kept — written as the tab's `filter=`. */
 function FilterButton({ tab, write }: { tab: Tab; write: Edit }) {
@@ -602,7 +643,12 @@ function FilterButton({ tab, write }: { tab: Tab; write: Edit }) {
   const cols = tab.columns.filter((c) => c.id);
   const set = (i: number, change: Partial<FilterRule>) => save(tab.filter.map((r, j) => (j === i ? { ...r, ...change } : r)));
   return (
-    <BarPop icon={<Filter {...ICON} aria-hidden="true" />} label="Filter" count={tab.filter.length} attr="data-dag-tablepage-filter">
+    <BarPop
+      icon={<Filter {...ICON} aria-hidden="true" />}
+      label="Filter"
+      count={tab.filter.length}
+      attr="data-dag-tablepage-filter"
+    >
       {() => (
         <div className="dag-tablepage__rules" data-dag-tablepage-filters="">
           {tab.filter.length === 0 ? <p className="dag-tablepage__hint">Every row shows.</p> : null}
@@ -639,7 +685,12 @@ function FilterButton({ tab, write }: { tab: Tab; write: Edit }) {
                 {test === "empty" || test === "filled" ? null : (
                   <RuleValue value={r.value} onCommit={(value) => set(i, { value })} />
                 )}
-                <button type="button" className="dag-icon" aria-label="Remove this filter" onClick={() => save(tab.filter.filter((_, j) => j !== i))}>
+                <button
+                  type="button"
+                  className="dag-icon"
+                  aria-label="Remove this filter"
+                  onClick={() => save(tab.filter.filter((_, j) => j !== i))}
+                >
                   <X {...ICON} aria-hidden="true" />
                 </button>
               </div>

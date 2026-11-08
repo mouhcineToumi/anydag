@@ -324,7 +324,14 @@ export function parseQuiz(text: string): Quiz {
   const lines = linesOf(text, front.length, firstLine);
   const diagnostics: QuizDiagnostic[] = [];
   const say = (code: QuizCode, line: number, col: number, message: string, question?: string) =>
-    diagnostics.push({ code, severity: code.startsWith("W") ? "warning" : "error", line, col, message, ...(question ? { question } : {}) });
+    diagnostics.push({
+      code,
+      severity: code.startsWith("W") ? "warning" : "error",
+      line,
+      col,
+      message,
+      ...(question ? { question } : {}),
+    });
 
   const questions: Question[] = [];
   const description: Line[] = [];
@@ -356,7 +363,14 @@ export function parseQuiz(text: string): Quiz {
     const who = h.id;
     if (!h.prompt) say("EQ_NO_PROMPT", b.line.n, 1, "This question has no prompt. Write what it asks after the `##`.", who);
     if (open) {
-      if (h.multi) say("WQ_UNKNOWN_ATTR", b.line.n, 1, "`multi` means nothing on an open question: it has no options to choose between.", who);
+      if (h.multi)
+        say(
+          "WQ_UNKNOWN_ATTR",
+          b.line.n,
+          1,
+          "`multi` means nothing on an open question: it has no options to choose between.",
+          who,
+        );
     } else if (b.options.length === 0) {
       say(
         "EQ_NO_OPTIONS",
@@ -372,9 +386,22 @@ export function parseQuiz(text: string): Quiz {
         say("EQ_NO_ANSWER", b.options[0]!.line, 1, "No option is marked correct. Tick the right one with `- [x]`.", who);
       for (const o of b.options) if (!o.text) say("EQ_EMPTY_OPTION", o.line, 1, "This option has no text.", who);
     }
-    if (b.stray) say("EQ_STRAY", b.stray.n, 1, "Only the explanation can follow the options, as one quote (`> …`). Move this into the prompt above the options, or into the explanation.", who);
+    if (b.stray)
+      say(
+        "EQ_STRAY",
+        b.stray.n,
+        1,
+        "Only the explanation can follow the options, as one quote (`> …`). Move this into the prompt above the options, or into the explanation.",
+        who,
+      );
     for (const w of h.unknown)
-      say("WQ_UNKNOWN_ATTR", b.line.n, 1, `\`${w}\` means nothing on a question. The heading takes \`{#id}\` and \`multi\`.`, who);
+      say(
+        "WQ_UNKNOWN_ATTR",
+        b.line.n,
+        1,
+        `\`${w}\` means nothing on a question. The heading takes \`{#id}\` and \`multi\`.`,
+        who,
+      );
     questions.push(q);
   };
 
@@ -401,7 +428,19 @@ export function parseQuiz(text: string): Quiz {
     if (heading) {
       if (cur) finish(cur);
       else descEnd = line.start;
-      cur = { heading, line, body: [], fencedBody: new Set(), options: [], why: [], phase: "body", last: line, open: null, read: [], inQuote: false };
+      cur = {
+        heading,
+        line,
+        body: [],
+        fencedBody: new Set(),
+        options: [],
+        why: [],
+        phase: "body",
+        last: line,
+        open: null,
+        read: [],
+        inQuote: false,
+      };
       continue;
     }
 
@@ -477,17 +516,24 @@ export function parseQuiz(text: string): Quiz {
     }
   }
   if (cur) finish(cur);
-  if (fence) say("WQ_OPEN_FENCE", fence.line.n, 1, "This code block is never closed, so everything after it is code and asks nothing.");
+  if (fence)
+    say("WQ_OPEN_FENCE", fence.line.n, 1, "This code block is never closed, so everything after it is code and asks nothing.");
 
   const seen = new Set<string>();
   for (const q of questions) {
     if (q.id === undefined) {
-      say("WQ_NO_ID", q.line, 1, "This question has no id yet. It is given one, `{#q…}`, the first time it is edited or answered.");
+      say(
+        "WQ_NO_ID",
+        q.line,
+        1,
+        "This question has no id yet. It is given one, `{#q…}`, the first time it is edited or answered.",
+      );
     } else if (seen.has(q.id)) {
       say("EQ_DUPLICATE_ID", q.line, 1, `Another question already has the id \`${q.id}\`. Give this one its own.`, q.id);
     } else seen.add(q.id);
   }
-  if (questions.length === 0) say("WQ_EMPTY", firstLine, 1, "This quiz has no questions yet. A question starts at a `##` heading.");
+  if (questions.length === 0)
+    say("WQ_EMPTY", firstLine, 1, "This quiz has no questions yet. A question starts at a `##` heading.");
 
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   const descStart = front.length;

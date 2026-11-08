@@ -168,7 +168,12 @@ export interface Contents {
  */
 export function contents(root: Tree, path: string): Contents | null {
   const find = (node: Tree): Tree | null =>
-    node.path === path ? node : node.folders.reduce<Tree | null>((hit, f) => hit ?? (path.startsWith(`${f.path}/`) || f.path === path ? find(f) : null), null);
+    node.path === path
+      ? node
+      : node.folders.reduce<Tree | null>(
+          (hit, f) => hit ?? (path.startsWith(`${f.path}/`) || f.path === path ? find(f) : null),
+          null,
+        );
   const node = path ? find(root) : null;
   if (!node) return null;
   const out: Contents = { files: [], folders: [] };

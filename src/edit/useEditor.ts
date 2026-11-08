@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type RefObject,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 
 import type { AttrValue } from "@/board/attrs";
 import { freshId, itemsToText, textToItems } from "@/board/clipboard";
@@ -192,7 +184,7 @@ function guided(
   off: boolean,
 ): { x: number; y: number } {
   const s = off ? null : snapBox(proposed, others, SNAP_PX / zoom);
-  if (overlay) overlay.innerHTML = s ? guidesToSvg(s.guides, (grid / 2) / zoom) : "";
+  if (overlay) overlay.innerHTML = s ? guidesToSvg(s.guides, grid / 2 / zoom) : "";
   return {
     x: s?.x ?? snap(proposed.x, grid),
     y: s?.y ?? snap(proposed.y, grid),
@@ -207,9 +199,7 @@ function guided(
  * identity on every render of a memoised tree. `dag:tidy` already works this way.
  */
 const previewLinks = (moves: readonly (readonly [string, { x: number; y: number }])[] | null) =>
-  document.dispatchEvent(
-    new CustomEvent("dag:links-preview", { detail: { moves: moves === null ? null : new Map(moves) } }),
-  );
+  document.dispatchEvent(new CustomEvent("dag:links-preview", { detail: { moves: moves === null ? null : new Map(moves) } }));
 
 const clearGuides = (overlay: SVGElement | null) => {
   if (overlay) overlay.innerHTML = "";
@@ -251,9 +241,7 @@ export interface Renaming {
  * the `<g>` that carries the id, and nesting cannot answer for them.
  */
 function nameableUnder(el: Element | null): { id: string; what: Renaming["what"] } | null {
-  const hit = el?.closest<HTMLElement>(
-    "[data-dag-node],[data-dag-group],[data-dag-lane],[data-dag-edge],[data-dag-title-of]",
-  );
+  const hit = el?.closest<HTMLElement>("[data-dag-node],[data-dag-group],[data-dag-lane],[data-dag-edge],[data-dag-title-of]");
   if (!hit) return null;
   const d = hit.dataset;
   if (d.dagTitleOf) return { id: d.dagTitleOf, what: "node" };
@@ -568,7 +556,7 @@ interface Options {
   /** What the flow decided, before any gesture. */
   laidOut: Map<string, Placement>;
   handle: BoardHandle;
-  viewport: RefObject<ViewportHandle>;
+  viewport: RefObject<ViewportHandle | null>;
   grid: number;
   /** False under `?snapshot=1`, where the page is being photographed rather than used. */
   enabled: boolean;
@@ -986,8 +974,7 @@ export function useEditor({
          picture, the picture is still there with none, and its text is optional. */
       const caption = r.what === "node" && src.trimStart().split(/\s+/)[0] === "figure";
       if (trimmed === "" && r.what !== "edge" && !caption) return;
-      const next =
-        r.what === "edge" ? setEdgeLabel(src, trimmed || null, r.seg) : setTitle(src, trimmed || null, it.type);
+      const next = r.what === "edge" ? setEdgeLabel(src, trimmed || null, r.seg) : setTitle(src, trimmed || null, it.type);
       writeBody(it, replaceLine(it.body, line, next));
     },
     [bodyOf, renaming, writeBody],
@@ -1717,7 +1704,7 @@ export function useEditor({
       const want = to.trim();
       if (want === id) return null;
       if (want === "") return "an item needs a name";
-      if (lockedRef.current) return refuseLocked(), "read only: unlock to rename it";
+      if (lockedRef.current) return (refuseLocked(), "read only: unlock to rename it");
       const cur = handleRef.current.current();
       if (!cur) return "the board has not loaded yet";
       const done = renameItemId(cur.text, id, want);
@@ -1891,54 +1878,52 @@ export function useEditor({
    * this returns the draft and the survival check beside it, and `applyRewrite` is the thing that
    * writes.
    */
-  const rewrite = useCallback<EditorCtl["rewrite"]>(
-    async (ids, prompt, signal) => {
-      const b = boardRef.current;
-      const empty: RewriteOutcome = { ok: false, lost: [], unparsed: false, diagnostics: [], attempts: 0 };
-      if (!b || ids.length === 0) return { ...empty, reason: "missing" };
-      /* One item is the case there is a gesture for; a multi-item rewrite is a real design — what
+  const rewrite = useCallback<EditorCtl["rewrite"]>(async (ids, prompt, signal) => {
+    const b = boardRef.current;
+    const empty: RewriteOutcome = { ok: false, lost: [], unparsed: false, diagnostics: [], attempts: 0 };
+    if (!b || ids.length === 0) return { ...empty, reason: "missing" };
+    /* One item is the case there is a gesture for; a multi-item rewrite is a real design — what
          does one answer mean across three bodies? — and is refused rather than half-done: the
          whole first item rewritten and the rest silently ignored would be worse than an honest no. */
-      if (ids.length > 1) return { ...empty, reason: "multi" };
-      const item = b.items.find((it) => it.id === ids[0]);
-      if (!item) return { ...empty, reason: "missing" };
-      if (!isDiagramType(item.type)) return { ...empty, reason: "not-diagram" };
+    if (ids.length > 1) return { ...empty, reason: "multi" };
+    const item = b.items.find((it) => it.id === ids[0]);
+    if (!item) return { ...empty, reason: "missing" };
+    if (!isDiagramType(item.type)) return { ...empty, reason: "not-diagram" };
 
-      /* The selection's own DSL, and the ids the rest of the board links into it: the
+    /* The selection's own DSL, and the ids the rest of the board links into it: the
          model sees the selection plus what references it, never the whole board. The instruction is
          appended to, so a line naming what must survive rides with whatever the person typed. */
-      const context = rewriteContext(b, new Set(ids));
-      const { llm } = readSettings();
-      const result = await requestRewrite(
-        {
-          prompt: context ? `${prompt}\n\n${context}` : prompt,
-          /* `from`, never `as`: the type is what the item is now, and the person may be asking for
+    const context = rewriteContext(b, new Set(ids));
+    const { llm } = readSettings();
+    const result = await requestRewrite(
+      {
+        prompt: context ? `${prompt}\n\n${context}` : prompt,
+        /* `from`, never `as`: the type is what the item is now, and the person may be asking for
              another one — pinned, "show this as a flowchart" was refused on every attempt. */
-          from: item.type,
-          source: item.body,
-          provider: llm.provider,
-          model: llm.model,
-          reasoning: llm.reasoning,
-        },
-        signal,
-      );
-      if (!result.ok || !result.draft) return { ...empty, error: result.error, diagnostics: result.diagnostics, attempts: result.attempts };
+        from: item.type,
+        source: item.body,
+        provider: llm.provider,
+        model: llm.model,
+        reasoning: llm.reasoning,
+      },
+      signal,
+    );
+    if (!result.ok || !result.draft)
+      return { ...empty, error: result.error, diagnostics: result.diagnostics, attempts: result.attempts };
 
-      /* What the draft would break elsewhere on the board, judged now — `applyRewrite` runs the
+    /* What the draft would break elsewhere on the board, judged now — `applyRewrite` runs the
          same check again against the board as it then is, but the person deciding whether to accept
          wants the answer before that, not after. */
-      const survival = lost(b, item, result.draft.body, result.draft.type);
-      return {
-        ok: true,
-        draft: result.draft,
-        lost: survival.parsed ? survival.lost : [],
-        unparsed: !survival.parsed,
-        diagnostics: result.diagnostics,
-        attempts: result.attempts,
-      };
-    },
-    [],
-  );
+    const survival = lost(b, item, result.draft.body, result.draft.type);
+    return {
+      ok: true,
+      draft: result.draft,
+      lost: survival.parsed ? survival.lost : [],
+      unparsed: !survival.parsed,
+      diagnostics: result.diagnostics,
+      attempts: result.attempts,
+    };
+  }, []);
 
   /*
    * Land an accepted rewrite, against the board as it is *now* — the answer took seconds, and in
@@ -2042,7 +2027,9 @@ export function useEditor({
         /* Shift toggles the whole family: in if any member is out, out otherwise. */
         next = new Set(was);
         const allIn = [...family].every((f) => next.has(f));
-        for (const f of family) if (allIn) next.delete(f); else next.add(f);
+        for (const f of family)
+          if (allIn) next.delete(f);
+          else next.add(f);
         setSelected(next);
         selectedRef.current = next;
         if (!next.has(id)) return true;
@@ -2170,7 +2157,7 @@ export function useEditor({
         addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
         const moves = new Map<string, Point>();
         for (const p of parts) moves.set(p.id, { x: p.from.x + at.dx, y: p.from.y + at.dy });
-        move(moves);
+        void move(moves);
       };
 
       /*
@@ -2245,7 +2232,13 @@ export function useEditor({
         const sn = off ? null : snapBox(probe, others, t);
         const hit = axis === "x" ? sn?.x : sn?.y;
         if (hit === null || hit === undefined) return { at: snap(at, g), svg: "" };
-        return { at: hit, svg: guidesToSvg(sn!.guides.filter((q) => q.axis === axis && q.kind === "align"), 0) };
+        return {
+          at: hit,
+          svg: guidesToSvg(
+            sn!.guides.filter((q) => q.axis === axis && q.kind === "align"),
+            0,
+          ),
+        };
       };
 
       const onMove = (ev: PointerEvent) => {
@@ -2359,9 +2352,7 @@ export function useEditor({
               if (at.y === undefined) at.y = Math.round(from.y);
             }
             setOverrides((prev) => new Map(prev).set(id, { ...prev.get(id), ...o }));
-            const ops: PatchOp[] = [
-              { id, attrs: at, body: scaleFixed(fixed, laid, item!.body, sx, sy, gridRef.current) },
-            ];
+            const ops: PatchOp[] = [{ id, attrs: at, body: scaleFixed(fixed, laid, item!.body, sx, sy, gridRef.current) }];
             if (at.x !== undefined) ops.push(...pins([id]));
             void commit(ops);
             return;
@@ -2428,7 +2419,13 @@ export function useEditor({
       }
       const keys = ["transform", "width", "height", "transformOrigin"] as const;
       const saved = new Map<HTMLElement, Record<(typeof keys)[number], string>>();
-      for (const el of [box, ...els.values()]) saved.set(el, { transform: el.style.transform, width: el.style.width, height: el.style.height, transformOrigin: el.style.transformOrigin });
+      for (const el of [box, ...els.values()])
+        saved.set(el, {
+          transform: el.style.transform,
+          width: el.style.width,
+          height: el.style.height,
+          transformOrigin: el.style.transformOrigin,
+        });
       const restore = () => {
         for (const [el, was] of saved) for (const k of keys) el.style[k] = was[k];
       };
@@ -2441,7 +2438,13 @@ export function useEditor({
         const sn = off ? null : snapBox(probe, others, t);
         const hit = axis === "x" ? sn?.x : sn?.y;
         if (hit === null || hit === undefined) return { at: snap(at, g), svg: "" };
-        return { at: hit, svg: guidesToSvg(sn!.guides.filter((q) => q.axis === axis && q.kind === "align"), 0) };
+        return {
+          at: hit,
+          svg: guidesToSvg(
+            sn!.guides.filter((q) => q.axis === axis && q.kind === "align"),
+            0,
+          ),
+        };
       };
 
       const onMove = (ev: PointerEvent) => {
@@ -2764,20 +2767,47 @@ export function useEditor({
       rewrite,
       applyRewrite: held(applyRewrite, Promise.resolve(false)),
     };
-  }, [move, commit, open, remove, duplicate, bringToFront, sendToBack, withGroups, pins, addLink, toBoard, paint, pickNode, pickEdge, clearPick, growFrom, startRename, nodeDrag, writePrompt, generateFor, acceptDraft, rewrite, applyRewrite]);
+  }, [
+    move,
+    commit,
+    open,
+    remove,
+    duplicate,
+    bringToFront,
+    sendToBack,
+    withGroups,
+    pins,
+    addLink,
+    toBoard,
+    paint,
+    pickNode,
+    pickEdge,
+    clearPick,
+    growFrom,
+    startRename,
+    nodeDrag,
+    writePrompt,
+    generateFor,
+    acceptDraft,
+    rewrite,
+    applyRewrite,
+  ]);
 
-  const onMarquee = useCallback((rect: Rect, additive: boolean) => {
-    const hit: string[] = [];
-    for (const [id, p] of placesRef.current) {
-      if (p.x < rect.x + rect.w && p.x + p.w > rect.x && p.y < rect.y + rect.h && p.y + p.h > rect.y) hit.push(id);
-    }
-    /* Only what is on this page: `places` is already per page, by way of `placeItems`. Touching
+  const onMarquee = useCallback(
+    (rect: Rect, additive: boolean) => {
+      const hit: string[] = [];
+      for (const [id, p] of placesRef.current) {
+        if (p.x < rect.x + rect.w && p.x + p.w > rect.x && p.y < rect.y + rect.h && p.y + p.h > rect.y) hit.push(id);
+      }
+      /* Only what is on this page: `places` is already per page, by way of `placeItems`. Touching
        one member of a group takes the group. */
-    const all = withGroups(hit);
-    setSelected((prev) => (additive ? new Set([...prev, ...all]) : all));
-    setPickedLink(null);
-    clearPick();
-  }, [withGroups, clearPick]);
+      const all = withGroups(hit);
+      setSelected((prev) => (additive ? new Set([...prev, ...all]) : all));
+      setPickedLink(null);
+      clearPick();
+    },
+    [withGroups, clearPick],
+  );
 
   const onPaperClick = useCallback(() => {
     clear();
@@ -2827,20 +2857,22 @@ export function useEditor({
     async (name?: string): Promise<string | null> => {
       const b = boardRef.current;
       if (!b) return null;
-      if (lockedRef.current) return refuseLocked(), null;
+      if (lockedRef.current) return (refuseLocked(), null);
       const sel = selectedRef.current;
       const chosen = sel.size ? b.items.filter((it) => sel.has(it.id)) : visible();
       if (chosen.length === 0) return null;
 
       const one = chosen.length === 1 ? chosen[0]! : null;
       const title = name?.trim() || one?.title?.trim() || (one ? `A ${one.type}` : `${chosen.length} items`);
-      const description = one
-        ? `${one.type}, saved from \`${b.name}\``
-        : `${chosen.length} items, saved from \`${b.name}\``;
+      const description = one ? `${one.type}, saved from \`${b.name}\`` : `${chosen.length} items, saved from \`${b.name}\``;
       const icon = one && isDiagramType(one.type) ? "Boxes" : "Layers";
       const text = `${componentFrontmatter(title, description, icon)}\n${itemsToText(chosen)}\n`;
 
-      const stem = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "component";
+      const stem =
+        title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "component";
       const r = await fetch("/__board/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -2938,7 +2970,9 @@ export function useEditor({
     const b = boardRef.current;
     const sel = selectedRef.current;
     if (!b) return;
-    const ops: PatchOp[] = b.items.filter((it) => sel.has(it.id) && it.group).map((it) => ({ id: it.id, attrs: { group: null } }));
+    const ops: PatchOp[] = b.items
+      .filter((it) => sel.has(it.id) && it.group)
+      .map((it) => ({ id: it.id, attrs: { group: null } }));
     if (ops.length) void commit(ops);
   }, [commit]);
 
@@ -2959,22 +2993,25 @@ export function useEditor({
    * The items to export, as boxes at zoom 1 with their elements. The height is measured, not the
    * flow's guess: `place.h` is what the flow was told, the element is what is on screen.
    */
-  const partsFor = useCallback((ids?: string[]) => {
-    const layer = document.querySelector<HTMLElement>(".dag-layer");
-    const zoom = Number(document.querySelector<HTMLElement>(".dag-viewport")?.dataset.zoom ?? 1) || 1;
-    const want = ids ? new Set(ids) : null;
-    const out: { el: HTMLElement; x: number; y: number; width: number; height: number; id: string }[] = [];
-    for (const it of visible()) {
-      if (want && !want.has(it.id)) continue;
-      const el = layer?.querySelector<HTMLElement>(`[data-dag-item="${CSS.escape(it.id)}"]`);
-      const p = placesRef.current.get(it.id);
-      if (!el || !p) continue;
-      const inner = el.querySelector<HTMLElement>(".dag-item__body");
-      const height = (inner?.getBoundingClientRect().height ?? p.h * zoom) / zoom;
-      out.push({ el, x: p.x, y: p.y, width: p.w, height, id: it.id });
-    }
-    return out;
-  }, [visible]);
+  const partsFor = useCallback(
+    (ids?: string[]) => {
+      const layer = document.querySelector<HTMLElement>(".dag-layer");
+      const zoom = Number(document.querySelector<HTMLElement>(".dag-viewport")?.dataset.zoom ?? 1) || 1;
+      const want = ids ? new Set(ids) : null;
+      const out: { el: HTMLElement; x: number; y: number; width: number; height: number; id: string }[] = [];
+      for (const it of visible()) {
+        if (want && !want.has(it.id)) continue;
+        const el = layer?.querySelector<HTMLElement>(`[data-dag-item="${CSS.escape(it.id)}"]`);
+        const p = placesRef.current.get(it.id);
+        if (!el || !p) continue;
+        const inner = el.querySelector<HTMLElement>(".dag-item__body");
+        const height = (inner?.getBoundingClientRect().height ?? p.h * zoom) / zoom;
+        out.push({ el, x: p.x, y: p.y, width: p.w, height, id: it.id });
+      }
+      return out;
+    },
+    [visible],
+  );
 
   /**
    * The link layer as a part, at its board position.
@@ -3057,7 +3094,9 @@ export function useEditor({
      data attribute, because an SVG with its fonts embedded is megabytes. */
   useEffect(() => {
     const onExport = (e: Event) => {
-      const d = (e as CustomEvent<{ kind?: string; ids?: string[]; reply?: (v: string) => void; fail?: (why: string) => void } | null>).detail;
+      const d = (
+        e as CustomEvent<{ kind?: string; ids?: string[]; reply?: (v: string) => void; fail?: (why: string) => void } | null>
+      ).detail;
       if (!d?.reply || (d.kind !== "svg" && d.kind !== "png")) return;
       const { reply, fail } = d;
       renderExport(d.kind, d.ids).then(
@@ -3290,10 +3329,7 @@ export function useEditor({
 
   /* ---- the editor panel's writes ---- */
 
-  const setBody = useCallback(
-    (id: string, body: string) => void commit([{ id, body }], `body:${id}`),
-    [commit],
-  );
+  const setBody = useCallback((id: string, body: string) => void commit([{ id, body }], `body:${id}`), [commit]);
   const setAttrs = useCallback(
     (id: string, attrs: Record<string, AttrValue | null>) =>
       void commit([{ id, attrs }], `attrs:${id}:${Object.keys(attrs).join(",")}`),
@@ -3342,8 +3378,7 @@ export function useEditor({
 
     /** One place saying which callback a binding names, so the table itself holds no closures. */
     const run = (command: Command) => {
-      const at = () =>
-        pointer.current.over ? viewport.current?.toBoard(pointer.current.x, pointer.current.y) : undefined;
+      const at = () => (pointer.current.over ? viewport.current?.toBoard(pointer.current.x, pointer.current.y) : undefined);
       switch (command) {
         case "select":
           return setTool("select");
@@ -3511,9 +3546,9 @@ export function useEditor({
         else undo();
         return;
       }
-      if (mod && e.key.toLowerCase() === "y") return take(), redo();
-      if (mod && e.key.toLowerCase() === "a") return take(), selectAll();
-      if (mod && e.key.toLowerCase() === "d") return take(), pn ? duplicatePickedNode() : duplicate();
+      if (mod && e.key.toLowerCase() === "y") return (take(), redo());
+      if (mod && e.key.toLowerCase() === "a") return (take(), selectAll());
+      if (mod && e.key.toLowerCase() === "d") return (take(), pn ? duplicatePickedNode() : duplicate());
       if (mod && e.key.toLowerCase() === "g") {
         take();
         if (e.shiftKey) ungroup();
@@ -3522,11 +3557,11 @@ export function useEditor({
       }
       /* ctrl+shift+K: keep this as a component. Not ctrl+S — the browser owns that, and a page
          save dialog over the board is the one thing worse than no shortcut. */
-      if (mod && e.shiftKey && e.key.toLowerCase() === "k") return take(), void saveAsComponent();
+      if (mod && e.shiftKey && e.key.toLowerCase() === "k") return (take(), void saveAsComponent());
       /* ⌘⇧H / ctrl+shift+H: hidden, off the canvas but still in the file. */
-      if (mod && e.shiftKey && e.key.toLowerCase() === "h") return take(), toggleHidden();
+      if (mod && e.shiftKey && e.key.toLowerCase() === "h") return (take(), toggleHidden());
       /* ctrl+, — what every editor binds for its preferences, and a key nothing here wanted. */
-      if (mod && e.key === ",") return take(), onSettingsRef.current?.();
+      if (mod && e.key === ",") return (take(), onSettingsRef.current?.());
       if (mod) return;
 
       switch (e.key) {
@@ -3534,25 +3569,25 @@ export function useEditor({
           /* A card over the board first: it sits over everything, and its Escape must not also
              clear what is selected underneath. One handler, in one order, rather than three racing
              on the window. */
-          if (document.querySelector("[data-dag-settings]")) return take(), onSettingsRef.current?.();
-          if (document.querySelector("[data-dag-shortcuts]")) return take(), onHelpRef.current?.();
+          if (document.querySelector("[data-dag-settings]")) return (take(), onSettingsRef.current?.());
+          if (document.querySelector("[data-dag-shortcuts]")) return (take(), onHelpRef.current?.());
           /* The pick before the panel and before the selection: it is the innermost thing that is
              held, so it is the first thing let go. A second Escape does what one always did. */
-          if (pn || pe) return take(), clearPick();
-          if (editingRef.current) return take(), close();
-          if (sel.size) return take(), clear();
-          if (pickedLinkRef.current) return take(), setPickedLink(null);
+          if (pn || pe) return (take(), clearPick());
+          if (editingRef.current) return (take(), close());
+          if (sel.size) return (take(), clear());
+          if (pickedLinkRef.current) return (take(), setPickedLink(null));
           /* The pen last, because it is the outermost thing held — the tool everything else sits
              on, the way the hand tool would be if it could be held. Everything above it let go
              first; the next Escape puts the pen down. */
-          if (toolRef.current === "pen") return take(), setTool("select");
+          if (toolRef.current === "pen") return (take(), setTool("select"));
           return;
         case "Delete":
         case "Backspace":
-          if (pn) return take(), removePickedNode();
-          if (pe) return take(), removePickedEdge();
-          if (sel.size) return take(), remove();
-          if (pickedLinkRef.current) return take(), removeLink(pickedLinkRef.current);
+          if (pn) return (take(), removePickedNode());
+          if (pe) return (take(), removePickedEdge());
+          if (sel.size) return (take(), remove());
+          if (pickedLinkRef.current) return (take(), removeLink(pickedLinkRef.current));
           return;
         case "Enter":
           if (pn || pe) {
@@ -3572,25 +3607,25 @@ export function useEditor({
               return open(link.fence);
             }
           }
-          if (sel.size === 1) return take(), open([...sel][0]!);
+          if (sel.size === 1) return (take(), open([...sel][0]!));
           return;
         case "ArrowLeft":
-          if (sel.size) return take(), nudge(-step, 0);
+          if (sel.size) return (take(), nudge(-step, 0));
           return;
         case "ArrowRight":
-          if (sel.size) return take(), nudge(step, 0);
+          if (sel.size) return (take(), nudge(step, 0));
           return;
         case "ArrowUp":
-          if (sel.size) return take(), nudge(0, -step);
+          if (sel.size) return (take(), nudge(0, -step));
           return;
         case "ArrowDown":
-          if (sel.size) return take(), nudge(0, step);
+          if (sel.size) return (take(), nudge(0, step));
           return;
         case "]":
-          if (sel.size) return take(), bringToFront();
+          if (sel.size) return (take(), bringToFront());
           return;
         case "[":
-          if (sel.size) return take(), sendToBack();
+          if (sel.size) return (take(), sendToBack());
           return;
       }
     };
@@ -3721,7 +3756,40 @@ export function useEditor({
       document.removeEventListener("cut", onCut);
       document.removeEventListener("paste", onPaste);
     };
-  }, [enabled, add, bringToFront, clear, clearPick, close, duplicate, duplicatePickedNode, flushNudge, group, history, importFiles, insert, links, move, open, paintMove, redo, remove, removeLink, removePickedEdge, removePickedNode, saveAsComponent, selectAll, sendToBack, setMode, tidyUp, toggleHidden, undo, ungroup, viewport, visible]);
+  }, [
+    enabled,
+    add,
+    bringToFront,
+    clear,
+    clearPick,
+    close,
+    duplicate,
+    duplicatePickedNode,
+    flushNudge,
+    group,
+    history,
+    importFiles,
+    insert,
+    links,
+    move,
+    open,
+    paintMove,
+    redo,
+    remove,
+    removeLink,
+    removePickedEdge,
+    removePickedNode,
+    saveAsComponent,
+    selectAll,
+    sendToBack,
+    setMode,
+    tidyUp,
+    toggleHidden,
+    undo,
+    ungroup,
+    viewport,
+    visible,
+  ]);
 
   /* `tick` is what makes `canUndo` a fresh read after a write; the stack itself is not state. */
   void tick;

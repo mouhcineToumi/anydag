@@ -41,10 +41,20 @@ export interface Conversion {
 }
 
 /** An id the tokenizer will read back as one word. `WORD` allows more than this; ids need less. */
-const idOf = (raw: string): string => raw.trim().replace(/[^A-Za-z0-9_.\-/]/g, "_").toLowerCase() || "n";
+const idOf = (raw: string): string =>
+  raw
+    .trim()
+    .replace(/[^A-Za-z0-9_.\-/]/g, "_")
+    .toLowerCase() || "n";
 
 /** A label, as the one string form this grammar has. */
-const q = (s: string): string => JSON.stringify(s.trim().replace(/<br\s*\/?>/gi, " ").replace(/\s+/g, " "));
+const q = (s: string): string =>
+  JSON.stringify(
+    s
+      .trim()
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/\s+/g, " "),
+  );
 
 const comment = (line: string, why: string): string => `%% ${why}: ${line.trim()}`;
 
@@ -372,7 +382,10 @@ function fromSequence(lines: string[]): Conversion {
      * class it also matched the first `-` of the arrow, so `A-->>W` read as a participant called
      * `a-` talking over `->>` — two phantom columns on every diagram with a return message in it.
      */
-    const msg = /^([A-Za-z0-9_.]+(?:-[A-Za-z0-9_.]+)*)\s*(--?>>?|--?\)|--?x)\s*([+-]?)([A-Za-z0-9_.]+(?:-[A-Za-z0-9_.]+)*)\s*:\s*(.*)$/.exec(line);
+    const msg =
+      /^([A-Za-z0-9_.]+(?:-[A-Za-z0-9_.]+)*)\s*(--?>>?|--?\)|--?x)\s*([+-]?)([A-Za-z0-9_.]+(?:-[A-Za-z0-9_.]+)*)\s*:\s*(.*)$/.exec(
+        line,
+      );
     if (msg) {
       const arrow = SEQ_ARROWS.find(([re]) => re.test(msg[2]!))?.[1] ?? "->>";
       const from = idOf(msg[1]!);
@@ -406,7 +419,11 @@ function fromSequence(lines: string[]): Conversion {
  * would then hand `parseChart` an id that reads as a value in every other position.
  */
 function chartId(raw: string, taken: Set<string>): string {
-  const base = raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const base = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   const head = /^[a-z]/.test(base) ? base : `s${base}`;
   let id = head || "s";
   for (let n = 2; taken.has(id); n++) id = `${head || "s"}-${n}`;
@@ -493,8 +510,7 @@ const items = (inside: string): string[] =>
         .filter((s) => s !== "");
 
 /** A category, bare where the tokenizer reads it back as one word and quoted where it would not. */
-const category = (s: string): string =>
-  /^[A-Za-z][A-Za-z0-9_.\-/+]*$/.test(s) || /^\d+(?:\.\d+)?$/.test(s) ? s : q(s);
+const category = (s: string): string => (/^[A-Za-z][A-Za-z0-9_.\-/+]*$/.test(s) || /^\d+(?:\.\d+)?$/.test(s) ? s : q(s));
 
 /** A value, or `-` for the gap — which is what an entry nobody can read already means here. */
 const value = (s: string): string => {

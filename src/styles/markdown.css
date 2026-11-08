@@ -182,7 +182,7 @@
   text-decoration: underline wavy var(--dag-color-danger);
   text-underline-offset: 0.2em;
 }
-/* A colour written in the TeX is one the theme does not own (`CLAUDE.md`, *A custom colour*): an
+/* A colour written in the TeX is one the theme does not own (`docs/architecture/design-and-layout.md`, *A custom colour*): an
    equation draws in the ink around it, whatever `\color` and `\colorbox` say. */
 .dag-math .katex [style*="color:"] { color: inherit !important; }
 .dag-math .katex [style*="background-color"] { background-color: transparent !important; }

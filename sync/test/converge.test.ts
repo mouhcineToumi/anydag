@@ -40,7 +40,9 @@ describe("convergence", () => {
       }
       if (failed.length) {
         console.error(failed.map(describeFailure).join("\n\n"));
-        expect.fail(`${failed.length} of ${SEEDS.length} seed(s) failed: ${failed.map((r) => r.seed).join(", ")} — the steps are printed above`);
+        expect.fail(
+          `${failed.length} of ${SEEDS.length} seed(s) failed: ${failed.map((r) => r.seed).join(", ")} — the steps are printed above`,
+        );
       }
     },
     Math.max(60_000, SEEDS.length * 15_000),
@@ -192,6 +194,33 @@ describe("convergence", () => {
         expect(w.read(A, "ideas.md")).not.toBeNull();
         expect(w.read(A, "ideas 2.board.md")).not.toBeNull();
         expect(w.read(B, "ideas.board.md")).toBeNull();
+      });
+    });
+
+    // Seed 2, once a loaded machine spread its births over several seconds: B pulled a document and
+    // renamed it before its vault ever walked, and the first walk dated the renamed file by its
+    // birth — the rename's second — rather than by the created sync had adopted for its id. The
+    // tie-break against a copy made on A read the id's created, the index row the birth, so B kept
+    // the copy and A kept the original: each fixed the other's file and the id ended on neither.
+    it("a document renamed before its first walk keeps its id's created in the index", async () => {
+      await scripted(async (w, A, B) => {
+        const T = Date.parse("2026-11-06T14:30:00Z");
+        A.clock = B.clock = T;
+        w.write(A, "notes/inbox.md", text("---\nid: hhhhhhhhhh\n---\none\n"));
+        w.write(A, "ideas.md", text("see [it](dag:hhhhhhhhhh)\n"));
+        await sync(A);
+        await B.engine.pull();
+        B.clock = T + 11_000;
+        w.remove(B, "notes/inbox.md");
+        w.write(B, "plan.md", text("---\nid: hhhhhhhhhh\n---\none\n"));
+        await B.vault.tree();
+        A.clock = T + 5_000;
+        w.write(A, "spec.md", text("---\nid: hhhhhhhhhh\n---\none\n"));
+        await A.engine.scan();
+        await A.engine.syncOnce();
+        await B.engine.pull();
+        await sync(B);
+        await sync(A);
       });
     });
 

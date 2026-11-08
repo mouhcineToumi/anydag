@@ -22,8 +22,9 @@ const flag = (name, fallback) => {
   const i = argv.indexOf(name);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
 };
-const ORIGIN = (
-  flag("--origin", process.env.ANYDAG_ORIGIN || `http://localhost:${process.env.ANYDAG_COMPOSE_PORT || 3600}`)
+const ORIGIN = flag(
+  "--origin",
+  process.env.ANYDAG_ORIGIN || `http://localhost:${process.env.ANYDAG_COMPOSE_PORT || 3600}`,
 ).replace(/\/$/, "");
 
 let session;

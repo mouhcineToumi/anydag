@@ -14,7 +14,7 @@ import type { TableDiagnostic } from "./codes";
 import { parseTable, type ColumnType, type FilterRule, type SortKey } from "./parse";
 import { readCell, tableDiagnostics, viewRows, type LinkValue } from "./values";
 
-export interface ColumnData {
+interface ColumnData {
   id: string | null;
   name: string;
   type: ColumnType;
@@ -22,7 +22,7 @@ export interface ColumnData {
   w: number | null;
 }
 
-export interface RowData {
+interface RowData {
   id: string | null;
   line: number;
   h: number | null;
@@ -33,7 +33,7 @@ export interface RowData {
   unread: string[];
 }
 
-export interface TabData {
+interface TabData {
   id: string | null;
   name: string;
   line: number;
@@ -53,7 +53,7 @@ export interface TableData {
 }
 
 /** A column's key in `cells`: its id, or its place for one with none. */
-export const columnKey = (id: string | undefined, index: number): string => id ?? `#${index + 1}`;
+const columnKey = (id: string | undefined, index: number): string => id ?? `#${index + 1}`;
 
 export function tableData(text: string, opts: { view?: boolean; tab?: string } = {}): TableData {
   const table = parseTable(text);

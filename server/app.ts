@@ -78,7 +78,13 @@ export function createApp(opts: ServerOptions): Hono {
     const start = performance.now();
     await next();
     const template = routePath(c, -1);
-    if (!template || template === "*" || template.endsWith("/*") || !(template.startsWith("/__board") || template.startsWith("/api"))) return;
+    if (
+      !template ||
+      template === "*" ||
+      template.endsWith("/*") ||
+      !(template.startsWith("/__board") || template.startsWith("/api"))
+    )
+      return;
     logs.routeDone(`${c.req.method} ${template}`, c.res.status, performance.now() - start);
   });
 

@@ -84,7 +84,13 @@ export function TelemetryPrompt() {
           <button type="button" className="dag-button" data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
             No thanks
           </button>
-          <button type="button" className="dag-button dag-button--primary" data-dag-telemetry-yes="" disabled={busy} onClick={() => answer(true)}>
+          <button
+            type="button"
+            className="dag-button dag-button--primary"
+            data-dag-telemetry-yes=""
+            disabled={busy}
+            onClick={() => answer(true)}
+          >
             Send anonymous logs
           </button>
         </footer>

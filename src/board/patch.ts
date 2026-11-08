@@ -46,7 +46,7 @@ export interface SetOp {
  * Delete an item: its fence lines, its body, and the blank line that separated it — and every link
  * that named it, or a card inside it, out of every `edges` fence (see `dropLinks`).
  */
-export interface RemoveOp {
+interface RemoveOp {
   id: string;
   remove: true;
 }
@@ -92,7 +92,7 @@ export interface MetaOp {
 type MoveTarget = "front" | "back" | { before: string } | { after: string };
 
 /** Cut an item's whole block out and paste it back in, front, back, or beside a named item. */
-export interface MoveOp {
+interface MoveOp {
   id: string;
   move: MoveTarget;
 }
@@ -101,10 +101,10 @@ export type PatchOp = SetOp | RemoveOp | InsertOp | MetaOp | MoveOp;
 
 export type PatchResult = { ok: true; text: string } | { ok: false; error: string };
 
-export const isInsert = (op: PatchOp): op is InsertOp => "insert" in op;
-export const isRemove = (op: PatchOp): op is RemoveOp => "remove" in op && op.remove === true;
-export const isMeta = (op: PatchOp): op is MetaOp => "meta" in op;
-export const isMove = (op: PatchOp): op is MoveOp => "move" in op;
+const isInsert = (op: PatchOp): op is InsertOp => "insert" in op;
+const isRemove = (op: PatchOp): op is RemoveOp => "remove" in op && op.remove === true;
+const isMeta = (op: PatchOp): op is MetaOp => "meta" in op;
+const isMove = (op: PatchOp): op is MoveOp => "move" in op;
 
 /** Between two blocks: exactly one blank line, which is how every board here is written. */
 function join(left: string, right: string): string {
@@ -375,17 +375,11 @@ function dropLinks(text: string, gone: ReadonlySet<string>): string {
  * means there is nothing to reorder against: a solo item on its page, or a named target that is
  * not (any more) on the board.
  */
-function moveTarget(
-  move: MoveTarget,
-  page: string,
-  candidates: Located[],
-): { item: Located; side: "before" | "after" } | null {
+function moveTarget(move: MoveTarget, page: string, candidates: Located[]): { item: Located; side: "before" | "after" } | null {
   if (typeof move === "string") {
     const onPage = candidates.filter((it) => (str(it.attrs, "page") ?? "page-1") === page);
     if (onPage.length === 0) return null;
-    return move === "front"
-      ? { item: onPage[onPage.length - 1]!, side: "after" }
-      : { item: onPage[0]!, side: "before" };
+    return move === "front" ? { item: onPage[onPage.length - 1]!, side: "after" } : { item: onPage[0]!, side: "before" };
   }
   if ("before" in move) {
     const item = candidates.find((it) => it.id === move.before);

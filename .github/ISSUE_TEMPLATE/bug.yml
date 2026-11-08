@@ -1,0 +1,116 @@
+name: Bug report
+description: Something does not work as it should
+title: "bug: "
+labels: ["status: triage", "type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. A new issue starts as `status: triage`; the maintainer marks it
+        `status: ready` when it has what is needed to be worked on (see the
+        [Definition of Ready](https://github.com/mouhcineToumi/anydag/blob/develop/CONTRIBUTING.md#definition-of-ready-for-an-issue)).
+        The more of this you fill in, the sooner that happens.
+
+        **A security problem?** Do not use this form. See the
+        [security policy](https://github.com/mouhcineToumi/anydag/security/policy).
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: This is a single problem, not a list of several.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong?
+      description: The problem, in a few sentences. What were you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a fresh start of the app if you can. A board, note or file that shows it helps a lot; paste its text or attach it.
+      placeholder: |
+        1. Open a vault with ...
+        2. Create a ...
+        3. Press ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What should have happened. This is what we will check against once it is fixed.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Include the error message, a screenshot or a screen recording if there is one.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AnyDag version
+      description: Settings → About, or `anydag --version`. For a build from source, the commit.
+      placeholder: "0.1.0, or 0.2.0-nightly.202611071200"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Other (say which below)
+    validations:
+      required: true
+  - type: dropdown
+    id: runs
+    attributes:
+      label: How are you running it?
+      options:
+        - Desktop app
+        - "`anydag serve` in a browser"
+        - From source (`npm run dev`)
+        - "`anydag mcp` / the CLI"
+        - The sync server
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part is it in?
+      description: Your best guess; the maintainer sets the `area:` label.
+      options:
+        - Canvas, boards and layout
+        - DSL and diagrams
+        - Notes, equations, search
+        - Tables
+        - Quizzes
+        - Tasks and calendar
+        - Sync
+        - Desktop app and installers
+        - CLI and MCP
+        - Assistant and prompt cards
+        - Docs, CI or tooling
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Logs, the browser console, other software involved, whether it happens in every vault, what you already tried.
+    validations:
+      required: false

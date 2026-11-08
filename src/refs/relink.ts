@@ -119,7 +119,12 @@ function sitesOf(text: string, kind: LinkKind): Site[] {
 
 /* -- which documents could be affected ------------------------------------------------------- */
 
-const fold = (s: string): string => s.normalize("NFC").toLowerCase().replace(/\\/g, "/").replace(/^\.?\/+/, "");
+const fold = (s: string): string =>
+  s
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/\\/g, "/")
+    .replace(/^\.?\/+/, "");
 const leafOf = (n: string): string => n.slice(n.lastIndexOf("/") + 1);
 /** What resolution strips off a target before it compares: `.md`, then a kind's `.board`, `.note`… */
 const SUFFIX = /(?:\.(?:note|board|quiz|table))?(?:\.md)?$/i;

@@ -27,6 +27,23 @@ cd "$(dirname "$0")/.."
 # not cost that.
 step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 
+# Biome's linter: half a second over the whole tree, so it goes first. The type-aware promise checks
+# are `npm run lint:promises` (typescript-eslint, ~40 s) and run in CI as their own job; they are too
+# slow for a commit hook.
+step "lint"
+npx biome lint .
+
+# Biome's formatter, checking only: a file it would change is a failure, and `npm run format` is the
+# fix. A whole-tree reformat is its own commit, listed in `.git-blame-ignore-revs`.
+step "format"
+npx biome format .
+
+# Unused exports, files and dependencies, and imports of packages `package.json` does not list: the
+# count is zero and stays zero, so any finding is a regression. Its exceptions, each with its
+# reason, are in `knip.jsonc`. About two seconds over the whole tree.
+step "knip"
+npx knip
+
 step "typecheck"
 npx tsc --noEmit
 npx tsc --noEmit -p tsconfig.worker.json

@@ -49,7 +49,8 @@ test.beforeEach(({}, info) => {
 test.afterEach(() => {
   fs.rmSync(file, { force: true });
   /* A rename or a duplicate leaves a second file behind, named after this one. */
-  for (const f of fs.readdirSync(DIR)) if (f.startsWith(`${name}-`) || f.startsWith(`renamed-${name}`)) fs.rmSync(path.join(DIR, f), { force: true });
+  for (const f of fs.readdirSync(DIR))
+    if (f.startsWith(`${name}-`) || f.startsWith(`renamed-${name}`)) fs.rmSync(path.join(DIR, f), { force: true });
 });
 
 const read = () => fs.readFileSync(file, "utf8");
@@ -83,8 +84,11 @@ test("picking a card and pressing enter opens the panel on that card", async ({ 
   /* F1 changed what this gesture means. It used to open the *text* with the declaring line
      selected; it now opens the controls for the thing that was clicked, and the line is one tab
      away — the DSL is for the reader who wants it, which is the whole of the milestone. */
+  await expect(page.locator("[data-dag-inspector]")).toBeVisible();
   await expect(page.locator('[data-dag-mode="props"]')).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "api");
+  /* Properties means controls: the text is behind the other tab, not on screen. */
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
 
   await page.locator('[data-dag-mode="source"]').click();
   const picked = await page.locator(".dag-inspector textarea").evaluate((el) => {
@@ -277,7 +281,6 @@ test("New board makes one, opens it, and names it where it is drawn", async ({ p
 
 /** The theme lives in Settings now, so every read of it opens the dialog first. */
 const theme = (page: Page) => page.locator("[data-dag-setting-theme]");
-
 
 test("a theme picked in settings survives a reload", async ({ page }) => {
   await open(page);

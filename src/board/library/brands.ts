@@ -19,14 +19,7 @@ import type { Blueprint } from "./types";
  */
 
 /** The panel glyph is Lucide's, the mark is the brand's: two different icons, two different jobs. */
-const tech = (
-  id: string,
-  use: string,
-  brand: string,
-  panel: string,
-  name: string,
-  description: string,
-): Blueprint => ({
+const tech = (id: string, use: string, brand: string, panel: string, name: string, description: string): Blueprint => ({
   id,
   layer: 0,
   type: "arch",
@@ -41,11 +34,32 @@ export const BRANDS: Blueprint[] = [
   tech("part-arch-postgres", "part-arch-store", "postgresql", "Database", "Postgres", "arch · a store with the Postgres logo."),
   tech("part-arch-redis", "part-arch-store", "redis", "Database", "Redis", "arch · a store with the Redis logo."),
   tech("part-arch-mongodb", "part-arch-store", "mongodb", "Database", "MongoDB", "arch · a store with the MongoDB logo."),
-  tech("part-arch-elasticsearch", "part-arch-store", "elasticsearch", "Database", "Elasticsearch", "arch · a search store with the Elasticsearch logo."),
+  tech(
+    "part-arch-elasticsearch",
+    "part-arch-store",
+    "elasticsearch",
+    "Database",
+    "Elasticsearch",
+    "arch · a search store with the Elasticsearch logo.",
+  ),
   tech("part-arch-kafka", "part-arch-queue", "kafka", "Radio", "Kafka", "arch · a queue with the Kafka logo."),
   tech("part-arch-rabbitmq", "part-arch-queue", "rabbitmq", "Radio", "RabbitMQ", "arch · a queue with the RabbitMQ logo."),
   tech("part-arch-nginx", "part-arch-service", "nginx", "Server", "Nginx", "arch · a service with the Nginx logo."),
   tech("part-arch-docker", "part-arch-container", "docker", "Container", "Docker", "arch · a container with the Docker logo."),
-  tech("part-arch-kubernetes", "part-arch-container", "kubernetes", "Container", "Kubernetes", "arch · a container with the Kubernetes logo."),
-  tech("part-arch-bigquery", "part-arch-store", "gcp:bigquery", "Database", "BigQuery", "arch · a warehouse with the BigQuery logo."),
+  tech(
+    "part-arch-kubernetes",
+    "part-arch-container",
+    "kubernetes",
+    "Container",
+    "Kubernetes",
+    "arch · a container with the Kubernetes logo.",
+  ),
+  tech(
+    "part-arch-bigquery",
+    "part-arch-store",
+    "gcp:bigquery",
+    "Database",
+    "BigQuery",
+    "arch · a warehouse with the BigQuery logo.",
+  ),
 ];

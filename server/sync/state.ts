@@ -126,7 +126,11 @@ export class SyncState {
 
   set(name: StateKey | string, value: string | null): void {
     if (value === null) this.sql("delete from kv where name = ?").run(name);
-    else this.sql("insert into kv (name, value) values (?, ?) on conflict (name) do update set value = excluded.value").run(name, value);
+    else
+      this.sql("insert into kv (name, value) values (?, ?) on conflict (name) do update set value = excluded.value").run(
+        name,
+        value,
+      );
   }
 
   cursor(): number {
@@ -147,7 +151,9 @@ export class SyncState {
 
   /** The entry spelled `rel`, case-insensitively; a live one before a delete. */
   entryAt(rel: string): PathEntry | undefined {
-    const r = this.sql("select * from paths where rel = ? collate nocase order by (blob is null) limit 1").get(rel) as Row | undefined;
+    const r = this.sql("select * from paths where rel = ? collate nocase order by (blob is null) limit 1").get(rel) as
+      | Row
+      | undefined;
     return r ? entryOf(r) : undefined;
   }
 

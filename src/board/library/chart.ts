@@ -46,12 +46,24 @@ const datum = (
 ): Blueprint => ({ id, layer: 0, type: "chart", name, description, icon, source, props, slot });
 
 export const CHART_ATOMS: Blueprint[] = [
-  datum("part-chart-series", "Series", "chart · a value per category: one line, or one group of bars.", "LineChart",
+  datum(
+    "part-chart-series",
+    "Series",
+    "chart · a value per category: one line, or one group of bars.",
+    "LineChart",
     'series ${self} "${title}" ${values}${?attrs}',
-    { title: "Series", values: "12 18 9 14", attrs: "" }, "s"),
-  datum("part-chart-slice", "Slice", "chart · one value: a wedge of a pie, or a bar of its own.", "PieChart",
+    { title: "Series", values: "12 18 9 14", attrs: "" },
+    "s",
+  ),
+  datum(
+    "part-chart-slice",
+    "Slice",
+    "chart · one value: a wedge of a pie, or a bar of its own.",
+    "PieChart",
     'slice ${self} "${title}" ${value}${?attrs}',
-    { title: "Slice", value: "30", attrs: "" }, "sl"),
+    { title: "Slice", value: "30", attrs: "" },
+    "sl",
+  ),
 ];
 
 /**

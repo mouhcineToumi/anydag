@@ -210,9 +210,7 @@ export function parseBoard(name: string, text: string): Board {
     });
   }
 
-  const declared: BoardPage[] = (fm.pages ?? []).map((p, i) =>
-    typeof p === "string" ? { id: `page-${i + 1}`, name: p } : p,
-  );
+  const declared: BoardPage[] = (fm.pages ?? []).map((p, i) => (typeof p === "string" ? { id: `page-${i + 1}`, name: p } : p));
   const used = new Set(items.map((it) => it.page));
   const pages: BoardPage[] = declared.length
     ? declared

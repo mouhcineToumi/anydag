@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaultKey } from "./vault";
+import { vaulted, vaultKey } from "./vault";
 import { clickOnHover } from "./hover";
 import { openSidebar } from "./sidebar";
 
@@ -39,7 +39,8 @@ test.beforeEach(({}, info) => {
   fs.writeFileSync(path.join(DIR, parent, "plan.assets", "shot.txt"), "asset");
 });
 test.afterEach(() => {
-  for (const p of [parent, `${loose}.board.md`, `${loose}.assets`]) fs.rmSync(path.join(DIR, p), { recursive: true, force: true });
+  for (const p of [parent, `${loose}.board.md`, `${loose}.assets`])
+    fs.rmSync(path.join(DIR, p), { recursive: true, force: true });
 });
 
 const at = (...p: string[]) => path.join(DIR, ...p);
@@ -48,7 +49,7 @@ const folderRow = (name: string) => `[data-dag-sidebar-folder="${name}"]`;
 const fileRow = (name: string) => `[data-dag-sidebar-file="${name}"]`;
 
 async function open(page: Page, board = `${parent}/plan`): Promise<void> {
-  await page.goto(`/?board=${board}`);
+  await page.goto(await vaulted(page, `/?board=${board}`));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await openSidebar(page);
 }
@@ -157,7 +158,7 @@ test("a board moved to the folder it is already in is left alone", async ({ page
   expect(there(parent, "b", "plan-2.board.md")).toBe(false);
 });
 
-test("a folder goes to the trash at once, empty or full, and the notice says what went", async ({ page }) => {
+test("a folder goes to the trash at once, empty or full, and the notice says what went", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   const notice = page.locator("[data-dag-trash-notice]");
   /* `b` is empty: nothing is asked, in the row or anywhere. */
@@ -200,7 +201,9 @@ test("a folder that could not go to the trash says so, keeps everything, and lea
   await open(page);
   /* The one answer worse than a question is a failure kept quiet: the person would believe a folder
      was gone that is still there. */
-  await page.route("**/__board/rmdir*", (r) => r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"boom"}' }));
+  await page.route("**/__board/rmdir*", (r) =>
+    r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"boom"}' }),
+  );
   await menu(page, folderRow(parent), parent, "delete");
   await expect(page.locator("[data-dag-sidebar-bulk-problem]")).toContainText(`“${parent}” could not be moved to the trash.`);
   await expect(page.locator("[data-dag-trash-notice]")).toHaveCount(0);
@@ -304,28 +307,86 @@ test("a dragged row rides beside the pointer, and the row it came from fades unt
   expect(there(parent, "c", "deep.board.md")).toBe(true);
 });
 
-test("a row held at the bottom of the tree scrolls it, and at the top scrolls it back", async ({ page }) => {
-  /* Forty rows under `b`, so there is a tree's height to scroll below it whatever else is listed. */
+/**
+ * Forty rows under `b`, so there is a tree's height to scroll below it whatever else is listed. Open,
+ * and `b` expanded with its last row drawn: the one setup both checks below share.
+ */
+async function withForty(page: Page): Promise<void> {
   for (let i = 0; i < 40; i++) fs.writeFileSync(at(parent, "b", `n${String(i).padStart(2, "0")}.board.md`), BOARD);
   await open(page);
   const b = page.locator(folderRow(`${parent}/b`));
   await b.scrollIntoViewIfNeeded();
   if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
   await expect(page.locator(fileRow(`${parent}/b/n39`))).toHaveCount(1);
-  /* In the middle, never at an edge: an edge is where holding it scrolls. */
-  await b.evaluate((el) => el.scrollIntoView({ block: "center" }));
+}
+
+test("a row held at the bottom of the tree scrolls it, and at the top scrolls it back", async ({ page }) => {
+  await withForty(page);
+  const key = `${parent}/b`;
+  const b = page.locator(folderRow(key));
   const tree = page.locator(".dag-sidebar__tree");
+  const scrolled = () => tree.evaluate((el) => el.scrollTop);
+
+  /*
+   * Pick `b` up where it is *now*, and only when the pointer is over it.
+   *
+   * It used to be read once — scroll to the middle, take the box, press there — and with other
+   * workers adding folders at the top of the shared list, and the page slow to lay them out, the
+   * row had moved by the time the button went down: the press landed on another row or on nothing,
+   * no drag began, and the wait below for the tree to scroll could only time out. The pointer is
+   * put over the row, the point is asked what is under it, and the button goes down only when that
+   * is `b`; a press that does not lift it is let go and made again.
+   */
+  await expect(async () => {
+    await page.mouse.up();
+    if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
+    await expect(page.locator(fileRow(`${parent}/b/n39`))).toHaveCount(1);
+    /* In the middle, never at an edge: an edge is where holding it scrolls. */
+    await b.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const a = (await b.boundingBox())!;
+    const x = a.x + a.width / 2;
+    const y = a.y + a.height / 2;
+    await page.mouse.move(x, y);
+    const under = await page.evaluate(
+      ([px, py]) =>
+        (document.elementFromPoint(px!, py!)?.closest("[data-dag-sidebar-folder]") as HTMLElement | null)?.dataset
+          .dagSidebarFolder,
+      [x, y],
+    );
+    expect(under).toBe(key);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 12, { steps: 3 });
+    await expect(page.locator(`${folderRow(key)}[data-dag-sidebar-lifted]`)).toHaveCount(1, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+
   const box = (await tree.boundingBox())!;
-  const a = (await b.boundingBox())!;
-  const start = await tree.evaluate((el) => el.scrollTop);
-  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + 12, { steps: 3 });
-  await page.mouse.move(a.x + a.width / 2, box.y + box.height - 6, { steps: 6 });
-  await expect.poll(() => tree.evaluate((el) => el.scrollTop), { timeout: 5_000 }).toBeGreaterThan(start + 100);
-  const peak = await tree.evaluate((el) => el.scrollTop);
-  await page.mouse.move(a.x + a.width / 2, box.y + 6, { steps: 6 });
-  await expect.poll(() => tree.evaluate((el) => el.scrollTop), { timeout: 5_000 }).toBeLessThan(peak - 100);
+  const x = box.x + box.width / 2;
+  const start = await scrolled();
+  /* What is waited on is the tree moving, not time: the glide is a frame loop, and a page that is
+     slow to draw frames scrolls less in the same second. */
+  await page.mouse.move(x, box.y + box.height - 6, { steps: 6 });
+  await expect.poll(scrolled, { timeout: 10_000 }).toBeGreaterThan(start + 100);
+  /* The middle of the tree is no edge, so the glide ends there — and the peak is read once it has,
+     not while it is still going, which is a number that is out of date by the time it is compared. */
+  await page.mouse.move(x, box.y + box.height / 2, { steps: 6 });
+  let last = -1;
+  await expect
+    .poll(
+      async () => {
+        const now = await scrolled();
+        const still = now === last;
+        last = now;
+        return still;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  const peak = last;
+  await page.mouse.move(x, box.y + 6, { steps: 6 });
+  /* Back by 100px, or all the way to the top when that is less than 100px away: another writer
+     removing rows above shrinks the list under the peak, and a bound below zero is one no scroll
+     position can meet. */
+  await expect.poll(scrolled, { timeout: 10_000 }).toBeLessThanOrEqual(Math.max(peak - 100, 0));
   /* Let go over the top bar, which is nowhere to go — and the tree, which the pointer passed over as
      the top level's target on the way, is not left outlined: every clearing of the marks used to miss
      the tree itself. */
@@ -336,13 +397,45 @@ test("a row held at the bottom of the tree scrolls it, and at the top scrolls it
   expect(there(parent, "b", "n00.board.md")).toBe(true);
 });
 
+test("a file somebody else makes does not bring the list back to the open board", async ({ page }) => {
+  /*
+   * The cause of the check above failing under load, held on its own. The sidebar shows the open
+   * file's row when it is out of view, and it did so on every change in the *number* of rows — so any
+   * other writer (an agent, the CLI, another tab, another worker of this suite) pulled the list back
+   * to the open board the moment a person had scrolled away from it, and a drag held at the tree's
+   * edge was undone as fast as the glide scrolled it.
+   */
+  await withForty(page);
+  const tree = page.locator(".dag-sidebar__tree");
+  const open = page.locator(fileRow(`${parent}/plan`));
+  const outOfView = async () => {
+    const t = (await tree.boundingBox())!;
+    const r = (await open.boundingBox())!;
+    return r.y + r.height <= t.y || r.y >= t.y + t.height;
+  };
+  /* Scrolled away from the open board: it is listed after `b`'s forty rows, so the top is far from it. */
+  await tree.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await expect.poll(outOfView).toBe(true);
+
+  fs.mkdirSync(at(parent, "later"), { recursive: true });
+  fs.writeFileSync(at(parent, "later", "arrived.board.md"), BOARD);
+  await expect(page.locator(folderRow(`${parent}/later`))).toHaveCount(1);
+  /* The row is in the DOM; give the effect that would have moved the list a frame or two to do it. */
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  expect(await outOfView()).toBe(true);
+});
+
 test("a folder move the server refuses says why under the tree, and nothing moves", async ({ page }) => {
   fs.mkdirSync(at(parent, "c"), { recursive: true });
   fs.writeFileSync(at(parent, "c", "deep.board.md"), BOARD);
   /* A refusal, in the words the store gives for a folder too heavy for one commit — stubbed:
      what is under test is that the page says the server's sentence, whatever it is. */
   const why = `${parent}/c is too big to move in one go: 9.1 MB across 1200 files, and a move carries at most 8 MB. Move some of its subfolders first.`;
-  await page.route("**/__board/mvdir*", (route) => route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: why }) }));
+  await page.route("**/__board/mvdir*", (route) =>
+    route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: why }) }),
+  );
   await open(page);
   await drag(page, folderRow(`${parent}/c`), folderRow(`${parent}/b`));
   await expect(page.locator("[data-dag-sidebar-bulk-problem]")).toHaveText(why);

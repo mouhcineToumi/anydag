@@ -154,7 +154,7 @@ and is optional**: with none the figure is the picture alone. A meta is a second
 
 The emoji are all of Unicode's, by their short name with hyphens (`emoji:money-bag`,
 `emoji:light-bulb`, `emoji:globe-with-meridians`) — about 1,600, from people and places to food,
-animals, tools and symbols. `/__board/icons?q=emoji:truck` (the `icons` tool, `anydag icons truck`)
+animals, tools and symbols. `/__board/icons?q=emoji:truck` (the `icons` tool)
 lists the names; the library's *Objects* section has every one as a picture to drop. A name that
 does not exist warns `W_UNKNOWN_ICON` with the near one, and draws the stick figure.
 

@@ -47,13 +47,7 @@ export function Logo({
       aria-hidden
       focusable="false"
     >
-      <g
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="4.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <g fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M 38 14 L 16 14 Q 6 14 6 24 L 6 42 Q 6 52 16 52 L 34 52 Q 44 52 44 42 L 44 20" />
         <path d="M 16 44 C 16 30 24 24 32 28 C 38 31 36 40 30 40 C 24 40 24 32 30 26 C 36 20 45 15 53 11" />
       </g>
@@ -70,7 +64,7 @@ export function Logo({
  * which is right
  * for an asset somebody drops into a slide and wrong here: a path could not be selected, could not
  * be read out, would not take the theme's ink, and would be a fourth drawing to keep in step with
- * the three `CLAUDE.md` already warns about. What is worth carrying over from that drawing is not the
+ * the three `docs/architecture/overview.md` already warns about. What is worth carrying over from that drawing is not the
  * outlines but the two numbers that make it a lockup rather than a logo with a word after it — the
  * size of the name against the mark, and the air between them. Both are written as fractions of
  * the mark in `chrome.css`, off its own 64-unit box: the name is its `font-size: 44`, the

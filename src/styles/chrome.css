@@ -1669,7 +1669,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* An item's own, and — `data-dag-group-handle` — the same eight on a group's dashed box,
    which sit on its border the way an item's sit on its edge. A second attribute rather than a second
    use of `data-dag-handle`: a spec or a `closest()` asking for an item's handle must not find the
-   group's, which is the namespace hazard `CLAUDE.md` records. */
+   group's, which is the namespace hazard `docs/architecture/things-that-will-bite.md` records. */
 .dag-handle:is([data-dag-handle="n"], [data-dag-group-handle="n"])   { top: -8px; left: 50%; margin-left: -6px; cursor: ns-resize; }
 .dag-handle:is([data-dag-handle="s"], [data-dag-group-handle="s"])   { bottom: -8px; left: 50%; margin-left: -6px; cursor: ns-resize; }
 .dag-handle:is([data-dag-handle="e"], [data-dag-group-handle="e"])   { right: -8px; top: 50%; margin-top: -6px; cursor: ew-resize; }
@@ -3372,7 +3372,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
  *
  * Names grepped before they were written — `dag-dock`, `dag-more`, `dag-zoombar` and their
  * `data-dag-*` twins were all free. `chrome.css` loads before `nodes.css` and the diagram wins any
- * collision, and `CLAUDE.md` records that biting three times.
+ * collision, and `docs/architecture/things-that-will-bite.md` records that biting three times.
  */
 
 .dag-dock,

@@ -172,12 +172,14 @@ export function tokenize(src: string, errors: LexError[] = []): Token[] {
         value += src[i];
         i++;
       }
-      if (src[i] !== '"') errors.push({ line: startLine, col: startCol, code: CODES.E_UNTERMINATED_STRING, message: "unterminated string" });
+      if (src[i] !== '"')
+        errors.push({ line: startLine, col: startCol, code: CODES.E_UNTERMINATED_STRING, message: "unterminated string" });
       /* A string closed right against a letter or a digit is a quote meant to be inside it: nothing
          in the grammar puts a word against a string's end, and `"s = "aa""` reads as a string, an
          id called `aa` and another string — three errors about an arrow and an id, none of them
-         about the quote. Said once here, and `tidy()` drops what follows from it. */
-      else if (/[\p{L}\p{N}_]/u.test(src[i + 1] ?? ""))
+         about the quote. Said once here, and `tidy()` drops what follows from it. */ else if (
+        /[\p{L}\p{N}_]/u.test(src[i + 1] ?? "")
+      )
         errors.push({
           line: startLine,
           col: startCol,

@@ -7,7 +7,19 @@
  * mints are 10 characters of Crockford base32, the app's own shape.
  */
 
-import type { AccountRef, Device, GcResult, Head, LogEntry, Metric, Plan, RemoteVault, StaleKey, UsageRow, VaultKey, PutVaultKey } from "../../protocol/wire";
+import type {
+  AccountRef,
+  Device,
+  Head,
+  LogEntry,
+  Metric,
+  Plan,
+  RemoteVault,
+  StaleKey,
+  UsageRow,
+  VaultKey,
+  PutVaultKey,
+} from "../../protocol/wire";
 
 /** A connection: a pool or PGlite. Parameters are `$1`, `$2`…, as Postgres spells them. */
 export interface Db {
@@ -93,8 +105,12 @@ export interface Meta {
   putKey(vault: string, put: PutVaultKey): Promise<VaultKey | false>;
 
   // -- blobs (the index; the bytes are `Blobs`')
-  /** Record a blob the store now holds. A second call for one id is nothing. */
-  addBlob(vault: string, id: string, size: number): Promise<void>;
+  /**
+   * Record a blob the store now holds. A second call for one id is nothing. `at` is the server's
+   * clock (the route passes `deps.now()`), the clock the log's `at` and the collector's window are
+   * read on; absent, the database's own `now()`.
+   */
+  addBlob(vault: string, id: string, size: number, at?: string): Promise<void>;
   blobSize(vault: string, id: string): Promise<number | null>;
 
   // -- the log
@@ -126,5 +142,3 @@ export interface Meta {
   collect(vault: string, before: string): Promise<{ compacted: number; blobs: { id: string; size: number }[] }>;
   allVaults(): Promise<VaultRow[]>;
 }
-
-export type { GcResult };

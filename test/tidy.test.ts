@@ -23,8 +23,7 @@ function after(boxes: TidyBox[], moves: Map<string, TidyPoint>): TidyBox[] {
   return boxes.map((b) => ({ ...b, x: moves.get(b.id)!.x, y: moves.get(b.id)!.y, w: up(b.w), h: up(b.h) }));
 }
 
-const overlapping = (a: TidyBox, b: TidyBox): boolean =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+const overlapping = (a: TidyBox, b: TidyBox): boolean => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
 /*
  * Two members of one group are exempt, and that is the promise rather than a hole in the check.
@@ -75,7 +74,12 @@ describe("a column beside a diagram", () => {
 describe("a grid", () => {
   it("shares left edges down a column and top edges along a row, with unequal cells", () => {
     /* Column one is wider than column two; row one is taller than row two. */
-    const boxes = [box("a", 0, 0, 600, 300), box("b", 700, 8, 400, 200), box("c", 4, 400, 400, 150), box("d", 690, 390, 400, 150)];
+    const boxes = [
+      box("a", 0, 0, 600, 300),
+      box("b", 700, 8, 400, 200),
+      box("c", 4, 400, 400, 150),
+      box("d", 690, 390, 400, 150),
+    ];
     const m = tidy(boxes, opts);
     expect(m.get("a")).toEqual({ x: 0, y: 0 });
     expect(m.get("b")).toEqual({ x: 600 + GAP, y: 0 });
@@ -145,11 +149,7 @@ describe("groups", () => {
    * touching their spacing.
    */
   it("moves a group as one box, leaving the arrangement inside it alone", () => {
-    const boxes = [
-      box("g1", 0, 0, 200, 100, "g"),
-      box("g2", 232, 8, 200, 100, "g"),
-      box("other", 0, 300, 700, 100),
-    ];
+    const boxes = [box("g1", 0, 0, 200, 100, "g"), box("g2", 232, 8, 200, 100, "g"), box("other", 0, 300, 700, 100)];
     const m = tidy(boxes, opts);
     const g1 = m.get("g1")!;
     const g2 = m.get("g2")!;
@@ -188,7 +188,6 @@ describe("groups", () => {
   });
 });
 
-
 describe("the origin", () => {
   it("stays where the board was, on the grid", () => {
     const m = tidy([box("a", 803, -397, 100, 100), box("b", 1000, -400, 100, 100)], opts);
@@ -220,7 +219,16 @@ describe("over random boards", () => {
     const out: TidyBox[] = [];
     for (let i = 0; i < n; i++) {
       const group = r() < 0.2 ? `g${Math.floor(r() * 2)}` : undefined;
-      out.push(box(`b${i}`, Math.floor(r() * 1600), Math.floor(r() * 1200), 80 + Math.floor(r() * 600), 40 + Math.floor(r() * 500), group));
+      out.push(
+        box(
+          `b${i}`,
+          Math.floor(r() * 1600),
+          Math.floor(r() * 1200),
+          80 + Math.floor(r() * 600),
+          40 + Math.floor(r() * 500),
+          group,
+        ),
+      );
     }
     return out;
   }

@@ -132,7 +132,15 @@ export interface SyncLinked {
 
 /** `GET /api/sync/devices`; `POST /api/sync/devices/revoke {id}` answers the same list. */
 export interface SyncDevices {
-  devices: { id: string; name: string; platform: string; created: string; seen: string | null; revoked: string | null; me: boolean }[];
+  devices: {
+    id: string;
+    name: string;
+    platform: string;
+    created: string;
+    seen: string | null;
+    revoked: string | null;
+    me: boolean;
+  }[];
 }
 
 // `GET /api/sync` → SyncStatus · `POST /api/sync/now` → SyncStatus once a pull and a push finished ·

@@ -66,7 +66,10 @@ function writeManifest(version) {
     const v = lock.packages?.[`node_modules/${name}`]?.version;
     if (v) dependencies[name] = v;
   }
-  fs.writeFileSync(path.join(DIST, "package.json"), JSON.stringify({ name: "anydag-sync", version, type: "module", private: true, dependencies }, null, 2) + "\n");
+  fs.writeFileSync(
+    path.join(DIST, "package.json"),
+    JSON.stringify({ name: "anydag-sync", version, type: "module", private: true, dependencies }, null, 2) + "\n",
+  );
 }
 
 /** Build once; writes `dist/meta.json` with the inputs, which the launcher checks for staleness. */
@@ -76,7 +79,10 @@ export async function build() {
   fs.mkdirSync(DIST, { recursive: true });
   const result = await esbuild.build(options(version));
   copyMigrations();
-  const inputs = [...Object.keys(result.metafile.inputs), ...fs.readdirSync(path.join(here, "server", "meta", "migrations")).map((f) => `sync/server/meta/migrations/${f}`)];
+  const inputs = [
+    ...Object.keys(result.metafile.inputs),
+    ...fs.readdirSync(path.join(here, "server", "meta", "migrations")).map((f) => `sync/server/meta/migrations/${f}`),
+  ];
   fs.writeFileSync(path.join(DIST, "meta.json"), JSON.stringify({ version, inputs }, null, 2));
   writeManifest(version);
   return BUNDLE;

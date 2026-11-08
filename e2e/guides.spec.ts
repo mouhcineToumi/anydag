@@ -58,7 +58,13 @@ async function open(page: Page) {
 }
 
 /** Drag `id` by a screen delta, in two moves so the slop is crossed before the drag proper. */
-async function drag(page: Page, id: string, dx: number, dy: number, opts: { alt?: boolean; hold?: (p: Page) => Promise<void> } = {}) {
+async function drag(
+  page: Page,
+  id: string,
+  dx: number,
+  dy: number,
+  opts: { alt?: boolean; hold?: (p: Page) => Promise<void> } = {},
+) {
   const at = (await page.locator(`[data-dag-item="${id}"]`).boundingBox())!;
   const x = at.x + 30;
   const y = at.y + 10;

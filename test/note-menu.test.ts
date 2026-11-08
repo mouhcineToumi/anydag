@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { getDefaultSlashMenuItems } from "@blocknote/core/extensions";
 import { ServerBlockNoteEditor } from "@blocknote/server-util";
@@ -20,7 +21,7 @@ describe("the schema", () => {
 
   it("lets code sit inside bold, which BlockNote's own code mark refuses", async () => {
     const server = ServerBlockNoteEditor.create({ schema: noteSchema });
-    const blocks = await server._withJSDOM(async () => {
+    const blocks = await server._withDOM(async () => {
       server.editor.replaceBlocks(server.editor.document, [
         { type: "paragraph", content: [{ type: "text", text: "x", styles: { bold: true, code: true } }] },
       ] as never);
@@ -59,7 +60,13 @@ describe("the slash menu", () => {
     quote: { type: "quote", content: [{ type: "text", text: "q", styles: {} }] },
     codeBlock: { type: "codeBlock", props: { language: "ts" }, content: "x" },
     divider: { type: "divider" },
-    table: { type: "table", content: { type: "tableContent", rows: [{ cells: [[{ type: "text", text: "a", styles: {} }]] }, { cells: [[{ type: "text", text: "1", styles: {} }]] }] } },
+    table: {
+      type: "table",
+      content: {
+        type: "tableContent",
+        rows: [{ cells: [[{ type: "text", text: "a", styles: {} }]] }, { cells: [[{ type: "text", text: "1", styles: {} }]] }],
+      },
+    },
     image: { type: "image", props: { url: "n.assets/p.png", name: "p" } },
     embed: { type: "embed", props: { href: "dag:0123456789", title: "The plan" } },
     equation: { type: "equation", props: { tex: "x^2", fenced: false } },

@@ -7,7 +7,8 @@ import { createApp } from "../../server/app";
 import { Session } from "../../server/context";
 import { makeEnv, sweepTemps, type Env } from "./helpers";
 
-const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 let env: Env;
 beforeEach(() => {
@@ -19,7 +20,7 @@ afterEach(async () => {
 });
 
 describe("POST /__board/asset", () => {
-  it("writes an image fence whose `src=\"dag:<id>\"` parses clean, twice over", async () => {
+  it('writes an image fence whose `src="dag:<id>"` parses clean, twice over', async () => {
     await env.vault.create("plan", "board", "```md {#one}\nhi\n```\n");
     const app = createApp({ session: new Session(env.home, env.vault, "test"), token: "t", page: null });
     for (let i = 0; i < 2; i++) {

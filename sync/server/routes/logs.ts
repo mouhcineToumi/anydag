@@ -43,7 +43,9 @@ export class LogStore {
       this.day = day;
     }
     const received = now.toISOString();
-    const lines = batch.events.map((e) => JSON.stringify({ received, ...batch.env, name: e.name, at: e.at, props: e.props })).join("\n");
+    const lines = batch.events
+      .map((e) => JSON.stringify({ received, ...batch.env, name: e.name, at: e.at, props: e.props }))
+      .join("\n");
     fs.appendFileSync(path.join(this.dir, `${day}.jsonl`), `${lines}\n`);
     return batch.events.length;
   }

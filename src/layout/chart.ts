@@ -3,18 +3,7 @@ import type { Hue } from "@/dsl/ir";
 import type { Theme } from "@/theme/contract";
 
 import { fontOf, type TextMeasurer } from "./measure";
-import type {
-  Bar,
-  Box,
-  ChartAxis,
-  ChartLabel,
-  ChartPlaced,
-  ChartTick,
-  HeroBox,
-  LegendBox,
-  LinePath,
-  Wedge,
-} from "./types";
+import type { Bar, Box, ChartAxis, ChartLabel, ChartPlaced, ChartTick, HeroBox, LegendBox, LinePath, Wedge } from "./types";
 
 /**
  * Chart layout: a scale, a run of rectangles, and an arc.
@@ -351,12 +340,14 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
        not eat the plot it labels. */
     const catCap = Math.floor(area.w * 0.4);
 
-    const mLeft = model.horizontal ? (anyCat ? Math.min(catW, catCap) + c.labelGap : 0) : tickW ? tickW + c.tickGap + c.tickLen : 0;
-    const mBottom = model.horizontal
-      ? c.lineH + c.tickGap + c.tickLen
-      : anyCat
-        ? c.lineH + c.labelGap
+    const mLeft = model.horizontal
+      ? anyCat
+        ? Math.min(catW, catCap) + c.labelGap
+        : 0
+      : tickW
+        ? tickW + c.tickGap + c.tickLen
         : 0;
+    const mBottom = model.horizontal ? c.lineH + c.tickGap + c.tickLen : anyCat ? c.lineH + c.labelGap : 0;
     const mTop = !model.horizontal && model.values ? c.lineH + c.valueGap : 0;
     const mRight = model.horizontal && model.values ? valueW + c.valueGap : 0;
 
@@ -396,11 +387,27 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
     });
 
     const valueAxis: ChartAxis = model.horizontal
-      ? { side: "bottom", kind: "value", x1: plot.x, y1: plot.y + plot.h, x2: plot.x + plot.w, y2: plot.y + plot.h, ticks: valueTicks }
+      ? {
+          side: "bottom",
+          kind: "value",
+          x1: plot.x,
+          y1: plot.y + plot.h,
+          x2: plot.x + plot.w,
+          y2: plot.y + plot.h,
+          ticks: valueTicks,
+        }
       : { side: "left", kind: "value", x1: plot.x, y1: plot.y, x2: plot.x, y2: plot.y + plot.h, ticks: valueTicks };
     const catAxis: ChartAxis = model.horizontal
       ? { side: "left", kind: "category", x1: plot.x, y1: plot.y, x2: plot.x, y2: plot.y + plot.h, ticks: catTicks }
-      : { side: "bottom", kind: "category", x1: plot.x, y1: plot.y + plot.h, x2: plot.x + plot.w, y2: plot.y + plot.h, ticks: catTicks };
+      : {
+          side: "bottom",
+          kind: "category",
+          x1: plot.x,
+          y1: plot.y + plot.h,
+          x2: plot.x + plot.w,
+          y2: plot.y + plot.h,
+          ticks: catTicks,
+        };
     xAxis = model.horizontal ? valueAxis : catAxis;
     yAxis = model.horizontal ? catAxis : valueAxis;
     for (const tk of valueTicks) gridAt.push(tk.x);
@@ -543,7 +550,14 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
           if (model.values) {
             valueLabels.push({
               label: model.horizontal
-                ? { x: end + (v >= 0 ? c.valueGap : -c.valueGap), y: near + slotW / 2, text: fmt(v), anchor: v >= 0 ? "start" : "end", token: "value", of: mem.id }
+                ? {
+                    x: end + (v >= 0 ? c.valueGap : -c.valueGap),
+                    y: near + slotW / 2,
+                    text: fmt(v),
+                    anchor: v >= 0 ? "start" : "end",
+                    token: "value",
+                    of: mem.id,
+                  }
                 : {
                     x: near + slotW / 2,
                     y: end + (v >= 0 ? -(c.valueGap + c.lineH / 2) : c.valueGap + c.lineH / 2),
@@ -599,7 +613,14 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
             valueLabels.push({
               label: model.horizontal
                 ? { x: p.x + c.valueGap + pad, y: p.y, text: fmt(p.value), anchor: "start", token: "value", of: mem.id }
-                : { x: p.x, y: p.y - pad - c.valueGap - c.lineH / 2, text: fmt(p.value), anchor: "middle", token: "value", of: mem.id },
+                : {
+                    x: p.x,
+                    y: p.y - pad - c.valueGap - c.lineH / 2,
+                    text: fmt(p.value),
+                    anchor: "middle",
+                    token: "value",
+                    of: mem.id,
+                  },
               font: valueFont,
             });
           }
@@ -620,7 +641,12 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
     const cx = plot.x + plot.w / 2;
     const cy = plot.y + plot.h / 2;
 
-    const parts = identities.map((s) => ({ id: s.id, title: s.title, hue: hues[s.id] ?? null, value: Math.max(0, isSeries(s) ? sumOf(s) : (s.value ?? 0)) }));
+    const parts = identities.map((s) => ({
+      id: s.id,
+      title: s.title,
+      hue: hues[s.id] ?? null,
+      value: Math.max(0, isSeries(s) ? sumOf(s) : (s.value ?? 0)),
+    }));
     const total = parts.reduce((a, p) => a + p.value, 0);
 
     const point = (a: number, r: number): { x: number; y: number } => ({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
@@ -709,7 +735,14 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
           const tipX = b.x + dir * c.leader;
           wedge.leader = `M ${n2(a.x)} ${n2(a.y)} L ${n2(b.x)} ${n2(b.y)} L ${n2(tipX)} ${n2(b.y)}`;
           offer(
-            { x: tipX + dir * c.tickGap, y: b.y, text: textOf(p, pct, true), anchor: dir > 0 ? "start" : "end", token: "value", of: p.id },
+            {
+              x: tipX + dir * c.tickGap,
+              y: b.y,
+              text: textOf(p, pct, true),
+              anchor: dir > 0 ? "start" : "end",
+              token: "value",
+              of: p.id,
+            },
             valueFont,
           );
         }

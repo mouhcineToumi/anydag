@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { JSX, PointerEvent as ReactPointerEvent } from "react";
 
 import type { MarkerAt, RoutedEdge } from "@/layout/types";
 import type { Theme } from "@/theme/contract";
@@ -56,9 +56,21 @@ function markerPath(mk: MarkerAt, theme: Theme): JSX.Element | null {
      marker instead of one per marker per direction. */
   switch (mk.kind) {
     case "chevron":
-      return <path transform={transform} d={`M${-m.chevron.len},${-m.chevron.half} L0,0 L${-m.chevron.len},${m.chevron.half}`} fill="none" />;
+      return (
+        <path
+          transform={transform}
+          d={`M${-m.chevron.len},${-m.chevron.half} L0,0 L${-m.chevron.len},${m.chevron.half}`}
+          fill="none"
+        />
+      );
     case "open":
-      return <path transform={transform} d={`M${-m.chevron.len},${-m.chevron.half} L0,0 L${-m.chevron.len},${m.chevron.half}`} fill="none" />;
+      return (
+        <path
+          transform={transform}
+          d={`M${-m.chevron.len},${-m.chevron.half} L0,0 L${-m.chevron.len},${m.chevron.half}`}
+          fill="none"
+        />
+      );
     case "one":
       return <circle transform={transform} cx={0} cy={0} r={m.dotR} strokeWidth={0} />;
     case "crow":
@@ -71,10 +83,7 @@ function markerPath(mk: MarkerAt, theme: Theme): JSX.Element | null {
       );
     case "triangle":
       return (
-        <path
-          transform={transform}
-          d={`M0,0 L${-m.triangle.h},${-m.triangle.w / 2} L${-m.triangle.h},${m.triangle.w / 2} Z`}
-        />
+        <path transform={transform} d={`M0,0 L${-m.triangle.h},${-m.triangle.w / 2} L${-m.triangle.h},${m.triangle.w / 2} Z`} />
       );
     case "diamond":
       return (
@@ -135,7 +144,12 @@ export function Edges({ edges, width, height, theme, onPick, picked, onBend, onS
               strokeDasharray={e.dash ? m.dash : undefined}
               opacity={opacity}
             />
-            {([["tail", e.tail], ["head", e.head]] as const).map(([which, mk]) =>
+            {(
+              [
+                ["tail", e.tail],
+                ["head", e.head],
+              ] as const
+            ).map(([which, mk]) =>
               mk ? (
                 <g
                   key={which}

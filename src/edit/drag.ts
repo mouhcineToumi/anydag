@@ -161,10 +161,7 @@ function containers(graph: Graph, body: string): Map<number, number | null> {
      that do not say which brace came last. `statementSpan` reads the braces, so it can. */
   const blocks = [...graph.groups.map((g) => g.line), ...graph.lanes.map((l) => l.line)].sort((a, b) => a - b);
   const spans = new Map(blocks.map((b) => [b, statementSpan(body, b)]));
-  const decls = [
-    ...graph.nodes.map((n) => n.line),
-    ...blocks,
-  ].sort((a, b) => a - b);
+  const decls = [...graph.nodes.map((n) => n.line), ...blocks].sort((a, b) => a - b);
 
   const out = new Map<number, number | null>();
   for (const line of decls) {
@@ -181,7 +178,10 @@ function containers(graph: Graph, body: string): Map<number, number | null> {
 
 /** The declarations directly inside a block, in file order. Edges are not declarations. */
 function childrenOf(map: Map<number, number | null>, block: number | null): number[] {
-  return [...map].filter(([, c]) => c === block).map(([line]) => line).sort((a, b) => a - b);
+  return [...map]
+    .filter(([, c]) => c === block)
+    .map(([line]) => line)
+    .sort((a, b) => a - b);
 }
 
 /** Where a box sits, whether it is a card or a boundary. Lanes are not published and answer none. */
@@ -280,14 +280,18 @@ function structuralDrop(d: Drop, graph: Graph, line: number): string | null {
   if (container !== null) {
     const target = lineOf(container);
     if (target === null || inside(target)) return null;
-    const last = childrenOf(map, target).filter((n) => !inside(n)).pop();
+    const last = childrenOf(map, target)
+      .filter((n) => !inside(n))
+      .pop();
     return moved(d.body, line, last === undefined ? { intoBlockLine: target } : { afterLine: last });
   }
 
   /* The frame's own padding: out of whatever held it, after the last thing declared at the top.
      Not `toTop` outright — that would put a card above the whole diagram, which is a different
      instruction from "take this out of that group". */
-  const top = childrenOf(map, null).filter((n) => !inside(n)).pop();
+  const top = childrenOf(map, null)
+    .filter((n) => !inside(n))
+    .pop();
   return moved(d.body, line, top === undefined ? { toTop: true } : { afterLine: top });
 }
 

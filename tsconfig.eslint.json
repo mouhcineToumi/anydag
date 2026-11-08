@@ -1,0 +1,24 @@
+{
+  /* Only for `eslint.config.mjs`: one program over everything type-aware linting reads, including the
+     files `tsc --noEmit` does not (`e2e/`, `playwright.config.ts`, `desktop/`). It is never used to
+     build or to type-check — `npm run typecheck` is that. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    "incremental": false,
+    "tsBuildInfoFile": null
+  },
+  "include": [
+    "src",
+    "test",
+    "plugins",
+    "cli",
+    "server",
+    "sync",
+    "e2e",
+    "desktop",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

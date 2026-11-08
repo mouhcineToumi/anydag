@@ -79,7 +79,11 @@ describe("the read that opens a page", () => {
     prefetchDoc("table", "deals");
     vi.advanceTimersByTime(11_000);
     expect(await textOf(await openDoc("table", "deals"))).toBe("version 3");
-    expect(calls).toEqual(["/__board/get?name=pg&kind=quiz", "/__board/get?name=deals&kind=table", "/__board/get?name=deals&kind=table"]);
+    expect(calls).toEqual([
+      "/__board/get?name=pg&kind=quiz",
+      "/__board/get?name=deals&kind=table",
+      "/__board/get?name=deals&kind=table",
+    ]);
   });
 
   it("is never what the server replaced since", async () => {
@@ -95,7 +99,9 @@ describe("the read that opens a page", () => {
       vi.fn(async (url: string) => {
         calls.push(url);
         served += 1;
-        return served === 1 ? new Response("{}", { status: 502 }) : new Response(JSON.stringify({ text: "fine" }), { status: 200 });
+        return served === 1
+          ? new Response("{}", { status: 502 })
+          : new Response(JSON.stringify({ text: "fine" }), { status: 200 });
       }),
     );
     prefetchDoc("board", "failed");

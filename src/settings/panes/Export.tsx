@@ -58,8 +58,8 @@ export function ExportPane() {
 
       <Group title="Import">
         <p className="dag-settings__prose">
-          Drop files on a board, or use Import in a board&rsquo;s ⋯ menu. Images land as images and text as notes. An exported board,
-          note or quiz comes back as its own file, and anything else becomes an attachment.
+          Drop files on a board, or use Import in a board&rsquo;s ⋯ menu. Images land as images and text as notes. An exported
+          board, note or quiz comes back as its own file, and anything else becomes an attachment.
         </p>
       </Group>
 

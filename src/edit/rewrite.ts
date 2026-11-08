@@ -86,7 +86,9 @@ export function rewriteOps(item: BoardItem, draft: Draft): PatchOp[] {
   const type = draft.type !== item.type ? { type: draft.type } : {};
   /* `attrs` left off entirely when the model said nothing about the fence: an empty patch would
      still trip `applyPatch`'s anonymous-id pinning, a file change the rewrite did not ask for. */
-  return [Object.keys(attrs).length ? { id: item.id, ...type, attrs, body: draft.body } : { id: item.id, ...type, body: draft.body }];
+  return [
+    Object.keys(attrs).length ? { id: item.id, ...type, attrs, body: draft.body } : { id: item.id, ...type, body: draft.body },
+  ];
 }
 
 /**

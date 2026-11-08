@@ -37,31 +37,39 @@ export function blobRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const id = blobIdOf(c.req.param("id"));
     const size = await deps.meta.blobSize(v.id, id);
     if (size === null) throw new HttpError("ES_NOT_FOUND", "no such blob");
-    if (c.req.method === "HEAD") return c.body(null, 200, { "content-length": String(size), "content-type": "application/octet-stream" });
+    if (c.req.method === "HEAD")
+      return c.body(null, 200, { "content-length": String(size), "content-type": "application/octet-stream" });
     const bytes = await deps.blobs.get(v.id, id);
     if (!bytes) throw new HttpError("ES_NOT_FOUND", "this blob's bytes are gone");
     await deps.usage.bump(v.account, v.id, "bytes_down", bytes.byteLength);
-    return c.body(bytes as Uint8Array<ArrayBuffer>, 200, { "content-type": "application/octet-stream", "content-length": String(bytes.byteLength) });
+    return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
+      "content-type": "application/octet-stream",
+      "content-length": String(bytes.byteLength),
+    });
   });
 
   app.put("/v1/vaults/:v/blobs/:id", async (c) => {
     const v = c.get("vault");
     const id = blobIdOf(c.req.param("id"));
     const header = c.req.header("content-length");
-    if (header === undefined || !/^\d+$/.test(header.trim())) throw new HttpError("ES_BAD_REQUEST", "a blob upload needs a Content-Length");
+    if (header === undefined || !/^\d+$/.test(header.trim()))
+      throw new HttpError("ES_BAD_REQUEST", "a blob upload needs a Content-Length");
     const length = Number(header.trim());
     const account = await deps.meta.account(v.account);
     const plan = await deps.meta.plan(account?.plan ?? "free");
-    if (plan.max_file_bytes !== null && length > plan.max_file_bytes) throw new HttpError("ES_QUOTA", `this plan takes files up to ${plan.max_file_bytes} bytes; this one is ${length}`);
-    if (length > deps.config.maxBodyBytes) throw new HttpError("ES_QUOTA", `this server takes uploads up to ${deps.config.maxBodyBytes} bytes; this one is ${length}`);
+    if (plan.max_file_bytes !== null && length > plan.max_file_bytes)
+      throw new HttpError("ES_QUOTA", `this plan takes files up to ${plan.max_file_bytes} bytes; this one is ${length}`);
+    if (length > deps.config.maxBodyBytes)
+      throw new HttpError("ES_QUOTA", `this server takes uploads up to ${deps.config.maxBodyBytes} bytes; this one is ${length}`);
 
     const held = await deps.meta.blobSize(v.id, id);
     if (held !== null) return c.json({ ok: true, size: held });
 
     const bytes = new Uint8Array(await c.req.arrayBuffer());
-    if (bytes.byteLength !== length) throw new HttpError("ES_BAD_REQUEST", `the body was ${bytes.byteLength} bytes, not the ${length} Content-Length said`);
+    if (bytes.byteLength !== length)
+      throw new HttpError("ES_BAD_REQUEST", `the body was ${bytes.byteLength} bytes, not the ${length} Content-Length said`);
     await deps.blobs.put(v.id, id, bytes);
-    await deps.meta.addBlob(v.id, id, length);
+    await deps.meta.addBlob(v.id, id, length, deps.now().toISOString());
     await deps.usage.bump(v.account, v.id, "bytes_up", length);
     return c.json({ ok: true, size: length });
   });

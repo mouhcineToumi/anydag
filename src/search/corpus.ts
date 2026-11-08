@@ -227,7 +227,7 @@ function quizCorpus(text: string): CorpusDoc {
  * `<tab>/L<line>`, the note's rule for a block nothing has anchored, because a search is a read and
  * minting an id would be a write.
  */
-export function tableCorpus(text: string): CorpusDoc {
+function tableCorpus(text: string): CorpusDoc {
   const table = parseTable(text);
   const { title } = splitNote(text);
   const units: Unit[] = [];
@@ -240,8 +240,14 @@ export function tableCorpus(text: string): CorpusDoc {
     const heading = squash([tab.name, ...tab.columns.map((c) => c.name)].join(" "));
     if (heading) units.push({ part: at, what: "tab", text: heading });
     for (const row of tab.rows) {
-      const cells = squash(row.cells.map((c) => words(c.replace(/\n/g, " "))).filter(Boolean).join(" "));
-      if (cells) units.push({ part: tab.id ? `${tab.id}/${row.id ?? `L${row.line}`}` : `L${row.line}`, what: "row", text: cells });
+      const cells = squash(
+        row.cells
+          .map((c) => words(c.replace(/\n/g, " ")))
+          .filter(Boolean)
+          .join(" "),
+      );
+      if (cells)
+        units.push({ part: tab.id ? `${tab.id}/${row.id ?? `L${row.line}`}` : `L${row.line}`, what: "row", text: cells });
     }
   }
   return title ? { title, units } : { units };

@@ -437,7 +437,8 @@ export class Vault {
       if (!validId(id)) continue;
       try {
         const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown };
-        if (typeof data.path === "string") out.set(id, { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null });
+        if (typeof data.path === "string")
+          out.set(id, { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null });
       } catch {
         /* a half-synced file: read again next time */
       }
@@ -637,7 +638,14 @@ export class Vault {
       const keepOther = known === other.file.toLowerCase() || (known !== d.file.toLowerCase() && older);
       const loser = keepOther ? d : other;
       if (!keepOther) claimed.set(id, d);
-      fixes.push({ listed: loser, id: derivedId(id, loser.file, (x) => (byId.has(x) && byId.get(x)!.path.toLowerCase() !== loser.file.toLowerCase()) || claimed.has(x)) });
+      fixes.push({
+        listed: loser,
+        id: derivedId(
+          id,
+          loser.file,
+          (x) => (byId.has(x) && byId.get(x)!.path.toLowerCase() !== loser.file.toLowerCase()) || claimed.has(x),
+        ),
+      });
       return !keepOther;
     };
 
@@ -653,11 +661,14 @@ export class Vault {
             id: own,
             path: d.file,
             kind: d.kind,
-            created: was?.created ?? row?.created ?? this.bornAt(d.file),
+            // A document renamed before this walk is its id's created, not the rename's birth: the
+            // tie-break above and `createdOf` read it so, and the row must too (seed 2, loaded).
+            created: was?.created ?? row?.created ?? this.createdOfId(own, d.file, was) ?? this.bornAt(d.file),
             minted: 1,
             title: d.kind === "file" ? (fileIds.get(own)?.title ?? null) : null,
           };
-          if (!was || was.path !== next.path || was.minted !== 1 || was.kind !== next.kind || was.title !== next.title) this.home.putDoc(next);
+          if (!was || was.path !== next.path || was.minted !== 1 || was.kind !== next.kind || was.title !== next.title)
+            this.home.putDoc(next);
           out.set(d.file, next);
           continue;
         }
@@ -676,14 +687,23 @@ export class Vault {
         byId.set(id, next);
         out.set(d.file, next);
       }
-      for (const r of rows) if (!claimed.has(r.id) || claimed.get(r.id)!.file.toLowerCase() !== r.path.toLowerCase()) {
-        if (!claimed.has(r.id)) this.home.dropDoc(vault, r.id);
-      }
+      for (const r of rows)
+        if (!claimed.has(r.id) || claimed.get(r.id)!.file.toLowerCase() !== r.path.toLowerCase()) {
+          if (!claimed.has(r.id)) this.home.dropDoc(vault, r.id);
+        }
     });
 
     for (const { listed, id } of fixes) {
       console.warn(`anydag: ${listed.file} carried an id another file has; it is ${id} now`);
-      const row: DocRow = { vault, id, path: listed.file, kind: listed.kind, created: this.bornAt(listed.file), minted: 0, title: null };
+      const row: DocRow = {
+        vault,
+        id,
+        path: listed.file,
+        kind: listed.kind,
+        created: this.bornAt(listed.file),
+        minted: 0,
+        title: null,
+      };
       this.home.putDoc(row);
       if (this.held) {
         out.set(listed.file, row);
@@ -820,7 +840,8 @@ export class Vault {
     if (now.text !== text) {
       writeAtomic(file, text);
       this.mintTargets(text, now.text);
-      if (this.component(name) !== null) this.emit({ type: "doc", kind: "board", name, sha1: sha1(text), title: titleOf(text) ?? null });
+      if (this.component(name) !== null)
+        this.emit({ type: "doc", kind: "board", name, sha1: sha1(text), title: titleOf(text) ?? null });
     }
     return version(text);
   }
@@ -847,7 +868,15 @@ export class Vault {
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : own && !taken(own) ? own : mint(taken);
     const body = own === false ? text : withId(text, id);
     writeAtomic(abs, body);
-    this.home.putDoc({ vault: this.id, id, path: file, kind, created: validInstant(opts.created) ? opts.created : instant(), minted: own === false ? 0 : 1, title: null });
+    this.home.putDoc({
+      vault: this.id,
+      id,
+      path: file,
+      kind,
+      created: validInstant(opts.created) ? opts.created : instant(),
+      minted: own === false ? 0 : 1,
+      title: null,
+    });
     this.mintTargets(body);
     return settled;
   }
@@ -862,7 +891,12 @@ export class Vault {
    * and a copy gets a new one. Moving between folders is this and nothing else. A rename to a name
    * that differs only by case is a rename: a person fixing a capital means it.
    */
-  async rename(name: string, kind: Kind, to: string, opts: { copy?: boolean; edit?: (text: string) => string } = {}): Promise<string> {
+  async rename(
+    name: string,
+    kind: Kind,
+    to: string,
+    opts: { copy?: boolean; edit?: (text: string) => string } = {},
+  ): Promise<string> {
     const copy = !!opts.copy;
     const from = this.fileOf(name, kind);
     const fromAbs = this.abs(from);
@@ -873,7 +907,11 @@ export class Vault {
       return name;
     }
     const caseOnly = !copy && same(stem, name);
-    const settled = caseOnly ? stem : kind === "file" ? uniqueFile(stem, (n) => this.taken(n)) : unique(stem, (n) => this.taken(n));
+    const settled = caseOnly
+      ? stem
+      : kind === "file"
+        ? uniqueFile(stem, (n) => this.taken(n))
+        : unique(stem, (n) => this.taken(n));
     const target = kind === "note" ? settled + from.slice(name.length) : this.fileOf(settled, kind);
     const toAbs = this.abs(target);
     fs.mkdirSync(path.dirname(toAbs), { recursive: true });
@@ -1019,7 +1057,6 @@ export class Vault {
     }
   }
 
-
   // -- the trash -----------------------------------------------------
   //
   // `<vault>/.anydag/trash/<entry>/`: `entry.json`, and `files/` holding what went exactly as it sat
@@ -1050,8 +1087,12 @@ export class Vault {
       return null;
     }
     if (!validId(data.id) || typeof data.name !== "string") return null;
-    const kind = typeof data.kind === "string" && (data.kind === "folder" || (KINDS as readonly string[]).includes(data.kind)) ? (data.kind as Kind | "folder") : "board";
-    const holds = data.holds && typeof data.holds === "object" ? { ...emptyRemoved(), ...(data.holds as Partial<Removed>) } : null;
+    const kind =
+      typeof data.kind === "string" && (data.kind === "folder" || (KINDS as readonly string[]).includes(data.kind))
+        ? (data.kind as Kind | "folder")
+        : "board";
+    const holds =
+      data.holds && typeof data.holds === "object" ? { ...emptyRemoved(), ...(data.holds as Partial<Removed>) } : null;
     return {
       id: data.id,
       name: data.name,
@@ -1059,7 +1100,7 @@ export class Vault {
       title: typeof data.title === "string" && data.title ? data.title : null,
       deleted: validInstant(data.deleted) ? data.deleted : instant(new Date(0)),
       doc: validId(data.doc) ? data.doc : null,
-      holds: kind === "folder" ? holds ?? emptyRemoved() : null,
+      holds: kind === "folder" ? (holds ?? emptyRemoved()) : null,
       docs: data.docs && typeof data.docs === "object" ? (data.docs as Record<string, Kept>) : {},
     };
   }
@@ -1144,7 +1185,15 @@ export class Vault {
         under.push(row);
       }
     }
-    const entry: Trashed = { id: mint((x) => exists(this.trashDir(x))), name: stem, kind: "folder", title: null, deleted: instant(), doc: null, holds };
+    const entry: Trashed = {
+      id: mint((x) => exists(this.trashDir(x))),
+      name: stem,
+      kind: "folder",
+      title: null,
+      deleted: instant(),
+      doc: null,
+      holds,
+    };
     const at = this.openEntry(entry, kept);
     const target = path.join(at, "files", ...stem.split("/"));
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -1193,7 +1242,15 @@ export class Vault {
         }
       }
     }
-    this.home.putDoc({ vault: this.id, id, path: file, kind: kept.kind, created: kept.created, minted: kept.minted, title: kept.title });
+    this.home.putDoc({
+      vault: this.id,
+      id,
+      path: file,
+      kind: kept.kind,
+      created: kept.created,
+      minted: kept.minted,
+      title: kept.title,
+    });
     if (kept.kind === "file" && kept.minted) this.writeFileId(id, file, kept.title);
     return id;
   }
@@ -1264,7 +1321,12 @@ export class Vault {
    * Store an attachment under `name` — a file's name, extension and all — returning the name the vault
    * settled on, numbered before its extension when taken. Its id record is written as it is made.
    */
-  async putFile(name: string, data: Uint8Array, title: string | null, opts: { id?: string; created?: string } = {}): Promise<string> {
+  async putFile(
+    name: string,
+    data: Uint8Array,
+    title: string | null,
+    opts: { id?: string; created?: string } = {},
+  ): Promise<string> {
     const asked = fileNameFrom(name, this.types);
     if (!asked) throw new Refused(`not a file name \`${name}\``);
     const settled = uniqueFile(asked, (n) => this.taken(n));
@@ -1277,7 +1339,15 @@ export class Vault {
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : mint(taken);
     const clean = title?.trim() || null;
     this.writeFileId(id, settled, clean);
-    this.home.putDoc({ vault: this.id, id, path: settled, kind: "file", created: validInstant(opts.created) ? opts.created : instant(), minted: 1, title: clean });
+    this.home.putDoc({
+      vault: this.id,
+      id,
+      path: settled,
+      kind: "file",
+      created: validInstant(opts.created) ? opts.created : instant(),
+      minted: 1,
+      title: clean,
+    });
     this.home.set(this.digestKey(id), digestOf(data));
     return settled;
   }
@@ -1384,7 +1454,10 @@ export class Vault {
         if (e.isDirectory()) walk(path.join(dir, e.name), `${prefix}${e.name}/`);
         else if (e.name.toLowerCase().endsWith(SUFFIX.board)) {
           try {
-            out[`${COMPONENT_PREFIX}${prefix}${e.name.slice(0, -SUFFIX.board.length)}`] = fs.readFileSync(path.join(dir, e.name), "utf8");
+            out[`${COMPONENT_PREFIX}${prefix}${e.name.slice(0, -SUFFIX.board.length)}`] = fs.readFileSync(
+              path.join(dir, e.name),
+              "utf8",
+            );
           } catch {
             /* gone */
           }
@@ -1657,7 +1730,7 @@ function sameFile(a: string, b: string): boolean {
 }
 
 /** The vault's own id, kept in `.anydag/vault.json` so caches keyed by it survive a moved folder. */
-export function vaultId(root: string): string {
+function vaultId(root: string): string {
   const file = path.join(root, ".anydag", "vault.json");
   try {
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as { id?: unknown };
@@ -1705,8 +1778,6 @@ export function writeAtomic(file: string, text: string | Uint8Array): void {
     throw e;
   }
 }
-
-export { KINDS };
 
 /** `${size}:${sha1}` of an attachment's bytes. */
 function digestOf(data: Uint8Array): string {

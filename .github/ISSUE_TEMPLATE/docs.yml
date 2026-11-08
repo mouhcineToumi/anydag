@@ -1,0 +1,72 @@
+name: Documentation
+description: Something is missing, wrong or unclear in the docs
+title: "docs: "
+labels: ["status: triage", "type: docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping the docs. A new issue starts as `status: triage`; the maintainer marks it
+        `status: ready` when it has what is needed to be worked on.
+
+        This covers the README, `CONTRIBUTING.md`, `docs/`, the DSL sheets, the agent skill and in-app
+        text. A wrong behaviour is a bug, not a docs issue.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The file, page or link that has the problem.
+      placeholder: "docs/dsl/arch.md, or https://github.com/mouhcineToumi/anydag/blob/develop/README.md"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: The mistake, the gap, or what confused you. Who is the reader and what were they trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should say
+      description: The correction or new text, or a clear description of what the reader needs to find there.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How will we know it is fixed?
+      placeholder: |
+        - [ ] The page says ...
+        - [ ] The example runs
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part is it about?
+      description: Your best guess; the maintainer sets the `area:` label.
+      options:
+        - Canvas, boards and layout
+        - DSL and diagrams
+        - Notes, equations, search
+        - Tables
+        - Quizzes
+        - Tasks and calendar
+        - Sync
+        - Desktop app and installers
+        - CLI and MCP
+        - Assistant and prompt cards
+        - Docs, CI or tooling
+        - Not sure
+    validations:
+      required: true

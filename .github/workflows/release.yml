@@ -1,16 +1,21 @@
-# A release: push a tag `vX.Y.Z` (or `vX.Y.Z-beta.N`) and this builds, checks and publishes it.
+# A release: push a tag `vX.Y.Z` (stable) or `vX.Y.Z-beta.N` (beta) and this builds, checks and
+# publishes it. Nightlies are `nightly.yml`'s, and this never runs for one.
 #
+#   0. **The tag is allowed.** A stable tag must be on `main` — which only a pull request from
+#      `release/X.Y.Z` or `hotfix/X.Y.Z` changes — and a beta tag on `release/X.Y.Z` (or a
+#      `hotfix/X.Y.Z`) of the same version. Any other pre-release word is refused.
 #   1. The tag must equal `VERSION` and `package.json` (`scripts/check-version.mjs`), so a release
 #      can never be built from a tree that says another number.
-#   2. The fast tier runs (`npm run checks`), once, on Linux.
-#   3. The desktop app is packaged on each system (`desktop/package.mjs`) — an AppImage for x64
-#      Linux, an NSIS installer for x64 Windows, a dmg and a zip each for arm64 and x64 macOS — and
-#      opened on a temp vault (`desktop/smoke.mjs`), passing only when the page reports it is drawn.
-#   4. A GitHub Release is created for the tag with every installer, their blockmaps, and the three
-#      files the app's updater reads: `latest-linux.yml`, `latest.yml` (Windows) and
-#      `latest-mac.yml`. The release is not made unless all three are there. A tag with a `-` in it
-#      (`v0.2.0-beta.1`) is published as a pre-release. The notes are generated from the merged pull
-#      requests; edit them on GitHub afterwards.
+#   2. Everything runs, once: the fast tier and the sync server's suites (`checks.yml`), the full
+#      Playwright run (`e2e.yml`), and the desktop app packaged and opened on each system
+#      (`desktop-build.yml`) — an AppImage for x64 Linux, an NSIS installer for x64 Windows, a dmg and
+#      a zip each for arm64 and x64 macOS.
+#   3. A GitHub Release is created for the tag with every installer, their blockmaps, and the three
+#      files the app's updater reads — `latest-linux.yml`, `latest.yml` and `latest-mac.yml` for a stable
+#      release, `beta*.yml` for a beta (`scripts/check-release-assets.mjs` holds the list). It is not
+#      made unless all of them are there. A beta is a pre-release; a stable release is the "latest"
+#      one, the only kind a stable build is ever offered. The notes are generated from the merged pull
+#      requests by their labels (`.github/release.yml`); edit them on GitHub afterwards.
 #
 # **Signing switches on with the secrets, and is skipped cleanly without them.**
 #   - macOS: `CSC_LINK` (a Developer ID Application .p12, base64) and `CSC_KEY_PASSWORD` sign;
@@ -23,7 +28,7 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "!v*-nightly.*"]
 
 concurrency:
   group: release-${{ github.ref }}
@@ -33,109 +38,129 @@ permissions:
   contents: read
 
 jobs:
-  checks:
+  verify:
+    name: verify tag
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      kind: ${{ steps.kind.outputs.kind }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
       - name: The tag is the version
-        run: node scripts/check-version.mjs "${{ github.ref_name }}"
-      - run: npm ci
-      - run: npm run checks
-
-  build:
-    name: build (${{ matrix.os }})
-    needs: checks
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - name: The tag is the version
-        run: node scripts/check-version.mjs "${{ github.ref_name }}"
-      - run: npm ci
-      - run: npm run desktop:build
-      - name: Package
-        run: node desktop/package.mjs
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-      - name: Open it (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a node desktop/smoke.mjs
-      - name: Open it
-        if: runner.os != 'Linux'
-        run: node desktop/smoke.mjs
-      - name: Open the x64 build too (macOS, under Rosetta)
-        if: runner.os == 'macOS'
+          TAG: ${{ github.ref_name }}
+        run: node scripts/check-version.mjs "$TAG"
+      - name: The tag is a release, and it is where a release is
+        id: kind
+        env:
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
-          if arch -x86_64 /usr/bin/true 2>/dev/null; then
-            # The arm64 run's keychain item belongs to a differently signed app, and reading it
-            # would be an "allow access?" prompt nobody answers. The runner is thrown away after.
-            perl -e 'alarm 20; exec @ARGV' security delete-generic-password -s "AnyDag Safe Storage" >/dev/null 2>&1 || true
-            node desktop/smoke.mjs --app release/mac/AnyDag.app/Contents/MacOS/AnyDag
-          else
-            echo "::warning::no Rosetta on this runner — the x64 build was packaged but not opened"
-          fi
-      - name: What was built
-        run: ls -la release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ runner.os }}
-          retention-days: 7
-          if-no-files-found: error
-          path: |
-            release/*.AppImage
-            release/*.exe
-            release/*.dmg
-            release/*.zip
-            release/*.blockmap
-            release/latest*.yml
+          set -euo pipefail
+          version=${TAG#v}
+          core=${version%%-*}
+          case "$version" in
+            *-*)
+              case "$version" in
+                *-beta.*) kind=beta ;;
+                *) echo "::error::$TAG: only stable (vX.Y.Z) and beta (vX.Y.Z-beta.N) tags are releases. Nightlies are tagged by nightly.yml alone."; exit 1 ;;
+              esac
+              on=$(git branch -r --contains "$SHA" | sed 's/^[ *]*//' | grep -E "^origin/(release|hotfix)/$core$" || true)
+              if [ -z "$on" ]; then
+                echo "::error::$TAG must be a commit of release/$core (or hotfix/$core); no such branch contains $SHA."
+                exit 1
+              fi
+              echo "$TAG is on ${on#origin/}." ;;
+            *)
+              kind=stable
+              git fetch --quiet origin main
+              if ! git merge-base --is-ancestor "$SHA" origin/main; then
+                echo "::error::$TAG is not on main. A stable release is tagged on the merge commit of the pull request from release/$core or hotfix/$core into main — see docs/RELEASING.md."
+                exit 1
+              fi
+              echo "$TAG is on main." ;;
+          esac
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+
+  checks:
+    name: checks
+    needs: verify
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+    with:
+      tag: ${{ github.ref_name }}
+      sync: true
+
+  e2e:
+    name: e2e
+    needs: verify
+    uses: ./.github/workflows/e2e.yml
+    permissions:
+      contents: read
+    with:
+      scope: full
+
+  desktop:
+    name: desktop
+    needs: verify
+    uses: ./.github/workflows/desktop-build.yml
+    permissions:
+      contents: read
+    with:
+      tag: ${{ github.ref_name }}
+      sign: true
+      artifact: release
+    secrets: inherit
 
   publish:
-    needs: build
+    name: publish
+    needs: [verify, checks, e2e, desktop]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+      KIND: ${{ needs.verify.outputs.kind }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
         with:
           path: out
+          pattern: release-*
           merge-multiple: true
-      - name: Every updater file is there
+      - name: Every installer and every updater file is there
         run: |
           ls -la out
-          for f in latest-linux.yml latest.yml latest-mac.yml; do
-            test -f "out/$f" || { echo "::error::$f is missing — the updater on that system would find no release"; exit 1; }
-          done
+          node scripts/check-release-assets.mjs out "$TAG"
       - name: Create the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
-          pre=""
-          case "$TAG" in *-*) pre="--prerelease" ;; esac
+          version=${TAG#v}
+          # The notes cover what changed since the release before this one: the last stable tag for a
+          # stable release; for a beta, the last beta of this version, else the last stable.
+          tags=$(git tag --list 'v*' --sort=-v:refname | grep -vF -- "-nightly." | grep -vx "$TAG" || true)
+          if [ "$KIND" = beta ]; then
+            prev=$(echo "$tags" | grep -E "^v${version%%-*}-beta\." | head -n 1 || true)
+            [ -n "$prev" ] || prev=$(echo "$tags" | grep -v -- '-' | head -n 1 || true)
+            flags=(--prerelease)
+          else
+            prev=$(echo "$tags" | grep -v -- '-' | head -n 1 || true)
+            flags=(--latest)
+          fi
+          notes=()
+          [ -n "$prev" ] && notes=(--notes-start-tag "$prev")
           gh release create "$TAG" out/* \
             --repo "${{ github.repository }}" \
-            --title "AnyDag ${TAG#v}" \
-            --generate-notes \
+            --title "AnyDag $version" \
+            --generate-notes "${notes[@]}" \
             --verify-tag \
-            $pre
+            "${flags[@]}"

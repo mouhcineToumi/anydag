@@ -62,7 +62,10 @@ export function fakeHarness(provider: "claude" | "opencode"): Harness {
       const done: Promise<RunEnd> = (async () => {
         on({ kind: "session", id: o.resume ?? o.fresh ?? `fake-session-${Date.now()}` });
         const said: string[] = [];
-        for (const line of lastWords(o.prompt).split("\n").map((l) => l.trim()).filter(Boolean)) {
+        for (const line of lastWords(o.prompt)
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)) {
           if (stopped) break;
           const [cmd, ...rest] = line.split(/\s+/);
           const at = cmd!.includes("@") ? cmd!.split("@")[1] : undefined;
@@ -72,7 +75,11 @@ export function fakeHarness(provider: "claude" | "opencode"): Harness {
               await call("change_block", "POST", "/__board/chat/block", { title: rest.join(" ") });
               break;
             case "note": {
-              const r = await call("note_create", "POST", `/__board/create${q}`, { name: rest[0], kind: "note", text: `${rest.slice(1).join(" ")}\n` });
+              const r = await call("note_create", "POST", `/__board/create${q}`, {
+                name: rest[0],
+                kind: "note",
+                text: `${rest.slice(1).join(" ")}\n`,
+              });
               said.push(r.ok ? `Made [${rest[0]}](dag:${r.json.id}).` : `Could not make ${rest[0]}: ${r.json?.error}`);
               break;
             }
@@ -82,7 +89,10 @@ export function fakeHarness(provider: "claude" | "opencode"): Harness {
                 said.push(`No note ${rest[0]}.`);
                 break;
               }
-              const r = await call("note_write", "POST", `/__board/put?name=${encodeURIComponent(rest[0]!)}&kind=note`, { base: got.json.base, text: `${rest.slice(1).join(" ")}\n` });
+              const r = await call("note_write", "POST", `/__board/put?name=${encodeURIComponent(rest[0]!)}&kind=note`, {
+                base: got.json.base,
+                text: `${rest.slice(1).join(" ")}\n`,
+              });
               said.push(r.ok ? `Rewrote ${rest[0]}.` : `Could not rewrite ${rest[0]}: ${r.json?.error}`);
               break;
             }
@@ -98,7 +108,11 @@ export function fakeHarness(provider: "claude" | "opencode"): Harness {
               break;
             }
             case "vault": {
-              const r = await call("vault_request", "POST", "/__board/chat/access", { vault: rest[0], why: "the script asked", mode: rest[1] === "edit" ? "edit" : "ask" });
+              const r = await call("vault_request", "POST", "/__board/chat/access", {
+                vault: rest[0],
+                why: "the script asked",
+                mode: rest[1] === "edit" ? "edit" : "ask",
+              });
               said.push(r.json?.granted ? `Granted ${rest[0]}.` : `Not granted: ${r.json?.error}`);
               break;
             }

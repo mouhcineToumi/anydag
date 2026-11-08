@@ -1,0 +1,11 @@
+# Commits `git blame` should look through: whole-repository mechanical changes that say nothing about
+# who wrote a line or why.
+#
+# GitHub reads this file by name. For a local checkout, once:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Each entry is one such commit, by its full hash, with a line above it saying what it was.
+
+# style: format the code with Biome (the first `npm run format` over the whole tree)
+238870489da061a8cffcc9cb82c3e0ca52887454

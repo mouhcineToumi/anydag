@@ -109,7 +109,10 @@ export interface Resolved {
 }
 
 const keyOf = (spec: ProviderSpec, env: Env): string | undefined =>
-  spec.keyEnv.map((k) => env[k]).find((v) => typeof v === "string" && v.trim() !== "")?.trim();
+  spec.keyEnv
+    .map((k) => env[k])
+    .find((v) => typeof v === "string" && v.trim() !== "")
+    ?.trim();
 
 const executable = (file: string): boolean => {
   try {
@@ -180,8 +183,16 @@ function remembered<T>(key: string, ask: () => T, good: (v: T) => boolean): T {
 
 /** Where Claude Code is, or why it cannot be used. */
 export function findClaude(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
-  const r = findCli("claude", env.ANYDAG_CLAUDE_BIN, "ANYDAG_CLAUDE_BIN", (home, exe) => [path.join(home, ".local", "bin", exe), path.join(home, ".claude", "local", exe)], env);
-  return r.ok || r.error ? r : { ok: false, error: "Claude Code is not installed — install it and sign in, or set ANYDAG_CLAUDE_BIN" };
+  const r = findCli(
+    "claude",
+    env.ANYDAG_CLAUDE_BIN,
+    "ANYDAG_CLAUDE_BIN",
+    (home, exe) => [path.join(home, ".local", "bin", exe), path.join(home, ".claude", "local", exe)],
+    env,
+  );
+  return r.ok || r.error
+    ? r
+    : { ok: false, error: "Claude Code is not installed — install it and sign in, or set ANYDAG_CLAUDE_BIN" };
 }
 
 /**
@@ -193,7 +204,15 @@ export function findClaude(env: Env): { ok: true; bin: string } | { ok: false; e
  */
 export function claudeEnv(env: Env): Env {
   const out: Env = { ...env };
-  for (const k of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ELECTRON_RUN_AS_NODE", "ANYDAG_TOKEN", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"]) delete out[k];
+  for (const k of [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ELECTRON_RUN_AS_NODE",
+    "ANYDAG_TOKEN",
+    "CLAUDECODE",
+    "CLAUDE_CODE_ENTRYPOINT",
+  ])
+    delete out[k];
   return out;
 }
 
@@ -222,7 +241,8 @@ export function claudeSignedIn(bin: string, env: Env): boolean {
 export function claudeReady(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
   const found = findClaude(env);
   if (!found.ok) return found;
-  if (!claudeSignedIn(found.bin, env)) return { ok: false, error: "Claude Code is not signed in — run `claude` once and sign in with your Claude account" };
+  if (!claudeSignedIn(found.bin, env))
+    return { ok: false, error: "Claude Code is not signed in — run `claude` once and sign in with your Claude account" };
   return found;
 }
 
@@ -230,8 +250,16 @@ export function claudeReady(env: Env): { ok: true; bin: string } | { ok: false; 
 
 /** Where OpenCode is, or why it cannot be used. `~/.opencode/bin` is where its install script puts it. */
 export function findOpencode(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
-  const r = findCli("opencode", env.ANYDAG_OPENCODE_BIN, "ANYDAG_OPENCODE_BIN", (home, exe) => [path.join(home, ".opencode", "bin", exe)], env);
-  return r.ok || r.error ? r : { ok: false, error: "OpenCode is not installed — install it and sign in, or set ANYDAG_OPENCODE_BIN" };
+  const r = findCli(
+    "opencode",
+    env.ANYDAG_OPENCODE_BIN,
+    "ANYDAG_OPENCODE_BIN",
+    (home, exe) => [path.join(home, ".opencode", "bin", exe)],
+    env,
+  );
+  return r.ok || r.error
+    ? r
+    : { ok: false, error: "OpenCode is not installed — install it and sign in, or set ANYDAG_OPENCODE_BIN" };
 }
 
 /**
@@ -240,7 +268,8 @@ export function findOpencode(env: Env): { ok: true; bin: string } | { ok: false;
  */
 export function opencodeEnv(env: Env): Env {
   const out: Env = { ...env };
-  for (const k of ["ELECTRON_RUN_AS_NODE", "ANYDAG_TOKEN", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"]) delete out[k];
+  for (const k of ["ELECTRON_RUN_AS_NODE", "ANYDAG_TOKEN", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"])
+    delete out[k];
   return out;
 }
 
@@ -289,7 +318,8 @@ export function opencodeReady(env: Env, model?: string): { ok: true; bin: string
   const found = findOpencode(env);
   if (!found.ok) return found;
   const major = opencodeMajor(found.bin, env);
-  if (major !== undefined && major < 2) return { ok: false, error: `OpenCode ${major}.x is too old — run \`opencode upgrade\` (2 or later is needed)` };
+  if (major !== undefined && major < 2)
+    return { ok: false, error: `OpenCode ${major}.x is too old — run \`opencode upgrade\` (2 or later is needed)` };
   const logins = opencodeLogins(found.bin, env);
   const provider = model?.split("/")[0];
   if (logins && (logins.size === 0 || (provider && !logins.has(provider))))
@@ -333,7 +363,8 @@ export function resolveProvider(
   /* Read against the provider the environment named (or Gemini), never the desktop's implicit
      Claude: a model set for Gemini in `.env.local` is not a model name Claude Code knows. */
   const envModel = id === (env.ANYDAG_LLM_PROVIDER?.trim() || "gemini") ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
-  const model = want?.model?.trim() || envModel || (spec.id === "custom" ? env.ANYDAG_LLM_MODEL?.trim() : "") || spec.defaultModel;
+  const model =
+    want?.model?.trim() || envModel || (spec.id === "custom" ? env.ANYDAG_LLM_MODEL?.trim() : "") || spec.defaultModel;
   if (!model) return { ok: false, error: `provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings` };
 
   if (spec.id === "claude") {

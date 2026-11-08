@@ -141,7 +141,11 @@ export function instantOf(wall: Partial<Wall> & Pick<Wall, "year" | "month" | "d
 /** A zone as a person reads it at `at` — `GMT+1`, `CEST` — or its offset when the engine has no name. */
 export function zoneName(at: Date | number, zone: string = currentZone()): string {
   try {
-    return new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value ?? "";
+    return (
+      new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "short" })
+        .formatToParts(at)
+        .find((p) => p.type === "timeZoneName")?.value ?? ""
+    );
   } catch {
     return "";
   }

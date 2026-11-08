@@ -117,7 +117,13 @@ export function parseSequence(src: string): SequenceModel {
           cur.next();
           continue;
         }
-        diagnostics.push({ line: t.line, col: t.col, code: CODES.E_UNEXPECTED, message: `unexpected \`${t.value}\``, severity: "error" });
+        diagnostics.push({
+          line: t.line,
+          col: t.col,
+          code: CODES.E_UNEXPECTED,
+          message: `unexpected \`${t.value}\``,
+          severity: "error",
+        });
         cur.skipStatement();
         continue;
       }
@@ -129,7 +135,12 @@ export function parseSequence(src: string): SequenceModel {
         cur.next();
         const idTok = cur.eat("word");
         if (!idTok) {
-          diagnostics.push({ line: t.line, code: CODES.E_EXPECTED_ID, message: "expected an id after `participant`", severity: "error" });
+          diagnostics.push({
+            line: t.line,
+            code: CODES.E_EXPECTED_ID,
+            message: "expected an id after `participant`",
+            severity: "error",
+          });
           cur.skipStatement();
           continue;
         }
@@ -235,7 +246,12 @@ export function parseSequence(src: string): SequenceModel {
           break;
         }
         if (!cur.eatWord("end")) {
-          diagnostics.push({ line: t.line, code: CODES.E_UNCLOSED_FRAGMENT, message: `\`${t.value}\` is never closed with \`end\``, severity: "error" });
+          diagnostics.push({
+            line: t.line,
+            code: CODES.E_UNCLOSED_FRAGMENT,
+            message: `\`${t.value}\` is never closed with \`end\``,
+            severity: "error",
+          });
         }
         out.push({ t: "fragment", kind: t.value as "alt", branches, line: t.line });
         cur.skipSeps();
@@ -245,14 +261,25 @@ export function parseSequence(src: string): SequenceModel {
       /* Anything else is a message: `<from> <arrow> <to> : <text>`. */
       cur.next();
       if (cur.peek().kind !== "arrow") {
-        diagnostics.push({ line: t.line, col: t.col, code: CODES.E_EXPECTED_ARROW, message: `expected an arrow after \`${t.value}\``, severity: "error" });
+        diagnostics.push({
+          line: t.line,
+          col: t.col,
+          code: CODES.E_EXPECTED_ARROW,
+          message: `expected an arrow after \`${t.value}\``,
+          severity: "error",
+        });
         cur.skipStatement();
         continue;
       }
       const arrow = cur.next();
       const to = cur.eat("word");
       if (!to) {
-        diagnostics.push({ line: arrow.line, code: CODES.E_EXPECTED_ARROW, message: "expected a participant after the arrow", severity: "error" });
+        diagnostics.push({
+          line: arrow.line,
+          code: CODES.E_EXPECTED_ARROW,
+          message: "expected a participant after the arrow",
+          severity: "error",
+        });
         cur.skipStatement();
         continue;
       }

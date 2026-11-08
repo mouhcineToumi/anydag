@@ -203,7 +203,9 @@ describe("parseQuiz", () => {
     expect(q.open).toBe(true);
     expect(q.options).toEqual([]);
     expect(q.body).toBe("The table is `cd.members`.\n\n> quoted in the prompt\n\n```md\n> a quote in code is code\n```");
-    expect(q.why).toBe("```sql\nselect * from cd.members\nwhere joindate >= '2012-09-01';\n```\n\n`>=` keeps the first day\nitself.");
+    expect(q.why).toBe(
+      "```sql\nselect * from cd.members\nwhere joindate >= '2012-09-01';\n```\n\n`>=` keeps the first day\nitself.",
+    );
     expect(askable(q)).toBe(true);
   });
 
@@ -217,7 +219,8 @@ describe("parseQuiz", () => {
   });
 
   it("never throws, whatever it is handed", () => {
-    for (const text of ["", "\n", "##", "- [x]", "> a", "```", "---\n", "---\ntitle: x\n---"]) expect(() => parseQuiz(text)).not.toThrow();
+    for (const text of ["", "\n", "##", "- [x]", "> a", "```", "---\n", "---\ntitle: x\n---"])
+      expect(() => parseQuiz(text)).not.toThrow();
   });
 });
 
@@ -344,7 +347,13 @@ describe("the writers", () => {
   });
 
   it("write an open question, and read it back open", () => {
-    const input = { id: "qo", prompt: "Write the query", body: "Every member.", options: [], why: "```sql\nselect * from cd.members;\n```" };
+    const input = {
+      id: "qo",
+      prompt: "Write the query",
+      body: "Every member.",
+      options: [],
+      why: "```sql\nselect * from cd.members;\n```",
+    };
     const text = renderQuestion(input);
     expect(text).toBe("## Write the query {#qo}\n\nEvery member.\n\n> ```sql\n> select * from cd.members;\n> ```\n");
     const back = parseQuiz(text).questions[0]!;
@@ -354,11 +363,28 @@ describe("the writers", () => {
   });
 
   it("write multi only where the ticks do not already say it", () => {
-    expect(renderQuestion({ id: "a", prompt: "Q", options: [{ text: "a", correct: true }, { text: "b", correct: true }], multi: true })).toMatch(/^## Q \{#a\}\n/);
+    expect(
+      renderQuestion({
+        id: "a",
+        prompt: "Q",
+        options: [
+          { text: "a", correct: true },
+          { text: "b", correct: true },
+        ],
+        multi: true,
+      }),
+    ).toMatch(/^## Q \{#a\}\n/);
   });
 
   it("add a question at the end, or before another, with one blank line", () => {
-    const q = { id: "qadd", prompt: "Added", options: [{ text: "y", correct: true }, { text: "n", correct: false }] };
+    const q = {
+      id: "qadd",
+      prompt: "Added",
+      options: [
+        { text: "y", correct: true },
+        { text: "n", correct: false },
+      ],
+    };
     const end = addQuestion(SAMPLE, q);
     expect(end.startsWith(SAMPLE)).toBe(true);
     expect(end.slice(SAMPLE.length)).toBe("\n" + renderQuestion(q));
@@ -432,8 +458,12 @@ describe("the writers", () => {
 
 describe("shuffling the options", () => {
   /** A `random` that plays back a list, so an order is a fact a test can state. */
-  const playing = (...values: number[]) => () => values.shift() ?? 0;
-  const SHUFFLED = "---\ntitle: T\nshuffle: true\n---\n\n## Q {#a}\n- [ ] one\n- [x] two {pin}\n- [ ] three\n- [ ] **None of the above**\n- [ ] Both\n";
+  const playing =
+    (...values: number[]) =>
+    () =>
+      values.shift() ?? 0;
+  const SHUFFLED =
+    "---\ntitle: T\nshuffle: true\n---\n\n## Q {#a}\n- [ ] one\n- [x] two {pin}\n- [ ] three\n- [ ] **None of the above**\n- [ ] Both\n";
 
   it("reads `shuffle: true` off the frontmatter, and nothing else as it", () => {
     expect(parseQuiz(SHUFFLED).shuffle).toBe(true);
@@ -471,16 +501,25 @@ describe("shuffling the options", () => {
   it("writes `{pin}` back, and `shuffle:` as one line of the frontmatter", () => {
     const q = parseQuiz(SHUFFLED).questions[0]!;
     expect(replaceQuestion(SHUFFLED, "a", inputOf(q))).toBe(SHUFFLED);
-    expect(renderQuestion({ ...inputOf(q), options: [{ text: "x\n```\ncode\n```", correct: true, pin: true }, { text: "y", correct: false }] })).toBe(
-      "## Q {#a}\n\n- [x] x {pin}\n  ```\n  code\n  ```\n- [ ] y\n",
-    );
-    expect(parseQuiz(renderQuestion({ prompt: "Q", options: [{ text: "```\nc\n```", correct: true, pin: true }] })).questions[0]!.options[0]).toMatchObject({
+    expect(
+      renderQuestion({
+        ...inputOf(q),
+        options: [
+          { text: "x\n```\ncode\n```", correct: true, pin: true },
+          { text: "y", correct: false },
+        ],
+      }),
+    ).toBe("## Q {#a}\n\n- [x] x {pin}\n  ```\n  code\n  ```\n- [ ] y\n");
+    expect(
+      parseQuiz(renderQuestion({ prompt: "Q", options: [{ text: "```\nc\n```", correct: true, pin: true }] })).questions[0]!
+        .options[0],
+    ).toMatchObject({
       text: "```\nc\n```",
       pin: true,
     });
     const off = setShuffle(SHUFFLED, false);
     expect(off).toBe(SHUFFLED.replace("shuffle: true\n", ""));
-    expect(setShuffle(off, true)).toBe("---\ntitle: T\nshuffle: true\n---\n" + SHUFFLED.slice(SHUFFLED.indexOf("\n## ") ));
+    expect(setShuffle(off, true)).toBe("---\ntitle: T\nshuffle: true\n---\n" + SHUFFLED.slice(SHUFFLED.indexOf("\n## ")));
     expect(setShuffle(SHUFFLED, true)).toBe(SHUFFLED);
     expect(setShuffle("## Q {#a}\n- [x] a\n- [ ] b\n", true)).toBe("---\nshuffle: true\n---\n## Q {#a}\n- [x] a\n- [ ] b\n");
   });

@@ -18,7 +18,13 @@ const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  * board page, and this has to sit beside a note, the Tasks page and the Calendar too. It is a
  * column of the shell, at a width of its own.
  */
-export function AssistantPanel({ onOpen, onPage }: { onOpen(kind: "board" | "note" | "quiz" | "table", name: string): void; onPage(chat: string): void }) {
+export function AssistantPanel({
+  onOpen,
+  onPage,
+}: {
+  onOpen(kind: "board" | "note" | "quiz" | "table", name: string): void;
+  onPage(chat: string): void;
+}) {
   const { chat: held } = usePanel();
   const chats = useChats();
   const id = held === NEW_CHAT ? null : (held ?? chats.rows[0]?.id ?? null);
@@ -35,13 +41,34 @@ export function AssistantPanel({ onOpen, onPage }: { onOpen(kind: "board" | "not
         <strong className="dag-assistant-panel__title" data-dag-assistant-panel-title="">
           {title || "Assistant"}
         </strong>
-        <button type="button" className="dag-icon" data-dag-assistant-panel-new="" aria-label="New chat" title="New chat" onClick={() => showChat(NEW_CHAT)}>
+        <button
+          type="button"
+          className="dag-icon"
+          data-dag-assistant-panel-new=""
+          aria-label="New chat"
+          title="New chat"
+          onClick={() => showChat(NEW_CHAT)}
+        >
           <MessageSquarePlus {...ICON} aria-hidden="true" />
         </button>
-        <button type="button" className="dag-icon" data-dag-assistant-panel-page="" aria-label="Open in Assistant" title="Open in Assistant" onClick={() => onPage(id ?? NEW_CHAT)}>
+        <button
+          type="button"
+          className="dag-icon"
+          data-dag-assistant-panel-page=""
+          aria-label="Open in Assistant"
+          title="Open in Assistant"
+          onClick={() => onPage(id ?? NEW_CHAT)}
+        >
           <ExternalLink {...ICON} aria-hidden="true" />
         </button>
-        <button type="button" className="dag-icon" data-dag-assistant-panel-close="" aria-label="Close the Assistant" title="Close (Space A)" onClick={closeAssistant}>
+        <button
+          type="button"
+          className="dag-icon"
+          data-dag-assistant-panel-close=""
+          aria-label="Close the Assistant"
+          title="Close (Space A)"
+          onClick={closeAssistant}
+        >
           <X {...ICON} aria-hidden="true" />
         </button>
       </header>

@@ -222,9 +222,7 @@ test("space released, a press on an item moves it again", async ({ page }) => {
   await page.mouse.move(at.x + 240, at.y + 220, { steps: 8 });
   await page.mouse.up();
 
-  await expect
-    .poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 })
-    .toMatch(/```md \{#one x=\d+ y=\d+\}/);
+  await expect.poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 }).toMatch(/```md \{#one x=\d+ y=\d+\}/);
 });
 
 /*
@@ -262,7 +260,7 @@ test("the hand tool pans from a press on an item, and writes nothing", async ({ 
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
 
-test("the hand tool makes the board unselectable, so a pan highlights nothing", async ({ page }) => {
+test("the hand tool and a held pan modifier make the board unselectable, so a pan highlights nothing", async ({ page }) => {
   await open(page);
 
   /*
@@ -293,16 +291,8 @@ test("the hand tool makes the board unselectable, so a pan highlights nothing", 
   await lead(page, "v");
   await expect(page.locator(".dag-viewport")).toHaveAttribute("data-tool", "select");
   expect(await inside()).toBe("auto");
-});
 
-test("a held pan modifier does the same, for the same reason", async ({ page }) => {
-  await open(page);
-  const inside = () =>
-    page.evaluate(() => {
-      const body = document.querySelector('[data-dag-item="one"] .dag-item__body') as HTMLElement;
-      return getComputedStyle(body).userSelect;
-    });
-
+  /* A held pan modifier is the same rule for the same reason, and goes the same way. */
   await page.keyboard.down("Space");
   await expect(page.locator(".dag-viewport")).toHaveAttribute("data-pan", "");
   expect(await inside()).toBe("none");

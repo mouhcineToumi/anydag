@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS, GROUPS, REFUSED } from "../cli/commands";
+import { COMMANDS, GROUPS, OUTSIDE, REFUSED } from "../cli/commands";
 import { find } from "../cli/main";
 // @ts-expect-error — a plain `.mjs` with no types, as every script beside it
 import { apiRoutes as readRoutes } from "../scripts/parity.mjs";
@@ -9,18 +9,20 @@ import { apiRoutes as readRoutes } from "../scripts/parity.mjs";
 const apiRoutes = (): string[] => readRoutes();
 
 /**
- * **Everything a person can do, a terminal can** — held as a closed set rather than as a claim.
+ * **The admin CLI's routes are a closed set** — held rather than claimed.
+ *
+ * `anydag` is an admin tool: vaults, files as whole documents, the trash, sync, logs, pictures and
+ * exports. It no longer mirrors the app (MCP does, in full), so a route is accounted for one of three
+ * ways: some command's `routes` reach it, `REFUSED` refuses it with a reason, or `OUTSIDE` says every
+ * feature holding it is outside the admin CLI (`{"admin": false}` in `docs/parity.json`).
  *
  * The API's routes are read out of its own source by regex, the way `check-skill.mjs` reads the MCP
- * tools and `HUE_ORDER`: a list typed here would be the copy nobody updates. Every one of them is
- * reached by some command's `routes` or named in `REFUSED` with a reason — which is read out of
- * `docs/parity.json` — and every route a command claims to reach exists. So a route
- * added to the API with no way to it from here is a red test, and so is a command that goes on
- * declaring a route that was renamed. `test/parity.test.ts` is the same argument across all three
- * interfaces.
+ * tools and `HUE_ORDER`: a list typed here would be the copy nobody updates. So a route added to the
+ * API that the manifest does not place is a red test, and so is a command that goes on declaring a
+ * route that was renamed. `test/parity.test.ts` is the same argument across all three interfaces.
  */
 
-describe("the CLI reaches the whole API", () => {
+describe("the CLI accounts for the whole API", () => {
   const routes = apiRoutes();
   const reached = new Set(COMMANDS.flatMap((c) => c.routes));
 
@@ -28,16 +30,18 @@ describe("the CLI reaches the whole API", () => {
     /* A regex that matched nothing would make every assertion below vacuous. */
     expect(routes.length).toBeGreaterThan(30);
     expect(routes).toContain("POST /__board/patch");
+    /* The admin CLI does not edit inside a board: that is the page's and MCP's. */
+    expect(OUTSIDE).toContain("POST /__board/patch");
     expect(routes).toContain("POST /api/vaults/open");
   });
 
-  it("reaches every route, or refuses it with a reason", () => {
-    const missing = routes.filter((r) => !reached.has(r) && !(r in REFUSED));
+  it("reaches every route, refuses it with a reason, or places it outside the admin CLI", () => {
+    const missing = routes.filter((r) => !reached.has(r) && !(r in REFUSED) && !OUTSIDE.includes(r));
     expect(missing).toEqual([]);
   });
 
   it("declares no route the API does not have", () => {
-    const phantom = [...reached, ...Object.keys(REFUSED)].filter((r) => !routes.includes(r));
+    const phantom = [...reached, ...Object.keys(REFUSED), ...OUTSIDE].filter((r) => !routes.includes(r));
     expect(phantom).toEqual([]);
   });
 
@@ -58,12 +62,15 @@ describe("the command table", () => {
   });
 
   it("finds the longest name, wherever the global flags are", () => {
-    const hit = find(["--vault", "/tmp/v", "item", "ls", "demo", "--json"]);
-    expect(hit && "command" in hit && hit.command.name).toEqual(["item", "ls"]);
+    const hit = find(["--vault", "/tmp/v", "board", "cat", "demo", "--json"]);
+    expect(hit && "command" in hit && hit.command.name).toEqual(["board", "cat"]);
     expect(hit && "command" in hit && hit.rest).toEqual(["--vault", "/tmp/v", "demo", "--json"]);
-    const group = find(["node"]);
-    expect(group).toEqual({ group: "node" });
+    const group = find(["table"]);
+    expect(group).toEqual({ group: "table" });
     expect(find(["nonsense"])).toBeNull();
+    /* What the admin CLI dropped is no command at all. */
+    expect(find(["item", "ls"])).toBeNull();
+    expect(find(["node"])).toBeNull();
   });
 
   it("gives every flag a word of help and a type", () => {

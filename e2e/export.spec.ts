@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { vaulted } from "./vault";
+
 /**
  * The exported SVG is the diagram, not a picture of something like it.
  *
@@ -25,8 +27,9 @@ const TOLERANCE = 0.02;
  * so it is still asked, of the two pictures this run took.
  */
 const PIXELS = !process.env.ANYDAG_NO_SNAPSHOTS;
+const PARKED = "translate(40px, 40px) scale(1)";
 
-test("an exported item renders the same as the item", async ({ page }) => {
+test("an exported item renders the same as the item", { tag: "@smoke" }, async ({ page }) => {
   /*
    * Only against the dev server, and that is a property of this check rather than a gap.
    *
@@ -39,17 +42,33 @@ test("an exported item renders the same as the item", async ({ page }) => {
   const devServer = (await page.request.get("/src/export/svg.ts")).ok();
   test.skip(!devServer, "imports a TypeScript source path, which only the dev server serves");
 
-  await page.goto(`/?board=${encodeURIComponent(BOARD)}`);
+  await page.goto(await vaulted(page, `/?board=${encodeURIComponent(BOARD)}`));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await page.evaluate(() => document.fonts.ready);
 
-  /* Park the canvas at 1:1 so the on-screen item and the export are the same size. */
-  await page.evaluate(() => {
+  /*
+   * Park the canvas at 1:1 so the on-screen item and the export are the same size — **with the
+   * zoom bar's "100%", not by writing the layer's transform.**
+   *
+   * The first version of this set `.dag-layer`'s style and `data-zoom` itself. That paints the
+   * glass but not the `Viewport`'s own record of it: `touched` stays false, so the canvas still
+   * believes nobody has moved the view, and the next `fit()` — any change of the content's bounds
+   * or of the canvas's box, both of which `data-dag-ready` does not rule out, since it stays `1`
+   * while a board re-lays out — puts the fit view back. That view is 0.606011 on this board, and
+   * 2429 × 0.606 is the 1472 the failed run measured: the item was captured, and sized for the
+   * export, at the fit zoom. The button is the person's way of taking the view over (`actual()`
+   * paints, writes `data-zoom` in the same statement and sets `touched`), so nothing refits after
+   * it. Only then is the offset rounded to whole pixels by hand — the fit's is 265.723, which
+   * makes the item's box 1025 tall to a screenshot whose baseline is 1024 — and that write is
+   * safe because the view is no longer one that refits. The view is asserted at the end rather
+   * than assumed, so one that did move reads as that and not as a mismatch of two image sizes.
+   */
+  await page.locator("[data-dag-zoom-actual]").click();
+  await expect(page.locator(".dag-viewport")).toHaveAttribute("data-zoom", "1");
+  await page.evaluate((to) => {
     const layer = document.querySelector<HTMLElement>(".dag-layer");
-    if (layer) layer.style.transform = "translate(40px, 40px) scale(1)";
-    const vp = document.querySelector<HTMLElement>(".dag-viewport");
-    if (vp) vp.dataset.zoom = "1";
-  });
+    if (layer) layer.style.transform = to;
+  }, PARKED);
   /* Two frames rather than a guess at how long one takes: the transform above is painted on the
      next one, and the screenshot below is compared pixel for pixel. */
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -78,6 +97,10 @@ test("an exported item renders the same as the item", async ({ page }) => {
       title: "export test",
     });
   });
+
+  /* Still where it was parked: nothing painted the view between the two pictures. */
+  await expect(page.locator(".dag-viewport")).toHaveAttribute("data-zoom", "1");
+  await expect(page.locator(".dag-layer")).toHaveCSS("transform", "matrix(1, 0, 0, 1, 40, 40)");
 
   expect(svg.startsWith("<svg")).toBe(true);
   /* The face itself, not a link to it: this is what makes the file portable. */
@@ -143,14 +166,21 @@ async function differing(
         const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
         const g = canvas.getContext("2d")!;
         g.drawImage(img, 0, 0);
-        return { w: img.naturalWidth, h: img.naturalHeight, data: g.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data };
+        return {
+          w: img.naturalWidth,
+          h: img.naturalHeight,
+          data: g.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data,
+        };
       };
       const [p, q] = await Promise.all([pixels(a), pixels(b)]);
       const size = { before: [p.w, p.h] as [number, number], after: [q.w, q.h] as [number, number] };
       if (p.w !== q.w || p.h !== q.h) return { size, ratio: 1 };
       let off = 0;
       for (let i = 0; i < p.data.length; i += 4) {
-        const d = Math.abs(p.data[i]! - q.data[i]!) + Math.abs(p.data[i + 1]! - q.data[i + 1]!) + Math.abs(p.data[i + 2]! - q.data[i + 2]!);
+        const d =
+          Math.abs(p.data[i]! - q.data[i]!) +
+          Math.abs(p.data[i + 1]! - q.data[i + 1]!) +
+          Math.abs(p.data[i + 2]! - q.data[i + 2]!);
         if (d > 153) off++;
       }
       return { size, ratio: off / (p.w * p.h) };

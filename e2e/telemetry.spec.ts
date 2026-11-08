@@ -53,7 +53,9 @@ async function open(page: Page) {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
-test("asks once when nobody has answered, sends nothing before, and a no is the end of it", async ({ page }) => {
+test("asks once when nobody has answered, sends nothing before, and a no is the end of it", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const server = await fakeServer(page, null);
   await open(page);
   const ask = page.locator("[data-dag-telemetry-ask]");

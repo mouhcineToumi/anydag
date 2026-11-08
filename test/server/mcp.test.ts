@@ -57,8 +57,35 @@ describe("tools/list", () => {
     const c = await connect();
     const names = (await c.listTools()).tools.map((t) => t.name).sort();
     expect(names).toEqual(TOOLS.map((t) => t.name).sort());
-    expect(names).toEqual(expect.arrayContaining(["board_read", "note_create", "vault_list", "vault_open", "vault_create", "vault_close", "board_transfer", "table_edit", "file_upload", "trash_list", "trash_restore", "trash_delete", "trash_empty"]));
-    for (const gone of ["board_share", "board_shares", "share_read", "share_file", "share_image", "feedback", "workspace_list", "workspace_create", "workspace_rename", "workspace_delete"]) {
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "board_read",
+        "note_create",
+        "vault_list",
+        "vault_open",
+        "vault_create",
+        "vault_close",
+        "board_transfer",
+        "table_edit",
+        "file_upload",
+        "trash_list",
+        "trash_restore",
+        "trash_delete",
+        "trash_empty",
+      ]),
+    );
+    for (const gone of [
+      "board_share",
+      "board_shares",
+      "share_read",
+      "share_file",
+      "share_image",
+      "feedback",
+      "workspace_list",
+      "workspace_create",
+      "workspace_rename",
+      "workspace_delete",
+    ]) {
       expect(names).not.toContain(gone);
     }
     expect(new Set(names).size).toBe(names.length);

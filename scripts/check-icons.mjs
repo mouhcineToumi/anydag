@@ -79,7 +79,8 @@ for (const name of known) {
        installed Lucide say. */
 {
   const { renderIconIndex, INDEX_FILE } = await import("./icons/index.mjs");
-  if (fs.readFileSync(INDEX_FILE, "utf8") !== (await renderIconIndex())) note("src/render/icon-index.ts does not match the bundle and lucide-react (stale — rebuild)", "icon-index.ts");
+  if (fs.readFileSync(INDEX_FILE, "utf8") !== (await renderIconIndex()))
+    note("src/render/icon-index.ts does not match the bundle and lucide-react (stale — rebuild)", "icon-index.ts");
 }
 
 /* 3. Every `icon=` any board actually writes. Board files are the thing a person edits by hand, so
@@ -151,7 +152,11 @@ for (const file of boards) {
  * but the question above — is it a brand that also has a glyph, or a concept that also has a
  * company?
  */
-const kebab = (p) => p.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([A-Z])([A-Z][a-z])/g, "$1-$2").toLowerCase();
+const kebab = (p) =>
+  p
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
 const lucideNames = new Set(
   Object.keys(await import("lucide-react"))
     .filter((k) => /^[A-Z]/.test(k) && !k.startsWith("Lucide") && !k.endsWith("Icon"))

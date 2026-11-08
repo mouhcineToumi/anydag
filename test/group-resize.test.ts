@@ -171,13 +171,19 @@ describe("what the release writes", () => {
   it("a lone circle or figure: both sides, since one given side would decide the other", () => {
     /* `circle w=192` alone is a 192×192 circle and `figure w=160` alone a taller picture: the pull
        east would have grown them south as well, while the group's height held still. */
-    const b = parseBoard("s", '```sketch {#c x=0 y=0 group=g}\ncircle c1 "C"\n```\n\n```sketch {#f x=200 y=0 group=g}\nfigure f1 "House" icon=emoji:house\n```\n');
+    const b = parseBoard(
+      "s",
+      '```sketch {#c x=0 y=0 group=g}\ncircle c1 "C"\n```\n\n```sketch {#f x=200 y=0 group=g}\nfigure f1 "House" icon=emoji:house\n```\n',
+    );
     const at = (id: string) => b.items.find((it) => it.id === id)!;
     const laid: Record<string, LaidOut> = {
       c: { nodes: { c1: { x: 0, y: 0, w: 96, h: 96 } }, groups: {} },
       f: { nodes: { f1: { x: 0, y: 0, w: 80, h: 104 } }, groups: {} },
     };
-    const ms = [memberOf(at("c"), { x: 0, y: 0, w: 112, h: 112 }, laid.c!), memberOf(at("f"), { x: 200, y: 0, w: 96, h: 120 }, laid.f!)];
+    const ms = [
+      memberOf(at("c"), { x: 0, y: 0, w: 112, h: 112 }, laid.c!),
+      memberOf(at("f"), { x: 200, y: 0, w: 96, h: 120 }, laid.f!),
+    ];
     const g = groupOf(ms);
     const wide: Box = { ...g, w: g.w * 2 };
     const circle = memberOps(at("c"), ms[0]!, g, wide, laid.c!, 8) as { body: string };
@@ -196,7 +202,10 @@ describe("what the release writes", () => {
   it("nothing at all for a member the pull did not change", () => {
     /* Pulled down, a note at the top keeps its place and its width — and it writes its height. */
     const south: Box = { ...g0, h: g0.h + 100 };
-    expect(memberOps(item("note"), byId("note"), g0, south, null, 8)).toEqual({ id: "note", attrs: { h: Math.round(48 * (south.h / g0.h)) } });
+    expect(memberOps(item("note"), byId("note"), g0, south, null, 8)).toEqual({
+      id: "note",
+      attrs: { h: Math.round(48 * (south.h / g0.h)) },
+    });
     expect(memberOps(item("note"), byId("note"), g0, g0, null, 8)).toBeNull();
   });
 });

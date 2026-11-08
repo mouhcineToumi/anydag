@@ -141,7 +141,21 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
  * key added in a component and not here is a preference that silently stops following anybody.
  * `test/prefs.test.ts` holds it against the keys the app actually reads.
  */
-export const PREF_KEYS = [THEME, LIBRARY, INSPECTOR_MODE, INSPECTOR_WIDTH, SIDEBAR, SIDEBAR_WIDTH, FAVOURITES, CALENDAR_HIDE, WEEK_START, TIME_ZONE, TIME_ZONE_SEEN, ATTACHMENTS, UPDATE_LINKS] as const;
+export const PREF_KEYS = [
+  THEME,
+  LIBRARY,
+  INSPECTOR_MODE,
+  INSPECTOR_WIDTH,
+  SIDEBAR,
+  SIDEBAR_WIDTH,
+  FAVOURITES,
+  CALENDAR_HIDE,
+  WEEK_START,
+  TIME_ZONE,
+  TIME_ZONE_SEEN,
+  ATTACHMENTS,
+  UPDATE_LINKS,
+] as const;
 
 /**
  * **The half of `PREF_KEYS` that switches with the vault**: the
@@ -338,35 +352,5 @@ export function adoptAll(values: Record<string, unknown>, half?: Half): void {
     } catch {
       /* Site data blocked. The session still honours whatever the defaults are. */
     }
-  }
-}
-
-/**
- * Forget everything this browser remembers — when somebody else takes the machine over.
- *
- * Without it, the next person here inherits the last one's theme and panel
- * width on the first render, and then — because their own stored settings are `null` and a browser
- * with nothing to adopt pushes what it has — *writes them in as theirs*. A preference
- * leaking between two people on one laptop is a small thing; it silently becoming theirs is not.
- */
-export function clearAll(): void {
-  if (snapshot()) return;
-  /* `SYNC` is deliberately not in here: it says what this *browser* does, not what the saved
-     copy remembers, and the e2e suite seeds it once through `storageState` — a reset inside a check
-     that wiped it would turn the sync back on for every check after it. */
-  /* The open folders go too, though they never travel: they are the last person's folder names. */
-  for (const key of [...PREF_KEYS, STAMP, SIDEBAR_FOLDERS]) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* Nothing to do, and nothing to report. */
-    }
-  }
-  /* And the list of files, in every workspace it was kept for: the last person's file
-     names. It names its uid and would never be drawn for anybody else, but it is theirs to take. */
-  try {
-    for (const key of Object.keys(localStorage)) if (key === FILE_LIST || key.startsWith(`${FILE_LIST}@`)) localStorage.removeItem(key);
-  } catch {
-    /* Blocked site data: there is nothing kept to take. */
   }
 }

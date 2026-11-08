@@ -33,7 +33,9 @@ const port = Number(flag("port") ?? process.env.ANYDAG_PORT ?? 3500);
 const prompt = args.join(" ").trim();
 
 if (!prompt) {
-  console.error('usage: node scripts/generate.mjs "<description>" [--as <type>] [--provider <id>] [--model <id>] [--port 3500] [--json]');
+  console.error(
+    'usage: node scripts/generate.mjs "<description>" [--as <type>] [--provider <id>] [--model <id>] [--port 3500] [--json]',
+  );
   process.exit(2);
 }
 
@@ -83,7 +85,9 @@ if (json) {
   }
   if (body.error) console.log(`\n${body.error}`);
   for (const x of body.diagnostics ?? [])
-    console.log(`${x.severity === "error" ? "error" : "warn "} ${x.line === 0 ? "fence" : `line ${x.line}`} ${x.code} — ${x.message}`);
+    console.log(
+      `${x.severity === "error" ? "error" : "warn "} ${x.line === 0 ? "fence" : `line ${x.line}`} ${x.code} — ${x.message}`,
+    );
 }
 
 process.exit(!res.ok ? 2 : body.ok ? 0 : body.draft ? 1 : 2);

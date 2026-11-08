@@ -41,7 +41,9 @@ describe("scopeUrl", () => {
 
   it("scopes an absolute URL on this origin and leaves every other origin alone", () => {
     expect(scopeUrl("http://here:3500/__board/list", "v1", "http://here:3500")).toBe("http://here:3500/__board/list?vault=v1");
-    expect(scopeUrl("https://elsewhere.example/__board/list", "v1", "http://here:3500")).toBe("https://elsewhere.example/__board/list");
+    expect(scopeUrl("https://elsewhere.example/__board/list", "v1", "http://here:3500")).toBe(
+      "https://elsewhere.example/__board/list",
+    );
   });
 
   it("encodes an id, though an id never needs it", () => {

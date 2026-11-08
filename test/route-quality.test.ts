@@ -134,9 +134,7 @@ describe.each(files)("%s", (file) => {
       for (const e of placed.edges) {
         if (!e.label) continue;
         const drift = distanceTo({ x: e.label.x, y: e.label.y }, flatten(e.d));
-        expect(drift, `${e.id} label is ${drift.toFixed(1)}px from its path`).toBeLessThanOrEqual(
-          T.metric.edge.labelOffset * 2,
-        );
+        expect(drift, `${e.id} label is ${drift.toFixed(1)}px from its path`).toBeLessThanOrEqual(T.metric.edge.labelOffset * 2);
       }
     }
   });

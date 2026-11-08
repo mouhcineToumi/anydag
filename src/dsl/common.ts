@@ -172,8 +172,7 @@ export function modifiers(cur: Cursor, ctx: Ctx): Modifiers {
       else if (t.value === "external") out.external = true;
       /* `bold` and `italic` are emphasis on the title, not a state — falling through to
          `STATUS_OF` would look the word up, get `undefined`, and clear a status the node
-         already carried (`done bold` would lose the `done`). */
-      else if (t.value === "bold") out.bold = true;
+         already carried (`done bold` would lose the `done`). */ else if (t.value === "bold") out.bold = true;
       else if (t.value === "italic") out.italic = true;
       else out.status = STATUS_OF[t.value];
       continue;
@@ -662,8 +661,9 @@ function parseBlock(cur: Cursor, ctx: Ctx, nested: boolean): void {
       const glyph = cur.eat("word");
       const text = cur.eat("string");
       if (!glyph || !text) err(ctx, t, CODES.E_BAD_LEGEND, "legend takes a glyph and a description");
-      /* A legend that explains a mark the diagram no longer draws is worse than no legend. */
-      else if (RETIRED_FLAGS.has(glyph.value)) {
+      /* A legend that explains a mark the diagram no longer draws is worse than no legend. */ else if (
+        RETIRED_FLAGS.has(glyph.value)
+      ) {
         warn(ctx, t.line, CODES.W_RETIRED_FLAG, `there is no \`${glyph.value}\` mark to explain any more`);
       } else ctx.graph.legend.push({ glyph: glyph.value, text: text.value });
     } else if (t.value === "dir" && cur.peek(1).kind === "punct" && cur.peek(1).value === "=") {
@@ -792,9 +792,7 @@ function finalize(ctx: Ctx): void {
     ctx.diag.push({
       line: n.line,
       code: CODES.W_UNKNOWN_ICON,
-      message:
-        `no icon named "${n.icon}"; drawing the default for a ${n.kind}` +
-        (guess ? `. Did you mean \`${guess}\`?` : ""),
+      message: `no icon named "${n.icon}"; drawing the default for a ${n.kind}` + (guess ? `. Did you mean \`${guess}\`?` : ""),
       severity: "warn",
     });
   }

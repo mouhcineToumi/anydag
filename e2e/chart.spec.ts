@@ -200,7 +200,7 @@ slice c "Gamma" 25
     return (JSON.parse(raw ?? "{}") as { nodes: Record<string, { x: number; y: number; w: number; h: number }> }).nodes;
   }
 
-  test("a picked series takes its values from the panel, and the bars move", async ({ page }) => {
+  test("a picked series takes its values from the panel, and the bars move", { tag: "@smoke" }, async ({ page }) => {
     await open(page);
     await pickMark(page, "rev", "web");
 
@@ -351,7 +351,7 @@ slice c "Gamma" 25
     await open(page);
     await pickMark(page, "rev", "mob");
     await page.keyboard.press("Delete");
-    await expect.poll(read, { timeout: 5_000 }).not.toContain('series mob');
+    await expect.poll(read, { timeout: 5_000 }).not.toContain("series mob");
     await expect(page.locator('[data-dag-item="rev"] [data-dag-node]')).toHaveCount(1);
 
     await page.locator(".dag-viewport").focus();

@@ -353,7 +353,13 @@ export class SyncEngine {
     };
     // A delete's head is a head: `null` only for a key this device has never seen a head for.
     const parent = st ? st.seq : null;
-    return { change: { key: l.key, parent, blob, meta: sealMeta(this.k.enc, l.key, meta) }, rel: l.rel, kind: l.kind, bytes: l.bytes, sha1 };
+    return {
+      change: { key: l.key, parent, blob, meta: sealMeta(this.k.enc, l.key, meta) },
+      rel: l.rel,
+      kind: l.kind,
+      bytes: l.bytes,
+      sha1,
+    };
   }
 
   private async upload(ids: Iterable<string>, plain: Map<string, Uint8Array>, force = false): Promise<void> {
@@ -425,7 +431,16 @@ export class SyncEngine {
   private async landed(p: Pending, seq: number, settled: Set<string>): Promise<void> {
     const key = p.change.key;
     if (p.bytes) this.bases.put(p.bytes);
-    this.state.put({ key, rel: p.rel, kind: p.kind, seq, blob: p.change.blob, sha1: p.sha1, size: p.bytes?.byteLength ?? 0, mtime: 0 });
+    this.state.put({
+      key,
+      rel: p.rel,
+      kind: p.kind,
+      seq,
+      blob: p.change.blob,
+      sha1: p.sha1,
+      size: p.bytes?.byteLength ?? 0,
+      mtime: 0,
+    });
     settled.add(key);
     if (p.kind === "dir") return;
     const now = await this.fs.read(p.rel);

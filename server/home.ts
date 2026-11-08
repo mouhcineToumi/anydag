@@ -110,7 +110,9 @@ export class Home {
   }
 
   docByPath(vault: string, file: string): DocRow | undefined {
-    return this.sql("select * from docs where vault = ? and path = ? collate nocase").get(vault, file) as unknown as DocRow | undefined;
+    return this.sql("select * from docs where vault = ? and path = ? collate nocase").get(vault, file) as unknown as
+      | DocRow
+      | undefined;
   }
 
   putDoc(row: DocRow): void {
@@ -137,7 +139,11 @@ export class Home {
 
   set(key: string, value: string | null): void {
     if (value === null) this.sql("delete from kv where key = ?").run(key);
-    else this.sql("insert into kv (key, value) values (?, ?) on conflict (key) do update set value = excluded.value").run(key, value);
+    else
+      this.sql("insert into kv (key, value) values (?, ?) on conflict (key) do update set value = excluded.value").run(
+        key,
+        value,
+      );
   }
 
   /**
@@ -157,7 +163,10 @@ export class Home {
       // `digest:<vault>:<doc>` is the only kv key that embeds a vault id (`Vault.digestKey`).
       const keys = this.sql("select key from kv where key like ?").all(`digest:${oldId}:%`) as { key: string }[];
       for (const { key } of keys) {
-        this.sql("update or replace kv set key = ? where key = ?").run(`digest:${newId}:${key.slice(`digest:${oldId}:`.length)}`, key);
+        this.sql("update or replace kv set key = ? where key = ?").run(
+          `digest:${newId}:${key.slice(`digest:${oldId}:`.length)}`,
+          key,
+        );
       }
     });
   }

@@ -66,7 +66,12 @@ describe("search", () => {
 
   it("keeps a document from filling the list on its own", () => {
     const many = buildEngine([
-      { id: "c000000000", name: "long", kind: "note", units: Array.from({ length: 10 }, (_, i) => ({ part: `L${i + 1}`, what: "paragraph", text: `alpha ${i}` })) },
+      {
+        id: "c000000000",
+        name: "long",
+        kind: "note",
+        units: Array.from({ length: 10 }, (_, i) => ({ part: `L${i + 1}`, what: "paragraph", text: `alpha ${i}` })),
+      },
       { id: "d000000000", name: "short", kind: "note", units: [{ part: "L1", what: "paragraph", text: "alpha too" }] },
     ]);
     const hits = search(many, "alpha");

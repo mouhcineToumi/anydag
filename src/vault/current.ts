@@ -15,7 +15,7 @@
 import { desktop } from "./desktop";
 
 /** The query key a request and a page name their vault with. */
-export const PARAM = "vault";
+const PARAM = "vault";
 
 /** Which vault this browser used last — what a bare `/` resumes. This browser's, never synced. */
 export const LAST = "dag:vault";

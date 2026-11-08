@@ -62,13 +62,14 @@ function pastedName(ext: string, at = new Date()): string {
  * Keep one uploaded file as an attachment, checked against the limits, named from what it was called
  * inside `folder`, numbered when taken. `store_upload`, ported; the refusals are word for word.
  */
-export async function storeUpload(s: Session, filename: string, folder: string, data: Uint8Array, title?: string | null) {
+async function storeUpload(s: Session, filename: string, folder: string, data: Uint8Array, title?: string | null) {
   const limits = s.limits();
   const leaf = leafOf(String(filename ?? "").replace(/\\/g, "/")).trim();
   const ext = extOf(leaf);
   if (!ext) throw err(415, `\`${leaf || "this file"}\` has no extension, so there is no telling what it is`);
   if (!s.vault.types.has(ext)) throw err(415, `\`.${ext}\` files cannot be uploaded here`);
-  if (data.byteLength > limits.maxBytes) throw err(413, `\`${leaf}\` is ${megabytes(data.byteLength)}; the limit is ${megabytes(limits.maxBytes)}`);
+  if (data.byteLength > limits.maxBytes)
+    throw err(413, `\`${leaf}\` is ${megabytes(data.byteLength)}; the limit is ${megabytes(limits.maxBytes)}`);
   const where = folderFrom(folder ?? "");
   if (where === null) throw err(400, `\`${folder}\` is not a folder name`);
   if (where === "components" || where.startsWith("components/")) throw err(400, "a file cannot live in components/");

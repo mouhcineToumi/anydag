@@ -39,9 +39,9 @@ export async function build() {
     banner: { js: "import{createRequire as __acr}from'node:module';const require=__acr(import.meta.url);" },
     /* `@parcel/watcher` reaches this bundle through `server/vault.ts`'s import — a native module
      esbuild cannot inline, and the newer edge the CLI's `--vault` half never opens. It stays
-     outside like `playwright` does; a machine that ships the bundle without it only breaks when a
+     outside like `@playwright/test` does; a machine that ships the bundle without it only breaks when a
      command opens a browser or serves in-process. */
-  external: ["@parcel/watcher", "playwright", "playwright-core", "esbuild"],
+    external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
     define: { __ANYDAG_VERSION__: JSON.stringify(version) },
     metafile: true,
     logLevel: "warning",

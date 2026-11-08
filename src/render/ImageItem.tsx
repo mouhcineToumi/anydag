@@ -26,10 +26,7 @@ export function ImageItem({ item, boardName }: { item: BoardItem; boardName: str
   const caption = item.body.trim();
 
   return (
-    <figure
-      className="dag-image"
-      style={{ ...hueVars(item.hue), ...(item.h !== undefined ? { minHeight: item.h } : undefined) }}
-    >
+    <figure className="dag-image" style={{ ...hueVars(item.hue), ...(item.h !== undefined ? { minHeight: item.h } : undefined) }}>
       <img src={url} alt={caption || item.id} draggable={false} />
       {caption ? <figcaption>{caption}</figcaption> : null}
     </figure>

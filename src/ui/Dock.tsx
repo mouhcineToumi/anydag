@@ -127,103 +127,103 @@ export function Dock({ edit }: { edit?: DockActions }) {
     <div className="dag-dock" data-dag-dock="" role="toolbar" aria-label="Tools">
       {edit ? (
         <>
-      <div className="dag-dock__group dag-dock__group--tools" role="radiogroup" aria-label="Tool">
-        <button
-          className={edit.tool === "select" ? "dag-icon dag-icon--on" : "dag-icon"}
-          role="radio"
-          aria-checked={edit.tool === "select"}
-          aria-label={`Select${hint("select")}`}
-          title={`Select: click an item, drag the paper to select several${hint("select")}`}
-          onClick={() => edit.onTool("select")}
-        >
-          <MousePointer2 {...ICON} aria-hidden="true" />
-        </button>
-        <button
-          className={edit.tool === "hand" ? "dag-icon dag-icon--on" : "dag-icon"}
-          role="radio"
-          aria-checked={edit.tool === "hand"}
-          aria-label={`Hand${hint("hand")}`}
-          title={`Hand: drag the paper to move around${hint("hand")}`}
-          onClick={() => edit.onTool("hand")}
-        >
-          <Hand {...ICON} aria-hidden="true" />
-        </button>
-        {/* The pen, beside the two tools it is a third of: all three
+          <div className="dag-dock__group dag-dock__group--tools" role="radiogroup" aria-label="Tool">
+            <button
+              className={edit.tool === "select" ? "dag-icon dag-icon--on" : "dag-icon"}
+              role="radio"
+              aria-checked={edit.tool === "select"}
+              aria-label={`Select${hint("select")}`}
+              title={`Select: click an item, drag the paper to select several${hint("select")}`}
+              onClick={() => edit.onTool("select")}
+            >
+              <MousePointer2 {...ICON} aria-hidden="true" />
+            </button>
+            <button
+              className={edit.tool === "hand" ? "dag-icon dag-icon--on" : "dag-icon"}
+              role="radio"
+              aria-checked={edit.tool === "hand"}
+              aria-label={`Hand${hint("hand")}`}
+              title={`Hand: drag the paper to move around${hint("hand")}`}
+              onClick={() => edit.onTool("hand")}
+            >
+              <Hand {...ICON} aria-hidden="true" />
+            </button>
+            {/* The pen, beside the two tools it is a third of: all three
             change what a press on the paper means, which is what makes them one radiogroup. */}
-        <button
-          className={edit.tool === "pen" ? "dag-icon dag-icon--on" : "dag-icon"}
-          role="radio"
-          aria-checked={edit.tool === "pen"}
-          aria-label={`Pen${hint("pen")}`}
-          title={`Pen: draw a freehand stroke; it becomes an item${hint("pen")}`}
-          onClick={() => edit.onTool("pen")}
-        >
-          <Pencil {...ICON} aria-hidden="true" />
-        </button>
-      </div>
+            <button
+              className={edit.tool === "pen" ? "dag-icon dag-icon--on" : "dag-icon"}
+              role="radio"
+              aria-checked={edit.tool === "pen"}
+              aria-label={`Pen${hint("pen")}`}
+              title={`Pen: draw a freehand stroke; it becomes an item${hint("pen")}`}
+              onClick={() => edit.onTool("pen")}
+            >
+              <Pencil {...ICON} aria-hidden="true" />
+            </button>
+          </div>
 
-      <span className="dag-dock__rule dag-dock__rule--make" />
+          <span className="dag-dock__rule dag-dock__rule--make" />
 
-      <div className="dag-dock__group dag-dock__group--make">
-        {/* Promoted, and accented, the way both references promote exactly one thing. Ours is the
+          <div className="dag-dock__group dag-dock__group--make">
+            {/* Promoted, and accented, the way both references promote exactly one thing. Ours is the
             prompt card rather than an "AI" button, because the card is a real item on the board
             that survives a reload and is undone like anything else. */}
-        <button
-          className="dag-icon dag-icon--accent"
-          data-dag-dock-prompt=""
-          aria-label={`Prompt card${hint("prompt")}`}
-          title={`Prompt card: describe a diagram and a model draws it${hint("prompt")}`}
-          onClick={edit.onPrompt}
-        >
-          <Sparkles {...ICON} aria-hidden="true" />
-        </button>
-        <button
-          className={edit.library ? "dag-icon dag-icon--on" : "dag-icon"}
-          data-dag-library-toggle=""
-          aria-pressed={edit.library}
-          aria-label={`Library${hint("library")}`}
-          title={`Ready-made components to click or drag onto the board${hint("library")}`}
-          onClick={() => edit.onLibrary(!edit.library)}
-        >
-          <LibraryBig {...ICON} aria-hidden="true" />
-        </button>
-        <button
-          className="dag-icon"
-          data-dag-tidy=""
-          aria-label={`Tidy up${hint("tidy")}`}
-          title={`Tidy up: line every item up in rows, columns and grids with even gaps; with a selection, just those${hint("tidy")}`}
-          onClick={edit.onTidy}
-        >
-          <LayoutGrid {...ICON} aria-hidden="true" />
-        </button>
-      </div>
+            <button
+              className="dag-icon dag-icon--accent"
+              data-dag-dock-prompt=""
+              aria-label={`Prompt card${hint("prompt")}`}
+              title={`Prompt card: describe a diagram and a model draws it${hint("prompt")}`}
+              onClick={edit.onPrompt}
+            >
+              <Sparkles {...ICON} aria-hidden="true" />
+            </button>
+            <button
+              className={edit.library ? "dag-icon dag-icon--on" : "dag-icon"}
+              data-dag-library-toggle=""
+              aria-pressed={edit.library}
+              aria-label={`Library${hint("library")}`}
+              title={`Ready-made components to click or drag onto the board${hint("library")}`}
+              onClick={() => edit.onLibrary(!edit.library)}
+            >
+              <LibraryBig {...ICON} aria-hidden="true" />
+            </button>
+            <button
+              className="dag-icon"
+              data-dag-tidy=""
+              aria-label={`Tidy up${hint("tidy")}`}
+              title={`Tidy up: line every item up in rows, columns and grids with even gaps; with a selection, just those${hint("tidy")}`}
+              onClick={edit.onTidy}
+            >
+              <LayoutGrid {...ICON} aria-hidden="true" />
+            </button>
+          </div>
 
-      <span className="dag-dock__rule dag-dock__rule--make" />
+          <span className="dag-dock__rule dag-dock__rule--make" />
 
-      <div className="dag-dock__group dag-dock__group--history">
-        <button
-          className="dag-icon"
-          data-dag-undo=""
-          disabled={!edit.canUndo}
-          aria-label="Undo (Ctrl+Z)"
-          title="Undo (Ctrl+Z)"
-          onClick={edit.onUndo}
-        >
-          <Undo2 {...ICON} aria-hidden="true" />
-        </button>
-        <button
-          className="dag-icon"
-          data-dag-redo=""
-          disabled={!edit.canRedo}
-          aria-label="Redo (Ctrl+Shift+Z)"
-          title="Redo (Ctrl+Shift+Z)"
-          onClick={edit.onRedo}
-        >
-          <Redo2 {...ICON} aria-hidden="true" />
-        </button>
-      </div>
+          <div className="dag-dock__group dag-dock__group--history">
+            <button
+              className="dag-icon"
+              data-dag-undo=""
+              disabled={!edit.canUndo}
+              aria-label="Undo (Ctrl+Z)"
+              title="Undo (Ctrl+Z)"
+              onClick={edit.onUndo}
+            >
+              <Undo2 {...ICON} aria-hidden="true" />
+            </button>
+            <button
+              className="dag-icon"
+              data-dag-redo=""
+              disabled={!edit.canRedo}
+              aria-label="Redo (Ctrl+Shift+Z)"
+              title="Redo (Ctrl+Shift+Z)"
+              onClick={edit.onRedo}
+            >
+              <Redo2 {...ICON} aria-hidden="true" />
+            </button>
+          </div>
 
-      <span className="dag-dock__rule dag-dock__rule--more" />
+          <span className="dag-dock__rule dag-dock__rule--more" />
         </>
       ) : null}
 
@@ -261,74 +261,74 @@ function MoreMenu({ edit, onDone }: { edit?: DockActions; onDone(): void }) {
     <div className="dag-more__menu" data-dag-more-menu="" role="menu">
       {edit ? (
         <>
-      <button
-        className="dag-more__item"
-        data-dag-links=""
-        role="menuitem"
-        title={`Links: the lines between items on this board, as text${hint("links")}`}
-        onClick={() => {
-          onDone();
-          edit.onLinks();
-        }}
-      >
-        <Spline {...ICON} aria-hidden="true" />
-        <span>Links</span>
-        <kbd>{chordFor("links")}</kbd>
-      </button>
-      <button
-        className="dag-more__item"
-        data-dag-keep=""
-        role="menuitem"
-        title="Keep as a component: the selection, or the whole page, joins the library for any board (Ctrl+Shift+K)"
-        onClick={() => {
-          onDone();
-          edit.onKeep();
-        }}
-      >
-        <PackagePlus {...ICON} aria-hidden="true" />
-        <span>Keep as component</span>
-        <kbd>⌃⇧K</kbd>
-      </button>
+          <button
+            className="dag-more__item"
+            data-dag-links=""
+            role="menuitem"
+            title={`Links: the lines between items on this board, as text${hint("links")}`}
+            onClick={() => {
+              onDone();
+              edit.onLinks();
+            }}
+          >
+            <Spline {...ICON} aria-hidden="true" />
+            <span>Links</span>
+            <kbd>{chordFor("links")}</kbd>
+          </button>
+          <button
+            className="dag-more__item"
+            data-dag-keep=""
+            role="menuitem"
+            title="Keep as a component: the selection, or the whole page, joins the library for any board (Ctrl+Shift+K)"
+            onClick={() => {
+              onDone();
+              edit.onKeep();
+            }}
+          >
+            <PackagePlus {...ICON} aria-hidden="true" />
+            <span>Keep as component</span>
+            <kbd>⌃⇧K</kbd>
+          </button>
 
-      <span className="dag-more__rule" />
+          <span className="dag-more__rule" />
 
-      {/* This stays exactly the control it was — a file input, worn by its own row. A menu item that
+          {/* This stays exactly the control it was — a file input, worn by its own row. A menu item that
           only *looked* like one would need a second route to the file dialog. */}
-      <label className="dag-more__item" title="Bring in files: images, text, a whole board">
-        <Upload {...ICON} aria-hidden="true" />
-        <span>Import…</span>
-        <input
-          className="dag-add__select"
-          data-dag-import=""
-          type="file"
-          multiple
-          accept="image/*,.md,.txt,.markdown,.csv,.tsv,text/*"
-          aria-label="Import files"
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            e.target.value = "";
-            onDone();
-            if (files.length) edit.onImport(files);
-          }}
-        />
-      </label>
+          <label className="dag-more__item" title="Bring in files: images, text, a whole board">
+            <Upload {...ICON} aria-hidden="true" />
+            <span>Import…</span>
+            <input
+              className="dag-add__select"
+              data-dag-import=""
+              type="file"
+              multiple
+              accept="image/*,.md,.txt,.markdown,.csv,.tsv,text/*"
+              aria-label="Import files"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                onDone();
+                if (files.length) edit.onImport(files);
+              }}
+            />
+          </label>
 
-      <span className="dag-more__rule" />
+          <span className="dag-more__rule" />
 
-      <button
-        className="dag-more__item"
-        data-dag-help=""
-        role="menuitem"
-        title={`Keyboard shortcuts${hint("help")}`}
-        onClick={() => {
-          onDone();
-          edit.onHelp();
-        }}
-      >
-        <Keyboard {...ICON} aria-hidden="true" />
-        <span>Shortcuts</span>
-        <kbd>{chordFor("help")}</kbd>
-      </button>
+          <button
+            className="dag-more__item"
+            data-dag-help=""
+            role="menuitem"
+            title={`Keyboard shortcuts${hint("help")}`}
+            onClick={() => {
+              onDone();
+              edit.onHelp();
+            }}
+          >
+            <Keyboard {...ICON} aria-hidden="true" />
+            <span>Shortcuts</span>
+            <kbd>{chordFor("help")}</kbd>
+          </button>
         </>
       ) : null}
     </div>

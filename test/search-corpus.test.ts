@@ -137,7 +137,8 @@ describe("corpusTexts", () => {
         const p = path.join(dir, e.name);
         if (e.isDirectory()) {
           if (!e.name.startsWith(".") && !e.name.endsWith(".assets")) walk(p);
-        } else if (e.name.endsWith(".board.md")) texts[path.relative(root, p).slice(0, -".board.md".length)] = fs.readFileSync(p, "utf8");
+        } else if (e.name.endsWith(".board.md"))
+          texts[path.relative(root, p).slice(0, -".board.md".length)] = fs.readFileSync(p, "utf8");
         else if (e.name.endsWith(".note.md")) texts[path.relative(root, p)] = fs.readFileSync(p, "utf8");
       }
     };

@@ -57,15 +57,7 @@ export function withComponents(base: Components | undefined, over: Components): 
  * `components` is how a caller draws something a note links to — a cross reference, an embed —
  * without this component having to know what one is.
  */
-export function NoteMarkdown({
-  name,
-  body,
-  components,
-}: {
-  name: string;
-  body: string;
-  components?: Components;
-}): ReactNode {
+export function NoteMarkdown({ name, body, components }: { name: string; body: string; components?: Components }): ReactNode {
   const assets = useContext(AssetUrlContext);
   /* A caller's `img` draws what it knows — a reference's embed — and every other image is this
      note's, relative to its folder. Memoised, because to React it is a component type: a new one on

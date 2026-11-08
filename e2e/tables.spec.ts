@@ -6,6 +6,7 @@ import { BOARDS } from "./boards";
 import { clickOnHover } from "./hover";
 import { openMore } from "./more";
 import { openSidebar } from "./sidebar";
+import { suiteVault, vaulted } from "./vault";
 
 /**
  * Tables. A table is `<name>.table.md`, and the grid's checks read the
@@ -67,7 +68,7 @@ function write(leaf: string, text = TABLE): string {
 }
 
 async function open(page: Page, name: string, extra = ""): Promise<void> {
-  await page.goto(`/?table=${encodeURIComponent(name)}${extra}`);
+  await page.goto(await vaulted(page, `/?table=${encodeURIComponent(name)}${extra}`));
   await expect(page.locator("[data-dag-grid-wrap]")).toBeVisible();
 }
 
@@ -75,7 +76,8 @@ async function idOf(page: Page, name: string): Promise<string> {
   let id: string | undefined;
   await expect
     .poll(async () => {
-      id = ((await (await page.request.get("/__board/list")).json()) as { ids: Record<string, string> }).ids[name];
+      const list = await page.request.get(`/__board/list?vault=${await suiteVault(page)}`);
+      id = ((await list.json()) as { ids: Record<string, string> }).ids[name];
       return id;
     })
     .toBeTruthy();
@@ -96,7 +98,9 @@ test("a table written as a file is a grid of its first tab, and opening it write
   expect(read("pipeline")).toBe(TABLE);
 });
 
-test("typing into a cell rewrites that cell and no other byte, and Escape takes a draft back", async ({ page }) => {
+test("typing into a cell rewrites that cell and no other byte, and Escape takes a draft back", { tag: "@smoke" }, async ({
+  page,
+}) => {
   const name = write("pipeline");
   await open(page, name);
   await page.locator('[data-dag-grid-at="1:1"]').click();
@@ -158,7 +162,9 @@ test("a new row is written with an id, its menu deletes it, and ctrl+Z brings it
   await expect(page.locator('[data-dag-grid-at="3:0"]')).toHaveAttribute("data-dag-grid-active", "");
   await page.keyboard.type("Umbrella");
   await page.keyboard.press("Enter");
-  await expect.poll(() => read("pipeline")).toMatch(/\| Initech \{#rinit\} \| 900 \| Lost \| \[ \] \|\n\| Umbrella \{#r[0-9a-z]{5}\} \| \| \| \|\n/);
+  await expect
+    .poll(() => read("pipeline"))
+    .toMatch(/\| Initech \{#rinit\} \| 900 \| Lost \| \[ \] \|\n\| Umbrella \{#r[0-9a-z]{5}\} \| \| \| \|\n/);
   const withRow = read("pipeline");
 
   await page.locator('tr[data-dag-grid-row-index="3"] .dag-grid__gutter').click();
@@ -187,7 +193,9 @@ test("the tabs are the strip along the bottom: one is added, renamed and opened"
   expect(read("pipeline").startsWith(TABLE)).toBe(true);
 });
 
-test("Source is the file, with its problems under it, and the grid will not guess between two rows with one id", async ({ page }) => {
+test("Source is the file, with its problems under it, and the grid will not guess between two rows with one id", async ({
+  page,
+}) => {
   const twice = TABLE.replace("{#rinit}", "{#rglob}");
   const name = write("pipeline", twice);
   await open(page, name);
@@ -230,9 +238,14 @@ test("an edit somebody else makes arrives on the page, and the page's next edit 
   await page.locator('[data-dag-grid-at="2:1"]').click();
   await page.keyboard.type("950");
   await page.keyboard.press("Enter");
-  await expect.poll(() => read("pipeline")).toBe(
-    TABLE.replace("| Acme {#racme} | 1200 |", "| Acme {#racme} | 1250 |").replace("| Initech {#rinit} | 900 |", "| Initech {#rinit} | 950 |"),
-  );
+  await expect
+    .poll(() => read("pipeline"))
+    .toBe(
+      TABLE.replace("| Acme {#racme} | 1200 |", "| Acme {#racme} | 1250 |").replace(
+        "| Initech {#rinit} | 900 |",
+        "| Initech {#rinit} | 950 |",
+      ),
+    );
 });
 
 test("a table on a board is a live card of its tab, and a double-click opens it", async ({ page }) => {
@@ -242,7 +255,7 @@ test("a table on a board is a live card of its tab, and a double-click opens it"
     path.join(dir, "board.board.md"),
     `---\ntitle: Plan\n---\n\n\`\`\`md {#t1 x=0 y=0 w=560}\n![Pipeline](dag:${id})\n\`\`\`\n\n\`\`\`md {#t2 x=640 y=0 w=360}\n![Pipeline](dag:${id}#people)\n\`\`\`\n`,
   );
-  await page.goto(`/?board=${folder}/board`);
+  await page.goto(await vaulted(page, `/?board=${folder}/board`));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   const deals = page.locator('[data-dag-tablecard="deals"]');
   await expect(deals).toContainText("Deals · 3 rows");
@@ -250,7 +263,10 @@ test("a table on a board is a live card of its tab, and a double-click opens it"
   await expect(page.locator('[data-dag-tablecard="people"]')).toContainText("Ada");
 
   /* The table changes, and the card with it — nothing on the board was written. */
-  fs.writeFileSync(tableFile("pipeline"), TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer |\n| Grace {#rgrac} | Admiral |"));
+  fs.writeFileSync(
+    tableFile("pipeline"),
+    TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer |\n| Grace {#rgrac} | Admiral |"),
+  );
   await expect(page.locator('[data-dag-tablecard="people"]')).toContainText("Grace");
 
   await page.locator('[data-dag-tablecard="people"] tbody tr').first().dblclick();
@@ -274,12 +290,12 @@ test("a search finds a row, and opens the table on it, marked", async ({ page })
 
 test("?view=1 draws the grid with nothing to edit, and a snapshot draws every tab", async ({ page }) => {
   const name = write("pipeline");
-  await page.goto(`/?table=${encodeURIComponent(name)}&view=1`);
+  await page.goto(await vaulted(page, `/?table=${encodeURIComponent(name)}&view=1`));
   await expect(page.locator(".dag-grid--read")).toBeVisible();
   await expect(page.locator("[data-dag-grid-wrap]")).toHaveCount(0);
   await expect(page.locator(".dag-tablepage__title")).toHaveText("Pipeline");
 
-  await page.goto(`/?table=${encodeURIComponent(name)}&snapshot=1`);
+  await page.goto(await vaulted(page, `/?table=${encodeURIComponent(name)}&snapshot=1`));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await expect(page.locator(".dag-tablepage__tabname")).toHaveText(["Deals", "People"]);
 });
@@ -305,18 +321,22 @@ test("a CSV imported onto a board becomes a table, and its card is placed", asyn
   const name = write("pipeline");
   fs.writeFileSync(path.join(dir, "board.board.md"), `---\ntitle: Plan\n---\n`);
   await idOf(page, name);
-  await page.goto(`/?board=${folder}/board`);
+  await page.goto(await vaulted(page, `/?board=${folder}/board`));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await openMore(page);
   const leaf = `csv-${Date.now().toString(36)}`;
-  await page.locator("[data-dag-import]").setInputFiles({ name: `${leaf}.csv`, mimeType: "text/csv", buffer: Buffer.from("City,Pop\nOslo,700000\n") });
+  await page
+    .locator("[data-dag-import]")
+    .setInputFiles({ name: `${leaf}.csv`, mimeType: "text/csv", buffer: Buffer.from("City,Pop\nOslo,700000\n") });
   await expect(page.locator("[data-dag-tablecard]")).toContainText("Oslo");
-  await expect.poll(() => fs.readFileSync(path.join(dir, "board.board.md"), "utf8")).toMatch(/```md \{#[^}]*w=560[^}]*\}\n!\[[^\]]+\]\(dag:[0-9a-z]{10}\)\n```/);
+  await expect
+    .poll(() => fs.readFileSync(path.join(dir, "board.board.md"), "utf8"))
+    .toMatch(/```md \{#[^}]*w=560[^}]*\}\n!\[[^\]]+\]\(dag:[0-9a-z]{10}\)\n```/);
   /* The table is made at the top level, named after the file; it is this check's to take away. */
   const made = path.join(BOARDS, `${leaf}.table.md`);
   try {
     expect(fs.readFileSync(made, "utf8")).toContain("| Oslo {#r");
   } finally {
-    await page.request.post("/__board/delete", { data: { name: leaf, kind: "table" } });
+    await page.request.post(`/__board/delete?vault=${await suiteVault(page)}`, { data: { name: leaf, kind: "table" } });
   }
 });

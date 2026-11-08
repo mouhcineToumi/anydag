@@ -82,11 +82,13 @@ test("the leader chord opens the library, the toolbar closes it, and the search 
   await expect(page.locator("[data-dag-library]")).toHaveCount(0);
 });
 
-test("a click adds the component in the middle of the view and opens it for editing", async ({ page }) => {
+test("a click adds the component in the middle of the view and opens it for editing", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await lead(page, "l");
   await card(page, "table").click();
-  await expect.poll(read, { timeout: 5_000 }).toMatch(/```md \{#md-[a-z0-9]{4} w=520 x=-?\d+ y=-?\d+\}\n\| name \| type \| note \|/);
+  await expect
+    .poll(read, { timeout: 5_000 })
+    .toMatch(/```md \{#md-[a-z0-9]{4} w=520 x=-?\d+ y=-?\d+\}\n\| name \| type \| note \|/);
   await expect(page.locator("[data-dag-inspector]")).toBeVisible();
   await expect(page.locator("[data-dag-body]")).toHaveValue(/\| name \| type \| note \|/);
   await expect(page.locator('[data-dag-type="md"] table')).toHaveCount(1);
@@ -163,6 +165,10 @@ test("a part dropped on the paper starts a diagram of its own, and never lands o
   await expect(page.locator('[data-dag-item="infra"]')).not.toHaveAttribute("data-dag-drop", "");
   await page.mouse.up();
 
-  await expect.poll(read, { timeout: 5_000 }).toMatch(/```erd \{#erd-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nentity table1 \{ id uuid pk; name text; created_at timestamptz \}\n```/);
+  await expect
+    .poll(read, { timeout: 5_000 })
+    .toMatch(
+      /```erd \{#erd-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nentity table1 \{ id uuid pk; name text; created_at timestamptz \}\n```/,
+    );
   expect(read()).toContain('service api "API"\n```');
 });

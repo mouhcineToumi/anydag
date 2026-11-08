@@ -20,7 +20,7 @@
  * no raw HTML. That is the one place in a Markdown renderer that sets HTML, and it is KaTeX's escaping
  * rather than anything of ours that keeps it safe.
  */
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import type Katex from "katex";
 
 type KatexModule = typeof Katex;
@@ -47,12 +47,16 @@ const subscribe = (l: () => void) => {
 };
 const current = () => katex;
 
-/** KaTeX once it has landed, `null` until then — and the ask, if it has not. */
+/**
+ * KaTeX once it has landed, `null` until then — and the ask, if it has not. The ask is made while
+ * rendering rather than in an effect: it is idempotent, and `mathSettled` must see it before the page
+ * says it is ready. Under React 19 the note editor's equations are node views BlockNote commits after
+ * the page's own effects have run, so an ask left to an effect came after the page had already
+ * decided there was nothing to wait for.
+ */
 function useKatex(): KatexModule | null {
   const k = useSyncExternalStore(subscribe, current, current);
-  useEffect(() => {
-    if (!k) void loadKatex();
-  }, [k]);
+  if (!k) void loadKatex();
   return k;
 }
 
@@ -67,6 +71,9 @@ const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
  * answers for the fonts already in hand.
  */
 export async function mathSettled(): Promise<void> {
+  /* A frame first: what the page is drawing may not have rendered an equation yet (the editor's
+     node views come after the page's own effects), and "nothing asked" is only true once it has. */
+  if (!loading) await frame();
   if (!loading) return;
   await loading;
   await frame();
@@ -85,7 +92,15 @@ function draw(k: KatexModule, tex: string, display: boolean): Drawn {
   let got = drawn.get(key);
   if (got) return got;
   try {
-    got = { html: k.renderToString(tex, { displayMode: display, throwOnError: true, strict: "ignore", trust: false, output: "htmlAndMathml" }) };
+    got = {
+      html: k.renderToString(tex, {
+        displayMode: display,
+        throwOnError: true,
+        strict: "ignore",
+        trust: false,
+        output: "htmlAndMathml",
+      }),
+    };
   } catch (e) {
     got = { error: e instanceof Error ? e.message : String(e) };
   }

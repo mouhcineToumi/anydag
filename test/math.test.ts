@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
@@ -116,7 +117,10 @@ describe("the note bridge", () => {
   });
 
   it("escapes a dollar only when it would otherwise come back as an equation", () => {
-    const literal: NoteBlock = { type: "paragraph", content: [{ type: "text", text: "a literal $x$ here", styles: {} }] as never };
+    const literal: NoteBlock = {
+      type: "paragraph",
+      content: [{ type: "text", text: "a literal $x$ here", styles: {} }] as never,
+    };
     expect(blocksToMd([literal])).toBe("a literal \\$x\\$ here");
     expect(mdToBlocks(blocksToMd([literal]))[0].content).toEqual(literal.content);
   });
@@ -139,7 +143,7 @@ describe("the note bridge", () => {
 
   it("keeps the equations through the editor's own schema", async () => {
     const server = ServerBlockNoteEditor.create({ schema: noteSchema });
-    const held = await server._withJSDOM(async () => {
+    const held = await server._withDOM(async () => {
       server.editor.replaceBlocks(server.editor.document, mdToBlocks(md) as never);
       return JSON.parse(JSON.stringify(server.editor.document)) as NoteBlock[];
     });
@@ -164,7 +168,9 @@ describe("a read-only page", () => {
   });
 
   const draw = (md: string) =>
-    renderToStaticMarkup(createElement(ReactMarkdown, { remarkPlugins: [remarkGfm, remarkMath], components: { pre: CodePre, code: MathCode } }, md));
+    renderToStaticMarkup(
+      createElement(ReactMarkdown, { remarkPlugins: [remarkGfm, remarkMath], components: { pre: CodePre, code: MathCode } }, md),
+    );
 
   it("draws an inline equation in its line and a display one as a block", () => {
     const html = draw("Let $x^2$ be.\n\n$$\n\\frac{a}{b}\n$$");

@@ -137,22 +137,12 @@ describe("routes over cards", () => {
     /* Four pixels of a card's edge is the router working in a tight space, not a route through a
        card, and an author asked to fix it has nothing to do. `mid` is 40 tall and the box is shrunk
        by the grid, so a line at 36 clips it and is left alone; the one above, at 20, does not. */
-    const q = scoreGraph(
-      graphOf([edge("e1", "a", "b")]),
-      placedOf(NODES, [routed("e1", "M30,36 L330,36")]),
-      {},
-      T,
-    );
+    const q = scoreGraph(graphOf([edge("e1", "a", "b")]), placedOf(NODES, [routed("e1", "M30,36 L330,36")]), {}, T);
     expect(q.totals.throughNode).toBe(0);
   });
 
   it("does not accuse an edge of crossing its own endpoints", () => {
-    const q = scoreGraph(
-      graphOf([edge("e1", "a", "mid")]),
-      placedOf(NODES, [routed("e1", "M30,20 L180,20")]),
-      {},
-      T,
-    );
+    const q = scoreGraph(graphOf([edge("e1", "a", "mid")]), placedOf(NODES, [routed("e1", "M30,20 L180,20")]), {}, T);
     expect(q.totals.throughNode).toBe(0);
   });
 });
@@ -219,12 +209,7 @@ describe("cards", () => {
   });
 
   it("leaves cards that merely touch alone", () => {
-    const q = scoreGraph(
-      graphOf([]),
-      placedOf({ a: { x: 0, y: 0, w: 60, h: 40 }, b: { x: 60, y: 0, w: 60, h: 40 } }, []),
-      {},
-      T,
-    );
+    const q = scoreGraph(graphOf([]), placedOf({ a: { x: 0, y: 0, w: 60, h: 40 }, b: { x: 60, y: 0, w: 60, h: 40 } }, []), {}, T);
     expect(q.totals.nodeOverlaps).toBe(0);
   });
 });

@@ -56,9 +56,7 @@ describe("setModifier", () => {
   });
 
   it("replaces a hue in place", () => {
-    expect(setModifier('service api "x" hue=coral icon=server', "hue", "teal")).toBe(
-      'service api "x" icon=server hue=teal',
-    );
+    expect(setModifier('service api "x" hue=coral icon=server', "hue", "teal")).toBe('service api "x" icon=server hue=teal');
   });
 
   it("removes a hue with null, and the space that held it", () => {
@@ -173,9 +171,7 @@ describe("setFlag — bold / italic", () => {
   });
 
   it("leaves the rest of the line byte-identical — indent, quoting, trailing comment", () => {
-    expect(setFlag('    state done "Done" %% the end', "italic", true)).toBe(
-      '    state done "Done" italic %% the end',
-    );
+    expect(setFlag('    state done "Done" %% the end', "italic", true)).toBe('    state done "Done" italic %% the end');
   });
 
   it("does not mistake a title for a flag", () => {
@@ -246,9 +242,7 @@ describe("setTitle / setMeta / setDesc", () => {
 
   it("renames a sequence participant, which is the same shape", () => {
     expect(setTitle('participant web "Browser"', "The browser")).toBe('participant web "The browser"');
-    expect(setTitle('  participant api "API" icon=aws:lambda', "The API")).toBe(
-      '  participant api "The API" icon=aws:lambda',
-    );
+    expect(setTitle('  participant api "API" icon=aws:lambda', "The API")).toBe('  participant api "The API" icon=aws:lambda');
   });
 
   it("writes a mindmap topic, where the line is the title", () => {
@@ -298,9 +292,7 @@ describe("statementSpan", () => {
 
 describe("rows", () => {
   it("makes the block when the statement has none", () => {
-    expect(addRow('entity workspace "Workspace"', 1, "id uuid pk")).toBe(
-      'entity workspace "Workspace" {\n  id uuid pk\n}',
-    );
+    expect(addRow('entity workspace "Workspace"', 1, "id uuid pk")).toBe('entity workspace "Workspace" {\n  id uuid pk\n}');
   });
 
   it("indents the new block two past the statement", () => {
@@ -314,9 +306,7 @@ describe("rows", () => {
   });
 
   it("appends to a one-liner in place rather than exploding it", () => {
-    expect(addRow("entity workspace { id uuid pk }", 1, "slug text")).toBe(
-      "entity workspace { id uuid pk; slug text }",
-    );
+    expect(addRow("entity workspace { id uuid pk }", 1, "slug text")).toBe("entity workspace { id uuid pk; slug text }");
     expect(addRow("entity workspace { }", 1, "id uuid pk")).toBe("entity workspace { id uuid pk }");
   });
 
@@ -397,9 +387,7 @@ describe("edge writers", () => {
   });
 
   it("swaps an ER cardinality, which is not in any table here", () => {
-    expect(setEdgeArrow("workspace.id ||--o{ intake.workspace_id", "||--||")).toBe(
-      "workspace.id ||--|| intake.workspace_id",
-    );
+    expect(setEdgeArrow("workspace.id ||--o{ intake.workspace_id", "||--||")).toBe("workspace.id ||--|| intake.workspace_id");
   });
 
   it("refuses a spelling the tokenizer does not read as one arrow", () => {
@@ -445,9 +433,7 @@ describe("removeNode", () => {
 
   it("drops one source off a bus and keeps the line", () => {
     const src = 'service a "A"\nservice b "B"\nstore c "C"\n\na & b --> c "writes" %% both of them';
-    expect(removeNode(src, "a", { type: "arch" })).toBe(
-      'service b "B"\nstore c "C"\n\nb --> c "writes" %% both of them',
-    );
+    expect(removeNode(src, "a", { type: "arch" })).toBe('service b "B"\nstore c "C"\n\nb --> c "writes" %% both of them');
   });
 
   it("drops two sources off a bus without eating the third", () => {
@@ -487,7 +473,8 @@ describe("removeNode", () => {
   });
 
   it("takes a group's children with it, and the edges that named them", () => {
-    const src = 'group gcp "GCP" {\n  service api "API"\n  store fs "FS"\n}\nclient br "Browser"\n\nbr --> api\napi --> fs\nbr --> gcp';
+    const src =
+      'group gcp "GCP" {\n  service api "API"\n  store fs "FS"\n}\nclient br "Browser"\n\nbr --> api\napi --> fs\nbr --> gcp';
     expect(removeNode(src, "gcp", { type: "arch" })).toBe('client br "Browser"');
   });
 
@@ -562,7 +549,10 @@ describe("removeNode", () => {
 /* -------------------------------------------------------------------------------- removeRefs */
 
 describe("removeRefs", () => {
-  const dead = (...ids: string[]) => (word: string) => ids.includes(word);
+  const dead =
+    (...ids: string[]) =>
+    (word: string) =>
+      ids.includes(word);
 
   it("takes a whole statement whose one end is going, and the blank line its going would double", () => {
     expect(removeRefs("a --> b\n\nb --> c\n\nc --> d", dead("b"))).toBe("c --> d");
@@ -613,9 +603,7 @@ const GROUPED = 'group gcp "GCP" {\n  service api "API"\n}\nstore db "D"';
 
 describe("moveStatement", () => {
   it("moves a statement into a block, at the block's depth", () => {
-    expect(moveStatement(GROUPED, 4, { intoBlockLine: 1 })).toBe(
-      'group gcp "GCP" {\n  store db "D"\n  service api "API"\n}',
-    );
+    expect(moveStatement(GROUPED, 4, { intoBlockLine: 1 })).toBe('group gcp "GCP" {\n  store db "D"\n  service api "API"\n}');
     clean("arch", moveStatement(GROUPED, 4, { intoBlockLine: 1 }));
   });
 
@@ -626,19 +614,14 @@ describe("moveStatement", () => {
   });
 
   it("carries a nested group's whole block, at the same relative indent", () => {
-    const src =
-      'group a "A" {\n  group b "B" {\n    service api "API"\n  }\n}\ngroup c "C" {\n  store db "D"\n}';
+    const src = 'group a "A" {\n  group b "B" {\n    service api "API"\n  }\n}\ngroup c "C" {\n  store db "D"\n}';
     const out = moveStatement(src, 2, { intoBlockLine: 6 });
-    expect(out).toBe(
-      'group a "A" {\n}\ngroup c "C" {\n  group b "B" {\n    service api "API"\n  }\n  store db "D"\n}',
-    );
+    expect(out).toBe('group a "A" {\n}\ngroup c "C" {\n  group b "B" {\n    service api "API"\n  }\n  store db "D"\n}');
     clean("arch", out);
   });
 
   it("puts one at the top, with no indent", () => {
-    expect(moveStatement(GROUPED, 2, { toTop: true })).toBe(
-      'service api "API"\ngroup gcp "GCP" {\n}\nstore db "D"',
-    );
+    expect(moveStatement(GROUPED, 2, { toTop: true })).toBe('service api "API"\ngroup gcp "GCP" {\n}\nstore db "D"');
   });
 
   it("takes the blank line the statement was sitting between", () => {
@@ -655,7 +638,7 @@ describe("moveStatement", () => {
 
   it("refuses a target with no block to move into", () => {
     expect(moveStatement(GROUPED, 2, { intoBlockLine: 4 })).toBe(GROUPED);
-    expect(moveStatement("entity a { id uuid pk }\nentity b \"B\"", 2, { intoBlockLine: 1 })).toBe(
+    expect(moveStatement('entity a { id uuid pk }\nentity b "B"', 2, { intoBlockLine: 1 })).toBe(
       'entity a { id uuid pk }\nentity b "B"',
     );
   });

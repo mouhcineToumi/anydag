@@ -141,7 +141,8 @@ function axisCandidates(axis: "x" | "y", mover: Span, others: Span[], threshold:
 function best(cands: Candidate[]): Candidate | null {
   let win: Candidate | null = null;
   for (const c of cands) {
-    if (!win || c.delta < win.delta - 1e-9 || (Math.abs(c.delta - win.delta) <= 1e-9 && c.kind === "gap" && win.kind !== "gap")) win = c;
+    if (!win || c.delta < win.delta - 1e-9 || (Math.abs(c.delta - win.delta) <= 1e-9 && c.kind === "gap" && win.kind !== "gap"))
+      win = c;
   }
   return win;
 }

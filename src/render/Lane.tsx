@@ -10,22 +10,10 @@ import { hueVars } from "./hue";
  * The label sits outside the band rather than inside it, so a lane with one node in it is still
  * obviously a lane and the band's left edge stays a clean line down the diagram.
  */
-export function Lane({
-  lane,
-  box,
-  theme,
-}: {
-  lane: LaneDef | undefined;
-  box: Placed["lanes"][number];
-  theme: Theme;
-}) {
+export function Lane({ lane, box, theme }: { lane: LaneDef | undefined; box: Placed["lanes"][number]; theme: Theme }) {
   return (
     <>
-      <div
-        className="dag-band"
-        data-dag-lane={box.id}
-        style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
-      />
+      <div className="dag-band" data-dag-lane={box.id} style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />
       {lane ? (
         <div
           className="dag-band__label"

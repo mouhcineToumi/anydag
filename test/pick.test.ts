@@ -79,13 +79,9 @@ describe("duplicateStatement", () => {
   });
 
   it("takes a group's children with it, and the edges between them", () => {
-    const body = [
-      'group gcp "Google Cloud" hue=indigo {',
-      '  service api "API"',
-      '  store db "DB"',
-      "  api --> db",
-      "}",
-    ].join("\n");
+    const body = ['group gcp "Google Cloud" hue=indigo {', '  service api "API"', '  store db "DB"', "  api --> db", "}"].join(
+      "\n",
+    );
     const made = duplicateStatement("arch", body, "gcp")!;
     expect(made.id).toBe("gcp2");
     expect(made.body).toContain('group gcp2 "Google Cloud" hue=indigo {');
@@ -120,7 +116,7 @@ describe("duplicateStatement", () => {
   it("copies a chart series under a fresh id, with the same numbers", () => {
     /* ctrl+D on a picked series. The values come through because the *statement* is copied as
        written — there is nothing here that understands what a value is, and nothing that needs to. */
-    const body = ['bar', 'x Q1 Q2', 'series web "Web" 12 30 hue=coral', 'series mob "Mobile" 4 6'].join("\n");
+    const body = ["bar", "x Q1 Q2", 'series web "Web" 12 30 hue=coral', 'series mob "Mobile" 4 6'].join("\n");
     const made = duplicateStatement("chart", body, "web")!;
     expect(made.id).toBe("web2");
     expect(made.body.split("\n")[3]).toBe('series web2 "Web" 12 30 hue=coral');

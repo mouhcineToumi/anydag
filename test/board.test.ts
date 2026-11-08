@@ -163,8 +163,7 @@ describe("auto-flow", () => {
 });
 
 describe("layout attributes on the fence", () => {
-  const board = (info: string) =>
-    parseBoard("t", `---\ntitle: t\n---\n\n\`\`\`arch {${info}}\nservice a "A"\n\`\`\`\n`);
+  const board = (info: string) => parseBoard("t", `---\ntitle: t\n---\n\n\`\`\`arch {${info}}\nservice a "A"\n\`\`\`\n`);
 
   it("reads a wrap target the theme would otherwise decide", () => {
     expect(board("#d aspect=0").items[0]?.aspect).toBe(0);
@@ -289,7 +288,14 @@ describe("applyPatch — frontmatter", () => {
   it("runs alongside item ops in one patch", () => {
     /* A page added and a card moved onto it is one action, and one undo has to take back both. */
     const r = applyPatch(WITH, [
-      { meta: { pages: [{ id: "page-1", name: "One" }, { id: "page-2", name: "Two" }] } },
+      {
+        meta: {
+          pages: [
+            { id: "page-1", name: "One" },
+            { id: "page-2", name: "Two" },
+          ],
+        },
+      },
       { id: "a", attrs: { page: "page-2" } },
     ]);
     expect(r.ok).toBe(true);

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { ServerBlockNoteEditor } from "@blocknote/server-util";
 
@@ -9,7 +10,8 @@ import { noteSchema } from "@/note/schema";
  * that each comes back as the Markdown it was, through the editor's own schema, and that an
  * untouched note with references in it still saves byte for byte.
  */
-const NOTE = "# Plan\n\nSee [the plan](dag:0123456789) and [a block](dag:abcdefghjk#^para).\n\n![Architecture](dag:mnpqrstvwx)\n\n![a picture](n.assets/p.png)\n";
+const NOTE =
+  "# Plan\n\nSee [the plan](dag:0123456789) and [a block](dag:abcdefghjk#^para).\n\n![Architecture](dag:mnpqrstvwx)\n\n![a picture](n.assets/p.png)\n";
 
 describe("references in a note", () => {
   it("reads a dag: link as a reference and a dag: image on its own line as an embed", () => {
@@ -29,7 +31,7 @@ describe("references in a note", () => {
 
   it("goes through the editor's own schema unchanged", async () => {
     const server = ServerBlockNoteEditor.create({ schema: noteSchema });
-    const back = await server._withJSDOM(async () => {
+    const back = await server._withDOM(async () => {
       server.editor.replaceBlocks(server.editor.document, mdToBlocks(NOTE) as never);
       return server.editor.document as unknown as NoteBlock[];
     });

@@ -50,7 +50,9 @@ export function SketchBox({ node, box }: Props) {
   return (
     <div {...shell(node, box, "box")}>
       <span className="dag-sketch__text">
-        <span className="dag-sketch__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+        <span className="dag-sketch__title" data-dag-title="" {...emOf(node)}>
+          {node.title}
+        </span>
         {node.meta ? <span className="dag-sketch__meta">{node.meta}</span> : null}
       </span>
     </div>
@@ -61,7 +63,9 @@ export function SketchBox({ node, box }: Props) {
 export function SketchText({ node, box }: Props) {
   return (
     <div {...shell(node, box, "text")}>
-      <span className="dag-sketch__title" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-sketch__title" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
     </div>
   );
 }
@@ -70,7 +74,9 @@ export function SketchText({ node, box }: Props) {
 export function SketchButton({ node, box }: Props) {
   return (
     <div {...shell(node, box, "button")}>
-      <span className="dag-sketch__label" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-sketch__label" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
     </div>
   );
 }
@@ -79,7 +85,9 @@ export function SketchButton({ node, box }: Props) {
 export function SketchInput({ node, box }: Props) {
   return (
     <div {...shell(node, box, "input")}>
-      <span className="dag-sketch__placeholder" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-sketch__placeholder" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
     </div>
   );
 }
@@ -140,7 +148,9 @@ export function SketchShape({ node, box, kind }: Props & { kind: ShapeKind }) {
 export function Sticky({ node, box }: Props) {
   return (
     <div {...shell(node, box, "sticky")}>
-      <span className="dag-sketch__note" data-dag-title="" {...emOf(node)}>{node.title}</span>
+      <span className="dag-sketch__note" data-dag-title="" {...emOf(node)}>
+        {node.title}
+      </span>
       {node.meta ? <span className="dag-sketch__hand">{node.meta}</span> : null}
     </div>
   );

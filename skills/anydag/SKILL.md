@@ -19,15 +19,18 @@ where the person is working, and ask if it is not clear.
 ## Three ways in, and this is how to tell which you have
 
 **Look for a tool called `board_read`.** If this client has the AnyDag MCP tools, use them: they
-need no checkout. If it does not and `anydag` is on the PATH (the desktop app installs it), **use the
-CLI** — it reaches the running app, or opens the vault itself, and it can see what it drew. Writing
-the files directly works too, because the app watches the folder. Do not mix them in one session —
-they all write the same files, and two mental models of where a board lives is how one of them gets
-written to the wrong place.
+need no checkout, and they are the whole app — every feature the page has, down to one card, one
+question or one cell. The CLI is not a second copy of them: **`anydag` is an admin tool** (vaults,
+whole files, the trash, sync, logs, and the pictures and exports only a browser can make), so a client
+with no MCP tools can still write a whole board and look at it, but cannot edit inside one. If you
+have no MCP tools and `anydag` is on the PATH (the desktop app installs it), write the whole file
+with the CLI or straight into the vault — the app watches the folder — and look at it with
+`anydag snapshot`. Do not mix the three in one session: they all write the same files, and two mental
+models of where a board lives is how one of them gets written to the wrong place.
 
 ### Through MCP
 
-The same features the page and the CLI have (`docs/PARITY.md` is the whole matrix), and the ones to
+Every feature the page has (`docs/PARITY.md` is the whole matrix; the CLI carries only the admin part of it), and the ones to
 reach for first at the top. **Every one that touches a file takes a `vault`** — an id from
 `vault_list` — and acts in the default vault when it is left out:
 
@@ -87,10 +90,16 @@ card: it is their own machine.
 
 `anydag`, in the repository — `npm link` there once puts it on the PATH, or `npm run anydag --
 <command>` runs it without that. It is a client of the routes the page calls, never of the disk,
-so it works whichever of the two it finds and uses the running app when there is one, else opens `--vault <path>` itself. It
-reaches what a person reaches on the canvas — not only whole files but an item's attributes, pages,
-links, and the cards, edges and rows inside one diagram — and, unlike MCP, **it can see the
-drawing**: `anydag snapshot` and `anydag tidy` open the page in Playwright.
+so it works whichever of the two it finds and uses the running app when there is one, else opens `--vault <path>` itself.
+
+**It is the admin CLI, not the app's other half.** It manages vaults, reads and writes whole files,
+moves them to the trash and back, runs sync, answers for logs, and — the one thing MCP cannot do —
+**sees the drawing**: `anydag snapshot`, `anydag tidy` and the exports open the page in Playwright.
+Everything finer than a whole file — an item's attributes, a page, a link, a card, an edge, a row, a
+task's status, a quiz question, a table cell, a search, the library, a model asked to draw, the
+Assistant — is **not a CLI command**: it is an MCP tool (`board_patch`, `task_set`, `quiz_question_set`,
+`table_edit`, `search`, `library`, `generate`, …, listed above), or text you write into the file.
+With no MCP tools, write the whole board with `board write` and check it with `board diagnose`.
 
 ```bash
 anydag vault ls                        # the vaults there are, and the default one (`*`)
@@ -104,33 +113,23 @@ anydag tidy plan                       # straighten it, as `space T` does, and w
 
 | Commands | For |
 |---|---|
-| `anydag board` · `anydag note` · `anydag folder` | the files: `new`, `cat`, `write`, `edit`, `mv`, `cp`, `rm`, and `title` — `anydag board title plan "Q3 plan"` is what the person sees it called |
-| `anydag task` | notes with a status: `anydag task new "Ship the pricing page" --due 2026-10-03`, `anydag task set <name> --status in-progress`, `anydag task done <name>`, `anydag task ls --open` in the Tasks page's order |
-| `anydag event` | notes with a start: `anydag event new "Offsite" --start "2026-10-03 09:00" --end "2026-10-03 17:00"` (the time zone's offset is added), `anydag event new "Conference" --start 2026-10-12 --end 2026-10-14` for all day, `anydag event set <name> --start …`, `anydag event ls --from 2026-10-01 --to 2026-10-31` |
-| `anydag project` | folders that are projects: `anydag project new work/pricing --hue coral`, `anydag project set work/pricing --status done`, `anydag project ls`, and `anydag task ls --project work/pricing` for its tasks |
-| `anydag quiz` | a quiz as a file — `new`, `cat`, `write`, `edit`, `mv`, `cp`, `rm`, `title`, as a note — and `anydag quiz check <name>` for what the parser says, `anydag quiz ls` with each one's question count and Mistakes, `anydag quiz practice <name>` (or a folder, or `--mistakes`) to run one in a terminal — the person answers, never you — `anydag quiz mistakes`, `anydag quiz threshold 3`, and one question at a time: `anydag quiz question set <name> --file q.md [--before <id>]`, `anydag quiz question rm <name> <id>`, `anydag quiz question mv <name> <id> --after <id>` |
-| `anydag table` | a table as a file — `new`, `cat`, `write`, `edit`, `mv`, `cp`, `rm`, `title` — and by id: `anydag table show <name>` prints every tab with its row and column ids, `anydag table set <name> <tab> <row> <column> <value>`, `anydag table row add <name> <tab> name=Acme amount=1200`, `anydag table col add <name> <tab> Amount --type number`, `anydag table tab set <name> <tab> --sort "amount:desc" --filter "stage!=Lost"`, `anydag table import deals.csv`, `anydag table export <name> --tab <id>`, `anydag table check <name>` |
-| `anydag search` | every place the words appear across every board, note, quiz and table, as `<name>#<part>` — an item id, a `^anchor`, `L<line>`, or a table's `<tab>/<row>`; `anydag corpus` prints the pieces it searches |
-| `anydag item` | what is on a board: `anydag item add <board> arch --at 0,0`, `anydag item set <board> <id> x=240 hue=teal`, `anydag item body` |
-| `anydag page` · `anydag link` | a board's pages, and the lines between items (`stack.api` ends on a card) |
-| `anydag node` · `anydag edge` · `anydag row` · `anydag chart` | inside one diagram: `anydag node set <board> <item> <card> title=… status=done`, `anydag node add … --from <card>` |
-| `anydag file` | attachments: `anydag file upload report.pdf --folder specs` prints its name and id, `anydag file ls` what there is and what this vault accepts, `get`, `mv`, `cp`, `title`, `refs`, and `rm`, which says what uses it first |
+| `anydag ls` | every board, note, quiz, table, attachment and folder in the vault, with `--ids`, a folder to look in, and `--boards`/`--notes`/`--quizzes`/`--tables`/`--files` to narrow it |
+| `anydag board` · `anydag note` · `anydag quiz` · `anydag table` | one file as a whole, the same five for each kind: `new`, `cat`, `write` (under the `base` you read, or `--force`), `mv` (a rename, or a move with a `/`) and `rm` (to the trash). Beside them `anydag board diagnose`, `anydag quiz check` and `anydag table check` say what the parser thinks, with `--file` for a draft |
+| `anydag folder` | `new`, `mv` and `rm` (`-r` for one with anything in it) — the folder goes to the trash whole |
+| `anydag file` | attachments: `anydag file upload report.pdf --folder specs` prints its name and id, `anydag file ls` what there is and what this vault accepts, `get`, `mv`, and `rm`, which says what uses it first |
 | `anydag trash` | what was deleted — every `rm` above moves a thing there for thirty days: `anydag trash ls`, `anydag trash restore <id-or-name>` (back where it was, with its id), `anydag trash rm` and `anydag trash empty`, which delete for good and ask first |
 | `anydag sync` | this vault's end-to-end encrypted link to a sync server: `anydag sync status`, `anydag sync now`, `anydag sync devices`; `anydag sync pair <server> <code>` then `anydag sync link --upload`, `--download <remote>` or `--merge <remote>`, which ask for the passphrase with no echo (or `--passphrase-file`) — **the person's to run, never an agent's**, and an upload prints the recovery code once |
-| `anydag chat` | the Assistant, a person's conversation with a model that works on the vault: `anydag chat ls`, `anydag chat new --mode edit`, `anydag chat say <id> <words…>` follows the answer as it is written, `anydag chat cat <id>` prints the turns and the changes each made, `anydag chat approve <id> <step> yes`, `anydag chat grant <id> <vault> ask`, `anydag chat undo <id> <turn> <block>` (and `redo`), `chat stop`, `chat rename`, `chat rm` — the person's to run; MCP offers none of it |
-| `anydag image` · `anydag component` | pictures beside a board, and the components a person kept |
-| `anydag dsl` · `anydag library` · `anydag icons` | the grammar, the ready-made parts (`anydag library --search truck` finds a picture), the icon names (`anydag icons emoji:house`) |
-| `anydag generate` · `anydag rewrite` · `anydag prompt run` | asking a model, with the app's own model settings |
 | `anydag snapshot` · `anydag tidy` · `anydag board export` · `anydag note export` | the laid-out page — and a note as a PDF: `anydag note export <name> --format pdf -o notes.pdf`, the page's own print of it, embedded boards and all; `--format zip` is the text with every picture and attachment it names beside it |
 | `anydag vault` | `anydag vault ls`, `open <path>`, `create <parent> <name>`, `close <id>` (`--forget` takes it off the list), and `anydag vault transfer <name> --to <id>` — every other command acts in the vault `--vault <path-or-id>` or `ANYDAG_VAULT` names, else the one opened last; nothing here ever deletes a folder |
+| `anydag settings` | the app's preferences and the vault's, as `key=value` |
 | `anydag telemetry` | whether this install sends anonymous logs and where: `anydag telemetry` says, and `on`, `off` or `ask` change it — **the person's answer, never yours to give**; MCP has no tool for it |
+| `anydag serve` · `anydag mcp` | serve a vault and the page to a browser; run the MCP server over stdio |
 
-`anydag help` lists all of it, and `anydag help --json` is the same as data. **Every edit carries
-its base**: a gesture command reads the board, works the change out, writes it, and if a person
-wrote in between it works the change out again against what they wrote — once. The exit codes are
-the snapshot script's: `3` the board moved under a whole-text write (read it again and redo it), `4`
-the board has errors, `5` the page never became ready, `6` no server, `7` no vault. Read `--help`
-before guessing a flag; text comes from `--file`, and stdin only as `--file -`.
+`anydag help` lists all of it, and `anydag help --json` is the same as data. The exit codes are the
+snapshot script's: `3` the file moved under a whole-text write (read it again and redo it — the CLI
+never sends your text over theirs), `4` the file has errors, `5` the page never became ready, `6` no
+server, `7` no vault. Read `--help` before guessing a flag; text comes from `--file`, and stdin only
+as `--file -`.
 
 ### Through the files
 
@@ -174,7 +173,6 @@ both and tell the person rather than deleting either.
    ```bash
    anydag snapshot <name> -o /tmp/<name>.png             # whole board, and every problem it has
    anydag snapshot <name> --item <id> -o /tmp/x.png      # one diagram
-   anydag item ls <name>                                 # where every item is
    anydag board export <name> --item <id> -o out.svg     # one diagram as a standalone SVG
    ```
 
@@ -273,7 +271,7 @@ about people and things, a row of these joined by arrows says it better than box
     van --> home
     ```
 
-`icons` with `q` (or `anydag icons <word>`) finds a picture's exact name, and a wrong one is
+`icons` with `q` finds a picture's exact name, and a wrong one is
 `W_UNKNOWN_ICON` naming the near miss. `house home "Home"` — a picture's name where the kind goes —
 is `E_UNKNOWN_KIND` naming the figure you meant. See *Pictures* in `references/dsl/sketch.md`.
 
@@ -453,7 +451,7 @@ Write the three words as they are: `doing`, `blocked` or `closed` is not a statu
 one is not a task. A `due:` is `YYYY-MM-DD`; a due date without a status is ignored. A `start:`, also
 `YYYY-MM-DD`, is the day it begins, and the calendar spans the task from one to the other. To change
 one without touching the text, `POST /__board/task {name, status?, due?, start?}` (`null` takes a line
-out, and all three `null` make it a plain note again) or `anydag task set`. On a board, a task's embed
+out, and all three `null` make it a plain note again) or the `task_set` tool. On a board, a task's embed
 card draws its status as a button that changes the file.
 
 **An event is a note with a `start:` and no `status:`**, and an optional `end:`. A date is all day and
@@ -481,7 +479,7 @@ kept as the moment it names; a time without one is given the zone this machine i
 written by hand, write the offset** (`+02:00`, or `Z`): one without is read as that wall-clock time
 wherever it is viewed. The calendar shows every time in the viewer's zone. An `end:` in the other form from its `start:` is no end; without one, a timed event
 is an hour. A `status:` makes the note a task instead, whose `start:` is its start date.
-`POST /__board/event {name, start?, end?}` or `anydag event set` changes it without touching the text.
+`POST /__board/event {name, start?, end?}` or the `event_set` tool changes it without touching the text.
 The Calendar page (`?calendar=1`) draws tasks, events and notes together — a note on the day it was
 made, which is the store's record (`created` in `/__board/list`), never a line in the file.
 
@@ -500,8 +498,8 @@ one: a reference to a project's note links to it and does not enrol anything.
 
 One project note per folder; with two, the first by name is the folder's. A project note at the top
 level makes nothing a project. Nested projects are allowed, and a document's project is the
-innermost. `anydag project new <folder>` writes the note; `POST /__board/project {name, status?,
-hue?}` or `anydag project set` changes the two lines without touching the text.
+innermost. `project_create` writes the note; `POST /__board/project {name, status?,
+hue?}` or `project_set` changes the two lines without touching the text.
 
 **A note and a board reference each other by id.** Every board and note has a permanent id — `id:`
 in its frontmatter, written when the app makes the file or the first time something links to it,
@@ -634,7 +632,7 @@ training, a drill. It is strict Markdown:
   — `q` and six characters are written in the first time the quiz is edited or answered — but when
   you rewrite a quiz that already has ids, carry them over.
 
-`anydag quiz check <name>`, or `quiz write`/`quiz edit`, prints what is wrong with its line. Branch
+`anydag quiz check <name>`, `quiz_check`, or `quiz write`, prints what is wrong with its line. Branch
 on the code:
 
 | Code | Means |
@@ -652,8 +650,7 @@ on the code:
 | `WQ_EMPTY` | no questions yet |
 
 **A course is a folder of quizzes**, one per topic, and it is practised as one run as well as quiz
-by quiz: the folder's menu in the sidebar has *Practice the quizzes* (`?quizzes=1&run=folder:<path>`,
-`anydag quiz practice <folder>`), which asks every quiz under it — subfolders too — in the order the
+by quiz: the folder's menu in the sidebar has *Practice the quizzes* (`?quizzes=1&run=folder:<path>`), which asks every quiz under it — subfolders too — in the order the
 sidebar shows them, so name them so they sort (`1 · Basics`, `2 · Joins`, … `10 · Windows`).
 
 What somebody answered is theirs, not the file's: a question they missed goes into **Mistakes**, and
@@ -707,9 +704,8 @@ It is Markdown, a GFM pipe table per tab:
   reference name them. Don't pad the columns to line up: a person's edit rewrites one row, and a
   padded table only looks aligned until then.
 
-To change a few cells, don't rewrite the file: `table_edit` (or `anydag table set`, `row add`, `col
-add`…) sends ops by id and is re-applied to whatever a person wrote meanwhile. `anydag table check
-<name>`, `table_check`, or `table write`/`table edit` print what is wrong. Branch on the code:
+To change a few cells, don't rewrite the file: `table_edit` sends ops by id and is re-applied to whatever a person wrote meanwhile. `anydag table check
+<name>`, `table_check`, or `table write` print what is wrong. Branch on the code:
 
 | Code | Means |
 |---|---|

@@ -1,0 +1,33 @@
+# A pull request that adds or upgrades a dependency is checked against the advisory database and
+# for licences, before it is merged rather than after. Needs the dependency graph, which a public
+# repository has.
+name: dependency-review
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - ".github/workflows/**"
+
+concurrency:
+  group: dependency-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: dependency review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Anything a known advisory rates high or critical blocks the merge; lower ones are shown.
+          fail-on-severity: high

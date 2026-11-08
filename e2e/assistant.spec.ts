@@ -111,7 +111,7 @@ test("the sidebar's Assistant row opens the page, and a first message makes the 
   await expect(page.locator('[data-dag-chat-day="Today"]')).toBeVisible();
 });
 
-test("Edit makes a note and a block card; Undo takes it away and Redo brings it back", async ({ page }) => {
+test("Edit makes a note and a block card; Undo takes it away and Redo brings it back", { tag: "@smoke" }, async ({ page }) => {
   const name = stem("make");
   await page.goto("/?chat=new");
   await say(page, `note ${name} hi there`, "edit");
@@ -171,7 +171,9 @@ test("Ask mode refuses a write", async ({ page }) => {
 });
 
 test("a vault the agent asks for is the person's to give, on an access card", async ({ page, request }) => {
-  const vaults = ((await (await request.get("/api/vaults")).json()) as { vaults: { id: string; open: boolean; default: boolean }[] }).vaults;
+  const vaults = (
+    (await (await request.get("/api/vaults")).json()) as { vaults: { id: string; open: boolean; default: boolean }[] }
+  ).vaults;
   const other = vaults.find((v) => v.open && !v.default);
   test.skip(!other, "only one vault is open here");
   await page.goto("/?chat=new");
