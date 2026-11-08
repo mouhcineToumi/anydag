@@ -445,8 +445,12 @@
   the page says *Nothing open*, and Chromium prints each 404 on the console, which the suite counts as
   a failure (two `Failed to load resource` lines, from a `tables.spec.ts` run, are what it looks like).
   A spec that loads a page and cannot afford that uses `vaulted(page, url)` from `e2e/vault.ts`, which
-  names the suite's vault in the address as a settled tab does; `tables.spec.ts`, `folders.spec.ts`
-  and `export.spec.ts` do, and the rest of the suite is exposed to it still.
+  names the suite's vault in the address as a settled tab does; `tables.spec.ts`, `folders.spec.ts`,
+  `export.spec.ts` and `tidy.spec.ts` do, and the rest of the suite is exposed to it still.
+  **Such a page never reports `data-dag-ready`**: the board it asked for is in another vault, the
+  fetch answers 404, `board` stays `null` and no item reports a size — so a check that waits on ready
+  times out at its own line, with no 404 in its own output (which is how `tidy.spec.ts` failed once,
+  #40). The trace is what says which vault the page pinned.
 - **Parking the canvas by writing its transform is not moving the view.** `export.spec.ts` set
   `.dag-layer`'s style and `data-zoom` by hand to get the item at 1:1. That paints the glass and not
   the `Viewport`'s record of it: `touched` stays false, so a later `fit()` — any change of the
