@@ -56,6 +56,14 @@ Eleven things are load-bearing:
   version against a designated requirement an ad-hoc signature does not have), so it does not try.
   electron-builder skips signing on a pull request, ad hoc included, so `CSC_FOR_PULL_REQUEST` is
   set when there is no certificate to protect. `desktop.yml` is handed no secrets at all.
+- **Electron and electron-builder's tools come from npmmirror in CI, not GitHub's release
+  downloads**, which once returned 504 for a whole morning and failed every build (#46):
+  `ELECTRON_MIRROR` and `ELECTRON_BUILDER_BINARIES_MIRROR` at the top of each workflow that runs
+  `npm ci`. Nothing the mirror serves is trusted for its own checksum: Electron's postinstall checks
+  against the `electron` package's `checksums.json`, electron-builder's tools against the hashes it
+  pins, and `package.mjs` writes those same `checksums.json` into Electron's cache as
+  `SHASUMS256.txt-<version>`, so the zip electron-builder unpacks is checked against them too rather
+  than against the mirror's `SHASUMS256.txt`.
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to
