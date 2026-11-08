@@ -33,7 +33,7 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | drag the handle at a picked link's middle · double-click it | `via="x,y"` on that statement — the point the line bends through · the bend gone |
 | ctrl+shift+K, Keep in the dock's `⋯`, the selection toolbar | a new `<vault>/components/<name>.board.md` holding the selection's own source |
 | a file dropped on the board, or Import | an `image` fence and an attachment in `attachments/`; `md` items; or a new board file |
-| `space P`, or the library's *Generate* | a new `prompt` fence, `w=420`, with the caret in it |
+| `space P`, or the library's *Generate* | a new `prompt` fence, `w=420`, with the caret in it — its centre in the middle of the view when the chord makes it |
 | typing on a prompt card · its type select | the card's body, under `body:<id>` · `as=` on its fence line |
 | Generate on a prompt card, or ctrl+Enter in it | the card replaced by one diagram fence at its `x`/`y`, page and group — one commit, so one ctrl+Z brings the card back |
 | a prompt card's Insert anyway | the same, with a draft that still has errors, to be fixed where it lands |

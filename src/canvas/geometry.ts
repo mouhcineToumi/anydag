@@ -54,6 +54,23 @@ export function clampPan(off: Point, content: Rect, zoom: number, view: { w: num
   };
 }
 
+/**
+ * The top-left for a box of `size` whose **centre** is `at`, kept inside `view`.
+ *
+ * A new item made from the chrome — the prompt card is the one — has no pointer to honour, so the
+ * middle of the view is the only sensible anchor. Anchoring its corner there puts half the card to
+ * the right and below the middle, which is the bug this asks about. When a view is too small for
+ * the box it starts at the view's left and top edges rather than hanging outside it.
+ */
+export function centeredBox(at: Point, size: { w: number; h: number }, view: Rect): Point {
+  const within = (start: number, span: number, lo: number, extent: number): number =>
+    Math.min(Math.max(start, lo), Math.max(lo, lo + extent - span));
+  return {
+    x: within(at.x - size.w / 2, size.w, view.x, view.w),
+    y: within(at.y - size.h / 2, size.h, view.y, view.h),
+  };
+}
+
 /** The zoom and offset that put `content` in the middle of `view` with a margin. */
 export function fitTo(content: Rect, view: { w: number; h: number }): { zoom: number; off: Point } {
   const zoom = clampZoom(

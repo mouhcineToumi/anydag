@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 
 import {
+  centeredBox,
   clampPan,
   clampZoom,
   DRAG_SLOP,
@@ -54,6 +55,11 @@ export interface ViewportHandle {
   zoom(): number;
   /** Board coordinates of the middle of the view — where a new item lands when there is no pointer. */
   center(): Point;
+  /**
+   * The top-left that puts a box of `w` × `h` in the middle of the view — what an item made from
+   * the chrome lands on. A view too small for the box keeps it against its top-left edge.
+   */
+  centerItem(w: number, h: number): Point;
   /** Take keyboard focus, so a shortcut typed after a toolbar click reaches the board. */
   focus(): void;
 }
@@ -222,6 +228,13 @@ export function Viewport({
       center: () => {
         const box = boxRef.current?.getBoundingClientRect();
         return toBoard((box?.left ?? 0) + (box?.width ?? 0) / 2, (box?.top ?? 0) + (box?.height ?? 0) / 2);
+      },
+      centerItem: (w, h) => {
+        const box = boxRef.current?.getBoundingClientRect();
+        if (!box) return { x: -w / 2, y: -h / 2 };
+        const a = toBoard(box.left, box.top);
+        const b = toBoard(box.right, box.bottom);
+        return centeredBox({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, { w, h }, { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y });
       },
       focus: () => boxRef.current?.focus({ preventScroll: true }),
     }),
