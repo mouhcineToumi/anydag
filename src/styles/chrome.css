@@ -4108,6 +4108,9 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   gap: 2px 8px;
 }
 .dag-facts__label { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; color: var(--dag-color-slate); }
+/* The event bar's labels act on the value beside them; a read-only bar leaves them plain. */
+.dag-eventbar__label { cursor: pointer; }
+.dag-eventbar__label:hover { color: var(--dag-color-ink); }
 .dag-facts__label > svg { flex: none; color: var(--dag-color-muted); }
 .dag-facts__value { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 32px; min-width: 0; color: var(--dag-color-ink); }
 .dag-facts__value input[type="date"],
