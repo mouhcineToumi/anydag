@@ -98,6 +98,34 @@ jobs:
           GQL
           )"
 
+          items_query="$(cat <<'GQL'
+          query ($owner: String!, $number: Int!, $endCursor: String) {
+            user(login: $owner) {
+              projectV2(number: $number) {
+                items(first: 100, after: $endCursor) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { id content { ... on Issue { number } } }
+                }
+              }
+            }
+          }
+          GQL
+          )"
+
+          issue_query="$(cat <<'GQL'
+          query ($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) { issue(number: $number) { id } }
+          }
+          GQL
+          )"
+
+          add_item="$(cat <<'GQL'
+          mutation ($project: ID!, $content: ID!) {
+            addProjectV2ItemById(input: { projectId: $project, contentId: $content }) { item { id } }
+          }
+          GQL
+          )"
+
           project_id=$(gh api graphql -f query="$project_query" \
             -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
             --jq '.data.user.projectV2.id')
@@ -166,16 +194,25 @@ jobs:
             exit 0
           fi
 
-          items=$(gh project item-list "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json --limit 1000)
+          # `gh project item-list` resolves the owner through REST, which a token with only the
+          # `project` scope cannot do ("unknown owner type"). The GraphQL calls below need nothing
+          # else, and `... on Issue` keeps a pull request from matching an issue of the same number.
+          owner_name="${REPOSITORY%%/*}"
+          repo_name="${REPOSITORY##*/}"
 
           for number in $numbers; do
-            url="https://github.com/$REPOSITORY/issues/$number"
-            item_id=$(jq -r --arg url "$url" '.items[] | select(.content.url == $url) | .id' <<<"$items" | head -n 1)
+            item_id=$(gh api graphql --paginate --slurp -f query="$items_query" \
+              -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
+              | jq -r --argjson number "$number" \
+                '[.[].data.user.projectV2.items.nodes[]] | map(select(.content.number == $number)) | .[0].id // empty')
 
             if [ -z "$item_id" ]; then
-              gh project item-add "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --url "$url" >/dev/null
-              items=$(gh project item-list "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json --limit 1000)
-              item_id=$(jq -r --arg url "$url" '.items[] | select(.content.url == $url) | .id' <<<"$items" | head -n 1)
+              content_id=$(gh api graphql -f query="$issue_query" \
+                -f owner="$owner_name" -f name="$repo_name" -F number="$number" \
+                --jq '.data.repository.issue.id')
+              item_id=$(gh api graphql -f query="$add_item" \
+                -f project="$project_id" -f content="$content_id" \
+                --jq '.data.addProjectV2ItemById.item.id')
             fi
 
             if [ -z "$item_id" ]; then
