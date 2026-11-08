@@ -1,0 +1,86 @@
+# A `status: ready` issue promises an agent or a contributor can start without asking anything. That
+# is only honest if the issue also says which part of the app (`area:`), how much of a person's time
+# (`size:`) and how much reasoning an AI agent needs (`agent:`). Without them nobody knows whether it
+# is an afternoon or a week, or which model should pick it up.
+#
+# This catches the gap at triage, where the labels are set. `pr-policy.yml` repeats the check at the
+# merge gate, so a pull request cannot merge its way around an undefined issue.
+#
+# The comment is one, found by its marker: it is updated as labels are added and deleted when the
+# issue is complete or loses `status: ready`. A failed run is the signal; the label is never taken
+# away from a maintainer who is halfway through setting it.
+name: issue-policy
+
+on:
+  issues:
+    types: [opened, reopened, labeled, unlabeled, edited]
+
+concurrency:
+  group: issue-policy-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ready:
+    name: Ready labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const MARKER = "<!-- ready-labels -->";
+            const READY = "status: ready";
+            const issue = context.payload.issue;
+            const labels = issue.labels.map((l) => (typeof l === "string" ? l : l.name));
+            const carried = (prefix) => labels.filter((l) => l.startsWith(prefix) && l.length > prefix.length);
+            const { owner, repo } = context.repo;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(MARKER));
+
+            const problems = [];
+            if (labels.includes(READY)) {
+              const sizes = carried("size: ");
+              const agents = carried("agent: ");
+              if (carried("area: ").length === 0) problems.push("no `area:` label");
+              if (sizes.length === 0) problems.push("no `size:` label");
+              else if (sizes.length > 1) problems.push(`more than one \`size:\` label (${sizes.join(", ")})`);
+              if (agents.length === 0) problems.push("no `agent:` label");
+              else if (agents.length > 1) problems.push(`more than one \`agent:\` label (${agents.join(", ")})`);
+            }
+
+            if (problems.length === 0) {
+              if (existing) await github.rest.issues.deleteComment({ owner, repo, comment_id: existing.id });
+              core.info(labels.includes(READY)
+                ? `#${issue.number} is ready, with an area, a size and an agent.`
+                : `#${issue.number} is not labelled ${READY}; nothing to check.`);
+              return;
+            }
+
+            const body = [
+              MARKER,
+              `**This issue is labelled \`${READY}\`, but it is not ready yet.**`,
+              "",
+              "`ready` means the work is defined enough to start without another decision: which part of the app (`area:`), how much of a person's time (`size:`), and how much reasoning an AI agent needs (`agent:`).",
+              "",
+              `Missing or wrong: ${problems.join("; ")}.`,
+              "",
+              `A pull request that closes this issue will not pass until this is fixed. The definitions are in [CONTRIBUTING.md](https://github.com/${owner}/${repo}/blob/develop/CONTRIBUTING.md#agent-tier).`,
+            ].join("\n");
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body });
+            }
+
+            core.setFailed(`#${issue.number} is labelled ${READY} but is missing: ${problems.join("; ")}.`);
