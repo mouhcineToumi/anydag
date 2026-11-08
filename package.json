@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=24.7"
   },
-  "version": "0.1.0",
+  "version": "0.1.0-nightly.202611080835",
   "main": "desktop/dist/main.cjs",
   "desktopName": "anydag.desktop",
   "bin": {
