@@ -120,7 +120,12 @@ export const typing = (t: EventTarget | null): boolean =>
 const READS: ReadonlySet<Command> = new Set(["select", "hand", "boards", "help"]);
 
 /** ELK snaps to the theme's grid; a hand-placed item should land on the same one. */
-const snap = (v: number, grid: number) => Math.round(v / grid) * grid;
+const snap = (v: number, grid: number) => {
+  const at = Math.round(v / grid) * grid;
+  /* `Math.round(-0.1)` is `-0`, and a file says `x=-0` where it means `0`. Normalising here keeps
+     every placement's sign honest, which the paste check in `select-copy.spec.ts` sees. */
+  return at === 0 ? 0 : at;
+};
 /** How wide a placed card is when nothing says (`noteCard`'s width), for spacing a row of them. */
 const PLACED_W = 360;
 
