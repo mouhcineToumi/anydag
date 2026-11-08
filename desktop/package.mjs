@@ -24,6 +24,11 @@
  * 4. **The second macOS architecture's watcher.** `npm ci` installs the prebuilt
  *    `@parcel/watcher-darwin-<arch>` of the machine it runs on; the x64 app built on an arm64 runner
  *    needs the other one, fetched with `npm pack` and checked against the lockfile's integrity.
+ * 5. **Which checksums Electron is checked against.** The workflows fetch Electron from a mirror
+ *    (`ELECTRON_MIRROR`), and electron-builder would check each zip against the mirror's own
+ *    `SHASUMS256.txt` — a file the same mirror could forge. The `electron` package ships the real
+ *    ones (`checksums.json`); written into Electron's cache as `SHASUMS256.txt-<version>`, they are
+ *    what electron-builder checks against instead (its documented offline seeding).
  *
  *   node desktop/package.mjs [any electron-builder arguments]
  */
@@ -59,6 +64,7 @@ console.log(
 );
 
 if (process.platform === "darwin") otherWatcher();
+seedElectronChecksums();
 
 /* The shell again, so it knows whether it was signed. */
 process.env.ANYDAG_SIGNED = env.ANYDAG_SIGNED;
@@ -97,6 +103,27 @@ function checkChannelFiles() {
     process.exit(1);
   }
   console.log(`package: update channel ${channel} (${file})`);
+}
+
+/** The `electron` package's checksums, where electron-builder looks before it asks the mirror. */
+function seedElectronChecksums() {
+  const electron = path.join(root, "node_modules", "electron");
+  const { version } = JSON.parse(fs.readFileSync(path.join(electron, "package.json"), "utf8"));
+  const sums = JSON.parse(fs.readFileSync(path.join(electron, "checksums.json"), "utf8"));
+  const lines = Object.entries(sums).map(([file, sha]) => `${sha} *${file}`);
+  if (!lines.some((l) => l.endsWith(` *electron-v${version}-${process.platform}-${process.arch}.zip`)))
+    throw new Error(`node_modules/electron/checksums.json has no electron-v${version} for this machine`);
+  /* @electron/get's cache root (`env-paths("electron").cache`), as electron-builder reads it. */
+  const home = os.homedir();
+  const cache =
+    process.platform === "darwin"
+      ? path.join(home, "Library", "Caches", "electron")
+      : process.platform === "win32"
+        ? path.join(env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "electron", "Cache")
+        : path.join(env.XDG_CACHE_HOME || path.join(home, ".cache"), "electron");
+  fs.mkdirSync(cache, { recursive: true });
+  fs.writeFileSync(path.join(cache, `SHASUMS256.txt-${version}`), `${lines.join("\n")}\n`);
+  console.log(`package: Electron ${version} is checked against the electron package's checksums`);
 }
 
 /** `@parcel/watcher-darwin-<the other arch>`, at the version and integrity the lockfile pins. */
