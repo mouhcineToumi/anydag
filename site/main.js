@@ -87,4 +87,65 @@
     const tag = card.querySelector(".platform__tag");
     if (tag) tag.hidden = false;
   }
+
+  /* A screenshot opens in a dialog over the page instead of navigating away. The link is still a
+     link: with JavaScript off it opens the image itself, as it did before. */
+  const lightbox = document.getElementById("lightbox");
+  if (lightbox && typeof lightbox.showModal === "function") {
+    const image = lightbox.querySelector(".lightbox__image");
+    const caption = lightbox.querySelector(".lightbox__caption");
+    const close = lightbox.querySelector("[data-lightbox-close]");
+    let opener = null;
+
+    const open = (link) => {
+      const thumb = link.querySelector("img");
+      if (!thumb) return;
+      const figure = link.closest("figure");
+      const text = figure?.querySelector("figcaption");
+      opener = link;
+      image.src = link.href;
+      image.alt = thumb.alt || "";
+      caption.innerHTML = text ? text.innerHTML : image.alt;
+      lightbox.showModal();
+      document.documentElement.classList.add("lightbox-open");
+    };
+
+    for (const link of document.querySelectorAll(".shot__link")) {
+      link.addEventListener("click", (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        open(link);
+      });
+    }
+
+    close?.addEventListener("click", () => lightbox.close());
+
+    /* The dialog has one control. Keep Tab on it rather than letting focus fall to the page behind. */
+    lightbox.addEventListener("keydown", (event) => {
+      if (event.key !== "Tab") return;
+      const focusable = [
+        ...lightbox.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"),
+      ];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox) lightbox.close();
+    });
+
+    lightbox.addEventListener("close", () => {
+      document.documentElement.classList.remove("lightbox-open");
+      image.removeAttribute("src");
+      opener?.focus();
+    });
+  }
 })();

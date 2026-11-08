@@ -96,6 +96,7 @@ html[data-theme="dark"] {
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 92px;
+  scrollbar-gutter: stable;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -605,6 +606,114 @@ html[data-theme="dark"] .window__img--dark {
 .shot figcaption strong {
   color: var(--ink);
   font-weight: 600;
+}
+
+/* A screenshot, opened over the page. The native dialog brings Escape, focus trapping and focus
+   restoration with it; the CSS only supplies the backdrop, the frame and the close button. */
+.lightbox {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: clamp(16px, 4vw, 44px);
+  border: 0;
+  background: transparent;
+  color: #fff;
+  overflow: auto;
+}
+
+.lightbox[open] {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lightbox::backdrop {
+  background: rgb(14 16 20 / 86%);
+  backdrop-filter: blur(8px);
+}
+
+.lightbox__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: min(1500px, 100%);
+  margin: auto;
+}
+
+.lightbox__image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: calc(100dvh - 148px);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 55%);
+}
+
+.lightbox__caption {
+  max-width: 860px;
+  margin: 16px auto 0;
+  color: rgb(255 255 255 / 82%);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.lightbox__caption strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.lightbox__close {
+  position: fixed;
+  top: clamp(14px, 2.5vw, 26px);
+  right: clamp(14px, 2.5vw, 26px);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  background: rgb(14 16 20 / 70%);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.lightbox__close:hover {
+  background: rgb(14 16 20 / 94%);
+}
+
+.lightbox__close svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+html.lightbox-open {
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .lightbox {
+    padding: 64px 12px 20px;
+  }
+
+  .lightbox__image {
+    max-height: calc(100dvh - 150px);
+    border-radius: 10px;
+  }
 }
 
 /* ------------------------------------------------------------------- split */

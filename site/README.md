@@ -17,7 +17,7 @@ blocks font files loaded from a `file://` page.
 |---|---|
 | `index.html` | The page: hero, features, screenshots, the licence and data-ownership section, AI, downloads, footer. |
 | `styles.css` | The paper and paper-dark palettes from `themes/`, Inter at four weights, and the layout. |
-| `main.js` | The theme toggle and the platform label on the download button. |
+| `main.js` | The theme toggle, the platform label on the download button, and the screenshot dialog. |
 | `assets/fonts/` | Inter and Fira Code, latin subset, with their OFL licences. |
 | `assets/screenshots/` | 1800 px and 900 px WebP captures of the app. |
 | `assets/og.png` | The 1200 × 630 social card. |
@@ -41,6 +41,10 @@ magick shot.png -resize 900x -quality 82 assets/screenshots/name-900.webp
 They show the note *How memory works*, the *Map of learning* board, the *Memory basics* quiz in
 practice, the *Reading list* table, the Tasks board, and the week of 9 November 2026. Recapture them
 when the app's chrome or theme changes; keep the alt text describing what the page shows.
+
+Clicking a gallery screenshot opens it in a native `<dialog>` over the page. Escape, the X button or
+a click outside closes it and puts focus back on the screenshot; the page does not navigate. The
+link is still a link, so with JavaScript off it opens the image on its own.
 
 ## Deploy
 
