@@ -88,8 +88,9 @@ things that need no discussion — a typo, a broken link — are still issues; t
 or the maintainer may label the PR `no-issue` instead.
 
 Labels, in case you want to filter: `status: …`, `type: bug|feature|docs|chore`, `area: …` (canvas,
-dsl, notes, tables, quizzes, tasks-calendar, sync, desktop, cli-mcp, assistant, ci) and
-`size: S|M|L`. The definitions are in [`.github/labels.yml`](.github/labels.yml).
+dsl, notes, tables, quizzes, tasks-calendar, sync, desktop, cli-mcp, assistant, ci),
+`size: S|M|L` and `agent: light|standard|deep` (see *Agent tier* below). The definitions are in
+[`.github/labels.yml`](.github/labels.yml).
 
 ## Definition of Ready (for an issue)
 
@@ -105,11 +106,38 @@ they are finished. It has:
       to stop.
 - [ ] **Acceptance criteria** — a short checklist a reviewer can tick.
 - [ ] **An `area:` label** (the maintainer sets it if you do not know).
+- [ ] **An `agent:` label**, set by the maintainer at triage: which model an AI agent should work on
+      it with. See *Agent tier*.
 - [ ] **No open design question.** If the issue still needs a decision — which of two approaches, whether
       the feature should exist — it is not ready; that discussion happens first, in the issue or in
       Discussions.
 
 The issue forms ask for exactly these.
+
+## Agent tier
+
+Much of AnyDag is built with AI agents, and a strong model on a typo wastes tokens while a small one
+on `merge3` makes mistakes. So every ready issue carries one `agent:` label that says **how much
+reasoning the work needs**. That is different from `size:`, which is a person's time: a one-line fix
+in the sync crypto is `size: S` and `agent: deep`.
+
+| Tier | When | Examples |
+|---|---|---|
+| `agent: light` | Mechanical. One place. The issue says exactly what to change, and there is a pattern or test to copy. No area with a *Things that will bite* entry is touched. | A typo, a doc or label change, a copy change, a dependency bump with no code change, a one-file fix whose cause the issue already names |
+| `agent: standard` | A normal fix or feature inside one or two layers, following existing patterns. It needs the area's architecture file, not a design decision. | A new setting, a new MCP tool over an existing route, a UI change in one pane, a bug with a known cause across two files |
+| `agent: deep` | Crosses several layers, touches a trap, or nobody knows the cause yet. | The board format and write path (sha1 `base`, the 409, `merge3`), undo, sync and its crypto, the token and `Host` gate, layout and ELK, anything that could lose a person's data, a flaky test whose cause is unknown, any security issue |
+
+Three rules:
+
+- **When in doubt, the higher tier.** A wrong `light` costs a broken PR; a wrong `deep` costs tokens.
+- **The trap decides, not the size.** If the change touches anything listed under *Things that will
+  bite* for its area, it is at least `standard`; if that thing is the write path, sync, the gate or
+  undo, it is `deep`.
+- **An agent that finds the work harder than its tier stops** and comments on the issue asking for a
+  higher tier, with what it found, instead of pushing on. The maintainer relabels it.
+
+Which model each tier maps to is in [`AGENTS.md`](AGENTS.md), so it can change without touching
+this rubric.
 
 ## Branches
 

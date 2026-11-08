@@ -100,3 +100,15 @@ body:
         - "Maybe, I would want some guidance"
     validations:
       required: false
+  - type: dropdown
+    id: tier
+    attributes:
+      label: How much reasoning does it need?
+      description: Your best guess for which model an AI agent should work on it with; the maintainer sets the `agent:` label. A small change in a tricky area (the write path, sync, the gate, undo) is still deep. See *Agent tier* in CONTRIBUTING.md.
+      options:
+        - "Light: mechanical, one place, the fix is clear"
+        - "Standard: a normal fix or feature following existing patterns"
+        - "Deep: crosses layers, touches a trap, or the cause is unknown"
+        - "Not sure"
+    validations:
+      required: false
