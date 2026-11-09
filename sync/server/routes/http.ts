@@ -94,3 +94,39 @@ export function qint(
 }
 
 export const today = (now: Date): string => now.toISOString().slice(0, 10);
+
+/**
+ * A fixed window per key, reset every minute: enough to keep one sender from filling a disk, or
+ * from filling an issue tracker (`feedback.ts` holds its own, with its own numbers).
+ */
+export class Rate {
+  private minute = 0;
+  private seen = new Map<string, number>();
+  private all = 0;
+
+  constructor(
+    private readonly perMinute: number,
+    private readonly allPerMinute: number,
+  ) {}
+
+  allow(key: string, now: number): boolean {
+    const minute = Math.floor(now / 60_000);
+    if (minute !== this.minute) {
+      this.minute = minute;
+      this.seen.clear();
+      this.all = 0;
+    }
+    const n = (this.seen.get(key) ?? 0) + 1;
+    this.seen.set(key, n);
+    this.all++;
+    return n <= this.perMinute && this.all <= this.allPerMinute;
+  }
+}
+
+/** Who is asking, for the rate alone: the proxy's word when there is one, else the socket's. */
+export function senderOf(c: { req: { header(name: string): string | undefined }; env: unknown }): string {
+  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+  if (forwarded) return forwarded;
+  const incoming = (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming;
+  return incoming?.socket?.remoteAddress ?? "local";
+}

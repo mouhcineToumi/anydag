@@ -13,6 +13,8 @@
  *   `<data>/blobs`.
  * - **`mode` is read here and in exactly two other places** — the health answer and `main.ts`'s
  *   first-boot account: no other branch knows the mode.
+ * - **No GitHub token means no feedback**: `POST /v1/feedback` answers `ES_UNAVAILABLE`, which the
+ *   app's card says in words. Only this environment ever holds that token (`routes/feedback.ts`).
  * - **No admin token means no admin routes**: they answer `ES_FORBIDDEN` rather than accept an
  *   empty secret (`auth.ts`). The CLI talks to the database directly and needs none.
  */
@@ -43,6 +45,12 @@ export interface Config {
   logs: boolean;
   /** How many days of logs are kept on disk, in `<data>/logs/`. */
   logsDays: number;
+  /** Whether `POST /v1/feedback` exists at all; off, it answers `ES_NOT_FOUND`. */
+  feedback: boolean;
+  /** The fine-grained GitHub token (Issues: write) feedback becomes issues with; `null` answers `ES_UNAVAILABLE`. */
+  feedbackToken: string | null;
+  /** The repository feedback lands in, `owner/name`. */
+  feedbackRepo: string;
 }
 
 class ConfigError extends Error {}
@@ -100,6 +108,15 @@ export function configFrom(env: Record<string, string | undefined> = process.env
   const logs = logsRaw === "on" || logsRaw === "1" || logsRaw === "true";
   const logsDays = int(env, "ANYDAG_SYNC_LOGS_DAYS", 30, 1, 3650);
 
+  const feedbackRaw = (text(env, "ANYDAG_FEEDBACK") ?? "on").toLowerCase();
+  if (!["on", "off", "1", "0", "true", "false"].includes(feedbackRaw))
+    throw new ConfigError(`ANYDAG_FEEDBACK must be on or off, not ${JSON.stringify(env.ANYDAG_FEEDBACK)}`);
+  const feedback = feedbackRaw === "on" || feedbackRaw === "1" || feedbackRaw === "true";
+  const feedbackToken = text(env, "ANYDAG_FEEDBACK_GITHUB_TOKEN");
+  const feedbackRepo = text(env, "ANYDAG_FEEDBACK_REPO") ?? "mouhcineToumi/anydag";
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(feedbackRepo))
+    throw new ConfigError(`ANYDAG_FEEDBACK_REPO must be owner/name, not ${JSON.stringify(feedbackRepo)}`);
+
   return {
     mode,
     databaseUrl,
@@ -113,5 +130,8 @@ export function configFrom(env: Record<string, string | undefined> = process.env
     maxBodyBytes: maxBodyMb * 1024 * 1024,
     logs,
     logsDays,
+    feedback,
+    feedbackToken,
+    feedbackRepo,
   };
 }

@@ -3746,6 +3746,82 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
 }
 .dag-feedback__text::placeholder { color: var(--dag-color-muted); }
 
+/*
+ * The feedback card (`feedback/FeedbackCard.tsx`): fixed over whatever page asked for it, like the
+ * logs question, because the sidebar's foot is where it opens and every page has one. Names
+ * grepped first: `dag-feedback__*` had only the textarea above, `data-dag-feedback*` was nobody's.
+ */
+.dag-settings__scrim.dag-feedback__scrim {
+  position: fixed;
+  z-index: 60;
+  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+}
+.dag-feedback { width: 520px; }
+.dag-feedback[data-dragging] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft), var(--elevation); }
+.dag-feedback__mark { flex: none; color: var(--dag-color-accent); }
+.dag-feedback__kinds { display: flex; gap: 4px; margin: 10px 0 8px; }
+.dag-feedback__kind {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dag-feedback__kind:hover { color: var(--dag-color-ink); }
+.dag-feedback__kind[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
+.dag-feedback__kind:focus-visible { outline: 2px solid var(--dag-color-accentSoft); }
+.dag-feedback__files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dag-feedback__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 2px 2px 8px;
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: 6px;
+}
+.dag-feedback__file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-feedback__file-size { flex: none; color: var(--dag-color-muted); }
+.dag-feedback__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dag-feedback__add:hover { color: var(--dag-color-ink); border-color: var(--dag-color-mutedBorder); }
+.dag-feedback__attach { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--dag-color-ink); }
+.dag-feedback__attach code, .dag-feedback__consent code { font-family: var(--dag-font-mono); font-size: 11.5px; }
+.dag-feedback__consent {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: 6px;
+}
+.dag-feedback__label { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
+.dag-feedback__consent ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-feedback__consent li { overflow-wrap: anywhere; }
+.dag-feedback__hint { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-feedback__hint strong { color: var(--dag-color-ink); font-weight: 600; }
+.dag-feedback__error { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: var(--dag-color-dangerText); overflow-wrap: anywhere; }
+.dag-feedback__sent { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--dag-color-ink); }
+.dag-feedback__sent p { margin: 0 0 8px; }
+.dag-feedback__sent a { display: inline-flex; align-items: center; gap: 6px; color: var(--dag-color-accent); overflow-wrap: anywhere; }
+.dag-feedback__foot { align-items: center; justify-content: space-between; }
+
 /* -- the crash screen ------------------------------------------------------ *
  *
  * What is drawn when a render throw has taken the tree down. It is deliberately the simplest

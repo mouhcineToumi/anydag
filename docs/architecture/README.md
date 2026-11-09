@@ -45,6 +45,7 @@ the file for that area, not to a new place.
 | [`sync.md`](sync.md) | The end-to-end-encrypted sync server and the app's client; the convergence harness. |
 | [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code or OpenCode. |
 | [`logs.md`](logs.md) | Opt-in anonymous logs: what a batch may hold and every hop that cleans it. |
+| [`feedback.md`](feedback.md) | Send feedback: the card, what leaves the machine, the stateless relay that makes a GitHub issue, and how to run it. |
 | [`gate-and-releases.md`](gate-and-releases.md) | Versions, how a release is cut, and what `npm run gate`, `checks` and CI run. |
 
 ## Find a section by name
@@ -67,6 +68,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Dragging a card | [`editing-drag.md`](editing-drag.md) |
 | Editing on the canvas | [`editing.md`](editing.md) |
 | Equations | [`notes.md`](notes.md) |
+| Feedback | [`feedback.md`](feedback.md) |
 | Folders | [`sidebar.md`](sidebar.md) |
 | Gate | [`gate-and-releases.md`](gate-and-releases.md) |
 | Geometric shapes | [`free-canvas.md`](free-canvas.md) |
@@ -93,6 +95,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Reaching what the file can say | [`editing-drag.md`](editing-drag.md) |
 | Reading it as a tree | [`sidebar.md`](sidebar.md) |
 | References, ids and the read-only view | [`references.md`](references.md) |
+| Running the relay | [`feedback.md`](feedback.md) |
 | Search | [`search.md`](search.md) |
 | Settings | [`settings.md`](settings.md) |
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |

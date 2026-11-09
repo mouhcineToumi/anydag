@@ -38,6 +38,7 @@ import {
   Grid2x2Plus,
   Link as LinkMark,
   ListTodo,
+  MessageCircleWarning,
   MoreHorizontal,
   NotebookPen,
   Pencil,
@@ -1858,6 +1859,7 @@ export function Sidebar({
           </button>
         ) : null}
         <SyncRow onOpen={() => ask("settings", "sync")} />
+        <FeedbackRow onFeedback={() => ask("feedback")} />
         <SettingsRow onSettings={() => ask("settings")} sheet={sheet} />
       </div>
 
@@ -2554,6 +2556,22 @@ function SyncRow({ onOpen }: { onOpen(): void }) {
     >
       <Mark {...ICON} aria-hidden="true" />
       <span>{words}</span>
+    </button>
+  );
+}
+
+/** Send feedback, above Settings: the card is the page's to draw (`feedback/FeedbackCard.tsx`). */
+function FeedbackRow({ onFeedback }: { onFeedback(): void }) {
+  return (
+    <button
+      type="button"
+      className="dag-sidebar__act"
+      data-dag-feedback-open=""
+      title="Tell us what to fix or build"
+      onClick={onFeedback}
+    >
+      <MessageCircleWarning {...ICON} aria-hidden="true" />
+      <span>Send feedback</span>
     </button>
   );
 }

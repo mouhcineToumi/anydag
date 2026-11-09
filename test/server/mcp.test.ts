@@ -22,8 +22,8 @@ const temps: string[] = [];
 /** A board with no `title:`, so it is filed under the name asked for (decision 14). */
 const PLAIN = "```md {#one}\nhi\n```\n";
 
-async function connect(readOnly = false): Promise<Client> {
-  const backend = inProcess(createApp({ session, token: "t", page: null }), "t");
+async function connect(readOnly = false, fetchImpl?: typeof fetch): Promise<Client> {
+  const backend = inProcess(createApp({ session, token: "t", page: null, ...(fetchImpl ? { fetch: fetchImpl } : {}) }), "t");
   const server = buildMcp(backend, { readOnly });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test", version: "0" });
@@ -68,6 +68,7 @@ describe("tools/list", () => {
         "board_transfer",
         "table_edit",
         "file_upload",
+        "feedback",
         "trash_list",
         "trash_restore",
         "trash_delete",
@@ -80,7 +81,6 @@ describe("tools/list", () => {
       "share_read",
       "share_file",
       "share_image",
-      "feedback",
       "workspace_list",
       "workspace_create",
       "workspace_rename",
@@ -154,6 +154,39 @@ describe("documents", () => {
     await call(c, "task_set", { name: t.name, status: "done" });
     const list = (await call(c, "task_list", { status: "done" })).data.tasks;
     expect(list).toEqual([expect.objectContaining({ name: t.name, status: "done", due: "2026-12-01" })]);
+  });
+});
+
+describe("feedback", () => {
+  it("says so when this app has nowhere to send it", async () => {
+    session = new Session(env.home, env.vault, "test", {});
+    const c = await connect();
+    expect((await call(c, "feedback", { kind: "bug", text: "x" })).error).toContain("feedback not available");
+  });
+
+  it("sends through the route: the text, the boards named, a file, and answers the issue", async () => {
+    const recorded = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", "fixtures", "feedback.json"), "utf8"));
+    fs.writeFileSync(path.join(env.root, "plan.board.md"), PLAIN);
+    session = new Session(env.home, env.vault, "test", { ANYDAG_FEEDBACK_URL: "https://relay.test" });
+    let form: FormData | null = null;
+    const relay = (async (_: RequestInfo | URL, init?: RequestInit) => {
+      form = init?.body as FormData;
+      return Response.json(recorded.post, { status: 201 });
+    }) as typeof fetch;
+    const c = await connect(false, relay);
+    const got = await call(c, "feedback", {
+      kind: "idea",
+      text: "Let me pin a board",
+      boards: ["plan"],
+      files: [{ filename: "notes.txt", data: Buffer.from("hello").toString("base64") }],
+    });
+    expect(got.data).toEqual(recorded.post);
+    const sent = form as unknown as FormData;
+    expect(sent.get("kind")).toBe("idea");
+    expect(JSON.parse(String(sent.get("boards")))).toEqual([{ name: "plan.board.md", text: PLAIN }]);
+    const file = sent.get("files") as File;
+    expect([file.name, file.type, await file.text()]).toEqual(["notes.txt", "text/plain", "hello"]);
+    expect((await call(await connect(true, relay), "feedback", { kind: "bug", text: "x" })).error).toContain("--read-only");
   });
 });
 

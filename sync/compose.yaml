@@ -33,6 +33,8 @@ services:
       ANYDAG_SYNC_MODE: ${ANYDAG_SYNC_MODE:-single}
       ANYDAG_SYNC_ADMIN_TOKEN: ${ANYDAG_SYNC_ADMIN_TOKEN:-}
       ANYDAG_SYNC_PUBLIC_URL: http://127.0.0.1:${ANYDAG_SYNC_PORT:-8790}
+      # The feedback relay (docs/architecture/feedback.md): unset, /v1/feedback answers 503.
+      ANYDAG_FEEDBACK_GITHUB_TOKEN: ${ANYDAG_FEEDBACK_GITHUB_TOKEN:-}
     ports:
       - "127.0.0.1:${ANYDAG_SYNC_PORT:-8790}:8790"
     volumes:

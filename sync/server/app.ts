@@ -5,7 +5,8 @@
  * `app.request(…)`, and `main.ts` over a real Postgres and a socket, with no difference between.
  *
  * Load-bearing:
- * - **Who may ask is decided by path, in one place**: `/v1/health`, `/v1/pair` and `/v1/logs` are open,
+ * - **Who may ask is decided by path, in one place**: `/v1/health`, `/v1/pair`, `/v1/logs` and
+ *   `/v1/feedback` are open,
  *   `/v1/admin/*` and `/metrics` take the admin token, every other `/v1/*` a device token, and
  *   `/v1/vaults/{v}/*` also a vault of that device's account. A route added under `/v1/` is behind
  *   a device token by default; forgetting is never a hole.
@@ -16,8 +17,8 @@
  * - **Every `/v1` answer says the protocol, and a device's request must say the same one**
  *   (`PROTOCOL_HEADER`), checked before who is asking: a client of another protocol — a 0.2.0 one
  *   sends none — is refused `ES_PROTOCOL`, never served a `meta` it would misread or let commit
- *   one this server's devices would refuse. `/v1/health`, `/v1/logs`, the poke stream and
- *   `/v1/admin/*` carry nothing whose shape moved, and are not checked.
+ *   one this server's devices would refuse. `/v1/health`, `/v1/logs`, `/v1/feedback`, the poke
+ *   stream and `/v1/admin/*` carry nothing whose shape moved, and are not checked.
  * - **Latency is recorded by route template**, never by path (`metrics.ts`): `routePath(c, -1)`
  *   after the handler ran is the template that answered, and a request no route matched is
  *   `unmatched`.
@@ -36,6 +37,7 @@ import { adminRoutes } from "./routes/admin";
 import { blobRoutes } from "./routes/blobs";
 import { changeRoutes } from "./routes/changes";
 import { commitRoutes } from "./routes/commit";
+import { feedbackRoutes } from "./routes/feedback";
 import { HttpError, type Deps, type Vars } from "./routes/http";
 import { logRoutes } from "./routes/logs";
 import { pairRoutes } from "./routes/pair";
@@ -56,11 +58,13 @@ export interface AppOptions {
   version?: string;
   pingMs?: number;
   ageOf?: (vault: string, id: string) => Promise<number | null>;
+  /** How the feedback route reaches GitHub; a test hands in recorded answers. */
+  fetch?: typeof fetch;
 }
 
-const OPEN = new Set(["/v1/health", "/v1/pair", "/v1/logs"]);
+const OPEN = new Set(["/v1/health", "/v1/pair", "/v1/logs", "/v1/feedback"]);
 /** Routes any protocol may call: health says the protocol, and the rest carry nothing it changed. */
-const ANY_PROTOCOL = new Set(["/v1/health", "/v1/logs"]);
+const ANY_PROTOCOL = new Set(["/v1/health", "/v1/logs", "/v1/feedback"]);
 const anyProtocol = (p: string): boolean =>
   ANY_PROTOCOL.has(p) || p.startsWith("/v1/admin/") || /^\/v1\/vaults\/[^/]+\/poke$/.test(p);
 
@@ -122,6 +126,7 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   for (const sub of [
     pairRoutes(deps),
     logRoutes(deps),
+    feedbackRoutes({ ...deps, ...(opts.fetch ? { fetch: opts.fetch } : {}) }),
     vaultRoutes(deps),
     blobRoutes(deps),
     commitRoutes(deps),

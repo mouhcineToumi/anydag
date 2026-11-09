@@ -50,7 +50,19 @@ export type ErrorCode =
   /** A vault key that is already set, or a `PUT` whose `etag` is not the current one. 409. */
   | "ES_KEY_SET"
   /** A request or an answer of another protocol than this side's (`PROTOCOL_HEADER`). 426. */
-  | "ES_PROTOCOL";
+  | "ES_PROTOCOL"
+  /*
+   * The feedback relay's own (`POST /v1/feedback`): no sync route answers them, so an older sync
+   * client never sees one and `PROTOCOL` did not move for them.
+   */
+  /** A feedback submission bigger than the relay reads. 413. */
+  | "ES_TOO_LARGE"
+  /** Over a rate: try again in a minute. 429. */
+  | "ES_RATE"
+  /** This server has no way to do it: a relay with no GitHub token. 503. */
+  | "ES_UNAVAILABLE"
+  /** The service behind this server refused or failed: GitHub, for feedback. 502. */
+  | "ES_UPSTREAM";
 
 export interface ErrorBody {
   code: ErrorCode;
@@ -76,6 +88,10 @@ export const STATUS: Readonly<Record<ErrorCode, number>> = {
   ES_PAIR: 400,
   ES_KEY_SET: 409,
   ES_PROTOCOL: 426,
+  ES_TOO_LARGE: 413,
+  ES_RATE: 429,
+  ES_UNAVAILABLE: 503,
+  ES_UPSTREAM: 502,
 };
 
 // -- health, pairing, devices ---------------------------------------------------------------------
