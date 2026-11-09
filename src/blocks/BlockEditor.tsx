@@ -53,7 +53,7 @@ import {
   getDefaultReactSlashMenuItems,
   useCreateBlockNote,
 } from "@blocknote/react";
-import { LayoutDashboard, Sigma, Upload } from "lucide-react";
+import { LayoutDashboard, Sigma, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { applySteps, mdToBlocks, type NoteBlock, type Step } from "@/note/markdown";
@@ -153,7 +153,14 @@ function useNoteEditor(props: BlockEditorProps) {
 function NoteDragHandleMenu() {
   return (
     <DragHandleMenu>
-      <RemoveBlockItem>Delete</RemoveBlockItem>
+      <RemoveBlockItem>
+        {/* The item has no icon slot of its own, so the glyph rides in its label. It is decorative —
+            the item is announced as "Delete", and `.dag-blocks-menu-label` centres the two. */}
+        <span className="dag-blocks-menu-label">
+          <Trash2 size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
+          Delete
+        </span>
+      </RemoveBlockItem>
     </DragHandleMenu>
   );
 }
