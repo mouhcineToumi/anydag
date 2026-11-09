@@ -327,7 +327,7 @@ function QuickAdd({ status, into }: { status: TaskStatus; into: string }) {
     const stem = titleStem(t) || "untitled";
     const made = await createNote(into ? `${into}/${stem}` : stem, taskText(t, status));
     setBusy(false);
-    if (made) setTitle("");
+    if ("name" in made) setTitle("");
   };
   return (
     <div className="dag-tasks__add">

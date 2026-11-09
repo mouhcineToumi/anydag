@@ -545,25 +545,59 @@ export function useSavedComponents(): SavedComponent[] {
  *
  * Plain functions rather than a hook, because none of them holds state — the board list is already
  * kept in step by the change feed, so the only thing a caller needs back is the name the server settled
- * on. Every one resolves to `null` (or `false`) on refusal rather than throwing: these are reached
- * from a click, and there is nothing useful to do with an exception in an event handler.
+ * on. A create answers the name or **why not**, and the rest resolve `null` (or `false`) on refusal
+ * rather than throwing: these are reached from a click, and there is nothing useful to do with an
+ * exception in an event handler.
  *
  * The server owns uniqueness. Asking for `plan` twice gives `plan` and then `plan-2`, and it is the
  * *returned* name a caller must open — guessing it is how you end up looking at the wrong board.
  */
-async function boardCall(route: string, payload: object): Promise<{ name?: string } | null> {
+/**
+ * What one board route answered: the body it returned, or the sentence saying why it refused.
+ *
+ * **The reason travels rather than a bare `null`.** A create the server refused was
+ * indistinguishable from one that worked and said nothing, so the sidebar could not tell a person
+ * why the row they expected never arrived.
+ */
+export type BoardCall<T> = { ok: true; data: T } | { ok: false; error: string };
+
+/** What the server says when it refuses without wording it: its own answer wins when it has one. */
+const refused = (status: number): string =>
+  status >= 500 ? "The server could not do that. Try again." : "The server refused that. Try again.";
+
+export async function boardCall<T extends object = Record<string, unknown>>(
+  route: string,
+  payload: object,
+): Promise<BoardCall<T>> {
   try {
     const r = await fetch(`/__board/${route}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) return null;
-    return (await r.json()) as { name?: string };
+    const body = (await r.json().catch(() => ({}))) as T & { error?: string };
+    if (!r.ok) return { ok: false, error: typeof body.error === "string" && body.error ? body.error : refused(r.status) };
+    return { ok: true, data: body };
   } catch {
-    return null;
+    return { ok: false, error: "The server did not answer. Try again." };
   }
 }
+
+/** The name a route settled on, for the operations that only say whether they landed. */
+const nameFrom = async (route: string, payload: object): Promise<string | null> => {
+  const done = await boardCall<{ name?: string }>(route, payload);
+  return done.ok ? (done.data.name ?? null) : null;
+};
+
+/** What a create answers: the name it landed at, or the sentence saying why it did not. */
+export type Made = { name: string } | { error: string };
+
+const made = async (route: string, payload: object): Promise<Made> => {
+  const done = await boardCall<{ name?: string }>(route, payload);
+  if (!done.ok) return { error: done.error };
+  if (!done.data.name) return { error: "The server did not say what it made. Try again." };
+  return { name: done.data.name };
+};
 
 /**
  * What a board starts as.
@@ -618,8 +652,8 @@ export const blankTaskText = (status: TaskStatus = "todo"): string => `---\ntitl
 export const blankEventText = (start: string, end?: string, title: string = UNTITLED): string =>
   `---\ntitle: ${title === UNTITLED ? UNTITLED : JSON.stringify(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
 
-export const createBoard = async (name: string, text?: string): Promise<string | null> =>
-  (await boardCall("create", { name, text: text ?? newBoardText(name) }))?.name ?? null;
+export const createBoard = async (name: string, text?: string): Promise<Made> =>
+  made("create", { name, text: text ?? newBoardText(name) });
 
 /**
  * The kinds of file a name can be. Every call below takes one, and a board is what it means when
@@ -649,14 +683,14 @@ export function assertNever(x: never): never {
 /** What a note starts as: its own name as a heading, so the first thing on the page says what it is. */
 const newNoteText = (name: string): string => `# ${name.slice(name.lastIndexOf("/") + 1)}\n`;
 
-export const createNote = async (name: string, text?: string): Promise<string | null> =>
-  (await boardCall("create", { name, text: text ?? newNoteText(name), kind: "note" }))?.name ?? null;
+export const createNote = async (name: string, text?: string): Promise<Made> =>
+  made("create", { name, text: text ?? newNoteText(name), kind: "note" });
 
 /** What a quiz made from the sidebar or the Quizzes page starts as: a title and no questions yet. */
 export const blankQuizText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
 
-export const createQuiz = async (name: string, text?: string): Promise<string | null> =>
-  (await boardCall("create", { name, text: text ?? blankQuizText(), kind: "quiz" }))?.name ?? null;
+export const createQuiz = async (name: string, text?: string): Promise<Made> =>
+  made("create", { name, text: text ?? blankQuizText(), kind: "quiz" });
 
 /**
  * What a table made from the sidebar starts as: titled *Untitled*, one tab with two text
@@ -665,11 +699,11 @@ export const createQuiz = async (name: string, text?: string): Promise<string | 
  */
 export const blankTableText = (): string => blankTable(UNTITLED);
 
-const createTable = async (name: string, text?: string): Promise<string | null> =>
-  (await boardCall("create", { name, text: text ?? blankTableText(), kind: "table" }))?.name ?? null;
+const createTable = async (name: string, text?: string): Promise<Made> =>
+  made("create", { name, text: text ?? blankTableText(), kind: "table" });
 
 /** Make a file of any kind with a text, as the sidebar's New does. An attachment is uploaded, never made. */
-export function createFile(kind: TextKind, name: string, text?: string): Promise<string | null> {
+export function createFile(kind: TextKind, name: string, text?: string): Promise<Made> {
   switch (kind) {
     case "board":
       return createBoard(name, text);
@@ -684,8 +718,8 @@ export function createFile(kind: TextKind, name: string, text?: string): Promise
   }
 }
 
-const renameBoard = async (name: string, to: string, kind: FileKind = "board"): Promise<string | null> =>
-  (await boardCall("rename", { name, to, kind }))?.name ?? null;
+const renameBoard = (name: string, to: string, kind: FileKind = "board"): Promise<string | null> =>
+  nameFrom("rename", { name, to, kind });
 
 /**
  * Call a file something: its `title:` is set, and — with `follow`, which is what the
@@ -693,8 +727,8 @@ const renameBoard = async (name: string, to: string, kind: FileKind = "board"): 
  * still say roughly what the person called it. Resolves to the name the file has afterwards, which
  * is the one to open.
  */
-export const retitleFile = async (name: string, title: string, kind: FileKind = "board", follow = true): Promise<string | null> =>
-  (await boardCall("retitle", { name, title, kind, follow }))?.name ?? null;
+export const retitleFile = (name: string, title: string, kind: FileKind = "board", follow = true): Promise<string | null> =>
+  nameFrom("retitle", { name, title, kind, follow });
 
 /**
  * Change a note's status or due date, make it a task, or make it a plain note again: the
@@ -703,8 +737,8 @@ export const retitleFile = async (name: string, title: string, kind: FileKind = 
  * for a plain note — or `undefined` when the write was refused.
  */
 export const setTask = async (name: string, change: TaskChange): Promise<Task | null | undefined> => {
-  const done = (await boardCall("task", { name, ...change })) as { task?: Task | null } | null;
-  return done ? (done.task ?? null) : undefined;
+  const done = await boardCall<{ task?: Task | null }>("task", { name, ...change });
+  return done.ok ? (done.data.task ?? null) : undefined;
 };
 
 /**
@@ -713,8 +747,8 @@ export const setTask = async (name: string, change: TaskChange): Promise<Task | 
  * note is now, `null` for a plain note, or `undefined` when the write was refused.
  */
 export const setEvent = async (name: string, change: EventChange): Promise<NoteEvent | null | undefined> => {
-  const done = (await boardCall("event", { name, ...change })) as { event?: NoteEvent | null } | null;
-  return done ? (done.event ?? null) : undefined;
+  const done = await boardCall<{ event?: NoteEvent | null }>("event", { name, ...change });
+  return done.ok ? (done.data.event ?? null) : undefined;
 };
 
 /**
@@ -726,12 +760,12 @@ export const setProject = async (name: string, change: ProjectChange): Promise<P
   const body: Record<string, unknown> = { name };
   if ("project" in change) body.status = change.project ?? null;
   if ("hue" in change) body.hue = change.hue ?? null;
-  const done = (await boardCall("project", body)) as { project?: Project | null } | null;
-  return done ? (done.project ?? null) : undefined;
+  const done = await boardCall<{ project?: Project | null }>("project", body);
+  return done.ok ? (done.data.project ?? null) : undefined;
 };
 
-export const duplicateBoard = async (name: string, to?: string, kind: FileKind = "board"): Promise<string | null> =>
-  (await boardCall("duplicate", { name, to, kind }))?.name ?? null;
+export const duplicateBoard = (name: string, to?: string, kind: FileKind = "board"): Promise<string | null> =>
+  nameFrom("duplicate", { name, to, kind });
 
 /**
  * One thing in the trash, as every trash route says it: a file somebody deleted, or a
@@ -755,8 +789,10 @@ export interface TrashEntry {
  * Move a file to the trash — what Delete does. Resolves to the entry it made, which is what
  * an Undo restores, or `null` when it was refused.
  */
-export const deleteBoard = async (name: string, kind: FileKind = "board"): Promise<TrashEntry | null> =>
-  ((await boardCall("delete", { name, kind })) as { trash?: TrashEntry } | null)?.trash ?? null;
+export const deleteBoard = async (name: string, kind: FileKind = "board"): Promise<TrashEntry | null> => {
+  const done = await boardCall<{ trash?: TrashEntry }>("delete", { name, kind });
+  return done.ok ? (done.data.trash ?? null) : null;
+};
 
 /**
  * Folders.
@@ -772,8 +808,17 @@ export const deleteBoard = async (name: string, kind: FileKind = "board"): Promi
  */
 const toldTheList = <T>(v: T): T => (dispatchEvent(new CustomEvent("dag:boards")), v);
 
-export const createFolder = async (name: string): Promise<string | null> =>
-  toldTheList(((await boardCall("mkdir", { name })) as { folder?: string } | null)?.folder ?? null);
+/**
+ * Make a folder. Resolves the path it landed at, or **what the server said when it refused** — a
+ * name it will not take, a directory the vault cannot write — which the sidebar says under the
+ * tree. The list is told only when something was made: a refusal changes nothing to redraw.
+ */
+export const createFolder = async (name: string): Promise<{ folder: string } | { error: string }> => {
+  const done = await boardCall<{ folder?: string }>("mkdir", { name });
+  if (!done.ok) return { error: done.error };
+  if (!done.data.folder) return { error: "The server did not say what it made. Try again." };
+  return toldTheList({ folder: done.data.folder });
+};
 
 /** What removing a folder took with it, as the server saw it at that moment. */
 export interface RemovedFolder {
@@ -798,8 +843,10 @@ export interface RemovedFolder {
  * caller lets go of: its own tree is one round trip stale, and a second writer may have put something
  * in the folder since.
  */
-export const deleteFolder = async (name: string, recursive = false): Promise<RemovedFolder | null> =>
-  toldTheList((await boardCall("rmdir", recursive ? { name, recursive: true } : { name })) as RemovedFolder | null);
+export const deleteFolder = async (name: string, recursive = false): Promise<RemovedFolder | null> => {
+  const done = await boardCall<RemovedFolder>("rmdir", recursive ? { name, recursive: true } : { name });
+  return done.ok ? toldTheList(done.data) : null;
+};
 
 /**
  * Rename or move a folder with everything in it: `to` is the whole new path. The one
