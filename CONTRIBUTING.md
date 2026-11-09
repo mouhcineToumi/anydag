@@ -25,6 +25,9 @@ open a PR into `develop` that says `Closes #<issue>`.
 
 You need **Node 24.7 or later** and git. Playwright's browsers are only needed if you run the browser
 suite, and Docker only for `npm run e2e:docker`.
+Install [**gitleaks**](https://github.com/gitleaks/gitleaks#installing) too (`pacman -S gitleaks`,
+`brew install gitleaks`, or a release binary): the pre-commit hook uses it to refuse a commit that holds
+a secret. Without it the hook only warns, and CI refuses the push instead.
 
 ```bash
 git clone https://github.com/mouhcineToumi/anydag.git
@@ -190,7 +193,15 @@ Examples: `feat/231-table-csv-export`, `fix/142-note-title-focus`, `docs/contrib
    without it. `anydag` itself is an admin tool (vault, serve, mcp, sync, trash, telemetry, snapshot and
    export, diagnostics, basic document commands); new capabilities for agents go in the MCP server
    (`anydag mcp`).
-7. **Using an AI agent?** That is fine, and nothing needs to be disclosed. You are still the author of
+7. **Never commit a secret.** This repository is public, the API server's code included, so a key,
+   token or password that is pushed is published, and rewriting the history does not take it back.
+   Secrets live in the environment or in a git-ignored `*.local` / `.env.*` file; a `.env.example`
+   lists the names with empty values. `scripts/secrets.sh` (gitleaks, with `.gitleaks.toml`) runs in the
+   pre-commit hook and in CI. A test fixture that looks like a secret should look obviously fake; if it
+   must not, add an allowance to `.gitleaks.toml` naming the file *and* the string, with the reason.
+   **If one gets pushed anyway, revoke it first**, then remove it, and say so in the PR (see
+   [`SECURITY.md`](SECURITY.md#if-a-secret-was-committed)).
+8. **Using an AI agent?** That is fine, and nothing needs to be disclosed. You are still the author of
    what you submit: you have read the diff, run the checks, and the PR follows this page. The agents'
    own instructions are in [`AGENTS.md`](AGENTS.md).
 

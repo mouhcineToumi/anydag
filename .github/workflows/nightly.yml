@@ -11,6 +11,9 @@
 #   3. **publish** — a pre-release with every installer and the nightly update files
 #      (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`), and only if every one is there.
 #
+# Beside them, every night whether or not there is a build: **secrets**, gitleaks over the whole
+# history of `develop` (`scripts/secrets.sh all`).
+#
 # **Why this publishes itself.** A push made with `GITHUB_TOKEN` starts no other workflow, so the tag
 # below does not start `release.yml` — which would refuse it anyway, because a nightly is not a release.
 #
@@ -109,6 +112,23 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "Pushed nightly/$version and v$version at $(git rev-parse HEAD)."
+
+  # The whole history of `develop`, every night, whether or not there is a build: a pull request's
+  # scan sees only its own commits, and a newer gitleaks can know a key shape an older one did not.
+  # A hit here is a secret already public — revoke it first (SECURITY.md); it does not hold the
+  # nightly back, because holding a build back would not unpublish it.
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+      - uses: ./.github/actions/gitleaks
+      - run: bash scripts/secrets.sh selftest
+      - run: bash scripts/secrets.sh all
 
   checks:
     name: checks
