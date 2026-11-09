@@ -1,4 +1,4 @@
-import { CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, ListFilter } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, ListFilter, Lock } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -51,6 +51,7 @@ import { dayOf, timeOf, type NoteEvent } from "@/note/event";
 import { wallOf } from "@/note/zone";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { titleStem, type Task, type TaskChange } from "@/note/task";
+import { LOCK_HINT, refuseLocked, setLocked } from "@/settings/lock";
 import { withVault } from "@/vault/current";
 
 import { startDrag } from "./pointerDrag";
@@ -293,11 +294,12 @@ export function CalendarView({
   const into = scoped ?? "";
   const make = useCallback(
     async (title: string, start: string, end: string | null) => {
+      if (locked) return void refuseLocked();
       const t = title.trim() || "Untitled";
       const stem = titleStem(t) || "untitled";
       await createNote(into ? `${into}/${stem}` : stem, blankEventText(start, end ?? undefined, t));
     },
-    [into],
+    [into, locked],
   );
 
   const ask = useCallback((start: string, end: string | null, x: number, y: number) => setMaking({ start, end, x, y }), []);
@@ -395,7 +397,7 @@ export function CalendarView({
           today={today}
           items={items}
           onOpen={open}
-          onAsk={locked ? undefined : ask}
+          onAsk={ask}
           onWrite={locked ? undefined : onWrite}
           onDay={(d) => onGo({ view: "days", day: d, count: 1 })}
         />
@@ -405,11 +407,11 @@ export function CalendarView({
           today={today}
           items={items}
           onOpen={open}
-          onAsk={locked ? undefined : ask}
+          onAsk={ask}
           onWrite={locked ? undefined : onWrite}
         />
       )}
-      {making ? <NewEvent making={making} onMake={make} onClose={() => setMaking(null)} /> : null}
+      {making ? <NewEvent making={making} locked={locked} onMake={make} onClose={() => setMaking(null)} /> : null}
     </main>
   );
 }
@@ -1339,10 +1341,13 @@ function DayColumn({
  */
 function NewEvent({
   making,
+  locked = false,
   onMake,
   onClose,
 }: {
   making: Making;
+  /** The app is read-only: the card opens to say why, and nothing it offers can write. */
+  locked?: boolean;
   onMake(title: string, start: string, end: string | null): Promise<void>;
   onClose(): void;
 }) {
@@ -1372,6 +1377,7 @@ function NewEvent({
 
   const when = whenWords(making.end ? { start: making.start, end: making.end } : { start: making.start });
   const submit = async () => {
+    if (locked) return void refuseLocked();
     if (busy) return;
     setBusy(true);
     await onMake(title, making.start, making.end);
@@ -1398,20 +1404,45 @@ function NewEvent({
         <CalendarClock size={14} strokeWidth={2} aria-hidden="true" />
         <span>{when}</span>
       </p>
+      {locked ? (
+        <p className="dag-calendar__new-locked" data-dag-calendar-new-locked="" title={LOCK_HINT}>
+          <Lock size={14} strokeWidth={2} aria-hidden="true" />
+          <span>Read only — unlock to make an event.</span>
+          <button
+            type="button"
+            className="dag-calendar__new-cancel"
+            data-dag-calendar-new-unlock=""
+            onClick={() => setLocked(false)}
+          >
+            Unlock
+          </button>
+        </p>
+      ) : null}
       <input
         type="text"
         placeholder="New event"
         aria-label="The event's title"
         value={title}
         disabled={busy}
+        readOnly={locked}
+        aria-disabled={locked || undefined}
+        title={locked ? LOCK_HINT : undefined}
         data-dag-calendar-new-title=""
+        data-dag-readonly-blocked={locked ? "" : undefined}
         onChange={(e) => setTitle(e.target.value)}
       />
       <div className="dag-calendar__new-acts">
         <button type="button" className="dag-calendar__new-cancel" onClick={onClose}>
           Cancel
         </button>
-        <button type="submit" className="dag-calendar__new-make" data-dag-calendar-new-make="" disabled={busy}>
+        <button
+          type="submit"
+          className="dag-calendar__new-make"
+          data-dag-calendar-new-make=""
+          aria-disabled={locked || undefined}
+          title={locked ? LOCK_HINT : undefined}
+          disabled={busy}
+        >
           Make it
         </button>
       </div>

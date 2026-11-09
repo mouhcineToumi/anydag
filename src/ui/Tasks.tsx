@@ -12,7 +12,7 @@ import {
 import { createNote, setTask, type BoardTree } from "@/board/useBoard";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskChange, type TaskStatus } from "@/note/task";
-import { refuseLocked } from "@/settings/lock";
+import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
 import { startDrag } from "./pointerDrag";
 import { ProjectChip } from "./ProjectBar";
@@ -369,7 +369,14 @@ export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: s
   };
   return (
     <div className="dag-tasks__add">
-      <label className="dag-tasks__add-row" data-dag-task-add-row={status}>
+      <label
+        className="dag-tasks__add-row"
+        data-dag-task-add-row={status}
+        /* Read only: the row looks unavailable and says why on hover, but the box still takes a
+           title, and Enter answers with the lock's notice and Unlock rather than nothing. */
+        data-dag-readonly-blocked={locked ? "" : undefined}
+        title={locked ? LOCK_HINT : undefined}
+      >
         <Plus size={14} strokeWidth={2} aria-hidden="true" />
         <input
           type="text"

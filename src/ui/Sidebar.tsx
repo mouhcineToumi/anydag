@@ -99,7 +99,7 @@ import {
 import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
-import { refuseLocked, useLocked } from "@/settings/lock";
+import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
 import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref } from "@/settings/prefs";
 
 /** Lucide at one size and weight, stated once — the dock's rule. */
@@ -1350,12 +1350,8 @@ export function Sidebar({
           aria-haspopup="menu"
           aria-expanded={making !== null}
           aria-label="New"
-          title={
-            locked
-              ? "Read only: unlock to make something"
-              : "New board, note, task, event, quiz, table or folder, or upload files"
-          }
-          aria-disabled={locked || undefined}
+          {...lockedAffordance(locked)}
+          title={locked ? LOCK_HINT : "New board, note, task, event, quiz, table or folder, or upload files"}
           onClick={(e) => {
             if (locked) return void refuseLocked();
             const r = e.currentTarget.getBoundingClientRect();

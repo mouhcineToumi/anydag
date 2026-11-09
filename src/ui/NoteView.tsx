@@ -743,6 +743,7 @@ export function NoteView({
           <NoteTitle
             title={title}
             editable={!locked && status.kind !== "conflict" && status.kind !== "deleted"}
+            locked={locked}
             field={titleField}
             onCommit={retitle}
             onNext={(newLine) => editor.current?.focusStart(newLine)}

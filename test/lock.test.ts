@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { LOCKED, LOCK_CHANGED, LOCK_REFUSED, isLocked, mayEdit, refuseLocked, setLocked, toggleLock } from "@/settings/lock";
+import {
+  LOCKED,
+  LOCK_CHANGED,
+  LOCK_HINT,
+  LOCK_KEYS,
+  LOCK_REFUSED,
+  isLocked,
+  lockNoticeLeaves,
+  lockNoticeText,
+  lockedAffordance,
+  mayEdit,
+  refuseLocked,
+  setLocked,
+  toggleLock,
+} from "@/settings/lock";
 
 /**
  * The lock's state: one key this browser keeps, and the two events every page hears it by.
@@ -74,5 +88,28 @@ describe("the lock", () => {
     expect(isLocked()).toBe(true);
     Object.defineProperty(globalThis, "location", { configurable: true, value: { search: "?board=demo&snapshot=1" } });
     expect(isLocked()).toBe(false);
+  });
+
+  it("gives a control that writes the one hover sentence and the disabled hook, and nothing unlocked", () => {
+    expect(LOCK_HINT).toBe(`Read only — unlock (${LOCK_KEYS})`);
+    expect(LOCK_HINT).toBe("Read only — unlock (Ctrl+Shift+L)");
+    expect(lockedAffordance(false)).toEqual({});
+    expect(lockedAffordance(true)).toEqual({
+      "aria-disabled": true,
+      "data-dag-readonly-blocked": "",
+      title: "Read only — unlock (Ctrl+Shift+L)",
+    });
+  });
+
+  it("says why a write was refused, and that unlocking worked, with the wording the notice uses", () => {
+    expect(lockNoticeText("refused")).toBe("Read only: unlock to change this.");
+    expect(lockNoticeText("locked")).toMatch(/^Read only:/);
+    expect(lockNoticeText("unlocked")).toMatch(/^Unlocked:/);
+  });
+
+  it("lets the two announcements leave on the timer, and holds a refusal until it is dismissed", () => {
+    expect(lockNoticeLeaves("locked")).toBe(true);
+    expect(lockNoticeLeaves("unlocked")).toBe(true);
+    expect(lockNoticeLeaves("refused")).toBe(false);
   });
 });
