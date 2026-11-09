@@ -86,13 +86,20 @@ jobs:
           base="https://localhost"
           # The account and a pairing code, minted by the api's own CLI directly against Postgres.
           compose exec -T api node /app/anydag-api.mjs account add ci-user
-          code="$(compose exec -T api node /app/anydag-api.mjs pair ci-user | sed -n 's/^code: *//p')"
-          # Pair a device, open a vault, put a blob, send a log batch — one of each kind of data.
-          token="$(curl -fsSk -X POST "$base/v1/pair" -H 'content-type: application/json' \
-            -d "{\"code\":\"$code\",\"device\":{\"name\":\"ci\",\"platform\":\"linux\"}}" | jq -r .token)"
+          # One of each kind of data, through Caddy: a paired device, a vault, a blob, a log batch.
+          # A refused pairing spends its code, so a retry mints a new one; two attempts is two more
+          # than a person needs.
+          token=""
+          for attempt in 1 2 3; do
+            code="$(compose exec -T api node /app/anydag-api.mjs pair ci-user | sed -n 's/^code: *//p')"
+            token="$(curl -skS -X POST "$base/v1/pair" -H 'content-type: application/json' \
+              -d "{\"code\":\"$code\",\"device\":{\"name\":\"ci\",\"platform\":\"linux\"}}" | jq -r '.token // empty')" && [ -n "$token" ] && break
+          done
+          [ -n "$token" ] || { echo "pairing failed" >&2; exit 1; }
           vault="$(curl -fsSk -X POST "$base/v1/vaults" -H "authorization: Bearer $token" \
             -H 'content-type: application/json' -d '{"name":"Y2ltYXJrZXI="}' | jq -r .id)"
-          blob="$(printf 'ci-blob-id-pad' | base64 -w0 | tr '+/' '-_' | tr -d '=\n' | head -c 43)"
+          # A blob id is 43 base64url characters: 32 bytes.
+          blob="$(head -c 32 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=\n' | head -c 43)"
           printf 'the bytes the vault holds' > data.bin
           curl -fsSk -X PUT "$base/v1/vaults/$vault/blobs/$blob" -H "authorization: Bearer $token" \
             -H 'content-type: application/octet-stream' --data-binary @data.bin

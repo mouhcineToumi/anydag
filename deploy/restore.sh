@@ -59,7 +59,7 @@ tar -xzf "$work/payload.tar.gz" -C "$work"
 
 step "postgres: pg_restore"
 docker compose -f compose.yaml cp "$work/db.dump" db:/tmp/db.restore
-docker compose -f compose.yaml exec -T db pg_restore --clean --if-exists --no-owner --dbname=anydag /tmp/db.restore
+docker compose -f compose.yaml exec -T db pg_restore --clean --if-exists --no-owner --username=anydag --dbname=anydag /tmp/db.restore
 docker compose -f compose.yaml exec -T db rm -f /tmp/db.restore
 
 step "the api's volume: blobs and logs, where they were"

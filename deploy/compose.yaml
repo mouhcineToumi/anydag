@@ -7,6 +7,9 @@
 #   cp deploy/.env.example deploy/.env   # then fill it in; it is git-ignored and stays on the vm
 #   docker compose -f deploy/compose.yaml up -d --wait
 #
+# The project is named `anydag` (`COMPOSE_PROJECT_NAME` overrides it, e.g. beside another stack on
+# a laptop), and the volumes carry that name explicitly — `backup.sh` and `restore.sh` name them.
+#
 # Load-bearing:
 # - **No secret is written in this file**: every value comes from deploy/.env, and `:?` refuses to
 #   start without the ones the stack cannot answer without. No secret is a build argument.
@@ -18,7 +21,7 @@
 #   volume and grow without a rebuild; `backup.sh` and `restore.sh` move both.
 # - **`/v1/ready` is the api's healthcheck here** — the process up *and* the database answering; the
 #   image's own `/v1/health` is liveness for a run without a database.
-name: anydag
+name: ${COMPOSE_PROJECT_NAME:-anydag}
 
 services:
   caddy:
@@ -114,6 +117,10 @@ services:
 
 volumes:
   caddy_data:
+    name: anydag_caddy_data
   caddy_config:
+    name: anydag_caddy_config
   api_data:
+    name: anydag_api_data
   db_data:
+    name: anydag_db_data

@@ -40,8 +40,8 @@ step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 
 step "the stack is answering"
 for service in caddy api db; do
-  running="$(docker compose -f compose.yaml ps --services --filter "name=${service}" --filter status=running)"
-  [[ "$running" == "$service" ]] || { echo "the $service service is not up — start it first" >&2; exit 1; }
+  running="$(docker compose -f compose.yaml ps --format '{{.Service}} {{.State}}' | grep -x "$service running" || true)"
+  [[ -n "$running" ]] || { echo "the $service service is not up — start it first" >&2; exit 1; }
 done
 curl -fsS --insecure "https://${CADDY_DOMAIN:-localhost}/v1/ready" >/dev/null
 
