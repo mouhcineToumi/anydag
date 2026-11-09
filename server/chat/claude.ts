@@ -231,7 +231,15 @@ export function claudeHarness(o: ClaudeOptions = {}): Harness {
     fs.writeFileSync(files.system, r.system);
     fs.writeFileSync(files.mcp, JSON.stringify(claudeMcpConfig(r.mcp)));
 
-    const env = { ...claudeEnv(baseEnv()), MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS) } as NodeJS.ProcessEnv;
+    /* `MCP_CONNECTION_NONBLOCKING=0` makes Claude Code connect the chat's MCP server before it says
+       `system/init`. Left on (its default), init can arrive while `anydag` is still `pending` — the
+       desktop app's Electron-as-Node child is slow to start — and the init check below would fail a
+       turn whose tools were about to be there. */
+    const env = {
+      ...claudeEnv(baseEnv()),
+      MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS),
+      MCP_CONNECTION_NONBLOCKING: "0",
+    } as NodeJS.ProcessEnv;
     const found = findClaude(env);
     const bin = o.bin ?? (found.ok ? found.bin : "claude");
     const st = newClaudeState();

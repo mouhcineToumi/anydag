@@ -18,7 +18,7 @@ import type { Context, Next } from "hono";
 import type { Session } from "../context";
 import { err } from "../http";
 import type { Harness, HarnessEvent, McpCommand, Running } from "./harness";
-import { isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
+import { guessed, isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
 import { installFsHooks, record, undo, type Op } from "./record";
 import { ChatStore, newId, validChatId } from "./store";
 import {
@@ -470,9 +470,11 @@ export class Assistant {
       console.error(`anydag: chat ${live.turn.chat}: the turn could not be kept:`, e);
     }
     try {
-      /* A failed turn has no answer the next turn may build on: it is not resumable, and a session
-         it ran in is dropped so the next turn starts fresh and seeds the transcript instead. */
-      if (live.turn.status === "failed") this.store.setSession(live.turn.chat, live.turn.provider, null);
+      /* A failed turn that ran no tool was the model guessing without them: it is not resumable,
+         and the session it ran in is dropped so the next turn starts fresh and seeds the transcript
+         instead. A turn that failed after a tool ran (an overloaded API, a dropped connection) did
+         change the vault, so its session is kept for the next turn to resume. */
+      if (guessed(live.turn)) this.store.setSession(live.turn.chat, live.turn.provider, null);
       else if (live.session)
         this.store.setSession(live.turn.chat, live.turn.provider, {
           id: live.session,

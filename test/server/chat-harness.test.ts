@@ -453,6 +453,8 @@ describe("the Claude harness", () => {
     expect(call.opts.cwd).toBe(r.scratch);
     expect(call.child.stdinText).toBe(r.prompt);
     expect(call.opts.env?.MCP_TOOL_TIMEOUT).toBe("600000");
+    /* init must not arrive while the anydag server is still pending, or the init check fails a good turn */
+    expect(call.opts.env?.MCP_CONNECTION_NONBLOCKING).toBe("0");
     /* the person's subscription, not a key; and not inside another Claude Code's own session */
     expect(call.opts.env?.ANTHROPIC_API_KEY).toBeUndefined();
     expect(call.opts.env?.CLAUDECODE).toBeUndefined();

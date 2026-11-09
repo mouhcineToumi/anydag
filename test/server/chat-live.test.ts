@@ -529,6 +529,20 @@ describe("sessions", () => {
     expect(runs[1]!.prompt.endsWith("The person now says:\n\nagain")).toBe(true);
   });
 
+  it("resumes and seeds a turn that failed after a tool ran, because it did change the vault", async () => {
+    const chat = await newChat();
+    const turn = await say(chat.id, "note log hi\nfail it broke");
+    expect(turn.status).toBe("failed");
+    expect(turn.steps.some((s) => s.kind === "tool")).toBe(true);
+
+    await say(chat.id, "again");
+    expect(runs[1]!.resume).toBe(runs[0]!.fresh);
+
+    await say(chat.id, "now you", { provider: "opencode", model: "x/y" });
+    expect(runs[2]!.resume).toBeUndefined();
+    expect(runs[2]!.prompt).toContain("<assistant>\n(called note_create");
+  });
+
   it("keeps the Electron-as-Node marker in the MCP child's env when the server has it", async () => {
     const was = process.env.ELECTRON_RUN_AS_NODE;
     process.env.ELECTRON_RUN_AS_NODE = "1";

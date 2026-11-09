@@ -46,8 +46,11 @@ Ten things are load-bearing:
   `GET /api/mcp` is waited on for the same. Missing, failed or toolless fails the turn with one clear
   error. A reply holding `<invoke name=` or `<parameter name=` while no tool ran is logged (raw text
   only) and shown as that error, never stored as the answer. A failed turn keeps the person's
-  message and the chat, is not seeded as an assistant answer, and drops its session so the next turn
-  starts fresh.
+  message and the chat; one that ran no tool is not seeded as an assistant answer and drops its
+  session so the next turn starts fresh, while one that failed after a tool ran (an overloaded API, a
+  dropped connection) is seeded whole and resumed, because it did change the vault. Claude Code runs
+  with `MCP_CONNECTION_NONBLOCKING=0`, so its init line is not sent while `anydag` is still
+  `pending`.
 - **The guard is the server's, never the prompt's.** Every request carrying `x-anydag-chat` passes
   `Assistant.guard` **before** the vault scoping: no running turn is 409 `no-turn`; a write route not
   on its list is 403 `chat-refused`; a vault the chat was not granted, 403 `not-granted`; a write in
