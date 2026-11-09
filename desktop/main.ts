@@ -427,6 +427,12 @@ function createWindow(vaultId: string, search: string): BrowserWindow {
     title: "AnyDag",
     show: false,
     backgroundColor: "#fbfbfa",
+    /* On macOS the window has no title bar of its own (#78): the traffic lights sit in the page's top
+       row, centred on its 48px, and the page's header and the sidebar's head are where the window is
+       dragged from (`-webkit-app-region` in `chrome.css`). The page clears room for the lights while
+       `data-dag-window="inset"` is on its root (`src/ui/windowInset.ts`), which full screen takes
+       off — the lights are not drawn there. Linux and Windows keep the system's frame. */
+    ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 17 } } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -438,6 +444,9 @@ function createWindow(vaultId: string, search: string): BrowserWindow {
     },
   });
   windows.set(vaultId, win);
+  /* Full screen hides the traffic lights, so the room the page keeps for them goes too. */
+  win.on("enter-full-screen", () => win.webContents.send("window:full-screen", true));
+  win.on("leave-full-screen", () => win.webContents.send("window:full-screen", false));
   win.on("closed", () => {
     if (windows.get(vaultId) === win) windows.delete(vaultId);
   });
@@ -860,6 +869,10 @@ async function whenReady(): Promise<void> {
     const frame = event.senderFrame;
     const top = frame !== null && frame === event.sender.mainFrame;
     event.returnValue = top && frame.url.startsWith(`${SCHEME}://${APP_HOST}/`) && !isApiUrl(frame.url) ? pageKey : null;
+  });
+  /* Whether the page's window is in full screen as it loads; the change after is pushed. */
+  ipcMain.on("window:full-screen?", (event) => {
+    event.returnValue = BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false;
   });
   /* Where the `anydag` command is, so the AI tab's MCP lines work without it on the PATH. */
   ipcMain.on("cli:path", (event) => {

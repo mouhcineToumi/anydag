@@ -48,6 +48,7 @@ import { pull } from "./settings/sync";
 import { startTelemetry } from "./telemetry/client";
 import { loadVaults } from "./vault/api";
 import { settleVault, watchVault } from "./vault/current";
+import { watchWindowInset } from "./ui/windowInset";
 import "./styles/base.css";
 import "./styles/chrome.css";
 import "./styles/canvas.css";
@@ -112,6 +113,8 @@ async function start(): Promise<void> {
 
   /* Before the first request, so that every one of them says which vault it is about. */
   watchVault();
+  /* Before the first paint, so the top row never draws under the macOS traffic lights. */
+  watchWindowInset();
 
   const [, account] = await Promise.all([
     facesLoaded().catch(() => undefined),

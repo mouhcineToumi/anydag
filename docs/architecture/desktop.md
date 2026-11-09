@@ -88,6 +88,18 @@ Eleven things are load-bearing:
   `ready`**: its spawn reads the keys and the home secret, `safeStorage` throws before `ready`, and
   that throw read as "no keyring" — every first launch stored the home secret merely encoded. The
   macOS smoke log is what showed it.
+- **On macOS the window has no title bar** (`titleBarStyle: "hiddenInset"`, #78): the traffic
+  lights sit in the page's top row, centred on its 48px. The page learns it from the bridge
+  (`platform`, `isFullScreen`, `onFullScreen`) and `src/ui/windowInset.ts` puts
+  `data-dag-window="inset"` on the root, which `chrome.css` reads twice: `--window-inset` pushes
+  whatever is at the window's left edge in that row (the sidebar's toggle and head, or the toolbar
+  while the column is away, `data-dag-toolbar-edge`) clear of the lights, and the toolbar and the
+  sidebar's head become the drag region with every control cut out of it (`no-drag`) — and the
+  no-vault page, which has neither, a 48px strip of its own. Full screen
+  hides the lights, so the main process pushes `window:full-screen` and the attribute comes off.
+  Linux and Windows keep the system frame, and the browser has no bridge, so none of it applies.
+  **Electron's drag region ignores what is drawn over it**: a scrim or a menu over the top 48px
+  drags the window rather than taking the press, unless it is itself `no-drag`.
 - **A load always names `index.html`.** `anydag://app/?x` canonicalises to a pathname of `//`, and
   the page's own `history.replaceState` then resolves to an address with no host, which Chromium
   refuses as another origin — the smoke run's `ready=never` before it was found.
