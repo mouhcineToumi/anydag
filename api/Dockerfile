@@ -1,7 +1,7 @@
-# anydag-sync's image. The build context is `sync/dist/` — what
-# `node sync/build.mjs` writes: the bundle, the migrations and a package.json naming PGlite alone —
-# so `npm run sync:build` comes first, and the image never sees the repository, its node_modules or
-# a .env (`sync/compose.yaml` and `npm run sync:up` do both).
+# anydag-api's image. The build context is `api/dist/` — what
+# `node api/build.mjs` writes: the bundle, the migrations and a package.json naming PGlite alone —
+# so `npm run api:build` comes first, and the image never sees the repository, its node_modules or
+# a .env (`api/compose.yaml` and `npm run api:up` do both).
 #
 # Load-bearing: it runs as `node`, not root, and owns only /data; it listens on 0.0.0.0 because a
 # container's loopback is not the host's (compose publishes it on 127.0.0.1 only); and the
@@ -17,7 +17,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY migrations/ ./migrations/
-COPY anydag-sync.mjs ./
+COPY anydag-api.mjs ./
 
 RUN mkdir -p /data && chown node:node /data
 USER node
@@ -27,5 +27,5 @@ EXPOSE 8790
 HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=10 \
   CMD wget -qO- "http://127.0.0.1:${ANYDAG_SYNC_PORT}/v1/health" >/dev/null || exit 1
 
-ENTRYPOINT ["node", "/app/anydag-sync.mjs"]
+ENTRYPOINT ["node", "/app/anydag-api.mjs"]
 CMD ["serve"]

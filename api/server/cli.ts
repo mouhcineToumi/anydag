@@ -1,15 +1,15 @@
 /**
- * `anydag-sync` — the server's one binary: `serve` runs it, and every
+ * `anydag-api` — the server's one binary: `serve` runs it, and every
  * other command is an operator's act done **against the database directly**, with the same config,
  * so making an account or minting a pairing code needs no running server and no admin token.
  *
- *     anydag-sync serve | migrate
- *     anydag-sync account add <name> [--plan <id>] | account ls
- *     anydag-sync pair <account>
- *     anydag-sync device ls <account> | device revoke <account> <id>
- *     anydag-sync plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]
- *     anydag-sync usage [--account <name>] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
- *     anydag-sync gc
+ *     anydag-api serve | migrate
+ *     anydag-api account add <name> [--plan <id>] | account ls
+ *     anydag-api pair <account>
+ *     anydag-api device ls <account> | device revoke <account> <id>
+ *     anydag-api plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]
+ *     anydag-api usage [--account <name>] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
+ *     anydag-api gc
  *
  * Load-bearing:
  * - **Exit codes are a contract**: 0 done, 1 refused (an unknown account, a busy PGlite folder, a
@@ -32,7 +32,7 @@ import { adminAccount, findAccount, parsePlan, planExists } from "./routes/admin
 import { HttpError } from "./routes/http";
 import { mintPairCode, wireDevice } from "./routes/pair";
 
-const HELP = `anydag-sync — the AnyDag sync server
+const HELP = `anydag-api — the AnyDag sync server
 
   serve                              run the server (config from the environment)
   migrate                            apply the database migrations and exit
@@ -112,7 +112,7 @@ export async function main(
   try {
     p = parse(argv);
   } catch (e) {
-    console.error(`anydag-sync: ${(e as Error).message}\n\n${HELP}`);
+    console.error(`anydag-api: ${(e as Error).message}\n\n${HELP}`);
     return 2;
   }
   const [cmd, sub, ...rest] = p.words;
@@ -129,7 +129,7 @@ export async function main(
   try {
     config = configFrom(env);
   } catch (e) {
-    console.error(`anydag-sync: ${(e as Error).message}`);
+    console.error(`anydag-api: ${(e as Error).message}`);
     return 1;
   }
 
@@ -138,14 +138,14 @@ export async function main(
       await serve(config);
       return 0;
     } catch (e) {
-      console.error(`anydag-sync: ${(e as Error).message}`);
+      console.error(`anydag-api: ${(e as Error).message}`);
       return 1;
     }
   }
 
   const known = new Set(["migrate", "account", "pair", "device", "plan", "usage", "gc"]);
   if (!known.has(cmd)) {
-    console.error(`anydag-sync: no command ${cmd}\n\n${HELP}`);
+    console.error(`anydag-api: no command ${cmd}\n\n${HELP}`);
     return 2;
   }
 
@@ -153,7 +153,7 @@ export async function main(
   try {
     store = await openStore(config);
   } catch (e) {
-    console.error(`anydag-sync: ${(e as Error).message}`);
+    console.error(`anydag-api: ${(e as Error).message}`);
     return 1;
   }
   const { meta } = store;
@@ -301,10 +301,10 @@ export async function main(
     return 2;
   } catch (e) {
     if (e instanceof Usage) {
-      console.error(`anydag-sync: ${e.message}`);
+      console.error(`anydag-api: ${e.message}`);
       return 2;
     }
-    console.error(`anydag-sync: ${(e as Error).message}`);
+    console.error(`anydag-api: ${(e as Error).message}`);
     return 1;
   } finally {
     await store.close();

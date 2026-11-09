@@ -1,5 +1,5 @@
 /**
- * `anydag-sync`'s configuration, read once from the environment.
+ * `anydag-api`'s configuration, read once from the environment.
  *
  * `configFrom(env)` is a pure function over a plain record, so a test hands it any environment it
  * likes and the server, the CLI and the tests all read the same names the same way. A value that

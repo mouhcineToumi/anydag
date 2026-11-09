@@ -1,5 +1,5 @@
 /**
- * The `anydag-sync` Hono app: every `/v1` route, the auth in front of them, error mapping and the
+ * The `anydag-api` Hono app: every `/v1` route, the auth in front of them, error mapping and the
  * per-route measurements. `createApp` takes its ports — `Meta`,
  * `Blobs`, the config, a clock — so a test runs it over PGlite and a temp directory with
  * `app.request(…)`, and `main.ts` over a real Postgres and a socket, with no difference between.
@@ -109,7 +109,7 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   app.notFound((c) => c.json({ code: "ES_NOT_FOUND", message: `no route ${c.req.method} ${c.req.path}` }, 404));
   app.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ ...err.extra, code: err.code, message: err.message }, STATUS[err.code] as 400);
-    console.error(`anydag-sync: ${c.req.method} ${c.req.path}:`, err);
+    console.error(`anydag-api: ${c.req.method} ${c.req.path}:`, err);
     return c.json({ message: "the server failed to answer this request" }, 500);
   });
 

@@ -1,5 +1,5 @@
 /**
- * The collector (`sync/server/gc.ts`) over the real `PgMeta` and `DiskBlobs`: compaction keeps each
+ * The collector (`api/server/gc.ts`) over the real `PgMeta` and `DiskBlobs`: compaction keeps each
  * key's newest row, a superseded blob goes only once it is past the history window, a blob a head
  * names never goes, an orphan file goes only when older than an hour, and storage is snapshotted
  * into the ledger — set, not added.

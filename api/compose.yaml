@@ -1,8 +1,8 @@
-# anydag-sync on this machine: Postgres and the server, both on
-# 127.0.0.1 only. `docker compose -f sync/compose.yaml up -d db` is Postgres alone, which is what
-# `npm run sync:dev` and `npm run sync:test:pg` want; `up` with no service adds the server's image,
-# built from `sync/dist/` — so `npm run sync:build` first, which is what `npm run sync:up` does.
-name: anydag-sync
+# anydag-api on this machine: Postgres and the server, both on
+# 127.0.0.1 only. `docker compose -f api/compose.yaml up -d db` is Postgres alone, which is what
+# `npm run api:dev` and `npm run api:test:pg` want; `up` with no service adds the server's image,
+# built from `api/dist/` — so `npm run api:build` first, which is what `npm run api:up` does.
+name: anydag-api
 services:
   db:
     image: postgres:17-alpine

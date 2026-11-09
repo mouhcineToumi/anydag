@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# `npm run sync:dev` — anydag-sync from source against Postgres in Docker:
-# `db` from sync/compose.yaml, esbuild watching the sources, and Node restarting the
+# `npm run api:dev` — anydag-api from source against Postgres in Docker:
+# `db` from api/compose.yaml, esbuild watching the sources, and Node restarting the
 # bundle whenever it is rewritten.
 #
 # Load-bearing: the ports come from the environment or .env (ANYDAG_SYNC_PORT, default 8790;
@@ -24,15 +24,15 @@ export ANYDAG_SYNC_DATA="${ANYDAG_SYNC_DATA:-$PWD/.dev-home/sync}"
 export DATABASE_URL="${DATABASE_URL:-postgres://anydag:anydag@127.0.0.1:${ANYDAG_SYNC_PG_PORT}/anydag_sync}"
 
 if [[ "$ANYDAG_SYNC_PORT" == 3500 ]]; then
-  echo "sync/dev.sh: 3500 is the app's port; pick another ANYDAG_SYNC_PORT" >&2
+  echo "api/dev.sh: 3500 is the app's port; pick another ANYDAG_SYNC_PORT" >&2
   exit 2
 fi
 
-docker compose -f sync/compose.yaml up -d --wait db
-node sync/build.mjs
+docker compose -f api/compose.yaml up -d --wait db
+node api/build.mjs
 
-node sync/build.mjs --watch &
+node api/build.mjs --watch &
 watcher=$!
 trap 'kill "$watcher" 2>/dev/null || true' EXIT INT TERM
 
-node --watch-path=sync/dist sync/dist/anydag-sync.mjs serve
+node --watch-path=api/dist api/dist/anydag-api.mjs serve

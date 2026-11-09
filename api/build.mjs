@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * Bundle `anydag-sync`: `sync/server/cli.ts` and everything it imports into one ESM file,
- * `sync/dist/anydag-sync.mjs`, plus the SQL migrations beside it in `sync/dist/migrations/` —
+ * Bundle `anydag-api`: `api/server/cli.ts` and everything it imports into one ESM file,
+ * `api/dist/anydag-api.mjs`, plus the SQL migrations beside it in `api/dist/migrations/` —
  * `server/build.mjs`'s move, for its reason (TypeScript with extensionless imports, run as plain
- * Node). `node sync/build.mjs --watch` rebuilds on every change, which is what `sync/dev.sh` runs.
+ * Node). `node api/build.mjs --watch` rebuilds on every change, which is what `api/dev.sh` runs.
  *
  * Load-bearing:
  * - **The migrations are copied, not inlined**: `meta/migrations.ts` reads `./migrations/` beside
- *   its own `import.meta.url`, which in the bundle is `sync/dist/`, so the SQL files are the source
+ *   its own `import.meta.url`, which in the bundle is `api/dist/`, so the SQL files are the source
  *   of truth in the checkout and in the image alike.
  * - **`dist/` is the whole of what the image takes**: the bundle, the migrations, and a
  *   `package.json` naming the externals at the lockfile's versions (`writeManifest`), so
- *   `sync/Dockerfile` copies one folder and installs one package.
+ *   `api/Dockerfile` copies one folder and installs one package.
  * - **PGlite stays outside the bundle**: it finds its WebAssembly and data files beside its own
  *   module, which a bundle would move away from them. `pg-native` and `pg-cloudflare` are optional
  *   requires of `pg` that nothing here uses. Everything else — `pg`, Hono, and the one file of the
@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 export const DIST = path.join(here, "dist");
-export const BUNDLE = path.join(DIST, "anydag-sync.mjs");
+export const BUNDLE = path.join(DIST, "anydag-api.mjs");
 export const EXTERNAL = ["@electric-sql/pglite", "pg-native", "pg-cloudflare"];
 /** The externals the bundle loads for real; the other two are `pg`'s optional requires, never reached. */
 const RUNTIME = ["@electric-sql/pglite"];
@@ -33,7 +33,7 @@ const RUNTIME = ["@electric-sql/pglite"];
 function options(version) {
   return {
     absWorkingDir: root,
-    entryPoints: ["sync/server/cli.ts"],
+    entryPoints: ["api/server/cli.ts"],
     bundle: true,
     platform: "node",
     format: "esm",
@@ -68,7 +68,7 @@ function writeManifest(version) {
   }
   fs.writeFileSync(
     path.join(DIST, "package.json"),
-    JSON.stringify({ name: "anydag-sync", version, type: "module", private: true, dependencies }, null, 2) + "\n",
+    JSON.stringify({ name: "anydag-api", version, type: "module", private: true, dependencies }, null, 2) + "\n",
   );
 }
 
@@ -81,7 +81,7 @@ export async function build() {
   copyMigrations();
   const inputs = [
     ...Object.keys(result.metafile.inputs),
-    ...fs.readdirSync(path.join(here, "server", "meta", "migrations")).map((f) => `sync/server/meta/migrations/${f}`),
+    ...fs.readdirSync(path.join(here, "server", "meta", "migrations")).map((f) => `api/server/meta/migrations/${f}`),
   ];
   fs.writeFileSync(path.join(DIST, "meta.json"), JSON.stringify({ version, inputs }, null, 2));
   writeManifest(version);

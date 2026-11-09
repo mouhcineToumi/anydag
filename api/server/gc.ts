@@ -99,7 +99,7 @@ export async function collect(meta: Meta, blobs: Blobs, opts: CollectOptions): P
       await meta.bump(day, v.account, v.id, "blobs", Number(s.blobs));
       await meta.bump(day, v.account, v.id, "files", Number(s.files));
     } catch (e) {
-      console.error(`anydag-sync: collecting vault ${v.id} failed: ${(e as Error).message}`);
+      console.error(`anydag-api: collecting vault ${v.id} failed: ${(e as Error).message}`);
     }
   }
 
@@ -111,7 +111,7 @@ export async function collect(meta: Meta, blobs: Blobs, opts: CollectOptions): P
       await meta.bump(day, account, null, "blobs", Number(s.blobs));
       await meta.bump(day, account, null, "files", Number(s.files));
     } catch (e) {
-      console.error(`anydag-sync: snapshotting account ${account} failed: ${(e as Error).message}`);
+      console.error(`anydag-api: snapshotting account ${account} failed: ${(e as Error).message}`);
     }
   }
   return result;

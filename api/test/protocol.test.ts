@@ -1,5 +1,5 @@
 /**
- * The pinned tests of the frozen protocol (`sync/protocol/crypto.ts`, `sync/protocol/meta.ts`).
+ * The pinned tests of the frozen protocol (`api/protocol/crypto.ts`, `api/protocol/meta.ts`).
  * Neither is edited here: these exist so a refactor cannot quietly move every key on the server or
  * every seal on its way up. Refusals branch on `Unsealed` (`crypto.ts`'s own class), discarding
  * anything that skips that error; the metadata's shape errors are its plain sentences.

@@ -6,7 +6,7 @@
 #      one number so that semver accepts it before 10:00 and the clock orders it), and pushes
 #      the branch `nightly/<version>` and the tag `v<version>` at that commit. **Each nightly gets its
 #      own branch, and nothing here ever deletes one.** `develop` itself is never touched.
-#   2. **checks, e2e, desktop** — everything, against that tag: the fast tier and the sync server's
+#   2. **checks, e2e, desktop** — everything, against that tag: the fast tier and the api server's
 #      suites, the full Playwright run (`e2e.yml`), and the desktop app on all three systems.
 #   3. **publish** — a pre-release with every installer and the nightly update files
 #      (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`), and only if every one is there.

@@ -18,7 +18,7 @@ import { openSettings, openSidebar } from "./sidebar";
  * **The second device is a second app home.** Linking adopts the remote's id, so a download into
  * another vault of the same app server would rekey it to an id already open there and be refused.
  *
- * **The sync server is this spec's own**: PGlite in a temp folder on a free port, with the account and
+ * **The api server is this spec's own**: PGlite in a temp folder on a free port, with the account and
  * both pairing codes made through its admin CLI *before* it starts (PGlite is opened by one process
  * at a time). Everything lives in one temp folder, which is the only thing removed afterwards.
  *
@@ -32,7 +32,7 @@ const run = promisify(execFile);
 const HOME = fs.realpathSync(BOARDS);
 const PASS = "correct horse battery";
 const ROOT = process.cwd();
-const SYNC_BIN = path.join(ROOT, "sync", "dist", "anydag-sync.mjs");
+const SYNC_BIN = path.join(ROOT, "api", "dist", "anydag-api.mjs");
 
 let tmp = "";
 let server: ChildProcess | null = null;
@@ -54,7 +54,7 @@ const freePort = (): Promise<number> =>
 test.beforeAll(async () => {
   test.setTimeout(120_000);
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-e2e-sync-"));
-  await run("node", [path.join(ROOT, "sync", "build.mjs")], { cwd: ROOT });
+  await run("node", [path.join(ROOT, "api", "build.mjs")], { cwd: ROOT });
   const port = await freePort();
   url = `http://127.0.0.1:${port}`;
   const env = {
@@ -77,7 +77,7 @@ test.beforeAll(async () => {
     } catch {
       /* Not listening yet. */
     }
-    if (Date.now() > end) throw new Error("the sync server did not start");
+    if (Date.now() > end) throw new Error("the api server did not start");
     await new Promise((r) => setTimeout(r, 200));
   }
 });

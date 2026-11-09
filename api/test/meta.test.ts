@@ -1,5 +1,5 @@
 /**
- * `Meta`'s contract (sync/server/meta/types.ts), written once and run against both backends the
+ * `Meta`'s contract (api/server/meta/types.ts), written once and run against both backends the
  * port has: PGlite in this process, and — when `ANYDAG_SYNC_TEST_PG` holds a URL — the same suite
  * over `pgDb` against a real Postgres on a schema of its own. The suite seeds itself: every test
  * mints its own ids, because the Postgres run shares one schema, and so asserts only what it made.

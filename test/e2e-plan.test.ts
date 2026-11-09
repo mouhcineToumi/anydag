@@ -31,7 +31,7 @@ describe("kindOf", () => {
     ["vite.config.ts", "app"],
     ["scripts/dev.sh", "app"],
     ["some/path/nobody/has/heard/of.ts", "app"],
-    ["sync/server/app.ts", "sync"],
+    ["api/server/app.ts", "sync"],
     ["server/sync/engine.ts", "sync"],
     ["playwright.config.ts", "harness"],
     ["package-lock.json", "harness"],
@@ -67,7 +67,7 @@ describe("plan", () => {
   });
 
   it("adds the sync spec for the sync server", () => {
-    expect(plan(["sync/server/routes/logs.ts"]).grep).toBe("@smoke|sync\\.spec\\.ts");
+    expect(plan(["api/server/routes/logs.ts"]).grep).toBe("@smoke|sync\\.spec\\.ts");
   });
 
   it("runs the specs a change under e2e/ reaches, and only those, when nothing else changed", () => {

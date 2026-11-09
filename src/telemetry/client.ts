@@ -11,7 +11,7 @@
  *   at once otherwise, and the error listeners are added only on yes.
  * - **Never under `?snapshot=1` or `?view=1`**: a picture of a board, and a page somebody was handed
  *   to read, are not somebody using the app. `startTelemetry` does nothing there, and nothing asks.
- * - **A prop is one of `sync/protocol/logs.ts`'s words, a count or a duration** — the types say so,
+ * - **A prop is one of `api/protocol/logs.ts`'s words, a count or a duration** — the types say so,
  *   and `cleanEvent` runs here too, so a caller that passed anything else has it dropped before it
  *   is ever held.
  */
@@ -30,7 +30,7 @@ import {
   type EventName,
   type LogEvent,
   type Props,
-} from "../../sync/protocol/logs";
+} from "../../api/protocol/logs";
 
 export interface TelemetryStatus {
   consent: boolean | null;

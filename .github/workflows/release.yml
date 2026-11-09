@@ -6,7 +6,7 @@
 #      `hotfix/X.Y.Z`) of the same version. Any other pre-release word is refused.
 #   1. The tag must equal `VERSION` and `package.json` (`scripts/check-version.mjs`), so a release
 #      can never be built from a tree that says another number.
-#   2. Everything runs, once: the fast tier and the sync server's suites (`checks.yml`), the full
+#   2. Everything runs, once: the fast tier and the api server's suites (`checks.yml`), the full
 #      Playwright run (`e2e.yml`), and the desktop app packaged and opened on each system
 #      (`desktop-build.yml`) — an AppImage for x64 Linux, an NSIS installer for x64 Windows, a dmg and
 #      a zip each for arm64 and x64 macOS.

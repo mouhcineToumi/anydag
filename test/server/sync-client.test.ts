@@ -21,7 +21,7 @@ import { conflictName, freshCopy, isJson, isText, mergeContent } from "../../ser
 import { syncs } from "../../server/sync/scope";
 import { SyncState } from "../../server/sync/state";
 import { frontId } from "../../server/ids";
-import { randomKey } from "../../sync/protocol/crypto";
+import { randomKey } from "../../api/protocol/crypto";
 import { FakeServer } from "./sync-fake";
 import { tmpFs, TYPES, type TmpFs } from "./sync-tmpfs";
 

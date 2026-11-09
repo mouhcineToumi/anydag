@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DIAGRAM_TYPES } from "@/board/types";
 
-import { cleanBatch, cleanEvent, DIAGRAM_KINDS, EVENTS, localeOf, MAX_EVENTS, scrub } from "../sync/protocol/logs";
+import { cleanBatch, cleanEvent, DIAGRAM_KINDS, EVENTS, localeOf, MAX_EVENTS, scrub } from "../api/protocol/logs";
 
 /**
  * The log vocabulary is the promise "no sensitive data": every hop runs it, so these are the

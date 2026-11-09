@@ -1,5 +1,5 @@
 /**
- * `anydag-sync serve` — the server on a socket, and `openStore`, which
+ * `anydag-api serve` — the server on a socket, and `openStore`, which
  * the CLI shares: the database (Postgres, or PGlite in the data folder), migrated, and the blob
  * directory.
  *
@@ -125,7 +125,7 @@ export async function serve(config: Config = configFrom()): Promise<() => Promis
 
   const first = await bootstrap(store.meta, config, new Date());
   const server = listen({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
-    console.log(`anydag-sync ${VERSION}: ${config.mode} mode, listening on ${config.host}:${info.port}`);
+    console.log(`anydag-api ${VERSION}: ${config.mode} mode, listening on ${config.host}:${info.port}`);
     console.log(
       `  database: ${config.databaseUrl ? config.databaseUrl.replace(/\/\/[^@/]*@/, "//…@") : `PGlite in ${path.join(config.data, "pg")}`}`,
     );
@@ -140,9 +140,9 @@ export async function serve(config: Config = configFrom()): Promise<() => Promis
   const gc = async () => {
     try {
       const r = await collect(store.meta, store.blobs, { historyDays: config.historyDays, now: new Date(), ageOf });
-      console.log(`anydag-sync: collected — ${r.compacted} log rows compacted, ${r.blobs} blobs (${r.bytes} bytes) removed`);
+      console.log(`anydag-api: collected — ${r.compacted} log rows compacted, ${r.blobs} blobs (${r.bytes} bytes) removed`);
     } catch (e) {
-      console.error(`anydag-sync: the collector failed: ${(e as Error).message}`);
+      console.error(`anydag-api: the collector failed: ${(e as Error).message}`);
     }
   };
   void gc();
@@ -161,7 +161,7 @@ export async function serve(config: Config = configFrom()): Promise<() => Promis
     void close().then(
       () => process.exit(0),
       (e) => {
-        console.error(`anydag-sync: closing failed: ${(e as Error).message}`);
+        console.error(`anydag-api: closing failed: ${(e as Error).message}`);
         process.exit(1);
       },
     );

@@ -1,4 +1,4 @@
--- anydag-sync's first schema. Applied by `PgMeta.migrate()` under an
+-- anydag-api's first schema. Applied by `PgMeta.migrate()` under an
 -- advisory lock and recorded in `schema_migrations`. Never edit an applied migration: add 002.
 
 create table plans (

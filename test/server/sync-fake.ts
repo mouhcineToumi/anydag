@@ -28,8 +28,8 @@ import type {
   StaleKey,
   VaultKey,
   VaultsResponse,
-} from "../../sync/protocol/wire";
-import { MAX_CHANGES, MAX_PAGE, PROTOCOL, STATUS } from "../../sync/protocol/wire";
+} from "../../api/protocol/wire";
+import { MAX_CHANGES, MAX_PAGE, PROTOCOL, STATUS } from "../../api/protocol/wire";
 import { SyncError, type SyncApi } from "../../server/sync/client";
 
 const fail = (code: ErrorCode, message: string, extra: Partial<ErrorBody> = {}): never => {

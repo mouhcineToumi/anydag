@@ -1,4 +1,4 @@
-# The fast tier, and — for a release or a nightly — the sync server's own tests.
+# The fast tier, and — for a release or a nightly — the api server's own tests.
 #
 # One definition for `ci.yml`, `nightly.yml` and `release.yml`. The fast tier is `npm run checks`
 # (`scripts/checks.sh`: typecheck, lint, the `check:*` contracts, parity and the unit suite): no
@@ -22,7 +22,7 @@ on:
         type: string
         default: ""
       sync:
-        description: "Also run the sync server's convergence harness and its Postgres suites."
+        description: "Also run the api server's convergence harness and its Postgres suites."
         type: boolean
         default: false
 
@@ -90,21 +90,21 @@ jobs:
       - run: npm ci
       - run: npm run lint:promises
 
-  # The sync server is a separate process with its own wire and its own suites, and these are the
+  # The api server is a separate process with its own wire and its own suites, and these are the
   # slow ones: a hundred seeded schedules of two or three devices editing, renaming and going offline
-  # (`sync/test/converge.test.ts`), and the metadata, route and collector suites on a real Postgres.
+  # (`api/test/converge.test.ts`), and the metadata, route and collector suites on a real Postgres.
   sync:
-    name: sync server
+    name: api server
     if: inputs.sync
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
-      # `npm run sync:test:pg` reads this; the default is `sync/compose.yaml`'s port on a laptop.
+      # `npm run api:test:pg` reads this; the default is `api/compose.yaml`'s port on a laptop.
       ANYDAG_SYNC_TEST_PG: postgres://anydag:anydag@127.0.0.1:5432/anydag_sync
     services:
       postgres:
-        # The image `sync/compose.yaml` runs, with the same credentials.
+        # The image `api/compose.yaml` runs, with the same credentials.
         image: postgres:17-alpine
         env:
           POSTGRES_USER: anydag
@@ -127,6 +127,6 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Convergence (a hundred seeds)
-        run: npm run sync:converge
+        run: npm run api:converge
       - name: Meta, routes and the collector on Postgres
-        run: npm run sync:test:pg
+        run: npm run api:test:pg

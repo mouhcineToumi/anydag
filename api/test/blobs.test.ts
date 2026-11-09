@@ -1,5 +1,5 @@
 /**
- * The disk store of sealed bytes (`sync/server/blobs/disk.ts`, the `Blobs` port's one adapter): a
+ * The disk store of sealed bytes (`api/server/blobs/disk.ts`, the `Blobs` port's one adapter): a
  * put is whole-or-not-at-all and idempotent; nothing a bad id names is written, so a path segment
  * never escapes the root; a write in flight lives in `.tmp` beside its blob and never in a
  * listing; and two uploads of one id racing each other still leave one complete blob.

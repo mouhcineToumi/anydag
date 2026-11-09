@@ -19,8 +19,8 @@ import { Home } from "../../server/home";
 import { TUNE } from "../../server/sync/loop";
 import type { SyncDevices, SyncLinked, SyncPaired, SyncRemotes, SyncStatus } from "../../server/sync/types";
 import type { Change } from "../../server/vault";
-import { harness, type Harness } from "../../sync/test/helpers";
-import { mintPairCode } from "../../sync/server/routes/pair";
+import { harness, type Harness } from "../../api/test/helpers";
+import { mintPairCode } from "../../api/server/routes/pair";
 import { makeEnv, NOTE, readText, write, type Env } from "./helpers";
 
 const PASS = "correct horse battery";

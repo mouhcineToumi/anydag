@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# `npm run sync:demo` — sync working end to end on this machine, with no browser.
+# `npm run api:demo` — sync working end to end on this machine, with no browser.
 #
-# Builds the sync server, runs it on PGlite in a temp folder, makes an account and two pairing codes,
+# Builds the api server, runs it on PGlite in a temp folder, makes an account and two pairing codes,
 # then drives two vaults — each its own folder and its own app home, as two devices would be —
 # through the CLI in-process: A pairs and uploads (and prints the recovery code), B pairs and
 # downloads, an edit on A reaches B, and the same line edited on both becomes a conflict copy.
@@ -11,8 +11,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PORT="${ANYDAG_SYNC_DEMO_PORT:-8795}"
-ROOT="$(mktemp -d "${TMPDIR:-/tmp}/anydag-sync-demo.XXXXXX")"
-SYNC="node sync/dist/anydag-sync.mjs"
+ROOT="$(mktemp -d "${TMPDIR:-/tmp}/anydag-api-demo.XXXXXX")"
+SYNC="node api/dist/anydag-api.mjs"
 export ANYDAG_SYNC_DATA="$ROOT/server" ANYDAG_SYNC_PORT="$PORT" ANYDAG_SYNC_HOST=127.0.0.1
 export ANYDAG_SYNC_PUBLIC_URL="http://127.0.0.1:$PORT"
 URL="$ANYDAG_SYNC_PUBLIC_URL"
@@ -32,15 +32,15 @@ A() { ANYDAG_HOME="$ROOT/a/home" node cli/anydag.mjs --vault "$ROOT/a/vault" "$@
 B() { ANYDAG_HOME="$ROOT/b/home" node cli/anydag.mjs --vault "$ROOT/b/vault" "$@"; }
 code_of() { awk '/^code:/ { print $2 }'; }
 
-step "build the sync server"
-node sync/build.mjs >/dev/null
+step "build the api server"
+node api/build.mjs >/dev/null
 
 step "make an account and two pairing codes (the database is opened by one process at a time)"
 $SYNC account add demo
 CODE_A="$($SYNC pair demo | tee /dev/stderr | code_of)"
 CODE_B="$($SYNC pair demo | code_of)"
 
-step "start the sync server on $URL"
+step "start the api server on $URL"
 $SYNC serve >"$ROOT/server.log" 2>&1 &
 SERVER_PID=$!
 for _ in $(seq 1 80); do curl -fsS "$URL/v1/health" >/dev/null 2>&1 && break; sleep 0.25; done

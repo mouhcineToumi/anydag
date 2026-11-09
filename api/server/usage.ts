@@ -28,7 +28,7 @@ export class Usage {
     try {
       await this.meta.bump(dayOf(this.now()), account, vault, metric, n);
     } catch (e) {
-      console.error(`anydag-sync: could not count ${metric}: ${(e as Error).message}`);
+      console.error(`anydag-api: could not count ${metric}: ${(e as Error).message}`);
     }
   }
 }

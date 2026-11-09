@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * `anydag-sync` from a checkout — run the bundle, rebuilding it first when any source it was built
- * from is newer (`cli/anydag.mjs`'s launcher, for the sync server). The image runs the bundle
+ * `anydag-api` from a checkout — run the bundle, rebuilding it first when any source it was built
+ * from is newer (`cli/anydag.mjs`'s launcher, for the api server). The image runs the bundle
  * directly and never this file.
  *
  * Load-bearing:
@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const bundle = path.join(here, "dist", "anydag-sync.mjs");
+const bundle = path.join(here, "dist", "anydag-api.mjs");
 const meta = path.join(here, "dist", "meta.json");
 
 function stale() {
@@ -47,10 +47,10 @@ if (stale()) {
     await build();
   } catch (e) {
     if (!fs.existsSync(bundle)) {
-      console.error(`anydag-sync: could not build the server (${e?.message ?? e}) — run \`npm install\` in ${root}`);
+      console.error(`anydag-api: could not build the server (${e?.message ?? e}) — run \`npm install\` in ${root}`);
       process.exit(1);
     }
-    console.error(`anydag-sync: running the last build — rebuilding failed: ${e?.message ?? e}`);
+    console.error(`anydag-api: running the last build — rebuilding failed: ${e?.message ?? e}`);
   }
 }
 

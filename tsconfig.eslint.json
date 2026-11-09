@@ -14,7 +14,7 @@
     "plugins",
     "cli",
     "server",
-    "sync",
+    "api",
     "e2e",
     "desktop",
     "playwright.config.ts",

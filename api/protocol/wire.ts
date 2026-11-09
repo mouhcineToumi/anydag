@@ -1,5 +1,5 @@
 /**
- * The sync protocol's wire format: every request and answer `anydag-sync` (`sync/server/`) and the
+ * The sync protocol's wire format: every request and answer `anydag-api` (`api/server/`) and the
  * app's sync client (`server/sync/`) exchange. **Frozen**: a
  * change here is a change to both halves in one commit, and `PROTOCOL` moves with a change that an
  * older peer would misread.
@@ -311,7 +311,7 @@ export interface UsageRow {
   value: number;
 }
 
-// -- admin (the `anydag-sync` CLI against a running server; `Authorization: Bearer <admin token>`) --
+// -- admin (the `anydag-api` CLI against a running server; `Authorization: Bearer <admin token>`) --
 
 /** `GET /v1/admin/accounts` → `{ accounts }`; `POST` `{ name, plan? }` → `AdminAccount`. */
 export interface AdminAccount {
