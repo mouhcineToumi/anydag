@@ -18,7 +18,7 @@ import type { Context, Next } from "hono";
 import type { Session } from "../context";
 import { err } from "../http";
 import type { Harness, HarnessEvent, McpCommand, Running } from "./harness";
-import { isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
+import { guessed, isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
 import { installFsHooks, record, undo, type Op } from "./record";
 import { ChatStore, newId, validChatId } from "./store";
 import {
@@ -41,6 +41,12 @@ const APPROVAL_MS = 5 * 60_000;
 
 /** The longest tool answer a turn keeps: the model saw it all, the page needs the gist. */
 const OUTPUT_CAP = 4000;
+
+/** A tool call the model wrote into its reply instead of calling: `<invoke name=…>` / `<parameter name=…>`. */
+const WRITTEN_CALL = /<(?:invoke|parameter)\s+name=/;
+
+/** What the person sees when that happened. The raw text goes only to the server log. */
+const WRITTEN_CALL_ERROR = "The model wrote a tool call as text instead of calling it, and no tool ran. Nothing was changed.";
 
 /** The writes a chat may make at all. Anything else non-GET is refused, whatever the mode. */
 const WRITES = new Set([
@@ -101,6 +107,8 @@ interface Live {
   waiting: Map<string, Waiting>;
   /** Provider session this turn runs in. */
   session: string | null;
+  /** Set when the turn must fail whatever the harness says: a tool call written into the reply. */
+  broken?: string;
 }
 
 export interface AssistantOptions {
@@ -362,7 +370,16 @@ export class Assistant {
   private mcpFor(chat: string, mode: Mode): McpCommand {
     const origin = { port: this.port, token: this.opts.token };
     if (this.opts.mcp) return this.opts.mcp(chat, mode, origin);
-    const env = { ANYDAG_CHAT_PORT: String(this.port), ANYDAG_TOKEN: this.opts.token, ANYDAG_HOME: this.s.home.dir };
+    const env: Record<string, string> = {
+      ANYDAG_CHAT_PORT: String(this.port),
+      ANYDAG_TOKEN: this.opts.token,
+      ANYDAG_HOME: this.s.home.dir,
+    };
+    /* The desktop app runs this server as Electron-as-Node, so `process.execPath` is Electron. The
+       MCP child is the same binary running `mcp --chat`; without the switch it starts as an Electron
+       app, fails to open a window (its env has no display) and dies before it speaks MCP. */
+    const electron = process.env.ELECTRON_RUN_AS_NODE;
+    if (electron) env.ELECTRON_RUN_AS_NODE = electron;
     const bin = process.env.ANYDAG_CHAT_MCP_BIN;
     if (bin) return { command: bin, args: ["mcp", "--chat", chat, "--mode", mode], env };
     return {
@@ -379,6 +396,26 @@ export class Assistant {
     return index;
   }
 
+  /**
+   * The reply text, unless the model wrote a tool call into it. A turn with no tool step yet that
+   * says `<invoke name=…>` or `<parameter name=…>` has guessed the protocol: the text is the server's
+   * log's, never the person's answer, and the turn fails.
+   */
+  private said(live: Live, text: string): void {
+    if (live.turn.steps.some((s) => s.kind === "tool")) {
+      if (text.trim()) this.push(live, { kind: "text", text });
+      return;
+    }
+    if (WRITTEN_CALL.test(text)) {
+      live.broken ??= WRITTEN_CALL_ERROR;
+      console.error(`anydag: chat ${live.turn.chat}: the model wrote a tool call as text; no tool ran:\n${text}`);
+      if (!live.turn.steps.some((s) => s.kind === "error" && s.text === WRITTEN_CALL_ERROR))
+        this.push(live, { kind: "error", text: WRITTEN_CALL_ERROR });
+      return;
+    }
+    if (text.trim()) this.push(live, { kind: "text", text });
+  }
+
   private heard(live: Live, e: HarnessEvent): void {
     const chat = live.turn.chat;
     switch (e.kind) {
@@ -388,7 +425,7 @@ export class Assistant {
         return;
       case "text":
         live.typing = "";
-        if (e.text.trim()) this.push(live, { kind: "text", text: e.text });
+        this.said(live, e.text);
         return;
       case "tool":
         live.typing = "";
@@ -418,24 +455,34 @@ export class Assistant {
       clearTimeout(w.timer);
       w.resolve(null);
     }
-    if (live.typing.trim()) live.turn.steps.push({ kind: "text", text: live.typing });
+    if (live.typing.trim()) this.said(live, live.typing);
     live.typing = "";
-    if (end.error && !live.stopping && !live.turn.steps.some((s) => s.kind === "error" && s.text === end.error))
-      live.turn.steps.push({ kind: "error", text: end.error });
-    live.turn.status = live.stopping ? "stopped" : end.error ? "failed" : "done";
+    const failure = live.broken ?? end.error;
+    if (failure && !live.stopping && !live.turn.steps.some((s) => s.kind === "error" && s.text === failure))
+      live.turn.steps.push({ kind: "error", text: failure });
+    live.turn.status = live.stopping ? "stopped" : failure ? "failed" : "done";
     live.turn.ended = new Date().toISOString();
     if (end.usage) live.turn.usage = end.usage;
     live.turn.blocks = live.turn.blocks.filter((b) => b.ops.length);
     try {
       this.store.writeTurn(live.root, live.turn);
-      if (live.session)
+    } catch (e) {
+      console.error(`anydag: chat ${live.turn.chat}: the turn could not be kept:`, e);
+    }
+    try {
+      /* A failed turn that ran no tool was the model guessing without them: it is not resumable,
+         and the session it ran in is dropped so the next turn starts fresh and seeds the transcript
+         instead. A turn that failed after a tool ran (an overloaded API, a dropped connection) did
+         change the vault, so its session is kept for the next turn to resume. */
+      if (guessed(live.turn)) this.store.setSession(live.turn.chat, live.turn.provider, null);
+      else if (live.session)
         this.store.setSession(live.turn.chat, live.turn.provider, {
           id: live.session,
           model: live.turn.model,
           turn: live.turn.id,
         });
     } catch (e) {
-      console.error(`anydag: chat ${live.turn.chat}: the turn could not be kept:`, e);
+      console.error(`anydag: chat ${live.turn.chat}: the provider session could not be kept:`, e);
     }
     this.live.delete(live.turn.chat);
     fs.rmSync(scratch, { recursive: true, force: true });

@@ -81,6 +81,8 @@ export interface ClaudeState {
   tools: Set<string>;
   /** Set by the closing `result` line. */
   end?: RunEnd;
+  /** Set by `system/init` when the chat's MCP server is not usable: no turn can succeed. */
+  failed?: string;
 }
 
 export const newClaudeState = (): ClaudeState => ({ tools: new Set() });
@@ -118,6 +120,28 @@ function endOf(d: Obj): RunEnd {
   return { usage, error: said || `Claude Code failed (${String(d.subtype ?? "error")})` };
 }
 
+/**
+ * Why `system/init` says this turn cannot reach the vault: the `anydag` MCP server is missing,
+ * failed, or listed no `mcp__anydag__*` tool. `undefined` when it is usable.
+ *
+ * The line is Claude Code's own account of what it was handed before it thought: a server that is
+ * not `connected`, or a tool list without ours, means the model can only guess the tool names — which
+ * is the turn that wrote `<invoke name=…>` as text and made no document.
+ */
+function initFailure(d: Obj): string | undefined {
+  const servers = Array.isArray(d.mcp_servers) ? d.mcp_servers.map(obj).filter((s): s is Obj => s !== undefined) : [];
+  const anydag = servers.find((s) => s.name === "anydag");
+  if (!anydag) return "Claude Code started without the anydag MCP server, so the Assistant had no tools. Nothing was changed.";
+  if (anydag.status !== "connected") {
+    const status = typeof anydag.status === "string" && anydag.status ? anydag.status : "not connected";
+    return `The anydag MCP server did not connect (${status}), so the Assistant had no tools. Nothing was changed.`;
+  }
+  const tools = Array.isArray(d.tools) ? d.tools : [];
+  if (!tools.some((t) => typeof t === "string" && t.startsWith("mcp__anydag__")))
+    return "The anydag MCP server connected but listed no tools, so the Assistant could not act. Nothing was changed.";
+  return undefined;
+}
+
 /** One line of `--output-format stream-json`, as the events it means. A line that is not JSON is nothing. */
 export function parseClaudeLine(line: string, st: ClaudeState): HarnessEvent[] {
   let d: Obj | undefined;
@@ -128,8 +152,17 @@ export function parseClaudeLine(line: string, st: ClaudeState): HarnessEvent[] {
   }
   if (!d) return [];
   switch (d.type) {
-    case "system":
-      return d.subtype === "init" && typeof d.session_id === "string" ? [{ kind: "session", id: d.session_id }] : [];
+    case "system": {
+      if (d.subtype !== "init") return [];
+      const out: HarnessEvent[] = [];
+      if (typeof d.session_id === "string") out.push({ kind: "session", id: d.session_id });
+      const why = initFailure(d);
+      if (why) {
+        st.failed = why;
+        out.push({ kind: "error", text: why });
+      }
+      return out;
+    }
     case "stream_event": {
       const ev = obj(d.event);
       const delta = obj(ev?.delta);
@@ -198,7 +231,15 @@ export function claudeHarness(o: ClaudeOptions = {}): Harness {
     fs.writeFileSync(files.system, r.system);
     fs.writeFileSync(files.mcp, JSON.stringify(claudeMcpConfig(r.mcp)));
 
-    const env = { ...claudeEnv(baseEnv()), MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS) } as NodeJS.ProcessEnv;
+    /* `MCP_CONNECTION_NONBLOCKING=0` makes Claude Code connect the chat's MCP server before it says
+       `system/init`. Left on (its default), init can arrive while `anydag` is still `pending` — the
+       desktop app's Electron-as-Node child is slow to start — and the init check below would fail a
+       turn whose tools were about to be there. */
+    const env = {
+      ...claudeEnv(baseEnv()),
+      MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS),
+      MCP_CONNECTION_NONBLOCKING: "0",
+    } as NodeJS.ProcessEnv;
     const found = findClaude(env);
     const bin = o.bin ?? (found.ok ? found.bin : "claude");
     const st = newClaudeState();
@@ -217,7 +258,11 @@ export function claudeHarness(o: ClaudeOptions = {}): Harness {
         resolve(end);
       };
       const reader = lines((line) => {
+        /* An init line that says the MCP server is not usable ends the turn here: nothing the model
+           says afterwards may reach the page, because it has no tools and can only guess. */
+        if (st.failed) return;
         for (const e of parseClaudeLine(line, st)) on(e);
+        if (st.failed) killer = terminate(child);
       });
       child.stdout?.on("data", (b: Buffer | string) => reader.push(b));
       child.stderr?.on("data", (b: Buffer | string) => (stderr += b.toString()));
@@ -227,6 +272,7 @@ export function claudeHarness(o: ClaudeOptions = {}): Harness {
       });
       child.on("close", (code) => {
         reader.flush();
+        if (st.failed) return settle({ usage: st.end?.usage, error: st.failed });
         if (st.end) return settle(st.end);
         /* Stopped on purpose: the person asked, so it is not a failure however the process ended. */
         if (stopped) return settle({});

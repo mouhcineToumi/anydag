@@ -69,11 +69,21 @@ function stepLine(s: Step): string | null {
 }
 
 /** The turns a fresh session has not seen, as one user message ahead of the new words. */
+/**
+ * A turn that failed before any tool ran: the model had no tools, or wrote a call as text, so what
+ * it said is a guess. Such a turn is neither seeded as an answer nor resumed.
+ */
+export const guessed = (t: Turn): boolean => t.status === "failed" && !t.steps.some((s) => s.kind === "tool");
+
 export function seeded(prior: readonly Turn[], text: string): string {
   if (!prior.length) return text;
   const out = ["This conversation started earlier, possibly with another model. Here it is so far:", ""];
   for (const t of prior) {
     out.push(`<person>\n${t.text}\n</person>`);
+    /* A failed turn that ran no tool is the model guessing without its tools, not an answer: its
+       words are kept in the chat for the person, and never seeded as something the Assistant said.
+       One that failed after a tool ran is seeded whole, so the next turn knows what it changed. */
+    if (guessed(t)) continue;
     const said = t.steps.map(stepLine).filter((l): l is string => !!l);
     if (said.length) out.push(`<assistant>\n${said.join("\n")}\n</assistant>`);
   }

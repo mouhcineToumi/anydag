@@ -243,20 +243,29 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
 
   const interrupt = (s: Serve, session: string) => api(s, "POST", `/api/session/${encodeURIComponent(session)}/interrupt`);
 
-  /** Wait until `anydag` shows as connected on `GET /api/mcp`, or give up quietly: the warm-up and the retry are the net. */
-  async function untilAttached(s: Serve): Promise<void> {
+  /**
+   * Wait until `anydag` shows as connected on `GET /api/mcp`, and answer why it did not. A serve whose
+   * MCP server failed or never attached can only give the model a shell with no vault tools — the
+   * turn that guessed tool names and wrote them as text — so `serveFor` fails the turn rather than
+   * sending it.
+   */
+  async function attachFailure(s: Serve): Promise<string | undefined> {
     const until = Date.now() + ATTACH_TIMEOUT_MS;
     while (Date.now() < until && s.child.exitCode === null) {
       try {
         const body = (await (await api(s, "GET", "/api/mcp")).json()) as {
-          data?: { name?: string; status?: { status?: string } }[];
+          data?: { name?: string; status?: { status?: string; error?: string } }[];
         };
-        if (body.data?.some((m) => m.name === "anydag" && m.status?.status === "connected")) return;
+        const anydag = body.data?.find((m) => m.name === "anydag");
+        if (anydag?.status?.status === "connected") return undefined;
+        if (anydag?.status?.status === "failed")
+          return `the anydag MCP server failed to start${anydag.status.error ? `: ${anydag.status.error}` : ""}`;
       } catch {
         /* not answering yet */
       }
       await sleep(200);
     }
+    return `the anydag MCP server did not attach in ${ATTACH_TIMEOUT_MS / 1000} s`;
   }
 
   /* ---- starting and stopping a serve ---- */
@@ -384,7 +393,13 @@ export function opencodeHarness(o: OpencodeOptions = {}): Harness {
       const s = await startServe(r, key);
       serves.set(r.chat, s);
       s.busy++;
-      await untilAttached(s);
+      const unattached = await attachFailure(s);
+      if (unattached) {
+        await stopServe(s);
+        throw new Error(
+          `OpenCode did not attach the anydag MCP server (${unattached}), so the Assistant had no tools. Nothing was changed.`,
+        );
+      }
       await warm(s, r);
       return s;
     });
