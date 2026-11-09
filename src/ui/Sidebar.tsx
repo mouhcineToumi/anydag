@@ -99,7 +99,7 @@ import {
 import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
-import { refuseLocked, useLocked } from "@/settings/lock";
+import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
 import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref } from "@/settings/prefs";
 
 /** Lucide at one size and weight, stated once — the dock's rule. */
@@ -1335,12 +1335,8 @@ export function Sidebar({
           aria-haspopup="menu"
           aria-expanded={making !== null}
           aria-label="New"
-          title={
-            locked
-              ? "Read only: unlock to make something"
-              : "New board, note, task, event, quiz, table or folder, or upload files"
-          }
-          aria-disabled={locked || undefined}
+          {...lockedAffordance(locked)}
+          title={locked ? LOCK_HINT : "New board, note, task, event, quiz, table or folder, or upload files"}
           onClick={(e) => {
             if (locked) return void refuseLocked();
             const r = e.currentTarget.getBoundingClientRect();
@@ -1354,8 +1350,9 @@ export function Sidebar({
           className="dag-sidebar__tool dag-sidebar__tool--shown"
           data-dag-sidebar-new-folder=""
           aria-label="New folder"
-          title="New folder at the top level"
-          onClick={() => files.newFolder("")}
+          {...lockedAffordance(locked)}
+          title={locked ? LOCK_HINT : "New folder at the top level"}
+          onClick={() => (locked ? refuseLocked() : files.newFolder(""))}
         >
           <FolderPlus {...SMALL} aria-hidden="true" />
         </button>

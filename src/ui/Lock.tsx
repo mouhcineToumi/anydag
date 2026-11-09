@@ -1,7 +1,17 @@
 import { Lock, LockOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { LOCK_CHANGED, LOCK_KEYS, LOCK_REFUSED, isLocked, setLocked, toggleLock, useLocked } from "@/settings/lock";
+import {
+  LOCK_CHANGED,
+  LOCK_KEYS,
+  LOCK_REFUSED,
+  type LockSaid,
+  isLocked,
+  lockNoticeText,
+  setLocked,
+  toggleLock,
+  useLocked,
+} from "@/settings/lock";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 
@@ -50,19 +60,32 @@ const NOTICE_MS = 2600;
  *
  * A press on a locked page that did nothing and said nothing would read as a broken page, which is
  * the one thing a read-only mode must not look like. So every place that refuses a write calls
- * `refuseLocked()`, and this is where that is heard. `role="status"`, so a screen reader hears it too,
- * and never the focus: it is told, not asked.
+ * `refuseLocked()`, and this is where that is heard. **A refusal stays up for as long as the app is
+ * locked**, rather than flashing for 2.6 s and leaving the page looking broken: the person can read
+ * it, reach the Unlock on it, and connect it to the pill. The one line that leaves on a timer is the
+ * word that unlocking worked, and its timer holds while the pointer or the focus is on the notice,
+ * so the button cannot vanish under a click. `role="status"`, so a screen reader hears it too, and
+ * never the focus: it is told, not asked.
  */
 export function LockNotice() {
   const locked = useLocked();
-  const [said, setSaid] = useState<"locked" | "unlocked" | "refused" | null>(null);
+  const [said, setSaid] = useState<LockSaid | null>(() => (isLocked() ? "locked" : null));
   const timer = useRef<number | undefined>(undefined);
+  /** A pointer or a focus on the notice holds the one line that would otherwise leave. */
+  const held = useRef(false);
 
   useEffect(() => {
-    const say = (what: "locked" | "unlocked" | "refused") => {
-      setSaid(what);
-      window.clearTimeout(timer.current);
+    const stop = () => window.clearTimeout(timer.current);
+    const leave = () => {
+      stop();
       timer.current = window.setTimeout(() => setSaid(null), NOTICE_MS);
+    };
+    const say = (what: LockSaid) => {
+      setSaid(what);
+      stop();
+      /* *Locked* and *refused* stay while the app is locked; only *unlocked* is a message that
+         has said its piece and may go. */
+      if (what === "unlocked" && !held.current) leave();
     };
     const onChange = () => say(isLocked() ? "locked" : "unlocked");
     const onRefused = () => say("refused");
@@ -71,21 +94,35 @@ export function LockNotice() {
     return () => {
       removeEventListener(LOCK_CHANGED, onChange);
       removeEventListener(LOCK_REFUSED, onRefused);
-      window.clearTimeout(timer.current);
+      stop();
     };
   }, []);
 
   if (!said) return null;
-  const text =
-    said === "unlocked"
-      ? "Unlocked: you can edit again."
-      : said === "locked"
-        ? "Read only: nothing here changes until you unlock."
-        : "Read only: unlock to change this.";
+  const hold = () => {
+    held.current = true;
+    window.clearTimeout(timer.current);
+  };
+  const release = () => {
+    held.current = false;
+    if (said !== "unlocked") return;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setSaid(null), NOTICE_MS);
+  };
   return (
-    <div className="dag-readonly-notice" data-dag-readonly-notice={said} role="status">
+    <div
+      className="dag-readonly-notice"
+      data-dag-readonly-notice={said}
+      role="status"
+      onPointerEnter={hold}
+      onPointerLeave={release}
+      onFocus={hold}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) release();
+      }}
+    >
       {said === "unlocked" ? <LockOpen {...ICON} /> : <Lock {...ICON} />}
-      <span>{text}</span>
+      <span>{lockNoticeText(said)}</span>
       {locked ? (
         <button
           type="button"

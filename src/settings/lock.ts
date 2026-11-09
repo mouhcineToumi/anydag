@@ -34,6 +34,36 @@ export const LOCK_REFUSED = "dag:lock-refused";
     note editor's inline code, so it is L, for lock. */
 export const LOCK_KEYS = "Ctrl+Shift+L";
 
+/** What a control that writes says while the app is locked, before it is pressed and on hover. */
+export const LOCK_HINT = `Read only — unlock (${LOCK_KEYS})`;
+
+/** What the lock's notice has to say: the switch, a refusal, or the word that unlocking worked. */
+export type LockSaid = "locked" | "unlocked" | "refused";
+
+export function lockNoticeText(said: LockSaid): string {
+  switch (said) {
+    case "unlocked":
+      return "Unlocked: you can edit again.";
+    case "locked":
+      return "Read only: nothing here changes until you unlock.";
+    case "refused":
+      return "Read only: unlock to change this.";
+  }
+}
+
+/**
+ * What a control that writes wears while the app is locked: `aria-disabled`, the class hook the
+ * chrome styles, and the one sentence a hover explains it with. Spreading nothing when unlocked is
+ * deliberate — a control that writes should not carry a lock's attributes all the time.
+ */
+export function lockedAffordance(locked: boolean): {
+  "aria-disabled"?: true;
+  "data-dag-readonly-blocked"?: "";
+  title?: string;
+} {
+  return locked ? { "aria-disabled": true, "data-dag-readonly-blocked": "", title: LOCK_HINT } : {};
+}
+
 export function isLocked(): boolean {
   return readPref(LOCKED) === "1";
 }

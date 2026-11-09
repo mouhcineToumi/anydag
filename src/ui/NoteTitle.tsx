@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type 
 
 import { UNTITLED } from "@/board/useBoard";
 import { cleanTitle, TITLE_MAX } from "@/note/format";
+import { LOCK_HINT } from "@/settings/lock";
 
 /**
  * A note's title, at the top of its page, Notion's page title.
@@ -44,6 +45,7 @@ const shownOf = (title: string | undefined): string => (title === undefined || t
 export function NoteTitle({
   title,
   editable,
+  locked = false,
   field,
   onCommit,
   onNext,
@@ -51,6 +53,8 @@ export function NoteTitle({
   /** The title the file has, as the page last read it. */
   title: string | undefined;
   editable: boolean;
+  /** The app is read-only: the field says so on hover, in the same words as every other write. */
+  locked?: boolean;
   field?: MutableRefObject<HTMLTextAreaElement | null>;
   /** Write it. Resolves to whether it was written; the field goes back to the file's title when not. */
   onCommit(title: string): Promise<boolean>;
@@ -126,6 +130,9 @@ export function NoteTitle({
       className="dag-note-title"
       data-dag-note-title=""
       aria-label="Title"
+      aria-disabled={locked || undefined}
+      title={locked ? LOCK_HINT : undefined}
+      data-dag-readonly-blocked={locked ? "" : undefined}
       placeholder={UNTITLED}
       rows={1}
       maxLength={TITLE_MAX}

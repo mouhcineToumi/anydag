@@ -12,6 +12,7 @@ import {
 import { createNote, setTask, type BoardTree } from "@/board/useBoard";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskChange, type TaskStatus } from "@/note/task";
+import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
 import { startDrag } from "./pointerDrag";
 import { ProjectChip } from "./ProjectBar";
@@ -235,7 +236,7 @@ export function TasksView({
         </p>
       ) : null}
       {layout === "board" ? (
-        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} />
+        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} locked={locked} />
       ) : (
         <div className="dag-tasks__groups">
           {LIST_ORDER.map((status) => (
@@ -247,6 +248,7 @@ export function TasksView({
               onChange={locked ? undefined : onChange}
               chip={chip}
               into={into}
+              locked={locked}
             />
           ))}
         </div>
@@ -263,6 +265,7 @@ function Group({
   onChange,
   chip,
   into,
+  locked = false,
 }: {
   status: TaskStatus;
   rows: Row[];
@@ -271,6 +274,7 @@ function Group({
   onChange?(row: Row, next: TaskChange): void;
   chip(row: Row): Row["project"];
   into: string;
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(status !== "done");
   return (
@@ -305,7 +309,7 @@ function Group({
               </span>
             </div>
           ))}
-          {onChange ? <QuickAdd status={status} into={into} /> : null}
+          {onChange || locked ? <QuickAdd status={status} into={into} locked={locked} /> : null}
         </div>
       ) : null}
     </section>
@@ -317,10 +321,11 @@ function Group({
  * status, at the top level — or in the folder of the project the page is showing. The page
  * stays where it is — typing five tasks in a row is the point.
  */
-function QuickAdd({ status, into }: { status: TaskStatus; into: string }) {
+function QuickAdd({ status, into, locked = false }: { status: TaskStatus; into: string; locked?: boolean }) {
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const make = async () => {
+    if (locked) return void refuseLocked();
     const t = title.trim();
     if (!t || busy) return;
     setBusy(true);
@@ -330,12 +335,14 @@ function QuickAdd({ status, into }: { status: TaskStatus; into: string }) {
     if (made) setTitle("");
   };
   return (
-    <div className="dag-tasks__add">
+    <div className="dag-tasks__add" data-dag-readonly-blocked={locked ? "" : undefined}>
       <Plus size={14} strokeWidth={2} aria-hidden="true" />
       <input
         type="text"
         placeholder="New task"
         aria-label={`New task in ${STATUS_LABEL[status]}`}
+        aria-disabled={locked || undefined}
+        title={locked ? LOCK_HINT : undefined}
         value={title}
         disabled={busy}
         data-dag-task-add={status}
@@ -364,6 +371,7 @@ function Columns({
   onChange,
   chip,
   into,
+  locked = false,
 }: {
   by(status: TaskStatus): Row[];
   onOpen(name: string): void;
@@ -371,6 +379,7 @@ function Columns({
   onChange?(row: Row, next: TaskChange): void;
   chip(row: Row): Row["project"];
   into: string;
+  locked?: boolean;
 }) {
   const board = useRef<HTMLDivElement>(null);
 
@@ -451,7 +460,7 @@ function Columns({
                   ) : null}
                 </div>
               ))}
-              {onChange ? <QuickAdd status={status} into={into} /> : null}
+              {onChange || locked ? <QuickAdd status={status} into={into} locked={locked} /> : null}
             </div>
           </section>
         );

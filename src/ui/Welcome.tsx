@@ -1,7 +1,8 @@
-import { FilePlus2, FileText, FolderOpen, FolderPlus, LibraryBig, NotebookPen, Search, Sparkles } from "lucide-react";
+import { FilePlus2, FileText, FolderOpen, FolderPlus, LibraryBig, LockOpen, NotebookPen, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { chordFor } from "@/edit/bindings";
+import { lockedAffordance, refuseLocked, setLocked } from "@/settings/lock";
 
 import { Logo } from "./Logo";
 import { CreateVaultForm, OpenFolderForm, RecentVaults, pickFolder, enterPath } from "./Vaults";
@@ -30,22 +31,67 @@ const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  *
  * The canvas underneath stays live — `pointer-events` is off on the layer and back on for the card
  * — so the paper can still be panned and zoomed behind it. It is an invitation, not a gate.
+ *
+ * **Locked, the card says so instead of offering two buttons that cannot write.** The read-only
+ * state is a sentence, *New board* and *New note* wear the lock's disabled style and the hover that
+ * names the chord, and **Unlock** stands in the acts where a working card would start something.
+ * `locked` is a prop rather than a hook so the card is one thing to render and to check; `App` owns
+ * the state.
  */
-export function Welcome({ onCreate, onWrite, onOpen }: { onCreate(): void; onWrite?(): void; onOpen(): void }) {
+export function Welcome({
+  locked = false,
+  onCreate,
+  onWrite,
+  onOpen,
+}: {
+  /** The app is read-only: say so, unlock in place, and leave the writes visibly unavailable. */
+  locked?: boolean;
+  onCreate(): void;
+  onWrite?(): void;
+  onOpen(): void;
+}) {
   const open = chordFor("boards");
+  const blocked = lockedAffordance(locked);
   return (
     <div className="dag-welcome__layer" data-dag-welcome="">
       <section className="dag-welcome" aria-label="No board open">
         <Logo size={28} />
         <h1 className="dag-welcome__title">Nothing open</h1>
-        <p className="dag-welcome__hint">Start something new, or open something you have already made.</p>
+        <p className="dag-welcome__hint" data-dag-welcome-locked={locked ? "" : undefined}>
+          {locked
+            ? "Read only: nothing here can be changed until you unlock."
+            : "Start something new, or open something you have already made."}
+        </p>
         <div className="dag-welcome__acts">
-          <button type="button" className="dag-welcome__act dag-welcome__act--go" data-dag-welcome-new="" onClick={onCreate}>
+          {locked ? (
+            <button
+              type="button"
+              className="dag-welcome__act dag-welcome__act--go"
+              data-dag-welcome-unlock=""
+              onClick={() => setLocked(false)}
+            >
+              <LockOpen {...ICON} aria-hidden="true" />
+              <span>Unlock</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="dag-welcome__act dag-welcome__act--go"
+            data-dag-welcome-new=""
+            {...blocked}
+            onClick={() => (locked ? refuseLocked() : onCreate())}
+          >
             <FilePlus2 {...ICON} aria-hidden="true" />
             <span>New board</span>
           </button>
           {onWrite ? (
-            <button type="button" className="dag-welcome__act" data-dag-welcome-note="" onClick={onWrite}>
+            <button
+              type="button"
+              className="dag-welcome__act"
+              data-dag-welcome-note=""
+              {...blocked}
+              onClick={() => (locked ? refuseLocked() : onWrite())}
+            >
               <NotebookPen {...ICON} aria-hidden="true" />
               <span>New note</span>
             </button>
@@ -77,9 +123,24 @@ export function Welcome({ onCreate, onWrite, onOpen }: { onCreate(): void; onWri
  *
  * `Welcome`'s layer: `pointer-events` off, and back on for the card, so a double-click on the paper
  * around it still makes a note — the gesture the first button names.
+ *
+ * Locked, the card stays where it was and says why nothing can land on the board, with Unlock in
+ * place. Hiding it left a locked empty board with no explanation at all, which is the same broken
+ * page the lock exists to prevent.
  */
-export function EmptyBoard({ onNote, onLibrary, onPrompt }: { onNote(): void; onLibrary(): void; onPrompt(): void }) {
+export function EmptyBoard({
+  locked = false,
+  onNote,
+  onLibrary,
+  onPrompt,
+}: {
+  locked?: boolean;
+  onNote(): void;
+  onLibrary(): void;
+  onPrompt(): void;
+}) {
   const chord = (c: "note" | "library" | "prompt") => chordFor(c);
+  const blocked = lockedAffordance(locked);
   const acts: { key: string; label: string; hint: string; icon: typeof FileText; go(): void; lead?: boolean }[] = [
     { key: "note", label: "A note", hint: chord("note") ?? "Space N", icon: FileText, go: onNote },
     { key: "library", label: "The library", hint: chord("library") ?? "Space L", icon: LibraryBig, go: onLibrary },
@@ -88,8 +149,23 @@ export function EmptyBoard({ onNote, onLibrary, onPrompt }: { onNote(): void; on
   return (
     <div className="dag-welcome__layer" data-dag-empty-board="">
       <section className="dag-welcome dag-welcome--empty" aria-label="An empty board">
-        <p className="dag-welcome__hint">An empty board. Double-click anywhere for a note, or start with</p>
+        <p className="dag-welcome__hint">
+          {locked
+            ? "Read only: unlock to add a note, open the library, or describe a diagram."
+            : "An empty board. Double-click anywhere for a note, or start with"}
+        </p>
         <div className="dag-welcome__acts">
+          {locked ? (
+            <button
+              type="button"
+              className="dag-welcome__act dag-welcome__act--go"
+              data-dag-empty-board-unlock=""
+              onClick={() => setLocked(false)}
+            >
+              <LockOpen {...ICON} aria-hidden="true" />
+              <span>Unlock</span>
+            </button>
+          ) : null}
           {acts.map(({ key, label, hint, icon: Icon, go, lead }) => (
             <button
               key={key}
@@ -98,7 +174,8 @@ export function EmptyBoard({ onNote, onLibrary, onPrompt }: { onNote(): void; on
                 lead ? "dag-welcome__act dag-welcome__act--tile dag-welcome__act--go" : "dag-welcome__act dag-welcome__act--tile"
               }
               data-dag-empty-board-act={key}
-              onClick={go}
+              {...blocked}
+              onClick={() => (locked ? refuseLocked() : go())}
             >
               <Icon {...ICON} aria-hidden="true" />
               <span>{label}</span>

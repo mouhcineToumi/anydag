@@ -3876,6 +3876,22 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   cursor: pointer;
 }
 .dag-readonly-notice__unlock:hover { background: var(--dag-color-paper200); }
+/* A control that writes while the app is locked. It keeps its press — which the notice answers, so
+   the page is never silently dead — but reads as unavailable before one, and its `title` names the
+   word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control
+   that moves under the pointer is one more thing that looks broken. */
+[data-dag-readonly-blocked] { opacity: 0.55; cursor: not-allowed; }
+[data-dag-readonly-blocked]:focus-visible { outline: 2px solid var(--dag-color-muted); outline-offset: 2px; }
+.dag-calendar__new-locked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+}
+.dag-calendar__new-locked > svg { flex: none; color: var(--dag-color-accent); }
+.dag-calendar__new-locked > button { margin-left: auto; }
 /* What only means something to an editor goes while locked: the hand that offers to move an item,
    and the hover that offers to drag a sidebar row. Selecting and panning stay. */
 html[data-dag-locked] .dag-item[data-dag-movable] { cursor: default; }
