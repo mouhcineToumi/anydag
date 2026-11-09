@@ -42,9 +42,10 @@ the file for that area, not to a new place.
 | [`diagnostics.md`](diagnostics.md) | Diagnostic codes and how they are earned; where a person reads what is wrong with a board. |
 | [`server.md`](server.md) | The one Node process, the token and `Host` gate, the store, and several vaults in one server. |
 | [`desktop.md`](desktop.md) | The Electron shell: the server child, the scheme, the token, signing, and the shim. |
-| [`sync.md`](sync.md) | The end-to-end-encrypted sync server and the app's client; the convergence harness. |
+| [`sync.md`](sync.md) | The end-to-end-encrypted sync client and its server half (`api/`), and the convergence harness. |
 | [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code or OpenCode. |
 | [`logs.md`](logs.md) | Opt-in anonymous logs: what a batch may hold and every hop that cleans it. |
+| [`api.md`](api.md) | The api server: its features, config, what it stores and never stores, and running and deploying it. |
 | [`gate-and-releases.md`](gate-and-releases.md) | Versions, how a release is cut, and what `npm run gate`, `checks` and CI run. |
 
 ## Find a section by name
@@ -95,6 +96,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Settings | [`settings.md`](settings.md) |
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Sync | [`sync.md`](sync.md) |
+| The api server | [`api.md`](api.md) |
 | Tables | [`tables.md`](tables.md) |
 | Tasks | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Text emphasis | [`editing.md`](editing.md) |

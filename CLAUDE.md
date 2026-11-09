@@ -67,12 +67,13 @@ the app's home).
 | `src/blocks/` | BlockNote configured once, loaded lazily | which file it writes |
 | `src/view/` | drawing read-only: `?view=1`, snapshots, embeds | `src/edit/`, BlockNote (`test/view-graph.test.ts` holds it) |
 | `src/refs/` · `src/calendar/` · `src/vault/` | what a reference is · what the calendar shows · which vault this tab is in | names (a reference is an id) · the DOM · the disk |
-| `src/search/` · `src/telemetry/` · `src/assistant/` · `src/sync/` | the page's half of search, logs, the Assistant, sync status | what a log may hold (`sync/protocol/logs.ts` decides) · the harness · the server's storage |
+| `src/search/` · `src/telemetry/` · `src/assistant/` · `src/sync/` | the page's half of search, logs, the Assistant, sync status | what a log may hold (`api/protocol/logs.ts` decides) · the harness · the server's storage |
 | `icons/` | the brand vocabulary and its provenance | anything about diagrams |
 | `cli/` | `anydag`: arguments, finding the server, commands as op lists | the disk: every read and write is a route |
 | `server/` | the local server: token and `Host` gate, vault store, home and SQLite index, routes, MCP tools, `chat/`, `sync/` | React, the DOM |
 | `desktop/` | the Electron shell: server child, `anydag://`, windows, dialogs, updates | the vault's format |
-| `sync/` | the self-hostable sync server and the wire/crypto protocol shared with the client | a path, a byte of plaintext |
+| `api/` | the api server: the self-hostable sync server and the wire/crypto protocol shared with the client, plus logs and the feedback relay | a path, a byte of plaintext |
+
 
 `src/edit/` splits along one line: **the gesture is in `useEditor.ts`, the meaning is in a file with
 no pointer in it** (`pick.ts`, `build.ts`, `drag.ts`, `connect.ts`, `snap.ts`, `history.ts`), which
@@ -141,7 +142,8 @@ One line each; the full account with the defect that found it is in
 | the `anydag` CLI, the MCP server, `docs/parity.json` | [`cli.md`](docs/architecture/cli.md) |
 | the local server, vaults, the token gate | [`server.md`](docs/architecture/server.md) |
 | the Electron shell, packaging, signing | [`desktop.md`](docs/architecture/desktop.md) |
-| sync (client or server) | [`sync.md`](docs/architecture/sync.md) |
+| the api server, its features, config and deployment | [`api.md`](docs/architecture/api.md), [`sync.md`](docs/architecture/sync.md) (the client half) |
+| sync (client) | [`sync.md`](docs/architecture/sync.md) |
 | the Assistant (chat) | [`assistant.md`](docs/architecture/assistant.md) |
 | anonymous logs | [`logs.md`](docs/architecture/logs.md) |
 | the gate, CI, releases | [`gate-and-releases.md`](docs/architecture/gate-and-releases.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), `docs/RELEASING.md` |
