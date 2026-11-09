@@ -311,32 +311,32 @@ test("an event made with a title shows it on its page, and editing starts from i
   await page.mouse.click(b.x + b.width / 2, b.y + b.height - 10);
 
   const card = page.locator("[data-dag-calendar-new]");
-  await card.locator("[data-dag-calendar-new-title]").fill("khansi nkfet");
+  await card.locator("[data-dag-calendar-new-title]").fill("team offsite");
   await card.locator("[data-dag-calendar-new-make]").click();
   await expect(card).toHaveCount(0);
 
   /* `/create` names the file after the title and keeps the title once, in the name: the page has to
      read it off the name. */
-  const created = path.join(dir, "khansi nkfet.md");
+  const created = path.join(dir, "team offsite.md");
   await expect.poll(() => (fs.existsSync(created) ? fs.readFileSync(created, "utf8") : "")).toContain("start: 2031-03-19");
   expect(fs.readFileSync(created, "utf8")).not.toMatch(/^title:/m);
 
-  const item = page.locator(`[data-dag-cal-item="${folder}/khansi nkfet"]`);
+  const item = page.locator(`[data-dag-cal-item="${folder}/team offsite"]`);
   await expect(item).toBeVisible({ timeout: 15_000 });
   await item.click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(`${folder}/khansi nkfet`);
+  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(`${folder}/team offsite`);
 
   const title = page.locator("[data-dag-note-title]");
-  await expect(title).toHaveValue("khansi nkfet");
-  await expect(page.locator(".dag-toolbar__title")).toHaveText("khansi nkfet");
+  await expect(title).toHaveValue("team offsite");
+  await expect(page.locator(".dag-toolbar__title")).toHaveText("team offsite");
 
   /* Editing starts from those words rather than from an empty *Untitled*, and the name follows. */
-  await title.fill("khansi nkfet lunch");
+  await title.fill("team offsite lunch");
   await title.press("Enter");
-  await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toBe(`${folder}/khansi nkfet lunch`);
-  await expect(page.locator(".dag-toolbar__title")).toHaveText("khansi nkfet lunch");
-  await expect(title).toHaveValue("khansi nkfet lunch");
-  await expect.poll(() => fs.existsSync(path.join(dir, "khansi nkfet lunch.md"))).toBe(true);
+  await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toBe(`${folder}/team offsite lunch`);
+  await expect(page.locator(".dag-toolbar__title")).toHaveText("team offsite lunch");
+  await expect(title).toHaveValue("team offsite lunch");
+  await expect.poll(() => fs.existsSync(path.join(dir, "team offsite lunch.md"))).toBe(true);
   expect(fs.existsSync(created)).toBe(false);
 });
 

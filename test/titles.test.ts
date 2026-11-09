@@ -48,8 +48,8 @@ describe("a document's title", () => {
  */
 describe("what a note's own page calls it", () => {
   it("falls back to the leaf of its name when the frontmatter names no title", () => {
-    expect(pageTitle("khansi nkfet", undefined)).toBe("khansi nkfet");
-    expect(pageTitle("work/khansi nkfet", undefined)).toBe("khansi nkfet");
+    expect(pageTitle("team offsite", undefined)).toBe("team offsite");
+    expect(pageTitle("work/team offsite", undefined)).toBe("team offsite");
   });
 
   it("still shows the placeholder for a file nobody has named", () => {
@@ -64,11 +64,11 @@ describe("what a note's own page calls it", () => {
   it("prefers the frontmatter, and an edit that starts from the name writes a title", () => {
     expect(pageTitle("file-name", "A real title")).toBe("A real title");
     /* What the field starts from on a file with no `title:` line, then what committing it writes. */
-    const start = pageTitle("khansi nkfet", splitNote("---\nid: 0000000000\n---\n").title);
-    expect(start).toBe("khansi nkfet");
+    const start = pageTitle("team offsite", splitNote("---\nid: 0000000000\n---\n").title);
+    expect(start).toBe("team offsite");
     const edited = withTitle("---\nid: 0000000000\n---\n", `${start} lunch`, "note");
-    expect(edited).toBe("---\ntitle: khansi nkfet lunch\nid: 0000000000\n---\n");
-    expect(titleOf(edited)).toBe("khansi nkfet lunch");
+    expect(edited).toBe("---\ntitle: team offsite lunch\nid: 0000000000\n---\n");
+    expect(titleOf(edited)).toBe("team offsite lunch");
   });
 });
 
