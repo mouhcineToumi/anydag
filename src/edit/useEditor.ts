@@ -128,6 +128,9 @@ const snap = (v: number, grid: number) => {
 };
 /** How wide a placed card is when nothing says (`noteCard`'s width), for spacing a row of them. */
 const PLACED_W = 360;
+/** The prompt card's box at the size it opens: its `w=` and the empty card's measured height. */
+const PROMPT_W = 420;
+const PROMPT_H = 174;
 
 /**
  * Move a set of items so their top-left corner lands at `at`, keeping the arrangement between them.
@@ -1358,12 +1361,16 @@ export function useEditor({
   const add = useCallback(
     (type: ItemType, at?: Point) => {
       const g = gridRef.current;
-      const p = at ?? viewport.current?.center() ?? { x: 0, y: 0 };
       const body = TEMPLATES[type] ?? "";
+      /* A prompt card is made from the chrome — `space P`, the dock's sparkle, Describe a diagram
+         on a new board — so there is no pointer to land under. Its centre goes on the middle of
+         the view, not its corner; the card is `PROMPT_W` × `PROMPT_H` at the size it opens at. */
+      const anchor = type === "prompt" ? viewport.current?.centerItem(PROMPT_W, PROMPT_H) : at;
+      const p = anchor ?? viewport.current?.center() ?? { x: 0, y: 0 };
       const attrs: Record<string, AttrValue> = { x: snap(p.x, g), y: snap(p.y, g) };
       if (type === "note") attrs.note = true;
       const kind: ItemType = type === "note" ? "md" : type;
-      if (type === "prompt") attrs.w = 420;
+      if (type === "prompt") attrs.w = PROMPT_W;
       void insert([{ type: kind, attrs, body }]).then((ids) => {
         /* This panel opening is the one a drop is allowed: `add` is only ever called
            with "md" and "prompt" — `N`, a double-click on the paper, and `P` — and the md case is
@@ -3394,7 +3401,7 @@ export function useEditor({
         case "note":
           return add("md", at());
         case "prompt":
-          return add("prompt", at());
+          return add("prompt");
         case "library":
           return onLibraryRef.current?.();
         case "links":

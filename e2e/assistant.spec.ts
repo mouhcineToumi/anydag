@@ -111,6 +111,27 @@ test("the sidebar's Assistant row opens the page, and a first message makes the 
   await expect(page.locator('[data-dag-chat-day="Today"]')).toBeVisible();
 });
 
+test("deleting a chat drops its row and lands on New chat", async ({ page }) => {
+  await page.goto("/?chat=new");
+  await say(page, "delete this chat", "ask");
+  const id = await chatId(page);
+  const row = page.locator(`[data-dag-chat-row="${id}"]`);
+  await expect(row).toBeVisible();
+
+  await page.locator("[data-dag-chat-delete]").click();
+  await page.locator("[data-dag-chat-delete-confirm]").click();
+
+  /* The row went with the chat — the list hears the delete's own event — and so did the page. */
+  await expect(row).toHaveCount(0);
+  await expect(page).toHaveURL(/chat=new/);
+  await expect(page.locator("[data-dag-chat-title]")).toHaveText("New chat");
+  await expect(page.locator("[data-dag-chat-missing]")).toHaveCount(0);
+
+  /* A reload finds it gone from the list too, not just from the page's state. */
+  await page.reload();
+  await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toHaveCount(0);
+});
+
 test("Edit makes a note and a block card; Undo takes it away and Redo brings it back", { tag: "@smoke" }, async ({ page }) => {
   const name = stem("make");
   await page.goto("/?chat=new");

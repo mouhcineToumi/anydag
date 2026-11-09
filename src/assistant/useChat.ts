@@ -20,6 +20,8 @@ export interface ChatState {
   loaded: boolean;
   /** The server says there is no such chat. */
   missing: boolean;
+  /** It was deleted while this page had it open, rather than never having existed. */
+  gone: boolean;
 }
 
 const EMPTY: ChatState = {
@@ -32,6 +34,7 @@ const EMPTY: ChatState = {
   device: "",
   loaded: false,
   missing: false,
+  gone: false,
 };
 
 type Act = { t: "reset" } | { t: "loaded"; read: ChatRead } | { t: "missing" } | { t: "event"; e: ChatEvent };
@@ -65,6 +68,7 @@ function reduce(s: ChatState, a: Act): ChatState {
         device: a.read.device,
         loaded: true,
         missing: false,
+        gone: false,
       };
     }
     case "event": {
@@ -97,6 +101,8 @@ function reduce(s: ChatState, a: Act): ChatState {
           };
         case "undo":
           return { ...s, undos: union(s.undos, [e.record]) };
+        case "gone":
+          return s.meta?.id === e.chat ? { ...EMPTY, loaded: true, missing: true, gone: true } : s;
       }
     }
   }
@@ -155,6 +161,12 @@ export function useChats(): { rows: ChatRow[]; loaded: boolean; reload(): void }
     const off = subscribeChat(
       "*",
       (e) => {
+        /* A deleted chat is gone now, in this tab and every other: drop its row before the list is
+           asked for again, so a stale row is never clickable. */
+        if (e.type === "gone") {
+          setRows((had) => had.filter((r) => r.id !== e.chat));
+          return;
+        }
         if (e.type === "chat" || e.type === "end" || e.type === "turn") again();
       },
       load,

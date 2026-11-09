@@ -18,10 +18,28 @@ TypeScript, React, Hono and Electron, in one repository.
    maintainer decides whether it is ready. (PRs by the owner and by bots are exempt.)
 2. **Say you are on it**: comment on the issue, and ask for `status: in-progress` if you cannot set it.
    Check that nobody else already has a branch or PR for it.
-3. **Read the right architecture file.** [`docs/architecture/README.md`](docs/architecture/README.md)
+3. **Check the issue's `agent:` label** and work on it only with a model of that tier or above
+   (see *Which model works on which issue* below). If the work turns out harder than the tier says,
+   stop and comment asking for a higher tier; do not push on.
+4. **Read the right architecture file.** [`docs/architecture/README.md`](docs/architecture/README.md)
    lists them; the table in `CLAUDE.md` says which one covers which area. Most of the code's traps are
    written down there, with the defect that found each. If the area you touch has a *Things that will
    bite* entry, read it.
+
+## Which model works on which issue
+
+Every `status: ready` issue carries one `agent:` label, set at triage, that says how much reasoning
+the work needs. The rubric is in [`CONTRIBUTING.md`](CONTRIBUTING.md#agent-tier). A tier maps to a
+model like this:
+
+| Label | Model | Effort |
+|---|---|---|
+| `agent: light` | GLM 5.3 Flash (`opencode-go/glm-5.3-flash`), or Claude Haiku 5.5 | default |
+| `agent: standard` | Claude Sonnet 5.5 | default |
+| `agent: deep` | Claude Opus 5.5 | high |
+
+When you **open** an issue, propose a tier in it ("Suggested tier: `agent: standard`, because …");
+the maintainer sets the label. An issue with no `agent:` label is not ready.
 
 ## Branches and pull requests
 

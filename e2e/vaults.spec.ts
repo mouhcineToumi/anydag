@@ -351,6 +351,120 @@ test("with no vault open the page is the picker: open a folder, create a vault, 
   expect(heard).toEqual([]);
 });
 
+/**
+ * What the first screen says about the form it is showing, and which action finishes it.
+ *
+ * The heading used to stay *Open a vault* while the create form was up, the labels read as centred
+ * captions over their fields, and every action was the same quiet text. A new person had nothing to
+ * tell them where to type or which button completes the job. The error's line is reserved in the
+ * form so a refusal from the server does not move the actions under the pointer.
+ */
+test("the first-run card names the form it shows, and only its submit is the filled action", async ({ page }) => {
+  const heard = listen(page);
+  await page.route("**/api/vaults", (route) => route.fulfill({ json: { vaults: [], home: "/home/someone" } }));
+  await page.goto("/");
+  const card = page.locator("[data-dag-novault]");
+  const title = card.locator("h1");
+  await expect(title).toHaveText("Open a vault");
+
+  /* The open half keeps the heading, and offers one filled action: Open. */
+  await page.locator("[data-dag-welcome-open-folder]").click();
+  await expect(page.locator("[data-dag-vault-open-form]")).toBeVisible();
+  await expect(title).toHaveText("Open a vault");
+  await expect(page.locator("[data-dag-vault-open-form] label")).toContainText("Folder to open");
+  await expect(page.locator("[data-dag-vault-open-go]")).toHaveClass(/dag-button--primary/);
+  await expect(page.locator("[data-dag-vault-open-go]")).toBeDisabled();
+  await page.locator("[data-dag-vault-open-form]").getByRole("button", { name: "Cancel" }).click();
+
+  /* The create half says what it is, and puts its labels above their fields, left-aligned. */
+  await page.locator("[data-dag-welcome-create-vault]").click();
+  await expect(page.locator("[data-dag-vault-create-form]")).toBeVisible();
+  await expect(title).toHaveText("Create a vault");
+  await expect(card.locator(".dag-welcome__hint")).toContainText("Give it a name");
+  const form = page.locator("[data-dag-vault-create-form]");
+  const name = page.locator("[data-dag-vault-create-name]");
+  const create = page.locator("[data-dag-vault-create-go]");
+  const cancel = form.getByRole("button", { name: "Cancel" });
+  await expect(form.locator("label").first()).toContainText("Name");
+  await expect(form.locator("label").nth(1)).toContainText("In the folder");
+  expect(
+    await form
+      .locator("label")
+      .first()
+      .evaluate((el) => getComputedStyle(el).textAlign),
+  ).toBe("left");
+  const labelBox = await form.locator("label").first().locator("span").first().boundingBox();
+  const fieldBox = await name.boundingBox();
+  expect(labelBox!.y + labelBox!.height).toBeLessThanOrEqual(fieldBox!.y);
+  await expect(create).toHaveText("Create");
+  await expect(create).toBeDisabled();
+  await expect(create).toHaveClass(/dag-button--primary/);
+  await expect(create).toHaveClass(/dag-button/);
+  await expect(cancel).toHaveClass(/dag-button/);
+  await expect(cancel).not.toHaveClass(/dag-button--primary/);
+
+  /* Both fields filled is what makes the one action available. */
+  await name.fill(`First run ${id}`);
+  await expect(create).toBeEnabled();
+
+  /* Enter from a field submits; a refusal lands under the form and the actions stay put. */
+  await page.route("**/api/vaults/create", (route) =>
+    route.fulfill({ status: 400, json: { error: "That folder already holds a vault." } }),
+  );
+  const acts = form.locator(".dag-vault__form-acts");
+  const before = await acts.boundingBox();
+  await name.press("Enter");
+  await expect(page.locator("[data-dag-vault-problem]")).toContainText("already holds a vault");
+  const after = await acts.boundingBox();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(0.5);
+  expect(Math.abs(after!.height - before!.height)).toBeLessThan(0.5);
+
+  /* Escape lets go of the form, and the card goes back to its chooser title. */
+  await name.focus();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-vault-create-form]")).toHaveCount(0);
+  await expect(title).toHaveText("Open a vault");
+  /* Chromium prints any 4xx; the one here is the refusal this check asked for. */
+  expect(heard.filter((line) => !line.includes("/api/vaults/create"))).toEqual([]);
+});
+
+test("the create form tabs through its fields, Browse, Cancel, then Create", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.anydagDesktop = { pickFolder: async () => null };
+  });
+  await page.route("**/api/vaults", (route) => route.fulfill({ json: { vaults: [], home: "/home/someone" } }));
+  await page.goto("/");
+  await page.locator("[data-dag-welcome-create-vault]").click();
+  const form = page.locator("[data-dag-vault-create-form]");
+  const browse = page.locator("[data-dag-vault-create-browse]");
+  await expect(browse).toBeVisible();
+  await expect(browse).toHaveClass(/dag-button/);
+  await expect(browse).not.toHaveClass(/dag-button--primary/);
+  await expect(page.locator("[data-dag-vault-create-name]")).toBeFocused();
+
+  /* A disabled Create is not in the tab order: name it first, so all five stops are live. */
+  await page.locator("[data-dag-vault-create-name]").fill(`Tab order ${id}`);
+
+  /* Name has the focus when the form opens; four tabs reach Browse, Cancel and Create in that order. */
+  const focus = () =>
+    page.evaluate(() => {
+      const el = document.activeElement;
+      if (!(el instanceof HTMLElement)) return "none";
+      for (const key of ["Name", "Parent", "Browse", "Go"]) {
+        if (el.hasAttribute(`data-dag-vault-create-${key.toLowerCase()}`)) return key.toLowerCase();
+      }
+      if (el.closest("[data-dag-vault-create-form]") && el.textContent?.trim() === "Cancel") return "cancel";
+      return el.tagName.toLowerCase();
+    });
+  const order = [await focus()];
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("Tab");
+    order.push(await focus());
+  }
+  expect(order).toEqual(["name", "parent", "browse", "cancel", "go"]);
+  await expect(form).toBeVisible();
+});
+
 test("the desktop shell's folder dialog is used when there is one", async ({ page }) => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-e2e-vault-"));
   parents.push(parent);
