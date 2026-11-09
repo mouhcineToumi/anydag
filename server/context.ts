@@ -24,7 +24,7 @@ import { SyncLinks } from "./sync/link";
 import { Telemetry } from "./telemetry";
 import { DEFAULT_MAX_MB } from "./uploads";
 import { mint, validId } from "./ids";
-import { readVaultId, Refused, Vault, type VaultOptions, writeAtomic } from "./vault";
+import { readVaultId, Refused, Vault, type VaultOptions, writeVaultId } from "./vault";
 
 export interface Limits {
   maxBytes: number;
@@ -203,7 +203,7 @@ export class Session {
   /** A copy of a vault: a new id, written where the claimed one was, and no link of the original's. */
   private reidentify(root: string): void {
     const id = mint((x) => this.open.has(x) || !!this.home.sql("select 1 from vaults where id = ?").get(x));
-    writeAtomic(path.join(root, ".anydag", "vault.json"), `${JSON.stringify({ id }, null, 1)}\n`);
+    writeVaultId(root, id);
   }
 
   /** Make a folder and open it as a vault. Refused when something is already there. */
@@ -263,7 +263,7 @@ export class Session {
     await at.vault.close();
     this.home.rekeyVault(oldId, newId);
     this.sync.moved(oldId, newId);
-    writeAtomic(path.join(root, ".anydag", "vault.json"), `${JSON.stringify({ id: newId }, null, 1)}\n`);
+    writeVaultId(root, newId);
     const vault = new Vault(root, this.home, vaultOptions(root, { ...this.options, types, attachments }));
     const next = this.adopt(vault);
     if (!wasDefault) this.defaultId = [...this.open.keys()].find((k) => k !== newId) ?? newId;

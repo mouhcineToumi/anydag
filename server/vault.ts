@@ -1870,14 +1870,27 @@ export function readVaultId(root: string): string | null {
   return null;
 }
 
+/**
+ * Write a vault's id. The `.anydag` folder is the app's own, so a link where it should be is
+ * refused: opening a downloaded folder must not write through it into somebody else's vault.
+ */
+export function writeVaultId(root: string, id: string): void {
+  const dir = path.join(root, ".anydag");
+  const st = fs.lstatSync(dir, { throwIfNoEntry: false });
+  if (st?.isSymbolicLink()) throw new Refused(`\`.anydag\` is a link: ${root}`);
+  if (st && !st.isDirectory()) throw new Refused(`\`.anydag\` is not a folder: ${root}`);
+  if (!st) fs.mkdirSync(dir, { recursive: true });
+  const realDir = fs.realpathSync(dir);
+  if (realDir !== path.join(fs.realpathSync(root), ".anydag")) throw new Refused(`\`.anydag\` is outside the vault: ${root}`);
+  writeAtomic(path.join(dir, "vault.json"), `${JSON.stringify({ id }, null, 1)}\n`);
+}
+
 /** The vault's own id, kept in `.anydag/vault.json` so caches keyed by it survive a moved folder. */
 function vaultId(root: string): string {
   const had = readVaultId(root);
   if (had) return had;
-  const file = path.join(root, ".anydag", "vault.json");
   const id = mint();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeAtomic(file, `${JSON.stringify({ id }, null, 1)}\n`);
+  writeVaultId(root, id);
   return id;
 }
 
