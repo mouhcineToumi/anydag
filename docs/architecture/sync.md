@@ -10,8 +10,8 @@ holds opaque keys, sealed blobs and sealed metadata, and never a path or a byte 
 
 | Where | Owns |
 |---|---|
-| `sync/protocol/wire.ts` · `crypto.ts` | every route body and `ES_*` code · the vault key, its three HKDF subkeys, AES-256-GCM seals bound to what they seal, Argon2id, the recovery code |
-| `sync/server/` | `anydag-sync serve`, the routes under `/v1`, `Meta` (`meta/pg.ts`) and `DiskBlobs`, pairing, quotas, the usage ledger, `/metrics`, the collector (`gc.ts`), and the admin CLI (`cli.ts`) |
+| `sync/protocol/wire.ts` · `crypto.ts` · `meta.ts` | every route body, `ES_*` code and `PROTOCOL` · the vault key, its three HKDF subkeys, AES-256-GCM seals bound to what they seal, Argon2id, the recovery code · a path's sealed metadata, bound to its key, blob and parent |
+| `sync/server/` | `anydag-sync serve`, the routes under `/v1`, `Meta` (`meta/pg.ts`) and `DiskBlobs`, pairing, quotas and the history allowance, the usage ledger, `/metrics`, the collector (`gc.ts`), and the admin CLI (`cli.ts`) |
 | `server/sync/engine.ts` | one pull, push or resync at a time: decisions per key, merges, conflict copies, renames recognised |
 | `server/sync/loop.ts` · `link.ts` | one loop per linked vault (catch-up, poke or a 30 s poll, a 2 s/10 s debounce on raw watcher events) · pair, link, unlink, devices |
 | `server/routes/sync.ts` | `GET /api/sync`, `POST /api/sync/{pair,link,unlink,now}`, `GET /api/sync/{remotes,devices}`, `POST /api/sync/devices/revoke` — the contract is `server/sync/types.ts` |
@@ -83,7 +83,9 @@ Eleven things are load-bearing:
   answered once by an upload and kept nowhere; an agent cannot link — MCP has `sync_status` and
   `sync_now` only, and `docs/parity.json` says why.
 - **A failure is the vault's.** `ES_NETWORK` is `offline` with a backoff; `ES_AUTH` (a revoked
-  device) and a quota are `paused` with a reason; the loop never unlinks on its own. The app answers
+  device) and a quota are `paused` with a reason; a version refused as not belonging where it
+  arrived (*What the server cannot forge*) and a server of another protocol (`ES_PROTOCOL`) are
+  `error` with the sentence that says why; the loop never unlinks on its own. The app answers
   a sync server's `ES_AUTH` as **403**, not 401, which the page would read as its own token gone.
 - **The feed's event is `dag:vault-sync`**, carrying a `SyncStatus`. `dag:sync` is the preference
   sync's key and stays it.
@@ -115,3 +117,83 @@ Settings tab `sync`, and the event `dag:vault-sync` (in `test/prefs.test.ts`'s l
 **Out, and why:** hosting it (running it is up to whoever wants it); billing (the usage ledger and
 `/metrics` are in place for when it is decided); chunking a large file; sharing a vault between
 accounts; history a person can browse; and real-time co-editing, which the file model cannot be.
+
+## What the server cannot forge
+
+The server, and anybody holding a device token on the account, holds every sealed `meta` and every
+sealed blob a vault ever had, and can commit any of them again. Sealed to its key alone (protocol 1),
+a `meta` could be committed over another file's blob (a **re-pointed** file), or again after newer
+versions (a **replayed version**, or a **replayed delete**), and every linked device would open it,
+so a file could be swapped, rolled back or deleted everywhere. Protocol 2 closes each:
+
+- **A `meta` is sealed with the log entry it belongs to** — `{v: 2, key, blob, parent, …}` inside
+  the seal, under the associated data `meta/v2:<key>` (`sync/protocol/meta.ts`). `openMeta` takes the
+  entry's `key`, `blob` and `parent` and throws `MetaRefused` unless all three are the sealed ones.
+  The server's commit rule makes a device token's replay land over the *current* head, so its parent
+  is never the sealed one. A head carries its `parent` too (`heads.parent`), so a device reading
+  heads after an `ES_HORIZON`, or on its first link, checks a head as it checks a log row.
+- **An entry for a key this device holds must be over that version or a later one** (`opened` in
+  `engine.ts`). The operator can write the parent the seal names into its own log; it cannot make that
+  parent newer than the version this device already has, because a key's heads are a chain and every
+  version this device knows is a link in it. `null` over a key held here is a replayed create.
+- **The path is the key's, and the bytes are the size the `meta` says.** Neither can be forged without
+  the vault key, which is why they are checks beyond the seal: they catch a writer that has the key
+  and a bug.
+- **A refusal stops the pull before it writes or moves the cursor.** The next pull meets it again: a
+  forged entry is the vault's `error` until somebody looks, never a file silently replaced. A device
+  that has never synced cannot tell a version the operator withheld from one that never existed; no
+  log can, without a party the devices trust beyond the server.
+- **A push seals in the round that commits**, over the parent that round read, so an `ES_STALE` that
+  pulls, merges and pushes again seals again.
+
+## Quotas and history
+
+What a plan's `storage_bytes` counts is **live** bytes (blobs a head names) **plus pending** bytes
+(uploaded, never named by a commit). Superseded **history** has an allowance of its own.
+
+- **A blob PUT is refused `ES_QUOTA`** when live + pending + this upload would pass `storage_bytes`:
+  once at the headers, before a byte is read, and again as the row is written, under an advisory lock
+  per account (`Meta.addBlob` with a quota), so two uploads cannot both take the last room. Bytes
+  refused at the second check are an orphan file for the collector, not deleted on the spot: another
+  upload of the same id may have written the same file. An id already held is answered as before and
+  counts nothing. The commit's own check (live after the commit) stays, for a commit that names a
+  blob back out of history.
+- **A blob is pending until a commit names it** (`blobs.committed`), and the collector forgets a
+  pending blob after `PENDING_MS` (an hour, the orphan window). A commit that names one after that is
+  `ES_NO_BLOB`, which the client already answers by uploading it again.
+- **History is bounded in bytes.** `Plan.history_bytes`, and when it is null, as much as
+  `storage_bytes` (so a plan with a quota has a bounded history without saying so; a plan with neither
+  is unlimited, as `free` is). After every commit, `Meta.trimHistory` drops the committing vault's
+  oldest history until the account is back under it — first blobs no log row names any more, then the
+  oldest superseded log rows (never a key's newest), with the blobs they leave unnamed — and raises the
+  horizon. A commit only adds history to its own vault, so trimming that vault holds the bound. The
+  collector runs the same trim on every vault, for an allowance lowered between commits. **The bytes
+  win over the window**: past the allowance, history inside `history_days` goes too, and a device
+  offline that long reads `ES_HORIZON` and resyncs.
+- `GET /v1/account` says `storage_pending` beside `storage_live` and `storage_history`;
+  `anydag-sync plan set … --history-bytes N` sets the allowance.
+
+## Protocol 2, and an older peer
+
+The seal binding and the head's `parent` change what a peer must understand, so `PROTOCOL` is 2,
+and a peer of protocol 1 (AnyDag 0.2.0) **fails with a sentence, never by accepting or corrupting
+data**. There is no production sync server yet and every sync feature is behind the `cloud` switch,
+so nothing is migrated in place:
+
+- **Every `/v1` request says `anydag-sync-protocol: 2`, and every answer says it back**
+  (`PROTOCOL_HEADER`). The server refuses a request that says another number, or none (a 0.2.0
+  client), with `ES_PROTOCOL` (426) before auth: such a client cannot pair, pull or commit, and so
+  can neither read a `meta` it would misread nor write one protocol-2 devices would refuse. The client
+  refuses an answer that says another number, or none (a 0.2.0 server, which would not keep `parent`
+  on a head or count pending bytes), with `ES_PROTOCOL` and a message naming which side to update.
+  `/v1/health` (whose body says the protocol), `/v1/logs`, the poke stream and `/v1/admin/*` are not
+  checked: nothing they carry changed.
+- **A protocol-1 `meta` is refused by name.** A 0.2.0 server's database migrates (`002-quota-and-binding.sql`:
+  `blobs.committed` backfilled from the log and heads, `heads.parent` from each head's own log row,
+  `plans.history_bytes`), but the `meta`s in it are sealed to the key alone: `openMeta` tries the old
+  associated data only to say *sealed by an older AnyDag*, and the pull stops there. Such a vault is
+  uploaded again from a device that has it. A 0.2.0 client that met a protocol-2 `meta` could not
+  open it (`Unsealed`, nothing written) — and is refused before it gets one.
+- **The sync server's URL is `https://`**, or `http://` only for `localhost`, `127.0.0.0/8` or `::1`
+  (`serverUrl` in `link.ts`): the device token is in every request, and in the clear anybody on the
+  path could sync as the device.
