@@ -131,7 +131,7 @@ async function mcp(): Promise<void> {
 }
 
 /**
- * `mcp --chat <id> --mode ask|edit`: the MCP server a chat's harness runs. It only ever reaches the
+ * `mcp --chat <id>`: the MCP server a chat's harness runs. It only ever reaches the
  * app's running server — the Assistant lives there — on the port and token the app put in its
  * environment, with the chat's header on every request.
  */
@@ -143,7 +143,6 @@ async function chatMcp(chat: string, startMcp: typeof import("./mcp/server").sta
     console.error("anydag mcp --chat: ANYDAG_CHAT_PORT and ANYDAG_TOKEN come from the app that started this");
     process.exit(2);
   }
-  const mode = arg("mode") === "edit" ? "edit" : "ask";
   const backend = remote(port, token, { "x-anydag-chat": chat });
   let home: string | undefined;
   try {
@@ -153,11 +152,11 @@ async function chatMcp(chat: string, startMcp: typeof import("./mcp/server").sta
     /* the server says so on the first tool call */
   }
   const server = await startMcp(backend, {
-    readOnly: mode === "ask",
+    readOnly: false,
     version: VERSION,
-    chat: { id: chat, mode, ...(home ? { home } : {}) },
+    chat: { id: chat, ...(home ? { home } : {}) },
   });
-  console.error(`anydag mcp: chat ${chat}, ${mode}`);
+  console.error(`anydag mcp: chat ${chat}`);
   server.server.onclose = () => process.exit(0);
 }
 

@@ -10,9 +10,10 @@ export type { Op } from "./record";
 export type Provider = "claude" | "opencode";
 export const PROVIDERS: readonly Provider[] = ["claude", "opencode"];
 
+/** What a vault was granted: read it, or change it too. */
 export type Mode = "ask" | "edit";
 
-/** What another vault was granted: read it, or change it too. `null` is a grant taken back. */
+/** What another vault was granted. `null` is a grant taken back. */
 type Grant = { mode: Mode; at: string } | null;
 
 /**
@@ -33,7 +34,6 @@ export interface ChatMeta {
   model: string;
   /** Claude's `--effort`, OpenCode's `#variant`; absent for the model's own. */
   effort?: string;
-  mode: Mode;
   [grant: `grant:${string}`]: Grant;
 }
 
@@ -84,7 +84,6 @@ export interface Turn {
   provider: Provider;
   model: string;
   effort?: string;
-  mode: Mode;
   steps: Step[];
   blocks: Block[];
   status: TurnStatus;

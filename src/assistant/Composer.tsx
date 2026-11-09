@@ -11,13 +11,12 @@ import { grantsOf } from "./types";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-/** What the next turn is sent with: the model it runs on, how hard it thinks, and whether it may write. */
+/** What the next turn is sent with: the model it runs on and how hard it thinks. */
 export interface Choice {
   provider: Provider;
   model: string;
   /** `""` is the harness's own. */
   effort: string;
-  mode: Mode;
 }
 
 /**
@@ -26,14 +25,14 @@ export interface Choice {
  */
 function defaultChoice(
   models: readonly ProviderModels[] | null,
-  pref: { provider: string | null; model: string | null; mode: Mode },
+  pref: { provider: string | null; model: string | null },
 ): Choice {
   const usable = models?.filter((m) => m.available) ?? [];
   const wanted = models?.find((m) => m.provider === pref.provider && m.available);
   const at = wanted ?? usable[0] ?? models?.[0];
   const provider = at?.provider ?? "claude";
   const model = at && at === wanted && pref.model ? pref.model : (at?.default ?? "claude-sonnet-5-5");
-  return { provider, model, effort: "", mode: pref.mode };
+  return { provider, model, effort: "" };
 }
 
 export interface ComposerProps {
@@ -52,16 +51,13 @@ export interface ComposerProps {
 export function Composer({ meta, models, running, onSend, onStop, onGrant, autofocus }: ComposerProps) {
   const pref = useSettings().assistant;
   const base = useMemo<Choice>(
-    () =>
-      meta
-        ? { provider: meta.provider, model: meta.model, effort: meta.effort ?? "", mode: meta.mode }
-        : defaultChoice(models, pref),
+    () => (meta ? { provider: meta.provider, model: meta.model, effort: meta.effort ?? "" } : defaultChoice(models, pref)),
     [meta, models, pref],
   );
   /* What was picked since the chat last said what it was on: the chat's own record wins again the
      moment a turn is sent, because the server has written the pick into it. */
   const [over, setOver] = useState<Partial<Choice>>({});
-  useEffect(() => setOver({}), [meta?.id, meta?.provider, meta?.model, meta?.mode, meta?.effort]);
+  useEffect(() => setOver({}), [meta?.id, meta?.provider, meta?.model, meta?.effort]);
   const choice: Choice = { ...base, ...over };
   const [text, setText] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
@@ -100,7 +96,7 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
         data-dag-chat-input=""
         rows={1}
         value={text}
-        placeholder={choice.mode === "edit" ? "Ask for a change, or a question" : "Ask about this vault"}
+        placeholder="Ask for a change, or a question"
         aria-label="Message the Assistant"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={key}
@@ -111,21 +107,6 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
         </p>
       ) : null}
       <div className="dag-chat-composer__row">
-        <div className="dag-chat-mode" role="group" aria-label="Ask or Edit">
-          {(["ask", "edit"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              className="dag-chat-mode__choice"
-              data-dag-chat-mode={m}
-              aria-pressed={choice.mode === m}
-              title={m === "ask" ? "Read and answer; change nothing" : "Allowed to change the vault; every change can be undone"}
-              onClick={() => setOver((o) => ({ ...o, mode: m }))}
-            >
-              {m === "ask" ? "Ask" : "Edit"}
-            </button>
-          ))}
-        </div>
         <Scope meta={meta} onGrant={(vault, mode) => onGrant(choice, vault, mode)} />
         <span className="dag-chat-composer__space" />
         <select

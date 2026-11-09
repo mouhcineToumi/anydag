@@ -49,7 +49,6 @@ export function ChatSurface({
         provider: c.provider,
         model: c.model,
         ...(c.effort ? { effort: c.effort } : {}),
-        mode: c.mode,
       });
       idRef.current = meta.id;
       onId(meta.id);
@@ -64,7 +63,7 @@ export function ChatSurface({
       setSending(true);
       try {
         const to = await ensure(c);
-        await sayTurn({ id: to, text, provider: c.provider, model: c.model, effort: c.effort || null, mode: c.mode });
+        await sayTurn({ id: to, text, provider: c.provider, model: c.model, effort: c.effort || null });
       } catch (e) {
         say(e);
       } finally {
@@ -145,7 +144,7 @@ export function ChatSurface({
         }}
       >
         {empty ? (
-          <Empty mode={meta?.mode ?? "ask"} />
+          <Empty />
         ) : (
           <Turns turns={chat.turns} live={chat.live} typing={chat.typing} undos={chat.undos} device={chat.device} a={actions} />
         )}

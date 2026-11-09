@@ -42,7 +42,6 @@ async function runTool(tool: Tool, args: unknown, kit: Kit) {
 
 export interface ChatMode {
   id: string;
-  mode: "ask" | "edit";
   /** The chat's own vault: what a document link names when a tool named none. */
   home?: string;
 }
@@ -51,7 +50,7 @@ export function buildMcp(backend: Backend, opts: { readOnly: boolean; version?: 
   const kit = makeKit(backend, opts.readOnly, opts.chat?.home);
   const server = new McpServer({ name: "anydag", version: opts.version ?? "dev" }, { instructions: INSTRUCTIONS });
 
-  for (const tool of opts.chat ? chatTools(opts.chat.mode) : TOOLS) {
+  for (const tool of opts.chat ? chatTools() : TOOLS) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.input, annotations: { readOnlyHint: !tool.write } },

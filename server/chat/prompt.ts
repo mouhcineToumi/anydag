@@ -3,7 +3,7 @@
  * session that has not seen the chat so far — the chat so far, as plain text: seeding is the
  * transcript with tool results dropped, and each call one line.
  *
- * The system prompt carries the mode and the vaults in reach, so it is built per turn and never
+ * The system prompt carries the vaults in reach, so it is built per turn and never
  * left in a resumed session (Claude's `--system-prompt-snapshot off`).
  */
 
@@ -16,7 +16,7 @@ export interface Reach {
   home: boolean;
 }
 
-export function systemPrompt(o: { mode: Mode; reach: Reach[]; others: { id: string; name: string }[] }): string {
+export function systemPrompt(o: { reach: Reach[]; others: { id: string; name: string }[] }): string {
   const home = o.reach.find((r) => r.home);
   const lines = [
     "You are the Assistant inside AnyDag, a local app that keeps a person's notes, boards (diagrams drawn from a DSL), tables, quizzes, tasks and attachments as plain files in vaults — folders on their machine.",
@@ -34,10 +34,9 @@ export function systemPrompt(o: { mode: Mode; reach: Reach[]; others: { id: stri
     "Pass `vault` to a tool only for a vault other than this chat's.",
     "A document is listed, read, made, written, renamed, copied, deleted and retitled with the `doc_*` tools and its `kind`; where a description names `note_read` or `board_write`, that is `doc_read` or `doc_write` with that kind.",
     "",
-    "## Mode",
-    o.mode === "ask"
-      ? "**Ask.** Answer from the vault. Do not change anything: tools that write are not available, and the person has to switch to Edit for that."
-      : '**Edit.** You may change the vault. Before each distinct group of changes, call `change_block` with a short title saying what the group does ("Draw the auth flow", "Move the meeting notes into 2026/") — the person undoes a block as one. Deleting, moving folders and emptying the trash wait for the person\'s approval; if they say no, do not try another way around it.',
+    "## Changing things",
+    'You may change the vaults in reach that are not marked read only. Before each distinct group of changes, call `change_block` with a short title saying what the group does ("Draw the auth flow", "Move the meeting notes into 2026/") — the person undoes a block as one. Deleting, moving folders and emptying the trash wait for the person\'s approval; if they say no, do not try another way around it.',
+    "A vault in reach marked read only cannot be changed; to change it, call `vault_request` with mode `edit`, and the person decides.",
     "",
     "## Answering",
     "- Ground every answer in what the tools return; say so plainly when the vault does not say.",
