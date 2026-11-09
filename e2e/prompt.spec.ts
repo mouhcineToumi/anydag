@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 import { lead } from "./keys";
 import { settingsTab } from "./sidebar";
@@ -61,6 +61,26 @@ async function open(page: Page, query = "") {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
+/**
+ * 100%, and the view marked as the person's so the next content change does not re-fit it.
+ *
+ * **`0` alone is not enough.** It returns to 100% but leaves the view the automatic one, so adding
+ * a card would fit the whole board again and the placement this spec is about would be measured
+ * against a view that had just moved. The wheel notch is what takes the view; the key is then only
+ * the zoom, and the focus goes to the board rather than a button so a chord still reaches it.
+ */
+async function atActual(page: Page) {
+  const view = await page.locator(".dag-viewport").boundingBox();
+  if (!view) throw new Error("the view has no box");
+  /* A wheel notch is how a person takes the view: it is the pan, and it is what stops the next
+     content change from fitting the board again. The far corner clears the empty-board card. */
+  await page.mouse.move(view.x + view.width - 40, view.y + 40);
+  await page.mouse.wheel(0, 16);
+  await page.locator(".dag-viewport").focus();
+  await page.keyboard.press("0");
+  await expect(page.locator(".dag-viewport")).toHaveAttribute("data-zoom", "1");
+}
+
 /** Answer `/generate` with `body` at `status`, and keep what the page asked. */
 async function answer(page: Page, status: number, body: unknown): Promise<unknown[]> {
   const asked: unknown[] = [];
@@ -71,9 +91,9 @@ async function answer(page: Page, status: number, body: unknown): Promise<unknow
   return asked;
 }
 
-test("P puts an empty card under the pointer with the caret in it, and typing writes the file", async ({ page }) => {
+test("P puts an empty card in the middle of the view with the caret in it, and typing writes the file", async ({ page }) => {
   await open(page);
-  await page.mouse.move(900, 700);
+  await atActual(page);
   await lead(page, "p");
   const box = page.locator(".dag-prompt:not(:has-text('A browser talking')) [data-dag-prompt-text]");
   await expect(box).toBeFocused();
@@ -81,6 +101,67 @@ test("P puts an empty card under the pointer with the caret in it, and typing wr
   await expect(page.locator("[data-dag-body]")).toHaveCount(0);
   await page.keyboard.type("A queue between two workers");
   await expect.poll(read).toMatch(/```prompt \{#prompt-[a-z0-9]{4} x=\d+ y=\d+ w=420\}\nA queue between two workers\n```/);
+});
+
+/**
+ * The card's box against the view's, on the glass.
+ *
+ * A box measure is screen pixels at the current zoom, which is what a person sees and what the
+ * acceptance says: the card's *centre* is the view's centre. One grid step is allowed because the
+ * placement snaps to the board grid.
+ */
+async function centring(page: Page, card: Locator) {
+  await expect(card).toBeVisible();
+  const box = await card.boundingBox();
+  const view = await page.locator(".dag-viewport").boundingBox();
+  if (!box || !view) throw new Error("the card or the view has no box");
+  return {
+    dx: box.x + box.width / 2 - (view.x + view.width / 2),
+    dy: box.y + box.height / 2 - (view.y + view.height / 2),
+    box,
+    view,
+  };
+}
+
+/* A grid step, 8px, is the snap's own allowance; the card's height is the empty card's, so a couple
+   of pixels of font difference are allowed on top. */
+const CENTRED = 8;
+
+for (const width of [1280, 1600]) {
+  test(`the dock's prompt card is centred and whole in a ${width}px window`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page);
+    await atActual(page);
+    await page.locator("[data-dag-dock-prompt]").click();
+    const { dx, dy, box, view } = await centring(page, page.locator(".dag-prompt:not(:has-text('A browser talking'))"));
+    expect(Math.abs(dx)).toBeLessThanOrEqual(CENTRED);
+    expect(Math.abs(dy)).toBeLessThanOrEqual(CENTRED);
+    expect(box.x).toBeGreaterThanOrEqual(view.x - 0.5);
+    expect(box.y).toBeGreaterThanOrEqual(view.y - 0.5);
+    expect(box.x + box.width).toBeLessThanOrEqual(view.x + view.width + 0.5);
+    expect(box.y + box.height).toBeLessThanOrEqual(view.y + view.height + 0.5);
+  });
+}
+
+test("P centres the card even with the pointer over the board", async ({ page }) => {
+  await open(page);
+  await atActual(page);
+  await page.mouse.move(900, 700);
+  await lead(page, "p");
+  const { dx, dy } = await centring(page, page.locator(".dag-prompt:not(:has-text('A browser talking'))"));
+  expect(Math.abs(dx)).toBeLessThanOrEqual(CENTRED);
+  expect(Math.abs(dy)).toBeLessThanOrEqual(CENTRED);
+});
+
+test("Describe a diagram on a new board centres the card", async ({ page }) => {
+  /* A blank board rather than the fixture, so this is the empty-board card and not the dock. */
+  fs.writeFileSync(file, "---\ntitle: Blank\n---\n");
+  await open(page);
+  await atActual(page);
+  await page.locator('[data-dag-empty-board-act="prompt"]').click();
+  const { dx, dy } = await centring(page, page.locator(".dag-prompt"));
+  expect(Math.abs(dx)).toBeLessThanOrEqual(CENTRED);
+  expect(Math.abs(dy)).toBeLessThanOrEqual(CENTRED);
 });
 
 test("the type select writes `as=` on the card", async ({ page }) => {
