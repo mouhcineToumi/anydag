@@ -35,7 +35,7 @@ model like this:
 | Label | Model | Effort |
 |---|---|---|
 | `agent: light` | GLM 5.3 Flash (`opencode-go/glm-5.3-flash`), or Claude Haiku 5.5 | default |
-| `agent: standard` | Claude Sonnet 5.5 | default |
+| `agent: standard` | Claude Sonnet 5.5, or GLM 5.3 Flash (`opencode-go/glm-5.3-flash`), or DeepSeek V4.1 Flash (`opencode-go/deepseek-v4.1-flash`) | max for GLM and DeepSeek, default for Sonnet |
 | `agent: deep` | Claude Opus 5.5 | high |
 
 When you **open** an issue, propose a tier in it ("Suggested tier: `agent: standard`, because …");
