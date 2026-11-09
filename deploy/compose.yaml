@@ -1,0 +1,119 @@
+# The one machine api.anydag.com runs on: Caddy — the only published ports, automatic
+# certificates — in front of the api, and Postgres on the compose network with no published port.
+# On a clean machine:
+#
+#   git clone … && cd anydag
+#   npm ci && npm run api:build          # the api image builds from api/dist/
+#   cp deploy/.env.example deploy/.env   # then fill it in; it is git-ignored and stays on the vm
+#   docker compose -f deploy/compose.yaml up -d --wait
+#
+# Load-bearing:
+# - **No secret is written in this file**: every value comes from deploy/.env, and `:?` refuses to
+#   start without the ones the stack cannot answer without. No secret is a build argument.
+# - **Caddy is the only hop**: the api's `ANYDAG_API_TRUST_PROXY=1` is what lets its rate limiter
+#   read the client address Caddy appended — anything else is untrusted by default.
+# - **Bounded**: each service has a memory limit, capped container logs (`json-file`, a few MB),
+#   `restart: unless-stopped`, and a healthcheck; Postgres' low-memory tuning is postgres.conf.
+# - **Blobs and logs on a named volume, Postgres on another**: both can sit on an attached block
+#   volume and grow without a rebuild; `backup.sh` and `restore.sh` move both.
+# - **`/v1/ready` is the api's healthcheck here** — the process up *and* the database answering; the
+#   image's own `/v1/health` is liveness for a run without a database.
+name: anydag
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # The site Caddy serves; `localhost` gets an internal certificate (what the restore test
+      # runs with), a real domain gets one from Let's Encrypt on the ports above.
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # The database is always this stack's Postgres; the password is the machine's. Single mode
+      # is a self-hoster's; multi is the api: one of ours, and the admin CLI exists for it.
+      DATABASE_URL: postgres://anydag:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/anydag
+      ANYDAG_API_DATA: /data
+      ANYDAG_API_HOST: 0.0.0.0
+      ANYDAG_API_PORT: "8790"
+      ANYDAG_API_MODE: ${ANYDAG_API_MODE:-multi}
+      ANYDAG_API_PUBLIC_URL: https://${CADDY_DOMAIN:-localhost}
+      ANYDAG_API_TRUST_PROXY: "1"
+      ANYDAG_API_ADMIN_TOKEN: ${ANYDAG_API_ADMIN_TOKEN:?set ANYDAG_API_ADMIN_TOKEN in deploy/.env}
+      # The feature switches, if the machine answers for fewer than all three.
+      ANYDAG_API_SYNC: ${ANYDAG_API_SYNC:-on}
+      ANYDAG_API_LOGS: ${ANYDAG_API_LOGS:-on}
+      ANYDAG_API_FEEDBACK: ${ANYDAG_API_FEEDBACK:-on}
+      ANYDAG_API_FEEDBACK_GITHUB_TOKEN: ${ANYDAG_API_FEEDBACK_GITHUB_TOKEN:-}
+      ANYDAG_API_FEEDBACK_REPO: ${ANYDAG_API_FEEDBACK_REPO:-}
+    volumes:
+      - api_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8790/v1/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    mem_limit: 384m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    # Nothing listens to Postgres but the compose network: no ports published, at all.
+    environment:
+      POSTGRES_USER: anydag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: anydag
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anydag -d anydag"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  api_data:
+  db_data:

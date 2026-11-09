@@ -1,0 +1,14 @@
+# Caddy fronts the api: it is the only published listener (80 and 443, deploy/compose.yaml), it
+# terminates TLS with automatic certificates — for a real domain an ACME one, for `localhost` an
+# internal one, which is what the restore test runs against — and it is the one hop the api
+# trusts: Caddy is what appends the client's address to `X-Forwarded-For`, which the api's rate
+# limiter reads only when `ANYDAG_API_TRUST_PROXY=1` (deploy/compose.yaml sets it).
+#
+# Kept to what the service needs, and no more: TLS terminating here, everything else passed
+# through. Caddy's access log goes to its container's stdout, which compose caps.
+
+{$CADDY_DOMAIN:localhost} {
+	encode zstd gzip
+
+	reverse_proxy api:8790
+}
