@@ -73,6 +73,8 @@
   description: "Workflows, checks, releases and repository tooling"
 
 # --- How big ------------------------------------------------------------------------------------
+# Every `status: ready` issue carries exactly one of these: a person's time, not the model's
+# reasoning (that is `agent:` below). `issue-policy` and `pr-policy` enforce it.
 - name: "size: S"
   color: "c2e0c6"
   description: "About an hour or two"

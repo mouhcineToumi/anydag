@@ -5,8 +5,10 @@
 #                 the release notes read it.
 #   PR target     `main` takes a pull request only from `release/*` or `hotfix/*` of this repository.
 #   Linked issue  a pull request into `develop` must close an issue labelled `status: ready` — the
-#                 maintainers have agreed it is wanted before anybody writes it. The maintainer,
-#                 bots and a PR a maintainer labelled `no-issue` are exempt.
+#                 maintainers have agreed it is wanted before anybody writes it. A ready issue also
+#                 carries at least one `area:`, exactly one `size:` and exactly one `agent:`; without
+#                 them nobody knows where the change is, how big it is or which model should do it.
+#                 The maintainer, bots and a PR a maintainer labelled `no-issue` are exempt.
 #
 # Its own workflow, and cheap: it runs again when a title or a body is edited or a label changes,
 # and a required check that reads stale text is a red tick nobody can explain. Each job always
@@ -159,12 +161,22 @@ jobs:
               const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: number }).catch(() => ({ data: null }));
               if (!issue || issue.pull_request) { problems.push(`#${number} is not an issue of this repository`); continue; }
               const labels = issue.labels.map((l) => (typeof l === "string" ? l : l.name));
+              const carried = (prefix) => labels.filter((l) => l.startsWith(prefix) && l.length > prefix.length);
               if (issue.state !== "open") problems.push(`#${number} is closed`);
               else if (!labels.includes(READY)) problems.push(`#${number} is not labelled \`${READY}\``);
-              else ready.push(number);
+              else {
+                // `ready` promises the work is defined: which part, how much of a person's time and
+                // how much reasoning an agent needs. A PR must not merge an issue that only claims it.
+                const missing = [];
+                if (carried("area: ").length === 0) missing.push("an `area:`");
+                if (carried("size: ").length !== 1) missing.push("exactly one `size:`");
+                if (carried("agent: ").length !== 1) missing.push("exactly one `agent:`");
+                if (missing.length > 0) problems.push(`#${number} is \`${READY}\` but does not carry ${missing.join(", ")}`);
+                else ready.push(number);
+              }
             }
             if (ready.length > 0) {
-              core.info(`Closes ${ready.map((n) => `#${n}`).join(", ")}, labelled ${READY}.`);
+              core.info(`Closes ${ready.map((n) => `#${n}`).join(", ")}, labelled ${READY} with an area, a size and an agent.`);
               return;
             }
 
@@ -174,6 +186,7 @@ jobs:
             const message = [
               why,
               `A pull request into develop must close an issue labelled \`${READY}\` — that label means a maintainer agreed the change is wanted.`,
+              `A ready issue also carries at least one \`area:\`, exactly one \`size:\` and exactly one \`agent:\`: where the change is, how much of a person's time it takes, and how much reasoning an agent needs.`,
               `1. Open an issue (or find one) and wait for a maintainer to label it \`${READY}\`.`,
               `2. Put "Closes #<number>" in this pull request's description. Editing it re-runs this check.`,
               `Details: ${guide}`,
