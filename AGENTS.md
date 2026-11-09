@@ -130,6 +130,7 @@ These are the short form of `CLAUDE.md`; the reasons are in `docs/architecture/`
 | every feature against its route, command and tool | `docs/parity.json`, `docs/PARITY.md` |
 | how a release is cut | `docs/RELEASING.md` |
 | the agent skill for drawing on the canvas | `skills/anydag/` |
+| the landing page at anydag.com | `site/` — plain HTML, CSS and JS, no build ([README](site/README.md)) |
 | setup, the full workflow, Definition of Ready and Done | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | security reports | [`SECURITY.md`](SECURITY.md) (private; not an issue) |
 | conduct | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) |

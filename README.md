@@ -12,7 +12,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mouhcineToumi/anydag/releases/latest"><strong>Download</strong></a> ·
+  <a href="https://anydag.com"><strong>anydag.com</strong></a> ·
+  <a href="https://github.com/mouhcineToumi/anydag/releases/latest">Download</a> ·
   <a href="docs/guide/getting-started.md">Getting started</a> ·
   <a href="docs/guide/README.md">Guide</a>
 </p>
