@@ -4,7 +4,7 @@
  * Load-bearing:
  * - **The size is decided before a byte is read.** `Content-Length` is required (`ES_BAD_REQUEST`
  *   without it) and checked against the plan's `max_file_bytes` and the server's own cap
- *   (`ANYDAG_SYNC_MAX_BODY_MB`) first, so an oversized upload is refused at its headers — a 413 for
+ *   (`ANYDAG_API_MAX_BODY_MB`) first, so an oversized upload is refused at its headers — a 413 for
  *   a gigabyte costs the server nothing. A body that is not the length it claimed is refused too.
  * - **The bytes land before the index learns of them** (`Blobs.put`, then `Meta.addBlob`): a crash
  *   in between leaves an orphan file, which the collector removes after an hour, and never an index

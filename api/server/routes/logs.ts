@@ -11,7 +11,7 @@
  *   written is what that file can describe, every free-text field scrubbed once more.
  * - **On disk, never in the database**: `<data>/logs/YYYY-MM-DD.jsonl`, one event a line with its
  *   batch's `env` beside it, and nothing about the request — no address, no header. Files older than
- *   `ANYDAG_SYNC_LOGS_DAYS` go the first time a day's file is opened. `ANYDAG_SYNC_LOGS=off` turns
+ *   `ANYDAG_API_LOGS_DAYS` go the first time a day's file is opened. `ANYDAG_API_LOGS=off` turns
  *   the route into `ES_NOT_FOUND`.
  */
 
@@ -21,7 +21,7 @@ import path from "node:path";
 import { Hono } from "hono";
 
 import { cleanBatch, MAX_BATCH_BYTES, type LogBatch, type LogsAccepted } from "../../protocol/logs";
-import { HttpError, type Deps, type Vars } from "./http";
+import { clientAddress, HttpError, type Deps, type Vars } from "./http";
 
 const PER_MINUTE = 30;
 const ALL_PER_MINUTE = 3000;
@@ -90,14 +90,7 @@ class Rate {
   }
 }
 
-/** Who is asking, for the rate alone: the proxy's word when there is one, else the socket's. */
-function senderOf(c: { req: { header(name: string): string | undefined }; env: unknown }): string {
-  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded) return forwarded;
-  const incoming = (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming;
-  return incoming?.socket?.remoteAddress ?? "local";
-}
-
+/** Who is asking, for the rate alone: the one proxy-trust helper (`clientAddress`). */
 export function logRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   const app = new Hono<{ Variables: Vars }>();
   const store = new LogStore(path.join(deps.config.data, "logs"), deps.config.logsDays);
@@ -108,7 +101,7 @@ export function logRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const none: LogsAccepted = { accepted: 0 };
     const length = Number(c.req.header("content-length") ?? 0);
     if (length > MAX_BATCH_BYTES) return c.json(none, 202);
-    if (!rate.allow(senderOf(c), deps.now().getTime())) return c.json(none, 202);
+    if (!rate.allow(clientAddress(c, deps.config.trustProxy), deps.now().getTime())) return c.json(none, 202);
     const raw = await c.req.text();
     if (raw.length > MAX_BATCH_BYTES) return c.json(none, 202);
     let parsed: unknown;

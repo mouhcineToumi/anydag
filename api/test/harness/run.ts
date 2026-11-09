@@ -1,7 +1,7 @@
 /**
  * One seed of the convergence harness: a world, its schedule, `settle`, and the three assertions.
  * A failing seed answers its failures and every step it took, so it can be read — and replayed
- * with `ANYDAG_SYNC_SEED=<seed>`, which runs that seed alone as a plain test.
+ * with `ANYDAG_API_SEED=<seed>`, which runs that seed alone as a plain test.
  */
 
 import type { Harness } from "../helpers";
@@ -49,6 +49,6 @@ export function describeFailure(r: SeedResult): string {
     ...r.failures.map((f) => `  - ${f}`),
     "steps:",
     ...r.log.map((l) => `  ${l}`),
-    `replay: ANYDAG_SYNC_SEED=${r.seed} npx vitest run sync/test/converge.test.ts`,
+    `replay: ANYDAG_API_SEED=${r.seed} npx vitest run api/test/converge.test.ts`,
   ].join("\n");
 }

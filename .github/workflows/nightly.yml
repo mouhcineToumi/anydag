@@ -145,6 +145,9 @@ jobs:
       sign: true
       artifact: nightly
       retention-days: 14
+      # Nightlies ship to people who run the app; their logs and feedback go to the api (#99).
+      logs_url: https://api.anydag.com/v1/logs
+      feedback_url: https://api.anydag.com/v1/feedback
     secrets: inherit
 
   publish:

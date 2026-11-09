@@ -1,7 +1,7 @@
 /**
  * Linking and the sync loop (`server/sync/loop.ts`, `link.ts`, `server/routes/sync.ts`): two and
  * three app sessions — each its own home and vault folder — against one real sync server on a real
- * port (`sync/test/helpers.ts`, PGlite), every step through the app's own `/api/sync` routes.
+ * port (`api/test/helpers.ts`, PGlite), every step through the app's own `/api/sync` routes.
  */
 
 import "./sqlite-shim";

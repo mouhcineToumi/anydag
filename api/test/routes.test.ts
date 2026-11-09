@@ -1,7 +1,7 @@
 /**
  * Every `/v1` route and every `ES_*` code, through `app.request` over the real `PgMeta` and
  * `DiskBlobs`. Runs on PGlite always, and on a real Postgres
- * too when `ANYDAG_SYNC_TEST_PG` names one (`npm run sync:test:pg`).
+ * too when `ANYDAG_API_TEST_PG` names one (`npm run api:test:pg`).
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -499,9 +499,9 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
     });
 
     it.skipIf(skip)(
-      "is 204 when ANYDAG_SYNC_POKE=off",
+      "is 204 when ANYDAG_API_POKE=off",
       async () => {
-        const off = await harness(name, { ANYDAG_SYNC_POKE: "off" });
+        const off = await harness(name, { ANYDAG_API_POKE: "off" });
         try {
           const me = await device(off);
           const v = await vault(off, me.token);
@@ -554,7 +554,7 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
         expect(res.status).toBe(403);
         const me = await device(h);
         expect((await call(h, "GET", "/v1/admin/accounts", { token: me.token })).status).toBe(403);
-        const off = await harness(name, { ANYDAG_SYNC_ADMIN_TOKEN: "" });
+        const off = await harness(name, { ANYDAG_API_ADMIN_TOKEN: "" });
         try {
           expect((await err(await call(off, "GET", "/v1/admin/accounts", { headers: admin }))).code).toBe("ES_FORBIDDEN");
         } finally {
@@ -597,7 +597,7 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const pair = (await (
         await call(h, "POST", "/v1/admin/pair", { headers: admin, json: { account: `ops-${name}` } })
       ).json()) as { code: string; url: string };
-      expect(pair.url).toBe("http://sync.test");
+      expect(pair.url).toBe("http://api.test");
       const paired = await call(h, "POST", "/v1/pair", { json: { code: pair.code, device: { name: "d", platform: "p" } } });
       expect(paired.status).toBe(200);
       expect((await err(await call(h, "POST", "/v1/admin/pair", { headers: admin, json: { account: "nobody" } }))).code).toBe(

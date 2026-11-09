@@ -74,6 +74,22 @@ export interface Health {
   mode: Mode;
 }
 
+/** `GET /v1` — no token: what this server runs, so the app can tell without trying each one. */
+export interface Info {
+  name: string;
+  version: string;
+  /**
+   * `feedback` is the relay's availability, not just its switch: on without the GitHub token or
+   * repo is reported `false`, matching the 503 the route would answer (#50).
+   */
+  features: { sync: boolean; logs: boolean; feedback: boolean };
+}
+
+/** `GET /v1/ready` — no token: the database answers, or the server is not serving. */
+export interface Ready {
+  ok: boolean;
+}
+
 /** `POST /v1/pair` — no token: the code is the credential. */
 export interface PairRequest {
   code: string;
@@ -327,7 +343,7 @@ export interface AdminAccount {
 export interface AdminPair {
   code: string;
   expires: string;
-  /** `ANYDAG_SYNC_PUBLIC_URL`, so a person can be handed one line. */
+  /** `ANYDAG_API_PUBLIC_URL`, so a person can be handed one line. */
   url: string;
 }
 

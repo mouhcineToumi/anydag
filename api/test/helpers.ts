@@ -1,6 +1,6 @@
 /**
  * The sync server under test: `createApp` over a real `PgMeta` — PGlite in memory, or a real
- * Postgres when `ANYDAG_SYNC_TEST_PG` names one, in a schema of its own for the run — and
+ * Postgres when `ANYDAG_API_TEST_PG` names one, in a schema of its own for the run — and
  * `DiskBlobs` in a temp folder, with a clock the test moves.
  *
  * Load-bearing:
@@ -27,7 +27,7 @@ import { mintPairCode } from "../server/routes/pair";
 import { PokeHub } from "../server/routes/poke";
 
 export const ADMIN = "admin-token-for-the-tests-0123456789";
-export const PG_URL = process.env.ANYDAG_SYNC_TEST_PG ?? "";
+export const PG_URL = process.env.ANYDAG_API_TEST_PG ?? "";
 
 export type Backend = "pglite" | "pg";
 export const BACKENDS: { name: Backend; skip: boolean }[] = [
@@ -53,7 +53,7 @@ export interface Harness {
 
 async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<void> }> {
   if (backend === "pglite") return { db: await pgliteDb(), drop: async () => {} };
-  const schema = `sync_test_${process.pid}_${randomBytes(4).toString("hex")}`;
+  const schema = `api_test_${process.pid}_${randomBytes(4).toString("hex")}`;
   const admin = pgDb(PG_URL);
   await admin.exec(`create schema ${schema}`);
   const db = pgDb(PG_URL, { schema });
@@ -67,11 +67,11 @@ async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<v
 }
 
 export async function harness(backend: Backend = "pglite", env: Record<string, string> = {}): Promise<Harness> {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-sync-test-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-api-test-"));
   const config = configFrom({
-    ANYDAG_SYNC_DATA: root,
-    ANYDAG_SYNC_ADMIN_TOKEN: ADMIN,
-    ANYDAG_SYNC_PUBLIC_URL: "http://sync.test",
+    ANYDAG_API_DATA: root,
+    ANYDAG_API_ADMIN_TOKEN: ADMIN,
+    ANYDAG_API_PUBLIC_URL: "http://api.test",
     ...env,
   });
   const { db, drop } = await openDb(backend);

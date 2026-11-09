@@ -94,3 +94,30 @@ export function qint(
 }
 
 export const today = (now: Date): string => now.toISOString().slice(0, 10);
+
+/**
+ * Who is asking, for a rate limit: the address the *last trusted proxy* forwarded, or the socket's
+ * own when no proxy is configured (`trustProxy` is `off`, header absent, or fewer entries than the
+ * hops promised). Every rate-limited route reads the client through this one helper, so a spoofed
+ * `X-Forwarded-For` cannot move a bucket: read backwards from the right, the entries a proxy added
+ * are the header's rightmost ones, and the address just left of them is the client the nearest
+ * trusted proxy saw. `hops` is `config.trustProxy`.
+ *
+ * With one hop (Caddy is this server's only proxy) a request the client forged to
+ * `9.9.9.9` arrives as `9.9.9.9, <real client>` — the proxy appended the true address — so the
+ * rightmost entry is the client and the forgery cannot shade another address's limit. Without a
+ * proxy (the self-hosted default) the header is untrusted on principle: the socket address is the
+ * answer, whatever it says.
+ */
+export function clientAddress(c: { req: { header(name: string): string | undefined }; env: unknown }, hops: number): string {
+  const socket = (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket?.remoteAddress;
+  if (hops <= 0) return socket ?? "local";
+  const header = c.req.header("x-forwarded-for");
+  if (!header) return socket ?? "local";
+  const hopsList = header
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const at = hopsList.length - hops;
+  return at < 0 ? (socket ?? "local") : (hopsList[at] ?? socket ?? "local");
+}

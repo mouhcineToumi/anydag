@@ -6,7 +6,7 @@
  * - **The index decides and the store obeys.** `Meta.collect` says which blobs to forget —
  *   superseded before the history window and named by no head and no remaining log row — and only
  *   those ids are deleted from `Blobs`. A blob a head names is never in that list, whatever its age.
- * - **The history window is the plan's when it has one, else `ANYDAG_SYNC_HISTORY_DAYS`.** A
+ * - **The history window is the plan's when it has one, else `ANYDAG_API_HISTORY_DAYS`.** A
  *   device offline less than that finds every base it needs to merge.
  * - **An orphan is a file the store holds and the index has no row for** — a crash between the
  *   upload's `Blobs.put` and its `Meta.addBlob`. It is removed only when older than an hour, because

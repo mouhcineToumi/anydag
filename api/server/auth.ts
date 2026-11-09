@@ -57,7 +57,7 @@ export function vault(deps: Deps): MiddlewareHandler<{ Variables: Vars }> {
 export function admin(deps: Deps): MiddlewareHandler {
   return async (c, next) => {
     const want = deps.config.adminToken;
-    if (!want) throw new HttpError("ES_FORBIDDEN", "the admin routes are off: set ANYDAG_SYNC_ADMIN_TOKEN to turn them on");
+    if (!want) throw new HttpError("ES_FORBIDDEN", "the admin routes are off: set ANYDAG_API_ADMIN_TOKEN to turn them on");
     const got = bearer(c.req.header("authorization")) ?? "";
     const a = createHash("sha256").update(want).digest();
     const b = createHash("sha256").update(got).digest();

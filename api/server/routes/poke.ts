@@ -1,7 +1,7 @@
 /**
  * `GET /v1/vaults/{v}/poke` — one SSE stream per open client that says *something changed* and
  * nothing else: `data: {"seq":N}` after each commit to that vault, a `: ping`
- * comment every 20 s so a proxy does not time the stream out, `204` when `ANYDAG_SYNC_POKE=off`.
+ * comment every 20 s so a proxy does not time the stream out, `204` when `ANYDAG_API_POKE=off`.
  *
  * Load-bearing:
  * - **The poke carries a number and no information.** Losing one costs the client a poll interval,

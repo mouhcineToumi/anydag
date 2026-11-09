@@ -26,7 +26,7 @@ import { serve as listen } from "@hono/node-server";
 import { DiskBlobs } from "./blobs/disk";
 import type { Blobs } from "./blobs/types";
 import { createApp, VERSION } from "./app";
-import { configFrom, type Config } from "./config";
+import { configFrom, describe, type Config } from "./config";
 import { collect, diskAge } from "./gc";
 import { pgDb, pgliteDb } from "./meta/db";
 import { PgMeta } from "./meta/pg";
@@ -126,9 +126,7 @@ export async function serve(config: Config = configFrom()): Promise<() => Promis
   const first = await bootstrap(store.meta, config, new Date());
   const server = listen({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
     console.log(`anydag-api ${VERSION}: ${config.mode} mode, listening on ${config.host}:${info.port}`);
-    console.log(
-      `  database: ${config.databaseUrl ? config.databaseUrl.replace(/\/\/[^@/]*@/, "//…@") : `PGlite in ${path.join(config.data, "pg")}`}`,
-    );
+    for (const row of describe(config)) console.log(`  ${row}`);
     console.log(`  blobs: ${store.blobRoot}`);
     if (first?.code) {
       console.log(`  pair a device with this code (valid 15 minutes, once):`);

@@ -1,7 +1,8 @@
 # anydag-api on this machine: Postgres and the server, both on
 # 127.0.0.1 only. `docker compose -f api/compose.yaml up -d db` is Postgres alone, which is what
 # `npm run api:dev` and `npm run api:test:pg` want; `up` with no service adds the server's image,
-# built from `api/dist/` — so `npm run api:build` first, which is what `npm run api:up` does.
+# built from `api/dist/` (see its build: below) — so `npm run api:build` first, which is what
+# `npm run api:up` does. The production shape of all three services is deploy/compose.yaml.
 name: anydag-api
 services:
   db:
@@ -9,32 +10,35 @@ services:
     environment:
       POSTGRES_USER: anydag
       POSTGRES_PASSWORD: anydag
-      POSTGRES_DB: anydag_sync
+      POSTGRES_DB: anydag_api
     ports:
-      - "127.0.0.1:${ANYDAG_SYNC_PG_PORT:-55432}:5432"
+      - "127.0.0.1:${ANYDAG_API_PG_PORT:-55432}:5432"
     volumes:
       - db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U anydag -d anydag_sync"]
+      test: ["CMD-SHELL", "pg_isready -U anydag -d anydag_api"]
       interval: 2s
       timeout: 3s
       retries: 30
   server:
     build:
-      context: ./dist
-      dockerfile: ../Dockerfile
+      # The context is api/ itself and `api/.dockerignore` keeps everything but `dist/` out, so
+      # `npm run api:build` first — this is what `npm run api:up` does — and the image never sees
+      # the repository or a .env file.
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://anydag:anydag@db:5432/anydag_sync
-      ANYDAG_SYNC_DATA: /data
-      ANYDAG_SYNC_PORT: "8790"
-      ANYDAG_SYNC_MODE: ${ANYDAG_SYNC_MODE:-single}
-      ANYDAG_SYNC_ADMIN_TOKEN: ${ANYDAG_SYNC_ADMIN_TOKEN:-}
-      ANYDAG_SYNC_PUBLIC_URL: http://127.0.0.1:${ANYDAG_SYNC_PORT:-8790}
+      DATABASE_URL: postgres://anydag:anydag@db:5432/anydag_api
+      ANYDAG_API_DATA: /data
+      ANYDAG_API_PORT: "8790"
+      ANYDAG_API_MODE: ${ANYDAG_API_MODE:-single}
+      ANYDAG_API_ADMIN_TOKEN: ${ANYDAG_API_ADMIN_TOKEN:-}
+      ANYDAG_API_PUBLIC_URL: http://127.0.0.1:${ANYDAG_API_PORT:-8790}
     ports:
-      - "127.0.0.1:${ANYDAG_SYNC_PORT:-8790}:8790"
+      - "127.0.0.1:${ANYDAG_API_PORT:-8790}:8790"
     volumes:
       - blobs:/data
 volumes:

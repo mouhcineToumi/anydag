@@ -3,8 +3,8 @@
 # `db` from api/compose.yaml, esbuild watching the sources, and Node restarting the
 # bundle whenever it is rewritten.
 #
-# Load-bearing: the ports come from the environment or .env (ANYDAG_SYNC_PORT, default 8790;
-# ANYDAG_SYNC_PG_PORT, default 55432) so a worktree runs its own pair beside another's, and never on
+# Load-bearing: the ports come from the environment or .env (ANYDAG_API_PORT, default 8790;
+# ANYDAG_API_PG_PORT, default 55432) so a worktree runs its own pair beside another's, and never on
 # 3500; DATABASE_URL set beforehand wins, so the same script serves a Postgres of your own. The watcher
 # is this script's child and goes when it does.
 set -euo pipefail
@@ -18,13 +18,13 @@ if [[ -f .env ]]; then
   done < .env
 fi
 
-export ANYDAG_SYNC_PORT="${ANYDAG_SYNC_PORT:-8790}"
-export ANYDAG_SYNC_PG_PORT="${ANYDAG_SYNC_PG_PORT:-55432}"
-export ANYDAG_SYNC_DATA="${ANYDAG_SYNC_DATA:-$PWD/.dev-home/sync}"
-export DATABASE_URL="${DATABASE_URL:-postgres://anydag:anydag@127.0.0.1:${ANYDAG_SYNC_PG_PORT}/anydag_sync}"
+export ANYDAG_API_PORT="${ANYDAG_API_PORT:-8790}"
+export ANYDAG_API_PG_PORT="${ANYDAG_API_PG_PORT:-55432}"
+export ANYDAG_API_DATA="${ANYDAG_API_DATA:-$PWD/.dev-home/sync}"
+export DATABASE_URL="${DATABASE_URL:-postgres://anydag:anydag@127.0.0.1:${ANYDAG_API_PG_PORT}/anydag_api}"
 
-if [[ "$ANYDAG_SYNC_PORT" == 3500 ]]; then
-  echo "api/dev.sh: 3500 is the app's port; pick another ANYDAG_SYNC_PORT" >&2
+if [[ "$ANYDAG_API_PORT" == 3500 ]]; then
+  echo "api/dev.sh: 3500 is the app's port; pick another ANYDAG_API_PORT" >&2
   exit 2
 fi
 

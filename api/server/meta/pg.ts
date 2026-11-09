@@ -139,6 +139,11 @@ export class PgMeta implements Meta {
     }
   }
 
+  /** The database's own word for `/v1/ready`: one `SELECT`, without touching a table. */
+  async ping(): Promise<void> {
+    await this.db.query("select 1");
+  }
+
   async close(): Promise<void> {
     await this.db.close();
   }

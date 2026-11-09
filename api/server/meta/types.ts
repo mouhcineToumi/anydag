@@ -71,6 +71,8 @@ export interface Meta {
   /** Apply every migration not yet applied, under an advisory lock, so two servers starting at once agree. */
   migrate(): Promise<void>;
   close(): Promise<void>;
+  /** The database answers: one `SELECT`, for `/v1/ready`. Throws when it does not. */
+  ping(): Promise<void>;
 
   // -- accounts and plans
   createAccount(name: string, plan?: string): Promise<Account>;

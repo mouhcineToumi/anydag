@@ -41,7 +41,7 @@ function options(version) {
     outfile: BUNDLE,
     banner: { js: "import{createRequire as __acr}from'node:module';const require=__acr(import.meta.url);" },
     external: EXTERNAL,
-    define: { __ANYDAG_SYNC_VERSION__: JSON.stringify(version) },
+    define: { __ANYDAG_API_VERSION__: JSON.stringify(version) },
     metafile: true,
     logLevel: "warning",
   };

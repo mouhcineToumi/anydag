@@ -5,8 +5,8 @@
  * carried twice or linked when nothing carries it. `harness/world.ts` says what each step does and
  * what each assertion allows.
  *
- * `ANYDAG_SYNC_SEEDS` sets how many seeds run (10 here, 100 under `npm run sync:converge`);
- * `ANYDAG_SYNC_SEED=<n>` runs one seed alone, which is how a printed failure is replayed.
+ * `ANYDAG_API_SEEDS` sets how many seeds run (10 here, 100 under `npm run api:converge`);
+ * `ANYDAG_API_SEED=<n>` runs one seed alone, which is how a printed failure is replayed.
  */
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -16,9 +16,9 @@ import { harness, type Harness } from "./helpers";
 import { describeFailure, runSeed, type SeedResult } from "./harness/run";
 import { World, type Dev } from "./harness/world";
 
-const ONE = process.env.ANYDAG_SYNC_SEED;
-const COUNT = Number(process.env.ANYDAG_SYNC_SEEDS ?? 10) || 10;
-const FIRST = Number(process.env.ANYDAG_SYNC_SEED_FROM ?? 1) || 1;
+const ONE = process.env.ANYDAG_API_SEED;
+const COUNT = Number(process.env.ANYDAG_API_SEEDS ?? 10) || 10;
+const FIRST = Number(process.env.ANYDAG_API_SEED_FROM ?? 1) || 1;
 const SEEDS = ONE !== undefined ? [Number(ONE)] : Array.from({ length: COUNT }, (_, i) => FIRST + i);
 
 let h: Harness;

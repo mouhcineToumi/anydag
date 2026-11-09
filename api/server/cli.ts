@@ -32,7 +32,7 @@ import { adminAccount, findAccount, parsePlan, planExists } from "./routes/admin
 import { HttpError } from "./routes/http";
 import { mintPairCode, wireDevice } from "./routes/pair";
 
-const HELP = `anydag-api — the AnyDag sync server
+const HELP = `anydag-api — the AnyDag api server
 
   serve                              run the server (config from the environment)
   migrate                            apply the database migrations and exit
@@ -47,9 +47,10 @@ const HELP = `anydag-api — the AnyDag sync server
                                      print the usage ledger
   gc                                 run the collector once
 
-Environment: ANYDAG_SYNC_MODE, DATABASE_URL (unset: PGlite in ANYDAG_SYNC_DATA/pg), ANYDAG_SYNC_DATA,
-ANYDAG_SYNC_PORT, ANYDAG_SYNC_HOST, ANYDAG_SYNC_ADMIN_TOKEN, ANYDAG_SYNC_HISTORY_DAYS, ANYDAG_SYNC_POKE,
-ANYDAG_SYNC_PUBLIC_URL, ANYDAG_SYNC_MAX_BODY_MB.
+Environment: ANYDAG_API_MODE, DATABASE_URL (unset: PGlite in ANYDAG_API_DATA/pg), ANYDAG_API_DATA,
+ANYDAG_API_PORT, ANYDAG_API_HOST, ANYDAG_API_ADMIN_TOKEN, ANYDAG_API_HISTORY_DAYS, ANYDAG_API_POKE,
+ANYDAG_API_PUBLIC_URL, ANYDAG_API_MAX_BODY_MB, ANYDAG_API_SYNC, ANYDAG_API_LOGS, ANYDAG_API_FEEDBACK.
+The old ANYDAG_SYNC_* names still answer, with a deprecation warning; api/.env.example lists all.
 Exit codes: 0 done, 1 refused, 2 usage.`;
 
 class Usage extends Error {}

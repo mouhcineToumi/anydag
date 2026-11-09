@@ -217,7 +217,7 @@ export class World {
     dev.fs = vaultFs(vault);
     dev.engine = new SyncEngine({
       fs: dev.fs,
-      api: new HttpSyncApi({ url: "http://sync.test", token: paired.token, fetch: fetcher, retries: 0 }),
+      api: new HttpSyncApi({ url: "http://api.test", token: paired.token, fetch: fetcher, retries: 0 }),
       state,
       bases: new Bases(path.join(stateDir, "bases")),
       vk,

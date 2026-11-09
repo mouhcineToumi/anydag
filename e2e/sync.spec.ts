@@ -59,10 +59,10 @@ test.beforeAll(async () => {
   url = `http://127.0.0.1:${port}`;
   const env = {
     ...process.env,
-    ANYDAG_SYNC_DATA: path.join(tmp, "server"),
-    ANYDAG_SYNC_PORT: String(port),
-    ANYDAG_SYNC_HOST: "127.0.0.1",
-    ANYDAG_SYNC_PUBLIC_URL: url,
+    ANYDAG_API_DATA: path.join(tmp, "server"),
+    ANYDAG_API_PORT: String(port),
+    ANYDAG_API_HOST: "127.0.0.1",
+    ANYDAG_API_PUBLIC_URL: url,
   };
   await run("node", [SYNC_BIN, "account", "add", "e2e"], { env });
   for (let i = 0; i < 2; i++) {

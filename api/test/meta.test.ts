@@ -1,6 +1,6 @@
 /**
  * `Meta`'s contract (api/server/meta/types.ts), written once and run against both backends the
- * port has: PGlite in this process, and — when `ANYDAG_SYNC_TEST_PG` holds a URL — the same suite
+ * port has: PGlite in this process, and — when `ANYDAG_API_TEST_PG` holds a URL — the same suite
  * over `pgDb` against a real Postgres on a schema of its own. The suite seeds itself: every test
  * mints its own ids, because the Postgres run shares one schema, and so asserts only what it made.
  *
@@ -73,7 +73,7 @@ const pgSuite = async (url: string): Promise<Suite> => {
   } catch (cause) {
     await root.close().catch(() => {});
     throw new Error(
-      `ANYDAG_SYNC_TEST_PG=${url} did not answer (${cause instanceof Error ? cause.message : String(cause)}) — is the compose database up? (docker compose -f sync/compose.yaml up -d --wait db)`,
+      `ANYDAG_API_TEST_PG=${url} did not answer (${cause instanceof Error ? cause.message : String(cause)}) — is the compose database up? (docker compose -f api/compose.yaml up -d --wait db)`,
     );
   }
   const schema = `t_${Math.random().toString(36).slice(2, 12)}`;
@@ -653,7 +653,7 @@ function contract(label: string, make: () => Promise<Suite>): void {
 
 // -- the backends -----------------------------------------------------------------------------------
 
-const PG_URL = process.env.ANYDAG_SYNC_TEST_PG ?? "";
+const PG_URL = process.env.ANYDAG_API_TEST_PG ?? "";
 
 contract("the Meta contract on PGlite", pgliteSuite);
 if (PG_URL !== "") contract("the Meta contract on Postgres", () => pgSuite(PG_URL));

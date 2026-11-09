@@ -5,10 +5,15 @@
  * `app.request(…)`, and `main.ts` over a real Postgres and a socket, with no difference between.
  *
  * Load-bearing:
- * - **Who may ask is decided by path, in one place**: `/v1/health`, `/v1/pair` and `/v1/logs` are open,
- *   `/v1/admin/*` and `/metrics` take the admin token, every other `/v1/*` a device token, and
+ * - **Who may ask is decided by path, in one place**: `/v1`, `/v1/health`, `/v1/ready` and
+ *   `/v1/logs` answer without a token of any kind; `/v1/pair` takes its code as its credential;
+ *   `/v1/admin/*` and `/metrics` the admin token; every other `/v1/*` a device token, and
  *   `/v1/vaults/{v}/*` also a vault of that device's account. A route added under `/v1/` is behind
  *   a device token by default; forgetting is never a hole.
+ * - **A feature that is `off` does not exist**: with `ANYDAG_API_SYNC=off` every sync route —
+ *   pairing, devices, vaults, and `/v1/admin/*` and `/metrics`, which only look at sync's data —
+ *   answers `ES_NOT_FOUND` before any token is read, so discovery of what is switched off does not
+ *   start with a `401`. `ANYDAG_API_LOGS=off` and `ANYDAG_API_FEEDBACK=off` are their routes' own gates.
  * - **Errors are answered by one handler**: an `HttpError` becomes `{code, message, ...extra}` at
  *   `STATUS[code]`; anything else is a 500 carrying a message and no `code` (no `ES_*` describes
  *   it, and the client retries a 5xx without one) and never the stack, which goes to stderr. An unknown route is
@@ -35,11 +40,12 @@ import { HttpError, type Deps, type Vars } from "./routes/http";
 import { logRoutes } from "./routes/logs";
 import { pairRoutes } from "./routes/pair";
 import { PokeHub, pokeRoutes } from "./routes/poke";
+import { serviceRoutes } from "./routes/service";
 import { vaultRoutes } from "./routes/vaults";
 import { Usage } from "./usage";
 
-declare const __ANYDAG_SYNC_VERSION__: string;
-export const VERSION = typeof __ANYDAG_SYNC_VERSION__ === "string" ? __ANYDAG_SYNC_VERSION__ : "dev";
+declare const __ANYDAG_API_VERSION__: string;
+export const VERSION = typeof __ANYDAG_API_VERSION__ === "string" ? __ANYDAG_API_VERSION__ : "dev";
 
 export interface AppOptions {
   meta: Meta;
@@ -52,8 +58,6 @@ export interface AppOptions {
   pingMs?: number;
   ageOf?: (vault: string, id: string) => Promise<number | null>;
 }
-
-const OPEN = new Set(["/v1/health", "/v1/pair", "/v1/logs"]);
 
 export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps: Deps } {
   const now = opts.now ?? (() => new Date());
@@ -84,17 +88,28 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   });
 
   const asDevice = device(deps);
+  /* Routes that answer whatever the switches say: /v1 itself, the two checks — and /v1/logs,
+     which is its own feature (`ANYDAG_API_LOGS=off` is the 404 of its own, and sync's switch is
+     not its business). */
+  const always = new Set(["/v1/health", "/v1/ready", "/v1/logs"]);
   app.use("/v1/*", async (c, next) => {
     const p = c.req.path;
-    if (OPEN.has(p) || p.startsWith("/v1/admin/")) return next();
+    if (p === "/v1" || always.has(p)) return next();
+    if (!deps.config.sync) throw new HttpError("ES_NOT_FOUND", "this server does not run sync");
+    /* Pairing carries its code as its credential; the admin routes the admin token. */
+    if (p === "/v1/pair" || p.startsWith("/v1/admin/")) return next();
     return asDevice(c, next);
   });
   app.use("/v1/vaults/:v/*", vault(deps));
   const asAdmin = admin(deps);
   app.use("/v1/admin/*", asAdmin);
-  app.use("/metrics", asAdmin);
+  app.use("/metrics", async (c, next) => {
+    if (!deps.config.sync) throw new HttpError("ES_NOT_FOUND", "this server does not run sync");
+    return asAdmin(c, next);
+  });
 
   for (const sub of [
+    serviceRoutes(deps),
     pairRoutes(deps),
     logRoutes(deps),
     vaultRoutes(deps),

@@ -101,7 +101,7 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       # `npm run api:test:pg` reads this; the default is `api/compose.yaml`'s port on a laptop.
-      ANYDAG_SYNC_TEST_PG: postgres://anydag:anydag@127.0.0.1:5432/anydag_sync
+      ANYDAG_API_TEST_PG: postgres://anydag:anydag@127.0.0.1:5432/anydag_api
     services:
       postgres:
         # The image `api/compose.yaml` runs, with the same credentials.
@@ -109,11 +109,11 @@ jobs:
         env:
           POSTGRES_USER: anydag
           POSTGRES_PASSWORD: anydag
-          POSTGRES_DB: anydag_sync
+          POSTGRES_DB: anydag_api
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U anydag -d anydag_sync"
+          --health-cmd "pg_isready -U anydag -d anydag_api"
           --health-interval 2s
           --health-timeout 3s
           --health-retries 30

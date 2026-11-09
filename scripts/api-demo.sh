@@ -10,12 +10,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PORT="${ANYDAG_SYNC_DEMO_PORT:-8795}"
+PORT="${ANYDAG_API_DEMO_PORT:-8795}"
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/anydag-api-demo.XXXXXX")"
 SYNC="node api/dist/anydag-api.mjs"
-export ANYDAG_SYNC_DATA="$ROOT/server" ANYDAG_SYNC_PORT="$PORT" ANYDAG_SYNC_HOST=127.0.0.1
-export ANYDAG_SYNC_PUBLIC_URL="http://127.0.0.1:$PORT"
-URL="$ANYDAG_SYNC_PUBLIC_URL"
+export ANYDAG_API_DATA="$ROOT/server" ANYDAG_API_PORT="$PORT" ANYDAG_API_HOST=127.0.0.1
+export ANYDAG_API_PUBLIC_URL="http://127.0.0.1:$PORT"
+URL="$ANYDAG_API_PUBLIC_URL"
 PASS="correct horse battery"
 SERVER_PID=""
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }

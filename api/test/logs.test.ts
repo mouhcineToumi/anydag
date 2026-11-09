@@ -66,7 +66,7 @@ describe("/v1/logs", () => {
   });
 
   it("is not there when the server keeps no logs", async () => {
-    h = await harness("pglite", { ANYDAG_SYNC_LOGS: "off" });
+    h = await harness("pglite", { ANYDAG_API_LOGS: "off" });
     expect((await call(h, "POST", "/v1/logs", { json: batch([tidy]) })).status).toBe(404);
   });
 });
