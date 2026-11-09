@@ -189,9 +189,11 @@ Nine things are load-bearing:
 - **A drag on empty time makes an event, and a drag on an event or a task moves it**. A
   press anywhere but on an item starts a range, snapped to a quarter of an hour in the grid and to days
   in the all-day row and a month, and a small card asks for the title; the file is named after it, in
-  the project's folder when the page shows one — the Tasks page's rule. A press on an item that does
-  not move is a click that opens it (a real link, so a modifier opens a tab). One that does picks it
-  up: along the days in a month and the all-day row, where the days it would land on wear the mark a
+  the project's folder when the page shows one — the Tasks page's rule. **The title is the file's,
+  once**: `/create` names the file after the title and drops the `title:` line, so the event's own
+  page reads the leaf of its name as its title (*Notes*), and the bar above agrees. A press on an
+  item that does not move is a click that opens it (a real link, so a modifier opens a tab). One that
+  does picks it up: along the days in a month and the all-day row, where the days it would land on wear the mark a
   range does, and in the hour grid by quarter hours and across the columns, where a ghost says the
   time it would start and end. It keeps how long it is — `shiftEvent` is `withStart` with the start
   carried past midnight, and a task's start and due move together (`shiftTask`). **The last few
