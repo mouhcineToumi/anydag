@@ -60,7 +60,9 @@ export interface NewChange {
 export interface Storage {
   /** Sealed bytes of every blob a live head names. */
   live: number;
-  /** Sealed bytes of every other blob still kept. */
+  /** Sealed bytes of every blob uploaded and never named by a commit. */
+  pending: number;
+  /** Sealed bytes of every other blob still kept: committed once, named by no head now. */
   history: number;
   blobs: number;
   /** Heads that are not deletes. */
@@ -106,11 +108,14 @@ export interface Meta {
 
   // -- blobs (the index; the bytes are `Blobs`')
   /**
-   * Record a blob the store now holds. A second call for one id is nothing. `at` is the server's
-   * clock (the route passes `deps.now()`), the clock the log's `at` and the collector's window are
-   * read on; absent, the database's own `now()`.
+   * Record a blob the store now holds, as pending until a commit names it. A second call for one id
+   * is nothing. `at` is the server's clock (the route passes `deps.now()`), the clock the log's `at`
+   * and the collector's windows are read on; absent, the database's own `now()`. With `quota`, the
+   * row is written only if the account's live and pending bytes plus `size` stay within
+   * `quota.bytes`, decided under a lock per account so two uploads cannot both take the last room:
+   * `false` when it would not fit (an id already recorded always fits — it adds nothing).
    */
-  addBlob(vault: string, id: string, size: number, at?: string): Promise<void>;
+  addBlob(vault: string, id: string, size: number, at?: string, quota?: { account: string; bytes: number }): Promise<boolean>;
   blobSize(vault: string, id: string): Promise<number | null>;
 
   // -- the log
@@ -139,6 +144,23 @@ export interface Meta {
    * lowest remaining `seq` (or `seq + 1` when nothing remains). Answers the blob ids it forgot, so
    * the caller can delete their bytes.
    */
-  collect(vault: string, before: string): Promise<{ compacted: number; blobs: { id: string; size: number }[] }>;
+  collect(
+    vault: string,
+    before: string,
+    /** Also forget every blob never committed and uploaded before this instant (the short window). */
+    pendingBefore?: string,
+  ): Promise<{ compacted: number; blobs: { id: string; size: number }[] }>;
+  /**
+   * While the account's history is over `bytes`, forget this vault's oldest history: first the
+   * committed blobs no log row names any more, then the oldest log rows a newer row of their key
+   * supersedes, a few at a time, with the blobs that leaves unnamed — whatever their age. Never a
+   * key's newest row, never a blob a head names, never a pending blob. Raises the horizon in the
+   * same transaction. Answers what it forgot, for the caller to delete the bytes of.
+   */
+  trimHistory(
+    account: string,
+    vault: string,
+    bytes: number,
+  ): Promise<{ compacted: number; blobs: { id: string; size: number }[] }>;
   allVaults(): Promise<VaultRow[]>;
 }

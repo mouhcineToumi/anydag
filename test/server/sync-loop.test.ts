@@ -349,3 +349,19 @@ describe("what a process that is not the app does with a linked vault", () => {
     }
   });
 });
+
+describe("pairing over plain http", () => {
+  it("is refused unless the server is on this machine: the device token travels in every request", async () => {
+    const X = app();
+    for (const server of ["http://sync.example.com", "http://192.168.1.20:8790", "http://127.0.0.1.example.com"]) {
+      const got = await X.call("POST", "/api/sync/pair", { server, code: "AAAAA-AAAAA" });
+      expect(got.status, server).toBe(400);
+      expect(String((got.json as { error?: string; message?: string }).error ?? JSON.stringify(got.json))).toMatch(/https:\/\//);
+    }
+    // On this machine it gets as far as the code, which is the sync server's to judge.
+    for (const server of ["http://localhost:1", "http://127.0.0.2:1", "http://[::1]:1"]) {
+      const got = await X.call("POST", "/api/sync/pair", { server, code: "AAAAA-AAAAA" });
+      expect(got.status, server).toBe(502);
+    }
+  });
+});

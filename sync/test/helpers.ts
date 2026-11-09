@@ -17,6 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { PROTOCOL, PROTOCOL_HEADER } from "../protocol/wire";
 import { createApp } from "../server/app";
 import { DiskBlobs } from "../server/blobs/disk";
 import { configFrom, type Config } from "../server/config";
@@ -105,6 +106,8 @@ export async function harness(backend: Backend = "pglite", env: Record<string, s
 
 export interface CallOptions {
   token?: string;
+  /** The protocol the request says it speaks: this build's unless given; `null` says none (0.2.0). */
+  protocol?: string | null;
   json?: unknown;
   bytes?: Uint8Array;
   headers?: Record<string, string>;
@@ -112,6 +115,7 @@ export interface CallOptions {
 
 export function call(h: Harness, method: string, route: string, opts: CallOptions = {}): Promise<Response> {
   const headers: Record<string, string> = { ...opts.headers };
+  if (opts.protocol !== null) headers[PROTOCOL_HEADER] = opts.protocol ?? String(PROTOCOL);
   if (opts.token) headers.authorization = `Bearer ${opts.token}`;
   let body: BodyInit | undefined;
   if (opts.json !== undefined) {

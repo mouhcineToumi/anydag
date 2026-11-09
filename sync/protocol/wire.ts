@@ -11,7 +11,19 @@
  * of them travel as base64url strings.
  */
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
+
+/**
+ * Every request a device makes says the protocol it speaks in this header, and every answer the
+ * server gives says its own. A server refuses a request that says another number, or none (a 0.2.0
+ * client), with `ES_PROTOCOL`; a client refuses an answer that says another, or none (a 0.2.0
+ * server), with the same code. `/v1/health` (which says it in its body), `/v1/logs`, the poke stream
+ * and `/v1/admin/*` carry nothing whose shape moved and are not checked.
+ *
+ * Protocol 2 seals a change's `meta` bound to its key, its blob and its parent (`meta.ts`): a peer
+ * of protocol 1 could neither open such a `meta` nor write one a peer of protocol 2 would open.
+ */
+export const PROTOCOL_HEADER = "anydag-sync-protocol";
 
 // -- errors --------------------------------------------------------------------------------------
 
@@ -36,7 +48,9 @@ export type ErrorCode =
   /** A pairing code that is unknown, used or expired. 400. */
   | "ES_PAIR"
   /** A vault key that is already set, or a `PUT` whose `etag` is not the current one. 409. */
-  | "ES_KEY_SET";
+  | "ES_KEY_SET"
+  /** A request or an answer of another protocol than this side's (`PROTOCOL_HEADER`). 426. */
+  | "ES_PROTOCOL";
 
 export interface ErrorBody {
   code: ErrorCode;
@@ -61,6 +75,7 @@ export const STATUS: Readonly<Record<ErrorCode, number>> = {
   ES_HORIZON: 410,
   ES_PAIR: 400,
   ES_KEY_SET: 409,
+  ES_PROTOCOL: 426,
 };
 
 // -- health, pairing, devices ---------------------------------------------------------------------
@@ -184,7 +199,10 @@ export interface Change {
   parent: number | null;
   /** The new content's blob, or `null` for a delete. */
   blob: string | null;
-  /** `Meta`, sealed with the key as associated data (`sealMeta`). Carried on a delete too. */
+  /**
+   * `Meta`, sealed with this change's key, blob and parent inside it (`sealMeta`), so it is refused
+   * under any other log entry. Carried on a delete too.
+   */
   meta: string;
 }
 
@@ -232,6 +250,8 @@ export interface ChangesResponse {
 export interface Head {
   key: string;
   seq: number;
+  /** The `parent` of the change that made this head: what its sealed `meta` is bound to. */
+  parent: number | null;
   blob: string | null;
   size: number;
   meta: string;
@@ -264,8 +284,15 @@ export interface Report {
 /** Every limit `null` is unlimited, which is the default plan (`free`) and every plan until somebody sets one. */
 export interface Plan {
   id: string;
+  /** Live bytes (what a head names) plus bytes uploaded and never committed. */
   storage_bytes: number | null;
   history_days: number | null;
+  /**
+   * Superseded history the server keeps, in sealed bytes; past it the oldest goes first, whatever
+   * `history_days` says. `null` is `storage_bytes` (so a plan with a quota bounds its history too),
+   * and unlimited only when that is null as well.
+   */
+  history_bytes: number | null;
   max_file_bytes: number | null;
   devices: number | null;
 }
@@ -275,7 +302,7 @@ export interface AccountInfo {
   id: string;
   name: string;
   plan: Plan;
-  used: { storage_live: number; storage_history: number; devices: number; vaults: number };
+  used: { storage_live: number; storage_pending: number; storage_history: number; devices: number; vaults: number };
 }
 
 /** The metrics the ledger counts. */

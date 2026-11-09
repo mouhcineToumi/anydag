@@ -37,7 +37,11 @@ describe("the protocol's crypto, end to end", () => {
     expect(openBlob(k.enc, id, sealBlob(k.enc, id, bytes))).toEqual(bytes);
     const key = keyOf(k.path, "a.md");
     expect(
-      openMeta(k.enc, key, sealMeta(k.enc, key, { path: "a.md", kind: "file", created: null, mtime: 1, size: 5 })).path,
+      openMeta(
+        k.enc,
+        { key, blob: id, parent: null },
+        sealMeta(k.enc, { key, blob: id, parent: null }, { path: "a.md", kind: "file", created: null, mtime: 1, size: 5 }),
+      ).path,
     ).toBe("a.md");
     const code = recoveryCode(vk);
     expect(fromRecoveryCode(code.toLowerCase())).toEqual(vk);

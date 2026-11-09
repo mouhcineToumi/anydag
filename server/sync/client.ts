@@ -9,6 +9,9 @@
  *   pulls, `ES_HORIZON` resyncs, `ES_AUTH` stops.
  * - **A request that got no answer is asked again** on a short backoff; an answer, a 4xx above all,
  *   never is — it is the server's word on the request.
+ * - **Every request says `PROTOCOL`, and every answer must say it back** (`PROTOCOL_HEADER`). An
+ *   answer that says another, or none — a 0.2.0 server, which would store and serve metadata this
+ *   client cannot check — is `ES_PROTOCOL`, whatever its status; `/v1/health` says it in its body.
  * - Paths are exactly `wire.ts`'s, and a blob travels as the raw body.
  */
 
@@ -31,7 +34,7 @@ import type {
   VaultKey,
   VaultsResponse,
 } from "../../sync/protocol/wire";
-import { MAX_PAGE } from "../../sync/protocol/wire";
+import { MAX_PAGE, PROTOCOL, PROTOCOL_HEADER } from "../../sync/protocol/wire";
 
 export interface SyncApi {
   health(): Promise<Health>;
@@ -101,7 +104,7 @@ export class HttpSyncApi implements SyncApi {
 
   /** One request, retried while it gets no answer; an answer that is not 2xx throws its code. */
   private async send(method: string, route: string, body?: unknown, raw?: Uint8Array): Promise<Response> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { [PROTOCOL_HEADER]: String(PROTOCOL) };
     if (this.token) headers.authorization = `Bearer ${this.token}`;
     let payload: BodyInit | undefined;
     if (raw) {
@@ -125,8 +128,10 @@ export class HttpSyncApi implements SyncApi {
         }
         throw new SyncError(0, "ES_NETWORK", `${method} ${route}: ${(e as Error).message ?? "no answer"}`);
       }
-      if (res.ok) return res;
-      if (res.status === 404 && method === "HEAD") return res;
+      if (res.ok || (res.status === 404 && method === "HEAD")) {
+        this.sameProtocol(res, method, route);
+        return res;
+      }
       const text = await res.text().catch(() => "");
       let parsed: ErrorBody | undefined;
       try {
@@ -140,13 +145,32 @@ export class HttpSyncApi implements SyncApi {
         wait *= 2;
         continue;
       }
-      if (parsed) throw new SyncError(res.status, parsed.code, parsed.message ?? parsed.code, parsed);
+      if (parsed) {
+        // The server's own refusal of our protocol says which side is behind better than we can.
+        if (parsed.code !== "ES_PROTOCOL") this.sameProtocol(res, method, route);
+        throw new SyncError(res.status, parsed.code, parsed.message ?? parsed.code, parsed);
+      }
       throw new SyncError(
         res.status,
         res.status >= 500 ? "ES_NETWORK" : "ES_BAD_REQUEST",
         `${method} ${route}: ${res.status} ${text.slice(0, 200)}`,
       );
     }
+  }
+
+  /** `ES_PROTOCOL` unless the answer is from a server of this client's protocol. */
+  private sameProtocol(res: Response, method: string, route: string): void {
+    if (route === "/v1/health") return;
+    const said = res.headers.get(PROTOCOL_HEADER);
+    if (said === String(PROTOCOL)) return;
+    const theirs = said === null ? null : Number(said);
+    throw new SyncError(
+      res.status,
+      "ES_PROTOCOL",
+      theirs === null
+        ? `The sync server at ${this.base} is older than this AnyDag: it did not say a sync protocol (${method} ${route}), and this AnyDag speaks ${PROTOCOL}. Update the sync server.`
+        : `The sync server at ${this.base} speaks sync protocol ${said}, and this AnyDag speaks ${PROTOCOL}: update ${theirs > PROTOCOL ? "AnyDag" : "the sync server"}.`,
+    );
   }
 
   private async json<T>(method: string, route: string, body?: unknown): Promise<T> {

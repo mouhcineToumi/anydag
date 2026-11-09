@@ -113,6 +113,7 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
       plan,
       used: {
         storage_live: Number(storage.live),
+        storage_pending: Number(storage.pending),
         storage_history: Number(storage.history),
         devices: live(devices),
         vaults: vaults.length,
