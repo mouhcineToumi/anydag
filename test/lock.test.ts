@@ -7,6 +7,7 @@ import {
   LOCK_KEYS,
   LOCK_REFUSED,
   isLocked,
+  lockNoticeLeaves,
   lockNoticeText,
   lockedAffordance,
   mayEdit,
@@ -104,5 +105,11 @@ describe("the lock", () => {
     expect(lockNoticeText("refused")).toBe("Read only: unlock to change this.");
     expect(lockNoticeText("locked")).toMatch(/^Read only:/);
     expect(lockNoticeText("unlocked")).toMatch(/^Unlocked:/);
+  });
+
+  it("lets the two announcements leave on the timer, and holds a refusal until it is dismissed", () => {
+    expect(lockNoticeLeaves("locked")).toBe(true);
+    expect(lockNoticeLeaves("unlocked")).toBe(true);
+    expect(lockNoticeLeaves("refused")).toBe(false);
   });
 });

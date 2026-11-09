@@ -52,6 +52,16 @@ export function lockNoticeText(said: LockSaid): string {
 }
 
 /**
+ * Which lines leave on the notice's timer. *Locked* and *unlocked* are announcements and go; a
+ * *refused* line stays until it is dismissed or the app is unlocked, because a press that was
+ * stopped is the thing the person is looking for an answer to. The notice handles the timer and the
+ * dismiss; this is the rule, kept beside the words.
+ */
+export function lockNoticeLeaves(said: LockSaid): boolean {
+  return said !== "refused";
+}
+
+/**
  * What a control that writes wears while the app is locked: `aria-disabled`, the class hook the
  * chrome styles, and the one sentence a hover explains it with. Spreading nothing when unlocked is
  * deliberate — a control that writes should not carry a lock's attributes all the time.

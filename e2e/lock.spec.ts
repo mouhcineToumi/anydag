@@ -129,12 +129,11 @@ test("with nothing open, a locked card says read only and unlocks in place", asy
     await expect(act).toHaveAttribute("data-dag-readonly-blocked", "");
   }
 
-  /* The notice is a banner while locked, not a flash: it is still here after 3 s. */
+  /* The page-loaded *read only* line says its piece and leaves the controls under it alone. */
   const notice = page.locator("[data-dag-readonly-notice]");
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "locked");
-  await notice.hover();
-  await page.waitForTimeout(3000);
   await expect(notice).toBeVisible();
+  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "locked");
+  await expect(notice).toBeHidden({ timeout: 5000 });
 
   /* Unlock is in place, and the card becomes a card that can start something — no reload. */
   await card.locator("[data-dag-welcome-unlock]").click();
@@ -145,7 +144,7 @@ test("with nothing open, a locked card says read only and unlocks in place", asy
   await expect(notice).toHaveAttribute("data-dag-readonly-notice", "unlocked");
 });
 
-test("a refused write leaves a notice with Unlock that stays while the pointer is on it", async ({ page }) => {
+test("a refused write leaves a notice with Unlock that waits for its dismiss", async ({ page }) => {
   const { name } = board();
   await lockFirst(page);
   await page.goto(`/?board=${name}`);
@@ -157,10 +156,15 @@ test("a refused write leaves a notice with Unlock that stays while the pointer i
   await expect(notice).toHaveAttribute("data-dag-readonly-notice", "refused");
   await expect(notice).toContainText("Read only: unlock to change this.");
 
-  /* The button cannot vanish under the pointer that is reaching for it. */
-  await notice.hover();
+  /* A refusal does not flash: it is still here after the announcements would have gone. */
   await page.waitForTimeout(3000);
   await expect(notice).toBeVisible();
+
+  /* The × puts it away so what is under it can be reached; a new refusal brings it back. */
+  await notice.locator("[data-dag-readonly-dismiss]").click();
+  await expect(notice).toHaveCount(0);
+  await page.locator("[data-dag-sidebar-new]").click({ force: true });
+  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "refused");
 
   await notice.locator("[data-dag-readonly-unlock]").click();
   await expect(page.locator("[data-dag-readonly]")).toHaveCount(0);

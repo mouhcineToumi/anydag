@@ -3876,6 +3876,22 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   cursor: pointer;
 }
 .dag-readonly-notice__unlock:hover { background: var(--dag-color-paper200); }
+.dag-readonly-notice__dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-readonly-notice__dismiss:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-readonly-notice__dismiss:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 /* A control that writes while the app is locked. It keeps its press — which the notice answers, so
    the page is never silently dead — but reads as unavailable before one, and its `title` names the
    word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control

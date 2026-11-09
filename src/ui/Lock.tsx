@@ -1,4 +1,4 @@
-import { Lock, LockOpen } from "lucide-react";
+import { Lock, LockOpen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -7,6 +7,7 @@ import {
   LOCK_REFUSED,
   type LockSaid,
   isLocked,
+  lockNoticeLeaves,
   lockNoticeText,
   setLocked,
   toggleLock,
@@ -60,12 +61,13 @@ const NOTICE_MS = 2600;
  *
  * A press on a locked page that did nothing and said nothing would read as a broken page, which is
  * the one thing a read-only mode must not look like. So every place that refuses a write calls
- * `refuseLocked()`, and this is where that is heard. **A refusal stays up for as long as the app is
- * locked**, rather than flashing for 2.6 s and leaving the page looking broken: the person can read
- * it, reach the Unlock on it, and connect it to the pill. The one line that leaves on a timer is the
- * word that unlocking worked, and its timer holds while the pointer or the focus is on the notice,
- * so the button cannot vanish under a click. `role="status"`, so a screen reader hears it too, and
- * never the focus: it is told, not asked.
+ * `refuseLocked()`, and this is where that is heard. **The *locked* and *unlocked* lines leave after
+ * 2.6 s**, because the top-bar pill and the cards already say the app is locked, and a card that sat
+ * over the Calendar's toolbar for ever would be the same problem the other way round. **A *refused*
+ * line stays until it is dismissed or the app is unlocked**, so a press that was stopped is not a
+ * flash the person missed; it wears a `×` that puts it away. Every timer holds while the pointer or
+ * the focus is on the notice, so the buttons cannot vanish under a click. `role="status"`, so a
+ * screen reader hears it too, and never the focus: it is told, not asked.
  */
 export function LockNotice() {
   const locked = useLocked();
@@ -83,14 +85,15 @@ export function LockNotice() {
     const say = (what: LockSaid) => {
       setSaid(what);
       stop();
-      /* *Locked* and *refused* stay while the app is locked; only *unlocked* is a message that
-         has said its piece and may go. */
-      if (what === "unlocked" && !held.current) leave();
+      /* A refusal waits for its dismiss; the two announcements leave. */
+      if (lockNoticeLeaves(what) && !held.current) leave();
     };
     const onChange = () => say(isLocked() ? "locked" : "unlocked");
     const onRefused = () => say("refused");
     addEventListener(LOCK_CHANGED, onChange);
     addEventListener(LOCK_REFUSED, onRefused);
+    /* A page loaded locked says so once, then leaves the controls it covers alone. */
+    if (isLocked()) leave();
     return () => {
       removeEventListener(LOCK_CHANGED, onChange);
       removeEventListener(LOCK_REFUSED, onRefused);
@@ -105,7 +108,7 @@ export function LockNotice() {
   };
   const release = () => {
     held.current = false;
-    if (said !== "unlocked") return;
+    if (!lockNoticeLeaves(said)) return;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setSaid(null), NOTICE_MS);
   };
@@ -132,6 +135,22 @@ export function LockNotice() {
           onClick={() => setLocked(false)}
         >
           Unlock
+        </button>
+      ) : null}
+      {said === "refused" ? (
+        <button
+          type="button"
+          className="dag-readonly-notice__dismiss"
+          data-dag-readonly-dismiss=""
+          aria-label="Dismiss"
+          title="Dismiss"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            held.current = false;
+            setSaid(null);
+          }}
+        >
+          <X {...ICON} />
         </button>
       ) : null}
     </div>

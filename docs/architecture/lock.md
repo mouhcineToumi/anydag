@@ -26,13 +26,15 @@ Seven things are load-bearing:
   person sees; the floor is what holds when a key, a menu or a test reaches a write anyway.
 - **A refusal is said, never silent — and said where it can be seen.** `refuseLocked()` is the call,
   and it returns `false` so a write that answers with whether it landed can return it. `LockNotice`
-  turns it into a banner under the top bar with **Unlock** on it, and **a refusal stays up for as long
-  as the app is locked**: it used to flash for 2.6 s at the top right, which the person who pressed a
-  button elsewhere did not see, and read as a broken page. The *unlocked* line is the only one that
-  leaves on a timer, and that timer holds while the pointer or the focus is on the notice, so its
-  Unlock cannot vanish under a click. The notice's own `Unlock` and the `Nothing open` card's are the
-  same `setLocked(false)`: nothing reloads, and every control comes back because each page draws from
-  `useLocked()`.
+  turns it into a banner under the top bar with **Unlock** on it, and **a refusal stays until it is
+  dismissed or the app is unlocked**: it used to flash for 2.6 s at the top right, which the person
+  who pressed a button elsewhere did not see, and read as a broken page. Its `×`
+  (`data-dag-readonly-dismiss`) puts it away so the controls under it can be reached, and a new
+  refusal brings it back. The *locked* and *unlocked* lines are announcements and leave on the 2.6 s
+  timer — keeping *locked* up for ever covered the Calendar's month toolbar — and every timer holds
+  while the pointer or the focus is on the notice, so its buttons cannot vanish under a click. The
+  notice's own `Unlock` and the `Nothing open` card's are the same `setLocked(false)`: nothing
+  reloads, and every control comes back because each page draws from `useLocked()`.
 - **A control that writes looks read-only before it is pressed.** `lockedAffordance(locked)` gives it
   `aria-disabled`, the `data-dag-readonly-blocked` hook that `chrome.css` dims, and the one hover
   sentence `LOCK_HINT` — *Read only — unlock (Ctrl+Shift+L)*. It keeps its click, because the notice
@@ -64,7 +66,7 @@ Seven things are load-bearing:
 
 Names claimed, grepped first: `dag-readonly*` (not `dag-lock*`: the logo owns `dag-lockup`),
 `data-dag-readonly`, `data-dag-readonly-notice`, `data-dag-readonly-unlock`,
-`data-dag-readonly-blocked`, `data-dag-locked`, `data-dag-welcome-locked`,
+`data-dag-readonly-dismiss`, `data-dag-readonly-blocked`, `data-dag-locked`, `data-dag-welcome-locked`,
 `data-dag-welcome-unlock`, `data-dag-empty-board-unlock`, `data-dag-calendar-new-locked`,
 `data-dag-calendar-new-unlock`, `data-dag-trash-unlock`, `dag-sidebar__menu-locked`,
 `data-dag-sidebar-menu-locked`, `data-dag-quiz-locked`, `data-dag-trash-locked`, the storage key
