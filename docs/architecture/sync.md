@@ -71,6 +71,8 @@ Eleven things are load-bearing:
 - **Linking adopts the remote's id.** Upload creates the remote under the vault's own id; download
   (into an empty vault) and merge call `Session.rekeyVault`, which moves the home's rows and the
   sync folder, and the page reloads onto `?vault=<new id>`.
+- **A link is bound to its folder.** `pair.json` records the root it was made for; a vault whose id
+  another folder claims pauses with a sentence instead of starting that link's loop.
 - **Nothing about sync is in the vault.** `<home>/sync/<vault>/` holds `pair.json` (the device token,
   mode 0600), `key` (the vault key sealed under the home secret — `ANYDAG_HOME_SECRET`, which the
   desktop app keeps in `safeStorage`, else `<home>/home.secret`), `state.sqlite` and `bases/`. A vault

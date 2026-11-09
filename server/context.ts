@@ -23,8 +23,8 @@ import { Practice } from "./practice";
 import { SyncLinks } from "./sync/link";
 import { Telemetry } from "./telemetry";
 import { DEFAULT_MAX_MB } from "./uploads";
-import { validId } from "./ids";
-import { Refused, Vault, type VaultOptions, writeAtomic } from "./vault";
+import { mint, validId } from "./ids";
+import { readVaultId, Refused, Vault, type VaultOptions, writeAtomic } from "./vault";
 
 export interface Limits {
   maxBytes: number;
@@ -146,8 +146,7 @@ export class Session {
   private adopt(vault: Vault): Open {
     const had = this.open.get(vault.id);
     if (had) {
-      this.defaultId = vault.id;
-      this.remember(vault);
+      this.defaultId = had.vault.id;
       return had;
     }
     const at: Open = {
@@ -174,14 +173,37 @@ export class Session {
   /**
    * Open a folder as a vault, or bring one already open to the front. Refused when it is not a
    * folder, and when it is inside a vault or holds one — two vaults would each list the other's files.
+   *
+   * **An id belongs to a folder.** A folder whose `.anydag/vault.json` names an id the home already
+   * maps to another folder that still exists and still claims it is a copy: it gets a fresh id, the
+   * rule the store already applies to a duplicate document id, so it can never take over the
+   * original's recent row or sync link.
    */
   openFolder(folder: string): Vault {
     const root = path.resolve(folder);
     if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) throw new Refused(`\`${root}\` is not a folder`);
     const nested = this.nesting(root);
     if (nested) throw new Refused(nested);
-    for (const o of this.open.values()) if (o.vault.root === root) return this.adopt(o.vault).vault;
+    for (const o of this.open.values()) if (sameFolder(o.vault.root, root)) return this.adopt(o.vault).vault;
+    const claimed = readVaultId(root);
+    if (claimed && this.claimedElsewhere(claimed, root)) this.reidentify(root);
     return this.adopt(new Vault(root, this.home, vaultOptions(root, this.options))).vault;
+  }
+
+  /** Whether `claimed` already belongs to another folder: one open now, or one the home remembers. */
+  private claimedElsewhere(claimed: string, root: string): boolean {
+    const here = this.open.get(claimed);
+    if (here && !sameFolder(here.vault.root, root)) return true;
+    const row = this.home.sql("select path from vaults where id = ?").get(claimed) as { path?: string } | undefined;
+    if (!row?.path) return false;
+    const owner = path.resolve(row.path);
+    return !sameFolder(owner, root) && readVaultId(owner) === claimed;
+  }
+
+  /** A copy of a vault: a new id, written where the claimed one was, and no link of the original's. */
+  private reidentify(root: string): void {
+    const id = mint((x) => this.open.has(x) || !!this.home.sql("select 1 from vaults where id = ?").get(x));
+    writeAtomic(path.join(root, ".anydag", "vault.json"), `${JSON.stringify({ id }, null, 1)}\n`);
   }
 
   /** Make a folder and open it as a vault. Refused when something is already there. */
@@ -285,6 +307,18 @@ export class Session {
       types: [...this.vault.types].sort(),
     };
   }
+}
+
+/** Two paths that name the same folder, links followed; a path that is gone compares as itself. */
+function sameFolder(a: string, b: string): boolean {
+  const real = (p: string): string => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  return real(a) === real(b);
 }
 
 /** A vault somewhere under `root`, `depth` folders down at most; skipping what a vault skips. */

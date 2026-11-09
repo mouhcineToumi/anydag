@@ -70,6 +70,8 @@ export interface Pairing {
   token: string;
   account: { id: string; name: string };
   device: { id: string; name: string };
+  /** The folder the link was made from. Absent on a pairing made before the root was recorded. */
+  root?: string;
 }
 
 export interface LoopOptions {
