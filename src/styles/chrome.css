@@ -3412,7 +3412,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   color: var(--dag-color-ink);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   font-family: var(--dag-font-sans);
   font-size: 12px;
   line-height: 1.4;
