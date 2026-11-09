@@ -1,0 +1,247 @@
+# Keeps the Status column of the project board ("Anydag Project", user project #3) in step with the
+# repository. It exists because GitHub's built-in project workflows cannot do this: none of the
+# eleven fires on a label, and the one that fires on "item closed" cannot tell a merge from an issue
+# closed as not planned.
+#
+# The columns, and what moves a card:
+#
+#   Backlog        no status label, `status: triage` or `status: needs-info`
+#   Todo - Ready   the `status: ready` label, added by the maintainer at triage
+#   In Progress    `status: in-progress` or `status: blocked`, or a draft pull request
+#   In Review      a non-draft pull request that names the issue (`Closes #N`, `Fixes #N`,
+#                  `Resolves #N`) — work is done and waiting on review and merge
+#   Done           the issue closed as *completed*, which here means the pull request merged
+#   Killed         the issue closed as *not planned* or *duplicate*: out of scope, superseded,
+#                  duplicated or abandoned
+#
+# The labels are the source of truth for triage and for picking work up; a pull request decides the
+# middle; the close reason decides Done from Killed.
+#
+# **Two built-in workflows must stay off**, or they fight this file, in the project's Workflows menu:
+#
+#   Item closed                   sets Done for every closed item, including a killed issue
+#   Pull request linked to issue  sets In Progress when a pull request opens
+#
+# **`PROJECT_TOKEN` is a classic personal access token with the `project` scope and nothing else.**
+# The default `GITHUB_TOKEN` cannot reach a user-owned project, and neither can a GitHub App, so a
+# token is the only way. It is read from the event file and from numbers, never from a title, body or
+# comment, so nothing a stranger writes is ever run as shell. Without the secret the run says so and
+# passes, rather than turning every issue event red until the token is added.
+name: project-status
+
+on:
+  issues:
+    types: [opened, reopened, labeled, unlabeled, closed]
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+
+concurrency:
+  group: project-status-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Project status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Move the card
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PROJECT_OWNER: mouhcineToumi
+          PROJECT_NUMBER: "3"
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # `GITHUB_EVENT_PATH` is set by the runner; `github.event_path` comes through empty in an
+          # `env:` block, which is how the first run with the token died on a `jq` with no file.
+          EVENT_PATH="${GITHUB_EVENT_PATH:-}"
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning title=Project status not synced::PROJECT_TOKEN is not set. Add a classic personal access token with the project scope as the PROJECT_TOKEN secret."
+            exit 0
+          fi
+
+          # Quoted here-documents: `$owner` and friends are GraphQL variables, not shell ones.
+          owner_name="${REPOSITORY%%/*}"
+          repo_name="${REPOSITORY##*/}"
+
+          project_query="$(cat <<'GQL'
+          query ($owner: String!, $number: Int!) {
+            user(login: $owner) { projectV2(number: $number) { id } }
+          }
+          GQL
+          )"
+
+          field_query="$(cat <<'GQL'
+          query ($owner: String!, $number: Int!) {
+            user(login: $owner) {
+              projectV2(number: $number) {
+                field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } }
+              }
+            }
+          }
+          GQL
+          )"
+
+          set_status="$(cat <<'GQL'
+          mutation ($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $project
+              itemId: $item
+              fieldId: $field
+              value: { singleSelectOptionId: $option }
+            }) { projectV2Item { id } }
+          }
+          GQL
+          )"
+
+          items_query="$(cat <<'GQL'
+          query ($owner: String!, $number: Int!, $endCursor: String) {
+            user(login: $owner) {
+              projectV2(number: $number) {
+                items(first: 100, after: $endCursor) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { id content { ... on Issue { number } } }
+                }
+              }
+            }
+          }
+          GQL
+          )"
+
+          issue_query="$(cat <<'GQL'
+          query ($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) { issue(number: $number) { id } }
+          }
+          GQL
+          )"
+
+          add_item="$(cat <<'GQL'
+          mutation ($project: ID!, $content: ID!) {
+            addProjectV2ItemById(input: { projectId: $project, contentId: $content }) { item { id } }
+          }
+          GQL
+          )"
+
+          closing_query="$(cat <<'GQL'
+          query ($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) { closingIssuesReferences(first: 50) { nodes { number } } }
+            }
+          }
+          GQL
+          )"
+
+          project_id=$(gh api graphql -f query="$project_query" \
+            -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
+            --jq '.data.user.projectV2.id')
+
+          field=$(gh api graphql -f query="$field_query" \
+            -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
+            --jq '.data.user.projectV2.field')
+
+          field_id=$(jq -r '.id' <<<"$field")
+
+          option_id() {
+            jq -r --arg name "$1" '.options[] | select(.name == $name) | .id' <<<"$field"
+          }
+
+          if jq -e 'has("issue")' "$EVENT_PATH" >/dev/null; then
+            action=$(jq -r '.action' "$EVENT_PATH")
+            state=$(jq -r '.issue.state' "$EVENT_PATH")
+            reason=$(jq -r '.issue.state_reason // "completed"' "$EVENT_PATH")
+
+            if [ "$state" = "closed" ]; then
+              case "$reason" in
+                not_planned | duplicate) target="Killed" ;;
+                *) target="Done" ;;
+              esac
+            else
+              labels=$(jq -r '.issue.labels[].name' "$EVENT_PATH")
+              if grep -qx 'status: in-progress' <<<"$labels"; then
+                target="In Progress"
+              elif grep -qx 'status: blocked' <<<"$labels"; then
+                target="In Progress"
+              elif grep -qx 'status: ready' <<<"$labels"; then
+                target="Todo - Ready"
+              else
+                target="Backlog"
+              fi
+            fi
+
+            numbers="$(jq -r '.issue.number' "$EVENT_PATH")"
+          else
+            action=$(jq -r '.action' "$EVENT_PATH")
+            draft=$(jq -r '.pull_request.draft' "$EVENT_PATH")
+            merged=$(jq -r '.pull_request.merged' "$EVENT_PATH")
+            pr_number=$(jq -r '.pull_request.number' "$EVENT_PATH")
+
+            # GitHub's own list of what this pull request will close — the same one the merge uses.
+            # Reading it beats a regex over the body, which matched an example in this very PR's
+            # prose ("Closes #1, #2") and sent the run hunting for issue 1.
+            numbers=$(gh api graphql -f query="$closing_query" \
+              -f owner="$owner_name" -f name="$repo_name" -F number="$pr_number" \
+              --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number' | sort -u)
+
+            case "$action" in
+              opened | reopened | ready_for_review)
+                if [ "$draft" = "true" ]; then target="In Progress"; else target="In Review"; fi
+                ;;
+              converted_to_draft)
+                target="In Progress"
+                ;;
+              closed)
+                if [ "$merged" = "true" ]; then target="Done"; else target="In Progress"; fi
+                ;;
+              *)
+                numbers=""
+                ;;
+            esac
+          fi
+
+          if [ -z "${numbers:-}" ]; then
+            echo "Nothing to move for $EVENT_NAME $action."
+            exit 0
+          fi
+
+          # `gh project item-list` resolves the owner through REST, which a token with only the
+          # `project` scope cannot do ("unknown owner type"). The GraphQL calls below need nothing
+          # else, and `... on Issue` keeps a pull request from matching an issue of the same number.
+          for number in $numbers; do
+            item_id=$(gh api graphql --paginate --slurp -f query="$items_query" \
+              -F owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" \
+              | jq -r --argjson number "$number" \
+                '[.[].data.user.projectV2.items.nodes[]] | map(select(.content.number == $number)) | .[0].id // empty')
+
+            if [ -z "$item_id" ]; then
+              content_id=$(gh api graphql -f query="$issue_query" \
+                -f owner="$owner_name" -f name="$repo_name" -F number="$number" \
+                --jq '.data.repository.issue.id')
+              item_id=$(gh api graphql -f query="$add_item" \
+                -f project="$project_id" -f content="$content_id" \
+                --jq '.data.addProjectV2ItemById.item.id')
+            fi
+
+            if [ -z "$item_id" ]; then
+              echo "::warning title=Project item not found::#$number is not on the board and could not be added."
+              continue
+            fi
+
+            option=$(option_id "$target")
+            if [ -z "$option" ]; then
+              echo "::error title=Status option missing::The board has no Status option named \"$target\"."
+              exit 1
+            fi
+
+            gh api graphql -f query="$set_status" \
+              -f project="$project_id" -f item="$item_id" -f field="$field_id" -f option="$option" \
+              --silent
+
+            echo "#$number -> $target"
+          done
