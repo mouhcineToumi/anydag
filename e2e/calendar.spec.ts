@@ -183,6 +183,53 @@ test("times are shown and written in the time zone Settings says", async ({ page
   await page.keyboard.press("Escape");
 });
 
+test("an event's labels act on the control beside them, and stay plain when read-only", async ({ page }) => {
+  const talk = write("talk", "Keynote", ["start: 2031-03-12T09:00Z", "end: 2031-03-12T10:30Z"]);
+  await page.goto(`/?note=${encodeURIComponent(talk)}`);
+  const bar = page.locator("[data-dag-eventbar]");
+  await expect(bar).toHaveAttribute("data-dag-eventbar", "timed", { timeout: 15_000 });
+
+  const label = (name: string) => page.locator(`[data-dag-eventbar-label="${name}"]`);
+  const allDay = page.locator("[data-dag-eventbar-allday]");
+  const startDay = page.locator("[data-dag-eventbar-start-day]");
+  const startTime = page.locator("[data-dag-eventbar-start-time]");
+  const endDay = page.locator("[data-dag-eventbar-end-day]");
+  const endTime = page.locator("[data-dag-eventbar-end-time]");
+
+  /* The visible label names each control for a screen reader too. */
+  await expect(startDay).toHaveAccessibleName("Starts");
+  await expect(startTime).toHaveAccessibleName("Starts");
+  await expect(endDay).toHaveAccessibleName("Ends");
+  await expect(endTime).toHaveAccessibleName("Ends");
+
+  /* A label is a pointer to its control. */
+  await label("start").click();
+  await expect(startDay).toBeFocused();
+  await label("end").click();
+  await expect(endDay).toBeFocused();
+
+  /* All day acts on the switch, and the timed fields go away. */
+  await expect(allDay).not.toBeChecked();
+  await label("all-day").click();
+  await expect(allDay).toBeChecked();
+  await expect(bar).toHaveAttribute("data-dag-eventbar", "all-day");
+  await expect(startTime).toHaveCount(0);
+  await label("start").click();
+  await expect(startDay).toBeFocused();
+
+  /* Read-only: the labels stay, the controls stay disabled, and a press changes nothing. */
+  await expect.poll(() => read("talk")).not.toContain("end:");
+  await page.evaluate(() => localStorage.setItem("dag:locked", "1"));
+  await page.reload();
+  await expect(bar).toHaveAttribute("data-dag-eventbar", "all-day", { timeout: 15_000 });
+  await expect(label("all-day")).toBeVisible();
+  await expect(allDay).toBeDisabled();
+  await expect(startDay).toBeDisabled();
+  /* The label is disabled with its control, and a press on it changes nothing. */
+  await label("all-day").click({ force: true });
+  await expect(allDay).toBeChecked();
+});
+
 test("a run of days is as long as it is asked, and the arrows move by that many", async ({ page }) => {
   const talk = write("talk", "Keynote", ["start: 2031-03-13T09:00Z", "end: 2031-03-13T10:30Z"]);
   await calendar(page, "calendar=days&days=5&date=2031-03-11", talk);

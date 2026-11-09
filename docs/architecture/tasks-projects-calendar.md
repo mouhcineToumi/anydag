@@ -147,7 +147,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 |---|---|
 | the sidebar | **Calendar** opens the page; **New event** makes `untitled` at the next whole hour, an hour long, and names it in its title; an event's row wears a calendar clock; a row's menu makes a plain note an event, or an event a note |
 | the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a drag or a click on empty time makes an event, a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
-| an event's own page | its properties under the title — all day, the start, the end and the zone they are shown in; the top bar's `⋯` has *Not an event*, and a plain note's has *Make it an event* |
+| an event's own page | its properties under the title — all day, the start, the end and the zone they are shown in, each label acting on the value beside it; the top bar's `⋯` has *Not an event*, and a plain note's has *Make it an event* |
 | a task's own page | a *Starts* date beside *Due* |
 | a board | a placed event's card says *Event* and when |
 | a project's bar | *Open calendar*, filtered to it |
