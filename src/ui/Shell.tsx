@@ -780,7 +780,7 @@ export function Shell({
     saveFavourites,
   ]);
 
-  const create = useCallback((kind: TextKind | "task" | "event", folder = "") => files.newFile(kind, folder), [files]);
+  const create = useCallback((kind: TextKind | "task" | "event", folder = "") => void files.newFile(kind, folder), [files]);
 
   const renamed = useCallback(
     (kind: FileKind, from: string, to: string) => moved({ kind: "file", file: kind, from, to }),
