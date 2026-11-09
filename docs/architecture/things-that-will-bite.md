@@ -783,6 +783,16 @@
   run first in its worker, because Python had landed and the block came out coloured. Pin exact HTML
   in a language nothing colours.
 
+- **A bundle path under the dev proxy's prefix is served to the backend.** The protocol lived under
+  `sync/protocol/` and the page imported it for free; the #99 rename moved it to `api/` — and Vite's
+  dev server derives every module's URL from its path, so `src/telemetry`'s import of
+  `api/protocol/logs.ts` became the *request* `/api/protocol/logs.ts`, which the dev proxy hands to
+  the real server, which has no such route: a 404 in the console and a page that never reports
+  ready, 49 of 50 specs failing on a run the unit suite called green. The proxy is a regex key now —
+  `"^/api(?!/protocol/)"` — and the rule it leaves behind: **a directory the page bundles from may
+  not share a URL prefix Vite proxies**, or name it and be pinned. `test/e2e-plan.mjs` and the smoke
+  tier in Docker are the instruments that see it; a host `npm run dev` does not (`vite.config.ts`
+  exempts the IDE's own file: your dev server already had the module).
 - **A sync test that reads the machine's clock passes on an idle machine and fails on a busy one.**
   The convergence harness dated every file by its disk birth, a second-resolution instant that picks
   the winner of a duplicate id, so a seed whose births all fell in one second held and the same seed

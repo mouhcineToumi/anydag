@@ -55,7 +55,12 @@ export default defineConfig({
      * holds it.
      */
     proxy: Object.fromEntries(
-      ["/__board", "/api"].map((prefix) => [
+      /* `/api` is a regex key, not a prefix, on purpose (#99): the page bundles `api/protocol/`
+         (the wire's types and the log vocabulary), and in dev Vite serves those modules at
+         `/api/protocol/*.ts` — a plain prefix would hand them to the backend, which has no such
+         route and would 404 every page that mentions a log. `/api/protocol/` is Vite's; every
+         other `/api/**` is the server's. */
+      ["/__board", "^/api(?!/protocol/)"].map((prefix) => [
         prefix,
         {
           target: `http://127.0.0.1:${Number(process.env.ANYDAG_API_PORT) || 3601}`,
