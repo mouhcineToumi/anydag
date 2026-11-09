@@ -74,9 +74,10 @@ Seven things are load-bearing:
 `.note.md` — and a PDF is the file drawn read-only, never the editor's DOM; see *Import and export*.
 
 **A note's title is the first thing on its page**: a field above the text holding the
-frontmatter's `title:`, which is what the note is called everywhere — so committing it,
-on Enter or on leaving the field, is `/retitle` with `follow`, and the file's name follows. A task's
-page is a note's page, so a task has one too, above its bar. Four things about it:
+frontmatter's `title:`, or — when the file has no line — the leaf of its name, which is what the note
+is called everywhere. Committing it, on Enter or on leaving the field, is `/retitle` with `follow`,
+and the file's name follows. A task's page is a note's page, so a task has one too, above its bar.
+Four things about it:
 
 - **The page renames the file it holds, and keeps its editor.** `NoteApp` keeps `NoteView`'s key
   across a rename the page announced (`onRenamed`), and `NoteView` reads its name through `nameRef`
@@ -89,7 +90,11 @@ page is a note's page, so a task has one too, above its bar. Four things about i
   as a conflict with anybody typing there, which is exactly where Enter in the title puts the caret.
 - ***Untitled* is an empty field**, with the word as the placeholder — `UNTITLED` is what a new file
   is called until somebody names it, and a field holding it looks answered. Emptied, a title is
-  *Untitled* again. A note with no `title:` at all shows the same placeholder.
+  *Untitled* again. **A note with no `title:` line is called by the leaf of its name** (`pageTitle`),
+  because `/create` keeps a title once, in the file's name, and drops the line when the two agree:
+  an event made from the calendar, a task typed into the Tasks page and a note made from the sidebar
+  with a title all show that name on their own page. A file still in the `Untitled` family — the
+  word, or the number `unique()` gave it — has no name to show yet and keeps the placeholder.
 - **A new note is named here, not in its sidebar row.** `nameWhenOpened` marks the name before the
   page opens and the page focuses its title once, when it does. A board and a quiz have no page
   title and are still named in their rows.

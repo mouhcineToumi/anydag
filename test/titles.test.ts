@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseBoard } from "@/board/parseBoard";
 import { blankBoardText, blankNoteText, UNTITLED } from "@/board/useBoard";
-import { cleanTitle, splitNote } from "@/note/format";
+import { cleanTitle, pageTitle, splitNote } from "@/note/format";
 import { titleOf } from "@/refs/extract";
 
 import { withTitle } from "../server/frontmatter";
@@ -38,6 +38,37 @@ describe("a document's title", () => {
     expect(blankBoardText()).not.toMatch(/# Untitled/);
     expect(splitNote(blankNoteText()).body).toBe("");
     expect(parseBoard("untitled", blankBoardText()).errors).toEqual([]);
+  });
+});
+
+/*
+ * The page's copy of the rule. `/create` keeps a title once, in the file's name, and drops the
+ * `title:` line when the two agree — so an event made from the calendar, a task typed into the
+ * Tasks page and a note made from the sidebar with a title are read back off their names.
+ */
+describe("what a note's own page calls it", () => {
+  it("falls back to the leaf of its name when the frontmatter names no title", () => {
+    expect(pageTitle("khansi nkfet", undefined)).toBe("khansi nkfet");
+    expect(pageTitle("work/khansi nkfet", undefined)).toBe("khansi nkfet");
+  });
+
+  it("still shows the placeholder for a file nobody has named", () => {
+    expect(pageTitle("Untitled", undefined)).toBeUndefined();
+    expect(pageTitle("work/untitled", undefined)).toBeUndefined();
+    /* `unique()` numbers the same word, and one of those is as nameless as the first. */
+    expect(pageTitle("Untitled 2", undefined)).toBeUndefined();
+    /* An explicit *Untitled* is the placeholder too, whatever the file is called. */
+    expect(pageTitle("Untitled 2", UNTITLED)).toBeUndefined();
+  });
+
+  it("prefers the frontmatter, and an edit that starts from the name writes a title", () => {
+    expect(pageTitle("file-name", "A real title")).toBe("A real title");
+    /* What the field starts from on a file with no `title:` line, then what committing it writes. */
+    const start = pageTitle("khansi nkfet", splitNote("---\nid: 0000000000\n---\n").title);
+    expect(start).toBe("khansi nkfet");
+    const edited = withTitle("---\nid: 0000000000\n---\n", `${start} lunch`, "note");
+    expect(edited).toBe("---\ntitle: khansi nkfet lunch\nid: 0000000000\n---\n");
+    expect(titleOf(edited)).toBe("khansi nkfet lunch");
   });
 });
 

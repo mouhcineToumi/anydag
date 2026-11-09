@@ -14,8 +14,10 @@ import { cleanTitle, TITLE_MAX } from "@/note/format";
  *
  * **`Untitled` is shown as nothing**, with *Untitled* as the placeholder. It is what a new note is
  * called until somebody names it (`UNTITLED`), and a field that holds the word looks
- * answered; a grey placeholder in an empty field is what asks for one. A
- * note with no `title:` at all is untitled too, and reads the same way.
+ * answered; a grey placeholder in an empty field is what asks for one. A note with no `title:` at
+ * all is called by its file's leaf name instead (`pageTitle`), which is what `/create` leaves when
+ * it keeps a title once, in the name; a file still in the `Untitled` family has no name to show
+ * yet and reads as the placeholder.
  *
  * A `<textarea>` rather than an `<input>` because a long title wraps, as a heading does, and never
  * `contentEditable`: this codebase keeps one copy of any text. It holds one line: Enter and a
@@ -152,8 +154,8 @@ export function NoteTitle({
 /**
  * The title drawn read-only, where nothing may change it — `?view=1`, `?snapshot=1`:
  * the same place and the same type as the field, so a picture of a note is laid out as the page is.
- * Nothing at all for a note with no `title:`, whose name is in the bar above; *Untitled* muted for
- * one nobody has named yet, which is what the file says.
+ * Nothing at all for a file nobody has named, whose name is in the bar above; *Untitled* muted for
+ * one whose frontmatter says so.
  */
 export function NoteTitleRead({ title }: { title: string | undefined }) {
   if (title === undefined) return null;

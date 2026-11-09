@@ -20,6 +20,12 @@ export interface NoteFile {
   title?: string;
 }
 
+/** What a new file is called until somebody names it. A title, never a name anybody has to see. */
+export const UNTITLED = "Untitled";
+
+/** The family a file nobody has named wears: `Untitled`, and the numbers `unique()` gives it. */
+const UNNAMED = /^untitled(?: \d+)?$/i;
+
 const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 
 export function splitNote(text: string): NoteFile {
@@ -41,6 +47,19 @@ export function splitNote(text: string): NoteFile {
 
 export function joinNote(front: string, body: string): string {
   return front + body;
+}
+
+/**
+ * What a note's page calls it: its frontmatter's `title:`, else the leaf of the name it is filed
+ * under. The server keeps a title once, in the file's name, and drops the `title:` line when the
+ * two agree (`titled()` in `POST /__board/create`), so a note made with a title — from the calendar,
+ * the Tasks page or the sidebar — has only the name to read. A file nobody has named is `undefined`,
+ * which the title field draws as its placeholder.
+ */
+export function pageTitle(name: string, title: string | undefined): string | undefined {
+  if (title !== undefined) return title === UNTITLED ? undefined : title;
+  const leaf = name.slice(name.lastIndexOf("/") + 1);
+  return leaf && !UNNAMED.test(leaf) ? leaf : undefined;
 }
 
 /** Longer than anyone names a document, short enough that a pasted paragraph does not become one. */
