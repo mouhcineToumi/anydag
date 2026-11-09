@@ -232,7 +232,9 @@ test("copy puts the item's own source on the clipboard, and paste reads it back"
   /* `one` is taken, so the paste took a fresh id — and it is pinned, on the grid. */
   const pasted = /```md \{#(md-[a-z0-9]{4}) x=(-?\d+) y=(-?\d+)\}\nThe first item\.\n```/.exec(text)!;
   expect(pasted).not.toBeNull();
-  expect(Number(pasted[2]) % 8).toBe(0);
+  /* `Math.abs`: the board opens at 100% now, so a paste can land left of the origin, and `-8 % 8` is
+     `-0`, which `toBe(0)` refuses. */
+  expect(Math.abs(Number(pasted[2]) % 8)).toBe(0);
   await expect(page.locator("[data-dag-selected]")).toHaveAttribute("data-dag-item", pasted[1]);
 });
 

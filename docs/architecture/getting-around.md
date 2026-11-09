@@ -29,3 +29,11 @@ become a prop threaded through `App` to be seen at all.
 the window takes focus delivers no keydown, so `Item` reads `ctrlKey`/`metaKey` off the press as
 well, and the press is what decides. Space has no equivalent — a `PointerEvent` does not report it —
 which is the whole reason both mechanisms exist rather than one.
+
+**The view a board opens with never magnifies past 100%.** Fitting answers "show me everything on
+the board", and on a small one that meant blowing it up until it filled the glass: a new board's
+prompt card opened at 215%, which reads as too much zoom rather than as a fitted board. So the
+automatic fit (`firstFit()` in `canvas/geometry.ts`, called from `Viewport`'s two effects) shrinks a
+large board and leaves a small one at 100%, with the paper around it. The explicit Fit action — `F`,
+Home, the button — still calls `fitTo()` at its full range, because a person asking to frame one
+small card means to look at it closely; `0` and the zoom figure remain 100% rather than a fit.

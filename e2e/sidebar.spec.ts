@@ -259,20 +259,22 @@ test("the drawing does not move when the column opens or closes", async ({ page 
   await expect(pct).toHaveText("100%");
 
   /* The button is the same choice from the same place: `f` hands the view back to the fit, then
-     the zoom bar's 100% claims it exactly as the key did. */
+     the zoom bar's 100% claims it exactly as the key did. The fit may magnify where the opening
+     view did not, and 100% keeps the corner it was given, so the drawing's place is read again. */
   await viewport.focus();
   await page.keyboard.press("f");
   await pct.click();
   await expect(viewport).toHaveAttribute("data-zoom", "1");
   await expect(pct).toHaveText("100%");
+  const x1 = await x();
 
   await close();
-  await expect.poll(x).toBe(x0);
+  await expect.poll(x).toBe(x1);
   await expect(viewport).toHaveAttribute("data-zoom", "1");
   await expect(pct).toHaveText("100%");
 
   await reopen();
-  await expect.poll(x).toBe(x0);
+  await expect.poll(x).toBe(x1);
   await expect(viewport).toHaveAttribute("data-zoom", "1");
   await expect(pct).toHaveText("100%");
 });
