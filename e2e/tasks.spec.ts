@@ -170,7 +170,7 @@ test("the New task row is one control: it focuses the box, Enter makes the task,
   const row = page.locator('[data-dag-task-add-row="todo"]');
   const box = page.locator('[data-dag-task-add="todo"]');
   await expect(box).toHaveAttribute("placeholder", "New task — type a title and press Enter");
-  await expect(box).toHaveAttribute("aria-label", "New task — type a title and press Enter");
+  await expect(box).toHaveAttribute("aria-label", "New task in To do — type a title and press Enter");
 
   /* The `+` is inside the row's label, so pressing it focuses the box it belongs to. */
   await row.locator("svg").click();

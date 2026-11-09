@@ -374,7 +374,7 @@ export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: s
         <input
           type="text"
           placeholder={NEW_TASK_HINT}
-          aria-label={NEW_TASK_HINT}
+          aria-label={`New task in ${STATUS_LABEL[status]} — type a title and press Enter`}
           value={state.title}
           disabled={busy}
           data-dag-task-add={status}
