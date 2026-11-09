@@ -540,6 +540,31 @@ export function useSavedComponents(): SavedComponent[] {
   return saved;
 }
 
+type BoardAnswer = { ok: true; body: Record<string, unknown> } | { ok: false; reason: string | null };
+
+/**
+ * A board route's answer, with the reason a refusal gave. `reason` is `null` when there was no
+ * answer to read — the server was down, or failed — because neither is the server refusing what
+ * was asked, and a caller that has to say something shows a sentence of ours instead.
+ *
+ * A 4xx is a refusal and its `{error}` is the server's own words; a 5xx is a failure like a dead
+ * connection, and its body is not a sentence for a person.
+ */
+async function boardAnswer(route: string, payload: object): Promise<BoardAnswer> {
+  try {
+    const r = await fetch(`/__board/${route}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    if (r.ok) return { ok: true, body };
+    return { ok: false, reason: r.status < 500 && typeof body.error === "string" ? body.error : null };
+  } catch {
+    return { ok: false, reason: null };
+  }
+}
+
 /**
  * The board file itself: made, renamed, copied, removed.
  *
@@ -552,17 +577,8 @@ export function useSavedComponents(): SavedComponent[] {
  * *returned* name a caller must open — guessing it is how you end up looking at the wrong board.
  */
 async function boardCall(route: string, payload: object): Promise<{ name?: string } | null> {
-  try {
-    const r = await fetch(`/__board/${route}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) return null;
-    return (await r.json()) as { name?: string };
-  } catch {
-    return null;
-  }
+  const answer = await boardAnswer(route, payload);
+  return answer.ok ? (answer.body as { name?: string }) : null;
 }
 
 /**
@@ -649,8 +665,26 @@ export function assertNever(x: never): never {
 /** What a note starts as: its own name as a heading, so the first thing on the page says what it is. */
 const newNoteText = (name: string): string => `# ${name.slice(name.lastIndexOf("/") + 1)}\n`;
 
-export const createNote = async (name: string, text?: string): Promise<string | null> =>
-  (await boardCall("create", { name, text: text ?? newNoteText(name), kind: "note" }))?.name ?? null;
+/** What making a note answered: the name the server settled on, or why it refused. */
+type CreateAnswer = { name: string } | { error: string };
+
+/**
+ * Make a note and say why when it could not be made — `createNote` with the reason kept, for a box
+ * that has to answer a person with it. A refusal says its own words (the name it will not take,
+ * the vault it cannot write); a server that did not answer, or failed, gets a sentence of ours.
+ */
+export const createNoteWithReason = async (name: string, text?: string): Promise<CreateAnswer> => {
+  const answer = await boardAnswer("create", { name, text: text ?? newNoteText(name), kind: "note" });
+  if (!answer.ok) return { error: answer.reason ?? "The note could not be created. Try again." };
+  return typeof answer.body.name === "string"
+    ? { name: answer.body.name }
+    : { error: "The note could not be created. Try again." };
+};
+
+export const createNote = async (name: string, text?: string): Promise<string | null> => {
+  const made = await createNoteWithReason(name, text);
+  return "name" in made ? made.name : null;
+};
 
 /** What a quiz made from the sidebar or the Quizzes page starts as: a title and no questions yet. */
 export const blankQuizText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
