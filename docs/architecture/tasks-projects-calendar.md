@@ -19,7 +19,7 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 | Where | What it does with one |
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
-| the Tasks page, `?tasks=1` | a list — *In progress*, *To do*, *Done*, each by due date then title — or a board of three columns a card is dragged between; a filter, and a box in every group that makes a task named after what is typed |
+| the Tasks page, `?tasks=1` | a list — *In progress*, *To do*, *Done*, each by due date then title — or a board of three columns a card is dragged between; a filter, and a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
 | the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
 | a board, or a note, embedding one | a card — status as a button, title, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
 | `?view=1`, a snapshot, the PDF | the status and date on a line above the text |
@@ -66,7 +66,8 @@ on first and the board's columns run the way work moves, so the three statuses c
 
 Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-embed--task`,
 `dag-embed__task*`, `dag-toolbar__make-task`, `dag-sidebar__badge`, `data-dag-task*`,
-`data-dag-tasks*`, `data-dag-taskbar*`, `data-dag-taskline`, `data-dag-embed-task`,
+`data-dag-tasks*`, `data-dag-taskbar*`, `data-dag-taskline`, `data-dag-task-add`,
+`data-dag-task-add-row`, `data-dag-task-add-problem`, `data-dag-embed-task`,
 `data-dag-sidebar-task`, `data-dag-sidebar-tasks`, `data-dag-sidebar-tasks-open`,
 `data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, the storage key
 `dag:tasks-view`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key

@@ -128,8 +128,12 @@ Names claimed, grepped first as this file has learned to: `dag-settings`, `dag-s
 `data-dag-settings-close`, `data-dag-vault-settings`, and the
 storage key `dag:settings-tab`. `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
-The CSS is chrome and lives in `chrome.css`; nothing here wanted a `--dag-*`, which would have demanded
-a key in all three themes for how wide a dialog is.
+The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
+the translucent elevation colour every dialog and floating card draws with — because a shadow is a
+colour the theme owns while how wide a dialog is is not. In `paper-dark` it is black, so the card sits
+on a dark edge rather than glowing; in `paper` and `neutral` it is a soft tint of ink. The shared
+`--elevation` rule is where the geometry lives, and the Settings modal, the board browser, the rewrite
+dialog and the welcome card all read it.
 
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);
 a config file the server reads (it would put a person's preference into every visual baseline, and

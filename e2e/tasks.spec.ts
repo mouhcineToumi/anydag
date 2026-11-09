@@ -18,6 +18,9 @@ import { openSidebar } from "./sidebar";
 let folder = "";
 let dir = "";
 let problems: string[] = [];
+/* A check that asks the server for a refusal makes Chromium print its 4xx; name that line here
+   rather than letting it fail the console check. */
+let expected: RegExp[] = [];
 const made: string[] = [];
 
 test.beforeEach(({ page }, info) => {
@@ -25,6 +28,7 @@ test.beforeEach(({ page }, info) => {
   dir = path.join(BOARDS, folder);
   fs.mkdirSync(dir, { recursive: true });
   problems = [];
+  expected = [];
   page.on("console", (msg) => {
     if (msg.type() === "error" || msg.type() === "warning") problems.push(msg.text());
   });
@@ -37,7 +41,10 @@ test.afterEach(() => {
   if (folder) fs.rmSync(dir, { recursive: true, force: true });
   for (const f of made.splice(0)) fs.rmSync(f, { force: true });
   folder = "";
-  expect(problems, "console output").toEqual([]);
+  expect(
+    problems.filter((p) => !expected.some((r) => r.test(p))),
+    "console output",
+  ).toEqual([]);
 });
 
 const noteFile = (leaf: string) => path.join(dir, `${leaf}.note.md`);
@@ -56,6 +63,11 @@ const day = (offset: number): string => {
 
 async function ready(page: Page) {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+}
+
+/** Lock this browser before the page loads, the way `lock.spec.ts` does. */
+async function lockFirst(page: Page) {
+  await page.addInitScript(() => localStorage.setItem("dag:locked", "1"));
 }
 
 /** The Tasks page, narrowed to this test's folder, once its rows have arrived. */
@@ -148,6 +160,91 @@ test("a title typed into a group is a task named after it, in that status", asyn
   /* The box is empty for the next one, and the page is where it was. */
   await expect(box).toHaveValue("");
   await expect(page).toHaveURL(/tasks=1/);
+});
+
+test("the New task row is one control: it focuses the box, Enter makes the task, Escape clears, and whitespace alone does nothing", async ({
+  page,
+}) => {
+  const anchor = write("anchor", "Something to wait for", ["status: todo"]);
+  await tasksPage(page, anchor);
+  const row = page.locator('[data-dag-task-add-row="todo"]');
+  const box = page.locator('[data-dag-task-add="todo"]');
+  await expect(box).toHaveAttribute("placeholder", "New task — type a title and press Enter");
+  await expect(box).toHaveAttribute("aria-label", "New task in To do — type a title and press Enter");
+
+  /* The `+` is inside the row's label, so pressing it focuses the box it belongs to. */
+  await row.locator("svg").click();
+  await expect(box).toBeFocused();
+
+  /* Whitespace alone is not a title. */
+  await box.fill("   ");
+  await box.press("Enter");
+  await expect(box).toHaveValue("   ");
+
+  const leaf = `quick-add-${Date.now()}`;
+  const file = path.join(BOARDS, `${leaf}.md`);
+  made.push(file);
+  await box.fill(leaf);
+  await box.press("Enter");
+  await expect
+    .poll(() => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""))
+    .toMatch(/^---\nstatus: todo\nid: [0-9a-z]{10}\n---\n$/);
+  await expect(box).toHaveValue("");
+  /* The page was narrowed to this test's folder; a quick add makes at the top level, so widen it. */
+  await page.locator("[data-dag-tasks-filter]").fill("");
+  await expect(page.locator(`[data-dag-tasks-group="todo"] [data-dag-task-row="${leaf}"]`)).toBeVisible();
+
+  /* Escape clears what is in the box and makes nothing. */
+  const escaped = `escaped-${Date.now()}`;
+  await box.fill(escaped);
+  await box.press("Escape");
+  await expect(box).toHaveValue("");
+  expect(fs.existsSync(path.join(BOARDS, `${escaped}.md`))).toBe(false);
+});
+
+test("a refused create says why and keeps the title: the lock's notice and the server's own words", async ({ page }) => {
+  const anchor = write("anchor", "Something to wait for", ["status: todo"]);
+  const leaf = `locked-${Date.now()}`;
+  const file = path.join(BOARDS, `${leaf}.md`);
+  await lockFirst(page);
+  await tasksPage(page, anchor);
+  const box = page.locator('[data-dag-task-add="todo"]');
+  await box.fill(leaf);
+  await box.press("Enter");
+
+  /* The existing lock notice, with its Unlock, is what a locked create says. */
+  const notice = page.locator("[data-dag-readonly-notice]");
+  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "refused");
+  await expect(notice).toContainText("Read only");
+  await expect(notice.locator("[data-dag-readonly-unlock]")).toBeVisible();
+  await expect(box).toHaveValue(leaf);
+  expect(fs.existsSync(file)).toBe(false);
+
+  /* Unlocking from the notice makes the title that was kept. */
+  await notice.locator("[data-dag-readonly-unlock]").click();
+  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "unlocked");
+  made.push(file);
+  await box.focus();
+  await box.press("Enter");
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "")).toMatch(/\nstatus: todo\n/);
+  await expect(box).toHaveValue("");
+
+  /* A server refusal says the server's reason, and the title stays to be changed and retried. */
+  await page.route(/\/__board\/create(?:\?|$)/, (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "The vault is read only." }),
+    }),
+  );
+  expected.push(/status of 400/);
+  await box.fill("A refused title");
+  await box.press("Enter");
+  const problem = page.locator('[data-dag-task-add-problem="todo"]');
+  await expect(problem).toContainText("The vault is read only.");
+  await expect(box).toHaveValue("A refused title");
+  await page.unroute(/\/__board\/create(?:\?|$)/);
+  expect(fs.existsSync(path.join(BOARDS, "a-refused-title.md"))).toBe(false);
 });
 
 test("a task's own page sets its status and its date through the note's save, and Not a task makes it a note", async ({
