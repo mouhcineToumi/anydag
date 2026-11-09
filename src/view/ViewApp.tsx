@@ -4,7 +4,7 @@ import { concerns, onNote, onQuiz } from "@/board/events";
 import type { Board } from "@/board/types";
 import { assertNever, useBoard, type FileKind } from "@/board/useBoard";
 import type { ViewportHandle } from "@/canvas/Viewport";
-import { splitNote } from "@/note/format";
+import { pageTitle, splitNote } from "@/note/format";
 import { projectOf } from "@/note/project";
 import { eventOf } from "@/note/event";
 import { taskOf } from "@/note/task";
@@ -217,7 +217,8 @@ function NotePage({ name }: { name: string }) {
   }, [name]);
 
   if (error) return <Missing what={error} />;
-  const title = text === null ? name : (splitNote(text).title ?? name);
+  const leaf = name.slice(name.lastIndexOf("/") + 1);
+  const title = text === null ? leaf : (pageTitle(name, splitNote(text).title) ?? leaf);
   return (
     <NoteFrame
       name={name}
@@ -269,7 +270,7 @@ function NoteFrame({ name, text, bar }: { name: string; text: string | null; bar
       {bar}
       <main className="dag-note-view" data-dag-note-view={name}>
         {/* The title at the top of the page, where the editor has its field. */}
-        {note ? <NoteTitleRead title={note.title} /> : null}
+        {note ? <NoteTitleRead title={pageTitle(name, note.title)} /> : null}
         {note && project ? <ProjectLine project={project} /> : null}
         {note && task ? <TaskLine task={task} /> : null}
         {note && event ? <EventLine event={event} /> : null}

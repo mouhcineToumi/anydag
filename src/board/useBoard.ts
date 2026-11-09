@@ -9,6 +9,7 @@ import { FILE_LIST, readPref, writeLocal } from "../settings/prefs";
 import type { PatchOp } from "./patch";
 import type { Board } from "./types";
 import type { EventChange, NoteEvent } from "../note/event";
+import { UNTITLED } from "../note/format";
 import type { Project, ProjectChange } from "../note/project";
 import type { Task, TaskChange, TaskStatus } from "../note/task";
 import { blankTable } from "../table/write";
@@ -576,7 +577,12 @@ export async function boardCall<T extends object = Record<string, unknown>>(
       body: JSON.stringify(payload),
     });
     const body = (await r.json().catch(() => ({}))) as T & { error?: string };
-    if (!r.ok) return { ok: false, error: typeof body.error === "string" && body.error ? body.error : refused(r.status) };
+    /* A 4xx is a refusal in the server's own words; a 5xx is a failure, and its body is not a sentence for a person. */
+    if (!r.ok)
+      return {
+        ok: false,
+        error: r.status < 500 && typeof body.error === "string" && body.error ? body.error : refused(r.status),
+      };
     return { ok: true, data: body };
   } catch {
     return { ok: false, error: "The server did not answer. Try again." };
@@ -620,7 +626,7 @@ const newBoardText = (title: string): string =>
  * What a new file is called until somebody names it. A *title*: the file is made under
  * the name `untitled`, numbered if taken, and that name is the technical half nobody has to see.
  */
-export const UNTITLED = "Untitled";
+export { UNTITLED };
 
 /**
  * What a board made from the sidebar starts as: **titled `Untitled`, and empty.**

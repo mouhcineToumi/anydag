@@ -12,6 +12,7 @@ import {
 import { createNote, setTask, type BoardTree } from "@/board/useBoard";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskChange, type TaskStatus } from "@/note/task";
+import { refuseLocked } from "@/settings/lock";
 
 import { startDrag } from "./pointerDrag";
 import { ProjectChip } from "./ProjectBar";
@@ -231,11 +232,12 @@ export function TasksView({
       </div>
       {total === 0 ? (
         <p className="dag-tasks__intro" data-dag-tasks-empty="">
-          A task is a note with a status. Type one under <strong>To do</strong>, or give any note a status from its own page.
+          A task is a note with a status. Type a title in <strong>+ New task</strong> and press Enter, or give any note a status
+          from its own page.
         </p>
       ) : null}
       {layout === "board" ? (
-        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} />
+        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} locked={locked} />
       ) : (
         <div className="dag-tasks__groups">
           {LIST_ORDER.map((status) => (
@@ -247,6 +249,7 @@ export function TasksView({
               onChange={locked ? undefined : onChange}
               chip={chip}
               into={into}
+              locked={locked}
             />
           ))}
         </div>
@@ -263,6 +266,7 @@ function Group({
   onChange,
   chip,
   into,
+  locked,
 }: {
   status: TaskStatus;
   rows: Row[];
@@ -271,6 +275,7 @@ function Group({
   onChange?(row: Row, next: TaskChange): void;
   chip(row: Row): Row["project"];
   into: string;
+  locked: boolean;
 }) {
   const [open, setOpen] = useState(status !== "done");
   return (
@@ -305,48 +310,91 @@ function Group({
               </span>
             </div>
           ))}
-          {onChange ? <QuickAdd status={status} into={into} /> : null}
+          <QuickAdd status={status} into={into} locked={locked} />
         </div>
       ) : null}
     </section>
   );
 }
 
+/** What the New task box asks for, in the placeholder and to a screen reader. */
+const NEW_TASK_HINT = "New task — type a title and press Enter";
+
+/** What the New task box holds after one Enter, and what it has to say about it. */
+export interface QuickAddState {
+  title: string;
+  problem: string | null;
+}
+
+/** How one Enter ended: made, refused with a reason, or refused because the app is read only. */
+export type QuickAddAnswer = { name: string } | { error: string } | { locked: true };
+
+/**
+ * One attempt's effect on the box: a success empties it, and a refusal keeps what was typed so it
+ * can be tried again. The lock's own notice carries its reason (`LockNotice`), so nothing is
+ * repeated here; a server's refusal is said in the box.
+ */
+export function afterQuickAdd(state: QuickAddState, answer: QuickAddAnswer): QuickAddState {
+  if ("name" in answer) return { title: "", problem: null };
+  if ("locked" in answer) return { title: state.title, problem: null };
+  return { title: state.title, problem: answer.error };
+}
+
 /**
  * A title typed where the task belongs, and Enter makes it: a note named after the title, in that
  * status, at the top level — or in the folder of the project the page is showing. The page
  * stays where it is — typing five tasks in a row is the point.
+ *
+ * The whole row is a `<label>`, so the `+` and the space around the box focus it; the placeholder
+ * says what Enter does. A create that did not land keeps the title and says why — the server's own
+ * words, or the lock's notice with Unlock when the app is read only.
  */
-function QuickAdd({ status, into }: { status: TaskStatus; into: string }) {
-  const [title, setTitle] = useState("");
+export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: string; locked: boolean }) {
+  const [state, setState] = useState<QuickAddState>({ title: "", problem: null });
   const [busy, setBusy] = useState(false);
   const make = async () => {
-    const t = title.trim();
+    const t = state.title.trim();
     if (!t || busy) return;
+    if (locked) {
+      refuseLocked();
+      setState((had) => afterQuickAdd(had, { locked: true }));
+      return;
+    }
     setBusy(true);
+    setState((had) => ({ ...had, problem: null }));
     const stem = titleStem(t) || "untitled";
     const made = await createNote(into ? `${into}/${stem}` : stem, taskText(t, status));
     setBusy(false);
-    if ("name" in made) setTitle("");
+    setState((had) => afterQuickAdd(had, made));
   };
   return (
     <div className="dag-tasks__add">
-      <Plus size={14} strokeWidth={2} aria-hidden="true" />
-      <input
-        type="text"
-        placeholder="New task"
-        aria-label={`New task in ${STATUS_LABEL[status]}`}
-        value={title}
-        disabled={busy}
-        data-dag-task-add={status}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void make();
-          } else if (e.key === "Escape") setTitle("");
-        }}
-      />
+      <label className="dag-tasks__add-row" data-dag-task-add-row={status}>
+        <Plus size={14} strokeWidth={2} aria-hidden="true" />
+        <input
+          type="text"
+          placeholder={NEW_TASK_HINT}
+          aria-label={`New task in ${STATUS_LABEL[status]} — type a title and press Enter`}
+          value={state.title}
+          disabled={busy}
+          data-dag-task-add={status}
+          onChange={(e) => setState((had) => ({ ...had, title: e.target.value }))}
+          onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void make();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setState({ title: "", problem: null });
+            }
+          }}
+        />
+      </label>
+      {state.problem ? (
+        <p className="dag-tasks__add-problem" role="alert" data-dag-task-add-problem={status}>
+          {state.problem}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -364,6 +412,7 @@ function Columns({
   onChange,
   chip,
   into,
+  locked,
 }: {
   by(status: TaskStatus): Row[];
   onOpen(name: string): void;
@@ -371,6 +420,7 @@ function Columns({
   onChange?(row: Row, next: TaskChange): void;
   chip(row: Row): Row["project"];
   into: string;
+  locked: boolean;
 }) {
   const board = useRef<HTMLDivElement>(null);
 
@@ -451,7 +501,7 @@ function Columns({
                   ) : null}
                 </div>
               ))}
-              {onChange ? <QuickAdd status={status} into={into} /> : null}
+              <QuickAdd status={status} into={into} locked={locked} />
             </div>
           </section>
         );
