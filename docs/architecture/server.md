@@ -10,7 +10,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 
 | Where | Owns |
 |---|---|
-| `server/main.ts` | `anydag serve <folder>`: bind `127.0.0.1`, mint the token, write `server.json`, print the URL |
+| `server/main.ts` | `anydag serve <folder>`: bind `127.0.0.1`, mint the token, write `server.json`, print the URL, and remove it on `SIGINT`, `SIGTERM` or `SIGHUP` |
 | `server/app.ts` | the gate — the `Host`, then the token — which vault a request means, the routes, and the built page |
 | `server/context.ts` | the `Session`: the open vaults, `?vault=<id>` through `AsyncLocalStorage`, so no route learned there is more than one |
 | `server/vault.ts` | the store over a folder: every kind listed and foldered, names that are titles, ids in frontmatter, attachments, the watcher |

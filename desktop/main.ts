@@ -11,7 +11,6 @@
 
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
-import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -22,6 +21,7 @@ import { autoUpdater } from "electron-updater";
 /* The one module the shell borrows from the server: where `~/.anydag/` is, so the keys, the
    `server.json` readback and the shim live where the server writes them. */
 import { homeDir } from "../server/home";
+import { serverHasStarted } from "./launch";
 
 /* -- what the app ships, and where it finds it --------------------------------------------- */
 
@@ -115,7 +115,8 @@ let launchFolder: string | null = null;
 
 /** Spawn `anydag-server.mjs` with Electron's own binary as Node — one runtime shipped, no Node of
  *  its own. `--no-page` because this process serves `dist/` itself; `--port 0` because the system
- *  picks, and the server says the number back in its server.json and on stdout. */
+ *  picks, and the server says the number back on stdout and in its server.json — which is believed
+ *  only for this child (`launch.ts`), never for a file an earlier server left behind. */
 async function startServer(folder: string | null): Promise<void> {
   serverToken = randomBytes(32).toString("base64url");
   const args: string[] = [serverBundle()];
@@ -149,63 +150,9 @@ async function startServer(folder: string | null): Promise<void> {
     child = null;
     app.quit();
   });
-  const port = await serverHasStarted(child.stdout);
+  const port = await serverHasStarted(child.stdout, { pid: child.pid, token: serverToken, home: homeDir() });
   if (!port) throw new Error("the server never said its port (20 s)");
   serverPort = port;
-}
-
-/**
- * Wait for the server to be up: its own words on stdout —
- * `open http://127.0.0.1:<port>/?token=…` — or, for a server said elsewhere, `server.json` in the
- * app's home ({port, pid, token, vault, version}), then one `/api/health` answer with the token.
- */
-async function serverHasStarted(stdout: ChildProcess["stdout"]): Promise<number | null> {
-  let said = "";
-  stdout?.setEncoding("utf8");
-  stdout?.on("data", (chunk: string) => {
-    said += chunk;
-    if (said.length > 16_000) said = said.slice(-4_000);
-  });
-  const fromStdout = (): number | null => {
-    const at = said.match(/open http:\/\/127\.0\.0\.1:(\d+)\//);
-    return at ? Number(at[1]) : null;
-  };
-  const fromJson = (): number | null => {
-    try {
-      const it = JSON.parse(fs.readFileSync(path.join(homeDir(), "server.json"), "utf8")) as { port?: number };
-      return typeof it.port === "number" && it.port > 0 ? it.port : null;
-    } catch {
-      return null;
-    }
-  };
-  const deadline = Date.now() + 20_000;
-  while (Date.now() < deadline) {
-    const port = fromStdout() ?? fromJson();
-    if (port && (await ping(port))) return port;
-    await wait(150);
-  }
-  return null;
-}
-
-/** `/api/health` needs no vault but does need the token, which is the check that matters. */
-function ping(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const req = http.request(
-      { host: "127.0.0.1", port, path: "/api/health", method: "GET", headers: { "x-anydag-token": serverToken }, timeout: 3_000 },
-      (res) => {
-        const ok = res.statusCode === 200;
-        res.resume();
-        req.destroy();
-        resolve(ok);
-      },
-    );
-    req.on("error", () => resolve(false));
-    req.on("timeout", () => {
-      req.destroy();
-      resolve(false);
-    });
-    req.end();
-  });
 }
 
 /**
