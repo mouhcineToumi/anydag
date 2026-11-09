@@ -9,6 +9,15 @@
  * exceptions anywhere in `src/`.
  */
 
+/*
+ * The elevation every full-size overlay shares — the Settings modal, the board browser, the
+ * rewrite dialog, the welcome card, the shortcut sheet, the floating sidebar, a calendar card and
+ * an equation's field. The theme owns the colour (`color.shadow`): dark and translucent on
+ * `paper-dark`, soft and low-contrast on the light themes. The geometry is chrome's, and the same
+ * on every one of them so two dialogs never sit at two different heights above the page.
+ */
+:root { --elevation: 0 12px 40px var(--dag-color-shadow); }
+
 .dag-toolbar {
   display: flex;
   align-items: center;
@@ -98,7 +107,7 @@
   height: 14px;
   background: var(--dag-color-card);
   border-radius: 50%;
-  box-shadow: 0 1px 2px var(--dag-color-outline);
+  box-shadow: 0 1px 2px var(--dag-color-shadow);
   transition: transform 0.15s ease;
 }
 .dag-switch:checked { background: var(--dag-color-accent); }
@@ -416,7 +425,7 @@
   border: 1px solid var(--dag-color-outline);
   border-left: none;
   border-radius: 0 var(--dag-metric-radius-card) var(--dag-metric-radius-card) 0;
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
   animation: dag-sidebar-in 120ms ease-out;
 }
 @keyframes dag-sidebar-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -683,7 +692,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   pointer-events: none;
   will-change: transform;
 }
@@ -803,7 +812,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   z-index: 6;
 }
 /* A row's menu, placed where it was asked for rather than hung off the account. */
@@ -1114,7 +1123,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   z-index: 30;
 }
 .dag-pagemore__group { display: flex; flex-direction: column; }
@@ -1194,7 +1203,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
   overflow: hidden;
 }
 
@@ -1444,7 +1453,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-welcome__title { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: var(--dag-color-ink); }
 .dag-welcome__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--dag-color-muted); }
@@ -2321,7 +2330,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 1px 6px var(--dag-color-outlineSoft);
+  box-shadow: 0 1px 6px var(--dag-color-shadow);
   outline: none;
 }
 
@@ -2558,7 +2567,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   pointer-events: none;
   z-index: 10;
 }
@@ -2677,7 +2686,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   z-index: 5;
   user-select: none;
 }
@@ -2804,7 +2813,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-shortcuts__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dag-shortcuts__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -2850,7 +2859,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 8px 28px var(--dag-color-outlineSoft);
+  box-shadow: 0 8px 28px var(--dag-color-shadow);
   pointer-events: none;
   z-index: 7;
 }
@@ -2881,7 +2890,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-settings__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .dag-settings__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -3031,7 +3040,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 24px 64px color-mix(in srgb, var(--dag-color-ink) 16%, transparent);
+  box-shadow: var(--elevation);
 }
 .dag-settings-modal:focus { outline: none; }
 .dag-settings-modal__nav {
@@ -3285,7 +3294,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: 999px;
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   cursor: pointer;
 }
 .dag-problems__pill--error { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
@@ -3300,7 +3309,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-dangerBorder);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-problems__icon { flex: none; color: var(--dag-color-dangerText); }
 .dag-problems__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -3341,7 +3350,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   overflow: hidden;
 }
 .dag-problems__head {
@@ -3381,6 +3390,44 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   color: var(--dag-color-muted);
 }
 
+/* ---- the drawn tooltip ---- */
+
+/*
+ * The dock is icon-only, so its `title` was the only place a control's name and chord existed —
+ * and the desktop app's native tooltip is not dependable on macOS. `Tooltip` draws this instead,
+ * in a portal at the body, so no ancestor's overflow or stacking context can clip it.
+ *
+ * Names grepped before they were written: `dag-tip` and `data-dag-tip` were both free. The
+ * colours are the menu's own (`card`, `ink`, `outline`), which is what keeps it legible in paper,
+ * paper-dark and neutral without a second surface colour to drift.
+ */
+.dag-tip { display: inline-flex; flex: none; }
+
+.dag-tip__bubble {
+  position: fixed;
+  z-index: 60;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 9px;
+  background: var(--dag-color-card);
+  color: var(--dag-color-ink);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  font-family: var(--dag-font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.dag-tip__key {
+  font-family: var(--dag-font-mono);
+  font-size: 11px;
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
 /* ---- the dock, the overflow and the zoom cluster ---- */
 
 /*
@@ -3407,7 +3454,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   z-index: 5;
   user-select: none;
 }
@@ -3481,7 +3528,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   z-index: 6;
 }
 .dag-more__item {
@@ -3802,7 +3849,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-backlinks__row {
   display: grid;
@@ -3858,7 +3905,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   pointer-events: auto;
 }
 .dag-readonly-notice > svg { flex: none; color: var(--dag-color-accent); }
@@ -3955,7 +4002,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-export__menu .dag-more__item { color: var(--dag-color-ink); }
 .dag-export__menu .dag-more__item:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
@@ -4260,7 +4307,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-projectbar__hues { display: inline-flex; align-items: center; gap: 4px; }
 .dag-projectbar__hue {
@@ -4433,8 +4480,16 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-tasks__row .dag-task-status[data-dag-task-status="done"] + .dag-tasks__title { color: var(--dag-color-slate); }
 .dag-tasks__folder { flex: none; max-width: 30%; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-muted); }
 
-.dag-tasks__add { display: flex; align-items: center; gap: 8px; padding: 4px 9px; color: var(--dag-color-muted); }
-.dag-tasks__add input {
+.dag-tasks__add { display: flex; flex-direction: column; gap: 2px; }
+.dag-tasks__add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 9px;
+  color: var(--dag-color-muted);
+  cursor: text;
+}
+.dag-tasks__add-row input {
   flex: 1;
   min-width: 0;
   padding: 5px 0;
@@ -4444,9 +4499,16 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: transparent;
   border: none;
 }
-.dag-tasks__add input::placeholder { color: var(--dag-color-muted); }
-.dag-tasks__add input:focus { outline: none; }
-.dag-tasks__add:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-row input::placeholder { color: var(--dag-color-muted); }
+.dag-tasks__add-row input:focus { outline: none; }
+.dag-tasks__add-row:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-problem {
+  margin: 0;
+  padding: 0 9px 4px 31px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dag-color-dangerText);
+}
 
 /* The board: three columns, a card per task. */
 .dag-tasks__columns { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; align-items: start; }
@@ -4477,12 +4539,13 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-tasks__card:hover { border-color: var(--dag-color-slate); }
 .dag-tasks__card:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 /* What the drag moves, not what was pressed, is what must stop answering `elementFromPoint`. */
-.dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: 0 8px 24px var(--dag-color-outline); }
+.dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: 0 8px 24px var(--dag-color-shadow); }
 .dag-tasks__card-top { display: flex; align-items: flex-start; gap: 6px; }
 .dag-tasks__card-title { flex: 1; min-width: 0; padding-top: 2px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .dag-tasks__card-meta { display: flex; align-items: center; gap: 8px; padding-left: 28px; }
 .dag-tasks__card-meta .dag-tasks__folder { flex: 1; max-width: none; }
-.dag-tasks__column .dag-tasks__add { padding: 4px 6px; }
+.dag-tasks__column .dag-tasks__add-row { padding: 4px 6px; }
+.dag-tasks__column .dag-tasks__add-problem { padding: 0 6px 4px 28px; }
 @media (max-width: 719px) {
   .dag-tasks { padding: 16px; }
   .dag-tasks__columns { grid-template-columns: 1fr; }
@@ -5071,7 +5134,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-calendar__show-head { margin: 4px 6px 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); }
 .dag-calendar__show-menu .dag-calendar__kind { justify-content: flex-start; height: 30px; border: none; color: var(--dag-color-ink); background: transparent; }
@@ -5389,7 +5452,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-calendar__new-when { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--dag-color-slate); }
 .dag-calendar__new input {
@@ -5549,7 +5612,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   background: var(--dag-color-paper100);
 }
-.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: 0 1px 3px color-mix(in srgb, var(--dag-color-ink) 18%, transparent); }
+.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: 0 1px 3px var(--dag-color-shadow); }
 
 /* A file in a note: a picture drawn, anything else a card whose Preview opens it in place. */
 .dag-embed.dag-embed--picture { margin: 0; border: none; background: transparent; }
@@ -5578,7 +5641,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   color: var(--dag-color-ink);
   font-size: 13px;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-upload-notice__lines { flex: 1; display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
 .dag-upload-notice__lines p { margin: 0; }
@@ -5890,7 +5953,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-grid__options-item {
   display: flex;
@@ -5944,7 +6007,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-grid__menu-field { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px 6px; font-size: 11px; color: var(--dag-color-slate); }
 .dag-grid__menu-field input {
@@ -6068,7 +6131,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: 8px;
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-math-field__tex {
   width: 100%;
@@ -6246,7 +6309,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
 .dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
@@ -6459,7 +6522,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-scope__chip > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__chip:hover { background: var(--dag-color-paper100); }
 .dag-chat-scope__more { color: var(--dag-color-accent); font-weight: 600; }
-.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 20; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: 0 8px 24px var(--dag-color-outline); }
+.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 20; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: 0 8px 24px var(--dag-color-shadow); }
 .dag-chat-scope__line { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 4px 6px; font-size: 12px; }
 .dag-chat-scope__line strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__line > span { color: var(--dag-color-muted); }

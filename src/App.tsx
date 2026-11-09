@@ -775,7 +775,7 @@ function QuizzesApp({
   const create = useCallback(
     async (title: string) => {
       const made = await createQuiz(titleStem(title), quizText(title));
-      if (made) open("quiz", made);
+      if ("name" in made) open("quiz", made.name);
     },
     [open],
   );
@@ -2521,7 +2521,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                 ? refuseLocked()
                 : sidebar
                   ? sidebar.create("board")
-                  : void createBoard("untitled", blankBoardText()).then((made) => made && openBoard(made))
+                  : void createBoard("untitled", blankBoardText()).then((made) => "name" in made && openBoard(made.name))
             }
             onWrite={() =>
               locked
@@ -2529,10 +2529,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                 : sidebar
                   ? sidebar.create("note")
                   : void createNote("untitled", blankNoteText()).then((made) => {
-                      if (!made) return;
+                      if ("error" in made) return;
                       /* Named in its own title, as one made from the sidebar is. */
-                      nameWhenOpened(made);
-                      openNote(made);
+                      nameWhenOpened(made.name);
+                      openNote(made.name);
                     })
             }
             onOpen={openBrowser}

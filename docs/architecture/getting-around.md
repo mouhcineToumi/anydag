@@ -37,3 +37,18 @@ automatic fit (`firstFit()` in `canvas/geometry.ts`, called from `Viewport`'s tw
 large board and leaves a small one at 100%, with the paper around it. The explicit Fit action — `F`,
 Home, the button — still calls `fitTo()` at its full range, because a person asking to frame one
 small card means to look at it closely; `0` and the zoom figure remain 100% rather than a fit.
+
+### The dock's tooltip
+
+The dock and the zoom cluster are icon-only, so a control's name and chord live in a tooltip rather
+than on its face. The browser's `title` was that tooltip until macOS stopped showing it in the
+desktop app — at least not within the time a person waits — so `src/ui/Tooltip.tsx` draws it instead,
+and the `title` is gone from those controls. `src/ui/tooltipPlace.ts` holds the placement arithmetic:
+400 ms after hover or keyboard focus, above the control (upward from the dock) unless there is no
+room, and clamped inside the window on both axes.
+
+It is a portal at the body, `position: fixed`, so no ancestor's overflow or stacking context can clip
+it; it is `pointer-events: none`, so it cannot take the press it describes; and it goes on pointer
+leave, blur, Escape and press. The wrapper adds no drawing of its own — it only measures the control
+and carries the handlers. The control keeps its `aria-label`, because the bubble is a visual name
+for a pointer or keyboard user, not the accessible name.

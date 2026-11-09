@@ -456,6 +456,58 @@ test("a file is called its title — Untitled until somebody names it — and it
   expect(titles).toEqual(["idea", "Other", "Q3: the plan"]);
 });
 
+test("one New control names every kind, and a refused create says why under the tree", async ({ page }) => {
+  await fresh(page);
+  const newControl = page.locator("[data-dag-sidebar-new]");
+  await expect(newControl).toHaveCount(1);
+  await expect(newControl).toHaveAttribute("aria-label", "New");
+  await expect(newControl).toHaveAttribute("title", /new board, note, task, event, quiz, table or folder, or upload files/i);
+  /* The folder-with-plus beside it is gone: Folder is a row of the one menu, not a second New. */
+  await expect(page.locator("[data-dag-sidebar-new-folder]")).toHaveCount(0);
+
+  await newControl.click();
+  const menu = page.locator("[data-dag-sidebar-new-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("[role=menuitem]")).toHaveText([
+    "Board",
+    "Note",
+    "Task",
+    "Event",
+    "Quiz",
+    "Table",
+    "Folder",
+    "Upload files…",
+  ]);
+  for (const kind of ["board", "note", "task", "event", "quiz", "table", "folder", "upload"])
+    await expect(menu.locator(`[data-dag-sidebar-new-kind="${kind}"] svg`)).toHaveCount(1);
+
+  /* Folder makes `Untitled` in the open file's folder and starts the inline rename, from the one
+     menu — the control that used to make a top-level folder at once. */
+  await menu.locator('[data-dag-sidebar-new-kind="folder"]').click();
+  await expect.poll(() => fs.existsSync(path.join(BOARDS, folder, "inner", "Untitled")), { timeout: 5_000 }).toBe(true);
+  const box = page.locator("[data-dag-sidebar-name]");
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue("Untitled");
+  await box.press("Escape");
+  await expect(folderRow(page, `${folder}/inner/Untitled`)).toHaveCount(1);
+
+  /* A create the server refuses says its own sentence under the tree, and the list it guessed at
+     is unchanged: no row, and no file. */
+  await page.route("**/__board/create*", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "This vault refuses new boards." }),
+    }),
+  );
+  const filesBefore = await page.locator("[data-dag-sidebar-file]").count();
+  await newControl.click();
+  await menu.locator('[data-dag-sidebar-new-kind="board"]').click();
+  await expect(page.locator("[data-dag-sidebar-create-problem]")).toHaveText("This vault refuses new boards.");
+  await expect(page.locator("[data-dag-sidebar-file]")).toHaveCount(filesBefore);
+  expect(fs.readdirSync(path.join(BOARDS, folder, "inner")).filter((f) => f.endsWith(".board.md"))).toEqual(["plan.board.md"]);
+});
+
 test("a snapshot draws no sidebar and no shell around the page", async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await page.evaluate(() => localStorage.removeItem("dag:sidebar"));

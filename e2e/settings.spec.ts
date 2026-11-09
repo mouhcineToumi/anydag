@@ -314,3 +314,24 @@ test("About says which version this is", async ({ page }) => {
   await expect(page.locator("[data-dag-setting-version]")).toHaveText(version);
   await expect(page.locator("[data-dag-setting-server]")).toBeVisible();
 });
+
+test("its elevation is a soft shadow on paper and a dark one on paper-dark", async ({ page }) => {
+  /* The shadow falls outside the card, so the screenshot is the scrim: the card and the space
+     around it. The sidebar is away in a fresh context (`global-setup.ts`), so what shows through
+     the veil is only this test's scratch board. */
+  for (const theme of ["paper", "paper-dark"]) {
+    await open(page, `&theme=${theme}`);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.keyboard.press("Control+Comma");
+    await expect(dialog(page)).toBeVisible();
+    await settingsTab(page, "shortcuts");
+    /* Off the tab and its focus ring, and onto the card's blank header: the screenshot is about the
+       elevation, not about which control this browser happens to have focused. */
+    const pane = page.locator('[data-dag-settings-pane="shortcuts"]');
+    const box = (await pane.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + 12);
+    await expect(dialog(page)).toHaveScreenshot(`settings-${theme}.png`);
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toHaveCount(0);
+  }
+});

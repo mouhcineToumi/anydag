@@ -19,6 +19,7 @@
 
     "outline": "#3D424B",
     "outlineSoft": "#2E323A",
+    "shadow": "#00000080",
     "externalBorder": "#525863",
 
     "accent": "#6B9BFF",
