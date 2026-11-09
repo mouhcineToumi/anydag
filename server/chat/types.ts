@@ -148,4 +148,6 @@ export type ChatEvent =
   | { type: "blocks"; turn: string; blocks: Block[] }
   | { type: "end"; turn: Turn }
   | { type: "chat"; chat: ChatMeta }
-  | { type: "undo"; record: UndoRecord };
+  | { type: "undo"; record: UndoRecord }
+  /** The chat was deleted: every open history drops its row, and a page on it goes to New chat. */
+  | { type: "gone"; chat: string };

@@ -264,6 +264,7 @@ export class Assistant {
       if (s) await this.opts.harnesses[p]!.forget(s.id).catch(() => undefined);
     }
     this.store.remove(root, chat);
+    this.emit(chat, { type: "gone", chat });
   }
 
   /* -- a turn ------------------------------------------------------------------------------ */

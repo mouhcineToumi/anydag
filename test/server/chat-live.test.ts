@@ -187,6 +187,26 @@ describe("a turn", () => {
   });
 });
 
+describe("deleting a chat", () => {
+  it("says gone to every listener, so each open history drops the row", async () => {
+    const chat = await newChat();
+    const all: ChatEvent[] = [];
+    const mine: ChatEvent[] = [];
+    const offAll = assistant.listen("*", (e) => all.push(e));
+    const offOne = assistant.listen(chat.id, (e) => mine.push(e));
+    try {
+      const r = await api("POST", "/__board/chat/delete", { id: chat.id });
+      expect(r.status, JSON.stringify(r.json)).toBe(200);
+    } finally {
+      offAll();
+      offOne();
+    }
+    expect(all).toContainEqual({ type: "gone", chat: chat.id });
+    expect(mine).toContainEqual({ type: "gone", chat: chat.id });
+    expect((await api("GET", `/__board/chats${q(env.vault.id)}`)).json.chats).toEqual([]);
+  });
+});
+
 describe("a reply that wrote its tool call as text", () => {
   const RAW = '<invoke name="change_block"> <parameter name="title">Write a note on merge queues</parameter> </invoke>';
 

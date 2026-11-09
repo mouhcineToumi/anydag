@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 
 import {
+  centeredBox,
   clampPan,
   clampZoom,
   DRAG_SLOP,
@@ -54,6 +55,11 @@ export interface ViewportHandle {
   zoom(): number;
   /** Board coordinates of the middle of the view — where a new item lands when there is no pointer. */
   center(): Point;
+  /**
+   * The top-left that puts a box of `w` × `h` in the middle of the view — what an item made from
+   * the chrome lands on. A view too small for the box keeps it against its top-left edge.
+   */
+  centerItem(w: number, h: number): Point;
   /** Take keyboard focus, so a shortcut typed after a toolbar click reaches the board. */
   focus(): void;
 }
@@ -197,6 +203,15 @@ export function Viewport({
     [commit, viewSize],
   );
 
+  /* Back to 100%, keeping the corner where it is. A choice like `show` and `zoomBy`, so it claims
+     the view: a later change of the content's bounds or of the box must not refit it. The `0` key
+     and the zoom bar's percentage call this one function — the same gesture in two places rather
+     than two commits that can drift. */
+  const actual = useCallback(() => {
+    commit(1, applied.current.off);
+    touched.current = true;
+  }, [commit]);
+
   const toBoard = useCallback((clientX: number, clientY: number): Point => {
     const box = boxRef.current?.getBoundingClientRect();
     const { zoom: z, off } = applied.current;
@@ -213,19 +228,23 @@ export function Viewport({
       show,
       zoomBy,
       reset: () => fit(),
-      actual: () => {
-        commit(1, applied.current.off);
-        touched.current = true;
-      },
+      actual,
       toBoard,
       zoom: () => applied.current.zoom,
       center: () => {
         const box = boxRef.current?.getBoundingClientRect();
         return toBoard((box?.left ?? 0) + (box?.width ?? 0) / 2, (box?.top ?? 0) + (box?.height ?? 0) / 2);
       },
+      centerItem: (w, h) => {
+        const box = boxRef.current?.getBoundingClientRect();
+        if (!box) return { x: -w / 2, y: -h / 2 };
+        const a = toBoard(box.left, box.top);
+        const b = toBoard(box.right, box.bottom);
+        return centeredBox({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, { w, h }, { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y });
+      },
       focus: () => boxRef.current?.focus({ preventScroll: true }),
     }),
-    [commit, fit, show, zoomBy, toBoard],
+    [actual, commit, fit, show, zoomBy, toBoard],
   );
 
   /* React registers `onWheel` passively at the root, so `preventDefault` inside a synthetic handler
@@ -637,7 +656,7 @@ export function Viewport({
         return fit();
       case "0":
         e.preventDefault();
-        return commit(1, applied.current.off);
+        return actual();
       case "+":
       case "=":
         e.preventDefault();

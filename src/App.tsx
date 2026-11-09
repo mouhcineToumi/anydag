@@ -2075,11 +2075,11 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const onRedo = () => (editor.redo(), focusBoard());
   const onTidy = () => (void editor.tidy(), focusBoard());
   const onKeep = () => (void editor.saveAsComponent(), focusBoard());
-  /* The `P` key puts one under the pointer; pressed on the dock there is no pointer over the
-     board, so it lands in the middle of the view — which is what the library's click already
-     means. Not `focusBoard()` after: a fresh prompt card takes the caret, and pulling focus back
-     to the board would take it straight off the thing the press just made. */
-  const onPrompt = () => editor.add("prompt", viewport.current?.center());
+  /* A prompt card is made from the chrome, so there is no pointer position to honour: `editor.add`
+     puts its centre in the middle of the view. Not `focusBoard()` after: a fresh prompt card takes
+     the caret, and pulling focus back to the board would take it straight off the thing the press
+     just made. */
+  const onPrompt = () => editor.add("prompt");
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;

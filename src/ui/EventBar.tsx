@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { CalendarClock, Clock, Sun } from "lucide-react";
 
 import { fieldsOf, whenWords, withAllDay, withEnd, withStart } from "@/calendar/model";
@@ -41,67 +43,80 @@ export function EventBar({
   useZone();
   const f = fieldsOf(event);
   const zone = f.allDay ? "" : zoneAt(momentOf(event.start));
+  /* The visible label is the control's name as well as its pointer: `htmlFor` on the date, and
+     `aria-labelledby` on the time a label cannot carry itself. */
+  const id = useId();
+  const allDayId = `${id}all-day`;
+  const startId = `${id}start`;
+  const startDayId = `${id}start-day`;
+  const startTimeId = `${id}start-time`;
+  const endId = `${id}end`;
+  const endDayId = `${id}end-day`;
+  const endTimeId = `${id}end-time`;
+  const labelClass = editable ? "dag-facts__label dag-eventbar__label" : "dag-facts__label";
   return (
     <div className="dag-taskbar dag-eventbar dag-facts" data-dag-eventbar={f.allDay ? "all-day" : "timed"}>
-      <span className="dag-facts__label">
+      <label className={labelClass} htmlFor={allDayId} data-dag-eventbar-label="all-day">
         <Sun size={14} strokeWidth={2} aria-hidden="true" />
         All day
-      </span>
+      </label>
       <span className="dag-facts__value">
         <Switch
+          id={allDayId}
           checked={f.allDay}
           disabled={!editable}
           data-dag-eventbar-allday=""
-          aria-label="All day"
           onChange={(e) => onChange(withAllDay(event, e.target.checked))}
         />
       </span>
-      <span className="dag-facts__label">
+      <label id={startId} className={labelClass} htmlFor={startDayId} data-dag-eventbar-label="start">
         <CalendarClock size={14} strokeWidth={2} aria-hidden="true" />
         Starts
-      </span>
+      </label>
       <span className="dag-facts__value dag-eventbar__when">
         <input
+          id={startDayId}
           type="date"
           value={f.startDay}
           disabled={!editable}
-          aria-label="Start day"
           data-dag-eventbar-start-day=""
           onChange={(e) => e.target.value && onChange(withStart(event, e.target.value))}
         />
         {f.allDay ? null : (
           <input
+            id={startTimeId}
             type="time"
             step={900}
             value={f.startTime}
             disabled={!editable}
-            aria-label="Start time"
+            aria-labelledby={startId}
             data-dag-eventbar-start-time=""
             onChange={(e) => e.target.value && onChange(withStart(event, f.startDay, e.target.value))}
           />
         )}
       </span>
-      <span className="dag-facts__label">
+      <label id={endId} className={labelClass} htmlFor={endDayId} data-dag-eventbar-label="end">
         <Clock size={14} strokeWidth={2} aria-hidden="true" />
         Ends
-      </span>
+      </label>
       <span className="dag-facts__value dag-eventbar__when">
         <input
+          id={endDayId}
           type="date"
           value={f.endDay}
           min={f.startDay}
           disabled={!editable}
-          aria-label={f.allDay ? "Last day" : "End day"}
           data-dag-eventbar-end-day=""
           onChange={(e) => e.target.value && onChange(withEnd(event, e.target.value))}
         />
         {f.allDay ? null : (
           <input
+            id={endTimeId}
             type="time"
             step={900}
             value={f.endTime}
             disabled={!editable}
-            aria-label="End time"
+            aria-labelledby={endId}
             data-dag-eventbar-end-time=""
             onChange={(e) => e.target.value && onChange(withEnd(event, f.endDay, e.target.value))}
           />

@@ -115,7 +115,11 @@ export function CellView({ type, text, options }: { type: ColumnType; text: stri
     }
     case "date": {
       /* Written `YYYY-MM-DD`, the file's form and what an agent types; read as words, the way every
-         other date in the app is shown. The written form is the tooltip, and what the editor opens. */
+         other date in the app is shown. The written form is the tooltip, and what the editor opens.
+         An empty cell reads `null`, as an empty select does: `Intl.DateTimeFormat.format` throws on
+         the invalid date `String(null)` would make, and the throw is in render, so it would take the
+         whole page down. */
+      if (read.value === null) return null;
       const day = String(read.value);
       return (
         <time className="dag-grid__value" dateTime={day} title={day}>

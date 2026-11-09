@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
-import { BOARDS } from "./boards";
+import { BOARDS, boardId } from "./boards";
 import { exportAs, openExport } from "./export";
 
 /**
@@ -157,10 +157,8 @@ test("a note saves as its own file, and as a PDF in the light theme, under its t
 test("a note's PDF waits for the board it embeds to be drawn", async ({ page }) => {
   const board = `${stem}-board`;
   write(board, "board", BOARD);
-  /* The id is the store's, minted when the file is first listed — which this is. */
-  const list = (await (await page.request.get("/__board/list")).json()) as { ids: Record<string, string> };
-  const id = list.ids[board];
-  expect(id).toBeTruthy();
+  /* The id is the store's, minted when the file is first listed — which this waits for. */
+  const id = await boardId(page, board);
 
   const name = `${stem}-note`;
   write(name, "note", `# Where it runs\n\n![Print scratch](dag:${id})\n\nAfter the board.\n`);
