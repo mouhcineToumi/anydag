@@ -9,7 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-import { createNoteWithReason, setTask, type BoardTree } from "@/board/useBoard";
+import { createNote, setTask, type BoardTree } from "@/board/useBoard";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskChange, type TaskStatus } from "@/note/task";
 import { refuseLocked } from "@/settings/lock";
@@ -363,7 +363,7 @@ export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: s
     setBusy(true);
     setState((had) => ({ ...had, problem: null }));
     const stem = titleStem(t) || "untitled";
-    const made = await createNoteWithReason(into ? `${into}/${stem}` : stem, taskText(t, status));
+    const made = await createNote(into ? `${into}/${stem}` : stem, taskText(t, status));
     setBusy(false);
     setState((had) => afterQuickAdd(had, made));
   };
