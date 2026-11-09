@@ -13,7 +13,7 @@ import { scopeUrl } from "@/vault/current";
 
 import type { ChatEvent } from "./types";
 
-const TYPES = ["chat", "turn", "step", "delta", "blocks", "end", "undo"] as const;
+const TYPES = ["chat", "turn", "step", "delta", "blocks", "end", "undo", "gone"] as const;
 
 interface Channel {
   source: EventSource;
