@@ -47,6 +47,18 @@ Seven things are load-bearing:
 
 `test/server/` is the store contract and the routes in vitest over a real folder and a real index.
 
+## The development server
+
+`npm run dev` is not this server: Vite serves the page and proxies `/__board` and `/api` to
+`anydag serve` on `ANYDAG_API_PORT`, adding the run's token in the proxy (`vite.config.ts`). The
+development vault and `.dev-home/` sit inside Vite's root, so the dev and preview servers bind
+`127.0.0.1` — `ANYDAG_DEV_HOST` is the explicit opt-in for a listener beyond loopback — and
+`server.fs.deny` refuses `.dev-home`, `.anydag`, `.git`, `.claude` and the other credential
+dot-folders in every form (`?raw`, `%2E` and `/@fs`). The proxy still accepts only a loopback
+`Host`, and refuses a request whose `Origin` is not the page's own or whose `Sec-Fetch-Site` is
+`cross-site` or `same-site`, before it attaches the token. `scripts/dev.sh` mints a token per run; `server.json` is
+where `scripts/session.mjs`, the CLI and the e2e suite read it.
+
 ## Vaults
 
 A **vault** is a folder — Obsidian's word and Obsidian's model. The sidebar's first row

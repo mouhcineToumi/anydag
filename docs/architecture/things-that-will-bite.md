@@ -96,7 +96,10 @@
   measurement taken during the initial fit divided a scaled rect by 1.
 - **There is no server inside Vite.** The api is the local server (`server/`, Hono):
   `vite.config.ts` proxies `/__board` and `/api` to it with the token, and `npm run dev`
-  (`scripts/dev.sh`) starts it on `boards/local/` before Vite. The live channel is SSE —
+  (`scripts/dev.sh`) starts it on `boards/local/` before Vite. That proxy is a credential boundary
+  too: it refuses a non-loopback `Host`, a foreign `Origin` and a `cross-site`/`same-site`
+  `Sec-Fetch-Site` before it adds the token, and the dev server binds loopback unless
+  `ANYDAG_DEV_HOST` opts into the LAN. The live channel is SSE —
   `src/board/events.ts`, one `EventSource`
   for the page, fanned out to its hooks — and not `import.meta.hot`, which is `undefined` in a build
   and made a built app go quietly stale rather than fail.
@@ -662,8 +665,10 @@
   needed: a "simple" `POST` from any website the person has open needs no preflight, so without the
   token any site could write into a vault. The desktop shell adds the header in the main process;
   `anydag serve` prints `/?token=…` once and swaps it for an `httpOnly`, `SameSite=Strict` cookie and
-  a redirect; Vite's proxy adds the header in development. A test or a script that `fetch`es the
-  server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401` as an empty list.
+  a redirect; Vite's proxy adds the header in development, after refusing anything that is not this
+  page. `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script
+  that `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401`
+  as an empty list.
 - **Opening a vault never writes a byte of it.** An existing `.md` with no `id:` is given one only
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
