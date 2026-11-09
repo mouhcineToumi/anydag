@@ -4401,8 +4401,16 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-tasks__row .dag-task-status[data-dag-task-status="done"] + .dag-tasks__title { color: var(--dag-color-slate); }
 .dag-tasks__folder { flex: none; max-width: 30%; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-muted); }
 
-.dag-tasks__add { display: flex; align-items: center; gap: 8px; padding: 4px 9px; color: var(--dag-color-muted); }
-.dag-tasks__add input {
+.dag-tasks__add { display: flex; flex-direction: column; gap: 2px; }
+.dag-tasks__add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 9px;
+  color: var(--dag-color-muted);
+  cursor: text;
+}
+.dag-tasks__add-row input {
   flex: 1;
   min-width: 0;
   padding: 5px 0;
@@ -4412,9 +4420,16 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: transparent;
   border: none;
 }
-.dag-tasks__add input::placeholder { color: var(--dag-color-muted); }
-.dag-tasks__add input:focus { outline: none; }
-.dag-tasks__add:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-row input::placeholder { color: var(--dag-color-muted); }
+.dag-tasks__add-row input:focus { outline: none; }
+.dag-tasks__add-row:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-problem {
+  margin: 0;
+  padding: 0 9px 4px 31px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dag-color-dangerText);
+}
 
 /* The board: three columns, a card per task. */
 .dag-tasks__columns { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; align-items: start; }
@@ -4450,7 +4465,8 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-tasks__card-title { flex: 1; min-width: 0; padding-top: 2px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .dag-tasks__card-meta { display: flex; align-items: center; gap: 8px; padding-left: 28px; }
 .dag-tasks__card-meta .dag-tasks__folder { flex: 1; max-width: none; }
-.dag-tasks__column .dag-tasks__add { padding: 4px 6px; }
+.dag-tasks__column .dag-tasks__add-row { padding: 4px 6px; }
+.dag-tasks__column .dag-tasks__add-problem { padding: 0 6px 4px 28px; }
 @media (max-width: 719px) {
   .dag-tasks { padding: 16px; }
   .dag-tasks__columns { grid-template-columns: 1fr; }
