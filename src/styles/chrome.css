@@ -3381,6 +3381,44 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   color: var(--dag-color-muted);
 }
 
+/* ---- the drawn tooltip ---- */
+
+/*
+ * The dock is icon-only, so its `title` was the only place a control's name and chord existed —
+ * and the desktop app's native tooltip is not dependable on macOS. `Tooltip` draws this instead,
+ * in a portal at the body, so no ancestor's overflow or stacking context can clip it.
+ *
+ * Names grepped before they were written: `dag-tip` and `data-dag-tip` were both free. The
+ * colours are the menu's own (`card`, `ink`, `outline`), which is what keeps it legible in paper,
+ * paper-dark and neutral without a second surface colour to drift.
+ */
+.dag-tip { display: inline-flex; flex: none; }
+
+.dag-tip__bubble {
+  position: fixed;
+  z-index: 60;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 9px;
+  background: var(--dag-color-card);
+  color: var(--dag-color-ink);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  font-family: var(--dag-font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.dag-tip__key {
+  font-family: var(--dag-font-mono);
+  font-size: 11px;
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
 /* ---- the dock, the overflow and the zoom cluster ---- */
 
 /*
