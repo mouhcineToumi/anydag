@@ -21,7 +21,6 @@ blocks font files loaded from a `file://` page.
 | `assets/fonts/` | Inter and Fira Code, latin subset, with their OFL licences. |
 | `assets/screenshots/` | 1800 px and 900 px WebP captures of the app. |
 | `assets/og.png` | The 1200 × 630 social card. |
-| `CNAME` | The custom domain GitHub Pages serves it on. |
 
 The theme is chosen before the first paint: a stored choice, otherwise `prefers-color-scheme`. The
 download buttons all point at the repository's **Releases** page; the script only changes the label
@@ -48,10 +47,6 @@ link is still a link, so with JavaScript off it opens the image on its own.
 
 ## Deploy
 
-`.github/workflows/site.yml` publishes this folder to GitHub Pages on a push to `develop` that
-touches `site/`, or by hand from the Actions tab. In the repository settings, set **Pages → Build and
-deployment → Source** to **GitHub Actions**, and point the custom domain at `anydag.com`. The
-`CNAME` file is already in the artifact.
-
-For any other static host (Cloudflare Pages, Bunny, Netlify, an nginx box), upload the contents of
-`site/` as the document root. There is nothing to build.
+Nothing in this repository publishes the page yet: it will be hosted on Google Cloud, and that is set
+up outside this folder. Whatever the host, the contents of `site/` are the document root and there is
+nothing to build.
