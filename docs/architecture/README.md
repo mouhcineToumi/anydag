@@ -102,6 +102,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The calendar | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | The command line | [`cli.md`](cli.md) |
 | The desktop app | [`desktop.md`](desktop.md) |
+| The dock's tooltip | [`getting-around.md`](getting-around.md) |
 | The free canvas | [`free-canvas.md`](free-canvas.md) |
 | The layers, and what each may not know | [`layers.md`](layers.md) |
 | The leader key | [`editing.md`](editing.md) |
