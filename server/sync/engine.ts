@@ -15,6 +15,8 @@
  * - **No echo.** After applying, the state holds the new sha1, so the watcher's event for that path
  *   finds the disk equal to its base and pushes nothing; and a pull skips a log entry whose key's
  *   state is already at or past it, which is how the device's own commits are not applied twice.
+ *   Nor does that event wake anything: `heard` drops a path whose disk is still what this engine
+ *   last wrote there (`echo.ts`) before it is marked, so it raises no `pending` and arms no debounce.
  * - **A commit is all or nothing, so a rename never lands half**: a delete and a create pushed
  *   together. On the way in, a page that deletes `P` and creates `Q` with `P`'s old blob, while `P`
  *   was edited here, is a rename: the edit follows the file to `Q`.
@@ -34,6 +36,7 @@ import { openMeta, sealMeta, type Meta } from "../../sync/protocol/meta";
 import { MAX_CHANGES, MAX_PAGE, type Change, type Head } from "../../sync/protocol/wire";
 import { Bases, sha1Of } from "./bases";
 import { isSyncError, type SyncApi } from "./client";
+import { Echoes, FOLDER } from "./echo";
 import { conflictName, freshCopy, mergeContent } from "./merge";
 import { dirSyncs, syncs } from "./scope";
 import type { PathEntry, SyncState } from "./state";
@@ -107,9 +110,11 @@ export class SyncEngine {
   private chain: Promise<unknown> = Promise.resolve();
   /** Files a pull wrote, for `settleKinds` once the page is applied. */
   private arrived = new Set<string>();
+  /** What this engine last wrote at each path, so the watcher's report of it is no change. */
+  private readonly wrote = new Echoes();
 
   constructor(o: EngineOptions) {
-    this.fs = o.fs;
+    this.fs = this.wrote.wrap(o.fs, sha1Of);
     this.api = o.api;
     this.state = o.state;
     this.bases = o.bases;
@@ -151,6 +156,26 @@ export class SyncEngine {
       // A file arriving in a folder that was a marker ends the marker.
       this.markAncestors(rel, (st) => st.kind === "dir" && st.blob !== null);
     }
+  }
+
+  /**
+   * The watcher's paths as the loop hears them: each whose disk is still what this engine last wrote
+   * there is its own write coming back and is dropped; the rest are `touch`ed. Whether any was left —
+   * the loop wakes the push debounce only then.
+   */
+  async heard(rels: string[]): Promise<boolean> {
+    const left: string[] = [];
+    for (const raw of rels) {
+      let rel: string;
+      try {
+        rel = normalise(raw);
+      } catch {
+        continue;
+      }
+      if (!(await this.echo(rel))) left.push(rel);
+    }
+    if (left.length) this.touch(left);
+    return left.length > 0;
   }
 
   pull(): Promise<void> {
@@ -200,6 +225,19 @@ export class SyncEngine {
       const st = this.state.entry(key);
       if (st && want(st)) this.dirty.set(key, st.rel);
     }
+  }
+
+  /** Whether the event for `rel` is this engine's own last write there, unchanged since (`echo.ts`). */
+  private async echo(rel: string): Promise<boolean> {
+    const left = this.wrote.take(rel);
+    if (left === undefined) return false;
+    if (left === FOLDER) {
+      // A folder cannot be read; one the state holds as an empty-folder marker is decided by a push.
+      const st = this.state.entry(this.keyOf(rel));
+      return !(st && st.kind === "dir" && st.blob !== null);
+    }
+    const disk = await this.fs.read(rel);
+    return (disk ? sha1Of(disk) : null) === left;
   }
 
   private async fetchBlob(id: string): Promise<Uint8Array> {

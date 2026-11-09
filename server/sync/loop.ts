@@ -6,7 +6,7 @@
  * - **A pull** on a poke (`GET /v1/vaults/{v}/poke`, a server-sent stream that says a `seq`), or on
  *   a poll every thirty seconds — a lost poke costs one poll interval, never a change.
  * - **A push** on the vault's raw watcher (`subscribeRaw`), filtered by `syncs()`/`dirSyncs()`,
- *   handed to `engine.touch`, and debounced: two seconds of quiet, ten at most.
+ *   handed to `engine.heard`, and debounced: two seconds of quiet, ten at most.
  *
  * Load-bearing:
  * - **The loop never dies of a failure.** `ES_NETWORK` is `offline`, retried on a backoff; `ES_AUTH`
@@ -14,6 +14,11 @@
  *   again; anything else is `error`, with the message, and retried. Nothing thrown leaves `once`.
  * - **One run at a time, and runs coalesce**: a poke, the poll and a burst of saves arriving while a
  *   run is out make one more run, not three.
+ * - **Sync's own writes wake nothing.** The watcher starts with the loop, so what a pull, a download
+ *   or a merge wrote comes back as events, often after the run that wrote it. `engine.heard` drops
+ *   every path whose disk is still what the engine wrote there (`echo.ts`); a batch with nothing
+ *   left neither raises `pending` nor arms the debounce, so the run that applied a pull is the only
+ *   `syncing` it causes. A path somebody else wrote meanwhile is left, and pushed as before.
  * - **The status is said only when it changes**, through `vault.emit({type: "sync"})`, which the
  *   change feed sends as `dag:vault-sync`. A poll does not flash `syncing`: the one thing a quiet poll
  *   changes is `last`.
@@ -291,7 +296,22 @@ export class SyncLoop {
     const types = this.vault.types;
     const ours = rels.filter((r) => syncs(r, types) || dirSyncs(r));
     if (!ours.length) return;
-    this.engine.touch(ours);
+    void this.engine.heard(ours).then(
+      (any) => {
+        if (any) this.arm();
+      },
+      // `heard` reads the disk and throws nothing it does not catch; a path it could not judge is
+      // still a change, so a failure here arms the debounce rather than lose one.
+      () => {
+        this.engine.touch(ours);
+        this.arm();
+      },
+    );
+  }
+
+  /** Something changed here: say `pending`, and push after the quiet (or at the most). */
+  private arm(): void {
+    if (this.stopped) return;
     this.say();
     if (this.quiet !== null) this.tune.clearTimeout(this.quiet);
     this.quiet = this.tune.setTimeout(() => this.fire(), this.tune.quietMs);

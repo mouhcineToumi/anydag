@@ -790,8 +790,10 @@
   the defect behind it (a renamed copy's index row dated by the rename, not its id's created) was the
   engine's. #14 was the same mistake in the collector (the database's `now()`). Give the test
   the clock. **And the other half: a status is a moment.** The sync loop's watcher reports a pull's
-  own writes late, and each batch runs once more and finds nothing to push, so `GET /api/sync` right
-  after a link answered `syncing` in six runs of fifteen on two starved cores. Wait for the loop to be
-  quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state, and prove a push
-  where it lands, on the server. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
+  own writes late, and each batch used to run once more and find nothing to push, so `GET /api/sync`
+  right after a link answered `syncing` in six runs of fifteen on two starved cores. Those echoes
+  wake nothing now (#36, `server/sync/echo.ts`), but a test's own write is still heard late. Wait for
+  the loop to be quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state,
+  prove a push where it lands, on the server, and before asserting that nothing ran, wait for the
+  watcher to catch up (`heardAll()`) and then past the debounce. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
   which starves a run far harder than the same loops spread over every core.

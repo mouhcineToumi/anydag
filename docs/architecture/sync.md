@@ -13,7 +13,8 @@ holds opaque keys, sealed blobs and sealed metadata, and never a path or a byte 
 | `sync/protocol/wire.ts` · `crypto.ts` | every route body and `ES_*` code · the vault key, its three HKDF subkeys, AES-256-GCM seals bound to what they seal, Argon2id, the recovery code |
 | `sync/server/` | `anydag-sync serve`, the routes under `/v1`, `Meta` (`meta/pg.ts`) and `DiskBlobs`, pairing, quotas, the usage ledger, `/metrics`, the collector (`gc.ts`), and the admin CLI (`cli.ts`) |
 | `server/sync/engine.ts` | one pull, push or resync at a time: decisions per key, merges, conflict copies, renames recognised |
-| `server/sync/loop.ts` · `link.ts` | one loop per linked vault (catch-up, poke or a 30 s poll, a 2 s/10 s debounce on raw watcher events) · pair, link, unlink, devices |
+| `server/sync/loop.ts` · `link.ts` | one loop per linked vault (catch-up, poke or a 30 s poll, a 2 s/10 s debounce on raw watcher events that are not sync's own writes) · pair, link, unlink, devices |
+| `server/sync/echo.ts` | what the engine last wrote at each path, so the watcher's report of it wakes nothing |
 | `server/routes/sync.ts` | `GET /api/sync`, `POST /api/sync/{pair,link,unlink,now}`, `GET /api/sync/{remotes,devices}`, `POST /api/sync/devices/revoke` — the contract is `server/sync/types.ts` |
 | `src/sync/` · `src/settings/panes/Sync.tsx` | the status hook and the calls · Settings → Sync |
 
@@ -35,7 +36,20 @@ Eleven things are load-bearing:
   `removeRawIf`), so the page or an agent writing in between wins and sync decides again. It writes
   raw: `write`/`create` parse and stamp, and sync puts back exactly the bytes another device committed.
 - **No echo.** After applying a version, its bytes are the key's base, so the watcher's event for
-  that write finds the disk equal to the base and pushes nothing.
+  that write finds the disk equal to the base and pushes nothing. **Nor does it wake the loop**
+  (#36): the watcher starts with the loop, so the files a pull, a download or a merge wrote come back
+  as events, often after the run that wrote them, and each batch used to raise `pending` and arm the
+  debounce for a run that pushed nothing — the feed went `idle` → `syncing` → `idle` a couple of
+  seconds after every pull. The engine now wraps its `SyncFs` (`echo.ts`) and notes what every
+  write, removal and folder it made left at the path: the sha1, nothing, or a folder.
+  `engine.heard`, which the loop calls instead of `touch`, drops a path whose disk is still exactly
+  that, and the loop arms the debounce only for what is left. It is safe because every write sync
+  makes is a compare-and-set: a write in between either failed sync's (no note) or was what sync
+  decided on, and whatever that left to push — a merge, a conflict copy — the engine marked itself.
+  A write after it changes the bytes and is pushed as before. Each event spends its path's note, a
+  note nothing spent lapses after 30 s, and a folder (which `SyncFs` cannot read) the state holds as
+  an empty-folder marker is always touched. `touch` and `scan` are unchanged: the harness calls
+  `touch` directly, and a scan decides against the base whatever a note says.
 - **A conflict is visible**: ours stays at the path and theirs is written beside it as
   `<stem> (conflict <device> <YYYY-MM-DD HH.mm>)<suffix>`, keeping its id unless ours has the same
   one. Text merges with `merge3` first; a merged board, quiz or table that would not parse is not a
@@ -99,11 +113,15 @@ Eleven things are load-bearing:
   unchanged) that every vault reads as a birth, so a seed makes the same births every run, idle or
   loaded. A scripted case that pins `Dev.clock` keeps it.
 
-**A test of the loop reads a status only once the loop is quiet.** The watcher starts with the loop and
-reports what a link or a pull wrote *after* the call returned; each batch is debounced into a run that
-finds nothing to push, and reads `syncing` while it goes. `test/server/sync-loop.test.ts` takes the
-status through `settled()` (idle, nothing pending, one observation) and sees a push on the server
-(`heads().seq`), never on the feed's `pending` and `idle` alone, which a stale echo satisfies.
+**A test of the loop reads a status only once the loop is quiet.** The watcher reports a write
+*after* the call that made it returned, later still on a busy machine. Sync's own writes no longer
+make a run (above), but a test's write can still be heard after `now` has pushed it.
+`test/server/sync-loop.test.ts` takes the status through `settled()` (idle, nothing pending, one
+observation) and sees a push on the server (`heads().seq`), never on the feed's `pending` and `idle`
+alone. To assert that something did **not** run, it first waits until the watcher has caught up
+(`heardAll()`: a temp-named file, which never syncs, written last and heard — the watcher reports in
+order), then for longer than the debounce, and only then counts the feed's `syncing`. A download's
+feed is read on `Vault.prototype.emit`, since the link re-keys the vault into a new `Vault`.
 
 The unit suite loads `node:sqlite` through an alias in `vitest.config.ts` (`test/node-sqlite.ts`):
 Vite strips the `node:` prefix from a built-in it does not know, and the sync client's tests failed

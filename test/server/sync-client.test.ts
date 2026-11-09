@@ -645,4 +645,39 @@ describe("the engine", () => {
     await b.engine.syncOnce();
     expect(server.commitCalls).toBe(calls);
   });
+
+  it("hears what sync itself wrote as no change, and a write over it as one (#36)", async () => {
+    const { server, devs } = world(2);
+    const [a, b] = devs as [Device, Device];
+    a.fs.write("deep/Plan.md", note("7q2m9xk4tb", LINES));
+    a.fs.write("old.md", note("8q2m9xk4tb", ["old"]));
+    await settle(server, devs);
+    // B pulled both, into a folder it made: the watcher reports the folder and the files.
+    expect(await b.engine.heard(["deep", "deep/Plan.md", "old.md"])).toBe(false);
+    expect(b.engine.pending()).toBe(0);
+
+    // A pulled delete and an edit: the removal and the new bytes are sync's own.
+    a.fs.remove("old.md");
+    a.fs.write("deep/Plan.md", note("7q2m9xk4tb", [...LINES, "seven"]));
+    await settle(server, devs);
+    expect(b.fs.readText("old.md")).toBeNull();
+    expect(await b.engine.heard(["old.md", "deep/Plan.md"])).toBe(false);
+    expect(b.engine.pending()).toBe(0);
+
+    // The same pull, and a person writes over the file before its event is heard: that is a change.
+    a.fs.write("deep/Plan.md", note("7q2m9xk4tb", [...LINES, "eight"]));
+    await settle(server, devs);
+    b.fs.write("deep/Plan.md", note("7q2m9xk4tb", ["mine", ...LINES, "eight"]));
+    expect(await b.engine.heard(["deep/Plan.md"])).toBe(true);
+    expect(b.engine.pending()).toBe(1);
+    const calls = server.commitCalls;
+    await b.engine.syncOnce();
+    expect(server.commitCalls).toBe(calls + 1);
+
+    // A note is spent by the event it explains: the next event at that path is judged as any other.
+    expect(await b.engine.heard(["old.md"])).toBe(true);
+    // A path sync never wrote is always a change.
+    b.fs.write("new.md", note("9q2m9xk4tb", ["new"]));
+    expect(await b.engine.heard(["new.md"])).toBe(true);
+  });
 });
