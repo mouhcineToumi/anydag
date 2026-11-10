@@ -36,19 +36,23 @@ quiz file, and a question leaves Mistakes after N right answers in a row inside 
     > select * from cd.members where joindate >= '2012-09-01';
     > ```
 
+    ## What is MVCC? {#q3c9d2 card}
+
+    > Multi-version concurrency control: each transaction reads a snapshot.
+
 | Where | What it does with one |
 |---|---|
 | the sidebar | **Quizzes** (with the Mistakes count) opens the Quizzes page; **New** → *Quiz* makes `untitled` titled *Untitled* with no questions and names it in the top bar; a quiz's row wears a cap |
 | the Quizzes page, `?quizzes=1` | Mistakes first, then a card per quiz — questions, how many in Mistakes, Practice — a filter, a folder (with *Practice the folder* once one is chosen), and a box that makes a quiz named after what is typed |
 | a folder's menu in the sidebar | *Practice the quizzes*, when anything under it is a quiz |
-| a quiz's page, `?quiz=` | **Questions** (a card per question, every field Markdown source, an option a text area that grows; *Shuffle the options* and a pin on each option; *Add an open question*) or **Source** (the file and its problems); Practice, Export (the file) |
-| a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; the end says the score, what was skipped and what went into Mistakes |
+| a quiz's page, `?quiz=` | **Questions** (a card per question, every field Markdown source, an option a text area that grows; *Shuffle the options* and a pin on each option; *Add an open question*, *Add a flashcard*, and *Ask it as a flashcard* on a question with no options) or **Source** (the file and its problems); Practice, Export (the file) |
+| a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; a flashcard's front with no box, Space or Enter to see the back, and the same `1`/`2`; the end says the score, what was skipped and what went into Mistakes |
 | a board, or a note, embedding one | a card: the title, the questions, how many in Mistakes, Practice |
 | `?view=1` | a run that records nothing |
-| a snapshot | the sheet: every question with its answers marked |
+| a snapshot | the sheet: every question with its answers marked, a flashcard's back under it |
 | Settings | how many right in a row take a question out of Mistakes, 1 to 10 |
 
-Thirteen things are load-bearing:
+Fourteen things are load-bearing:
 
 - **A question is a `##` heading and everything up to the next one**, and only `##` delimits. Fences
   are tracked across the whole file, so a `##` or a `- [ ]` in a code sample is code; and a line that
@@ -94,6 +98,15 @@ Thirteen things are load-bearing:
   after the quote means there is none — still `EQ_NO_OPTIONS`. Its verdict is the person's, given
   once the answer is showing (`revealIn`, `judgeIn`), and a read-only box takes no typing, so `1`
   and `2` reach the run.
+- **A flashcard is `card` on an open question's heading** (#131): `{#q… card}`, the quote at its
+  end the back, and a run shows the front with nothing to type, then the back, then the same
+  verdict. A bare word, as `multi` is: `.card` is not an attribute word (`ATTR_WORD`), so the whole
+  `{…}` would be read as the prompt and its id lost; and a build that does not know `card` reads an
+  open question and warns, so the file still runs there. `Question.card` is the word on a question
+  with no options — a new card with no back yet is still one, so the form shows it as one, but it
+  is not `open` and says `EQ_NO_OPTIONS` until it has a back. **Every writer that rebuilds a
+  heading's words keeps it** (`headingWords`: `stampIds` and the `set` op), or giving a card its id
+  would make it an open question; `card` beside options is `WQ_UNKNOWN_ATTR` and is not written.
 - **A shuffle is a run's, never the file's**: `optionOrder` draws one order per question
   when a run starts — pinned options at their own index — and the runner keeps it until Again or a
   new list; answering the skipped ones keeps the order seen. A pick is the file's index, so grading
@@ -116,17 +129,22 @@ keys `dag:quiz-mode` and `dag:quiz-about`, the events `dag:quiz` and `dag:practi
 and `run` — and `dag-run__option--block`, `dag-run__option-text--block`,
 `dag-run__answer*`, `dag-run__judge*`, `dag-quiz-sheet__option--block`, `dag-quiz-sheet__open`,
 `dag-quiz__option-text`, `dag-quiz__pin`, `dag-quiz__shuffle`, `dag-quiz__adds`,
-`dag-quizzes__practice-folder`, `dag-quizzes__count`, `data-dag-run-place`, `data-dag-run-open`,
+`dag-quizzes__practice-folder`, `dag-quizzes__count`, `dag-quiz__flashcard-tag`, `dag-run__flashcard-tag`, `data-dag-run-place`, `data-dag-run-open`,
 `data-dag-run-answer`, `data-dag-run-reveal`, `data-dag-run-judge`, `data-dag-run-model`,
 `data-dag-quiz-open`, `data-dag-quiz-pin`, `data-dag-quiz-shuffle`, `data-dag-quiz-add-open`,
-`data-dag-quiz-sheet-open`, `data-dag-quizzes-practice-folder`, and the menu pick `practise`.
+`data-dag-quiz-sheet-open`, `data-dag-quizzes-practice-folder`, `data-dag-quiz-flashcard`,
+`data-dag-quiz-flashcard-note`, `data-dag-quiz-flashcard-toggle`, `data-dag-quiz-add-flashcard`,
+`data-dag-run-flashcard`, `data-dag-run-flashcard-tag`, `data-dag-quiz-sheet-flashcard`, and the menu pick `practise`.
+"Card" was taken three times over (the form's `dag-quiz__card`, the Quizzes page's `dag-quizzes__card`, an
+embed's card), which is why every name for a flashcard says `flashcard`.
 
 **Out, and why:** a button that asks a model to generate a quiz (an agent writes one with
 `quiz_create` and `quiz_write`, and runs one in a conversation with `quiz_questions` and
-`quiz_answer`); a pick of questions as a preset (a preset is one quiz file); shuffling the
+`quiz_answer`; generating flashcards in the app is proposed in #140, not yet decided); a pick of questions as a preset (a preset is one quiz file); shuffling the
 *questions* of a run
 (the options shuffle, an author's order of questions being a course's order); grading an open
-answer automatically (the person's verdict is the answer); a recall schedule (records are kept, so
+answer automatically (the person's verdict is the answer); a flashcard asked back to front, and
+importing Anki decks; a recall schedule (records are kept, so
 the counts one needs exist; when to ask again is a design decision); resetting a history, scores
 over time and timers; a printed sheet; and practising on a
 read-only view with a history, which has nowhere to keep it.

@@ -147,8 +147,10 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
   const input = inputOf(q);
   const [asking, setAsking] = useState(false);
   const correct = q.options.filter((o) => o.correct).length;
-  /* No options: answered in words, its explanation the model answer. */
+  /* No options: answered in words, its explanation the model answer — or a flashcard, the front
+     shown, then the back, with nothing typed. */
   const open = q.options.length === 0;
+  const card = q.card;
   /* Something after the options the form has no field for: rewriting the card would drop it, so the
      card says where to edit it instead. */
   const stray = problems.some((p) => p.code === "EQ_STRAY");
@@ -163,7 +165,14 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
   return (
     <section className="dag-quiz__card" data-dag-quiz-question={q.id ?? `L${q.line}`} aria-label={`Question ${index + 1}`}>
       <header className="dag-quiz__card-head">
-        <span className="dag-quiz__card-number">Question {index + 1}</span>
+        <span className="dag-quiz__card-number">
+          Question {index + 1}
+          {card ? (
+            <span className="dag-quiz__flashcard-tag" data-dag-quiz-flashcard="">
+              Flashcard
+            </span>
+          ) : null}
+        </span>
         <span className="dag-quiz__card-tools">
           <button
             type="button"
@@ -211,8 +220,8 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
       </header>
       {stray ? <p className="dag-quiz__note">This question has text the form cannot show. Edit it in Source.</p> : null}
       <Field
-        label="Question"
-        placeholder="What do you want to ask?"
+        label={card ? "Front" : "Question"}
+        placeholder={card ? "The front: a question, a term, a prompt" : "What do you want to ask?"}
         value={q.prompt}
         readOnly={stray}
         autoFocus={focus}
@@ -221,105 +230,130 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
         onCommit={(prompt) => onEdit({ ...input, prompt })}
       />
       <Field
-        label="More to the question"
-        placeholder="More to the question, a code sample, a picture (optional)"
+        label={card ? "More on the front" : "More to the question"}
+        placeholder={
+          card
+            ? "More on the front, a code sample, a picture (optional)"
+            : "More to the question, a code sample, a picture (optional)"
+        }
         multiline
         value={q.body}
         readOnly={stray}
         attrs={{ "data-dag-quiz-body": "" }}
         onCommit={(body) => onEdit({ ...input, body })}
       />
-      {open ? (
+      {open && !card ? (
         <p className="dag-quiz__note" data-dag-quiz-open="">
           Answered in words: the person writes an answer, sees the model answer below, and says whether they had it. Add an option
           to make it multiple choice.
         </p>
       ) : null}
-      <div className="dag-quiz__options" role="list" aria-label="Options">
-        {q.options.map((o, i) => (
-          <div
-            key={i}
-            className="dag-quiz__option"
-            role="listitem"
-            data-dag-quiz-option={i}
-            data-dag-quiz-correct={o.correct ? "" : undefined}
-          >
-            <input
-              type="checkbox"
-              className="dag-check"
-              checked={o.correct}
-              disabled={stray}
-              aria-label={`Option ${i + 1} is correct`}
-              title="Correct"
-              data-dag-quiz-correct-toggle=""
-              onChange={(e) => setOption(i, { correct: e.target.checked })}
-            />
-            {/* A text area of one row that grows: an option may be a code block. */}
-            <Field
-              label={`Option ${i + 1}`}
-              placeholder={o.correct ? "A correct answer" : "A wrong answer"}
-              multiline
-              minRows={1}
-              value={o.text}
-              readOnly={stray}
-              className="dag-quiz__option-text"
-              attrs={{ "data-dag-quiz-option-text": "" }}
-              onCommit={(text) => setOption(i, { text })}
-            />
-            {shuffle ? (
+      {card ? (
+        <p className="dag-quiz__note" data-dag-quiz-flashcard-note="">
+          A flashcard: the person sees the front, thinks of the answer, shows the back, and says whether they had it.
+        </p>
+      ) : null}
+      {open ? (
+        <label className="dag-quiz__check">
+          <input
+            type="checkbox"
+            className="dag-check"
+            checked={card}
+            disabled={stray}
+            data-dag-quiz-flashcard-toggle=""
+            onChange={(e) => onEdit({ ...input, card: e.target.checked })}
+          />
+          Ask it as a flashcard
+          <span className="dag-quiz__hint"> — no box to type in: show the back, then say whether they had it</span>
+        </label>
+      ) : null}
+      {card ? null : (
+        <div className="dag-quiz__options" role="list" aria-label="Options">
+          {q.options.map((o, i) => (
+            <div
+              key={i}
+              className="dag-quiz__option"
+              role="listitem"
+              data-dag-quiz-option={i}
+              data-dag-quiz-correct={o.correct ? "" : undefined}
+            >
+              <input
+                type="checkbox"
+                className="dag-check"
+                checked={o.correct}
+                disabled={stray}
+                aria-label={`Option ${i + 1} is correct`}
+                title="Correct"
+                data-dag-quiz-correct-toggle=""
+                onChange={(e) => setOption(i, { correct: e.target.checked })}
+              />
+              {/* A text area of one row that grows: an option may be a code block. */}
+              <Field
+                label={`Option ${i + 1}`}
+                placeholder={o.correct ? "A correct answer" : "A wrong answer"}
+                multiline
+                minRows={1}
+                value={o.text}
+                readOnly={stray}
+                className="dag-quiz__option-text"
+                attrs={{ "data-dag-quiz-option-text": "" }}
+                onCommit={(text) => setOption(i, { text })}
+              />
+              {shuffle ? (
+                <button
+                  type="button"
+                  className="dag-icon dag-quiz__pin"
+                  aria-pressed={pinned(o)}
+                  disabled={stray || (!o.pin && pinned(o))}
+                  title={
+                    o.pin
+                      ? "Keeps its place when the options shuffle — click to let it move"
+                      : pinned(o)
+                        ? "Keeps its place: it speaks about the options around it"
+                        : "Keep its place when the options shuffle"
+                  }
+                  aria-label={`Keep option ${i + 1} in its place`}
+                  data-dag-quiz-pin={o.pin ? "" : pinned(o) ? "words" : undefined}
+                  onClick={() => setOption(i, { pin: !o.pin })}
+                >
+                  <Pin size={14} strokeWidth={2} aria-hidden="true" />
+                </button>
+              ) : null}
               <button
                 type="button"
-                className="dag-icon dag-quiz__pin"
-                aria-pressed={pinned(o)}
-                disabled={stray || (!o.pin && pinned(o))}
-                title={
-                  o.pin
-                    ? "Keeps its place when the options shuffle — click to let it move"
-                    : pinned(o)
-                      ? "Keeps its place: it speaks about the options around it"
-                      : "Keep its place when the options shuffle"
-                }
-                aria-label={`Keep option ${i + 1} in its place`}
-                data-dag-quiz-pin={o.pin ? "" : pinned(o) ? "words" : undefined}
-                onClick={() => setOption(i, { pin: !o.pin })}
+                className="dag-icon"
+                title="Move up"
+                aria-label={`Move option ${i + 1} up`}
+                disabled={stray || i === 0}
+                onClick={() => moveOption(i, i - 1)}
               >
-                <Pin size={14} strokeWidth={2} aria-hidden="true" />
+                <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
               </button>
-            ) : null}
-            <button
-              type="button"
-              className="dag-icon"
-              title="Move up"
-              aria-label={`Move option ${i + 1} up`}
-              disabled={stray || i === 0}
-              onClick={() => moveOption(i, i - 1)}
-            >
-              <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="dag-icon"
-              title="Remove option"
-              aria-label={`Remove option ${i + 1}`}
-              data-dag-quiz-remove-option=""
-              disabled={stray}
-              onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
-            >
-              <X size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="dag-quiz__add-option"
-          data-dag-quiz-add-option=""
-          disabled={stray}
-          onClick={() => onEdit({ ...input, options: [...input.options, { text: "", correct: false }] })}
-        >
-          <Plus size={14} strokeWidth={2} aria-hidden="true" />
-          Add an option
-        </button>
-      </div>
+              <button
+                type="button"
+                className="dag-icon"
+                title="Remove option"
+                aria-label={`Remove option ${i + 1}`}
+                data-dag-quiz-remove-option=""
+                disabled={stray}
+                onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
+              >
+                <X size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="dag-quiz__add-option"
+            data-dag-quiz-add-option=""
+            disabled={stray}
+            onClick={() => onEdit({ ...input, options: [...input.options, { text: "", correct: false }] })}
+          >
+            <Plus size={14} strokeWidth={2} aria-hidden="true" />
+            Add an option
+          </button>
+        </div>
+      )}
       {open ? null : (
         <label className="dag-quiz__check">
           <input
@@ -335,11 +369,13 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
         </label>
       )}
       <Field
-        label={open ? "Model answer" : "Explanation"}
+        label={card ? "Back" : open ? "Model answer" : "Explanation"}
         placeholder={
-          open
-            ? "The answer, shown once they have written theirs — a code block if it is code"
-            : "Why the answer is right, shown after answering (optional)"
+          card
+            ? "The back: the answer, shown once they have thought of theirs"
+            : open
+              ? "The answer, shown once they have written theirs — a code block if it is code"
+              : "Why the answer is right, shown after answering (optional)"
         }
         multiline
         value={q.why}
@@ -396,19 +432,21 @@ export function QuizEditor({
     onChange(fn(stamped, parseQuiz(stamped).questions));
   };
 
-  /** A question at the end: two options to fill in, or none — an open question. */
-  const add = (open = false) => {
+  /** A question at the end: two options to fill in, or none — an open question, or a flashcard. */
+  const add = (kind: "choice" | "open" | "flashcard" = "choice") => {
     const id = mintQuestionId(new Set(quiz.questions.flatMap((q) => (q.id ? [q.id] : []))));
     write((t) =>
       addQuestion(t, {
         id,
         prompt: "",
-        options: open
-          ? []
-          : [
-              { text: "", correct: true },
-              { text: "", correct: false },
-            ],
+        options:
+          kind === "choice"
+            ? [
+                { text: "", correct: true },
+                { text: "", correct: false },
+              ]
+            : [],
+        ...(kind === "flashcard" ? { card: true } : {}),
       }),
     );
     setFocus(id);
@@ -494,10 +532,20 @@ export function QuizEditor({
               className="dag-quiz__add"
               data-dag-quiz-add-open=""
               title="A question answered in words, compared with a model answer"
-              onClick={() => add(true)}
+              onClick={() => add("open")}
             >
               <Plus size={16} strokeWidth={2} aria-hidden="true" />
               Add an open question
+            </button>
+            <button
+              type="button"
+              className="dag-quiz__add"
+              data-dag-quiz-add-flashcard=""
+              title="A front and a back: think of the answer, show the back, say whether you had it"
+              onClick={() => add("flashcard")}
+            >
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              Add a flashcard
             </button>
           </div>
         </>
