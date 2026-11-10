@@ -3668,6 +3668,11 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
 /* The read-only page `?snapshot=1` draws is the board's own Markdown; it wants the gutter the
    editor gives its blocks. */
 .dag-note-view__page.dag-md { padding-inline: 54px; }
+/* The same drawing, standing in for the editor until it is up (#120): inside the editor's page, so
+   only the gutter is the article's own. Names grepped first: `dag-note-view__first`,
+   `dag-note-view__editor` and `data-dag-note-first` were unclaimed. */
+.dag-note-view__first > .dag-note-view__page { margin: 0; padding-block: 0; max-width: none; }
+.dag-note-view__editor[hidden] { display: none; }
 .dag-note-view__notice {
   max-width: 820px;
   margin: 16px auto 0;

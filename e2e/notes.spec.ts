@@ -272,6 +272,33 @@ test("the list shows a note beside the boards, and opens either", async ({ page 
   await expect(block(page, "The second paragraph.")).toBeVisible();
 });
 
+test("a note's text is on screen before its editor is up, and the editor takes its place", async ({ page }) => {
+  /* The editor's chunk held back, as a first open on a slow machine holds it: its module in dev,
+     its chunk in a build (#120). The text was not on screen until BlockNote was; it is drawn
+     read-only the moment the file is back. */
+  let release = () => {};
+  const held = new Promise<void>((ok) => {
+    release = ok;
+  });
+  await page.route(/\/BlockEditor[^/]*\.(tsx|js)(\?.*)?$/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto(`/?note=${name}`);
+  const first = page.locator("[data-dag-note-first]");
+  await expect(first.getByText("The second paragraph.")).toBeVisible({ timeout: 10_000 });
+  await expect(first.locator("h1", { hasText: "The plan" })).toBeVisible();
+  await expect(page.locator("[data-dag-note-editor]")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.dataset.dagReady)).toBeUndefined();
+  release();
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(block(page, "The second paragraph.")).toBeVisible();
+  /* The two change places in one render: once the editor is up, the stand-in is gone. */
+  await expect(first).toHaveCount(0);
+  await expect(page.getByText("The second paragraph.")).toHaveCount(1);
+  expect(read()).toBe(NOTE);
+});
+
 test("New note makes one, opens it, and names it in its own title", { tag: "@smoke" }, async ({ page }) => {
   await open(page);
   await newFile(page, "note", { top: true });

@@ -1,7 +1,7 @@
 import { Calendar, CalendarDays, X } from "lucide-react";
-import { Suspense, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 
-import { BlockEditor, type NoteEditor } from "@/blocks";
+import { useBlockEditor, type NoteEditor } from "@/blocks";
 import { concerns, onNote } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
 import { retitleFile } from "@/board/useBoard";
@@ -26,6 +26,14 @@ import { EventBar, EventLine } from "./EventBar";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { TaskGlyph, TaskLine } from "./TaskGlyph";
+
+/**
+ * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
+ * life costs several times what any later one does — measured in the packaged desktop app, about
+ * 45 ms against under 10, and 165 ms at a quarter of the CPU — so the first note opened paints its
+ * text read-only before the editor is mounted at all, rather than in the same commit (#120).
+ */
+let editorMountedBefore = false;
 
 /** A quarter of a second after the last change, as the panel and the prompt card write theirs. */
 const WRITE_AFTER_MS = 250;
@@ -150,7 +158,8 @@ export interface NoteHandle {
  *
  * Under `?snapshot=1` there is no editor at all: the note is drawn read-only through
  * `react-markdown`, the renderer every board's text already uses, so a picture of a note is a fact
- * about the file.
+ * about the file. The same drawing stands in for the editor on an ordinary open until the editor is
+ * ready, so the text is on screen the moment the file has come back rather than once BlockNote has.
  */
 export function NoteView({
   name,
@@ -191,6 +200,11 @@ export function NoteView({
   handle?: MutableRefObject<NoteHandle | null>;
 }) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  /* Asked for as the page mounts, beside the note's own fetch — and never for a snapshot. */
+  const BlockEditor = useBlockEditor(!snapshot);
+  /* Whether the editor may mount yet: at once once one has come up on this page, and otherwise
+     only after the note's text has been painted without it (`editorMountedBefore`). */
+  const [mountEditor, setMountEditor] = useState(editorMountedBefore);
   /* Read by the writers below at the moment they would write: the bars are disabled while locked,
      and this is the floor under them — the top bar's `⋯` reaches the same writers. */
   const lockedRef = useRef(locked);
@@ -567,7 +581,25 @@ export function NoteView({
     });
   }, [name, snapshot, adopt]);
 
+  /* Two frames: the first is the one the text is drawn in, and the editor is mounted once it is on
+     screen. A tab in the background draws no frames, so a timer stands behind them. */
+  useEffect(() => {
+    if (mountEditor || !opened) return;
+    const go = () => setMountEditor(true);
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(go);
+    });
+    const late = setTimeout(go, 250);
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+      clearTimeout(late);
+    };
+  }, [mountEditor, opened]);
+
   const onReady = useCallback((ed: NoteEditor) => {
+    editorMountedBefore = true;
     editor.current = ed;
     if (loaded.current) loaded.current = settle(loaded.current, ed.document());
     setReady(true);
@@ -760,20 +792,31 @@ export function NoteView({
           {event ? (
             <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"} />
           ) : null}
-          <Suspense fallback={null}>
-            <BlockEditor
-              key={opened.seq}
-              initial={opened.blocks}
-              onReady={onReady}
-              onChange={onChange}
-              upload={upload}
-              attach={locked ? refuseFiles : attach}
-              resolve={resolve}
-              scheme={scheme}
-              self={self}
-              editable={!locked && status.kind !== "conflict"}
-            />
-          </Suspense>
+          {/* The text first, read-only, while the editor's chunk loads and BlockNote builds itself:
+              on a first open, about 120 ms on a fast machine and 450 at a quarter of its CPU (#120). The editor
+              mounts hidden under it and the two change places in the one render `onReady` causes,
+              so the page never shows both, nor neither. */}
+          {!ready && body !== null ? (
+            <div className="dag-note-view__first" data-dag-note-first="">
+              <NoteMarkdown name={name} body={body} components={refComponents()} />
+            </div>
+          ) : null}
+          <div className="dag-note-view__editor" hidden={!ready}>
+            {BlockEditor && mountEditor ? (
+              <BlockEditor
+                key={opened.seq}
+                initial={opened.blocks}
+                onReady={onReady}
+                onChange={onChange}
+                upload={upload}
+                attach={locked ? refuseFiles : attach}
+                resolve={resolve}
+                scheme={scheme}
+                self={self}
+                editable={!locked && status.kind !== "conflict"}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
     </main>
