@@ -179,6 +179,13 @@ describe("the model a prompt card asks", () => {
     expect(normalise({ llm: { reasoning: 7 } }).llm.reasoning).toBeNull();
   });
 
+  it("loads an Assistant default stored with the old mode, and drops the mode", () => {
+    expect(normalise({ assistant: { provider: "claude", model: "m", mode: "edit" } }).assistant).toEqual({
+      provider: "claude",
+      model: "m",
+    });
+  });
+
   it("writes one field of it without touching the others", () => {
     writeSettings({ llm: { provider: "opencode" } });
     writeSettings({ llm: { reasoning: "low" } });

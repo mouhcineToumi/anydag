@@ -33,7 +33,7 @@ import {
 } from "./harness";
 import type { Usage } from "./types";
 
-/** `MCP_TOOL_TIMEOUT`: above chat mode's five-minute approval, which a write tool blocks on. */
+/** `MCP_TOOL_TIMEOUT`: above the five-minute approval a write tool blocks on. */
 const MCP_TOOL_TIMEOUT_MS = 600_000;
 
 /** The MCP config file's content: the one server, spelled the way `--mcp-config` reads it. */

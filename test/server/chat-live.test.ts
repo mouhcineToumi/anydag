@@ -80,11 +80,10 @@ async function api(
 
 const q = (vault: string) => `?vault=${encodeURIComponent(vault)}`;
 
-async function newChat(o: { mode?: "ask" | "edit"; provider?: "claude" | "opencode"; vault?: string } = {}): Promise<ChatMeta> {
+async function newChat(o: { provider?: "claude" | "opencode"; vault?: string } = {}): Promise<ChatMeta> {
   const r = await api("POST", `/__board/chat${q(o.vault ?? env.vault.id)}`, {
     provider: o.provider ?? "claude",
     model: "m",
-    mode: o.mode ?? "edit",
   });
   expect(r.status).toBe(200);
   return r.json.chat;
@@ -226,7 +225,7 @@ describe("a reply that wrote its tool call as text", () => {
         const ended = new Promise<Turn>((resolve) => {
           a.listen(chat.id, (e) => e.type === "end" && resolve(e.turn));
         });
-        a.say(chat.id, "write me a small doc about merge queues", { provider, mode: "edit" });
+        a.say(chat.id, "write me a small doc about merge queues", { provider });
         const turn = await ended;
 
         expect(turn.status).toBe("failed");
@@ -244,17 +243,90 @@ describe("a reply that wrote its tool call as text", () => {
 });
 
 describe("the guard", () => {
-  it("refuses a write in Ask mode, and nothing changes", async () => {
-    const chat = await newChat({ mode: "ask" });
+  it("writes in the chat's own vault with no mode given, and nothing waits for approval", async () => {
+    const chat = await newChat();
     const turn = await say(chat.id, "note log hi");
-    expect(said(turn)).toMatch(/Could not make log: .*Ask mode/);
-    expect(exists(env.root, "log.md")).toBe(false);
-    expect(turn.blocks).toEqual([]);
+    expect(turn.status).toBe("done");
+    expect(said(turn)).toMatch(/Made \[log\]/);
+    expect(exists(env.root, "log.md")).toBe(true);
+    expect(turn.blocks.length).toBeGreaterThan(0);
   });
 
-  it("lets a turn switch the mode", async () => {
-    const chat = await newChat({ mode: "ask" });
-    await say(chat.id, "note log hi", { mode: "edit" });
+  it("ignores a mode an old client still sends on create or say, and writes all the same", async () => {
+    const r = await api("POST", `/__board/chat${q(env.vault.id)}`, { provider: "claude", model: "m", mode: "ask" });
+    expect(r.status).toBe(200);
+    const turn = await say(r.json.chat.id, "note log hi", { mode: "ask" });
+    expect(turn.status).toBe("done");
+    expect(exists(env.root, "log.md")).toBe(true);
+  });
+
+  it("refuses a write to a vault granted read, with code read-only, and changes nothing", async () => {
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-other-"));
+    temps.push(other);
+    const v2 = session.openFolder(other).id;
+    const chat = await newChat();
+    await api("POST", "/__board/chat/grant", { id: chat.id, vault: v2, mode: "ask" });
+    expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat[`grant:${v2}`].mode).toBe("ask");
+
+    // A turn is running, and the write goes over HTTP with the chat's header, as the MCP child sends
+    // it — so the refusal below is the guard's, not the harness's.
+    const ended = new Promise<Turn>((resolve) => assistant.listen(chat.id, (e) => e.type === "end" && resolve(e.turn)));
+    expect((await api("POST", "/__board/chat/turn", { id: chat.id, text: "wait" })).status).toBe(200);
+    const write = await api(
+      "POST",
+      `/__board/create${q(v2)}`,
+      { name: "far", kind: "note", text: "hi\n" },
+      { "x-anydag-chat": chat.id },
+    );
+    expect(write.status).toBe(403);
+    expect(write.json.code).toBe("read-only");
+    expect(write.json.error).toMatch(/vault_request/);
+    await api("POST", "/__board/chat/stop", { id: chat.id });
+    await ended;
+    expect(exists(other, "far.md")).toBe(false);
+  });
+
+  it('reads an old chat and turn that still carry `mode: "ask"`, and a new turn writes', async () => {
+    const chatId = newId("c", "zzzz");
+    const dir = path.join(env.root, ".anydag/chats", chatId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "chat.json"),
+      JSON.stringify({
+        v: 1,
+        id: chatId,
+        title: "Old chat",
+        created: "2026-11-06T00:00:00.000Z",
+        home: env.vault.id,
+        provider: "claude",
+        model: "m",
+        mode: "ask", // what an old chat.json still carries; read without it, never promoted
+      }),
+    );
+    const t = newId("t", "zzzz");
+    fs.writeFileSync(
+      path.join(dir, `${t}.json`),
+      JSON.stringify({
+        v: 1,
+        id: t,
+        chat: chatId,
+        device: "zzzz",
+        at: "2026-11-06T00:00:00.000Z",
+        text: "an old Ask turn",
+        provider: "claude",
+        model: "m",
+        mode: "ask",
+        status: "done",
+        steps: [],
+        blocks: [],
+      }),
+    );
+    const read = await api("GET", `/__board/chat?id=${chatId}`);
+    expect(read.status).toBe(200);
+    expect(read.json.turns).toHaveLength(1);
+
+    const turn = await say(chatId, "note log hi");
+    expect(turn.status).toBe("done");
     expect(exists(env.root, "log.md")).toBe(true);
   });
 
@@ -308,13 +380,13 @@ describe("the guard", () => {
     expect(exists(other, "far.md")).toBe(true);
     expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat[`grant:${v2}`].mode).toBe("edit");
 
-    // An Ask turn reads a vault granted for edit, and writes nothing there.
-    const asked = await say(chat.id, `note@${v2} near hi`, { mode: "ask" });
-    expect(said(asked)).toMatch(/Could not make near/);
+    // A grant for change stays change: a later turn writes there without asking again.
+    await say(chat.id, `note@${v2} near hi`);
+    expect(exists(other, "near.md")).toBe(true);
 
     // Taken back, it is out of reach again.
     await api("POST", "/__board/chat/grant", { id: chat.id, vault: v2, mode: null });
-    const gone = await say(chat.id, `note@${v2} gone hi`, { mode: "edit" });
+    const gone = await say(chat.id, `note@${v2} gone hi`);
     expect(said(gone)).toMatch(/does not reach vault/);
   });
 });
@@ -378,7 +450,6 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
     text: "tidy my notes",
     provider: "claude",
     model: "m",
-    mode: "edit",
     status: "done",
     steps: [],
     blocks,
@@ -420,7 +491,6 @@ describe("undo, on a chat somebody else wrote into the vault", () => {
       home: env.vault.id,
       provider: "claude",
       model: "m",
-      mode: "edit",
     });
   });
 
@@ -507,12 +577,14 @@ describe("sessions", () => {
     expect(runs[2]!.model).toBe("x/y");
   });
 
-  it("tells the model its mode and its reach", async () => {
-    const chat = await newChat({ mode: "ask" });
+  it("tells the model its reach, and starts the MCP child with no mode flag", async () => {
+    const chat = await newChat();
     await say(chat.id, "hello");
-    expect(runs[0]!.system).toContain("**Ask.**");
+    expect(runs[0]!.system).toContain("call `vault_request` with mode `edit`");
     expect(runs[0]!.system).toContain(env.vault.id);
-    expect(runs[0]!.mcp.args).toEqual(expect.arrayContaining(["mcp", "--chat", chat.id, "--mode", "ask"]));
+    expect(runs[0]!.system).toContain("read and change");
+    expect(runs[0]!.mcp.args).toEqual(expect.arrayContaining(["mcp", "--chat", chat.id]));
+    expect(runs[0]!.mcp.args).not.toContain("--mode");
     expect(runs[0]!.mcp.env.ANYDAG_CHAT_PORT).toBe(String(port));
   });
 
@@ -558,25 +630,18 @@ describe("sessions", () => {
 });
 
 describe("the chat's MCP tools", () => {
-  it("offers Ask no write tool and Edit the block tool, and neither a way to open a vault", () => {
-    const ask = chatTools("ask").map((t) => t.name);
-    const edit = chatTools("edit").map((t) => t.name);
-    expect(chatTools("ask").filter((t) => t.write)).toEqual([]);
-    expect(ask).toContain("vault_request");
-    expect(ask).not.toContain("change_block");
-    expect(edit).toEqual(expect.arrayContaining(["change_block", "vault_request", "doc_create", "board_patch"]));
+  it("offers every tool but the never ones, and never the per-kind tools a doc_* stands for", () => {
+    const tools = chatTools().map((t) => t.name);
+    expect(tools).toEqual(
+      expect.arrayContaining(["change_block", "vault_request", "doc_create", "doc_read", "doc_write", "board_patch"]),
+    );
     // The per-kind tools a `doc_*` stands for are not offered twice.
-    expect(edit).not.toContain("note_create");
-    expect(ask).toContain("doc_read");
-    expect(ask).not.toContain("doc_write");
-    for (const name of NEVER_IN_CHAT) {
-      expect(ask).not.toContain(name);
-      expect(edit).not.toContain(name);
-    }
+    expect(tools).not.toContain("note_create");
+    for (const name of NEVER_IN_CHAT) expect(tools).not.toContain(name);
   });
 
   it("hands a doc_* call to the kind's own tool, held to that tool's arguments", async () => {
-    const read = chatTools("ask").find((t) => t.name === "doc_read")!;
+    const read = chatTools().find((t) => t.name === "doc_read")!;
     const calls: unknown[] = [];
     const kit = {
       readOnly: true,
@@ -602,10 +667,10 @@ describe("the chat's MCP tools", () => {
 
 describe("the chat's MCP server", () => {
   it("reaches the app with the chat's header, so the guard holds it to the turn", async () => {
-    const chat = await newChat({ mode: "ask" });
+    const chat = await newChat();
     const server = buildMcp(remote(port, TOKEN, { "x-anydag-chat": chat.id }), {
-      readOnly: true,
-      chat: { id: chat.id, mode: "ask", home: env.vault.id },
+      readOnly: false,
+      chat: { id: chat.id, home: env.vault.id },
     });
     const [a, b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test", version: "0" });
@@ -613,7 +678,7 @@ describe("the chat's MCP server", () => {
     try {
       const names = (await client.listTools()).tools.map((t) => t.name).sort();
       expect(names).toEqual(
-        chatTools("ask")
+        chatTools()
           .map((t) => t.name)
           .sort(),
       );

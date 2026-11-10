@@ -1,9 +1,9 @@
 /**
- * The MCP server a chat's harness runs (`anydag-server mcp --chat <id> --mode ask|edit`): the same
- * tools, cut to what the mode may do, plus two of its own.
+ * The MCP server a chat's harness runs (`anydag-server mcp --chat <id>`): the same
+ * tools, plus two of its own.
  *
- * Every request carries `X-AnyDag-Chat`, and **the server enforces** the reach, the mode and the
- * approvals (`server/chat/live.ts`): what this file leaves out is to spare the model the schemas and a
+ * Every request carries `X-AnyDag-Chat`, and **the server enforces** the reach, the approvals and
+ * the grants (`server/chat/live.ts`): what this file leaves out is to spare the model the schemas and a
  * refusal, never the only thing standing in the way.
  */
 
@@ -57,7 +57,6 @@ const vaultRequest: Tool = {
   },
 };
 
-/** The tools a chat in `mode` is offered. */
 /* -- one tool per operation, with a kind ------------------------------------------------------ */
 
 type DocKind = "board" | "note" | "quiz" | "table" | "file";
@@ -67,7 +66,7 @@ const TEXT: DocKind[] = ["board", "note", "quiz", "table"];
 /**
  * The eight things every kind of document can have done to it, each one tool taking a `kind` rather
  * than five named `<kind>_<op>` — in a chat only, where every schema is input tokens on every
- * request (Edit mode was 81 tools, about 15k tokens; this is 45). An outside agent keeps the named
+ * request (81 tools and about 15k tokens once; this is 52). An outside agent keeps the named
  * tools, whose names its client already knows. Each validates its arguments against the named
  * tool's own schema and runs it, so a default, a refusal and an answer are that tool's exactly.
  */
@@ -164,8 +163,9 @@ const docTools = DOC_OPS.map(({ op, kinds, description }) => docTool(op, kinds, 
 const tail = `\n${NOTE_VAULT}`;
 const brief = (t: Tool): Tool => (t.description.endsWith(tail) ? { ...t, description: t.description.slice(0, -tail.length) } : t);
 
-export function chatTools(mode: "ask" | "edit"): Tool[] {
-  const allowed = (t: Tool) => !NEVER_IN_CHAT.has(t.name) && (mode === "edit" || !t.write);
+/** The tools a chat is offered: every one but `NEVER_IN_CHAT` and the folded per-kind tools. */
+export function chatTools(): Tool[] {
+  const allowed = (t: Tool) => !NEVER_IN_CHAT.has(t.name);
   const base = [...docTools, ...TOOLS.filter((t) => !FOLDED.has(t.name)).map(brief)].filter(allowed);
-  return mode === "edit" ? [...base, changeBlock, vaultRequest] : [...base, vaultRequest];
+  return [...base, changeBlock, vaultRequest];
 }

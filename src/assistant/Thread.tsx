@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 
 import { refComponents, urlTransform } from "@/refs/Ref";
 
-import type { Block, Mode, Step, Turn, UndoRecord } from "./types";
+import type { Block, Step, Turn, UndoRecord } from "./types";
 import { blockUndone } from "./types";
 import { clock, conflictLines, oneLine, openable, targetOf, touched, undoable, verbOf, waiting } from "./words";
 
@@ -328,9 +328,6 @@ const TurnView = memo(function TurnView({
           {providerLabel(turn.provider)} · {modelLabel(turn.model)}
           {effort}
         </span>
-        <span className="dag-chat-model__mode" data-mode={turn.mode}>
-          {turn.mode === "edit" ? "Edit" : "Ask"}
-        </span>
         <time dateTime={turn.at}>{clock(turn.at)}</time>
         {elsewhere ? (
           <span title="Written on another of your devices" className="dag-chat-model__elsewhere">
@@ -398,15 +395,11 @@ export function Turns({
 }
 
 /** Shown when a chat has no turns yet. */
-export function Empty({ mode }: { mode: Mode }) {
+export function Empty() {
   return (
     <div className="dag-chat-empty" data-dag-chat-empty="">
       <Check {...ICON} aria-hidden="true" />
-      <p>
-        {mode === "edit"
-          ? "Ask for a change, or a question. It can write in this vault, and every change can be undone."
-          : "Ask a question about this vault. In Ask it reads and answers, and changes nothing."}
-      </p>
+      <p>Ask for a change, or a question. It can write in this vault, and every change can be undone.</p>
     </div>
   );
 }

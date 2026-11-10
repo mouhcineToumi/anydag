@@ -574,7 +574,6 @@ describe("the engine", () => {
       home: "v",
       provider: "claude",
       model: "sonnet",
-      mode: "ask",
     };
     const put = (d: Device, m: object) => d.fs.write(`.anydag/chats/${CHAT}/chat.json`, `${JSON.stringify(m, null, 1)}\n`);
     put(a, meta);

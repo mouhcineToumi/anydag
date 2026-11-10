@@ -6,7 +6,7 @@
  * changes, the approvals it is waiting on — and written once, as `<turnId>.json`, when it ends. The
  * agent reaches the vault through `anydag-server mcp --chat <id>`, which calls this server's routes
  * with `X-AnyDag-Chat`; `guard` is what every one of those requests goes through, and it is where the
- * reach, the mode, the approvals and the change recorder are enforced. Nothing here trusts the prompt.
+ * reach, the approvals and the change recorder are enforced. Nothing here trusts the prompt.
  */
 
 import fs from "node:fs";
@@ -48,7 +48,7 @@ const WRITTEN_CALL = /<(?:invoke|parameter)\s+name=/;
 /** What the person sees when that happened. The raw text goes only to the server log. */
 const WRITTEN_CALL_ERROR = "The model wrote a tool call as text instead of calling it, and no tool ran. Nothing was changed.";
 
-/** The writes a chat may make at all. Anything else non-GET is refused, whatever the mode. */
+/** The writes a chat may make at all. Anything else non-GET is refused, whatever the grant. */
 const WRITES = new Set([
   "/__board/create",
   "/__board/patch",
@@ -116,7 +116,7 @@ export interface AssistantOptions {
   token: string;
   harnesses: Partial<Record<Provider, Harness>>;
   /** How the chat's MCP server is started; the default re-runs this process as `mcp --chat`. */
-  mcp?: (chat: string, mode: Mode, origin: { port: number; token: string }) => McpCommand;
+  mcp?: (chat: string, origin: { port: number; token: string }) => McpCommand;
   /** Where a run's scratch files go. */
   scratch?: string;
 }
@@ -215,10 +215,7 @@ export class Assistant {
     return { ...l.turn, steps, blocks: l.turn.blocks.map((b) => ({ ...b })) };
   }
 
-  create(
-    vault: string | null | undefined,
-    o: { provider: Provider; model: string; effort?: string; mode?: Mode; title?: string },
-  ): ChatMeta {
+  create(vault: string | null | undefined, o: { provider: Provider; model: string; effort?: string; title?: string }): ChatMeta {
     const v = this.s.pick(vault).vault;
     if (!this.opts.harnesses[o.provider]) throw err(400, `\`${o.provider}\` is not available here`, { code: "provider" });
     const meta = this.store.create(v.root, {
@@ -227,7 +224,6 @@ export class Assistant {
       provider: o.provider,
       model: o.model,
       ...(o.effort ? { effort: o.effort } : {}),
-      mode: o.mode ?? "ask",
     });
     this.emit(meta.id, { type: "chat", chat: meta });
     return meta;
@@ -273,7 +269,7 @@ export class Assistant {
   say(
     chat: string,
     text: string,
-    o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null; mode?: Mode } = {},
+    o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null } = {},
   ): Turn {
     const words = text.trim();
     if (!words) throw err(400, "say something");
@@ -290,7 +286,6 @@ export class Assistant {
         if (o.effort) m.effort = o.effort;
         else delete m.effort;
       }
-      if (o.mode) m.mode = o.mode;
       if (isUntitled(m)) m.title = titleFrom(words);
     });
     const harness = this.opts.harnesses[meta.provider];
@@ -307,7 +302,6 @@ export class Assistant {
       provider: meta.provider,
       model: meta.model,
       ...(meta.effort ? { effort: meta.effort } : {}),
-      mode: meta.mode,
       steps: [],
       blocks: [],
       status: "running",
@@ -335,10 +329,10 @@ export class Assistant {
             chat,
             model: meta.model,
             ...(meta.effort ? { effort: meta.effort } : {}),
-            system: systemPrompt({ mode: meta.mode, ...this.reach(meta) }),
+            system: systemPrompt(this.reach(meta)),
             prompt: seeded(unseen, words),
             ...(resume ? { resume } : { fresh }),
-            mcp: this.mcpFor(chat, meta.mode),
+            mcp: this.mcpFor(chat),
             scratch,
           },
           (e) => this.heard(live, e),
@@ -360,16 +354,16 @@ export class Assistant {
     const others: { id: string; name: string }[] = [];
     for (const v of this.s.served()) {
       const name = path.basename(v.root);
-      if (v.id === meta.home) reach.push({ id: v.id, name, mode: meta.mode, home: true });
-      else if (grants[v.id]) reach.push({ id: v.id, name, mode: meta.mode === "ask" ? "ask" : grants[v.id]!.mode, home: false });
+      if (v.id === meta.home) reach.push({ id: v.id, name, mode: "edit", home: true });
+      else if (grants[v.id]) reach.push({ id: v.id, name, mode: grants[v.id]!.mode, home: false });
       else others.push({ id: v.id, name });
     }
     return { reach, others };
   }
 
-  private mcpFor(chat: string, mode: Mode): McpCommand {
+  private mcpFor(chat: string): McpCommand {
     const origin = { port: this.port, token: this.opts.token };
-    if (this.opts.mcp) return this.opts.mcp(chat, mode, origin);
+    if (this.opts.mcp) return this.opts.mcp(chat, origin);
     const env: Record<string, string> = {
       ANYDAG_CHAT_PORT: String(this.port),
       ANYDAG_TOKEN: this.opts.token,
@@ -381,10 +375,10 @@ export class Assistant {
     const electron = process.env.ELECTRON_RUN_AS_NODE;
     if (electron) env.ELECTRON_RUN_AS_NODE = electron;
     const bin = process.env.ANYDAG_CHAT_MCP_BIN;
-    if (bin) return { command: bin, args: ["mcp", "--chat", chat, "--mode", mode], env };
+    if (bin) return { command: bin, args: ["mcp", "--chat", chat], env };
     return {
       command: process.execPath,
-      args: [...process.execArgv, process.argv[1]!, "mcp", "--chat", chat, "--mode", mode],
+      args: [...process.execArgv, process.argv[1]!, "mcp", "--chat", chat],
       env,
     };
   }
@@ -535,7 +529,7 @@ export class Assistant {
   }
 
   /**
-   * Every request carrying `X-AnyDag-Chat` comes through here: the reach, the mode, the approval,
+   * Every request carrying `X-AnyDag-Chat` comes through here: the reach, the approval,
    * and the recording of what it changed.
    */
   async guard(c: Context, next: Next): Promise<Response | void> {
@@ -550,23 +544,20 @@ export class Assistant {
     }
     const meta = live.meta;
     const vault = c.req.query("vault") || meta.home;
-    const mode = this.modeIn(meta, live.turn.mode, vault);
+    const mode = this.modeIn(meta, vault);
     if (!mode)
       throw err(403, `this chat does not reach vault \`${vault}\`; ask for it with vault_request`, { code: "not-granted" });
     if (!reads && mode === "ask") {
       throw err(
         403,
-        live.turn.mode === "ask"
-          ? "this chat is in Ask mode: it cannot change anything"
-          : `vault \`${vault}\` was granted to read only`,
-        { code: "ask-mode" },
+        `vault \`${vault}\` was granted to read only; call vault_request with mode \`edit\` to ask the person for more`,
+        { code: "read-only" },
       );
     }
     if (p === "/__board/transfer") {
       const body = (await c.req.json().catch(() => ({}))) as { to?: unknown };
       const to = typeof body.to === "string" ? body.to : "";
-      if (this.modeIn(meta, live.turn.mode, to) !== "edit")
-        throw err(403, `this chat may not change vault \`${to}\``, { code: "not-granted" });
+      if (this.modeIn(meta, to) !== "edit") throw err(403, `this chat may not change vault \`${to}\``, { code: "not-granted" });
     }
     return this.s.within(vault, async () => {
       if (reads) return next();
@@ -592,12 +583,12 @@ export class Assistant {
     });
   }
 
-  /** What a chat may do in a vault: its own turn's mode at home, its grant elsewhere, or nothing. */
-  private modeIn(meta: ChatMeta, turnMode: Mode, vault: string): Mode | null {
-    if (vault === meta.home) return turnMode;
+  /** What a chat may do in a vault: its grant's mode, or nothing. Its own vault is always changeable. */
+  private modeIn(meta: ChatMeta, vault: string): Mode | null {
+    if (vault === meta.home) return "edit";
     const g = meta[`grant:${vault}`];
     if (!g) return null;
-    return turnMode === "ask" ? "ask" : g.mode;
+    return g.mode;
   }
 
   private async detailOf(c: Context): Promise<string> {
@@ -640,7 +631,7 @@ export class Assistant {
     } catch {
       return { granted: false, error: `vault \`${vault}\` is not open; vault_list says which are` };
     }
-    if (vault === live.meta.home) return { granted: true, mode: live.turn.mode };
+    if (vault === live.meta.home) return { granted: true, mode: "edit" };
     const had = live.meta[`grant:${vault}`];
     if (had && (had.mode === "edit" || mode === "ask")) return { granted: true, mode: had.mode };
     const yes = await this.ask(live, {

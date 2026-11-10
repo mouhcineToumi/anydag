@@ -11,14 +11,14 @@ Choose the provider and model in **Settings → AI and agents**.
 The Assistant is a chat about your vault, run on your Claude Code or OpenCode sign-in. Open it beside any page with `space A` (or the sparkle
 icon in the top bar), or full-window from **Assistant** in the sidebar.
 
-- **Ask mode** answers questions from your notes and cites the documents it used, as links you can
-  click.
-- **Edit mode** can also make and reorganise documents: "turn my notes on chapter 3 into a quiz",
-  "make a reading-list table from these links", "draw a mind map of this note". Every change it makes
-  is listed and can be undone.
+It answers questions from your notes and cites the documents it used, as links you can click. It can
+also make and reorganise documents in the vault the chat belongs to: "turn my notes on chapter 3 into
+a quiz", "make a reading-list table from these links", "draw a mind map of this note". Every change it
+makes is listed and can be undone, and a delete still waits for your yes.
 
-It can only reach the vaults you grant it, and only through AnyDag itself: it cannot run commands or
-read other files on your computer.
+Other vaults are closed to it until you grant them from the chat's vault menu, either **Read** or
+**Read and change**. A vault granted Read refuses writes; the Assistant can ask you for more. It
+only works through AnyDag itself: it cannot run commands or read other files on your computer.
 
 ## Prompt cards
 
