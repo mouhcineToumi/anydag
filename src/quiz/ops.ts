@@ -21,7 +21,7 @@
  * No browser, no React, no `@/` aliases: the `dsl` service and the CLI import this verbatim.
  */
 import { askable, parseQuiz, type Quiz } from "./parse";
-import { mintQuestionId, moveQuestion, removeQuestion } from "./write";
+import { headingWords, mintQuestionId, moveQuestion, removeQuestion } from "./write";
 
 type QuizOp =
   | { op: "set"; markdown: string; id?: string; before?: string; after?: string }
@@ -115,8 +115,7 @@ function questionOf(markdown: string, id: string | undefined, taken: ReadonlySet
   if (q.id === undefined) {
     /* The heading gains its id inside the `{…}` a reader looks for, the other words of it kept. */
     const eol = md.indexOf("\n");
-    const words = [`#${wanted}`, q.multiFlag ? "multi" : ""].filter(Boolean).join(" ");
-    md = `## ${q.prompt} {${words}}` + md.slice(eol);
+    md = `## ${q.prompt} {${headingWords(wanted, q)}}` + md.slice(eol);
   }
   return { md, id: wanted };
 }

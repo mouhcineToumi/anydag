@@ -24,6 +24,8 @@ export interface QuestionInput {
   options: { text: string; correct: boolean; pin?: boolean }[];
   why?: string;
   multi?: boolean;
+  /** A flashcard: `card` on the heading, written only while it has no options. */
+  card?: boolean;
 }
 
 /** The id alphabet the store uses (`store/ids.py`): no `i`, `l`, `o` or `u` to misread. */
@@ -64,11 +66,26 @@ function renderOption(o: { text: string; correct: boolean; pin?: boolean }): str
   return [head, ...rest].join("\n");
 }
 
-/** The heading's `{…}`: the id, and `multi` only where the count of ticks does not already say it. */
+/**
+ * The heading's `{…}`: the id, `multi` only where the count of ticks does not already say it, and
+ * `card` only on a question with no options, where it means something.
+ */
 function attrsOf(q: QuestionInput): string {
   const correct = q.options.filter((o) => o.correct).length;
-  const words = [q.id ? `#${q.id}` : "", q.multi && correct < 2 ? "multi" : ""].filter(Boolean);
+  const words = [
+    q.id ? `#${q.id}` : "",
+    q.multi && correct < 2 ? "multi" : "",
+    q.card && q.options.length === 0 ? "card" : "",
+  ].filter(Boolean);
   return words.length ? ` {${words.join(" ")}}` : "";
+}
+
+/**
+ * The words of a heading's `{…}` a writer that only adds an id must keep: `multi` and `card`. Rebuilt
+ * from the id alone, a flashcard stamped with its id would become an open question.
+ */
+export function headingWords(id: string, q: Pick<Question, "multiFlag" | "card">): string {
+  return [`#${id}`, q.multiFlag ? "multi" : "", q.card ? "card" : ""].filter(Boolean).join(" ");
 }
 
 /** One question in the house form, ending in a newline. */
@@ -97,6 +114,7 @@ export function inputOf(q: Question): QuestionInput {
     options: q.options.map((o) => ({ text: o.text, correct: o.correct, ...(o.pin ? { pin: true } : {}) })),
     why: q.why,
     multi: q.multi,
+    ...(q.card ? { card: true } : {}),
   };
 }
 
@@ -109,6 +127,7 @@ export function sameQuestion(q: Question, input: QuestionInput): boolean {
     q.body === trimBlank(input.body ?? "") &&
     q.why === trimBlank(input.why ?? "") &&
     q.multi === (!!input.multi || correct > 1) &&
+    q.card === (!!input.card && input.options.length === 0) &&
     q.options.length === input.options.length &&
     q.options.every(
       (o, i) =>
@@ -212,8 +231,7 @@ export function stampIds(
     minted.unshift(id);
     const eol = out.indexOf("\n", q.span.start);
     const lineEnd = eol === -1 ? out.length : out[eol - 1] === "\r" ? eol - 1 : eol;
-    const words = [`#${id}`, q.multiFlag ? "multi" : ""].filter(Boolean).join(" ");
-    out = out.slice(0, q.span.start) + `## ${q.prompt} {${words}}` + out.slice(lineEnd);
+    out = out.slice(0, q.span.start) + `## ${q.prompt} {${headingWords(id, q)}}` + out.slice(lineEnd);
   }
   return { text: out, minted };
 }
