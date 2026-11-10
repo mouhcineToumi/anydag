@@ -6,7 +6,8 @@
  *
  * Two naming facts: `vault` in a tool's arguments is the id of an open vault;
  * scopes are one `--read-only` flag, and a tool says whether it `write`s;
- * and nothing is shared, sent or signed in to, so the share, feedback and account tools are gone.
+ * and nothing is shared or signed in to, so the share and account tools are gone. The one thing that
+ * leaves the machine is `feedback`, and only when the person asked for it in their words.
  *
  * Plain Node, no `@/` aliases and no `Session`: this is imported by the parity test as the list of
  * tool names, and by `server.ts` to register them.
@@ -23,6 +24,7 @@ import { withEvent } from "../../src/note/event";
 import { FetchRefused, fetchFile, type Fetched } from "../fetch";
 import { endsBeforeItStarts, placed, withTitle } from "../frontmatter";
 import { grammar } from "../grammar";
+import { extOf } from "../names";
 import { MIME } from "../uploads";
 import type { Answer, Backend, CallOptions } from "./backend";
 
@@ -1514,6 +1516,32 @@ const grammarTools: Tool[] = [
 ];
 
 const appTools: Tool[] = [
+  tool({
+    name: "feedback",
+    description:
+      "Send the person's bug report or idea to AnyDag's maintainers: it becomes a **public** GitHub issue in `mouhcineToumi/anydag`. **Only when the person asked you to send feedback, in their words** — never on your own initiative, and never to report your own trouble with a tool.\n\n" +
+      "`kind` is `bug` or `idea`; `text` is what happened or what they would like, in their words. `boards` and `notes` are names whose **whole text** is attached — only the ones they said to attach. `files` are up to five pictures, videos, PDFs or text files, each `{filename, data}` (base64) or `{filename, url}`; 10 MB in all. The app's version, system and arch go with it, and nothing else. Tell the person exactly what will be sent before you call this. The answer is the issue's `url`; a refusal says why, and nothing was sent.",
+    write: true,
+    input: {
+      kind: z.enum(["bug", "idea"]),
+      text: z.string(),
+      boards: z.array(z.string()).default([]),
+      notes: z.array(z.string()).default([]),
+      files: z.array(z.object({ filename: z.string(), data: z.string().optional(), url: z.string().optional() })).default([]),
+      vault,
+    },
+    run: async ({ kind, text, boards, notes, files, vault: v }, kit) => {
+      kit.needWrite("send feedback");
+      const sent: { name: string; type: string; data: string }[] = [];
+      for (const f of files as { filename: string; data?: string; url?: string }[]) {
+        const fetched = await bytesFrom(kit, v, f.data, f.url);
+        const type = fetched?.contentType || MIME[extOf(f.filename)] || "application/octet-stream";
+        const data = fetched ? Buffer.from(fetched.data).toString("base64") : f.data!;
+        sent.push({ name: f.filename, type, data });
+      }
+      return kit.api("POST", "/api/feedback", { vault: v, body: { kind, text, boards, notes, files: sent } });
+    },
+  }),
   tool({
     name: "settings",
     description:

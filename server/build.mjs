@@ -36,6 +36,8 @@ export async function build() {
     define: {
       __ANYDAG_VERSION__: JSON.stringify(version),
       __ANYDAG_LOGS_URL__: JSON.stringify(process.env.ANYDAG_LOGS_BUILD_URL ?? ""),
+      /* And where feedback goes (`server/feedback.ts`): an address only, never a token. */
+      __ANYDAG_FEEDBACK_URL__: JSON.stringify(process.env.ANYDAG_FEEDBACK_BUILD_URL ?? ""),
     },
     logLevel: "warning",
   });

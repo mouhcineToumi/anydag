@@ -67,7 +67,11 @@ async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<v
   };
 }
 
-export async function harness(backend: Backend = "pglite", env: Record<string, string> = {}): Promise<Harness> {
+export async function harness(
+  backend: Backend = "pglite",
+  env: Record<string, string> = {},
+  opts: { fetch?: typeof fetch } = {},
+): Promise<Harness> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-sync-test-"));
   const config = configFrom({
     ANYDAG_SYNC_DATA: root,
@@ -86,7 +90,7 @@ export async function harness(backend: Backend = "pglite", env: Record<string, s
     },
   };
   const hub = new PokeHub();
-  const app = createApp({ meta, blobs, config, now: () => clock.now, hub, version: "test", pingMs: 50 });
+  const app = createApp({ meta, blobs, config, now: () => clock.now, hub, version: "test", pingMs: 50, ...opts });
   return {
     app,
     meta,

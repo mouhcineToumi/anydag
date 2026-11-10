@@ -39,8 +39,9 @@ Seven things are load-bearing:
   the vault, `.git/ .stversions/ *.sync-conflict-* *.icloud .trash/` ignored, the sha1 base, the 409 and
   `merge3` kept, and opening never writes.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
-  there is no sign-in, no session, no share link and no feedback card. Logs are sent only once the
-  person says yes — see *Logs*.
+  there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
+  see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a
+  GitHub token — see *Feedback*.
 - **Generation is the person's key** (`plugins/generate/`): the prompt card's providers
   read it from the environment or `.env.local` in development and, in the desktop app, from the OS
   keychain through `safeStorage`.

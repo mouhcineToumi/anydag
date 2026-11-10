@@ -147,6 +147,7 @@ One line each; the full account with the defect that found it is in
 | sync (client or server) | [`sync.md`](docs/architecture/sync.md) |
 | the Assistant (chat) | [`assistant.md`](docs/architecture/assistant.md) |
 | anonymous logs | [`logs.md`](docs/architecture/logs.md) |
+| Send feedback, the feedback relay | [`feedback.md`](docs/architecture/feedback.md) |
 | the gate, CI, releases | [`gate-and-releases.md`](docs/architecture/gate-and-releases.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), `docs/RELEASING.md` |
 
 Section names in italics inside those files (*Picking a node*, *The time zone*) are listed with their

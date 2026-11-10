@@ -63,6 +63,10 @@ Eight things are load-bearing:
 Names claimed, grepped first: `dag-telemetry*`, `data-dag-telemetry*`, `data-dag-setting-telemetry*`,
 the Settings tab `privacy`, and the event `dag:telemetry` (in `test/prefs.test.ts`'s list).
 
+**Not feedback.** The feedback card (`feedback.md`) is a separate, explicit channel: a person presses
+Send, their own words go, and the result is public. It never rides a batch, and the answer here has
+no say over it, either way.
+
 **Out, and why:** a third-party SDK (a vendor, and a second place deciding what is sent); session
 recordings, clicks, or anything with a coordinate; and a per-vault or per-browser answer — a person
 says it once.

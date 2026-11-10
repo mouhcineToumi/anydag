@@ -21,7 +21,7 @@ import path from "node:path";
 import { Hono } from "hono";
 
 import { cleanBatch, MAX_BATCH_BYTES, type LogBatch, type LogsAccepted } from "../../protocol/logs";
-import { HttpError, type Deps, type Vars } from "./http";
+import { HttpError, Rate, senderOf, type Deps, type Vars } from "./http";
 
 const PER_MINUTE = 30;
 const ALL_PER_MINUTE = 3000;
@@ -70,38 +70,10 @@ export class LogStore {
   }
 }
 
-/** A fixed window per key, reset every minute: enough to keep one sender from filling a disk. */
-class Rate {
-  private minute = 0;
-  private seen = new Map<string, number>();
-  private all = 0;
-
-  allow(key: string, now: number): boolean {
-    const minute = Math.floor(now / 60_000);
-    if (minute !== this.minute) {
-      this.minute = minute;
-      this.seen.clear();
-      this.all = 0;
-    }
-    const n = (this.seen.get(key) ?? 0) + 1;
-    this.seen.set(key, n);
-    this.all++;
-    return n <= PER_MINUTE && this.all <= ALL_PER_MINUTE;
-  }
-}
-
-/** Who is asking, for the rate alone: the proxy's word when there is one, else the socket's. */
-function senderOf(c: { req: { header(name: string): string | undefined }; env: unknown }): string {
-  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded) return forwarded;
-  const incoming = (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming;
-  return incoming?.socket?.remoteAddress ?? "local";
-}
-
 export function logRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   const app = new Hono<{ Variables: Vars }>();
   const store = new LogStore(path.join(deps.config.data, "logs"), deps.config.logsDays);
-  const rate = new Rate();
+  const rate = new Rate(PER_MINUTE, ALL_PER_MINUTE);
 
   app.post("/v1/logs", async (c) => {
     if (!deps.config.logs) throw new HttpError("ES_NOT_FOUND", "this server does not keep logs");

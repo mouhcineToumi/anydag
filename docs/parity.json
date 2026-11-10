@@ -42,6 +42,14 @@
       "mcp": {"refused": "Events are what the page observes about itself; an agent posting them would be inventing usage."}
     },
     {
+      "id": "account.feedback",
+      "area": "Account",
+      "what": "Send a bug or an idea to the maintainers, with files and the text of chosen boards and notes — a public GitHub issue, through the relay; only when the person sends it or asks for it",
+      "rest": ["GET /api/feedback", "POST /api/feedback"],
+      "cli": {"admin": false},
+      "mcp": ["feedback"]
+    },
+    {
       "id": "vault.list",
       "area": "Vaults",
       "what": "Which vaults there are — the recent list, and which are being served",
