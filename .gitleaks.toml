@@ -1,0 +1,19 @@
+# What `scripts/secrets.sh` refuses: gitleaks' own rules, and the few fixtures in this repository
+# that look like a secret and are not one.
+#
+# **An allowance names one file and one string, both.** A path alone would let a real key into a
+# file that already has a fake one, and a pattern alone would let the same string in anywhere. So
+# every entry is `condition = "AND"` over a path and a regex on the match, and says why it is safe.
+# Never allow a directory; never allow by rule id.
+
+title = "anydag"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "test/llm.test.ts: a dummy key the provider tests hand to a stubbed fetch; no service ever sees it"
+condition = "AND"
+paths = ['''^test/llm\.test\.ts$''']
+regexTarget = "match"
+regexes = ['''sk-test-0123456789abcdef''']

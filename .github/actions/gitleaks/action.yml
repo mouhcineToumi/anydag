@@ -1,0 +1,34 @@
+# The gitleaks binary `scripts/secrets.sh` runs, at one pinned version, checked against its
+# published checksum before it runs. One definition for `ci.yml` and `nightly.yml`.
+#
+# A binary rather than `gitleaks/gitleaks-action` (which wants a licence key for an organisation and
+# wraps the same binary) or the Docker image (whose user does not own the checkout, so git refuses
+# to read it as a "dubious" repository).
+#
+# To move to a new version: change both inputs' defaults to that release and the sha256 of its
+# `gitleaks_<version>_linux_x64.tar.gz` line in `gitleaks_<version>_checksums.txt`.
+name: gitleaks
+description: Install the pinned gitleaks on PATH
+inputs:
+  version:
+    description: gitleaks release, without the v
+    default: "8.28.0"
+  sha256:
+    description: sha256 of gitleaks_<version>_linux_x64.tar.gz
+    default: a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        SHA256: ${{ inputs.sha256 }}
+      run: |
+        set -euo pipefail
+        dir="$RUNNER_TEMP/gitleaks"
+        mkdir -p "$dir"
+        tarball="gitleaks_${VERSION}_linux_x64.tar.gz"
+        curl -fsSL --retry 3 -o "$dir/$tarball" "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${tarball}"
+        echo "${SHA256}  $dir/$tarball" | sha256sum -c -
+        tar -xzf "$dir/$tarball" -C "$dir" gitleaks
+        echo "$dir" >> "$GITHUB_PATH"
