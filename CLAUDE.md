@@ -115,6 +115,8 @@ One line each; the full account with the defect that found it is in
 - **ProseMirror redraws any attribute it did not set**: marks inside the editor are CSS highlights.
 - **A choice between document kinds is a `switch` ending in `assertNever`**, never `kind === "note" ? … : board`.
 - **A stub is a claim about another module**; copy it from a route's recorded answer, never invent it.
+- **The desktop forwards the page over `node:http`, not `net.fetch`**: Chromium's six connections to
+  a host, filled by streams nobody let go of, froze every request (`desktop/forward.ts`, #123).
 - **The token and the `Host` are the whole security model** — both checked on every request; a script
   that `fetch`es the server needs `authed()` from `scripts/session.mjs`.
 - **The repository is public, so a committed secret is a published one.** Secrets live in the

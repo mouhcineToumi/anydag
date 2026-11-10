@@ -20,13 +20,14 @@ failed on both.
 | Where | Owns |
 |---|---|
 | `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, updates |
+| `desktop/forward.ts` | a page request sent on to the server over `node:http`, and let go of when the page lets go |
 | `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
 | `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Eleven things are load-bearing:
+Twelve things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
@@ -72,6 +73,18 @@ Eleven things are load-bearing:
   `anydag serve`, and a file an earlier one left behind names a port anybody may hold now. The page,
   its `localStorage` and its `EventSource` live on one stable origin, `anydag://app`, and no script
   in it ever sees the token.
+- **The page's requests go to the server over `node:http`, never `net.fetch`** (`desktop/forward.ts`,
+  #123). `net.fetch` is Chromium's network stack, which holds six HTTP/1.1 connections to a host and
+  queues the rest — and a page holds three streams that never end (the change feed, the
+  Assistant's history, the open chat), so two windows were the whole budget. Worse, a stream the
+  page closed was never let go: the handler passed the upstream body on and nothing cancelled it, so
+  each reload and each switch of chat kept a connection for the rest of the launch. With six held,
+  every request waited for ever and nothing failed: a note the Assistant rewrote went blank, the
+  sidebar never listed the board it made, and the chat's link to it said *Nothing has this id any
+  more*. Node's agent has no cap and no timeout (a prompt card can take minutes to answer), and
+  `request.signal` — which Chromium aborts when the page cancels — destroys the upstream request, as
+  cancelling the answer's body does. `test/desktop-forward.test.ts` holds both; a browser on
+  `anydag serve` never had the problem, which is why no e2e spec could see it.
 - **Only the page writes.** Chromium gives a custom scheme's handler no `Origin` and runs no CORS
   preflight for it — measured: a sandboxed frame's `POST` with any header it liked reached the
   handler — so the handler asks every write for a per-launch **page key**, which the preload asks
