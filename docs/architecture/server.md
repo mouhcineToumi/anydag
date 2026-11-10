@@ -76,10 +76,16 @@ action. A refusal from the server is drawn under the form without moving its but
 | `POST /api/vaults/open` `{path}` · `/create` `{path}` · `/close` `{id}` | open a folder, make one and open it, close one — **never deleting it** |
 | `POST /__board/transfer` `{name, kind, to}` · `{folder, to}` | a file, or a folder whole, to another open vault |
 
-Six things are load-bearing:
+Eight things are load-bearing:
 
 - **Closing never deletes, and nothing in the app removes a vault's folder.** A vault is a folder
   the person already owns; the file manager is where it is renamed or thrown away.
+- **A vault's id belongs to its folder.** A folder whose `.anydag/vault.json` claims an id the home
+  already maps to another folder that still exists and still claims it is a copy: it is given a
+  fresh id, and the original's recent row and sync link are left alone.
+- **Every path the store resolves stays in the vault's real path.** `Vault.abs` follows the root
+  once and refuses an existing component that links out of it; a write checks again immediately
+  before it lands.
 - **A vault inside another is refused**, both ways: one file would be two documents with two
   owners, and the watchers would report every change twice.
 - **An existing `.obsidian/` is never touched**, and every dot-folder is neither listed nor walked.

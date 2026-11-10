@@ -52,6 +52,18 @@ export interface Rekeys {
 
 const MIN_PASSPHRASE = 8;
 
+/** Two paths that name the same folder, links followed; a path that is gone compares as itself. */
+function sameFolder(a: string, b: string): boolean {
+  const real = (p: string): string => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  return real(a) === real(b);
+}
+
 export class SyncLinks {
   /** The loop's timers and `fetch`; a test sets it before a vault opens. */
   tune: Tune = TUNE;
@@ -63,8 +75,8 @@ export class SyncLinks {
    */
   auto = true;
   private readonly loops = new Map<string, SyncLoop>();
-  /** A linked vault whose loop could not start, and why. */
-  private readonly broken = new Map<string, string>();
+  /** A linked vault whose loop could not start, and why: an error, or a pause waiting on the person. */
+  private readonly broken = new Map<string, { state: "paused" | "error"; reason: string }>();
   private readonly starting = new Map<string, Promise<SyncLoop | null>>();
 
   constructor(
@@ -111,7 +123,20 @@ export class SyncLinks {
   /** A vault was opened: start its loop when it is linked, and do nothing at all when it is not. */
   opened(vault: Vault): void {
     if (!this.auto || !this.linked(vault.id)) return;
+    const mismatch = this.rootMismatch(vault, this.pairing(vault.id));
+    if (mismatch) {
+      this.broken.set(vault.id, { state: "paused", reason: mismatch });
+      vault.emit({ type: "sync", status: this.status(vault) });
+      return;
+    }
     void this.start(vault).catch(() => undefined);
+  }
+
+  /** The sentence refusing a link made for another folder, or `null` when the roots agree. */
+  private rootMismatch(vault: Vault, pairing: Pairing | null): string | null {
+    if (!pairing?.root) return null;
+    if (sameFolder(pairing.root, vault.root)) return null;
+    return `This vault's sync link was made for ${pairing.root}; ${vault.root} claims its id. Confirm before syncing.`;
   }
 
   /** The loop for a linked vault, started — its catch-up (or `first`) run finished — or `null`. */
@@ -129,6 +154,12 @@ export class SyncLinks {
     const id = vault.id;
     const pairing = this.pairing(id);
     if (!pairing) return null;
+    const mismatch = this.rootMismatch(vault, pairing);
+    if (mismatch) {
+      this.broken.set(id, { state: "paused", reason: mismatch });
+      vault.emit({ type: "sync", status: this.status(vault) });
+      return null;
+    }
     let loop: SyncLoop;
     try {
       const vk = loadVaultKey(this.dir(id), this.secret());
@@ -139,7 +170,7 @@ export class SyncLinks {
         e instanceof SecretElsewhere
           ? e.message
           : `The vault key kept on this machine will not open (${(e as Error).message}). Unlink this vault and link it again.`;
-      this.broken.set(id, why);
+      this.broken.set(id, { state: "error", reason: why });
       vault.emit({ type: "sync", status: this.status(vault) });
       return null;
     }
@@ -184,8 +215,8 @@ export class SyncLinks {
     return {
       vault: vault.id,
       linked: broken !== undefined,
-      state: broken !== undefined ? "error" : "unlinked",
-      reason: broken ?? null,
+      state: broken ? broken.state : "unlinked",
+      reason: broken?.reason ?? null,
       server: p?.server ?? null,
       remote: null,
       device: p?.device.name ?? null,
@@ -287,6 +318,7 @@ export async function pair(links: SyncLinks, vault: Vault, req: Partial<SyncPair
     token: got.token,
     account: got.account,
     device: { id: got.device.id, name: got.device.name },
+    root: vault.root,
   });
   vault.emit({ type: "sync", status: links.status(vault) });
   return { server, account: got.account.name, device: got.device.name };
@@ -327,11 +359,12 @@ function openKey(key: VaultKey, passphrase: unknown, recovery: unknown): Uint8Ar
   throw err(400, "Give the vault's passphrase, or its recovery code.");
 }
 
-/** Keep what a link decided: the vault key at rest, and the engine's state naming the remote. */
-function keep(links: SyncLinks, id: string, pairing: Pairing, remote: string, vk: Uint8Array): void {
-  const dir = links.dir(id);
+/** Keep what a link decided: the vault key at rest, the root it was made for, and the engine's state naming the remote. */
+function keep(links: SyncLinks, vault: Vault, pairing: Pairing, remote: string, vk: Uint8Array): void {
+  const dir = links.dir(vault.id);
   fs.rmSync(path.join(dir, "state.sqlite"), { force: true });
   fs.rmSync(path.join(dir, "bases"), { recursive: true, force: true });
+  links.savePairing(vault.id, { ...pairing, root: vault.root });
   saveVaultKey(dir, links.secret(), vk);
   const st = new SyncState(dir);
   try {
@@ -383,7 +416,7 @@ export async function link(
     }
     // The server keeps the vault's id when it is free; when it is not, the vault takes the server's.
     const v = remote === vault.id ? vault : await s.rekeyVault(vault.id, remote);
-    keep(links, v.id, pairing, remote, vk);
+    keep(links, v, pairing, remote, vk);
     const loop = await links.start(v);
     if (!loop) throw err(500, "the link was kept but its sync did not start");
     return { status: loop.status(), recovery: recoveryCode(rk), vault: v.id };
@@ -416,7 +449,7 @@ export async function link(
   if (links.get(want) || (want !== vault.id && links.linked(want)))
     throw err(409, `Vault \`${want}\` is already linked on this machine.`, { code: "linked" });
   const v = want === vault.id ? vault : await s.rekeyVault(vault.id, want);
-  keep(links, v.id, pairing, want, vk);
+  keep(links, v, pairing, want, vk);
   const loop = await links.start(v, mode === "download" ? "resync" : "merge");
   if (!loop) throw err(500, "the link was kept but its sync did not start");
   return { status: loop.status(), vault: v.id };
