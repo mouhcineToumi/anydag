@@ -85,9 +85,11 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Pictures | [`free-canvas.md`](free-canvas.md) |
 | Problems | [`diagnostics.md`](diagnostics.md) |
 | Projects | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
+| Protocol 2, and an older peer | [`sync.md`](sync.md) |
 | Prompt cards | [`prompt-cards.md`](prompt-cards.md) |
 | Prompt to edit | [`prompt-cards.md`](prompt-cards.md) |
 | Quizzes | [`quizzes.md`](quizzes.md) |
+| Quotas and history | [`sync.md`](sync.md) |
 | Reaching what the file can say | [`editing-drag.md`](editing-drag.md) |
 | Reading it as a tree | [`sidebar.md`](sidebar.md) |
 | References, ids and the read-only view | [`references.md`](references.md) |
@@ -117,6 +119,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Things that will bite | [`things-that-will-bite.md`](things-that-will-bite.md) |
 | Tidy up | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Vaults | [`server.md`](server.md) |
+| What the server cannot forge | [`sync.md`](sync.md) |
 | Versions and releases | [`gate-and-releases.md`](gate-and-releases.md) |
 | What the panel opens on, and what it opens with | [`editing.md`](editing.md) |
 | Why it stopped being a column | [`sidebar.md`](sidebar.md) |

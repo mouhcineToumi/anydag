@@ -32,11 +32,12 @@ import {
   recoveryCode,
   seal,
   sealBlob,
+  unb64,
   Unsealed,
   unwrapKey,
   wrapKey,
 } from "../protocol/crypto";
-import { openMeta, sealMeta, type Meta } from "../protocol/meta";
+import { MetaRefused, openMeta, sealMeta, type Meta } from "../protocol/meta";
 import { BLOB_ID, type KdfParams } from "../protocol/wire";
 
 // -- helpers --------------------------------------------------------------------------------------
@@ -171,6 +172,8 @@ describe("a blob is bound to its id", () => {
 describe("the metadata beside a key", () => {
   const keys = keysOf(randomKey());
   const key = keyOf(keys.path, "Notes/érrands.md");
+  const blob = blobId(keys.blob, utf8("the errands, as of Thursday"));
+  const at = { key, blob, parent: 7 };
   const meta: Meta = {
     path: "Notes/érrands.md",
     kind: "file",
@@ -179,26 +182,53 @@ describe("the metadata beside a key", () => {
     size: 408,
   };
   /* Sealed the way a bad writer would, honestly, and with the wrong-key refusals out of the way: */
-  const hand = (what: unknown): string => b64(seal(keys.enc, utf8(JSON.stringify(what)), `meta:${key}`));
+  const hand = (what: unknown): string =>
+    b64(seal(keys.enc, utf8(JSON.stringify({ v: 2, key, blob, parent: 7, ...(what as object) })), `meta/v2:${key}`));
 
   it("round trips", () => {
-    expect(openMeta(keys.enc, key, sealMeta(keys.enc, key, meta))).toEqual(meta);
+    expect(openMeta(keys.enc, at, sealMeta(keys.enc, at, meta))).toEqual(meta);
+    const del = { key, blob: null, parent: 9 };
+    expect(openMeta(keys.enc, del, sealMeta(keys.enc, del, { ...meta, size: 0 })).size).toBe(0);
   });
 
   it("refuses a seal opened under another key of the same vault", () => {
-    const sealed = sealMeta(keys.enc, key, meta);
-    expect(() => openMeta(keys.enc, keyOf(keys.path, "Announcements.md"), sealed)).toThrow(Unsealed);
+    const sealed = sealMeta(keys.enc, at, meta);
+    expect(() => openMeta(keys.enc, { ...at, key: keyOf(keys.path, "Announcements.md") }, sealed)).toThrow(Unsealed);
+  });
+
+  /* What the server, or anybody holding a device token, can commit again: a sealed meta it has. */
+  it("refuses a seal under another blob: a re-pointed file", () => {
+    const sealed = sealMeta(keys.enc, at, meta);
+    const other = blobId(keys.blob, utf8("somebody else's file"));
+    expect(() => openMeta(keys.enc, { ...at, blob: other }, sealed)).toThrow(MetaRefused);
+    expect(() => openMeta(keys.enc, { ...at, blob: other }, sealed)).toThrow(/re-pointed/);
+    expect(() => openMeta(keys.enc, { ...at, blob: null }, sealed)).toThrow(MetaRefused);
+  });
+
+  it("refuses a seal under another parent: a replayed version or delete", () => {
+    expect(() => openMeta(keys.enc, { ...at, parent: 12 }, sealMeta(keys.enc, at, meta))).toThrow(/replayed/);
+    expect(() => openMeta(keys.enc, { ...at, parent: null }, sealMeta(keys.enc, at, meta))).toThrow(MetaRefused);
+    const del = { key, blob: null, parent: 9 };
+    expect(() => openMeta(keys.enc, { ...del, parent: 14 }, sealMeta(keys.enc, del, meta))).toThrow(MetaRefused);
+  });
+
+  it("says so when protocol 1 sealed it, which a protocol-1 peer reads the other way round", () => {
+    const v1 = b64(seal(keys.enc, utf8(JSON.stringify(meta)), `meta:${key}`));
+    expect(() => openMeta(keys.enc, at, v1)).toThrow(/older AnyDag \(sync protocol 1\)/);
+    /* A 0.2.0 peer opens with `meta:<key>`, and a protocol-2 seal does not open so. */
+    expect(() => open(keys.enc, unb64(sealMeta(keys.enc, at, meta)), `meta:${key}`)).toThrow(Unsealed);
   });
 
   it("refuses what is not a Meta in JSON", () => {
-    expect(() => openMeta(keys.enc, key, hand({ nope: 1 }))).toThrow();
-    expect(() => openMeta(keys.enc, key, hand({ path: "a.md" }))).toThrow();
-    expect(() => openMeta(keys.enc, key, hand({ path: "a.md", kind: "salad" }))).toThrow();
-    expect(() => openMeta(keys.enc, key, b64(seal(keys.enc, utf8("not json"), `meta:${key}`)))).toThrow();
+    expect(() => openMeta(keys.enc, at, hand({ nope: 1 }))).toThrow();
+    expect(() => openMeta(keys.enc, at, hand({ path: "a.md" }))).toThrow();
+    expect(() => openMeta(keys.enc, at, hand({ path: "a.md", kind: "salad" }))).toThrow();
+    expect(() => openMeta(keys.enc, at, b64(seal(keys.enc, utf8("not json"), `meta/v2:${key}`)))).toThrow();
+    expect(() => openMeta(keys.enc, at, hand({ path: "a.md", kind: "file", v: 3 }))).toThrow(MetaRefused);
   });
 
   it("reads a spare seal with the shape's defaults", () => {
-    expect(openMeta(keys.enc, key, hand({ path: "a.md", kind: "file" }))).toEqual({
+    expect(openMeta(keys.enc, at, hand({ path: "a.md", kind: "file" }))).toEqual({
       path: "a.md",
       kind: "file",
       created: null,

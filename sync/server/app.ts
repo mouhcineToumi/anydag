@@ -13,6 +13,11 @@
  *   `STATUS[code]`; anything else is a 500 carrying a message and no `code` (no `ES_*` describes
  *   it, and the client retries a 5xx without one) and never the stack, which goes to stderr. An unknown route is
  *   `ES_NOT_FOUND`, in the same shape, so a client never parses an HTML page.
+ * - **Every `/v1` answer says the protocol, and a device's request must say the same one**
+ *   (`PROTOCOL_HEADER`), checked before who is asking: a client of another protocol — a 0.2.0 one
+ *   sends none — is refused `ES_PROTOCOL`, never served a `meta` it would misread or let commit
+ *   one this server's devices would refuse. `/v1/health`, `/v1/logs`, the poke stream and
+ *   `/v1/admin/*` carry nothing whose shape moved, and are not checked.
  * - **Latency is recorded by route template**, never by path (`metrics.ts`): `routePath(c, -1)`
  *   after the handler ran is the template that answered, and a request no route matched is
  *   `unmatched`.
@@ -21,7 +26,7 @@
 import { Hono } from "hono";
 import { routePath } from "hono/route";
 
-import { STATUS } from "../protocol/wire";
+import { PROTOCOL, PROTOCOL_HEADER, STATUS } from "../protocol/wire";
 import { admin, device, vault } from "./auth";
 import type { Blobs } from "./blobs/types";
 import type { Config } from "./config";
@@ -54,6 +59,10 @@ export interface AppOptions {
 }
 
 const OPEN = new Set(["/v1/health", "/v1/pair", "/v1/logs"]);
+/** Routes any protocol may call: health says the protocol, and the rest carry nothing it changed. */
+const ANY_PROTOCOL = new Set(["/v1/health", "/v1/logs"]);
+const anyProtocol = (p: string): boolean =>
+  ANY_PROTOCOL.has(p) || p.startsWith("/v1/admin/") || /^\/v1\/vaults\/[^/]+\/poke$/.test(p);
 
 export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps: Deps } {
   const now = opts.now ?? (() => new Date());
@@ -81,6 +90,22 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
     const template = routePath(c, -1);
     const route = !template || template === "*" || template.endsWith("/*") ? "unmatched" : template;
     metrics.record(route, c.req.method, c.res.status, (performance.now() - start) / 1000);
+    // Here, outside every other layer, so a refusal `onError` answered says it too.
+    if (c.req.path.startsWith("/v1/")) c.res.headers.set(PROTOCOL_HEADER, String(PROTOCOL));
+  });
+
+  app.use("/v1/*", async (c, next) => {
+    if (!anyProtocol(c.req.path)) {
+      const said = c.req.header(PROTOCOL_HEADER);
+      if (said !== String(PROTOCOL))
+        throw new HttpError(
+          "ES_PROTOCOL",
+          said === undefined
+            ? `this sync server speaks sync protocol ${PROTOCOL}, and this client did not say which it speaks (AnyDag 0.2.0 or older): update AnyDag`
+            : `this sync server speaks sync protocol ${PROTOCOL}, and this client speaks ${said}: update ${Number(said) > PROTOCOL ? "the sync server" : "AnyDag"}`,
+        );
+    }
+    await next();
   });
 
   const asDevice = device(deps);

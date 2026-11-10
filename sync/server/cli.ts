@@ -7,7 +7,7 @@
  *     anydag-sync account add <name> [--plan <id>] | account ls
  *     anydag-sync pair <account>
  *     anydag-sync device ls <account> | device revoke <account> <id>
- *     anydag-sync plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]
+ *     anydag-sync plan set <id> [--storage-bytes N] [--history-days N] [--history-bytes N] [--max-file-bytes N] [--devices N] [--account <name>]
  *     anydag-sync usage [--account <name>] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
  *     anydag-sync gc
  *
@@ -41,7 +41,7 @@ const HELP = `anydag-sync — the AnyDag sync server
   pair <account>                     print a one-time pairing code for an account
   device ls <account>                list an account's devices
   device revoke <account> <id>       revoke a device
-  plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]
+  plan set <id> [--storage-bytes N] [--history-days N] [--history-bytes N] [--max-file-bytes N] [--devices N] [--account <name>]
                                      write a plan (N or "none"), and put an account on it
   usage [--account <name>] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
                                      print the usage ledger
@@ -59,7 +59,17 @@ interface Parsed {
   flags: Map<string, string | true>;
 }
 
-const VALUED = new Set(["plan", "storage-bytes", "history-days", "max-file-bytes", "devices", "account", "since", "until"]);
+const VALUED = new Set([
+  "plan",
+  "storage-bytes",
+  "history-days",
+  "history-bytes",
+  "max-file-bytes",
+  "devices",
+  "account",
+  "since",
+  "until",
+]);
 
 function parse(argv: string[]): Parsed {
   const words: string[] = [];
@@ -239,7 +249,7 @@ export async function main(
       case "plan": {
         if (sub !== "set")
           throw new Usage(
-            "plan set <id> [--storage-bytes N] [--history-days N] [--max-file-bytes N] [--devices N] [--account <name>]",
+            "plan set <id> [--storage-bytes N] [--history-days N] [--history-bytes N] [--max-file-bytes N] [--devices N] [--account <name>]",
           );
         const id = need(rest[0], "a plan id");
         const current = await meta.plan(id);
@@ -247,6 +257,7 @@ export async function main(
         for (const [f, k] of [
           ["storage-bytes", "storage_bytes"],
           ["history-days", "history_days"],
+          ["history-bytes", "history_bytes"],
           ["max-file-bytes", "max_file_bytes"],
           ["devices", "devices"],
         ] as const) {
@@ -260,7 +271,7 @@ export async function main(
         out(
           json
             ? JSON.stringify(plan)
-            : `plan ${plan.id}: ${["storage_bytes", "history_days", "max_file_bytes", "devices"].map((k) => `${k}=${plan[k as keyof typeof plan] ?? "unlimited"}`).join(" ")}${onto ? ` — ${onto} is on it` : ""}`,
+            : `plan ${plan.id}: ${["storage_bytes", "history_days", "history_bytes", "max_file_bytes", "devices"].map((k) => `${k}=${plan[k as keyof typeof plan] ?? "unlimited"}`).join(" ")}${onto ? ` — ${onto} is on it` : ""}`,
         );
         return 0;
       }

@@ -297,7 +297,19 @@ function serverUrl(raw: unknown): string {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:")
     throw err(400, "A sync server's address starts with https:// (or http:// on this machine).");
+  // The device token travels in every request: in the clear, anybody on the path could sync as us.
+  if (url.protocol === "http:" && !loopback(url.hostname))
+    throw err(
+      400,
+      `A sync server's address starts with https://: http:// is only for a server on this machine (localhost, 127.0.0.1 or ::1), and ${url.hostname} is not.`,
+    );
   return url.toString().replace(/\/+$/, "");
+}
+
+/** Whether a URL's hostname is this machine: `localhost`, `127.0.0.0/8` or `::1`. */
+function loopback(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === "localhost" || h.endsWith(".localhost") || h === "[::1]" || /^127(\.\d{1,3}){3}$/.test(h);
 }
 
 export async function pair(links: SyncLinks, vault: Vault, req: Partial<SyncPairRequest>): Promise<SyncPaired> {
