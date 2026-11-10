@@ -48,11 +48,14 @@ branch — electron-updater reads the ten newest releases, and ten nightlies in 
 beta's next version from it.
 
 **The update channel is the version's own word.** `0.2.0` is `latest`, `0.2.0-beta.1` is `beta`,
-`0.2.0-nightly.…` is `nightly`. electron-builder names the update files after it (`latest*.yml`,
-`beta*.yml`, `nightly*.yml`) and electron-updater reads the same word off the running version, so a
+`0.2.0-nightly.…` is `nightly`. The update files are named after it (`latest*.yml`, `beta*.yml`,
+`nightly*.yml`) and electron-updater reads the same word off the running version, so a
 stable build never sees a pre-release and a nightly build follows nightlies. `desktop/main.ts` sets
 `allowPrerelease` from it and never sets `autoUpdater.channel`, whose setter turns on
-`allowDowngrade`. `desktop/package.mjs` fails a build whose update files do not match its channel.
+`allowDowngrade`. **electron-builder does not read the channel off the version for the `github`
+provider** (its `detectUpdateChannel` is for `generic` and S3-like ones), so `desktop/package.mjs`
+passes `-c.publish.channel=<word>` for a pre-release, and fails a build whose update files do not match
+its channel. Without it every nightly wrote `latest*.yml` and none published (#116).
 
 **The file names are the updater's URLs**, so none has a space: `AnyDag-<v>.AppImage`,
 `AnyDag-Setup-<v>.exe`, `AnyDag-<v>-<arm64|x64>.dmg` and `.zip`. electron-builder's default

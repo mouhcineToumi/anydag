@@ -40,8 +40,9 @@ declare const __ANYDAG_SIGNED__: boolean;
 const SIGNED: boolean = typeof __ANYDAG_SIGNED__ === "boolean" ? __ANYDAG_SIGNED__ : false;
 
 /** The update channel is the version's own: `0.2.0` is `latest`, `0.2.0-beta.1` is `beta` and
- *  `0.2.0-nightly.202611070230` is `nightly`. electron-builder names the update files after it
- *  (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`) and electron-updater reads the same word
+ *  `0.2.0-nightly.202611070230` is `nightly`. The update files are named after it (`nightly.yml`,
+ *  `nightly-linux.yml`, `nightly-mac.yml`; `desktop/package.mjs` hands electron-builder the word
+ *  as `publish.channel`) and electron-updater reads the same word
  *  back off the running version, so a stable build only ever asks for the newest *stable* release
  *  (GitHub's "latest", which no pre-release is), a beta follows betas and what is stable, and a
  *  nightly follows nightlies. `allowPrerelease` is what lets the last two see a pre-release; it is
