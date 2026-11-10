@@ -1,5 +1,5 @@
 /**
- * The migrations (sync/server/meta/migrations/NNN-*.sql), with the files as the source of truth:
+ * The migrations (api/server/meta/migrations/NNN-*.sql), with the files as the source of truth:
  * read once at module load, in name order, each applied whole in its own transaction under the
  * migrate lock. The directory is `ANYDAG_API_MIGRATIONS` when that is set and otherwise next to
  * this source file; the bundled server copies the directory beside itself, so the same list answers

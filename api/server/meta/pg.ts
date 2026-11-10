@@ -1,5 +1,5 @@
 /**
- * `Meta` on Postgres — the one adapter of the port (sync/server/meta/types.ts), given its `Db` by
+ * `Meta` on Postgres — the one adapter of the port (api/server/meta/types.ts), given its `Db` by
  * db.ts, so the same statements run against a real Postgres and against PGlite. Everything the
  * contract calls atomic lives inside ONE transaction here: a commit is refused whole or written
  * whole, the vault's `seq` only ever moves by the commit that landed, and the collector raises the

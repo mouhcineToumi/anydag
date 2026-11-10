@@ -3,7 +3,7 @@
  *
  * One closed vocabulary, read by the three places that touch a log — the page that makes one, the
  * app's server that holds and forwards it (`server/telemetry.ts`), and the sync server that stores
- * it (`sync/server/routes/logs.ts`). Each of them runs the same `cleanBatch` over what it was
+ * it (`api/server/routes/logs.ts`). Each of them runs the same `cleanBatch` over what it was
  * handed, so a log that left a machine is one this file could describe, whatever sent it.
  *
  * Load-bearing:
