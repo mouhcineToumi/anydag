@@ -1,0 +1,11 @@
+# The disk alert (deploy/check-disk.sh): the data volumes' filesystem against DISK_ALERT_PERCENT.
+# Installed by deploy/provision.sh, which writes the checkout's path in place of @DEPLOY@.
+[Unit]
+Description=AnyDag api data disk check
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@DEPLOY@/check-disk.sh
+TimeoutStartSec=2min

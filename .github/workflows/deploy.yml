@@ -75,6 +75,19 @@ jobs:
           EOF
           chmod 600 deploy/.env
 
+      - name: The scripts and the tunnel variant, before anything runs
+        env:
+          TUNNEL_TOKEN: not-a-real-token
+        run: |
+          set -euo pipefail
+          shellcheck deploy/*.sh
+          docker compose -f deploy/compose.yaml -f deploy/compose.tunnel.yaml config -q
+          for site in localhost http://localhost; do
+            docker run --rm -e CADDY_SITE="$site" -e CADDY_TRUSTED_PROXIES=private_ranges \
+              -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine \
+              caddy validate --config /etc/caddy/Caddyfile
+          done
+
       - name: Stack up
         run: docker compose -f deploy/compose.yaml up -d --build --wait
 

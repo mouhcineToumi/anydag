@@ -2,12 +2,29 @@
 # terminates TLS with automatic certificates — for a real domain an ACME one, for `localhost` an
 # internal one, which is what the restore test runs against — and it is the one hop the api
 # trusts: Caddy is what appends the client's address to `X-Forwarded-For`, which the api's rate
-# limiter reads only when `ANYDAG_API_TRUST_PROXY=1` (deploy/compose.yaml sets it).
+# limiter reads only when `ANYDAG_API_TRUST_PROXY` is a hop count (deploy/compose.yaml sets it).
 #
-# Kept to what the service needs, and no more: TLS terminating here, everything else passed
-# through. Caddy's access log goes to its container's stdout, which compose caps.
+# Two ways in, one file:
+# - **Direct** (a VPS with a public address): `CADDY_SITE` is the domain, Caddy gets the
+#   certificate itself, and it trusts no incoming `X-Forwarded-For` — the default below names
+#   only the container's own loopback, which nothing connects from — so the header the api reads
+#   holds exactly one address, the client's, and the api trusts one hop.
+# - **Behind a tunnel** (deploy/compose.tunnel.yaml, a home server): the tunnel terminates TLS
+#   and connects to Caddy over plain HTTP from inside the compose network. `CADDY_SITE` is
+#   `http://<domain>` and `CADDY_TRUSTED_PROXIES` is `private_ranges`, so Caddy keeps the
+#   address the tunnel's edge put in the header and appends the tunnel's own: two hops, and the
+#   api is told two.
+#
+# Kept to what the service needs, and no more: TLS terminating here or at the tunnel, everything
+# else passed through. Caddy's access log goes to its container's stdout, which compose caps.
 
-{$CADDY_DOMAIN:localhost} {
+{
+	servers {
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES:127.0.0.1/32}
+	}
+}
+
+{$CADDY_SITE:localhost} {
 	encode zstd gzip
 
 	reverse_proxy api:8790

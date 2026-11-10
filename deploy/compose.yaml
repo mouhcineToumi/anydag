@@ -14,7 +14,8 @@
 # - **No secret is written in this file**: every value comes from deploy/.env, and `:?` refuses to
 #   start without the ones the stack cannot answer without. No secret is a build argument.
 # - **Caddy is the only hop**: the api's `ANYDAG_API_TRUST_PROXY=1` is what lets its rate limiter
-#   read the client address Caddy appended — anything else is untrusted by default.
+#   read the client address Caddy appended — anything else is untrusted by default. Behind a
+#   tunnel there are two (deploy/compose.tunnel.yaml says so, and sets it).
 # - **Bounded**: each service has a memory limit, capped container logs (`json-file`, a few MB),
 #   `restart: unless-stopped`, and a healthcheck; Postgres' low-memory tuning is postgres.conf.
 # - **Blobs and logs on a named volume, Postgres on another**: both can sit on an attached block
@@ -32,8 +33,9 @@ services:
       - "443:443"
     environment:
       # The site Caddy serves; `localhost` gets an internal certificate (what the restore test
-      # runs with), a real domain gets one from Let's Encrypt on the ports above.
-      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+      # runs with), a real domain gets one from Let's Encrypt on the ports above. A tunnel's
+      # override serves it as plain `http://` instead (deploy/compose.tunnel.yaml).
+      CADDY_SITE: ${CADDY_DOMAIN:-localhost}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
@@ -68,7 +70,7 @@ services:
       ANYDAG_API_PORT: "8790"
       ANYDAG_API_MODE: ${ANYDAG_API_MODE:-multi}
       ANYDAG_API_PUBLIC_URL: https://${CADDY_DOMAIN:-localhost}
-      ANYDAG_API_TRUST_PROXY: "1"
+      ANYDAG_API_TRUST_PROXY: ${ANYDAG_API_TRUST_PROXY:-1}
       ANYDAG_API_ADMIN_TOKEN: ${ANYDAG_API_ADMIN_TOKEN:?set ANYDAG_API_ADMIN_TOKEN in deploy/.env}
       # The feature switches, if the machine answers for fewer than all three.
       ANYDAG_API_SYNC: ${ANYDAG_API_SYNC:-on}

@@ -1,10 +1,49 @@
 # Running the api: api.anydag.com
 
-One small virtual machine, three containers, and the api behind Caddy. The api is **`api/`** in
-this repository, unchanged: this folder holds only what runs on the machine — the compose stack,
-its TLS, its Postgres tuning, and the backup and restore that keep it honest. #101 (provisioning
-the machine: the provider, DNS, monitoring) is next after this; everything here runs on any VM
-that has Docker,compose and the repository.
+One small machine, three containers, and the api behind Caddy. The api is **`api/`** in this
+repository, unchanged: this folder holds only what runs on the machine — the compose stack, its
+TLS, its Postgres tuning, the backup and restore that keep it honest, the alerts, and the script
+that makes a fresh machine ready for all of it. Nothing here depends on a provider: a VPS, a home
+server, anything with Docker.
+
+## The machine
+
+What it needs: **1 GB of RAM** (2 GB is comfortable), 1 vCPU, a disk with room to grow — an
+attached block volume if the provider has one, so the data survives rebuilding the VM — and
+**outbound traffic that is not billed per GB** (every sync download is outbound; it is the cost
+that grows). A public address for 80 and 443, or a tunnel (*Behind a tunnel*). Moving to another
+machine later is a restore and a DNS change, so the first choice is not final.
+
+In order — the steps marked **you** are the maintainer's, because they need an account, a key or
+a decision; the rest is `provision.sh`:
+
+1. **You:** the machine, on a current Debian or Ubuntu LTS. A login user with your SSH key in
+   `~/.ssh/authorized_keys` (`ssh-copy-id`), and `sudo`.
+2. The repository on it, owned by the login: `sudo apt-get install -y git`, then
+   `sudo git clone https://github.com/mouhcineToumi/anydag.git /opt/anydag` and
+   `sudo chown -R <login>: /opt/anydag`. Then
+   `sudo deploy/provision.sh --user <login>` — add `--ssh-from <range>` to keep SSH to your VPN or
+   Tailscale, and `--tunnel` behind a tunnel. It installs security updates that apply themselves,
+   turns off password and root logins (and refuses to while that would lock you out), opens 22
+   and 80/443 in `ufw` and nothing else, installs Docker, `age` and `rclone`, and enables the
+   backup and disk timers. Log in again in a second terminal before closing the first.
+3. **You:** DNS — an `A` (and `AAAA`) record for `api.anydag.com` to the machine. Behind a tunnel,
+   the tunnel's own hostname instead.
+4. **You:** the secrets, in `deploy/.env` (from `.env.example`, `chmod 600`). The admin token
+   and the Postgres password (`openssl rand -base64 32`), the feedback relay's GitHub token, the
+   tunnel's token if there is one, and `AGE_PUBLIC_KEY`. The age **private** key goes into the
+   password manager and never onto this machine. **None of these is ever in the repository, an
+   issue, a PR or a CI log.**
+5. **You:** `sudo rclone config` — the backup destination, at a **different provider** from the
+   machine's (as root: the timer runs as root). Its credentials stay in rclone's config there.
+6. **You:** the three alerts (*Alerts*) — an uptime check on `/v1/ready`, and the two ping URLs in
+   `deploy/.env`.
+7. *Bring it up*, below; then `sudo systemctl start anydag-backup` once and check the backup
+   reached the remote and the check went green.
+8. **You:** the restore drill (*Restore*) onto a second, throwaway machine — once, before the
+   launch is called done — and its line in the record there.
+9. **You:** from a release build with `ANYDAG_CLOUD=on`, say yes to logs and send feedback: the
+   feedback is an issue in the repository, and the logs are a line in today's day file.
 
 **What the stack is.** Caddy — the only published ports (80 and 443), certificates done
 automatically — in front of the api (which trusts that one hop, `ANYDAG_API_TRUST_PROXY=1`,
@@ -15,11 +54,17 @@ healthcheck, and Postgres' tuning is small on purpose (`postgres.conf`).
 ## Bring it up
 
 ```sh
-git clone git@github.com:mouhcineToumi/anydag.git && cd anydag
-npm ci && npm run api:build          # the image builds from api/dist/ — see api/.dockerignore
-cp deploy/.env.example deploy/.env   # then fill in the two secrets and the domain; chmod 0600
+cd /opt/anydag                       # the checkout provision.sh ran from
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+  -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 -v "$PWD:/w" -w /w node:24-alpine \
+  sh -c 'npm ci --no-audit --no-fund && npm run api:build'   # api/dist/, which the image builds from
+cp deploy/.env.example deploy/.env   # then fill it in (*The machine*, step 4); chmod 0600
 docker compose -f deploy/compose.yaml up -d --wait
 ```
+
+The bundle is built in a throwaway Node container, so the machine needs Docker and nothing else
+(`api/.dockerignore` keeps everything but `api/dist/` out of the image). Behind a tunnel, every
+`docker compose` here takes `-f deploy/compose.tunnel.yaml` as well.
 
 `deploy/.env` is the machine's own file: `CADDY_DOMAIN` (the site Caddy requests certificates
 for — a real domain over its published ports, or `localhost` for a test stack), the api's
@@ -31,6 +76,47 @@ The api listens for itself on 8790 inside the network only; a person reaches
 `https://CADDY_DOMAIN/v1`, and the app tells what runs from `GET /v1`'s `features` — sync, logs
 and feedback, each switchable off (`api/.env.example` explains every variable; deploy/compose.yaml
 carries them through). A feature that is off answers 404, and `/v1` says so.
+
+## Behind a tunnel
+
+For a machine with no public address it can serve on — a home server behind CGNAT, an ISP that
+blocks 80 and 443. The tunnel dials out, so nothing on the internet reaches the machine at all:
+
+```sh
+docker compose -f deploy/compose.yaml -f deploy/compose.tunnel.yaml up -d --wait
+```
+
+`compose.tunnel.yaml` (Cloudflare Tunnel, written out; another tunnel is the same shape) publishes
+no port, serves Caddy as plain `http://` to the tunnel's connector on the compose network — TLS
+ends at the tunnel's edge — and runs the connector with `TUNNEL_TOKEN`. In the tunnel's dashboard
+the public hostname points at `http://caddy:80`.
+
+**The hop count is the part to get right.** The edge writes the client's address into
+`X-Forwarded-For`, and Caddy appends the connector's, so the api must trust **two** hops
+(`ANYDAG_API_TRUST_PROXY=2`, which the override sets). One too few and every client is the
+connector — one person's rate limit is everyone's; one too many and a client picks its own
+address. Any other tunnel is checked the same way before it serves anyone: send a request from two
+different networks and see two addresses in the api's rate-limit buckets.
+
+On a home server, also: **upload bandwidth** is everyone's download speed — check a few vault
+downloads at once fit; **power** — a UPS, or accept outages and let the uptime alert say when;
+and the **ISP's terms**, which may not allow a public server. Backups at another provider matter
+most here: one dead disk is otherwise everything.
+
+## Alerts
+
+Three, each of which must have fired once, in a test, before the launch is done:
+
+| Alert | How | Test it |
+|---|---|---|
+| **Down** | an external uptime check (any HTTP monitor) on `https://api.anydag.com/v1/ready`, emailing on failure | `docker compose -f deploy/compose.yaml stop api`, wait for the mail, `start api` |
+| **Disk over 70%** | `check-disk.sh`, hourly from `anydag-disk.timer`, pings `DISK_PING_URL` — `/fail` with the numbers when over | `sudo DISK_ALERT_PERCENT=1 deploy/check-disk.sh` |
+| **No backup** | `backup.sh`, nightly from `anydag-backup.timer`, pings `BACKUP_PING_URL` — `/start`, then success or `/fail` | set the check's period to a day; a `/fail`: `sudo BACKUP_REMOTE=nowhere: deploy/backup.sh` |
+
+The two pings follow healthchecks.io's convention (the URL, `/start`, `/fail`); a service that
+alerts on silence as well as on failure is the point — a timer that stopped running sends nothing.
+The checks never decide anything themselves: a monitoring service that is down costs an alert,
+never a backup.
 
 ## Watch it
 
@@ -48,15 +134,16 @@ carries them through). A feature that is off answers 404, and `/v1` says so.
 
 ```sh
 git pull
-npm run api:build
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+  -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 -v "$PWD:/w" -w /w node:24-alpine \
+  sh -c 'npm ci --no-audit --no-fund && npm run api:build'   # api/dist/, which the image builds from
 docker compose -f deploy/compose.yaml up -d --build --wait
-node api/dist/anydag-api.mjs migrate        # the database is migrated by that one act
-curl -fsSk "https://${CADDY_DOMAIN:-localhost}/v1/ready"
+docker compose -f deploy/compose.yaml exec -T api wget -qO- http://127.0.0.1:8790/v1/ready
 ```
 
-Migrations run on every start as well (`api/server/main.ts`), so the new version's schema is
-applied by simply starting it — `migrate` is for doing it before the restart, when a rollout
-wants the database first.
+Migrations run on every start (`api/server/main.ts`), so the new version's schema is applied by
+starting it; `docker compose -f deploy/compose.yaml exec -T api node /app/anydag-api.mjs migrate`
+does it again by hand.
 
 ## Back up
 
@@ -87,6 +174,15 @@ the account count, the blob bytes, the log day files. The restore is **tested in
 (`.github/workflows/deploy.yml`): a stack is started, data is written through Caddy, backed up,
 restored into a fresh stack, and the same bytes are read back. Run the same locally with Docker:
 the workflow is a small list of the same four commands.
+
+**The drill.** CI restores into a fresh stack on the same runner; the drill restores into a
+**second machine**, by hand, from the remote, with the private key from the password manager —
+the path a dead machine would take. Once before launch, and after any change to `deploy/`'s
+backup or restore. Afterwards, add a line here:
+
+| Date | From | Onto | Took | What came back |
+|---|---|---|---|---|
+| — | — | — | — | not done yet |
 
 ## Rotate a secret
 

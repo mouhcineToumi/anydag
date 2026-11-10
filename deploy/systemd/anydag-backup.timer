@@ -1,0 +1,12 @@
+# Nightly, at a quiet hour UTC, with a little jitter. `Persistent` runs a missed night's backup
+# at the next boot rather than skipping it.
+[Unit]
+Description=AnyDag api backup, nightly
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

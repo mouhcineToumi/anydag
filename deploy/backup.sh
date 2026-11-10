@@ -10,7 +10,11 @@
 #                        backup can be read only where that key is;
 #   BACKUP_REMOTE        where uploads go, as rclone names a remote: `remote:bucket/prefix`;
 #   BACKUP_KEEP_DAILY    (7) — how many dailies to keep on the remote;
-#   BACKUP_KEEP_WEEKLY   (4) — how many weeklies to keep on the remote.
+#   BACKUP_KEEP_WEEKLY   (4) — how many weeklies to keep on the remote;
+#   BACKUP_PING_URL      (optional) a dead man's switch, healthchecks.io-style: pinged at
+#                        `/start`, then at the URL itself when the backup is uploaded, or at
+#                        `/fail` when it is not. The service alerts on a failure *and* on a night
+#                        with no ping at all — which is how "the backup has not run" is noticed.
 #
 # What it does: `pg_dump` (format `custom`, so a restore is parallel and selective), a tar of the
 # api's named volume (`blobs/` and `logs/`), the two into one file, encrypted with age to the
@@ -38,19 +42,27 @@ KEEP_WEEKLY="${BACKUP_KEEP_WEEKLY:-4}"
 
 step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 
+# The ping never decides the backup's fate: a monitoring service that is down costs an alert,
+# not a backup. `-m 10` so a hung one does not hold the timer.
+beat() { [[ -z "${BACKUP_PING_URL:-}" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "${BACKUP_PING_URL%/}$1" || true; }
+beat /start
+
 step "the stack is answering"
 for service in caddy api db; do
   running="$(docker compose -f compose.yaml ps --format '{{.Service}} {{.State}}' | grep -x "$service running" || true)"
   [[ -n "$running" ]] || { echo "the $service service is not up — start it first" >&2; exit 1; }
 done
-curl -fsS --insecure "https://${CADDY_DOMAIN:-localhost}/v1/ready" >/dev/null
+# Asked of the api itself, inside its container — the same check as its healthcheck — so it holds
+# whether Caddy serves HTTPS here or a tunnel's edge does (deploy/compose.tunnel.yaml).
+docker compose -f compose.yaml exec -T api wget -qO- http://127.0.0.1:8790/v1/ready >/dev/null
 
 STAMP="$(date -u +%Y%m%d-%H%M)"
 NAME="daily-${STAMP}.tar.gz.age"
 [[ "$(date -u +%u)" == 7 ]] && NAME="weekly-${STAMP}.tar.gz.age"
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/anydag-backup.XXXXXX")"
-trap 'rm -rf "$work"' EXIT
+finished=0
+trap 'rm -rf "$work"; [[ $finished == 1 ]] || beat /fail' EXIT
 
 step "postgres: pg_dump"
 docker compose -f compose.yaml exec -T db pg_dump -U anydag --format=custom --file=/tmp/db.dump anydag
@@ -79,3 +91,5 @@ done
 
 rm -f "$NAME" # the encrypted file does not stay on the machine it backs up
 printf '\nbackup: %s%s (%s)\n' "$BACKUP_REMOTE" "/${NAME}" "$(rclone lsl "${BACKUP_REMOTE%/}/$NAME" | awk '{print $2, $3}')"
+finished=1
+beat ""
