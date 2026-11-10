@@ -96,7 +96,10 @@
   measurement taken during the initial fit divided a scaled rect by 1.
 - **There is no server inside Vite.** The api is the local server (`server/`, Hono):
   `vite.config.ts` proxies `/__board` and `/api` to it with the token, and `npm run dev`
-  (`scripts/dev.sh`) starts it on `boards/local/` before Vite. The live channel is SSE —
+  (`scripts/dev.sh`) starts it on `boards/local/` before Vite. That proxy is a credential boundary
+  too: it refuses a non-loopback `Host`, a foreign `Origin` and a `cross-site`/`same-site`
+  `Sec-Fetch-Site` before it adds the token, and the dev server binds loopback unless
+  `ANYDAG_DEV_HOST` opts into the LAN. The live channel is SSE —
   `src/board/events.ts`, one `EventSource`
   for the page, fanned out to its hooks — and not `import.meta.hot`, which is `undefined` in a build
   and made a built app go quietly stale rather than fail.
@@ -299,6 +302,12 @@
   on its scheme, so neither notices; in a browser it is the `anydag_token` cookie, which rides on
   both with no client change. A token in the query string would be a credential in every log there
   is, which is why `/?token=` is accepted once and then taken out of the address.
+- **A `server.json` names a port, it does not prove who holds it.** The app home is shared with
+  `anydag serve`, and a file an earlier one left behind — a closed terminal, before `SIGHUP` was
+  handled, or a crash — names a port that another local user may be listening on now. The desktop
+  shell sends its per-launch token only to the child it spawned this time: the port from that
+  child's stdout, or a `server.json` whose `pid` and `token` both match (`desktop/launch.ts`). The
+  server removes the file on `SIGINT`, `SIGTERM` and `SIGHUP`, and on its IPC channel closing.
 - **`?snapshot=1` strips the chrome, never the token.** Every Playwright check and both scripts
   open a board that way, and an exemption would be a query string any page on the machine could
   load. `scripts/session.mjs`, `e2e/global-setup.ts` and the CLI's `snapshot` find the token
@@ -445,16 +454,22 @@
   the page says *Nothing open*, and Chromium prints each 404 on the console, which the suite counts as
   a failure (two `Failed to load resource` lines, from a `tables.spec.ts` run, are what it looks like).
   A spec that loads a page and cannot afford that uses `vaulted(page, url)` from `e2e/vault.ts`, which
-  names the suite's vault in the address as a settled tab does; `tables.spec.ts`, `folders.spec.ts`
-  and `export.spec.ts` do, and the rest of the suite is exposed to it still.
+  names the suite's vault in the address as a settled tab does; `tables.spec.ts`, `folders.spec.ts`,
+  `export.spec.ts` and `tidy.spec.ts` do, and the rest of the suite is exposed to it still.
+  **Such a page never reports `data-dag-ready`**: the board it asked for is in another vault, the
+  fetch answers 404, `board` stays `null` and no item reports a size — so a check that waits on ready
+  times out at its own line, with no 404 in its own output (which is how `tidy.spec.ts` failed once,
+  #40). The trace is what says which vault the page pinned.
 - **Parking the canvas by writing its transform is not moving the view.** `export.spec.ts` set
   `.dag-layer`'s style and `data-zoom` by hand to get the item at 1:1. That paints the glass and not
   the `Viewport`'s record of it: `touched` stays false, so a later `fit()` — any change of the
   content's bounds or of the canvas's box, neither of which `data-dag-ready` rules out, since it stays
   `1` while a board re-lays out — puts the fit view back. On `reference/architecture` that is
   `0.606011`, and 2429 × 0.606 is the 1472 a failed run measured. Take the view over with the zoom
-  bar's `[data-dag-zoom-actual]`, which calls `actual()` (paint, `data-zoom` in the same statement,
-  `touched = true`); the `0` key calls `commit` and does not set `touched`.
+  bar's `[data-dag-zoom-actual]` or the `0` key, which both call `actual()` (paint, `data-zoom` in
+  the same statement, `touched = true`). The `0` key used to commit alone and leave `touched` false,
+  so the next sidebar toggle refitted over it and the two controls disagreed about whose view it
+  was (`#41` made them one handler).
 - **A script that hands its browser the token has not handed it to its own `fetch`.** `snapshot.mjs`
   put the session into Playwright's context and then asked `/__board/diagnostics` with a bare
   `fetch` — a 401, whose body has no `board` and no `items`, so it printed no diagnostic and exited 0
@@ -656,8 +671,10 @@
   needed: a "simple" `POST` from any website the person has open needs no preflight, so without the
   token any site could write into a vault. The desktop shell adds the header in the main process;
   `anydag serve` prints `/?token=…` once and swaps it for an `httpOnly`, `SameSite=Strict` cookie and
-  a redirect; Vite's proxy adds the header in development. A test or a script that `fetch`es the
-  server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401` as an empty list.
+  a redirect; Vite's proxy adds the header in development, after refusing anything that is not this
+  page. `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script
+  that `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401`
+  as an empty list.
 - **Opening a vault never writes a byte of it.** An existing `.md` with no `id:` is given one only
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
@@ -777,6 +794,16 @@
   run first in its worker, because Python had landed and the block came out coloured. Pin exact HTML
   in a language nothing colours.
 
+- **A bundle path under the dev proxy's prefix is served to the backend.** The protocol lived under
+  `sync/protocol/` and the page imported it for free; the #99 rename moved it to `api/` — and Vite's
+  dev server derives every module's URL from its path, so `src/telemetry`'s import of
+  `api/protocol/logs.ts` became the *request* `/api/protocol/logs.ts`, which the dev proxy hands to
+  the real server, which has no such route: a 404 in the console and a page that never reports
+  ready, 49 of 50 specs failing on a run the unit suite called green. The proxy is a regex key now —
+  `"^/api(?!/protocol/)"` — and the rule it leaves behind: **a directory the page bundles from may
+  not share a URL prefix Vite proxies**, or name it and be pinned. `test/e2e-plan.mjs` and the smoke
+  tier in Docker are the instruments that see it; a host `npm run dev` does not (`vite.config.ts`
+  exempts the IDE's own file: your dev server already had the module).
 - **A sync test that reads the machine's clock passes on an idle machine and fails on a busy one.**
   The convergence harness dated every file by its disk birth, a second-resolution instant that picks
   the winner of a duplicate id, so a seed whose births all fell in one second held and the same seed
@@ -784,8 +811,10 @@
   the defect behind it (a renamed copy's index row dated by the rename, not its id's created) was the
   engine's. #14 was the same mistake in the collector (the database's `now()`). Give the test
   the clock. **And the other half: a status is a moment.** The sync loop's watcher reports a pull's
-  own writes late, and each batch runs once more and finds nothing to push, so `GET /api/sync` right
-  after a link answered `syncing` in six runs of fifteen on two starved cores. Wait for the loop to be
-  quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state, and prove a push
-  where it lands, on the server. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
+  own writes late, and each batch used to run once more and find nothing to push, so `GET /api/sync`
+  right after a link answered `syncing` in six runs of fifteen on two starved cores. Those echoes
+  wake nothing now (#36, `server/sync/echo.ts`), but a test's own write is still heard late. Wait for
+  the loop to be quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state,
+  prove a push where it lands, on the server, and before asserting that nothing ran, wait for the
+  watcher to catch up (`heardAll()`) and then past the debounce. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
   which starves a run far harder than the same loops spread over every core.

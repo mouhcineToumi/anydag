@@ -130,7 +130,7 @@ export function AgentsPane() {
 }
 
 /**
- * What a new Assistant chat starts on: the harness, the model, and Ask or Edit.
+ * What a new Assistant chat starts on: the harness and the model.
  * Only a new chat reads it — a chat already begun keeps what it was last sent with, and the
  * composer changes that per turn. Both harnesses are the person's own, signed in on this computer.
  */
@@ -194,20 +194,6 @@ function AssistantGroup() {
               {m.label}
             </option>
           ))}
-        </select>
-      </Field>
-      <Field
-        label="Starts in"
-        hint="Ask answers from the vault and changes nothing. Edit may write, and every change can be undone."
-      >
-        <select
-          className="dag-select"
-          data-dag-setting-assistant-mode=""
-          value={s.assistant.mode}
-          onChange={(e) => writeSettings({ assistant: { mode: e.target.value === "edit" ? "edit" : "ask" } })}
-        >
-          <option value="ask">Ask</option>
-          <option value="edit">Edit</option>
         </select>
       </Field>
     </Group>

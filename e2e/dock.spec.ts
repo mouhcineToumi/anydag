@@ -65,6 +65,59 @@ test("nothing on the dock wears a text label, and every control names its chord"
     const key = BINDINGS.find((b) => b.command === command)!.key.toUpperCase();
     await expect(dock.getByRole("radio", { name: `${label} (Space ${key})` })).toBeVisible();
   }
+
+  /* The drawn tooltip replaced the native one; a `title` left behind would draw both. */
+  await expect(dock.locator("button[title]")).toHaveCount(0);
+});
+
+test("a hover or a focus draws the tooltip, and leave, Escape and blur put it away", async ({ page }) => {
+  await open(page);
+  const dock = page.locator("[data-dag-dock]");
+  const select = dock.getByRole("radio", { name: /^Select/ });
+  const tidy = page.locator("[data-dag-tidy]");
+  const tip = page.locator("[data-dag-tip]");
+
+  await expect(tip).toHaveCount(0);
+
+  /* Hover: the tooltip is drawn, names the control, carries the chord, and opens upward without
+     leaving the window. The dock sits at the bottom, so every one of those is checkable. */
+  await select.hover();
+  await expect(tip).toBeVisible();
+  const key = BINDINGS.find((b) => b.command === "select")!.key.toUpperCase();
+  await expect(tip).toContainText("Select");
+  await expect(tip).toContainText(`(Space ${key})`);
+
+  const box = (await tip.boundingBox())!;
+  const control = (await select.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  expect(box.y + box.height).toBeLessThanOrEqual(control.y);
+
+  /* A different control says a different thing, so the text is the control's and not one bubble
+     left standing for the whole dock. */
+  await tidy.hover();
+  await expect(tip).toContainText("Tidy up");
+
+  await page.mouse.move(0, 0);
+  await expect(tip).toHaveCount(0);
+
+  /* Keyboard focus opens it too. */
+  await select.focus();
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("Select");
+  await page.keyboard.press("Escape");
+  await expect(tip).toHaveCount(0);
+
+  /* And blur dismisses it. Blurred explicitly rather than by Tab: Tab lands on Hand, whose own
+     tooltip would be due 400 ms later and could race the assertion. */
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await select.focus();
+  await expect(tip).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expect(tip).toHaveCount(0);
 });
 
 test("the rare half is behind the ⋯, and Escape puts it away", async ({ page }) => {
@@ -95,9 +148,8 @@ test("the zoom figure follows the board, and the percentage is a button back to 
   await expect(pct).toBeVisible();
 
   /* It arrives on a `dag:zoom` event rather than as state, so the check that matters is that it
-     moved at all — a figure wired to nothing would sit at whatever it first rendered.
-     Out rather than in: a board this small fits at the 400% ceiling, where `stepZoom` returns the
-     zoom it was given and `zoomBy` commits nothing, so zooming *in* is a no-op here by design. */
+     moved at all — a figure wired to nothing would sit at whatever it first rendered. The board
+     opens at 100% (the automatic fit never magnifies), so either step moves it. */
   const first = await pct.innerText();
   await page.locator("[data-dag-zoombar] button[aria-label^='Zoom out']").click();
   await expect(pct).not.toHaveText(first);

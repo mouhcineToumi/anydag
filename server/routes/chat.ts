@@ -30,7 +30,7 @@ const mode = (v: unknown): Mode | undefined => {
   return v;
 };
 
-/** Requests from a chat's MCP server: the reach, the mode, the approvals, the recorder. Registered
+/** Requests from a chat's MCP server: the reach, the approvals, the recorder. Registered
  *  before the vault scoping, so a chat's request is scoped to the chat's vault, not the default. */
 export function chatGuard(app: Hono, a: Assistant): void {
   app.use("*", async (c, next) => (c.req.header("x-anydag-chat") ? a.guard(c, next) : next()));
@@ -49,7 +49,6 @@ export function chatRoutes(app: Hono, a: Assistant): void {
       provider: p,
       model: str(b.model, "model"),
       effort: typeof b.effort === "string" ? b.effort : undefined,
-      mode: mode(b.mode),
       title: typeof b.title === "string" ? b.title : undefined,
     });
     return c.json({ chat });
@@ -75,7 +74,6 @@ export function chatRoutes(app: Hono, a: Assistant): void {
       provider: provider(b.provider),
       model: typeof b.model === "string" && b.model ? b.model : undefined,
       effort: b.effort === null ? null : typeof b.effort === "string" ? b.effort : undefined,
-      mode: mode(b.mode),
     });
     return c.json({ turn });
   });

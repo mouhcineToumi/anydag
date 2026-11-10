@@ -58,7 +58,10 @@
   description: "Tasks, projects, events and the calendar"
 - name: "area: sync"
   color: "5319e7"
-  description: "The sync server and the app's sync client"
+  description: "The app's sync client and its server half in server/sync/"
+- name: "area: api"
+  color: "5319e7"
+  description: "The api server (api/): features, config, deployment and its docs"
 - name: "area: desktop"
   color: "5319e7"
   description: "The Electron app, packaging, updates and installers"
@@ -73,6 +76,8 @@
   description: "Workflows, checks, releases and repository tooling"
 
 # --- How big ------------------------------------------------------------------------------------
+# Every `status: ready` issue carries exactly one of these: a person's time, not the model's
+# reasoning (that is `agent:` below). `issue-policy` and `pr-policy` enforce it.
 - name: "size: S"
   color: "c2e0c6"
   description: "About an hour or two"
@@ -82,6 +87,20 @@
 - name: "size: L"
   color: "f9d0c4"
   description: "More than a day; consider splitting it"
+
+# --- Which model should do it ------------------------------------------------------------------
+# How much reasoning the work needs, not how long it takes: `size:` is a person's time, `agent:` is
+# the model an AI agent should run on. A small change in an area with traps is still `deep`. The
+# rubric and the model each tier maps to are in CONTRIBUTING.md (*Agent tier*) and AGENTS.md.
+- name: "agent: light"
+  color: "d4f5d0"
+  description: "Mechanical, one place, the issue says what to change: a small, fast model"
+- name: "agent: standard"
+  color: "a8d8f0"
+  description: "A normal fix or feature that follows existing patterns: a mid-tier model"
+- name: "agent: deep"
+  color: "6f42c1"
+  description: "Crosses layers, touches a trap, or the cause is unknown: the strongest model"
 
 # --- Labels that already exist and stay ---------------------------------------------------------
 - name: "good first issue"
@@ -102,6 +121,9 @@
 - name: "skip-changelog"
   color: "ededed"
   description: "Leave this out of the generated release notes"
+- name: "feedback"
+  color: "c2e0c6"
+  description: "Sent from the app's Send feedback card; check it before triage"
 - name: "no-issue"
   color: "ededed"
   description: "A PR that does not need an issue (maintainer and bots)"

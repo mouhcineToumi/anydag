@@ -42,7 +42,13 @@ export async function build() {
      outside like `@playwright/test` does; a machine that ships the bundle without it only breaks when a
      command opens a browser or serves in-process. */
     external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
-    define: { __ANYDAG_VERSION__: JSON.stringify(version) },
+    /* `__ANYDAG_CLOUD__` is the feature switch the server bundle bakes (`server/features.ts`) —
+       the CLI answers `anydag sync` and `anydag telemetry` for itself when it serves in-process,
+       and its `--help` mirrors it, so it bakes the same word. */
+    define: {
+      __ANYDAG_VERSION__: JSON.stringify(version),
+      __ANYDAG_CLOUD__: JSON.stringify(process.env.ANYDAG_CLOUD_BUILD === "on" ? "on" : ""),
+    },
     metafile: true,
     logLevel: "warning",
   });

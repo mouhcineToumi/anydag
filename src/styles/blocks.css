@@ -117,6 +117,14 @@
   background-color: var(--dag-color-paper100);
 }
 
+/* The drag-handle menu's one item: its label carries a trash glyph (the item has no icon slot of its
+   own), so the two are centred on one line. The glyph itself is `currentColor`, the menu's text. */
+.dag-blocks .dag-blocks-menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* A colour is not something a note can hold — the file has no way to say it, and the theme owns
    every colour there is. The menus do not offer one; a block pasted from another BlockNote editor
    can still arrive carrying one, and it is drawn as though it did not until the save drops it. */

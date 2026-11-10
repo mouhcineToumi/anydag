@@ -21,7 +21,7 @@ const PLAIN = "```md {#one}\nhi\n```\n";
 
 async function connect(): Promise<Client> {
   const backend = inProcess(createApp({ session, token: "t", page: null }), "t");
-  const server = buildMcp(backend, { readOnly: false });
+  const server = await buildMcp(backend, { readOnly: false });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test", version: "0" });
   await Promise.all([server.connect(a), client.connect(b)]);

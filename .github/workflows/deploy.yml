@@ -1,0 +1,166 @@
+# The api's deployment, restored: a compose stack is started, data is written through Caddy,
+# backed up with age and rclone, the stack is replaced by a fresh one, and the backup is restored
+# into it — all three kinds of data must read back the same.
+#
+#   stack up → account, pairing, vault, blob, logs → backup.sh → stack down -v → restore.sh
+#   → the same blob's bytes back, the account back, the log day file back
+#
+# It runs when deploy/ or the api changes, and weekly at 03:15 UTC (Monday), so the scripts
+# cannot rot quietly: **a backup that has never been restored is not a backup**. The same four
+# steps answer a machine by hand — see deploy/README.md. No secret is needed: the age key pair is
+# made for this run, and the backup's rclone remote is a local directory (`:local:`), which the
+# scripts name as any other remote.
+#
+# `CADDY_DOMAIN=localhost` in this run: Caddy issues an internal certificate for `localhost` and
+# the flow is exercised over real TLS without a real domain.
+name: deploy
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "api/**"
+      - ".github/workflows/deploy.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "deploy/**"
+      - "api/**"
+      - ".github/workflows/deploy.yml"
+  schedule:
+    - cron: "15 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    name: backup and restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: The api's bundle, which its image builds from
+        run: npm run api:build
+      - name: age and rclone
+        run: sudo apt-get update -q && sudo apt-get install -y -q age rclone
+
+      - name: A key pair for this run alone
+        id: age
+        run: |
+          set -euo pipefail
+          age-keygen -o key.txt
+          pub="$(age-keygen -y key.txt)"
+          echo "public_key=$pub" >> "$GITHUB_OUTPUT"
+
+      - name: The machine's .env — this run's values, none of them real
+        run: |
+          set -euo pipefail
+          cat > deploy/.env <<EOF
+          CADDY_DOMAIN=localhost
+          ANYDAG_API_ADMIN_TOKEN=$(openssl rand -hex 20)
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          AGE_PUBLIC_KEY=${{ steps.age.outputs.public_key }}
+          BACKUP_REMOTE=:local:${{ github.workspace }}/backups
+          EOF
+          chmod 600 deploy/.env
+
+      - name: The scripts and the tunnel variant, before anything runs
+        env:
+          TUNNEL_TOKEN: not-a-real-token
+        run: |
+          set -euo pipefail
+          shellcheck deploy/*.sh
+          docker compose -f deploy/compose.yaml -f deploy/compose.tunnel.yaml config -q
+          for site in localhost http://localhost; do
+            docker run --rm -e CADDY_SITE="$site" -e CADDY_TRUSTED_PROXIES=private_ranges \
+              -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine \
+              caddy validate --config /etc/caddy/Caddyfile
+          done
+
+      - name: Stack up
+        run: docker compose -f deploy/compose.yaml up -d --build --wait
+
+      - name: Data through the routes, Caddy in front
+        id: data
+        run: |
+          set -euo pipefail
+          compose() { docker compose -f deploy/compose.yaml "$@"; }
+          base="https://localhost"
+          # The account and a pairing code, minted by the api's own CLI directly against Postgres.
+          compose exec -T api node /app/anydag-api.mjs account add ci-user
+          # One of each kind of data, through Caddy: a paired device, a vault, a blob, a log batch.
+          # A refused pairing spends its code, so a retry mints a new one; two attempts is two more
+          # than a person needs.
+          # Every sync route wants the protocol the server speaks (api/protocol/wire.ts: PROTOCOL).
+          proto='anydag-sync-protocol: 2'
+          token=""
+          for _ in 1 2 3; do
+            code="$(compose exec -T api node /app/anydag-api.mjs pair ci-user | sed -n 's/^code: *//p')"
+            token="$(curl -skS -X POST "$base/v1/pair" -H "$proto" -H 'content-type: application/json' \
+              -d "{\"code\":\"$code\",\"device\":{\"name\":\"ci\",\"platform\":\"linux\"}}" | jq -r '.token // empty')" && [ -n "$token" ] && break
+          done
+          [ -n "$token" ] || { echo "pairing failed" >&2; exit 1; }
+          vault="$(curl -fsSk -X POST "$base/v1/vaults" -H "$proto" -H "authorization: Bearer $token" \
+            -H 'content-type: application/json' -d '{"name":"Y2ltYXJrZXI="}' | jq -r .id)"
+          # A blob id is 43 base64url characters: 32 bytes.
+          blob="$(head -c 32 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=\n' | head -c 43)"
+          printf 'the bytes the vault holds' > data.bin
+          curl -fsSk -X PUT "$base/v1/vaults/$vault/blobs/$blob" -H "$proto" -H "authorization: Bearer $token" \
+            -H 'content-type: application/octet-stream' --data-binary @data.bin
+          curl -fsSk -X POST "$base/v1/logs" -H 'content-type: application/json' \
+            -d "{\"v\":1,\"env\":{\"version\":\"0.0.0-ci\",\"install\":\"0f8fad5b-d9cb-469f-a165-70867728950e\",\"shell\":\"browser\",\"os\":\"linux\",\"arch\":\"x64\",\"locale\":\"en\"},\"events\":[{\"name\":\"app.open\",\"at\":\"2026-11-09T00:00:00Z\",\"props\":{\"page\":\"board\",\"shell\":\"browser\"}}]}"
+          {
+            echo "vault=$vault"
+            echo "blob=$blob"
+            echo "token=$token"
+            echo "bytes=$(sha256sum data.bin | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Backup
+        run: deploy/backup.sh
+
+      - name: What the stack said, before it is thrown away
+        run: |
+          set -euo pipefail
+          base="https://localhost"
+          curl -fsSk "$base/v1/ready"
+          got="$(curl -fsSk "https://localhost/v1/vaults/${{ steps.data.outputs.vault }}/blobs/${{ steps.data.outputs.blob }}" \
+            -H 'anydag-sync-protocol: 2' -H "authorization: Bearer ${{ steps.data.outputs.token }}" | sha256sum | cut -d' ' -f1)"
+          [ "$got" = "${{ steps.data.outputs.bytes }}" ] || { echo "the pre-restore read does not match" >&2; exit 1; }
+
+      - name: Stack down, volumes gone — a fresh machine
+        run: docker compose -f deploy/compose.yaml down -v --remove-orphans
+
+      - name: Restore into it
+        env:
+          B: ${{ github.workspace }}/backups
+        run: |
+          set -euo pipefail
+          backup="$(find "$B" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -r | head -n1)"
+          deploy/restore.sh "$B/$backup" --age key.txt
+
+      - name: Read it back
+        env:
+          DD: ${{ github.workspace }}/data.bin
+        run: |
+          set -euo pipefail
+          base="https://localhost"
+          compose() { docker compose -f deploy/compose.yaml "$@"; }
+          compose exec -T api node /app/anydag-api.mjs account ls | grep -q ci-user
+          curl -fsSk "$base/v1/ready"
+          got="$(curl -fsSk "$base/v1/vaults/${{ steps.data.outputs.vault }}/blobs/${{ steps.data.outputs.blob }}" \
+            -H 'anydag-sync-protocol: 2' -H "authorization: Bearer ${{ steps.data.outputs.token }}" | sha256sum | cut -d' ' -f1)"
+          [ "$got" = "${{ steps.data.outputs.bytes }}" ] || { echo "the restored blob is not what was backed up" >&2; exit 1; }
+          days="$(docker run --rm -v anydag_api_data:/data:ro alpine sh -c 'ls /data/logs/*.jsonl 2>/dev/null | wc -l')"
+          [ -n "$days" ] && [ "$days" -ge 1 ]

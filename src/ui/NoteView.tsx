@@ -5,7 +5,7 @@ import { BlockEditor, type NoteEditor } from "@/blocks";
 import { concerns, onNote } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
 import { retitleFile } from "@/board/useBoard";
-import { joinNote, splitNote } from "@/note/format";
+import { joinNote, pageTitle, splitNote } from "@/note/format";
 import { blockAt, load, plan, saved, settle, type Loaded, type NoteBlock } from "@/note/markdown";
 import { anchorsOf } from "@/note/anchors";
 import { eventOf, withEvent, type EventChange, type NoteEvent } from "@/note/event";
@@ -274,7 +274,7 @@ export function NoteView({
       setReady(false);
       setBody(f.body);
       setOpened({ blocks, loaded: l, seq: ++seq.current });
-      named(f.title);
+      named(pageTitle(nameRef.current, f.title));
       tell(taskOf(f.front));
       tellProject(projectOf(f.front));
       tellEvent(eventOf(f.front));
@@ -319,7 +319,7 @@ export function NoteView({
       }
       loaded.current = settle(next.loaded, ed.document());
       setBody(f.body);
-      named(f.title);
+      named(pageTitle(nameRef.current, f.title));
       tell(taskOf(f.front));
       tellProject(projectOf(f.front));
       tellEvent(eventOf(f.front));
@@ -442,7 +442,7 @@ export function NoteView({
                matters most on a note that had no frontmatter — the block the rename adds sits right
                against the first line, and a line merge cannot tell that from somebody typing there. */
             held.current = { text: got.text, base: got.base, front: f.front };
-            named(f.title);
+            named(pageTitle(nameRef.current, f.title));
             tell(taskOf(f.front));
             tellProject(projectOf(f.front));
             tellEvent(eventOf(f.front));
@@ -743,6 +743,7 @@ export function NoteView({
           <NoteTitle
             title={title}
             editable={!locked && status.kind !== "conflict" && status.kind !== "deleted"}
+            locked={locked}
             field={titleField}
             onCommit={retitle}
             onNext={(newLine) => editor.current?.focusStart(newLine)}

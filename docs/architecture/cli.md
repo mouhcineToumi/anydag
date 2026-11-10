@@ -14,7 +14,10 @@ task's status, search, the library, the Assistant — is the page's and MCP's, a
 `vault ls|open|create|close|transfer`; `ls`; for `board`, `note`, `quiz` and `table` `new|cat|write|mv|rm`;
 `board diagnose`, `quiz check`, `table check`; `folder new|mv|rm`; `file upload|ls|get|mv|rm`; `trash`;
 `sync`; `snapshot`, `tidy`, `board export`, `note export` (the things only a laid-out page can answer,
-which MCP cannot); `telemetry`; `settings`.
+which MCP cannot); `telemetry`; `settings`. The `sync` group and `telemetry` are behind the build's
+`cloud` switch (`server/features.ts` — see *Feature switches* in [`server.md`](server.md)): a build
+without them leaves them out of every help table and answers both with one line, because the server
+they reach says the switch is off.
 
 | Where | Owns |
 |---|---|
@@ -65,7 +68,8 @@ running app's server through `server.json`, or one in this process. It speaks on
 `--json`. See *Parity*.
 
 **Out, and why:** every gesture inside a document and every feature of the app beyond administering a
-vault (MCP has them); undo; `login`/`logout` (no account); `share` and `feedback` (nothing to reach).
+vault (MCP has them); undo; `login`/`logout` (no account); `share` (nothing to reach); `feedback`
+(the MCP `feedback` tool sends it when the person asks; sending feedback is not administering a vault).
 
 ## Parity
 

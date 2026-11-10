@@ -42,6 +42,21 @@ AnyDag is maintained by one person, so these are intentions and not a contract:
 
 We do not run a bug bounty.
 
+## If a secret was committed
+
+The repository is public, so a secret that reached GitHub — in a commit, a branch, a pull request or
+an issue — is published. Forks, clones and caches keep it whatever happens to the history. In order:
+
+1. **Revoke or rotate it at its source** (the GitHub token, the API key, the database password)
+   before anything else. Until then it works for whoever copied it.
+2. Remove it from the code and put it where it belongs: the environment, or a git-ignored file.
+3. If it is ours (the maintainer's or a deployment's), say so in a private report as above, so the
+   deployment is checked for use of it.
+
+`scripts/secrets.sh` runs gitleaks in the pre-commit hook and in CI on every pull request and push, and
+over the whole history every night. GitHub's secret scanning and push protection are on for the
+repository as well.
+
 ## Supported versions
 
 Only the **latest stable release** receives security fixes. Nightly builds

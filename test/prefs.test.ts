@@ -65,6 +65,8 @@ function literals(): Set<string> {
  * `window` or `document` and none is ever written to `localStorage`.
  */
 const EVENTS = new Set([
+  /* The server's answer to which features this build carries landed (`src/features.ts`). */
+  "dag:features",
   "dag:board",
   "dag:boards",
   /* A note changed: the change feed's event for the second kind of file. */

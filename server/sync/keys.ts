@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { b64, open, randomKey, seal, unb64 } from "../../sync/protocol/crypto";
+import { b64, open, randomKey, seal, unb64 } from "../../api/protocol/crypto";
 
 const AAD = "vault-key-at-rest";
 

@@ -39,13 +39,8 @@ export const listChats = async (): Promise<ChatRow[]> => (await call<{ chats: Ch
 export const loadModels = async (): Promise<ProviderModels[]> =>
   (await call<{ providers: ProviderModels[] }>("/__board/chat/models")).providers;
 
-export const makeChat = async (o: {
-  provider: Provider;
-  model: string;
-  effort?: string;
-  mode?: Mode;
-  title?: string;
-}): Promise<ChatMeta> => (await call<{ chat: ChatMeta }>("/__board/chat", o)).chat;
+export const makeChat = async (o: { provider: Provider; model: string; effort?: string; title?: string }): Promise<ChatMeta> =>
+  (await call<{ chat: ChatMeta }>("/__board/chat", o)).chat;
 
 export const readChat = (id: string): Promise<ChatRead> => call<ChatRead>(`/__board/chat?id=${q(id)}`);
 
@@ -61,7 +56,6 @@ export interface TurnAsk {
   model?: string;
   /** `null` is the harness's own; absent leaves what the chat had. */
   effort?: string | null;
-  mode?: Mode;
 }
 
 export const sayTurn = async (ask: TurnAsk): Promise<Turn> => (await call<{ turn: Turn }>("/__board/chat/turn", ask)).turn;

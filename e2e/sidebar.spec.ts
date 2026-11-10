@@ -141,6 +141,68 @@ test("the toggle and the mark stay where they are, docked, away and peeking", as
   await expect(toggle(page)).toBeFocused();
 });
 
+test("in the macOS desktop app the top row clears the traffic lights, and full screen gives the room back", async ({ page }) => {
+  /* The window there has no title bar (`desktop/main.ts`, #78). The bridge is `desktop/preload.ts`'s
+     shape: the platform, whether the window is in full screen, and a listener for the change — which
+     the main process calls on `enter-full-screen` and `leave-full-screen`. */
+  await page.addInitScript(() => {
+    const w = window as unknown as { anydagDesktop: unknown; fullScreen: (full: boolean) => void };
+    const listeners: ((full: boolean) => void)[] = [];
+    w.fullScreen = (full) => {
+      for (const l of listeners) l(full);
+    };
+    w.anydagDesktop = {
+      platform: "darwin",
+      isFullScreen: () => false,
+      onFullScreen: (l: (full: boolean) => void) => {
+        listeners.push(l);
+        return () => listeners.splice(listeners.indexOf(l), 1);
+      },
+    };
+  });
+  await fresh(page);
+  await expect(docked(page)).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-dag-window", "inset");
+  const x = async (sel: string) => Math.round((await page.locator(sel).first().boundingBox())!.x);
+  const style = (sel: string, prop: string) =>
+    page
+      .locator(sel)
+      .first()
+      .evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
+
+  /* 16px of the bars' own padding plus the lights' 64: the toggle and its slot move together. */
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(80);
+  expect(await x("[data-dag-sidebar] .dag-sidebar-toggle-slot")).toBe(80);
+  /* Docked, the toolbar starts at the column's edge, far from the lights, and keeps its padding. */
+  await expect(page.locator(".dag-toolbar")).not.toHaveAttribute("data-dag-toolbar-edge");
+  expect(await style(".dag-toolbar", "padding-left")).toBe("16px");
+  /* The page's header is the page's top edge — no rule under it — and still 48px tall. */
+  expect(await style(".dag-toolbar", "border-bottom-width")).toBe("0px");
+  expect(Math.round((await page.locator(".dag-toolbar").boundingBox())!.height)).toBe(48);
+  /* The top row drags the window; the controls in it, and the toggle drawn over it, do not. */
+  expect(await style(".dag-toolbar", "app-region")).toBe("drag");
+  expect(await style(".dag-sidebar__head", "app-region")).toBe("drag");
+  expect(await style("[data-dag-sidebar-toggle]", "app-region")).toBe("no-drag");
+  expect(await style(".dag-toolbar__board", "app-region")).toBe("no-drag");
+
+  /* Away, the toolbar is at the window's edge and keeps the toggle's slot under the toggle. */
+  await page.keyboard.press("Control+Backslash");
+  await expect(sidebar(page)).toHaveCount(0);
+  await expect(page.locator(".dag-toolbar")).toHaveAttribute("data-dag-toolbar-edge", "");
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(80);
+  expect(await x(".dag-toolbar .dag-sidebar-toggle-slot")).toBe(80);
+
+  /* Full screen draws no lights, so the corner is the page's again. */
+  await page.evaluate(() => (window as unknown as { fullScreen: (full: boolean) => void }).fullScreen(true));
+  await expect(page.locator("html")).not.toHaveAttribute("data-dag-window");
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(16);
+  expect(await x(".dag-toolbar .dag-sidebar-toggle-slot")).toBe(16);
+  expect(await style(".dag-toolbar", "app-region")).not.toBe("drag");
+  await page.evaluate(() => (window as unknown as { fullScreen: (full: boolean) => void }).fullScreen(false));
+  await expect(page.locator("html")).toHaveAttribute("data-dag-window", "inset");
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(80);
+});
+
 test("what is open is marked, and the folders above it are opened to show it", async ({ page }) => {
   await fresh(page);
   await expect(fileRow(page, board())).toHaveAttribute("aria-current", "page");
@@ -222,19 +284,61 @@ test("while it peeks, the toggle is still there to press, and pressing it keeps 
 
 test("the drawing does not move when the column opens or closes", async ({ page }) => {
   await fresh(page);
-  /* Move the view first: a view nobody has touched is refitted on a resize, as it always was. */
-  await page.locator(".dag-viewport").focus();
-  await page.keyboard.press("ArrowDown");
+  const viewport = page.locator(".dag-viewport");
+  const pct = page.locator("[data-dag-zoom-actual]");
   const item = page.locator('[data-dag-item="a"]');
-  const x0 = (await item.boundingBox())!.x;
+  const x = async () => Math.round((await item.boundingBox())!.x);
+  const close = async () => {
+    await page.keyboard.press("Control+Backslash");
+    await expect(sidebar(page)).toHaveCount(0);
+  };
+  const reopen = async () => {
+    await page.keyboard.press("Control+Backslash");
+    await expect(docked(page)).toBeVisible();
+  };
 
-  await page.keyboard.press("Control+Backslash");
-  await expect(sidebar(page)).toHaveCount(0);
-  await expect.poll(async () => Math.round((await item.boundingBox())!.x)).toBe(Math.round(x0));
+  /*
+   * Take the view over with `0`: a view nobody has touched is refitted on a resize, as it always
+   * was, and `0` is a choice like the zoom bar's 100% — the ResizeObserver a sidebar toggle fires
+   * must leave both the zoom and the drawing where it put them. `data-zoom` alone would miss a
+   * refit that kept the zoom and moved the paper; the item's place on the glass and the zoom bar's
+   * own readout are read as well.
+   */
+  await viewport.focus();
+  await page.keyboard.press("0");
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+  const x0 = await x();
 
-  await page.keyboard.press("Control+Backslash");
-  await expect(docked(page)).toBeVisible();
-  await expect.poll(async () => Math.round((await item.boundingBox())!.x)).toBe(Math.round(x0));
+  await close();
+  await expect.poll(x).toBe(x0);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  await reopen();
+  await expect.poll(x).toBe(x0);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  /* The button is the same choice from the same place: `f` hands the view back to the fit, then
+     the zoom bar's 100% claims it exactly as the key did. The fit may magnify where the opening
+     view did not, and 100% keeps the corner it was given, so the drawing's place is read again. */
+  await viewport.focus();
+  await page.keyboard.press("f");
+  await pct.click();
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+  const x1 = await x();
+
+  await close();
+  await expect.poll(x).toBe(x1);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
+
+  await reopen();
+  await expect.poll(x).toBe(x1);
+  await expect(viewport).toHaveAttribute("data-zoom", "1");
+  await expect(pct).toHaveText("100%");
 });
 
 test("a laptop window keeps it docked, narrower, and a phone's is a sheet over the whole window", async ({ page }) => {
@@ -412,6 +516,58 @@ test("a file is called its title — Untitled until somebody names it — and it
     .locator(`[data-dag-sidebar-file^="${folder}/"]:not([data-dag-sidebar-file^="${folder}/inner/"]) .dag-sidebar__name`)
     .allTextContents();
   expect(titles).toEqual(["idea", "Other", "Q3: the plan"]);
+});
+
+test("one New control names every kind, and a refused create says why under the tree", async ({ page }) => {
+  await fresh(page);
+  const newControl = page.locator("[data-dag-sidebar-new]");
+  await expect(newControl).toHaveCount(1);
+  await expect(newControl).toHaveAttribute("aria-label", "New");
+  await expect(newControl).toHaveAttribute("title", /new board, note, task, event, quiz, table or folder, or upload files/i);
+  /* The folder-with-plus beside it is gone: Folder is a row of the one menu, not a second New. */
+  await expect(page.locator("[data-dag-sidebar-new-folder]")).toHaveCount(0);
+
+  await newControl.click();
+  const menu = page.locator("[data-dag-sidebar-new-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("[role=menuitem]")).toHaveText([
+    "Board",
+    "Note",
+    "Task",
+    "Event",
+    "Quiz",
+    "Table",
+    "Folder",
+    "Upload files…",
+  ]);
+  for (const kind of ["board", "note", "task", "event", "quiz", "table", "folder", "upload"])
+    await expect(menu.locator(`[data-dag-sidebar-new-kind="${kind}"] svg`)).toHaveCount(1);
+
+  /* Folder makes `Untitled` in the open file's folder and starts the inline rename, from the one
+     menu — the control that used to make a top-level folder at once. */
+  await menu.locator('[data-dag-sidebar-new-kind="folder"]').click();
+  await expect.poll(() => fs.existsSync(path.join(BOARDS, folder, "inner", "Untitled")), { timeout: 5_000 }).toBe(true);
+  const box = page.locator("[data-dag-sidebar-name]");
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue("Untitled");
+  await box.press("Escape");
+  await expect(folderRow(page, `${folder}/inner/Untitled`)).toHaveCount(1);
+
+  /* A create the server refuses says its own sentence under the tree, and the list it guessed at
+     is unchanged: no row, and no file. */
+  await page.route("**/__board/create*", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "This vault refuses new boards." }),
+    }),
+  );
+  const filesBefore = await page.locator("[data-dag-sidebar-file]").count();
+  await newControl.click();
+  await menu.locator('[data-dag-sidebar-new-kind="board"]').click();
+  await expect(page.locator("[data-dag-sidebar-create-problem]")).toHaveText("This vault refuses new boards.");
+  await expect(page.locator("[data-dag-sidebar-file]")).toHaveCount(filesBefore);
+  expect(fs.readdirSync(path.join(BOARDS, folder, "inner")).filter((f) => f.endsWith(".board.md"))).toEqual(["plan.board.md"]);
 });
 
 test("a snapshot draws no sidebar and no shell around the page", async ({ page }) => {

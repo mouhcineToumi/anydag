@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
 
+import { Tooltip } from "@/ui/Tooltip";
+
 /**
  * Zoom, in the corner, away from everything that makes something.
  *
@@ -30,26 +32,33 @@ export function ZoomBar({ onZoom, onFit, onActual }: { onZoom(dir: 1 | -1): void
   }, []);
   return (
     <div className="dag-zoombar" data-dag-zoombar="" role="group" aria-label="Zoom">
-      <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(-1)} aria-label="Zoom out (−)" title="Zoom out (−)">
-        <Minus {...ICON} aria-hidden="true" />
-      </button>
+      <Tooltip name="Zoom out" shortcut="−">
+        <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(-1)} aria-label="Zoom out (−)">
+          <Minus {...ICON} aria-hidden="true" />
+        </button>
+      </Tooltip>
       {/* Not a label: a control. "100%" that only reported would be the one thing on the board you
           can read and not act on, and the `0` key already means this. */}
-      <button
-        className="dag-zoombar__pct"
-        data-dag-zoom-actual=""
-        onClick={onActual}
-        aria-label={`Zoom to 100% (currently ${Math.round(zoom * 100)}%) (0)`}
-        title="Back to 100% (0)"
-      >
-        {Math.round(zoom * 100)}%
-      </button>
-      <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(1)} aria-label="Zoom in (+)" title="Zoom in (+)">
-        <Plus {...ICON} aria-hidden="true" />
-      </button>
-      <button className="dag-icon" onClick={onFit} aria-label="Fit to content (F)" title="Fit to content (F)">
-        <Maximize2 {...ICON} aria-hidden="true" />
-      </button>
+      <Tooltip name="Back to 100%" shortcut="0">
+        <button
+          className="dag-zoombar__pct"
+          data-dag-zoom-actual=""
+          onClick={onActual}
+          aria-label={`Zoom to 100% (currently ${Math.round(zoom * 100)}%) (0)`}
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+      </Tooltip>
+      <Tooltip name="Zoom in" shortcut="+">
+        <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(1)} aria-label="Zoom in (+)">
+          <Plus {...ICON} aria-hidden="true" />
+        </button>
+      </Tooltip>
+      <Tooltip name="Fit to content" shortcut="F">
+        <button className="dag-icon" onClick={onFit} aria-label="Fit to content (F)">
+          <Maximize2 {...ICON} aria-hidden="true" />
+        </button>
+      </Tooltip>
     </div>
   );
 }

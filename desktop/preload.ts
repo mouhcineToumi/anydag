@@ -36,6 +36,10 @@ export interface AnyDagDesktop {
   keys: AnyDagDesktopKeys;
   readonly version: string;
   readonly platform: string;
+  /** Whether the window is in full screen now. */
+  isFullScreen(): boolean;
+  /** Called with `true` when the window enters full screen, `false` when it leaves. Returns the unsubscribe. */
+  onFullScreen(listener: (full: boolean) => void): () => void;
 }
 
 /* Asked once, synchronously, before any page script runs; the main process decides whether this
@@ -72,6 +76,14 @@ const api: AnyDagDesktop = {
   },
   get platform(): string {
     return process.platform;
+  },
+  isFullScreen(): boolean {
+    return ipcRenderer.sendSync("window:full-screen?") === true;
+  },
+  onFullScreen(listener: (full: boolean) => void): () => void {
+    const on = (_event: Electron.IpcRendererEvent, full: unknown) => listener(full === true);
+    ipcRenderer.on("window:full-screen", on);
+    return () => ipcRenderer.removeListener("window:full-screen", on);
   },
 };
 

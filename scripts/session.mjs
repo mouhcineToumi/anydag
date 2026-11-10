@@ -13,7 +13,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/** The token: `ANYDAG_TOKEN`, else the `server.json` of `ANYDAG_HOME`, this checkout's `.dev-home`, or `~/.anydag`. */
+/**
+ * The token: `ANYDAG_TOKEN`, else the `server.json` of `ANYDAG_HOME`, this checkout's `.dev-home`,
+ * or `~/.anydag`. There is no fallback value: `npm run dev` mints one per run, so a guessed token
+ * is only a 401 with a clearer name.
+ */
 export function token() {
   if (process.env.ANYDAG_TOKEN) return process.env.ANYDAG_TOKEN;
   const homes = [process.env.ANYDAG_HOME, path.resolve(".dev-home"), path.join(os.homedir(), ".anydag")].filter(Boolean);
@@ -25,7 +29,7 @@ export function token() {
       /* Not there, or not a server's. */
     }
   }
-  return "dev-token";
+  throw new Error("no AnyDag token found — set ANYDAG_TOKEN, or start `npm run dev` so `server.json` has one");
 }
 
 /** What `signIn` returns — the token, as `cookie`, plus the one person the machine has. */

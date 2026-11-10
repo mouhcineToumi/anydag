@@ -15,10 +15,11 @@ sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and t
 |---|---|---|
 | Account | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
-| | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs* |
+| | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) — logs are all it holds, so a build without them has no tab |
 | | About | the build's `VERSION` and the server's |
 | *the vault's name* | Preferences | the theme, problems, pasted images, and the quiz threshold (the person's, and says so) |
 | | Vault | where it is, where its attachments go, whether a rename updates the `[[wikilinks]]` to it, the open board's unused images, and Close vault — never deleting the folder |
+| | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on, like Privacy |
 | | AI and agents | the prompt card's provider, model and thinking; how to reach this vault from the CLI and MCP |
 | | Import and export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 
@@ -128,8 +129,12 @@ Names claimed, grepped first as this file has learned to: `dag-settings`, `dag-s
 `data-dag-settings-close`, `data-dag-vault-settings`, and the
 storage key `dag:settings-tab`. `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
-The CSS is chrome and lives in `chrome.css`; nothing here wanted a `--dag-*`, which would have demanded
-a key in all three themes for how wide a dialog is.
+The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
+the translucent elevation colour every dialog and floating card draws with — because a shadow is a
+colour the theme owns while how wide a dialog is is not. In `paper-dark` it is black, so the card sits
+on a dark edge rather than glowing; in `paper` and `neutral` it is a soft tint of ink. The shared
+`--elevation` rule is where the geometry lives, and the Settings modal, the board browser, the rewrite
+dialog and the welcome card all read it.
 
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);
 a config file the server reads (it would put a person's preference into every visual baseline, and

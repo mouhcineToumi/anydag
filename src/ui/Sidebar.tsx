@@ -38,6 +38,7 @@ import {
   Grid2x2Plus,
   Link as LinkMark,
   ListTodo,
+  MessageCircleWarning,
   MoreHorizontal,
   NotebookPen,
   Pencil,
@@ -99,7 +100,8 @@ import {
 import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
-import { refuseLocked, useLocked } from "@/settings/lock";
+import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
+import { useFeatures } from "@/features";
 import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref } from "@/settings/prefs";
 
 /** Lucide at one size and weight, stated once — the dock's rule. */
@@ -267,9 +269,11 @@ const pressed = (a: ReturnType<typeof ahead>) => ({ ...hover(a), onPointerDown: 
 export interface SidebarFiles {
   /**
    * A board, a note, a quiz, a table, a task — which is a note that starts with
-   * a status — or an event, a note that starts with a start.
+   * a status — or an event, a note that starts with a start. Resolves `null` once it was made and
+   * opened, or the sentence saying why it was not — which the column says under the tree. A locked
+   * app answers through the lock's own notice instead, so it resolves `null` too.
    */
-  newFile(kind: TextKind | "task" | "event", folder: string): void;
+  newFile(kind: TextKind | "task" | "event", folder: string): Promise<string | null>;
   /**
    * Upload files from the computer into a folder: each becomes an attachment, listed here
    * like any other file. Resolves to the sentences for any the server — or its upload limits —
@@ -282,12 +286,13 @@ export interface SidebarFiles {
   event(name: string, change: EventChange): void;
   /**
    * Make a folder a project: its project note, titled after the folder, made in it and
-   * opened with the title ready to type — New note's way.
+   * opened with the title ready to type — New note's way. Resolves `null` or why it was not made.
    */
-  makeProject(folder: string): void;
+  makeProject(folder: string): Promise<string | null>;
   /** Change a project's status or colour, or make its note a plain note again. */
   project(name: string, change: ProjectChange): void;
-  newFolder(parent: string): void;
+  /** Make a folder in `parent` (`""` is the top level), then name it in its row. Resolves like `newFile`. */
+  newFolder(parent: string): Promise<string | null>;
   /**
    * Call a file something: what a file's name box answers. The title is what the row
    * draws, and the file's name follows it in the background — `Shell` opens whatever it settles on.
@@ -521,6 +526,11 @@ export function Sidebar({
       })),
     [boards, notes, quizzes, tables, attachments, titles],
   );
+  /* What the server says this build may show — the sync row is a glance at a server that may not be
+     in it (`src/features.ts`). Mounted or not, never hidden once drawn: the hook under it asks for
+     the status, so its absence here is what keeps a build without the route from polling it. */
+  const features = useFeatures();
+  const cloud = features?.cloud === true;
   const store = useAttachmentsFolder();
   const all = useMemo(() => tree(entries, folders, store), [entries, folders, store]);
   /* How many listed tasks are not done — the count beside Tasks. */
@@ -586,6 +596,9 @@ export function Sidebar({
   /* Uploads: how many are on their way, and what the last lot was refused with. */
   const [uploading, setUploading] = useState(0);
   const [uploadProblems, setUploadProblems] = useState<string[]>([]);
+  /* The last create the server refused, in its own words, shown under the tree. A locked app
+     says it through the lock's notice and Unlock instead, so this stays empty there. */
+  const [createProblems, setCreateProblems] = useState<string[]>([]);
   /* The folder the picker's files go into: the actions' Upload says the top level, a folder's `+`
      says that folder. Held in a ref because the picker answers after the click that opened it. */
   const pickFor = useRef("");
@@ -607,6 +620,13 @@ export function Sidebar({
     pickFor.current = folder;
     picker.current?.click();
   };
+  /** Make something and, if the server refused, say its sentence under the tree — never a dead press. */
+  const reportMake = useCallback((done: Promise<string | null>) => {
+    setCreateProblems([]);
+    void done.then((problem) => {
+      if (problem) setCreateProblems([problem]);
+    });
+  }, []);
   /* *Link copied*, said under the tree for a moment after a row's *Copy link*. */
   const [linked, setLinked] = useState<string | null>(null);
   useEffect(() => {
@@ -1327,7 +1347,9 @@ export function Sidebar({
         {/* One way to make anything, beside what it makes (the UI review): it was a row
             among the pages above, with a chevron, as though New were somewhere to go. It opens under
             the +, and says where the file will go — the open file's folder, which is where somebody
-            working in one wants the next file, with the top level one press away. */}
+            working in one wants the next file, with the top level one press away. The folder button
+            that made a top-level folder at once looked like a second kind of New and is gone; Folder
+            is the menu's row, made where the menu says. */}
         <button
           type="button"
           className="dag-sidebar__tool dag-sidebar__tool--shown dag-sidebar__plus"
@@ -1335,12 +1357,8 @@ export function Sidebar({
           aria-haspopup="menu"
           aria-expanded={making !== null}
           aria-label="New"
-          title={
-            locked
-              ? "Read only: unlock to make something"
-              : "New board, note, task, event, quiz, table or folder, or upload files"
-          }
-          aria-disabled={locked || undefined}
+          {...lockedAffordance(locked)}
+          title={locked ? LOCK_HINT : "New board, note, task, event, quiz, table or folder, or upload files"}
           onClick={(e) => {
             if (locked) return void refuseLocked();
             const r = e.currentTarget.getBoundingClientRect();
@@ -1348,16 +1366,6 @@ export function Sidebar({
           }}
         >
           <Plus {...SMALL} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="dag-sidebar__tool dag-sidebar__tool--shown"
-          data-dag-sidebar-new-folder=""
-          aria-label="New folder"
-          title="New folder at the top level"
-          onClick={() => files.newFolder("")}
-        >
-          <FolderPlus {...SMALL} aria-hidden="true" />
         </button>
       </div>
       <div
@@ -1714,6 +1722,11 @@ export function Sidebar({
           <Said text={problem} />
         </p>
       ))}
+      {createProblems.map((problem) => (
+        <p key={problem} className="dag-sidebar__none" role="alert" data-dag-sidebar-create-problem="">
+          <Said text={problem} />
+        </p>
+      ))}
 
       {making ? (
         <NewMenu
@@ -1723,8 +1736,8 @@ export function Sidebar({
           onPick={(what, folder) => {
             setMaking(null);
             if (what === "upload") return pickFiles(folder);
-            if (what === "folder") return files.newFolder(folder);
-            files.newFile(what, folder);
+            if (what === "folder") return reportMake(files.newFolder(folder));
+            reportMake(files.newFile(what, folder));
           }}
         />
       ) : null}
@@ -1789,19 +1802,19 @@ export function Sidebar({
             else if (menuLine.type === "file" && (what === "favourite" || what === "unfavourite"))
               files.favourite(menuLine.entry.kind, where, what === "favourite");
             else if (what === "duplicate" && menuLine.type === "file") files.duplicate(menuLine.entry.kind, where);
-            else if (what === "new-board") files.newFile("board", where);
-            else if (what === "new-note") files.newFile("note", where);
-            else if (what === "new-task") files.newFile("task", where);
-            else if (what === "new-event") files.newFile("event", where);
-            else if (what === "new-quiz") files.newFile("quiz", where);
-            else if (what === "new-table") files.newFile("table", where);
+            else if (what === "new-board") reportMake(files.newFile("board", where));
+            else if (what === "new-note") reportMake(files.newFile("note", where));
+            else if (what === "new-task") reportMake(files.newFile("task", where));
+            else if (what === "new-event") reportMake(files.newFile("event", where));
+            else if (what === "new-quiz") reportMake(files.newFile("quiz", where));
+            else if (what === "new-table") reportMake(files.newFile("table", where));
             else if (what === "make-task" || what === "mark-todo") files.task(where, { status: "todo" });
             else if (what === "mark-done") files.task(where, { status: "done" });
             else if (what === "unmake-task") files.task(where, { status: null, due: null, start: null });
             else if (what === "make-event") files.event(where, nextHourEvent());
             else if (what === "unmake-event") files.event(where, { start: null, end: null });
-            else if (what === "new-folder") files.newFolder(where);
-            else if (what === "make-project") files.makeProject(where);
+            else if (what === "new-folder") reportMake(files.newFolder(where));
+            else if (what === "make-project") reportMake(files.makeProject(where));
             else if (what === "practise" && menuLine.type === "folder") onPracticeFolder?.(where);
             else if (what === "open-project" && menuLine.type === "folder") {
               const owner = owners.get(where);
@@ -1851,7 +1864,8 @@ export function Sidebar({
             <span>Trash</span>
           </button>
         ) : null}
-        <SyncRow onOpen={() => ask("settings", "sync")} />
+        {cloud ? <SyncRow onOpen={() => ask("settings", "sync")} /> : null}
+        {cloud ? <FeedbackRow onFeedback={() => ask("feedback")} /> : null}
         <SettingsRow onSettings={() => ask("settings")} sheet={sheet} />
       </div>
 
@@ -2548,6 +2562,22 @@ function SyncRow({ onOpen }: { onOpen(): void }) {
     >
       <Mark {...ICON} aria-hidden="true" />
       <span>{words}</span>
+    </button>
+  );
+}
+
+/** Send feedback, above Settings: the card is the page's to draw (`feedback/FeedbackCard.tsx`). */
+function FeedbackRow({ onFeedback }: { onFeedback(): void }) {
+  return (
+    <button
+      type="button"
+      className="dag-sidebar__act"
+      data-dag-feedback-open=""
+      title="Tell us what to fix or build"
+      onClick={onFeedback}
+    >
+      <MessageCircleWarning {...ICON} aria-hidden="true" />
+      <span>Send feedback</span>
     </button>
   );
 }

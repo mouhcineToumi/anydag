@@ -18,10 +18,28 @@ TypeScript, React, Hono and Electron, in one repository.
    maintainer decides whether it is ready. (PRs by the owner and by bots are exempt.)
 2. **Say you are on it**: comment on the issue, and ask for `status: in-progress` if you cannot set it.
    Check that nobody else already has a branch or PR for it.
-3. **Read the right architecture file.** [`docs/architecture/README.md`](docs/architecture/README.md)
+3. **Check the issue's `agent:` label** and work on it only with a model of that tier or above
+   (see *Which model works on which issue* below). If the work turns out harder than the tier says,
+   stop and comment asking for a higher tier; do not push on.
+4. **Read the right architecture file.** [`docs/architecture/README.md`](docs/architecture/README.md)
    lists them; the table in `CLAUDE.md` says which one covers which area. Most of the code's traps are
    written down there, with the defect that found each. If the area you touch has a *Things that will
    bite* entry, read it.
+
+## Which model works on which issue
+
+Every `status: ready` issue carries one `agent:` label, set at triage, that says how much reasoning
+the work needs. The rubric is in [`CONTRIBUTING.md`](CONTRIBUTING.md#agent-tier). A tier maps to a
+model like this:
+
+| Label | Model | Effort |
+|---|---|---|
+| `agent: light` | GLM 5.3 Flash (`opencode-go/glm-5.3-flash`), or Claude Haiku 5.5 | default |
+| `agent: standard` | Claude Sonnet 5.5, or GLM 5.3 Flash (`opencode-go/glm-5.3-flash`), or DeepSeek V4.1 Flash (`opencode-go/deepseek-v4.1-flash`) | max for GLM and DeepSeek, default for Sonnet |
+| `agent: deep` | Claude Opus 5.5 | high |
+
+When you **open** an issue, propose a tier in it ("Suggested tier: `agent: standard`, because …");
+the maintainer sets the label. An issue with no `agent:` label is not ready.
 
 ## Branches and pull requests
 
@@ -31,7 +49,7 @@ TypeScript, React, Hono and Electron, in one repository.
   `refactor/<slug>`, `test/<slug>`, `ci/<slug>` — for example `fix/142-note-title-focus`.
 - Commits and the **PR title** are [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(notes): …`, `fix(canvas): …`, `docs: …`. CI checks the title. Scopes follow the `area:` labels
-  (`canvas`, `dsl`, `notes`, `tables`, `quizzes`, `tasks-calendar`, `sync`, `desktop`, `cli-mcp`,
+  (`canvas`, `dsl`, `notes`, `tables`, `quizzes`, `tasks-calendar`, `sync`, `api`, `desktop`, `cli-mcp`,
   `assistant`, `ci`).
 - The PR description says `Closes #<issue>` for the `status: ready` issue it implements. CI fails a PR
   into `develop` that does not close one.
@@ -47,6 +65,10 @@ TypeScript, React, Hono and Electron, in one repository.
 Run **`npm run checks`** (Biome lint and format check, knip, typecheck, the `check:*` contracts, `docs/parity.json`, unit tests).
 It is also the pre-commit hook; do not skip it with `--no-verify`, and do not push on red. Then:
 
+- **Never commit a secret** — a key, token or password, real or plausible. The repository is public.
+  Use the environment or a git-ignored `*.local` file; the hook and CI run `scripts/secrets.sh`
+  (gitleaks). A fixture that must look real gets an allowance in `.gitleaks.toml` naming the file and
+  the string.
 - **Add or update tests** for the behaviour you changed: unit tests in `test/`, browser checks in `e2e/`.
   A bug fix includes the test that fails without it.
 - **Update the docs** that describe what you changed: the matching file in `docs/architecture/`,
@@ -112,6 +134,7 @@ These are the short form of `CLAUDE.md`; the reasons are in `docs/architecture/`
 | every feature against its route, command and tool | `docs/parity.json`, `docs/PARITY.md` |
 | how a release is cut | `docs/RELEASING.md` |
 | the agent skill for drawing on the canvas | `skills/anydag/` |
+| the landing page at anydag.com | `site/` — plain HTML, CSS and JS, no build ([README](site/README.md)) |
 | setup, the full workflow, Definition of Ready and Done | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | security reports | [`SECURITY.md`](SECURITY.md) (private; not an issue) |
 | conduct | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) |

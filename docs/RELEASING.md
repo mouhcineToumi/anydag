@@ -34,7 +34,7 @@ No other pre-release word (`rc`, `alpha`) is a release: `release.yml` refuses th
 | a pull request into `develop` | fast tier (typecheck, lint, contracts, unit); the desktop app on **Linux**, if something it is made of changed; `e2e.yml`'s smoke tier; the policy checks (title, target, linked issue); CodeQL; dependency review |
 | a push to `develop` | fast tier; e2e |
 | a push to `release/**` or `hotfix/**`, a pull request into one, a pull request into `main` | the fast tier and the desktop app on **Linux, Windows and macOS**; e2e |
-| `nightly.yml`, every night at 02:00 UTC | everything: fast tier, the sync server's convergence harness and Postgres suites, full e2e, desktop on all three — then publishes |
+| `nightly.yml`, every night at 02:00 UTC | everything: fast tier, the api server's convergence harness and Postgres suites, full e2e, desktop on all three — then publishes |
 | a release tag | the same everything, then publishes |
 
 Docs-only changes (`**/*.md`, `docs/**`) skip the heavy jobs; the fast tier always runs, so a required
@@ -136,7 +136,7 @@ and open that into `develop`. No further bump: `develop` is still on the version
    `package.json` and the lockfile in **one commit on a new branch** `nightly/<version>`, and pushes the
    branch and the tag `v<version>` at that commit. `develop` is never written to. Branches are never
    deleted.
-3. It runs everything against the tag — fast tier, `sync:converge` and `sync:test:pg`, full e2e, the
+3. It runs everything against the tag — fast tier, `api:converge` and `api:test:pg`, full e2e, the
    desktop app on all three systems, signed when the secrets exist.
 4. If every installer and the three `nightly*.yml` update files are there, it publishes a **pre-release**
    (never marked *latest*) named `AnyDag nightly <stamp>`, with the notes of what was merged since the

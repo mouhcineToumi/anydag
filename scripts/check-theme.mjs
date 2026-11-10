@@ -192,12 +192,33 @@ if (!(chartHuesMax > 0)) {
   process.exit(1);
 }
 
+/**
+ * The alpha of a shadow colour, or `null` when it is not a form this gate can read.
+ *
+ * A shadow has to be translucent: opaque, it is a second outline painted outside the border rather
+ * than depth under it. Eight-digit hex and `rgba()` are the forms the themes use; six-digit hex and
+ * `rgb()` are refused for exactly that reason.
+ */
+function shadowAlpha(value) {
+  if (typeof value !== "string") return null;
+  const hex = /^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(value.trim());
+  if (hex) return Number.parseInt(hex[1], 16) / 255;
+  const rgba = /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\s*\)$/i.exec(value.trim());
+  if (rgba) return Number(rgba[1]);
+  return null;
+}
+
 function shapeErrors(theme) {
   const out = [];
   for (const hue of HUE_ORDER) {
     if (!theme.color?.hues?.[hue]) out.push(`color.hues.${hue} is missing — parsers assign it by name`);
   }
   if (!(theme.type?.base > 0)) out.push("type.base must be a positive number");
+
+  const shadow = shadowAlpha(theme.color?.shadow);
+  if (shadow === null || !(shadow > 0 && shadow < 1)) {
+    out.push("color.shadow must be a translucent colour (8-digit hex or rgba) — an opaque shadow paints over the surface");
+  }
 
   /*
    * `color.chartHues` — the one hue list a theme owns rather than the parser (the charts

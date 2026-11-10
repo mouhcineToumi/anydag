@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { onTrash } from "@/board/events";
 import type { FileKind, TrashEntry } from "@/board/useBoard";
 import { FileIcon as AttachmentIcon } from "@/files/FileIcon";
-import { useLocked } from "@/settings/lock";
+import { lockedAffordance, refuseLocked, setLocked, useLocked } from "@/settings/lock";
 
 import { daysLeft, deleteForever, emptyTrash, readTrash, restoreFromTrash, type TrashList } from "./trashApi";
 import { counted, leaf, parentOf } from "./tree";
@@ -177,13 +177,14 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        {count && !locked ? (
+        {count ? (
           <button
             type="button"
             className="dag-trash__empty"
             data-dag-trash-empty=""
-            disabled={busy.has("empty")}
-            onClick={() => setAsking("empty")}
+            {...lockedAffordance(locked)}
+            disabled={!locked && busy.has("empty")}
+            onClick={() => (locked ? refuseLocked() : setAsking("empty"))}
           >
             <Trash2 {...SMALL} aria-hidden="true" />
             Empty trash
@@ -199,7 +200,10 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
 
       {locked && count ? (
         <p className="dag-trash__said" data-dag-trash-locked="">
-          Read only: unlock to restore or delete anything here.
+          Read only: unlock to restore or delete anything here.{" "}
+          <button type="button" className="dag-trash__link" data-dag-trash-unlock="" onClick={() => setLocked(false)}>
+            Unlock
+          </button>
         </p>
       ) : null}
 
@@ -285,7 +289,30 @@ export function TrashView({ onOpen }: { onOpen(kind: FileKind, name: string): vo
                           {where ? ` · in ${where}` : ""}
                         </span>
                       </span>
-                      {locked ? null : asking === e.id ? (
+                      {locked ? (
+                        <span className="dag-trash__acts">
+                          <button
+                            type="button"
+                            className="dag-trash__plain"
+                            data-dag-trash-restore=""
+                            {...lockedAffordance(true)}
+                            onClick={() => refuseLocked()}
+                          >
+                            <RotateCcw {...SMALL} aria-hidden="true" />
+                            Restore
+                          </button>
+                          <button
+                            type="button"
+                            className="dag-icon dag-trash__forget"
+                            data-dag-trash-forget=""
+                            aria-label={`Delete ${nameOf(e)} for good`}
+                            {...lockedAffordance(true)}
+                            onClick={() => refuseLocked()}
+                          >
+                            <Trash2 {...SMALL} aria-hidden="true" />
+                          </button>
+                        </span>
+                      ) : asking === e.id ? (
                         <span
                           className="dag-trash__ask dag-trash__ask--row"
                           role="alertdialog"

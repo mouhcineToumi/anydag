@@ -41,6 +41,10 @@ the app's home).
 - `npm run dev` — Vite + the local server. `npm run desktop:dev` — the Electron app.
 - `npm run checks` — the fast tier: Biome lint and format check, knip, typechecks, the `check:*` contracts, parity, the
   unit suite. No browser, about half a minute. **Run it before every push**; it is also the pre-commit hook.
+- `ANYDAG_CLOUD_BUILD=on|off` and `ANYDAG_CLOUD=on|off` — the build's feature switch (`server/features.ts`,
+  see *Feature switches* in `docs/architecture/server.md`): whether the app carries the features that talk to
+  an AnyDag server (sync, anonymous logs, feedback). Off unless a build says on — no release does — and the
+  run-time override wins. Dev and the test suites run on.
 - `npm run e2e:smoke` / `npm run e2e:docker` — the Playwright suite's smoke tier / all of it, in the
   pinned Playwright Docker image, screenshots compared. `npm run e2e:local` is the host browser and
   compares none (see *Gate* below).
@@ -67,12 +71,13 @@ the app's home).
 | `src/blocks/` | BlockNote configured once, loaded lazily | which file it writes |
 | `src/view/` | drawing read-only: `?view=1`, snapshots, embeds | `src/edit/`, BlockNote (`test/view-graph.test.ts` holds it) |
 | `src/refs/` · `src/calendar/` · `src/vault/` | what a reference is · what the calendar shows · which vault this tab is in | names (a reference is an id) · the DOM · the disk |
-| `src/search/` · `src/telemetry/` · `src/assistant/` · `src/sync/` | the page's half of search, logs, the Assistant, sync status | what a log may hold (`sync/protocol/logs.ts` decides) · the harness · the server's storage |
+| `src/search/` · `src/telemetry/` · `src/assistant/` · `src/sync/` | the page's half of search, logs, the Assistant, sync status | what a log may hold (`api/protocol/logs.ts` decides) · the harness · the server's storage |
 | `icons/` | the brand vocabulary and its provenance | anything about diagrams |
 | `cli/` | `anydag`: arguments, finding the server, commands as op lists | the disk: every read and write is a route |
 | `server/` | the local server: token and `Host` gate, vault store, home and SQLite index, routes, MCP tools, `chat/`, `sync/` | React, the DOM |
 | `desktop/` | the Electron shell: server child, `anydag://`, windows, dialogs, updates | the vault's format |
-| `sync/` | the self-hostable sync server and the wire/crypto protocol shared with the client | a path, a byte of plaintext |
+| `api/` | the api server: the self-hostable sync server and the wire/crypto protocol shared with the client, plus logs and the feedback relay | a path, a byte of plaintext |
+
 
 `src/edit/` splits along one line: **the gesture is in `useEditor.ts`, the meaning is in a file with
 no pointer in it** (`pick.ts`, `build.ts`, `drag.ts`, `connect.ts`, `snap.ts`, `history.ts`), which
@@ -112,6 +117,9 @@ One line each; the full account with the defect that found it is in
 - **A stub is a claim about another module**; copy it from a route's recorded answer, never invent it.
 - **The token and the `Host` are the whole security model** — both checked on every request; a script
   that `fetch`es the server needs `authed()` from `scripts/session.mjs`.
+- **The repository is public, so a committed secret is a published one.** Secrets live in the
+  environment or a git-ignored `*.local`/`.env.*`; `scripts/secrets.sh` (gitleaks) refuses them in the
+  hook and CI. If one is pushed, revoke it first ([`SECURITY.md`](SECURITY.md)).
 - **A cleanup that matches by prefix must refuse an empty one** — a spec once emptied `boards/local/`.
 - **A screenshot baseline is valid only in the Playwright Docker image.** Regenerate with
   `npm run e2e:docker -- --update-snapshots=all`, read a sample, and commit the images on their own.
@@ -141,20 +149,23 @@ One line each; the full account with the defect that found it is in
 | the `anydag` CLI, the MCP server, `docs/parity.json` | [`cli.md`](docs/architecture/cli.md) |
 | the local server, vaults, the token gate | [`server.md`](docs/architecture/server.md) |
 | the Electron shell, packaging, signing | [`desktop.md`](docs/architecture/desktop.md) |
-| sync (client or server) | [`sync.md`](docs/architecture/sync.md) |
+| the api server, its features, config and deployment | [`api.md`](docs/architecture/api.md), [`sync.md`](docs/architecture/sync.md) (the client half) |
+| sync (client) | [`sync.md`](docs/architecture/sync.md) |
 | the Assistant (chat) | [`assistant.md`](docs/architecture/assistant.md) |
 | anonymous logs | [`logs.md`](docs/architecture/logs.md) |
+| Send feedback, the feedback relay | [`feedback.md`](docs/architecture/feedback.md) |
 | the gate, CI, releases | [`gate-and-releases.md`](docs/architecture/gate-and-releases.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), `docs/RELEASING.md` |
 
 Section names in italics inside those files (*Picking a node*, *The time zone*) are listed with their
 file in the index at the foot of [`docs/architecture/README.md`](docs/architecture/README.md).
 Other reference material: `docs/dsl/` (the grammar, one sheet per type), `docs/generate/` (the prompt
 card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/` (the agent skill),
-`icons/README.md`, `desktop/README.md`.
+`icons/README.md`, `desktop/README.md`, `site/README.md` (the landing page at anydag.com).
 
 ## Gate
 
-`npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
+The pre-commit hook first runs `scripts/secrets.sh` (gitleaks over the staged change; CI's `secrets`
+job and the nightly run it too). `npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
 `check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `test/parity.test.ts`,
 vitest). It needs no browser and is the pre-commit hook; CI also runs `npm run lint:promises`. The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)

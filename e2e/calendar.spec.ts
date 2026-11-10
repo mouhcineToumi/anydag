@@ -183,6 +183,53 @@ test("times are shown and written in the time zone Settings says", async ({ page
   await page.keyboard.press("Escape");
 });
 
+test("an event's labels act on the control beside them, and stay plain when read-only", async ({ page }) => {
+  const talk = write("talk", "Keynote", ["start: 2031-03-12T09:00Z", "end: 2031-03-12T10:30Z"]);
+  await page.goto(`/?note=${encodeURIComponent(talk)}`);
+  const bar = page.locator("[data-dag-eventbar]");
+  await expect(bar).toHaveAttribute("data-dag-eventbar", "timed", { timeout: 15_000 });
+
+  const label = (name: string) => page.locator(`[data-dag-eventbar-label="${name}"]`);
+  const allDay = page.locator("[data-dag-eventbar-allday]");
+  const startDay = page.locator("[data-dag-eventbar-start-day]");
+  const startTime = page.locator("[data-dag-eventbar-start-time]");
+  const endDay = page.locator("[data-dag-eventbar-end-day]");
+  const endTime = page.locator("[data-dag-eventbar-end-time]");
+
+  /* The visible label names each control for a screen reader too. */
+  await expect(startDay).toHaveAccessibleName("Starts");
+  await expect(startTime).toHaveAccessibleName("Starts");
+  await expect(endDay).toHaveAccessibleName("Ends");
+  await expect(endTime).toHaveAccessibleName("Ends");
+
+  /* A label is a pointer to its control. */
+  await label("start").click();
+  await expect(startDay).toBeFocused();
+  await label("end").click();
+  await expect(endDay).toBeFocused();
+
+  /* All day acts on the switch, and the timed fields go away. */
+  await expect(allDay).not.toBeChecked();
+  await label("all-day").click();
+  await expect(allDay).toBeChecked();
+  await expect(bar).toHaveAttribute("data-dag-eventbar", "all-day");
+  await expect(startTime).toHaveCount(0);
+  await label("start").click();
+  await expect(startDay).toBeFocused();
+
+  /* Read-only: the labels stay, the controls stay disabled, and a press changes nothing. */
+  await expect.poll(() => read("talk")).not.toContain("end:");
+  await page.evaluate(() => localStorage.setItem("dag:locked", "1"));
+  await page.reload();
+  await expect(bar).toHaveAttribute("data-dag-eventbar", "all-day", { timeout: 15_000 });
+  await expect(label("all-day")).toBeVisible();
+  await expect(allDay).toBeDisabled();
+  await expect(startDay).toBeDisabled();
+  /* The label is disabled with its control, and a press on it changes nothing. */
+  await label("all-day").click({ force: true });
+  await expect(allDay).toBeChecked();
+});
+
 test("a run of days is as long as it is asked, and the arrows move by that many", async ({ page }) => {
   const talk = write("talk", "Keynote", ["start: 2031-03-13T09:00Z", "end: 2031-03-13T10:30Z"]);
   await calendar(page, "calendar=days&days=5&date=2031-03-11", talk);
@@ -254,6 +301,43 @@ test("a click on a month's day asks for an all-day event on it, and Escape leave
   await card.locator("[data-dag-calendar-new-make]").click();
   await expect.poll(() => read("Retreat")).toMatch(/^---\nstart: 2031-03-19\nend: 2031-03-21\nid: [0-9a-z]{10}\n---\n$/);
   expect(fs.readdirSync(dir).sort()).toEqual(["Retreat.md", "anchor.note.md", "project.note.md"]);
+});
+
+test("an event made with a title shows it on its page, and editing starts from it", async ({ page }) => {
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=month&date=2031-03-15", `${folder}/anchor`);
+  const cell = page.locator('[data-dag-cal-day="2031-03-19"]');
+  const b = (await cell.boundingBox())!;
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height - 10);
+
+  const card = page.locator("[data-dag-calendar-new]");
+  await card.locator("[data-dag-calendar-new-title]").fill("team offsite");
+  await card.locator("[data-dag-calendar-new-make]").click();
+  await expect(card).toHaveCount(0);
+
+  /* `/create` names the file after the title and keeps the title once, in the name: the page has to
+     read it off the name. */
+  const created = path.join(dir, "team offsite.md");
+  await expect.poll(() => (fs.existsSync(created) ? fs.readFileSync(created, "utf8") : "")).toContain("start: 2031-03-19");
+  expect(fs.readFileSync(created, "utf8")).not.toMatch(/^title:/m);
+
+  const item = page.locator(`[data-dag-cal-item="${folder}/team offsite"]`);
+  await expect(item).toBeVisible({ timeout: 15_000 });
+  await item.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(`${folder}/team offsite`);
+
+  const title = page.locator("[data-dag-note-title]");
+  await expect(title).toHaveValue("team offsite");
+  await expect(page.locator(".dag-toolbar__title")).toHaveText("team offsite");
+
+  /* Editing starts from those words rather than from an empty *Untitled*, and the name follows. */
+  await title.fill("team offsite lunch");
+  await title.press("Enter");
+  await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toBe(`${folder}/team offsite lunch`);
+  await expect(page.locator(".dag-toolbar__title")).toHaveText("team offsite lunch");
+  await expect(title).toHaveValue("team offsite lunch");
+  await expect.poll(() => fs.existsSync(path.join(dir, "team offsite lunch.md"))).toBe(true);
+  expect(fs.existsSync(created)).toBe(false);
 });
 
 test("New event makes one at the next hour, and its bar moves it and makes it all day", async ({ page }) => {

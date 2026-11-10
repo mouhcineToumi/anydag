@@ -73,10 +73,8 @@ test.afterEach(() => {
   expect(problems, "console output").toEqual([]);
 });
 
-/** Type into the composer and send with Enter, in the mode asked for. */
-async function say(page: Page, text: string, mode: "ask" | "edit") {
-  await page.locator(`[data-dag-chat-mode="${mode}"]`).click();
-  await expect(page.locator(`[data-dag-chat-mode="${mode}"]`)).toHaveAttribute("aria-pressed", "true");
+/** Type into the composer and send with Enter. */
+async function say(page: Page, text: string) {
   await page.locator("[data-dag-chat-input]").fill(text);
   await page.locator("[data-dag-chat-input]").press("Enter");
 }
@@ -98,7 +96,7 @@ test("the sidebar's Assistant row opens the page, and a first message makes the 
 
   await page.goto("/?chat=new");
   await expect(page.locator("[data-dag-chat-empty]")).toBeVisible();
-  await say(page, "hello there", "ask");
+  await say(page, "hello there");
   const id = await chatId(page);
   const turn = page.locator("[data-dag-chat-turn]");
   await expect(turn.locator("[data-dag-chat-asked]")).toHaveText("hello there");
@@ -111,10 +109,31 @@ test("the sidebar's Assistant row opens the page, and a first message makes the 
   await expect(page.locator('[data-dag-chat-day="Today"]')).toBeVisible();
 });
 
-test("Edit makes a note and a block card; Undo takes it away and Redo brings it back", { tag: "@smoke" }, async ({ page }) => {
+test("deleting a chat drops its row and lands on New chat", async ({ page }) => {
+  await page.goto("/?chat=new");
+  await say(page, "throw this chat away");
+  const id = await chatId(page);
+  const row = page.locator(`[data-dag-chat-row="${id}"]`);
+  await expect(row).toBeVisible();
+
+  await page.locator("[data-dag-chat-delete]").click();
+  await page.locator("[data-dag-chat-delete-confirm]").click();
+
+  /* The row went with the chat — the list hears the delete's own event — and so did the page. */
+  await expect(row).toHaveCount(0);
+  await expect(page).toHaveURL(/chat=new/);
+  await expect(page.locator("[data-dag-chat-title]")).toHaveText("New chat");
+  await expect(page.locator("[data-dag-chat-missing]")).toHaveCount(0);
+
+  /* A reload finds it gone from the list too, not just from the page's state. */
+  await page.reload();
+  await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toHaveCount(0);
+});
+
+test("a turn makes a note and a block card; Undo takes it away and Redo brings it back", { tag: "@smoke" }, async ({ page }) => {
   const name = stem("make");
   await page.goto("/?chat=new");
-  await say(page, `note ${name} hi there`, "edit");
+  await say(page, `note ${name} hi there`);
   await chatId(page);
 
   const card = page.locator("[data-dag-chat-turns] [data-dag-chat-block]");
@@ -143,7 +162,7 @@ test("a delete waits on an approval card, and Deny keeps the note", async ({ pag
   const name = stem("keep");
   fs.writeFileSync(noteFile(name), "---\ntitle: Keep\n---\nkeep me\n");
   await page.goto("/?chat=new");
-  await say(page, `delete ${name}`, "edit");
+  await say(page, `delete ${name}`);
   await chatId(page);
 
   const card = page.locator("[data-dag-chat-approval]");
@@ -159,14 +178,32 @@ test("a delete waits on an approval card, and Deny keeps the note", async ({ pag
   expect(fs.existsSync(noteFile(name))).toBe(true);
 });
 
-test("Ask mode refuses a write", async ({ page }) => {
-  const name = stem("ask");
+test("a fresh chat writes with no switch to flip", async ({ page }) => {
+  const name = stem("fresh");
   await page.goto("/?chat=new");
-  await say(page, `note ${name} nope`, "ask");
+  await expect(page.locator("[data-dag-chat-mode]")).toHaveCount(0);
+  await say(page, `note ${name} written`);
   await chatId(page);
   await expect(page.locator("[data-dag-chat-turn]")).toHaveAttribute("data-dag-chat-status", "done");
+  expect(fs.existsSync(noteFile(name))).toBe(true);
+  await expect(page.locator("[data-dag-chat-changes] [data-dag-chat-block]")).toHaveCount(1);
+});
+
+test("a vault granted Read refuses a write", async ({ page, request }) => {
+  const vaults = (
+    (await (await request.get("/api/vaults")).json()) as { vaults: { id: string; open: boolean; default: boolean }[] }
+  ).vaults;
+  const other = vaults.find((v) => v.open && !v.default);
+  test.skip(!other, "only one vault is open here");
+  const name = stem("readonly");
+  await page.goto("/?chat=new");
+  await page.locator("[data-dag-chat-scope]").click();
+  await page.locator(`[data-dag-chat-grant-vault="${other!.id}"][data-dag-chat-grant-mode="ask"]`).click();
+  await chatId(page);
+  await expect(page.locator(`[data-dag-chat-granted="${other!.id}"]`)).toBeVisible();
+  await say(page, `note@${other!.id} ${name} nope`);
+  await expect(page.locator("[data-dag-chat-turn]")).toHaveAttribute("data-dag-chat-status", "done");
   await expect(page.locator("[data-dag-chat-said]").last()).toContainText(`Could not make ${name}`);
-  expect(fs.existsSync(noteFile(name))).toBe(false);
   await expect(page.locator("[data-dag-chat-turns] [data-dag-chat-block]")).toHaveCount(0);
 });
 
@@ -177,7 +214,7 @@ test("a vault the agent asks for is the person's to give, on an access card", as
   const other = vaults.find((v) => v.open && !v.default);
   test.skip(!other, "only one vault is open here");
   await page.goto("/?chat=new");
-  await say(page, `vault ${other!.id}`, "ask");
+  await say(page, `vault ${other!.id}`);
   await chatId(page);
   const card = page.locator("[data-dag-chat-access]");
   await expect(card).toBeVisible();
@@ -230,7 +267,7 @@ test("the panel keeps the chat it opens onto the page", async ({ page }) => {
   await page.locator("[data-dag-assistant-toggle]").click();
   const panel = page.locator("[data-dag-assistant-panel]");
   await panel.locator("[data-dag-assistant-panel-new]").click();
-  await say(page, "from the panel", "ask");
+  await say(page, "from the panel");
   const turn = panel.locator("[data-dag-chat-turn]");
   await expect(turn.locator("[data-dag-chat-asked]")).toHaveText("from the panel");
   await expect(turn).toHaveAttribute("data-dag-chat-status", "done");

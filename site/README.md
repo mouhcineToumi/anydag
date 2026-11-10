@@ -1,0 +1,52 @@
+# anydag.com
+
+The landing page for AnyDag. It is plain HTML, CSS and JavaScript — no build step, no framework and
+no dependencies. Open `index.html` in a browser, or serve the folder:
+
+```bash
+python3 -m http.server 4173 --directory site
+# then open http://localhost:4173/
+```
+
+Opening `index.html` directly works for a quick look, but the bundled fonts need a server: a browser
+blocks font files loaded from a `file://` page.
+
+## What is here
+
+| Path | What it is |
+|---|---|
+| `index.html` | The page: hero, features, screenshots, the licence and data-ownership section, AI, downloads, footer. |
+| `styles.css` | The paper and paper-dark palettes from `themes/`, Inter at four weights, and the layout. |
+| `main.js` | The theme toggle, the platform label on the download button, and the screenshot dialog. |
+| `assets/fonts/` | Inter and Fira Code, latin subset, with their OFL licences. |
+| `assets/screenshots/` | 1800 px and 900 px WebP captures of the app. |
+| `assets/og.png` | The 1200 × 630 social card. |
+
+The theme is chosen before the first paint: a stored choice, otherwise `prefers-color-scheme`. The
+download buttons all point at the repository's **Releases** page; the script only changes the label
+to the visitor's platform and highlights the matching card. With JavaScript off, the page still
+works and the button says *Download the latest release*.
+
+## Screenshots
+
+The screenshots were taken from the app with a temporary study vault (`My notebook`) at 1600 × 1000
+and a 1.5 device scale factor, then converted to WebP:
+
+```bash
+magick shot.png -resize 1800x -quality 84 assets/screenshots/name-1800.webp
+magick shot.png -resize 900x -quality 82 assets/screenshots/name-900.webp
+```
+
+They show the note *How memory works*, the *Map of learning* board, the *Memory basics* quiz in
+practice, the *Reading list* table, the Tasks board, and the week of 9 November 2026. Recapture them
+when the app's chrome or theme changes; keep the alt text describing what the page shows.
+
+Clicking a gallery screenshot opens it in a native `<dialog>` over the page. Escape, the X button or
+a click outside closes it and puts focus back on the screenshot; the page does not navigate. The
+link is still a link, so with JavaScript off it opens the image on its own.
+
+## Deploy
+
+Nothing in this repository publishes the page yet: it will be hosted on Google Cloud, and that is set
+up outside this folder. Whatever the host, the contents of `site/` are the document root and there is
+nothing to build.

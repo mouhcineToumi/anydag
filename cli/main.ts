@@ -2,6 +2,7 @@ import { Api, ApiError, EXIT } from "./api";
 import { UsageError, parseArgs, type FlagSpec } from "./args";
 import { COMMANDS, GROUPS } from "./commands";
 import { nodeIo, type Command, type Ctx, type Io } from "./context";
+import { cloudOn } from "../server/features";
 import type { connect as Connect } from "../server/connect";
 import { pathToFileURL } from "node:url";
 
@@ -33,6 +34,29 @@ export const GLOBAL_FLAGS: FlagSpec[] = [
   { name: "help", short: "h", type: "boolean", help: "what this command does" },
 ];
 
+/**
+ * The commands that need an AnyDag server to reach (`server/features.ts`): sync, and the logs. With
+ * the build's `cloud` switch off they are not this CLI's commands — every help table and dispatch
+ * below is drawn from `tableFor` — and whatever words an old script may still type met them with one
+ * line from the server's answer, which is the one thing they ask.
+ */
+const CLOUD_GROUPS = new Set(["sync", "telemetry"]);
+
+/** The line a command behind the switch answers with, and nothing else (`docs/architecture/server.md`). */
+export const CLOUD_OFF_LINE = "Sync is not available in this build.";
+
+/** What this CLI lists: the whole table, or the one a build without the server-backed features has. */
+export function tableFor(env: NodeJS.ProcessEnv = process.env): readonly Command[] {
+  return cloudOn(env) ? COMMANDS : COMMANDS.filter((c) => !CLOUD_GROUPS.has(c.name[0] ?? ""));
+}
+
+/** The gated group the words name, read against the whole table — or `null` for any other command. */
+function gatedGroup(argv: readonly string[]): string | null {
+  const whole = find(argv, COMMANDS);
+  const group = !whole ? null : "group" in whole ? whole.group : (whole.command.name[0] ?? null);
+  return group && CLOUD_GROUPS.has(group) ? group : null;
+}
+
 export interface Found {
   command: Command;
   rest: string[];
@@ -42,7 +66,7 @@ export interface Found {
 const LEADING = new Set(["--json", "--help", "-h"]);
 
 /** The command the leading words name — the longest match wins, so `item ls` beats `item`. */
-export function find(argv: readonly string[]): Found | { group: string } | null {
+export function find(argv: readonly string[], table: readonly Command[] = tableFor()): Found | { group: string } | null {
   const at: number[] = [];
   for (let i = 0; i < argv.length && at.length < 3; i++) {
     const tok = argv[i]!;
@@ -57,13 +81,13 @@ export function find(argv: readonly string[]): Found | { group: string } | null 
   const words = at.map((i) => argv[i]!);
   for (let n = words.length; n > 0; n--) {
     const want = words.slice(0, n).join(" ");
-    const command = COMMANDS.find((c) => c.name.join(" ") === want);
+    const command = table.find((c) => c.name.join(" ") === want);
     if (command) {
       const skip = new Set(at.slice(0, n));
       return { command, rest: argv.filter((_, i) => !skip.has(i)) };
     }
   }
-  if (words[0] && COMMANDS.some((c) => c.name.length > 1 && c.name[0] === words[0])) return { group: words[0] };
+  if (words[0] && table.some((c) => c.name.length > 1 && c.name[0] === words[0])) return { group: words[0] };
   return null;
 }
 
@@ -79,24 +103,28 @@ export async function main(
   env: NodeJS.ProcessEnv = process.env,
   reach: Reach = connect,
 ): Promise<number> {
+  const table = tableFor(env);
   if (argv[0] === "help" && argv.includes("--json")) {
     /* The command table as data — what `check-skill.mjs` holds the skill against, and how an agent
        learns the whole surface in one call rather than one `--help` at a time. */
     io.out(
       JSON.stringify(
-        COMMANDS.map(({ run: _run, ...c }) => ({ ...c, name: c.name.join(" "), flags: [...(c.flags ?? []), ...GLOBAL_FLAGS] })),
+        table.map(({ run: _run, ...c }) => ({ ...c, name: c.name.join(" "), flags: [...(c.flags ?? []), ...GLOBAL_FLAGS] })),
         null,
         2,
       ),
     );
     return EXIT.ok;
   }
+  const off = !cloudOn(env);
   if (argv.length === 0 || argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h") {
     const topic = argv[0] === "help" ? argv.slice(1) : [];
-    const found = topic.length ? find(topic) : null;
-    if (found && "command" in found) io.out(commandHelp(found.command));
-    else if (found && "group" in found) io.out(groupHelp(found.group));
-    else io.out(overview());
+    const gated = off && topic.length ? gatedGroup(topic) : null;
+    const found = topic.length ? find(topic, table) : null;
+    if (gated) io.err(`anydag ${gated}: ${CLOUD_OFF_LINE}`);
+    else if (found && "command" in found) io.out(commandHelp(found.command));
+    else if (found && "group" in found) io.out(groupHelp(found.group, table));
+    else io.out(overview(table));
     return EXIT.ok;
   }
   if (argv[0] === "--version" || argv[0] === "version") {
@@ -104,7 +132,14 @@ export async function main(
     return EXIT.ok;
   }
 
-  const found = find(argv);
+  /* A command the build has none of is looked up in the whole table, so `anydag sync status` gets
+     the one line rather than "no command": an old script is told why, not that it typed wrong. */
+  const gated = off ? gatedGroup(argv) : null;
+  if (gated) {
+    io.err(`anydag ${gated}: ${CLOUD_OFF_LINE}`);
+    return EXIT.failed;
+  }
+  const found = find(argv, table);
   if (!found) {
     io.err(
       `anydag: no command \`${argv
@@ -115,7 +150,7 @@ export async function main(
     return EXIT.usage;
   }
   if ("group" in found) {
-    io.out(groupHelp(found.group));
+    io.out(groupHelp(found.group, table));
     return EXIT.ok;
   }
 
@@ -146,6 +181,16 @@ export async function main(
     }
     try {
       const api = new Api({ origin: conn.origin, token: conn.token, vault: conn.vault, fetch: conn.fetch });
+      if (CLOUD_GROUPS.has(command.name[0] ?? "")) {
+        /* The server decides (`server/features.ts`), and the CLI asks it like every other caller:
+           a route behind the switch is not registered when it is off, so the answer has to be this
+           one line here rather than the route's 404. */
+        const said = await api.get<{ features?: { cloud?: boolean } }>("/api/health");
+        if (said.features?.cloud !== true) {
+          io.err(`anydag ${command.name[0]}: ${CLOUD_OFF_LINE}`);
+          return EXIT.failed;
+        }
+      }
       const ctx: Ctx = { api, conn, vault: conn.vault, json: p.flags.json === true, env, io };
       return (await command.run(ctx, p)) ?? EXIT.ok;
     } finally {
@@ -179,7 +224,7 @@ function rowsOf(commands: readonly Command[]): string[] {
   return rows.map(([a, b]) => `${a.padEnd(width)}  ${b}`);
 }
 
-function overview(): string {
+function overview(table: readonly Command[] = tableFor()): string {
   const lines = [
     `anydag ${VERSION} — the AnyDag canvas from a terminal`,
     "",
@@ -187,7 +232,7 @@ function overview(): string {
     "",
   ];
   for (const g of GROUPS) {
-    const mine = COMMANDS.filter((c) => groupOf(c) === g.name);
+    const mine = table.filter((c) => groupOf(c) === g.name);
     if (mine.length === 0) continue;
     lines.push(`${g.title} — ${g.blurb}`, ...rowsOf(mine), "");
   }
@@ -198,9 +243,9 @@ function overview(): string {
   return lines.join("\n");
 }
 
-function groupHelp(group: string): string {
+function groupHelp(group: string, table: readonly Command[] = tableFor()): string {
   const g = GROUPS.find((x) => x.name === group);
-  const mine = COMMANDS.filter((c) => c.name[0] === group);
+  const mine = table.filter((c) => c.name[0] === group);
   return [g ? `${g.title} — ${g.blurb}` : group, "", ...rowsOf(mine)].join("\n");
 }
 

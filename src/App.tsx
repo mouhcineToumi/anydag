@@ -32,6 +32,7 @@ import { proposedItem } from "@/edit/rewrite";
 import { SelectionBar, type RewriteRun } from "@/edit/SelectionBar";
 import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
+import { FeedbackCard } from "@/feedback/FeedbackCard";
 import { Settings, useSettingsOpen } from "@/settings/Settings";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
@@ -391,7 +392,7 @@ export function App() {
  * `dag:tidy` reaches the page from a script. `dag:chrome` and not `dag:settings`, which is the
  * settings-changed event: one name meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  */
-function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void }) {
+function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void; feedback(): void }) {
   const ref = useRef(on);
   ref.current = on;
   useEffect(() => {
@@ -399,10 +400,22 @@ function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): vo
       const ask = (e as CustomEvent<ChromeAsk>).detail;
       if (ask?.what === "settings") ref.current.settings(ask.tab);
       else if (ask?.what === "search") ref.current.search();
+      else if (ask?.what === "feedback") ref.current.feedback();
     };
     document.addEventListener("dag:chrome", listen);
     return () => document.removeEventListener("dag:chrome", listen);
   }, []);
+}
+
+/**
+ * Whether the feedback card is up. The draft is the card's own and outlives it
+ * (`feedback/FeedbackCard.tsx`); this is only open or shut.
+ */
+function useFeedbackOpen(): { open: boolean; show(): void; close(): void } {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  return { open, show, close };
 }
 
 /**
@@ -480,7 +493,8 @@ function usePageChrome({
   const { name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
   const [browsing, setBrowsing] = useState(false);
   const settings = useSettingsOpen();
-  useChromeRequests({ search: () => setBrowsing(true), settings: settings.show });
+  const feedback = useFeedbackOpen();
+  useChromeRequests({ search: () => setBrowsing(true), settings: settings.show, feedback: feedback.show });
   usePageKeys(snapshot, { settings: settings.toggle, search: () => setBrowsing(true) });
   const chooseTheme = useCallback(
     (n: string) => {
@@ -524,6 +538,7 @@ function usePageChrome({
           onClose={settings.close}
         />
       ) : null}
+      {feedback.open ? <FeedbackCard document={null} onClose={feedback.close} /> : null}
     </>
   );
   return { themeName, openBrowser: () => setBrowsing(true), cards };
@@ -775,7 +790,7 @@ function QuizzesApp({
   const create = useCallback(
     async (title: string) => {
       const made = await createQuiz(titleStem(title), quizText(title));
-      if (made) open("quiz", made);
+      if ("name" in made) open("quiz", made.name);
     },
     [open],
   );
@@ -1363,7 +1378,8 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
   /* Settings and Send feedback, which a note could not reach until the sidebar: the note
      page has no dock, and the dock's `⋯` was the only door to either. */
   const settings = useSettingsOpen();
-  useChromeRequests({ search: openBrowser, settings: settings.show });
+  const feedback = useFeedbackOpen();
+  useChromeRequests({ search: openBrowser, settings: settings.show, feedback: feedback.show });
 
   /*
    * Export. The note's text comes from the page showing it, which knows what is
@@ -1595,6 +1611,7 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
           onClose={settings.close}
         />
       ) : null}
+      {feedback.open && !snapshot ? <FeedbackCard document={{ kind: "note", name }} onClose={feedback.close} /> : null}
     </div>
   );
 }
@@ -1674,10 +1691,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      not part of what a shared `?board=…` link means, which is the same argument the theme makes. */
   const settings = useSettingsOpen();
 
-  /* Sending a report. Plain state beside Settings, for the same reason and with one more: there is
-     nowhere else it could live. A draft is not a preference and it is not part of a board, and
-     nothing stores one — closing this card is the end of what was written in it. */
-  useChromeRequests({ search: openBrowser, settings: settings.show });
+  /* Sending feedback. Plain state beside Settings, for the same reason. The draft is not a
+     preference and not part of a board: the card holds it in memory, past a close or a failed send. */
+  const feedback = useFeedbackOpen();
+  useChromeRequests({ search: openBrowser, settings: settings.show, feedback: feedback.show });
 
   /* Choosing a theme now is choosing: a `?theme=` in the URL outranks the stored preference, so a
      pick made while one is present would be recorded and then ignored. */
@@ -2075,11 +2092,11 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const onRedo = () => (editor.redo(), focusBoard());
   const onTidy = () => (void editor.tidy(), focusBoard());
   const onKeep = () => (void editor.saveAsComponent(), focusBoard());
-  /* The `P` key puts one under the pointer; pressed on the dock there is no pointer over the
-     board, so it lands in the middle of the view — which is what the library's click already
-     means. Not `focusBoard()` after: a fresh prompt card takes the caret, and pulling focus back
-     to the board would take it straight off the thing the press just made. */
-  const onPrompt = () => editor.add("prompt", viewport.current?.center());
+  /* A prompt card is made from the chrome, so there is no pointer position to honour: `editor.add`
+     puts its centre in the middle of the view. Not `focusBoard()` after: a fresh prompt card takes
+     the caret, and pulling focus back to the board would take it straight off the thing the press
+     just made. */
+  const onPrompt = () => editor.add("prompt");
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
@@ -2498,9 +2515,12 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
           />
         ) : null}
         {/* A page with nothing on it yet — a new board, or a page just added — and the three
-            ways one begins, where the board is. Gone the moment anything lands. */}
-        {!snapshot && !locked && boardName && board && items.length === 0 && !library ? (
+            ways one begins, where the board is. Gone the moment anything lands. Locked, it stays
+            and says read only, with Unlock in place: hiding it explained the empty page with
+            nothing at all. */}
+        {!snapshot && boardName && board && items.length === 0 && !library ? (
           <EmptyBoard
+            locked={locked}
             onNote={() => editor.add("md", viewport.current?.center())}
             onLibrary={() => showLibrary(true)}
             onPrompt={onPrompt}
@@ -2510,6 +2530,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             board that is not there is a picture of this card, which is never what was asked for. */}
         {!snapshot && !boardName ? (
           <Welcome
+            locked={locked}
             /* The sidebar's own way to begin a file — made, opened, and named where it is drawn —
                so the welcome card and New board are one gesture rather than two that drift. */
             onCreate={() =>
@@ -2517,7 +2538,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                 ? refuseLocked()
                 : sidebar
                   ? sidebar.create("board")
-                  : void createBoard("untitled", blankBoardText()).then((made) => made && openBoard(made))
+                  : void createBoard("untitled", blankBoardText()).then((made) => "name" in made && openBoard(made.name))
             }
             onWrite={() =>
               locked
@@ -2525,10 +2546,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                 : sidebar
                   ? sidebar.create("note")
                   : void createNote("untitled", blankNoteText()).then((made) => {
-                      if (!made) return;
+                      if ("error" in made) return;
                       /* Named in its own title, as one made from the sidebar is. */
-                      nameWhenOpened(made);
-                      openNote(made);
+                      nameWhenOpened(made.name);
+                      openNote(made.name);
                     })
             }
             onOpen={openBrowser}
@@ -2546,6 +2567,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             tab={settings.open.tab}
             onClose={settings.close}
           />
+        ) : null}
+        {feedback.open && !snapshot ? (
+          <FeedbackCard document={board ? { kind: "board", name: board.name } : null} onClose={feedback.close} />
         ) : null}
 
         {editingItem && board ? (

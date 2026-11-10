@@ -67,8 +67,11 @@ Eleven things are load-bearing:
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to
-  `127.0.0.1`. The page, its `localStorage` and its `EventSource` live on one stable origin,
-  `anydag://app`, and no script in it ever sees the token.
+  `127.0.0.1`. It is sent only to the port that child reported — on stdout, or in a `server.json`
+  whose `pid` and `token` are this launch's (`desktop/launch.ts`) — because the home is shared with
+  `anydag serve`, and a file an earlier one left behind names a port anybody may hold now. The page,
+  its `localStorage` and its `EventSource` live on one stable origin, `anydag://app`, and no script
+  in it ever sees the token.
 - **Only the page writes.** Chromium gives a custom scheme's handler no `Origin` and runs no CORS
   preflight for it — measured: a sandboxed frame's `POST` with any header it liked reached the
   handler — so the handler asks every write for a per-launch **page key**, which the preload asks
@@ -88,6 +91,18 @@ Eleven things are load-bearing:
   `ready`**: its spawn reads the keys and the home secret, `safeStorage` throws before `ready`, and
   that throw read as "no keyring" — every first launch stored the home secret merely encoded. The
   macOS smoke log is what showed it.
+- **On macOS the window has no title bar** (`titleBarStyle: "hiddenInset"`, #78): the traffic
+  lights sit in the page's top row, centred on its 48px. The page learns it from the bridge
+  (`platform`, `isFullScreen`, `onFullScreen`) and `src/ui/windowInset.ts` puts
+  `data-dag-window="inset"` on the root, which `chrome.css` reads twice: `--window-inset` pushes
+  whatever is at the window's left edge in that row (the sidebar's toggle and head, or the toolbar
+  while the column is away, `data-dag-toolbar-edge`) clear of the lights, and the toolbar and the
+  sidebar's head become the drag region with every control cut out of it (`no-drag`) — and the
+  no-vault page, which has neither, a 48px strip of its own. Full screen
+  hides the lights, so the main process pushes `window:full-screen` and the attribute comes off.
+  Linux and Windows keep the system frame, and the browser has no bridge, so none of it applies.
+  **Electron's drag region ignores what is drawn over it**: a scrim or a menu over the top 48px
+  drags the window rather than taking the press, unless it is itself `no-drag`.
 - **A load always names `index.html`.** `anydag://app/?x` canonicalises to a pathname of `//`, and
   the page's own `history.replaceState` then resolves to an address with no host, which Chromium
   refuses as another origin — the smoke run's `ready=never` before it was found.

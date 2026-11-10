@@ -232,6 +232,8 @@ export class Vault {
   private held = false;
   /** Whether sync has ever read or written created here — kept in the index, so it outlives a restart. */
   private syncing: boolean | null = null;
+  /** The vault's own path with every link followed, read once: `abs` holds every other path to it. */
+  private realRoot: string | null = null;
 
   /**
    * A folder as a vault. Its id is `.anydag/vault.json`'s, made the first time the folder is opened
@@ -254,6 +256,35 @@ export class Vault {
   abs(rel: string): string {
     const out = path.resolve(this.root, ...rel.split("/"));
     if (out !== this.root && !out.startsWith(this.root + path.sep)) throw new Refused(`outside the vault: ${rel}`);
+    this.confine(out, rel);
+    return out;
+  }
+
+  /**
+   * Refuse `out` when it, or the deepest existing folder on the way to it, is a link out of the
+   * vault. The root may itself be a link (a temp folder on macOS), so the comparison is against its
+   * real path. A link that leads nowhere is refused too: nobody can say where it would go.
+   */
+  private confine(out: string, rel: string): void {
+    const real = (this.realRoot ??= fs.realpathSync(this.root));
+    let probe = out;
+    while (probe !== this.root && !fs.lstatSync(probe, { throwIfNoEntry: false })) probe = path.dirname(probe);
+    if (probe === this.root) return;
+    const st = fs.lstatSync(probe);
+    let resolved: string;
+    try {
+      resolved = fs.realpathSync(probe);
+    } catch {
+      throw new Refused(`a link that leads nowhere: ${rel}`);
+    }
+    if (resolved !== real && !resolved.startsWith(real + path.sep)) throw new Refused(`outside the vault: ${rel}`);
+    if (probe === out && st.isSymbolicLink()) throw new Refused(`a link: ${rel}`);
+  }
+
+  /** `abs`, checked again immediately before a write: a folder can become a link in between. */
+  private writeAt(rel: string): string {
+    const out = this.abs(rel);
+    this.confine(out, rel);
     return out;
   }
 
@@ -447,7 +478,7 @@ export class Vault {
   }
 
   private writeFileId(id: string, file: string, title: string | null): void {
-    const target = this.abs(`.anydag/files/${id}.json`);
+    const target = this.writeAt(`.anydag/files/${id}.json`);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     writeAtomic(target, `${JSON.stringify({ path: file, ...(title ? { title } : {}) }, null, 1)}\n`);
   }
@@ -758,7 +789,7 @@ export class Vault {
     if (row.kind === "file") {
       this.writeFileId(row.id, row.path, row.title);
     } else {
-      const abs = this.abs(row.path);
+      const abs = this.writeAt(row.path);
       let text: string;
       try {
         text = fs.readFileSync(abs, "utf8");
@@ -829,7 +860,7 @@ export class Vault {
    * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1.
    */
   async write(name: string, kind: TextKind, text: string, base?: string | null): Promise<Version> {
-    const file = this.abs(this.fileOf(name, kind));
+    const file = this.writeAt(this.fileOf(name, kind));
     let now: Version;
     try {
       now = version(fs.readFileSync(file, "utf8"));
@@ -856,7 +887,7 @@ export class Vault {
     const stem = comp !== null ? `${COMPONENT_PREFIX}${nameFrom(comp, "component")}` : nameFrom(name);
     const settled = comp !== null ? this.uniqueComponent(stem) : unique(stem, (n) => this.taken(n));
     const file = this.fileOf(settled, kind);
-    const abs = this.abs(file);
+    const abs = this.writeAt(file);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     if (comp !== null) {
       writeAtomic(abs, text);
@@ -913,7 +944,7 @@ export class Vault {
         ? uniqueFile(stem, (n) => this.taken(n))
         : unique(stem, (n) => this.taken(n));
     const target = kind === "note" ? settled + from.slice(name.length) : this.fileOf(settled, kind);
-    const toAbs = this.abs(target);
+    const toAbs = this.writeAt(target);
     fs.mkdirSync(path.dirname(toAbs), { recursive: true });
     const row = this.row(name, kind);
 
@@ -958,7 +989,7 @@ export class Vault {
   /** Delete a document. Its legacy `.assets/` go with it; an attachment's id record too. */
   async delete(name: string, kind: Kind = "board"): Promise<void> {
     const file = this.fileOf(name, kind);
-    const abs = this.abs(file);
+    const abs = this.writeAt(file);
     if (!isFile(abs)) throw new NotFound(`no ${kind} \`${name}\``);
     const row = this.home.docByPath(this.id, file);
     fs.rmSync(abs);
@@ -984,7 +1015,7 @@ export class Vault {
   async mkdir(name: string): Promise<string> {
     const stem = this.folder(name);
     if (!stem) throw new Refused(`not a folder name \`${name}\``);
-    fs.mkdirSync(this.abs(stem), { recursive: true });
+    fs.mkdirSync(this.writeAt(stem), { recursive: true });
     return stem;
   }
 
@@ -995,7 +1026,7 @@ export class Vault {
   async rmdir(name: string, recursive = false): Promise<Removed> {
     const stem = this.folder(name);
     if (!stem) throw new Refused("the top level is not a folder");
-    const abs = this.abs(stem);
+    const abs = this.writeAt(stem);
     if (!isDir(abs)) throw new NotFound(`no folder \`${name}\``);
     if (!recursive) {
       if (fs.readdirSync(abs).length) throw new Refused(`\`${name}\` is not empty`);
@@ -1030,7 +1061,7 @@ export class Vault {
     const [src, dst] = ends;
     if (src === dst) return dst;
     const srcAbs = this.abs(src);
-    const dstAbs = this.abs(dst);
+    const dstAbs = this.writeAt(dst);
     if (!isDir(srcAbs)) throw new NotFound(`no folder \`${src}\``);
     if (!same(src, dst) && (exists(dstAbs) || this.caseTwin(dst))) throw new Refused(`\`${dst}\` already exists`);
     fs.mkdirSync(path.dirname(dstAbs), { recursive: true });
@@ -1075,8 +1106,67 @@ export class Vault {
     const at = this.trashDir(entry.id);
     fs.mkdirSync(path.join(at, "files"), { recursive: true });
     const manifest = { ...entry, docs };
-    writeAtomic(path.join(at, "entry.json"), `${JSON.stringify(manifest, null, 1)}\n`);
+    writeAtomic(this.writeAt(`${TRASH}/${entry.id}/entry.json`), `${JSON.stringify(manifest, null, 1)}\n`);
     return at;
+  }
+
+  /**
+   * The stored files a document of `name` and `kind` may have in an entry: `fileNameFrom` for an
+   * attachment, `refusal` for a text. `null` when the name is one the vault would not accept from
+   * the wire. A note has two suffixes, so an old `.note.md` restores as it was.
+   */
+  private ownFiles(name: string, kind: Kind): string[] | null {
+    if (kind === "file") {
+      if (name.split("/").some((s) => s.startsWith("."))) return null;
+      const asked = fileNameFrom(name, this.types);
+      return asked && same(asked, name) ? [name] : null;
+    }
+    if (refusal(name)) return null;
+    if (kind === "note") return [`${name}.md`, `${name}.note.md`];
+    return [name + SUFFIX[kind]];
+  }
+
+  /** A folder name a trashed folder may restore to, or `null` when it is not one. */
+  private ownFolder(name: string): string | null {
+    const stem = folderFrom(name);
+    return stem && stem === name ? stem : null;
+  }
+
+  /** A relative path a manifest may name: no root, no climb, no empty or dot segment. */
+  private safeRel(rel: string): boolean {
+    if (!rel || rel.includes("\0") || path.posix.isAbsolute(rel) || path.isAbsolute(rel)) return false;
+    return rel.split("/").every((s) => !!s && s !== "." && s !== "..");
+  }
+
+  /** A manifest's `docs` entry as a kept row, or `null` when it is not one. */
+  private keptOfManifest(raw: unknown): Kept | null {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const k = raw as Record<string, unknown>;
+    if (!validId(k.id) || typeof k.kind !== "string" || !(KINDS as readonly string[]).includes(k.kind)) return null;
+    if (!validInstant(k.created)) return null;
+    if (typeof k.minted !== "number" || !Number.isInteger(k.minted) || k.minted < 0) return null;
+    if (k.title !== null && k.title !== undefined && typeof k.title !== "string") return null;
+    return {
+      id: k.id,
+      kind: k.kind as Kind,
+      created: k.created,
+      minted: k.minted,
+      title: typeof k.title === "string" ? k.title : null,
+    };
+  }
+
+  /** The `docs` map of a manifest, every key and kept row checked, or `null` when any is not one. */
+  private keptDocs(raw: unknown): Record<string, Kept> | null {
+    if (raw === undefined || raw === null) return {};
+    if (typeof raw !== "object" || Array.isArray(raw)) return null;
+    const out: Record<string, Kept> = {};
+    for (const [file, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (!this.safeRel(file)) return null;
+      const kept = this.keptOfManifest(value);
+      if (!kept) return null;
+      out[file] = kept;
+    }
+    return out;
   }
 
   private manifest(id: string): (Trashed & { docs: Record<string, Kept> }) | null {
@@ -1091,6 +1181,9 @@ export class Vault {
       typeof data.kind === "string" && (data.kind === "folder" || (KINDS as readonly string[]).includes(data.kind))
         ? (data.kind as Kind | "folder")
         : "board";
+    if (kind === "folder" ? this.ownFolder(data.name) === null : this.ownFiles(data.name, kind) === null) return null;
+    const docs = this.keptDocs(data.docs);
+    if (!docs) return null;
     const holds =
       data.holds && typeof data.holds === "object" ? { ...emptyRemoved(), ...(data.holds as Partial<Removed>) } : null;
     return {
@@ -1101,7 +1194,7 @@ export class Vault {
       deleted: validInstant(data.deleted) ? data.deleted : instant(new Date(0)),
       doc: validId(data.doc) ? data.doc : null,
       holds: kind === "folder" ? (holds ?? emptyRemoved()) : null,
-      docs: data.docs && typeof data.docs === "object" ? (data.docs as Record<string, Kept>) : {},
+      docs,
     };
   }
 
@@ -1158,7 +1251,7 @@ export class Vault {
   async trashFolder(name: string, recursive = false): Promise<Trashed> {
     const stem = this.folder(name);
     if (!stem) throw new Refused("the top level is not a folder");
-    const abs = this.abs(stem);
+    const abs = this.writeAt(stem);
     if (!isDir(abs)) throw new NotFound(`no folder \`${name}\``);
     if (!recursive && fs.readdirSync(abs).length) throw new Refused(`\`${name}\` is not empty`);
     // Listed, and every document under it given a row, before anything moves — so what the entry
@@ -1234,7 +1327,7 @@ export class Vault {
     if (holder && holder.path.toLowerCase() !== file.toLowerCase() && exists(this.abs(holder.path))) {
       id = mint((x) => !!this.home.docById(this.id, x));
       if (kept.kind !== "file" && kept.minted) {
-        const abs = this.abs(file);
+        const abs = this.writeAt(file);
         try {
           writeAtomic(abs, withId(fs.readFileSync(abs, "utf8"), id));
         } catch {
@@ -1255,9 +1348,33 @@ export class Vault {
     return id;
   }
 
+  private damaged(entry: Trashed): NotFound {
+    return new NotFound(`\`${entry.name}\` is a damaged trash entry`);
+  }
+
+  /**
+   * The path of `rel` under an entry's `files/`, refused when it leaves that folder or is a link.
+   * The entry's own `files/` is checked too: a planted link there would make every source path
+   * look like a file in the vault.
+   */
+  private trashSource(entry: Trashed, rel: string): string {
+    if (!this.safeRel(rel)) throw this.damaged(entry);
+    const filesRel = `${TRASH}/${entry.id}/files`;
+    const filesRoot = this.abs(filesRel);
+    if (fs.lstatSync(filesRoot, { throwIfNoEntry: false })?.isSymbolicLink()) throw this.damaged(entry);
+    const src = this.abs(`${filesRel}/${rel}`);
+    if (!src.startsWith(filesRoot + path.sep)) throw this.damaged(entry);
+    if (fs.lstatSync(src, { throwIfNoEntry: false })?.isSymbolicLink()) throw this.damaged(entry);
+    return src;
+  }
+
   /**
    * Put an entry back where it was, returning it as it landed. A name taken since is numbered — a
    * folder's too, never merged — and every document keeps its id and the day it was made.
+   *
+   * **The manifest is untrusted input**: a synced or shared folder carries one its author wrote.
+   * The name is put through the same rules a name from the wire is, the `docs` key must be the file
+   * that name stores, and the source stays under this entry's `files/` with no link on the way.
    */
   async restore(id: string): Promise<Trashed> {
     const m = this.manifest(id);
@@ -1268,10 +1385,16 @@ export class Vault {
     let doc: string | null = null;
     let holds: Removed | null = null;
     if (entry.kind === "folder") {
-      const src = path.join(at, "files", ...entry.name.split("/"));
+      const own = this.ownFolder(entry.name);
+      if (!own) throw this.damaged(entry);
+      for (const file of Object.keys(docs)) {
+        if (!file.startsWith(`${own}/`)) throw this.damaged(entry);
+        this.trashSource(entry, file);
+      }
+      const src = this.trashSource(entry, own);
       if (!isDir(src)) throw new NotFound(`\`${entry.name}\` has nothing left to restore`);
       settled = unique(entry.name, (n) => exists(this.abs(n)) || this.caseTwin(n));
-      const dst = this.abs(settled);
+      const dst = this.writeAt(settled);
       fs.mkdirSync(path.dirname(dst), { recursive: true });
       moveFile(src, dst);
       const moved = (n: string): string => settled + n.slice(entry.name.length);
@@ -1289,16 +1412,22 @@ export class Vault {
       });
     } else {
       const kind = entry.kind;
-      const [file, kept] = Object.entries(docs)[0] ?? [this.fileOf(entry.name, kind), null];
-      const src = path.join(at, "files", ...file.split("/"));
+      const own = this.ownFiles(entry.name, kind);
+      if (!own) throw this.damaged(entry);
+      const keys = Object.keys(docs);
+      if (keys.length > 1) throw this.damaged(entry);
+      const file = keys[0] ?? own.find((f) => isFile(this.trashSource(entry, f))) ?? own[0]!;
+      if (!own.includes(file)) throw this.damaged(entry);
+      const src = this.trashSource(entry, file);
       if (!isFile(src)) throw new NotFound(`\`${entry.name}\` has nothing left to restore`);
       settled = kind === "file" ? uniqueFile(entry.name, (n) => this.taken(n)) : unique(entry.name, (n) => this.taken(n));
       const target = kind === "file" ? settled : settled + file.slice(entry.name.length);
-      const dst = this.abs(target);
+      const dst = this.writeAt(target);
       fs.mkdirSync(path.dirname(dst), { recursive: true });
       moveFile(src, dst);
-      const images = path.join(at, "files", ...assetsPrefix(entry.name).split("/"));
-      if (isDir(images)) fs.cpSync(images, this.abs(assetsPrefix(settled)), { recursive: true });
+      const images = this.trashSource(entry, assetsPrefix(entry.name));
+      if (isDir(images)) fs.cpSync(images, this.writeAt(assetsPrefix(settled)), { recursive: true });
+      const kept = docs[file];
       if (kept) doc = this.back(kept, target);
     }
     fs.rmSync(at, { recursive: true, force: true });
@@ -1330,7 +1459,7 @@ export class Vault {
     const asked = fileNameFrom(name, this.types);
     if (!asked) throw new Refused(`not a file name \`${name}\``);
     const settled = uniqueFile(asked, (n) => this.taken(n));
-    const abs = this.abs(settled);
+    const abs = this.writeAt(settled);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.${process.pid}.tmp`);
     fs.writeFileSync(tmp, data);
@@ -1510,7 +1639,7 @@ export class Vault {
    * what sync writes is what the other device had.
    */
   writeRawIf(rel: string, bytes: Uint8Array, expect: string | null): boolean {
-    const abs = this.abs(rel);
+    const abs = this.writeAt(rel);
     const st = fs.statSync(abs, { throwIfNoEntry: false });
     if (st && !st.isFile()) return false;
     if (st) {
@@ -1529,7 +1658,7 @@ export class Vault {
 
   /** Remove the file at `rel` if its sha1 is `expect`. Its folder stays. */
   removeRawIf(rel: string, expect: string): boolean {
-    const abs = this.abs(rel);
+    const abs = this.writeAt(rel);
     const cur = this.readRaw(rel);
     if (!cur || sha1(cur) !== expect) return false;
     fs.rmSync(abs, { force: true });
@@ -1537,12 +1666,12 @@ export class Vault {
   }
 
   mkdirRaw(rel: string): void {
-    fs.mkdirSync(this.abs(rel), { recursive: true });
+    fs.mkdirSync(this.writeAt(rel), { recursive: true });
   }
 
   rmdirRawIfEmpty(rel: string): boolean {
     try {
-      fs.rmdirSync(this.abs(rel));
+      fs.rmdirSync(this.writeAt(rel));
       return true;
     } catch {
       return false;
@@ -1729,8 +1858,8 @@ function sameFile(a: string, b: string): boolean {
   return !!x && !!y && x.ino === y.ino && x.dev === y.dev;
 }
 
-/** The vault's own id, kept in `.anydag/vault.json` so caches keyed by it survive a moved folder. */
-function vaultId(root: string): string {
+/** The id `.anydag/vault.json` claims, or `null` when the folder is not a vault yet. Reads only. */
+export function readVaultId(root: string): string | null {
   const file = path.join(root, ".anydag", "vault.json");
   try {
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as { id?: unknown };
@@ -1738,9 +1867,30 @@ function vaultId(root: string): string {
   } catch {
     /* not a vault yet */
   }
+  return null;
+}
+
+/**
+ * Write a vault's id. The `.anydag` folder is the app's own, so a link where it should be is
+ * refused: opening a downloaded folder must not write through it into somebody else's vault.
+ */
+export function writeVaultId(root: string, id: string): void {
+  const dir = path.join(root, ".anydag");
+  const st = fs.lstatSync(dir, { throwIfNoEntry: false });
+  if (st?.isSymbolicLink()) throw new Refused(`\`.anydag\` is a link: ${root}`);
+  if (st && !st.isDirectory()) throw new Refused(`\`.anydag\` is not a folder: ${root}`);
+  if (!st) fs.mkdirSync(dir, { recursive: true });
+  const realDir = fs.realpathSync(dir);
+  if (realDir !== path.join(fs.realpathSync(root), ".anydag")) throw new Refused(`\`.anydag\` is outside the vault: ${root}`);
+  writeAtomic(path.join(dir, "vault.json"), `${JSON.stringify({ id }, null, 1)}\n`);
+}
+
+/** The vault's own id, kept in `.anydag/vault.json` so caches keyed by it survive a moved folder. */
+function vaultId(root: string): string {
+  const had = readVaultId(root);
+  if (had) return had;
   const id = mint();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeAtomic(file, `${JSON.stringify({ id }, null, 1)}\n`);
+  writeVaultId(root, id);
   return id;
 }
 

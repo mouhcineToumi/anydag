@@ -84,19 +84,23 @@ export function OpenFolderForm({ onCancel }: { onCancel?(): void }) {
       </label>
       <div className="dag-vault__form-acts">
         {onCancel ? (
-          <button type="button" className="dag-icon dag-icon--wide" onClick={onCancel} disabled={busy}>
+          <button type="button" className="dag-button" onClick={onCancel} disabled={busy}>
             <span>Cancel</span>
           </button>
         ) : null}
-        <button type="submit" className="dag-icon dag-icon--wide" data-dag-vault-open-go="" disabled={busy || !path.trim()}>
+        <button
+          type="submit"
+          className="dag-button dag-button--primary"
+          data-dag-vault-open-go=""
+          disabled={busy || !path.trim()}
+        >
           <span>{busy ? "Opening…" : "Open"}</span>
         </button>
       </div>
-      {problem ? (
-        <p className="dag-vault__problem" role="alert" data-dag-vault-problem="">
-          {problem}
-        </p>
-      ) : null}
+      {/* Always in the flow, so a refusal replaces a line rather than pushing the actions down. */}
+      <p className="dag-vault__form-error" role="alert" data-dag-vault-problem={problem ? "" : undefined}>
+        {problem}
+      </p>
     </form>
   );
 }
@@ -152,10 +156,9 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
       </label>
       <label>
         <span>In the folder</span>
-        <span style={{ display: "flex", gap: 6 }}>
+        <span className="dag-vault__field-row">
           <input
             className="dag-sidebar__name-input"
-            style={{ flex: 1, minWidth: 0 }}
             data-dag-vault-create-parent=""
             spellCheck={false}
             autoComplete="off"
@@ -166,7 +169,7 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
           {browse ? (
             <button
               type="button"
-              className="dag-icon dag-icon--wide"
+              className="dag-button"
               data-dag-vault-create-browse=""
               disabled={busy}
               onClick={() => void browse().then((p) => p && setParent(p))}
@@ -178,24 +181,23 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
       </label>
       <div className="dag-vault__form-acts">
         {onCancel ? (
-          <button type="button" className="dag-icon dag-icon--wide" onClick={onCancel} disabled={busy}>
+          <button type="button" className="dag-button" onClick={onCancel} disabled={busy}>
             <span>Cancel</span>
           </button>
         ) : null}
         <button
           type="submit"
-          className="dag-icon dag-icon--wide"
+          className="dag-button dag-button--primary"
           data-dag-vault-create-go=""
           disabled={busy || !name.trim() || !where.trim()}
         >
           <span>{busy ? "Creating…" : "Create"}</span>
         </button>
       </div>
-      {problem ? (
-        <p className="dag-vault__problem" role="alert" data-dag-vault-problem="">
-          {problem}
-        </p>
-      ) : null}
+      {/* Always in the flow, so a refusal replaces a line rather than pushing the actions down. */}
+      <p className="dag-vault__form-error" role="alert" data-dag-vault-problem={problem ? "" : undefined}>
+        {problem}
+      </p>
     </form>
   );
 }

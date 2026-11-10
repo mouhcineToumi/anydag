@@ -8,16 +8,19 @@
  *
  * Load-bearing:
  * - **Nothing is held, listened for or posted unless the answer is yes.** `track` and `fail` return
- *   at once otherwise, and the error listeners are added only on yes.
+ *   at once otherwise, and the error listeners are added only on yes. With the build's `cloud`
+ *   switch off (`src/features.ts`), `startTelemetry` asks nothing: `/api/telemetry` is not
+ *   registered on that build, and the page must not be seen looking for it.
  * - **Never under `?snapshot=1` or `?view=1`**: a picture of a board, and a page somebody was handed
  *   to read, are not somebody using the app. `startTelemetry` does nothing there, and nothing asks.
- * - **A prop is one of `sync/protocol/logs.ts`'s words, a count or a duration** — the types say so,
+ * - **A prop is one of `api/protocol/logs.ts`'s words, a count or a duration** — the types say so,
  *   and `cleanEvent` runs here too, so a caller that passed anything else has it dropped before it
  *   is ever held.
  */
 
 import { useSyncExternalStore } from "react";
 
+import { cloudOn } from "@/features";
 import { desktop } from "@/vault/desktop";
 
 import {
@@ -30,7 +33,7 @@ import {
   type EventName,
   type LogEvent,
   type Props,
-} from "../../sync/protocol/logs";
+} from "../../api/protocol/logs";
 
 export interface TelemetryStatus {
   consent: boolean | null;
@@ -170,6 +173,9 @@ function opened(): void {
 /** Ask the server for the answer, once, when the page starts. */
 export async function startTelemetry(): Promise<void> {
   if (started || quietPage()) return;
+  /* Only a build that carries the features knows the question: `cloud` off (`src/features.ts`
+     reading what the server answered at boot) means no request for one that is not registered. */
+  if (!cloudOn()) return;
   started = true;
   try {
     const r = await fetch("/api/telemetry");

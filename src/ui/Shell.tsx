@@ -65,6 +65,7 @@ import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
 import { usePanel } from "@/assistant/panelState";
+import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
@@ -312,6 +313,12 @@ export function Shell({
      beside it, so a second delete is a second notice with its own time to read it. */
   const [trashed, setTrashed] = useState<{ gone: Gone[]; n: number } | null>(null);
 
+  /* What the server says this build may show of itself — sync, the logs question, Send feedback.
+     One answer at boot (`src/features.ts`); a build without it draws nothing of those, and here is
+     where the question's absence is decided once, not in the prompt's own component. */
+  const features = useFeatures();
+  const cloud = features?.cloud === true;
+
   const mode: "docked" | "overlay" | null = !narrow && docked ? "docked" : peeking || pinned ? "overlay" : null;
 
   /* On a phone the sidebar is the home screen: with nothing open there is no page to show,
@@ -501,14 +508,21 @@ export function Shell({
             : kind === "event"
               ? createNote(ask, blankEventText(next.start, next.end))
               : createFile(kind, ask, BLANK[kind]());
-        void making.then((made) => {
-          done(made !== null);
-          if (!made) return;
-          if (as !== "note") return bring(as, made);
+        return making.then((made) => {
+          if ("error" in made) {
+            done(false);
+            return made.error;
+          }
+          done(true);
+          if (as !== "note") {
+            bring(as, made.name);
+            return null;
+          }
           /* A note — or a task, which is one — is named in its own title at the top of its page
 , Notion's way: the row would be a second box asking the same question. */
-          nameWhenOpened(made);
-          onOpen("note", made);
+          nameWhenOpened(made.name);
+          onOpen("note", made.name);
+          return null;
         });
       },
       async upload(list, folder) {
@@ -531,10 +545,11 @@ export function Shell({
            opened with its title ready to type — a new note's way. `/create` numbers a
            name that is taken, so a folder already holding a note of that name is no obstacle. */
         const title = folderTitle(folder);
-        void createNote(`${folder}/${titleStem(title) || "project"}`, projectText(title)).then((made) => {
-          if (!made) return;
-          nameWhenOpened(made);
-          onOpen("note", made);
+        return createNote(`${folder}/${titleStem(title) || "project"}`, projectText(title)).then((made) => {
+          if ("error" in made) return made.error;
+          nameWhenOpened(made.name);
+          onOpen("note", made.name);
+          return null;
         });
       },
       project(name, change) {
@@ -551,11 +566,15 @@ export function Shell({
         let path = base;
         for (let i = 2; lower.has(path.toLowerCase()); i++) path = `${base} ${i}`;
         const done = guess({ op: "folder-add", path });
-        void createFolder(path).then((made) => {
-          done(made !== null);
-          if (!made) return;
+        return createFolder(path).then((made) => {
+          if ("error" in made) {
+            done(false);
+            return made.error;
+          }
+          done(true);
           if (parent) setFolders((had) => (had.has(parent) ? had : new Set([...had, parent])));
-          nameNext(folderKey(made));
+          nameNext(folderKey(made.folder));
+          return null;
         });
       },
       retitle(kind, name, title) {
@@ -729,15 +748,18 @@ export function Shell({
       (...a: A): R =>
         isLocked() ? (refuseLocked(), refused(...a)) : f(...a);
     const no = () => Promise.resolve(false);
+    /* A locked create says why through the lock's own notice and `Unlock`, so it does not also
+       put a second sentence under the tree. */
+    const refusedCreate = () => Promise.resolve<string | null>(null);
     return {
       ...raw,
-      newFile: held(raw.newFile, () => undefined),
+      newFile: held(raw.newFile, refusedCreate),
       upload: held(raw.upload, () => Promise.resolve([])),
       task: held(raw.task, () => undefined),
       event: held(raw.event, () => undefined),
-      makeProject: held(raw.makeProject, () => undefined),
+      makeProject: held(raw.makeProject, refusedCreate),
       project: held(raw.project, () => undefined),
-      newFolder: held(raw.newFolder, () => undefined),
+      newFolder: held(raw.newFolder, refusedCreate),
       retitle: held(raw.retitle, () => undefined),
       duplicate: held(raw.duplicate, () => undefined),
       /* Nothing went, so everything asked for is what is left — and stays selected. */
@@ -765,7 +787,7 @@ export function Shell({
     saveFavourites,
   ]);
 
-  const create = useCallback((kind: TextKind | "task" | "event", folder = "") => files.newFile(kind, folder), [files]);
+  const create = useCallback((kind: TextKind | "task" | "event", folder = "") => void files.newFile(kind, folder), [files]);
 
   const renamed = useCallback(
     (kind: FileKind, from: string, to: string) => moved({ kind: "file", file: kind, from, to }),
@@ -924,7 +946,7 @@ export function Shell({
           />
         ) : null}
         <LockNotice />
-        <TelemetryPrompt />
+        {cloud ? <TelemetryPrompt /> : null}
       </SidebarContext.Provider>
     </div>
   );

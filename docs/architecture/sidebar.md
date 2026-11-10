@@ -68,7 +68,11 @@ Fourteen things are load-bearing:
   an agent or Obsidian reads on disk says exactly what the person typed. A `/` in a title is a character,
   never a folder — moving is Move to… and a drag. A row says its title, or its name's last part for
   a file nobody titled, and the rows sort by what they say. With the column put away, it floats
-  over the page to ask.
+  over the page to ask. **The menu is the only control beside Files**, with its title naming every
+  kind it makes; the folder-with-plus that made a top-level folder at once is gone, because beside
+  the `+` it read as a second kind of New. **Folder** is the menu's own row, made where the menu says
+  — the open file's folder or the top level — still as `Untitled`, numbered when taken, with the
+  row's rename box open.
 - **Shell owns the operations, because it knows what is open.** A renamed or moved file stays open
   under the name the server settled on, a folder move carries the open file and the open folders
   with it (`rebase`), and a deleted one leaves nothing open. `fileActions` in `App` went with the
@@ -128,6 +132,14 @@ and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `da
 `dag:follow`. The retired `dag-sidebar__*` of the old board-list column
 survives only in a comment in `chrome.css`. The sidebar's rows are deliberately **not**
 `data-dag-board` or `.dag-board`: the search keeps those, and `boards.spec.ts` counts `.dag-board`.
+
+**A create that fails says why under the tree.** `/create` and `/mkdir` answer the server's own
+sentence now — `boardCall` carries `{ok: true, data}` or `{ok: false, error}` rather than a bare
+`null`, and `createFolder` returns `{folder}` or `{error}` — and `Shell` hands it back to the column.
+The row the list guessed at is taken back, the list stays as it was, and the sentence is drawn where
+a row would have appeared (`data-dag-sidebar-create-problem`). While locked, the New control refuses
+before its menu opens and the lock's notice says so, with **Unlock**: the same notice every other
+refusal uses, not a second one here.
 
 **Deleting asks nothing.** A row's Delete — a file, or a folder with everything in it
 — and a selection's go straight to the trash through `Shell`'s `trash`, which lets go of what went the

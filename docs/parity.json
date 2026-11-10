@@ -1,5 +1,5 @@
 {
-  "$comment": "The feature surface, once. Every route in server/routes, every `anydag` command and every MCP tool is named here, and test/parity.test.ts fails on one that is not — or on a name here that no longer exists. An interface is a list of names (done), {\"via\": [...], \"why\"} (covered by something more general), or {\"refused\"} (not offered, and why). REST and MCP are complete; the CLI is an admin tool, so a feature it does not carry says {\"admin\": false} there — valid for the CLI column alone. docs/PARITY.md is generated from this: `npm run parity`.",
+  "$comment": "The feature surface, once. Every route in server/routes, every `anydag` command and every MCP tool is named here, and test/parity.test.ts fails on one that is not — or on a name here that no longer exists. An interface is a list of names (done), {\"via\": [...], \"why\"} (covered by something more general), or {\"refused\"} (not offered, and why). REST and MCP are complete; the CLI is an admin tool, so a feature it does not carry says {\"admin\": false} there — valid for the CLI column alone. A feature a build does not always carry says \"flag\": \"cloud\" (the build switch of server/features.ts, told in docs/architecture/server.md). docs/PARITY.md is generated from this: `npm run parity`.",
   "features": [
     {
       "id": "account.me",
@@ -31,7 +31,8 @@
       "what": "Whether this install sends anonymous logs, and where they go — off until the person says yes",
       "rest": ["GET /api/telemetry", "PUT /api/telemetry"],
       "cli": ["telemetry"],
-      "mcp": {"refused": "Consent is the person's to give: an agent turning the logs on would be answering a question that was asked of somebody else."}
+      "mcp": {"refused": "Consent is the person's to give: an agent turning the logs on would be answering a question that was asked of somebody else."},
+      "flag": "cloud"
     },
     {
       "id": "account.telemetry.events",
@@ -39,7 +40,17 @@
       "what": "The page's own log events — errors, the features used, how fast a page drew",
       "rest": ["POST /api/telemetry/events"],
       "cli": {"refused": "Events are what the page observes about itself; a command that posted them would be logs nobody's use made."},
-      "mcp": {"refused": "Events are what the page observes about itself; an agent posting them would be inventing usage."}
+      "mcp": {"refused": "Events are what the page observes about itself; an agent posting them would be inventing usage."},
+      "flag": "cloud"
+    },
+    {
+      "id": "account.feedback",
+      "area": "Account",
+      "what": "Send a bug or an idea to the maintainers, with files and the text of chosen boards and notes — a public GitHub issue, through the relay; only when the person sends it or asks for it",
+      "rest": ["GET /api/feedback", "POST /api/feedback"],
+      "cli": {"admin": false},
+      "mcp": ["feedback"],
+      "flag": "cloud"
     },
     {
       "id": "vault.list",
@@ -631,7 +642,8 @@
       "what": "Whether a vault syncs to a sync server, and how it is going",
       "rest": ["GET /api/sync"],
       "cli": ["sync status"],
-      "mcp": ["sync_status"]
+      "mcp": ["sync_status"],
+      "flag": "cloud"
     },
     {
       "id": "sync.pair",
@@ -639,7 +651,8 @@
       "what": "Pair a vault with a sync server, with a one-time code",
       "rest": ["POST /api/sync/pair"],
       "cli": ["sync pair"],
-      "mcp": {"refused": "A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either."}
+      "mcp": {"refused": "A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either."},
+      "flag": "cloud"
     },
     {
       "id": "sync.remotes",
@@ -647,7 +660,8 @@
       "what": "The remote vaults the paired account holds",
       "rest": ["GET /api/sync/remotes"],
       "cli": ["sync remotes"],
-      "mcp": {"refused": "It is the list a link chooses from, and linking is the person's: a passphrase is the person's."}
+      "mcp": {"refused": "It is the list a link chooses from, and linking is the person's: a passphrase is the person's."},
+      "flag": "cloud"
     },
     {
       "id": "sync.link",
@@ -655,7 +669,8 @@
       "what": "Link a vault: upload it as a new remote, download a remote into an empty vault, or merge the two",
       "rest": ["POST /api/sync/link"],
       "cli": ["sync link"],
-      "mcp": {"refused": "A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either."}
+      "mcp": {"refused": "A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either."},
+      "flag": "cloud"
     },
     {
       "id": "sync.unlink",
@@ -663,7 +678,8 @@
       "what": "Stop syncing a vault, keeping its files and the remote",
       "rest": ["POST /api/sync/unlink"],
       "cli": ["sync unlink"],
-      "mcp": {"refused": "Undoing a link is the person's, as making one is: a passphrase is the person's, and so is the decision to stop using it."}
+      "mcp": {"refused": "Undoing a link is the person's, as making one is: a passphrase is the person's, and so is the decision to stop using it."},
+      "flag": "cloud"
     },
     {
       "id": "sync.now",
@@ -671,7 +687,8 @@
       "what": "Pull and push now",
       "rest": ["POST /api/sync/now"],
       "cli": ["sync now"],
-      "mcp": ["sync_now"]
+      "mcp": ["sync_now"],
+      "flag": "cloud"
     },
     {
       "id": "sync.devices",
@@ -679,7 +696,8 @@
       "what": "The devices paired into the sync account",
       "rest": ["GET /api/sync/devices"],
       "cli": ["sync devices"],
-      "mcp": {"refused": "The account's devices are the person's to manage, beside the passphrase that is theirs."}
+      "mcp": {"refused": "The account's devices are the person's to manage, beside the passphrase that is theirs."},
+      "flag": "cloud"
     },
     {
       "id": "sync.revoke",
@@ -687,7 +705,8 @@
       "what": "Sign a device out of the sync account",
       "rest": ["POST /api/sync/devices/revoke"],
       "cli": ["sync devices revoke"],
-      "mcp": {"refused": "Signing a device out is the person's, beside the passphrase that is theirs."}
+      "mcp": {"refused": "Signing a device out is the person's, beside the passphrase that is theirs."},
+      "flag": "cloud"
     },
     {
       "id": "item.show",

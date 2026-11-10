@@ -45,6 +45,14 @@ on:
       retention-days:
         type: number
         default: 7
+      logs_url:
+        description: "Where a release build sends logs when its person said yes (#99). Empty in a checkout build."
+        type: string
+        default: ""
+      feedback_url:
+        description: "Where a release build relays feedback (#99). Empty in a checkout build."
+        type: string
+        default: ""
     secrets:
       CSC_LINK:
         required: false
@@ -98,7 +106,14 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: node scripts/check-version.mjs "$TAG"
       - run: npm ci
-      - run: npm run desktop:build
+      - name: Build
+        run: npm run desktop:build
+        env:
+          # Release builds point logs and feedback at api.anydag.com (#99): a caller that names no
+          # address, as every pull request's build is, bakes in none, and nothing reads one until
+          # #103's cloud switch is on.
+          ANYDAG_LOGS_BUILD_URL: ${{ inputs.logs_url }}
+          ANYDAG_FEEDBACK_BUILD_URL: ${{ inputs.feedback_url }}
       - name: Package
         run: node desktop/package.mjs
         env:

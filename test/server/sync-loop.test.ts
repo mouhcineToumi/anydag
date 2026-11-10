@@ -1,7 +1,7 @@
 /**
  * Linking and the sync loop (`server/sync/loop.ts`, `link.ts`, `server/routes/sync.ts`): two and
  * three app sessions — each its own home and vault folder — against one real sync server on a real
- * port (`sync/test/helpers.ts`, PGlite), every step through the app's own `/api/sync` routes.
+ * port (`api/test/helpers.ts`, PGlite), every step through the app's own `/api/sync` routes.
  */
 
 import "./sqlite-shim";
@@ -11,16 +11,16 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 
 import { serve, type ServerType } from "@hono/node-server";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../server/app";
 import { Session } from "../../server/context";
 import { Home } from "../../server/home";
 import { TUNE } from "../../server/sync/loop";
 import type { SyncDevices, SyncLinked, SyncPaired, SyncRemotes, SyncStatus } from "../../server/sync/types";
-import type { Change } from "../../server/vault";
-import { harness, type Harness } from "../../sync/test/helpers";
-import { mintPairCode } from "../../sync/server/routes/pair";
+import { Vault, type Change } from "../../server/vault";
+import { harness, type Harness } from "../../api/test/helpers";
+import { mintPairCode } from "../../api/server/routes/pair";
 import { makeEnv, NOTE, readText, write, type Env } from "./helpers";
 
 const PASS = "correct horse battery";
@@ -81,11 +81,11 @@ async function until(what: string, ok: () => boolean | Promise<boolean>, ms = 80
 /**
  * The status once the loop has gone quiet: idle with nothing pending, as one observation.
  *
- * A status is a moment, and the loop makes moments the caller did not ask for. The watcher starts
- * with the loop and reports the files a link or a pull has just written *afterwards* — late, and
- * later still on a busy machine — each batch is touched, debounced (`quietMs`) and run, and the run
- * finds the disk equal to the base and pushes nothing. Reading `GET /api/sync` straight after the
- * call that caused it asserts a state that run has every right to be in the middle of.
+ * A status is a moment, and the loop makes moments the caller did not ask for. The watcher reports
+ * a write *afterwards* — late, and later still on a busy machine. Sync's own writes no longer wake
+ * the loop (#36, `server/sync/echo.ts`), but a test's write can be heard after `now` has already
+ * pushed it, and is debounced (`quietMs`) into a run of its own. Reading `GET /api/sync` straight
+ * after the call that caused it asserts a state that run has every right to be in the middle of.
  */
 async function settled(a: App, what = "the loop"): Promise<SyncStatus> {
   let seen: SyncStatus | null = null;
@@ -97,6 +97,31 @@ async function settled(a: App, what = "the loop"): Promise<SyncStatus> {
 }
 
 const has = (root: string, rel: string): boolean => fs.existsSync(path.join(root, ...rel.split("/")));
+
+const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Once this returns, the watcher has reported everything written in `root` before it was called.
+ * A watcher reports in order, so a file that never syncs (a writer's temp name), written last and
+ * heard, is behind every event before it.
+ */
+async function heardAll(vault: Vault, root: string): Promise<void> {
+  const name = `.heard.${process.pid}.tmp`;
+  let heard = false;
+  const off = await vault.subscribeRaw((rels) => {
+    if (rels.includes(name)) heard = true;
+  });
+  try {
+    write(root, name, "x");
+    await until("the watcher to catch up", () => heard);
+  } finally {
+    off();
+    fs.rmSync(path.join(root, name), { force: true });
+  }
+}
+
+/** Long enough for a debounce the last events armed to have fired and its run to have started. */
+const DEBOUNCED = TUNED.maxMs + 4 * TUNED.quietMs;
 
 beforeAll(async () => {
   h = await harness("pglite");
@@ -182,6 +207,32 @@ describe("linking two vaults through /api/sync", () => {
     expect(await settled(B, "B")).toMatchObject({ linked: true, remote });
   });
 
+  it("a download says syncing once, and its files wake no second run (#36)", { timeout: 30_000 }, async () => {
+    const D = app();
+    await paired(D);
+    // The download re-keys the vault into a new `Vault` while the call runs, so the feed is read
+    // where every vault says it: each status D's loops say, from before the link to well after.
+    const said: SyncStatus[] = [];
+    const emit = Vault.prototype.emit;
+    const spy = vi.spyOn(Vault.prototype, "emit").mockImplementation(function (this: Vault, c: Change) {
+      if (this.root === D.env.root && c.type === "sync") said.push(c.status);
+      return emit.call(this, c);
+    });
+    try {
+      const got = await D.call("POST", "/api/sync/link", { mode: "download", remote, passphrase: PASS });
+      expect(got.status, JSON.stringify(got.json)).toBe(200);
+      expect(readText(D.env.root, "plan.md")).toBe(NOTE);
+      await heardAll(D.s.vault, D.env.root);
+      await pause(DEBOUNCED);
+      expect(said.filter((s) => s.state === "syncing")).toHaveLength(1);
+      expect(said.filter((s) => s.linked && s.pending > 0)).toEqual([]);
+      expect(said.at(-1)).toMatchObject({ state: "idle", pending: 0 });
+    } finally {
+      spy.mockRestore();
+      await D.call("POST", "/api/sync/unlink");
+    }
+  });
+
   it("refuses a download into a vault that holds documents, and opens the key with the recovery code", {
     timeout: 30_000,
   }, async () => {
@@ -253,6 +304,47 @@ describe("linking two vaults through /api/sync", () => {
     await A.call("POST", "/api/sync/now");
     expect(readText(A.env.root, "from-b.md")).toContain("Written in B.");
     off();
+  });
+
+  it("a pull wakes no second run for the files it wrote (#36)", { timeout: 30_000 }, async () => {
+    // A loop with no poke, so the only run is the one asked for.
+    await B.s.sync.closed(B.s.vault.id);
+    await B.s.sync.start(B.s.vault);
+    await settled(B, "B");
+    write(A.env.root, "pulled.md", "---\ntitle: Pulled\n---\nFrom A.\n");
+    write(A.env.root, "deep/er/pulled.md", "---\ntitle: Deeper\n---\nFrom A, in a folder B has not got.\n");
+    await A.call("POST", "/api/sync/now");
+
+    const said: SyncStatus[] = [];
+    const off = await B.s.vault.subscribe((c: Change) => {
+      if (c.type === "sync") said.push(c.status);
+    });
+    try {
+      expect((await B.call("POST", "/api/sync/now")).json).toMatchObject({ state: "idle", pending: 0 });
+      expect(readText(B.env.root, "deep/er/pulled.md")).toContain("in a folder");
+      // Every event the pull's writes made has reached the loop, and any debounce it armed has fired.
+      await heardAll(B.s.vault, B.env.root);
+      await pause(DEBOUNCED);
+      expect(said.filter((s) => s.state === "syncing")).toHaveLength(1);
+      expect(said.filter((s) => s.pending > 0)).toEqual([]);
+      expect(said.at(-1)).toMatchObject({ state: "idle", pending: 0 });
+    } finally {
+      off();
+    }
+  });
+
+  it("a write over a file a pull has just written still pushes after the debounce (#36)", { timeout: 30_000 }, async () => {
+    await settled(B, "B");
+    write(A.env.root, "both.md", "---\ntitle: Both\n---\nFrom A.\n");
+    await A.call("POST", "/api/sync/now");
+    expect((await B.call("POST", "/api/sync/now")).json).toMatchObject({ state: "idle" });
+    // At once, before or with the watcher's report of the pull's own write.
+    write(B.env.root, "both.md", "---\ntitle: Both\n---\nFrom A.\nAnd B, at once.\n");
+    const before = (await h.meta.heads(remote, "", 1)).seq;
+    await until("B to push its write", async () => (await h.meta.heads(remote, "", 1)).seq > before);
+    await settled(B, "B");
+    await A.call("POST", "/api/sync/now");
+    expect(readText(A.env.root, "both.md")).toContain("And B, at once.");
   });
 
   it("lists the devices, and a revoked device pauses with a reason", { timeout: 15_000 }, async () => {
@@ -346,6 +438,22 @@ describe("what a process that is not the app does with a linked vault", () => {
       expect(fs.existsSync(path.join(F.env.homeDir, "home.secret"))).toBe(false);
     } finally {
       await s.closeAll();
+    }
+  });
+});
+
+describe("pairing over plain http", () => {
+  it("is refused unless the server is on this machine: the device token travels in every request", async () => {
+    const X = app();
+    for (const server of ["http://sync.example.com", "http://192.168.1.20:8790", "http://127.0.0.1.example.com"]) {
+      const got = await X.call("POST", "/api/sync/pair", { server, code: "AAAAA-AAAAA" });
+      expect(got.status, server).toBe(400);
+      expect(String((got.json as { error?: string; message?: string }).error ?? JSON.stringify(got.json))).toMatch(/https:\/\//);
+    }
+    // On this machine it gets as far as the code, which is the sync server's to judge.
+    for (const server of ["http://localhost:1", "http://127.0.0.2:1", "http://[::1]:1"]) {
+      const got = await X.call("POST", "/api/sync/pair", { server, code: "AAAAA-AAAAA" });
+      expect(got.status, server).toBe(502);
     }
   });
 });

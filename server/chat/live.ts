@@ -6,7 +6,7 @@
  * changes, the approvals it is waiting on — and written once, as `<turnId>.json`, when it ends. The
  * agent reaches the vault through `anydag-server mcp --chat <id>`, which calls this server's routes
  * with `X-AnyDag-Chat`; `guard` is what every one of those requests goes through, and it is where the
- * reach, the mode, the approvals and the change recorder are enforced. Nothing here trusts the prompt.
+ * reach, the approvals and the change recorder are enforced. Nothing here trusts the prompt.
  */
 
 import fs from "node:fs";
@@ -18,7 +18,7 @@ import type { Context, Next } from "hono";
 import type { Session } from "../context";
 import { err } from "../http";
 import type { Harness, HarnessEvent, McpCommand, Running } from "./harness";
-import { isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
+import { guessed, isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
 import { installFsHooks, record, undo, type Op } from "./record";
 import { ChatStore, newId, validChatId } from "./store";
 import {
@@ -42,7 +42,13 @@ const APPROVAL_MS = 5 * 60_000;
 /** The longest tool answer a turn keeps: the model saw it all, the page needs the gist. */
 const OUTPUT_CAP = 4000;
 
-/** The writes a chat may make at all. Anything else non-GET is refused, whatever the mode. */
+/** A tool call the model wrote into its reply instead of calling: `<invoke name=…>` / `<parameter name=…>`. */
+const WRITTEN_CALL = /<(?:invoke|parameter)\s+name=/;
+
+/** What the person sees when that happened. The raw text goes only to the server log. */
+const WRITTEN_CALL_ERROR = "The model wrote a tool call as text instead of calling it, and no tool ran. Nothing was changed.";
+
+/** The writes a chat may make at all. Anything else non-GET is refused, whatever the grant. */
 const WRITES = new Set([
   "/__board/create",
   "/__board/patch",
@@ -101,6 +107,8 @@ interface Live {
   waiting: Map<string, Waiting>;
   /** Provider session this turn runs in. */
   session: string | null;
+  /** Set when the turn must fail whatever the harness says: a tool call written into the reply. */
+  broken?: string;
 }
 
 export interface AssistantOptions {
@@ -108,7 +116,7 @@ export interface AssistantOptions {
   token: string;
   harnesses: Partial<Record<Provider, Harness>>;
   /** How the chat's MCP server is started; the default re-runs this process as `mcp --chat`. */
-  mcp?: (chat: string, mode: Mode, origin: { port: number; token: string }) => McpCommand;
+  mcp?: (chat: string, origin: { port: number; token: string }) => McpCommand;
   /** Where a run's scratch files go. */
   scratch?: string;
 }
@@ -207,10 +215,7 @@ export class Assistant {
     return { ...l.turn, steps, blocks: l.turn.blocks.map((b) => ({ ...b })) };
   }
 
-  create(
-    vault: string | null | undefined,
-    o: { provider: Provider; model: string; effort?: string; mode?: Mode; title?: string },
-  ): ChatMeta {
+  create(vault: string | null | undefined, o: { provider: Provider; model: string; effort?: string; title?: string }): ChatMeta {
     const v = this.s.pick(vault).vault;
     if (!this.opts.harnesses[o.provider]) throw err(400, `\`${o.provider}\` is not available here`, { code: "provider" });
     const meta = this.store.create(v.root, {
@@ -219,7 +224,6 @@ export class Assistant {
       provider: o.provider,
       model: o.model,
       ...(o.effort ? { effort: o.effort } : {}),
-      mode: o.mode ?? "ask",
     });
     this.emit(meta.id, { type: "chat", chat: meta });
     return meta;
@@ -256,6 +260,7 @@ export class Assistant {
       if (s) await this.opts.harnesses[p]!.forget(s.id).catch(() => undefined);
     }
     this.store.remove(root, chat);
+    this.emit(chat, { type: "gone", chat });
   }
 
   /* -- a turn ------------------------------------------------------------------------------ */
@@ -264,7 +269,7 @@ export class Assistant {
   say(
     chat: string,
     text: string,
-    o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null; mode?: Mode } = {},
+    o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null } = {},
   ): Turn {
     const words = text.trim();
     if (!words) throw err(400, "say something");
@@ -281,7 +286,6 @@ export class Assistant {
         if (o.effort) m.effort = o.effort;
         else delete m.effort;
       }
-      if (o.mode) m.mode = o.mode;
       if (isUntitled(m)) m.title = titleFrom(words);
     });
     const harness = this.opts.harnesses[meta.provider];
@@ -298,7 +302,6 @@ export class Assistant {
       provider: meta.provider,
       model: meta.model,
       ...(meta.effort ? { effort: meta.effort } : {}),
-      mode: meta.mode,
       steps: [],
       blocks: [],
       status: "running",
@@ -326,10 +329,10 @@ export class Assistant {
             chat,
             model: meta.model,
             ...(meta.effort ? { effort: meta.effort } : {}),
-            system: systemPrompt({ mode: meta.mode, ...this.reach(meta) }),
+            system: systemPrompt(this.reach(meta)),
             prompt: seeded(unseen, words),
             ...(resume ? { resume } : { fresh }),
-            mcp: this.mcpFor(chat, meta.mode),
+            mcp: this.mcpFor(chat),
             scratch,
           },
           (e) => this.heard(live, e),
@@ -351,22 +354,31 @@ export class Assistant {
     const others: { id: string; name: string }[] = [];
     for (const v of this.s.served()) {
       const name = path.basename(v.root);
-      if (v.id === meta.home) reach.push({ id: v.id, name, mode: meta.mode, home: true });
-      else if (grants[v.id]) reach.push({ id: v.id, name, mode: meta.mode === "ask" ? "ask" : grants[v.id]!.mode, home: false });
+      if (v.id === meta.home) reach.push({ id: v.id, name, mode: "edit", home: true });
+      else if (grants[v.id]) reach.push({ id: v.id, name, mode: grants[v.id]!.mode, home: false });
       else others.push({ id: v.id, name });
     }
     return { reach, others };
   }
 
-  private mcpFor(chat: string, mode: Mode): McpCommand {
+  private mcpFor(chat: string): McpCommand {
     const origin = { port: this.port, token: this.opts.token };
-    if (this.opts.mcp) return this.opts.mcp(chat, mode, origin);
-    const env = { ANYDAG_CHAT_PORT: String(this.port), ANYDAG_TOKEN: this.opts.token, ANYDAG_HOME: this.s.home.dir };
+    if (this.opts.mcp) return this.opts.mcp(chat, origin);
+    const env: Record<string, string> = {
+      ANYDAG_CHAT_PORT: String(this.port),
+      ANYDAG_TOKEN: this.opts.token,
+      ANYDAG_HOME: this.s.home.dir,
+    };
+    /* The desktop app runs this server as Electron-as-Node, so `process.execPath` is Electron. The
+       MCP child is the same binary running `mcp --chat`; without the switch it starts as an Electron
+       app, fails to open a window (its env has no display) and dies before it speaks MCP. */
+    const electron = process.env.ELECTRON_RUN_AS_NODE;
+    if (electron) env.ELECTRON_RUN_AS_NODE = electron;
     const bin = process.env.ANYDAG_CHAT_MCP_BIN;
-    if (bin) return { command: bin, args: ["mcp", "--chat", chat, "--mode", mode], env };
+    if (bin) return { command: bin, args: ["mcp", "--chat", chat], env };
     return {
       command: process.execPath,
-      args: [...process.execArgv, process.argv[1]!, "mcp", "--chat", chat, "--mode", mode],
+      args: [...process.execArgv, process.argv[1]!, "mcp", "--chat", chat],
       env,
     };
   }
@@ -378,6 +390,26 @@ export class Assistant {
     return index;
   }
 
+  /**
+   * The reply text, unless the model wrote a tool call into it. A turn with no tool step yet that
+   * says `<invoke name=…>` or `<parameter name=…>` has guessed the protocol: the text is the server's
+   * log's, never the person's answer, and the turn fails.
+   */
+  private said(live: Live, text: string): void {
+    if (live.turn.steps.some((s) => s.kind === "tool")) {
+      if (text.trim()) this.push(live, { kind: "text", text });
+      return;
+    }
+    if (WRITTEN_CALL.test(text)) {
+      live.broken ??= WRITTEN_CALL_ERROR;
+      console.error(`anydag: chat ${live.turn.chat}: the model wrote a tool call as text; no tool ran:\n${text}`);
+      if (!live.turn.steps.some((s) => s.kind === "error" && s.text === WRITTEN_CALL_ERROR))
+        this.push(live, { kind: "error", text: WRITTEN_CALL_ERROR });
+      return;
+    }
+    if (text.trim()) this.push(live, { kind: "text", text });
+  }
+
   private heard(live: Live, e: HarnessEvent): void {
     const chat = live.turn.chat;
     switch (e.kind) {
@@ -387,7 +419,7 @@ export class Assistant {
         return;
       case "text":
         live.typing = "";
-        if (e.text.trim()) this.push(live, { kind: "text", text: e.text });
+        this.said(live, e.text);
         return;
       case "tool":
         live.typing = "";
@@ -417,24 +449,34 @@ export class Assistant {
       clearTimeout(w.timer);
       w.resolve(null);
     }
-    if (live.typing.trim()) live.turn.steps.push({ kind: "text", text: live.typing });
+    if (live.typing.trim()) this.said(live, live.typing);
     live.typing = "";
-    if (end.error && !live.stopping && !live.turn.steps.some((s) => s.kind === "error" && s.text === end.error))
-      live.turn.steps.push({ kind: "error", text: end.error });
-    live.turn.status = live.stopping ? "stopped" : end.error ? "failed" : "done";
+    const failure = live.broken ?? end.error;
+    if (failure && !live.stopping && !live.turn.steps.some((s) => s.kind === "error" && s.text === failure))
+      live.turn.steps.push({ kind: "error", text: failure });
+    live.turn.status = live.stopping ? "stopped" : failure ? "failed" : "done";
     live.turn.ended = new Date().toISOString();
     if (end.usage) live.turn.usage = end.usage;
     live.turn.blocks = live.turn.blocks.filter((b) => b.ops.length);
     try {
       this.store.writeTurn(live.root, live.turn);
-      if (live.session)
+    } catch (e) {
+      console.error(`anydag: chat ${live.turn.chat}: the turn could not be kept:`, e);
+    }
+    try {
+      /* A failed turn that ran no tool was the model guessing without them: it is not resumable,
+         and the session it ran in is dropped so the next turn starts fresh and seeds the transcript
+         instead. A turn that failed after a tool ran (an overloaded API, a dropped connection) did
+         change the vault, so its session is kept for the next turn to resume. */
+      if (guessed(live.turn)) this.store.setSession(live.turn.chat, live.turn.provider, null);
+      else if (live.session)
         this.store.setSession(live.turn.chat, live.turn.provider, {
           id: live.session,
           model: live.turn.model,
           turn: live.turn.id,
         });
     } catch (e) {
-      console.error(`anydag: chat ${live.turn.chat}: the turn could not be kept:`, e);
+      console.error(`anydag: chat ${live.turn.chat}: the provider session could not be kept:`, e);
     }
     this.live.delete(live.turn.chat);
     fs.rmSync(scratch, { recursive: true, force: true });
@@ -487,7 +529,7 @@ export class Assistant {
   }
 
   /**
-   * Every request carrying `X-AnyDag-Chat` comes through here: the reach, the mode, the approval,
+   * Every request carrying `X-AnyDag-Chat` comes through here: the reach, the approval,
    * and the recording of what it changed.
    */
   async guard(c: Context, next: Next): Promise<Response | void> {
@@ -502,23 +544,20 @@ export class Assistant {
     }
     const meta = live.meta;
     const vault = c.req.query("vault") || meta.home;
-    const mode = this.modeIn(meta, live.turn.mode, vault);
+    const mode = this.modeIn(meta, vault);
     if (!mode)
       throw err(403, `this chat does not reach vault \`${vault}\`; ask for it with vault_request`, { code: "not-granted" });
     if (!reads && mode === "ask") {
       throw err(
         403,
-        live.turn.mode === "ask"
-          ? "this chat is in Ask mode: it cannot change anything"
-          : `vault \`${vault}\` was granted to read only`,
-        { code: "ask-mode" },
+        `vault \`${vault}\` was granted to read only; call vault_request with mode \`edit\` to ask the person for more`,
+        { code: "read-only" },
       );
     }
     if (p === "/__board/transfer") {
       const body = (await c.req.json().catch(() => ({}))) as { to?: unknown };
       const to = typeof body.to === "string" ? body.to : "";
-      if (this.modeIn(meta, live.turn.mode, to) !== "edit")
-        throw err(403, `this chat may not change vault \`${to}\``, { code: "not-granted" });
+      if (this.modeIn(meta, to) !== "edit") throw err(403, `this chat may not change vault \`${to}\``, { code: "not-granted" });
     }
     return this.s.within(vault, async () => {
       if (reads) return next();
@@ -544,12 +583,12 @@ export class Assistant {
     });
   }
 
-  /** What a chat may do in a vault: its own turn's mode at home, its grant elsewhere, or nothing. */
-  private modeIn(meta: ChatMeta, turnMode: Mode, vault: string): Mode | null {
-    if (vault === meta.home) return turnMode;
+  /** What a chat may do in a vault: its grant's mode, or nothing. Its own vault is always changeable. */
+  private modeIn(meta: ChatMeta, vault: string): Mode | null {
+    if (vault === meta.home) return "edit";
     const g = meta[`grant:${vault}`];
     if (!g) return null;
-    return turnMode === "ask" ? "ask" : g.mode;
+    return g.mode;
   }
 
   private async detailOf(c: Context): Promise<string> {
@@ -592,7 +631,7 @@ export class Assistant {
     } catch {
       return { granted: false, error: `vault \`${vault}\` is not open; vault_list says which are` };
     }
-    if (vault === live.meta.home) return { granted: true, mode: live.turn.mode };
+    if (vault === live.meta.home) return { granted: true, mode: "edit" };
     const had = live.meta[`grant:${vault}`];
     if (had && (had.mode === "edit" || mode === "ask")) return { granted: true, mode: had.mode };
     const yes = await this.ask(live, {

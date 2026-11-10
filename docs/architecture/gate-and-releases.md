@@ -35,7 +35,7 @@ merge. Rulesets on GitHub hold all of it: a pull request for `main`, `develop`, 
 
 **A release is a tag, and the workflow checks where it stands.** `release.yml` runs on `v*` tags that
 are not nightlies: a stable tag must be on `main` and a beta on `release/<core>` or `hotfix/<core>`.
-It runs the whole tier — `checks.yml` with the sync harness and the Postgres suites, `e2e.yml` with
+It runs the whole tier — `checks.yml` with the api's harness and its Postgres suites, `e2e.yml` with
 `scope: full`, the desktop app packaged and opened on Linux, Windows and macOS (signing where the
 secrets allow — see *The desktop app*) — and publishes only when `scripts/check-release-assets.mjs`
 finds every installer and the update feeds for the version's channel.
@@ -82,7 +82,25 @@ job and not in the hook. Biome's own promise rules are not used: they infer type
 missed an unawaited `fs.readFile()` while flagging correct code. **knip** (`knip.jsonc`) holds the count
 of unused files, exports and dependencies at zero; each exception in it says why.
 
-`.githooks/pre-commit` runs the fast tier, and `npm run prepare` installs the hooks with
+**Secrets are refused before anything else** (`scripts/secrets.sh`, gitleaks with `.gitleaks.toml`).
+The repository is public — the API server too — so a pushed secret is a published one, and no later
+commit or history rewrite takes it back; the scan is the one check whose failure cannot be fixed after
+the fact. It runs in three places: the pre-commit hook over the **staged** changes (`staged` — it reads
+the index, which the rest of the hook does not, and needs no stash to do it), before the fast tier and
+whether or not `node_modules` exists; `ci.yml`'s `secrets` job over the commits a pull request or push
+adds (`range`, or `all` for a new branch), part of `CI passed`; and `nightly.yml` over the whole history
+of `develop` (`all`), because a pull request's scan sees only its own commits and a newer gitleaks knows
+key shapes an older one did not. Both CI jobs first run `selftest`, which plants a GitHub token in a
+throwaway repository and fails if it is not refused — the guard against an allowance written so wide
+that every scan passes. **An allowance in `.gitleaks.toml` names a file and a string, both**
+(`condition = "AND"`), never a directory or a rule. Without gitleaks the hook warns and lets the commit
+through (a hook that refuses every commit on a machine without the binary is a hook people turn off);
+in CI, where `CI` is set, a missing binary is a failure. CI installs one pinned version, checked against
+its published sha256 (`.github/actions/gitleaks/`). GitHub's own secret scanning and push protection are
+on for the repository too (Settings → Code security). If a secret gets through: revoke it first
+(`SECURITY.md`, *If a secret was committed*).
+
+`.githooks/pre-commit` runs the secret scan and then the fast tier, and `npm run prepare` installs the hooks with
 `git config core.hooksPath .githooks` — relative on purpose, so one setting serves every worktree.
 `prepare` is `scripts/hooks.mjs`, which does nothing without git or a repository, because `npm ci`
 runs it where there may be neither — and is Node, because npm runs a script line with `cmd.exe` on
@@ -107,8 +125,10 @@ by whatever fonts the machine has, and a host's layout is not the image's.
 |---|---|---|
 | `ci.yml` → `CI passed` | the fast tier and `promises` (`checks.yml`); the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
 | `e2e.yml` → `e2e` | the `@smoke` tier on a pull request; the whole suite sharded four ways on a push, with the shards' reports merged into one | the same branches; `workflow_call` with `scope: smoke \| full` |
+| `ci.yml` → `secrets` (in `CI passed`) | gitleaks over the commits the pull request or push adds; the selftest first | the same events as `ci.yml` |
 | `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
 | `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
+| `deploy.yml` → `backup and restore` | the api's deployment restored: a stack up, data through Caddy, `backup.sh`, a fresh stack, `restore.sh`, and the data read back | pull requests and pushes that touch `deploy/**` or `api/**`; a weekly cron (Monday 03:15 UTC); a button |
 | `codeql.yml`, `dependency-review.yml` | static security analysis; new dependencies' advisories and licences | pull requests and develop; not required |
 
 `CI passed` and `e2e` are summary jobs: a reusable workflow's jobs do not exist when the job that calls
@@ -125,7 +145,7 @@ for a surface that has one — the tier is under a minute on purpose.
 a remote) → no tests, one line saying so. Otherwise `scripts/e2e-plan.mjs` reads the diff against
 `origin/develop` (else `origin/main`, else the whole suite) and answers with a `--grep`: docs, CI config
 and unit tests run nothing; application code the `@smoke` tier; what can move pixels (`boards/`,
-`icons/`, the drawing layers of `src/`) also `reference.spec.ts`; `sync/` also `sync.spec.ts`; and a
+`icons/`, the drawing layers of `src/`) also `reference.spec.ts`; `api/` and `server/sync/` also `sync.spec.ts`; and a
 change under `e2e/` the specs Playwright's `--only-changed` traces it to. It runs in the image when
 Docker answers, else on the host with no screenshots, and says which. The number of browsers comes from
 the machine (`scripts/e2e-lib.sh`: cores − 2 and free memory at 600 MB a worker, clamped to 1..6) and the

@@ -21,7 +21,7 @@
  *   pixels   what changes how a board is drawn (`boards/`, `icons/`, `public/`, and the drawing
  *            layers of `src/`): also `reference.spec.ts`, the 45 screenshots, because the smoke tier
  *            holds only ten of them
- *   sync     the sync server and its client: also `sync.spec.ts`
+ *   sync     the sync server (api/) and its client: also `sync.spec.ts`
  *   harness  the way the suite is run (`playwright.config.ts`, the lockfile, `scripts/e2e-*`): the
  *            smoke tier, to prove the suite still runs
  *
@@ -41,14 +41,14 @@ const RULES = [
   [/^e2e\/[^/]+-snapshots\//, "snapshot"],
   [/^e2e\//, "spec"],
   [/^(playwright\.config\.ts|package(-lock)?\.json|scripts\/e2e-[^/]+|\.github\/workflows\/e2e\.yml)$/, "harness"],
-  [/^(sync\/|server\/sync\/)/, "sync"],
+  [/^(api\/|server\/sync\/)/, "sync"],
   [/^boards\//, "pixels"],
   [/^(icons\/|public\/|index\.html$)/, "pixels"],
   [/^src\/(render|layout|theme|styles|dsl|quality|view|board)\//, "pixels"],
   /* Prose. Under `boards/` a `.md` is a fixture the suite draws, and was caught above. */
   [/\.md$/, "ignore"],
   [/^(docs|\.github|\.githooks|\.claude|test|skills|desktop)\//, "ignore"],
-  [/^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|stamp\.mjs|icons\/.*|sync-demo\.sh)$/, "ignore"],
+  [/^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh)$/, "ignore"],
   [/^(LICENSE[^/]*|CODEOWNERS|\.gitignore|\.gitattributes|\.editorconfig|biome\.jsonc?|renovate\.json|VERSION)$/, "ignore"],
 ];
 

@@ -12,8 +12,14 @@ export default defineConfig({
       "elkjs/lib/elk-worker.min.js?worker": fileURLToPath(new URL("./test/elk-worker-stub.ts", import.meta.url)),
     },
   },
+  /* The build's feature switch (`server/features.ts`): the suite runs on, without a build.
+     A test that wants a feature off passes `ANYDAG_CLOUD=off` in its own environment — the
+     override is read per call, which is what makes that a test rather than a rebuild. */
+  define: {
+    __ANYDAG_CLOUD__: JSON.stringify(process.env.ANYDAG_CLOUD_BUILD === "off" ? "" : "on"),
+  },
   test: {
-    include: ["test/**/*.test.ts", "sync/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "api/**/*.test.ts"],
     environment: "node",
     /*
      * **Modules are shared between the files a worker runs, and two workers run them.** Isolated,

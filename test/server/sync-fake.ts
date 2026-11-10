@@ -28,8 +28,8 @@ import type {
   StaleKey,
   VaultKey,
   VaultsResponse,
-} from "../../sync/protocol/wire";
-import { MAX_CHANGES, MAX_PAGE, PROTOCOL, STATUS } from "../../sync/protocol/wire";
+} from "../../api/protocol/wire";
+import { MAX_CHANGES, MAX_PAGE, PROTOCOL, STATUS } from "../../api/protocol/wire";
 import { SyncError, type SyncApi } from "../../server/sync/client";
 
 const fail = (code: ErrorCode, message: string, extra: Partial<ErrorBody> = {}): never => {
@@ -93,7 +93,7 @@ export class FakeServer {
       const seq = ++this.seq;
       const size = c.blob ? this.blobs.get(c.blob)!.byteLength : 0;
       this.log.push({ seq, key: c.key, parent: c.parent, blob: c.blob, size, meta: c.meta, device, at });
-      this.heads.set(c.key, { key: c.key, seq, blob: c.blob, size, meta: c.meta });
+      this.heads.set(c.key, { key: c.key, seq, parent: c.parent, blob: c.blob, size, meta: c.meta });
       seqs.push(seq);
     }
     this.commits.set(device, (this.commits.get(device) ?? 0) + 1);
@@ -196,8 +196,8 @@ export class FakeServer {
         return {
           id: "owner00001",
           name: "owner",
-          plan: { id: "free", storage_bytes: null, history_days: null, max_file_bytes: null, devices: null },
-          used: { storage_live: 0, storage_history: 0, devices: 0, vaults: 1 },
+          plan: { id: "free", storage_bytes: null, history_days: null, history_bytes: null, max_file_bytes: null, devices: null },
+          used: { storage_live: 0, storage_pending: 0, storage_history: 0, devices: 0, vaults: 1 },
         };
       },
     };

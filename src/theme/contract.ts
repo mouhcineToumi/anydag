@@ -44,6 +44,15 @@ interface ThemeColor {
 
   outline: string;
   outlineSoft: string;
+  /**
+   * The colour every elevation shadow is drawn with.
+   *
+   * A shadow is not an outline: it is translucent, and it must be darker than the surface it falls
+   * on. That is one value per theme rather than one per dialog — in the light themes it is a soft,
+   * low-contrast tint of ink, and in `paper-dark` it is black at enough opacity to read as depth
+   * instead of the pale halo a light `outlineSoft` made.
+   */
+  shadow: string;
   /** Dashed border of a node we do not own. */
   externalBorder: string;
 

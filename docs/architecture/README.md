@@ -42,9 +42,11 @@ the file for that area, not to a new place.
 | [`diagnostics.md`](diagnostics.md) | Diagnostic codes and how they are earned; where a person reads what is wrong with a board. |
 | [`server.md`](server.md) | The one Node process, the token and `Host` gate, the store, and several vaults in one server. |
 | [`desktop.md`](desktop.md) | The Electron shell: the server child, the scheme, the token, signing, and the shim. |
-| [`sync.md`](sync.md) | The end-to-end-encrypted sync server and the app's client; the convergence harness. |
+| [`sync.md`](sync.md) | The end-to-end-encrypted sync client and its server half (`api/`), and the convergence harness. |
 | [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code or OpenCode. |
 | [`logs.md`](logs.md) | Opt-in anonymous logs: what a batch may hold and every hop that cleans it. |
+| [`api.md`](api.md) | The api server: its features, config, what it stores and never stores, and running and deploying it. |
+| [`feedback.md`](feedback.md) | Send feedback: the card, what leaves the machine, the stateless relay that makes a GitHub issue, and how to run it. |
 | [`gate-and-releases.md`](gate-and-releases.md) | Versions, how a release is cut, and what `npm run gate`, `checks` and CI run. |
 
 ## Find a section by name
@@ -67,6 +69,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Dragging a card | [`editing-drag.md`](editing-drag.md) |
 | Editing on the canvas | [`editing.md`](editing.md) |
 | Equations | [`notes.md`](notes.md) |
+| Feedback | [`feedback.md`](feedback.md) |
 | Folders | [`sidebar.md`](sidebar.md) |
 | Gate | [`gate-and-releases.md`](gate-and-releases.md) |
 | Geometric shapes | [`free-canvas.md`](free-canvas.md) |
@@ -85,16 +88,20 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Pictures | [`free-canvas.md`](free-canvas.md) |
 | Problems | [`diagnostics.md`](diagnostics.md) |
 | Projects | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
+| Protocol 2, and an older peer | [`sync.md`](sync.md) |
 | Prompt cards | [`prompt-cards.md`](prompt-cards.md) |
 | Prompt to edit | [`prompt-cards.md`](prompt-cards.md) |
 | Quizzes | [`quizzes.md`](quizzes.md) |
+| Quotas and history | [`sync.md`](sync.md) |
 | Reaching what the file can say | [`editing-drag.md`](editing-drag.md) |
 | Reading it as a tree | [`sidebar.md`](sidebar.md) |
 | References, ids and the read-only view | [`references.md`](references.md) |
+| Running the relay | [`feedback.md`](feedback.md) |
 | Search | [`search.md`](search.md) |
 | Settings | [`settings.md`](settings.md) |
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Sync | [`sync.md`](sync.md) |
+| The api server | [`api.md`](api.md) |
 | Tables | [`tables.md`](tables.md) |
 | Tasks | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Text emphasis | [`editing.md`](editing.md) |
@@ -102,6 +109,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The calendar | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | The command line | [`cli.md`](cli.md) |
 | The desktop app | [`desktop.md`](desktop.md) |
+| The dock's tooltip | [`getting-around.md`](getting-around.md) |
 | The free canvas | [`free-canvas.md`](free-canvas.md) |
 | The layers, and what each may not know | [`layers.md`](layers.md) |
 | The leader key | [`editing.md`](editing.md) |
@@ -116,6 +124,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Things that will bite | [`things-that-will-bite.md`](things-that-will-bite.md) |
 | Tidy up | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Vaults | [`server.md`](server.md) |
+| What the server cannot forge | [`sync.md`](sync.md) |
 | Versions and releases | [`gate-and-releases.md`](gate-and-releases.md) |
 | What the panel opens on, and what it opens with | [`editing.md`](editing.md) |
 | Why it stopped being a column | [`sidebar.md`](sidebar.md) |

@@ -10,7 +10,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 
 | Where | Owns |
 |---|---|
-| `server/main.ts` | `anydag serve <folder>`: bind `127.0.0.1`, mint the token, write `server.json`, print the URL |
+| `server/main.ts` | `anydag serve <folder>`: bind `127.0.0.1`, mint the token, write `server.json`, print the URL, and remove it on `SIGINT`, `SIGTERM` or `SIGHUP` |
 | `server/app.ts` | the gate — the `Host`, then the token — which vault a request means, the routes, and the built page |
 | `server/context.ts` | the `Session`: the open vaults, `?vault=<id>` through `AsyncLocalStorage`, so no route learned there is more than one |
 | `server/vault.ts` | the store over a folder: every kind listed and foldered, names that are titles, ids in frontmatter, attachments, the watcher |
@@ -39,13 +39,67 @@ Seven things are load-bearing:
   the vault, `.git/ .stversions/ *.sync-conflict-* *.icloud .trash/` ignored, the sha1 base, the 409 and
   `merge3` kept, and opening never writes.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
-  there is no sign-in, no session, no share link and no feedback card. Logs are sent only once the
-  person says yes — see *Logs*.
+  there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
+  see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a
+  GitHub token — see *Feedback*.
 - **Generation is the person's key** (`plugins/generate/`): the prompt card's providers
   read it from the environment or `.env.local` in development and, in the desktop app, from the OS
   keychain through `safeStorage`.
 
 `test/server/` is the store contract and the routes in vitest over a real folder and a real index.
+
+## The development server
+
+`npm run dev` is not this server: Vite serves the page and proxies `/__board` and `/api` to
+`anydag serve` on `ANYDAG_API_PORT`, adding the run's token in the proxy (`vite.config.ts`). The
+development vault and `.dev-home/` sit inside Vite's root, so the dev and preview servers bind
+`127.0.0.1` — `ANYDAG_DEV_HOST` is the explicit opt-in for a listener beyond loopback — and
+`server.fs.deny` refuses `.dev-home`, `.anydag`, `.git`, `.claude` and the other credential
+dot-folders in every form (`?raw`, `%2E` and `/@fs`). The proxy still accepts only a loopback
+`Host`, and refuses a request whose `Origin` is not the page's own or whose `Sec-Fetch-Site` is
+`cross-site` or `same-site`, before it attaches the token. `scripts/dev.sh` mints a token per run; `server.json` is
+where `scripts/session.mjs`, the CLI and the e2e suite read it.
+
+## Feature switches
+
+The features that talk to an AnyDag server somebody else runs — **sync, the anonymous logs, Send
+feedback, and any later thing that needs one (accounts, say)** — are behind one
+switch, `cloud`. The server decides it, and everything else asks the server: it is not a preference,
+there is no second copy of the answer in the page bundle, in `localStorage`, or anywhere else.
+
+| Where | Owns |
+|---|---|
+| `server/features.ts` | the read: the build default, the run-time override, the answer |
+| `src/features.ts` | the page's half: one `GET /api/health` at boot, `useFeatures()` for everything gated |
+| `server/routes/meta.ts` | `GET /api/health` now answers `features: { cloud }`, beside the version |
+
+The switch is read as follows, from one function (`cloudOn`):
+
+- **The build bakes it.** `server/build.mjs` and `cli/build.mjs` define `__ANYDAG_CLOUD__` from
+  `ANYDAG_CLOUD_BUILD=on|off`. **Off unless a build says on.** The release workflow never says on, so
+  no release carries the server-backed features; a checkout's own build (`npm run dev` via
+  `scripts/dev.sh`) runs on without baking anything, because the override says on.
+- **The run time overrides it.** `ANYDAG_CLOUD=on` (or `off`) beats the build in everything that
+  reads the environment in this process: the server's routes, the CLI's own answer and help table,
+  the test suite (which defaults to on — see `vitest.config.ts` and `scripts/checks.sh`).
+- **The page asks.** `/api/health` answers it; `/api/sync/*`, `/api/telemetry*`, `/api/feedback` and each
+  later route behind the switch are registered only when it is on, so off they are a plain 404. The sync
+  links start no loop; `Telemetry` (`server/telemetry.ts`) records nothing and never reads an
+  address baked in for logs; the MCP server — and a chat's tool list — leaves out `sync_status`, `sync_now` and `feedback` by asking the same `GET /api/health`
+  (`listTools` in `server/mcp/tools.ts`); the CLI's `sync` group and `telemetry` command answer with
+  one line — *Sync is not available in this build.* — and are out of `anydag --help` when the CLI's
+  own build says off.
+
+Nothing is deleted when the switch is off. A vault that was linked keeps its `key` and `pair.json`
+in the app's home, a consent answer keeps its place in `kv`, and turning the switch on
+(`ANYDAG_CLOUD=on` on any build) resumes them: the loop starts at the next vault open, the next
+page asks the question only if it was never answered. The gates live at the edges — route
+registration, the loop start, the tool list, the component mount — and are guards around code that
+stays built and tested.
+
+`docs/parity.json` marks the gated rows `{"flag": "cloud"}`; `docs/PARITY.md` draws them with a
+dagger. `skills/anydag/SKILL.md` says its sync and telemetry entries exist only when the switch is
+on, and `scripts/check-skill.mjs` tolerates those names in a table that is drawn without them.
 
 ## Vaults
 
@@ -53,16 +107,27 @@ A **vault** is a folder — Obsidian's word and Obsidian's model. The sidebar's 
 names the open one and opens the switcher: the recent vaults, *Open folder…*, *Create vault* and
 *Close vault*. Settings → Vault says where it is, where its attachments go, and closes it.
 
+The first screen before there is a vault at all is `src/ui/Welcome.tsx`'s `NoVault`:
+the recent list, *Open folder…* and *Create vault*, each opening a form that names itself —
+**Open a vault** or **Create a vault** — with its labels above their fields and one filled primary
+action. A refusal from the server is drawn under the form without moving its buttons.
+
 | Route | Does |
 |---|---|
 | `GET /api/vaults` | the recent vaults, the open ones first |
 | `POST /api/vaults/open` `{path}` · `/create` `{path}` · `/close` `{id}` | open a folder, make one and open it, close one — **never deleting it** |
 | `POST /__board/transfer` `{name, kind, to}` · `{folder, to}` | a file, or a folder whole, to another open vault |
 
-Six things are load-bearing:
+Eight things are load-bearing:
 
 - **Closing never deletes, and nothing in the app removes a vault's folder.** A vault is a folder
   the person already owns; the file manager is where it is renamed or thrown away.
+- **A vault's id belongs to its folder.** A folder whose `.anydag/vault.json` claims an id the home
+  already maps to another folder that still exists and still claims it is a copy: it is given a
+  fresh id, and the original's recent row and sync link are left alone.
+- **Every path the store resolves stays in the vault's real path.** `Vault.abs` follows the root
+  once and refuses an existing component that links out of it; a write checks again immediately
+  before it lands.
 - **A vault inside another is refused**, both ways: one file would be two documents with two
   owners, and the watchers would report every change twice.
 - **An existing `.obsidian/` is never touched**, and every dot-folder is neither listed nor walked.

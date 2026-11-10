@@ -62,6 +62,77 @@ const under = (v: Awaited<ReturnType<typeof view>>, cx: number, cy: number) => (
   y: (cy - v.top - v.y) / v.zoom,
 });
 
+const zoomOf = (page: Page) => page.locator(".dag-viewport").getAttribute("data-zoom").then(Number);
+
+/*
+ * The view a board opens with.
+ *
+ * The automatic first fit frames the content, and it used to magnify a small board until it filled
+ * the glass: a new board's one prompt card opened at 215%, which reads as "too much zoom". It now
+ * caps itself at 100%, while the Fit button keeps the full range — a person who asks to frame one
+ * small thing means to look at it closely.
+ */
+const SMALL_BOARD = `---
+title: One small card
+---
+
+\`\`\`md {#only x=0 y=0 w=240 h=160}
+One small card.
+\`\`\`
+`;
+
+/** Bigger than the 1600 × 1200 harness window in both directions. */
+const BIG_BOARD = `---
+title: One big card
+---
+
+\`\`\`md {#big x=0 y=0 w=4000 h=3000}
+One card bigger than the window.
+\`\`\`
+`;
+
+test("opens a board smaller than the view at 100%, and keeps Fit able to magnify", async ({ page }) => {
+  fs.writeFileSync(file, SMALL_BOARD);
+  await open(page);
+
+  await expect.poll(() => zoomOf(page)).toBe(1);
+  await expect(page.locator(".dag-zoombar__pct")).toHaveText("100%");
+
+  /* The explicit action is unchanged: it still fills the glass with the one card. */
+  await page.locator('.dag-zoombar button[aria-label="Fit to content (F)"]').click();
+  await expect.poll(() => zoomOf(page)).toBeGreaterThan(1);
+
+  /* Manual zoom still reaches the ceiling, and the readout's own button returns to 100%. */
+  await page.mouse.move(800, 600);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, -5000);
+  await page.keyboard.up("Control");
+  await expect.poll(() => zoomOf(page)).toBe(4);
+
+  await page.locator(".dag-zoombar__pct").click();
+  await expect.poll(() => zoomOf(page)).toBe(1);
+});
+
+test("still fits a board larger than the view, with the existing margin", async ({ page }) => {
+  fs.writeFileSync(file, BIG_BOARD);
+  await open(page);
+
+  await expect.poll(() => zoomOf(page)).toBeLessThan(1);
+  const zoom = await zoomOf(page);
+  const viewport = await page.evaluate(() => {
+    const box = document.querySelector(".dag-viewport") as HTMLElement;
+    return { w: box.clientWidth, h: box.clientHeight };
+  });
+  const onScreen = (await page.locator('[data-dag-item="big"]').boundingBox())!;
+  const content = { w: onScreen.width / zoom, h: onScreen.height / zoom };
+
+  /* The same arithmetic as `fitTo`: the box minus a 64px margin on each side, at the tighter axis. */
+  const expected = Math.min((viewport.w - 128) / content.w, (viewport.h - 128) / content.h);
+  expect(Math.abs(zoom - expected)).toBeLessThan(0.01);
+  expect(onScreen.width).toBeLessThanOrEqual(viewport.w - 128 + 0.5);
+  expect(onScreen.height).toBeLessThanOrEqual(viewport.h - 128 + 0.5);
+});
+
 test("a plain wheel moves the board rather than zooming it", async ({ page }) => {
   await open(page);
   const before = await view(page);

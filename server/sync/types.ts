@@ -7,7 +7,7 @@
  * write is a compare-and-set against bytes the client has seen — the sha1 base, applied to sync —
  * so the page or an agent writing in between always wins, and sync decides again.
  *
- * Paths are vault-relative, `/`-separated, as `normalise` (sync/protocol/crypto.ts) leaves them.
+ * Paths are vault-relative, `/`-separated, as `normalise` (api/protocol/crypto.ts) leaves them.
  */
 
 /** One thing the scan found. */

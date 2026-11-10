@@ -6,7 +6,8 @@
  *
  * Two naming facts: `vault` in a tool's arguments is the id of an open vault;
  * scopes are one `--read-only` flag, and a tool says whether it `write`s;
- * and nothing is shared, sent or signed in to, so the share, feedback and account tools are gone.
+ * and nothing is shared or signed in to, so the share and account tools are gone. The one thing that
+ * leaves the machine is `feedback`, and only when the person asked for it in their words.
  *
  * Plain Node, no `@/` aliases and no `Session`: this is imported by the parity test as the list of
  * tool names, and by `server.ts` to register them.
@@ -23,6 +24,7 @@ import { withEvent } from "../../src/note/event";
 import { FetchRefused, fetchFile, type Fetched } from "../fetch";
 import { endsBeforeItStarts, placed, withTitle } from "../frontmatter";
 import { grammar } from "../grammar";
+import { extOf } from "../names";
 import { MIME } from "../uploads";
 import type { Answer, Backend, CallOptions } from "./backend";
 
@@ -1515,6 +1517,32 @@ const grammarTools: Tool[] = [
 
 const appTools: Tool[] = [
   tool({
+    name: "feedback",
+    description:
+      "Send the person's bug report or idea to AnyDag's maintainers: it becomes a **public** GitHub issue in `mouhcineToumi/anydag`. **Only when the person asked you to send feedback, in their words** — never on your own initiative, and never to report your own trouble with a tool.\n\n" +
+      "`kind` is `bug` or `idea`; `text` is what happened or what they would like, in their words. `boards` and `notes` are names whose **whole text** is attached — only the ones they said to attach. `files` are up to five pictures, videos, PDFs or text files, each `{filename, data}` (base64) or `{filename, url}`; 10 MB in all. The app's version, system and arch go with it, and nothing else. Tell the person exactly what will be sent before you call this. The answer is the issue's `url`; a refusal says why, and nothing was sent.",
+    write: true,
+    input: {
+      kind: z.enum(["bug", "idea"]),
+      text: z.string(),
+      boards: z.array(z.string()).default([]),
+      notes: z.array(z.string()).default([]),
+      files: z.array(z.object({ filename: z.string(), data: z.string().optional(), url: z.string().optional() })).default([]),
+      vault,
+    },
+    run: async ({ kind, text, boards, notes, files, vault: v }, kit) => {
+      kit.needWrite("send feedback");
+      const sent: { name: string; type: string; data: string }[] = [];
+      for (const f of files as { filename: string; data?: string; url?: string }[]) {
+        const fetched = await bytesFrom(kit, v, f.data, f.url);
+        const type = fetched?.contentType || MIME[extOf(f.filename)] || "application/octet-stream";
+        const data = fetched ? Buffer.from(fetched.data).toString("base64") : f.data!;
+        sent.push({ name: f.filename, type, data });
+      }
+      return kit.api("POST", "/api/feedback", { vault: v, body: { kind, text, boards, notes, files: sent } });
+    },
+  }),
+  tool({
     name: "settings",
     description:
       "The person's preferences — or, with `set`, a change to them. **Only when they asked.**\n\n" +
@@ -1648,7 +1676,6 @@ const trashTools: Tool[] = [
   }),
 ];
 
-/** Every tool, in the order the server lists them. The parity test reads the names from here. */
 /**
  * Sync: what the vault's link says, and a sync now. Pairing and linking are not
  * tools — a passphrase is the person's, typed by them in Settings or a terminal.
@@ -1675,6 +1702,11 @@ const syncTools: Tool[] = [
   }),
 ];
 
+/**
+ * Every tool, in the order the server lists them, the whole surface — the parity test reads the
+ * names from here. What the MCP server *registers* is `listTools`'s, which the `cloud` switch
+ * (`server/features.ts`) cuts to what the build carries.
+ */
 export const TOOLS: Tool[] = [
   ...boardTools,
   ...noteTools,
@@ -1692,3 +1724,16 @@ export const TOOLS: Tool[] = [
   ...grammarTools,
   ...appTools,
 ];
+
+/**
+ * The tools that exist only when the build's `cloud` switch is on (`server/features.ts`): the ones
+ * that reach an AnyDag server. `TOOLS` above stays the whole surface — the parity test and the
+ * skill's check hold it — and `listTools` is what the MCP server registers, asked of the server the
+ * tools run against (`GET /api/health`), so a client can never see a tool whose route is not there.
+ */
+const CLOUD = new Set(["sync_status", "sync_now", "feedback"]);
+
+/** The tools to register: all of them, or only the ones the switch leaves. */
+export function listTools(cloud: boolean): Tool[] {
+  return cloud ? TOOLS : TOOLS.filter((t) => !CLOUD.has(t.name));
+}

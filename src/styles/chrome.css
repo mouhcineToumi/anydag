@@ -9,6 +9,32 @@
  * exceptions anywhere in `src/`.
  */
 
+/*
+ * The elevation every full-size overlay shares — the Settings modal, the board browser, the
+ * rewrite dialog, the welcome card, the shortcut sheet, the floating sidebar, a calendar card and
+ * an equation's field. The theme owns the colour (`color.shadow`): dark and translucent on
+ * `paper-dark`, soft and low-contrast on the light themes. The geometry is chrome's, and the same
+ * on every one of them so two dialogs never sit at two different heights above the page.
+ */
+:root { --elevation: 0 12px 40px var(--dag-color-shadow); }
+
+/*
+ * The room the macOS window's traffic lights take at its top-left corner, in the desktop app, where
+ * the window has no title bar of its own (`desktop/main.ts`, #78). `src/ui/windowInset.ts` puts
+ * `data-dag-window="inset"` on the root there, and takes it off in full screen, where the lights
+ * are not drawn. Everywhere else it is nothing. What is pushed right by it is whatever sits at the
+ * window's left edge in the top 48px: the sidebar's toggle, the sidebar's head, and the toolbar
+ * while the column is away. No `--dag-` prefix: that is the theme's (`check-theme.mjs`).
+ */
+:root { --window-inset: 0px; }
+:root[data-dag-window="inset"] { --window-inset: 64px; }
+
+/*
+ * The page's header is the top edge of the page, not a strip laid over it (#78). It has no rule
+ * under it and the page's own ground, so the title reads as the page's and the sidebar's head
+ * beside it reads as the same row. The height stays 48px: `pages.spec.ts` measures this element to
+ * know where the board starts, and `box-sizing: border-box` means the rule never counted.
+ */
 .dag-toolbar {
   display: flex;
   align-items: center;
@@ -16,10 +42,20 @@
   height: 48px;
   padding: 0 16px;
   flex: none;
-  border-bottom: 1px solid var(--dag-color-outline);
   background: var(--dag-color-paper);
   font-size: 13px;
 }
+/* At the window's left edge — the column away — it keeps clear of the traffic lights. */
+.dag-toolbar[data-dag-toolbar-edge] { padding-left: calc(16px + var(--window-inset)); }
+
+/*
+ * With no title bar, the window is dragged by its top row: the header and the sidebar's head.
+ * Everything in them that takes a press is cut out of the region, or Electron would take the
+ * press for a drag. The toggle is drawn over the head rather than in it, so it is named too.
+ */
+[data-dag-window] :is(.dag-toolbar, .dag-sidebar__head) { -webkit-app-region: drag; }
+[data-dag-window] :is(.dag-toolbar, .dag-sidebar__head) :is(button, a, input, select, textarea, [role], [tabindex], [contenteditable]),
+[data-dag-window] .dag-sidebar-toggle { -webkit-app-region: no-drag; }
 .dag-toolbar__title { font-weight: 600; letter-spacing: -0.006em; }
 .dag-toolbar__spacer { flex: 1; }
 
@@ -98,7 +134,7 @@
   height: 14px;
   background: var(--dag-color-card);
   border-radius: 50%;
-  box-shadow: 0 1px 2px var(--dag-color-outline);
+  box-shadow: 0 1px 2px var(--dag-color-shadow);
   transition: transform 0.15s ease;
 }
 .dag-switch:checked { background: var(--dag-color-accent); }
@@ -190,6 +226,20 @@
 .dag-button:disabled { opacity: 0.5; cursor: default; }
 .dag-button--danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
 .dag-button--danger:hover:not(:disabled) { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-danger); }
+/*
+ * The one action a card is asking for: filled in the accent. It used to be spelled twice, scoped to
+ * the telemetry question and the chat card; it is the same button everywhere, so it lives here now.
+ * Disabled is a soft tint rather than the quiet button's half-opacity: the shape of the action stays
+ * on the card, and it reads as *not yet* instead of as a second secondary.
+ */
+.dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); border-color: var(--dag-color-accent); opacity: 0.9; }
+.dag-button--primary:disabled {
+  color: var(--dag-color-slate);
+  background: var(--dag-color-accentSoft);
+  border-color: var(--dag-color-accentSoft);
+  opacity: 1;
+}
 
 /*
  * The toolbar sits above a row: the board list, then the plane. `min-height` and `min-width` are
@@ -402,7 +452,7 @@
   border: 1px solid var(--dag-color-outline);
   border-left: none;
   border-radius: 0 var(--dag-metric-radius-card) var(--dag-metric-radius-card) 0;
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
   animation: dag-sidebar-in 120ms ease-out;
 }
 @keyframes dag-sidebar-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -421,7 +471,7 @@
   gap: 12px;
   flex: none;
   height: 48px;
-  padding: 0 8px 0 16px;
+  padding: 0 8px 0 calc(16px + var(--window-inset));
 }
 .dag-sidebar__logo { display: flex; align-items: center; color: var(--dag-color-ink); }
 
@@ -438,7 +488,7 @@
  * column, which is `position: relative` and drawn first; every scrim is 20 and stays over it.
  * Names grepped first: `dag-sidebar-toggle*` and `data-dag-sidebar-toggle` were nobody's.
  */
-.dag-sidebar-toggle { position: absolute; top: 9px; left: 16px; z-index: 1; }
+.dag-sidebar-toggle { position: absolute; top: 9px; left: calc(16px + var(--window-inset)); z-index: 1; }
 .dag-sidebar-toggle:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 /* Over the docked column's `paper100`, the usual hover fill is the colour already behind it. */
 .dag-sidebar-toggle[data-dag-sidebar-toggle="docked"]:hover { background: var(--dag-color-paper200); }
@@ -669,7 +719,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   pointer-events: none;
   will-change: transform;
 }
@@ -789,7 +839,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   z-index: 6;
 }
 /* A row's menu, placed where it was asked for rather than hung off the account. */
@@ -837,8 +887,6 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-telemetry-ask__hint { margin: 12px 0 0; font-size: 12px; color: var(--dag-color-slate); }
 .dag-telemetry-ask__failed { margin: 8px 0 0; font-size: 12px; color: var(--dag-color-dangerText); }
 .dag-telemetry-ask__foot { gap: 8px; }
-.dag-telemetry-ask .dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
-.dag-telemetry-ask .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); opacity: 0.9; }
 /* The Privacy tab's two lists. */
 .dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); }
 .dag-sidebar__menu-who {
@@ -909,10 +957,19 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-vault__line:hover .dag-vault__forget,
 .dag-vault__line:focus-within .dag-vault__forget { opacity: 1; }
 .dag-vault__path { margin-left: auto; padding-left: 8px; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-muted); }
-.dag-vault__form { display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 6px; }
-.dag-vault__form label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--dag-color-slate); }
+/*
+ * The two first-run forms. The card centres its prose, but a label is not prose: it starts at its
+ * field's left edge and sits directly above the control it names, so the two fields read as a form
+ * rather than as two captions. The error is always in the flow with its line reserved, so a refusal
+ * from the server never moves the actions under the person's pointer.
+ */
+.dag-vault__form { display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; padding: 4px 8px 6px; text-align: left; }
+.dag-vault__form label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 500; color: var(--dag-color-slate); }
 .dag-vault__form .dag-sidebar__name-input { height: 30px; font-family: var(--dag-font-sans); font-size: 13px; }
+.dag-vault__field-row { display: flex; align-items: center; gap: 6px; }
+.dag-vault__field-row > .dag-sidebar__name-input { flex: 1; min-width: 0; }
 .dag-vault__form-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.dag-vault__form-error { min-height: 17px; margin: 0; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); }
 /* The page when no vault is open: the picker alone, on the paper. */
 .dag-novault {
   position: fixed;
@@ -925,6 +982,16 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-paper);
   color: var(--dag-color-ink);
   font-family: var(--dag-font-sans);
+}
+/* It has no header, so with no title bar (macOS desktop) its top 48px is what drags the window. */
+[data-dag-window] .dag-novault::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  -webkit-app-region: drag;
 }
 .dag-novault .dag-welcome { position: static; max-width: 460px; width: 100%; }
 .dag-novault__recent { display: flex; flex-direction: column; gap: 2px; align-self: stretch; margin-top: 12px; text-align: left; }
@@ -1093,7 +1160,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   z-index: 30;
 }
 .dag-pagemore__group { display: flex; flex-direction: column; }
@@ -1114,8 +1181,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  */
 @media (max-width: 719px) {
   .dag-toolbar { height: 52px; gap: 2px; padding: 0 4px; }
+  .dag-toolbar[data-dag-toolbar-edge] { padding-left: calc(4px + var(--window-inset)); }
   .dag-toolbar .dag-sidebar-toggle-slot { width: 44px; height: 44px; }
-  .dag-sidebar-toggle { top: 4px; left: 4px; width: 44px; height: 44px; }
+  .dag-sidebar-toggle { top: 4px; left: calc(4px + var(--window-inset)); width: 44px; height: 44px; }
   .dag-toolbar .dag-toolbar__logo,
   .dag-toolbar .dag-toolbar__crumbs,
   .dag-toolbar .dag-export { display: none; }
@@ -1173,7 +1241,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
   overflow: hidden;
 }
 
@@ -1423,7 +1491,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-welcome__title { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: var(--dag-color-ink); }
 .dag-welcome__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--dag-color-muted); }
@@ -2300,7 +2368,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 1px 6px var(--dag-color-outlineSoft);
+  box-shadow: 0 1px 6px var(--dag-color-shadow);
   outline: none;
 }
 
@@ -2537,7 +2605,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   pointer-events: none;
   z-index: 10;
 }
@@ -2656,7 +2724,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   z-index: 5;
   user-select: none;
 }
@@ -2783,7 +2851,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-shortcuts__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dag-shortcuts__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -2829,7 +2897,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 8px 28px var(--dag-color-outlineSoft);
+  box-shadow: 0 8px 28px var(--dag-color-shadow);
   pointer-events: none;
   z-index: 7;
 }
@@ -2860,7 +2928,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-settings__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .dag-settings__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -3010,7 +3078,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 24px 64px color-mix(in srgb, var(--dag-color-ink) 16%, transparent);
+  box-shadow: var(--elevation);
 }
 .dag-settings-modal:focus { outline: none; }
 .dag-settings-modal__nav {
@@ -3264,7 +3332,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: 999px;
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   cursor: pointer;
 }
 .dag-problems__pill--error { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
@@ -3279,7 +3347,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-dangerBorder);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-problems__icon { flex: none; color: var(--dag-color-dangerText); }
 .dag-problems__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -3320,7 +3388,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   overflow: hidden;
 }
 .dag-problems__head {
@@ -3360,6 +3428,44 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   color: var(--dag-color-muted);
 }
 
+/* ---- the drawn tooltip ---- */
+
+/*
+ * The dock is icon-only, so its `title` was the only place a control's name and chord existed —
+ * and the desktop app's native tooltip is not dependable on macOS. `Tooltip` draws this instead,
+ * in a portal at the body, so no ancestor's overflow or stacking context can clip it.
+ *
+ * Names grepped before they were written: `dag-tip` and `data-dag-tip` were both free. The
+ * colours are the menu's own (`card`, `ink`, `outline`), which is what keeps it legible in paper,
+ * paper-dark and neutral without a second surface colour to drift.
+ */
+.dag-tip { display: inline-flex; flex: none; }
+
+.dag-tip__bubble {
+  position: fixed;
+  z-index: 60;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 9px;
+  background: var(--dag-color-card);
+  color: var(--dag-color-ink);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  font-family: var(--dag-font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.dag-tip__key {
+  font-family: var(--dag-font-mono);
+  font-size: 11px;
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
 /* ---- the dock, the overflow and the zoom cluster ---- */
 
 /*
@@ -3386,7 +3492,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-outlineSoft);
+  box-shadow: 0 2px 8px var(--dag-color-shadow);
   z-index: 5;
   user-select: none;
 }
@@ -3460,7 +3566,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   z-index: 6;
 }
 .dag-more__item {
@@ -3640,6 +3746,82 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
 }
 .dag-feedback__text::placeholder { color: var(--dag-color-muted); }
 
+/*
+ * The feedback card (`feedback/FeedbackCard.tsx`): fixed over whatever page asked for it, like the
+ * logs question, because the sidebar's foot is where it opens and every page has one. Names
+ * grepped first: `dag-feedback__*` had only the textarea above, `data-dag-feedback*` was nobody's.
+ */
+.dag-settings__scrim.dag-feedback__scrim {
+  position: fixed;
+  z-index: 60;
+  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+}
+.dag-feedback { width: 520px; }
+.dag-feedback[data-dragging] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft), var(--elevation); }
+.dag-feedback__mark { flex: none; color: var(--dag-color-accent); }
+.dag-feedback__kinds { display: flex; gap: 4px; margin: 10px 0 8px; }
+.dag-feedback__kind {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dag-feedback__kind:hover { color: var(--dag-color-ink); }
+.dag-feedback__kind[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
+.dag-feedback__kind:focus-visible { outline: 2px solid var(--dag-color-accentSoft); }
+.dag-feedback__files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dag-feedback__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 2px 2px 8px;
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: 6px;
+}
+.dag-feedback__file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-feedback__file-size { flex: none; color: var(--dag-color-muted); }
+.dag-feedback__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dag-feedback__add:hover { color: var(--dag-color-ink); border-color: var(--dag-color-mutedBorder); }
+.dag-feedback__attach { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--dag-color-ink); }
+.dag-feedback__attach code, .dag-feedback__consent code { font-family: var(--dag-font-mono); font-size: 11.5px; }
+.dag-feedback__consent {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: 6px;
+}
+.dag-feedback__label { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
+.dag-feedback__consent ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-feedback__consent li { overflow-wrap: anywhere; }
+.dag-feedback__hint { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-feedback__hint strong { color: var(--dag-color-ink); font-weight: 600; }
+.dag-feedback__error { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: var(--dag-color-dangerText); overflow-wrap: anywhere; }
+.dag-feedback__sent { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--dag-color-ink); }
+.dag-feedback__sent p { margin: 0 0 8px; }
+.dag-feedback__sent a { display: inline-flex; align-items: center; gap: 6px; color: var(--dag-color-accent); overflow-wrap: anywhere; }
+.dag-feedback__foot { align-items: center; justify-content: space-between; }
+
 /* -- the crash screen ------------------------------------------------------ *
  *
  * What is drawn when a render throw has taken the tree down. It is deliberately the simplest
@@ -3781,7 +3963,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-backlinks__row {
   display: grid;
@@ -3837,7 +4019,7 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
   pointer-events: auto;
 }
 .dag-readonly-notice > svg { flex: none; color: var(--dag-color-accent); }
@@ -3855,6 +4037,38 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   cursor: pointer;
 }
 .dag-readonly-notice__unlock:hover { background: var(--dag-color-paper200); }
+.dag-readonly-notice__dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-readonly-notice__dismiss:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-readonly-notice__dismiss:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+/* A control that writes while the app is locked. It keeps its press — which the notice answers, so
+   the page is never silently dead — but reads as unavailable before one, and its `title` names the
+   word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control
+   that moves under the pointer is one more thing that looks broken. */
+[data-dag-readonly-blocked] { opacity: 0.55; cursor: not-allowed; }
+[data-dag-readonly-blocked]:focus-visible { outline: 2px solid var(--dag-color-muted); outline-offset: 2px; }
+.dag-calendar__new-locked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+}
+.dag-calendar__new-locked > svg { flex: none; color: var(--dag-color-accent); }
+.dag-calendar__new-locked > button { margin-left: auto; }
 /* What only means something to an editor goes while locked: the hand that offers to move an item,
    and the hover that offers to drag a sidebar row. Selecting and panning stay. */
 html[data-dag-locked] .dag-item[data-dag-movable] { cursor: default; }
@@ -3902,7 +4116,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-export__menu .dag-more__item { color: var(--dag-color-ink); }
 .dag-export__menu .dag-more__item:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
@@ -4108,6 +4322,9 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   gap: 2px 8px;
 }
 .dag-facts__label { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; color: var(--dag-color-slate); }
+/* The event bar's labels act on the value beside them; a read-only bar leaves them plain. */
+.dag-eventbar__label { cursor: pointer; }
+.dag-eventbar__label:hover { color: var(--dag-color-ink); }
 .dag-facts__label > svg { flex: none; color: var(--dag-color-muted); }
 .dag-facts__value { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 32px; min-width: 0; color: var(--dag-color-ink); }
 .dag-facts__value input[type="date"],
@@ -4204,7 +4421,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-projectbar__hues { display: inline-flex; align-items: center; gap: 4px; }
 .dag-projectbar__hue {
@@ -4377,8 +4594,16 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-tasks__row .dag-task-status[data-dag-task-status="done"] + .dag-tasks__title { color: var(--dag-color-slate); }
 .dag-tasks__folder { flex: none; max-width: 30%; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-muted); }
 
-.dag-tasks__add { display: flex; align-items: center; gap: 8px; padding: 4px 9px; color: var(--dag-color-muted); }
-.dag-tasks__add input {
+.dag-tasks__add { display: flex; flex-direction: column; gap: 2px; }
+.dag-tasks__add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 9px;
+  color: var(--dag-color-muted);
+  cursor: text;
+}
+.dag-tasks__add-row input {
   flex: 1;
   min-width: 0;
   padding: 5px 0;
@@ -4388,9 +4613,16 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: transparent;
   border: none;
 }
-.dag-tasks__add input::placeholder { color: var(--dag-color-muted); }
-.dag-tasks__add input:focus { outline: none; }
-.dag-tasks__add:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-row input::placeholder { color: var(--dag-color-muted); }
+.dag-tasks__add-row input:focus { outline: none; }
+.dag-tasks__add-row:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-problem {
+  margin: 0;
+  padding: 0 9px 4px 31px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dag-color-dangerText);
+}
 
 /* The board: three columns, a card per task. */
 .dag-tasks__columns { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; align-items: start; }
@@ -4421,12 +4653,13 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-tasks__card:hover { border-color: var(--dag-color-slate); }
 .dag-tasks__card:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 /* What the drag moves, not what was pressed, is what must stop answering `elementFromPoint`. */
-.dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: 0 8px 24px var(--dag-color-outline); }
+.dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: 0 8px 24px var(--dag-color-shadow); }
 .dag-tasks__card-top { display: flex; align-items: flex-start; gap: 6px; }
 .dag-tasks__card-title { flex: 1; min-width: 0; padding-top: 2px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .dag-tasks__card-meta { display: flex; align-items: center; gap: 8px; padding-left: 28px; }
 .dag-tasks__card-meta .dag-tasks__folder { flex: 1; max-width: none; }
-.dag-tasks__column .dag-tasks__add { padding: 4px 6px; }
+.dag-tasks__column .dag-tasks__add-row { padding: 4px 6px; }
+.dag-tasks__column .dag-tasks__add-problem { padding: 0 6px 4px 28px; }
 @media (max-width: 719px) {
   .dag-tasks { padding: 16px; }
   .dag-tasks__columns { grid-template-columns: 1fr; }
@@ -5015,7 +5248,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-outlineSoft);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-calendar__show-head { margin: 4px 6px 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); }
 .dag-calendar__show-menu .dag-calendar__kind { justify-content: flex-start; height: 30px; border: none; color: var(--dag-color-ink); background: transparent; }
@@ -5333,7 +5566,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-calendar__new-when { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--dag-color-slate); }
 .dag-calendar__new input {
@@ -5493,7 +5726,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   background: var(--dag-color-paper100);
 }
-.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: 0 1px 3px color-mix(in srgb, var(--dag-color-ink) 18%, transparent); }
+.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: 0 1px 3px var(--dag-color-shadow); }
 
 /* A file in a note: a picture drawn, anything else a card whose Preview opens it in place. */
 .dag-embed.dag-embed--picture { margin: 0; border: none; background: transparent; }
@@ -5522,7 +5755,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   color: var(--dag-color-ink);
   font-size: 13px;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-upload-notice__lines { flex: 1; display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
 .dag-upload-notice__lines p { margin: 0; }
@@ -5834,7 +6067,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-grid__options-item {
   display: flex;
@@ -5888,7 +6121,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dag-color-ink) 12%, transparent);
+  box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-grid__menu-field { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px 6px; font-size: 11px; color: var(--dag-color-slate); }
 .dag-grid__menu-field input {
@@ -6012,7 +6245,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: 8px;
-  box-shadow: 0 12px 40px var(--dag-color-outlineSoft);
+  box-shadow: var(--elevation);
 }
 .dag-math-field__tex {
   width: 100%;
@@ -6190,7 +6423,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
 .dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
 .dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
@@ -6321,8 +6554,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-asked { align-self: flex-end; max-width: 85%; padding: 8px 12px; background: var(--dag-color-paper200); border-radius: var(--dag-metric-radius-card); }
 .dag-chat-asked p { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dag-chat-model { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--dag-color-muted); }
-.dag-chat-model__mode { padding: 0 6px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); }
-.dag-chat-model__mode[data-mode="edit"] { color: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 .dag-chat-model__elsewhere { color: var(--dag-color-warningText); }
 .dag-chat-steps { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .dag-chat-md { font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
@@ -6359,8 +6590,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-card__text > span { color: var(--dag-color-slate); font-size: 12px; }
 .dag-chat-card__buttons { flex: none; display: flex; align-items: center; gap: 6px; }
 .dag-chat-card__answer { flex: none; font-size: 12px; color: var(--dag-color-slate); }
-.dag-chat-card .dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
-.dag-chat-card .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); opacity: 0.9; }
 .dag-chat-card--block[data-dag-chat-block-state="undone"] .dag-chat-card__text strong { text-decoration: line-through; color: var(--dag-color-muted); }
 .dag-chat-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; font-family: var(--dag-font-mono); color: var(--dag-color-slate); }
 .dag-chat-files li { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -6387,10 +6616,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer__why { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
 .dag-chat-composer__row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .dag-chat-composer__space { flex: 1; }
-.dag-chat-mode { display: inline-flex; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); }
-.dag-chat-mode__choice { padding: 2px 10px; font: inherit; font-size: 12px; font-weight: 500; color: var(--dag-color-slate); background: transparent; border: none; border-radius: var(--dag-metric-radius-chip); cursor: pointer; }
-.dag-chat-mode__choice[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
-.dag-chat-mode__choice:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 .dag-chat-picker { max-width: 220px; height: 28px; font-size: 12px; }
 .dag-chat-picker--effort { max-width: 130px; }
 .dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-paper); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }
@@ -6405,7 +6630,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-scope__chip > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__chip:hover { background: var(--dag-color-paper100); }
 .dag-chat-scope__more { color: var(--dag-color-accent); font-weight: 600; }
-.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 20; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: 0 8px 24px var(--dag-color-outline); }
+.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 20; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: 0 8px 24px var(--dag-color-shadow); }
 .dag-chat-scope__line { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 4px 6px; font-size: 12px; }
 .dag-chat-scope__line strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__line > span { color: var(--dag-color-muted); }

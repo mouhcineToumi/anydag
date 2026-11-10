@@ -80,6 +80,12 @@ Eight things are load-bearing:
   what keep a web page the person happens to have open from calling it. A description is at most 4000 characters, at most four run at once, each has a
   timeout (`ANYDAG_LLM_TIMEOUT`, 120 s), and the client going away cancels the call.
 
+**A card made from the chrome is centred, not cornered.** `space P`, the dock's sparkle and
+*Describe a diagram* on a new board have no pointer position to honour, so `add` puts the card's
+*centre* on the middle of the view (`centerItem` in `Viewport`, `centeredBox` in
+`canvas/geometry.ts`). A card wider than the view is kept against its top-left edge rather than
+half outside it.
+
 The card itself: its controls stop the press that would select and drag the item — the header strip
 is what you grab it by — and its text is written through the editor under `body:<id>`, the key the
 panel types under, a quarter of a second after the last keystroke. Its run state is its own
