@@ -14,6 +14,8 @@
 # restore over live data is the one thing this file must never do by accident. `docker compose
 # down -v` first, if the machine is to become the empty one to restore into.
 set -euo pipefail
+# Paths on the command line are the caller's, read before this moves into deploy/.
+caller="$PWD"
 cd "$(dirname "$0")"
 
 if [[ -f .env ]]; then
@@ -35,6 +37,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$backup" && -n "$agekey" ]] || usage
+[[ "$agekey" == /* ]] || agekey="$caller/$agekey"
+# A backup is a local file or an rclone remote (`remote:path`); only a local relative one moves.
+[[ "$backup" != /* && -e "$caller/$backup" ]] && backup="$caller/$backup"
 
 step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
 
