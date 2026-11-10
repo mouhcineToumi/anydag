@@ -30,6 +30,13 @@ export const MATRIX = path.join(ROOT, "docs/PARITY.md");
 export const INTERFACES = /** @type {const} */ (["rest", "cli", "mcp"]);
 const LABEL = { rest: "REST", cli: "CLI", mcp: "MCP" };
 
+/**
+ * The build switches a feature can be behind: the ones `server/features.ts` answers for. A feature
+ * behind one is in the code, tested and counted, and is what the build may leave out — the matrix
+ * draws it with a dagger and says so under the tables.
+ */
+export const FLAGS = /** @type {const} */ (["cloud"]);
+
 export function readManifest() {
   return JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
 }
@@ -100,6 +107,9 @@ export function check(manifest, surface) {
     if (!f.id || ids.has(f.id)) problems.push(`feature ${where} has no id, or one used twice`);
     ids.add(f.id);
     if (!f.area || !f.what) problems.push(`${where} needs an \`area\` and a \`what\``);
+    if (f.flag !== undefined && !FLAGS.includes(f.flag)) {
+      problems.push(`${where} has \`${String(f.flag)}\` as its flag — one of ${FLAGS.join(", ")}`);
+    }
     for (const i of INTERFACES) {
       const s = shapeOf(f[i]);
       if (s.kind === "gap") problems.push(`${where} says nothing for ${LABEL[i]} — a list of names, {via, why} or {refused}`);
@@ -196,13 +206,16 @@ export function render(manifest) {
     "done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the",
     "admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and",
     "exports, and everything finer is the page's and MCP's, whose columns are complete. The reason for every ↳",
-    "and ✗ is numbered under the tables.",
+    "and ✗ is numbered under the tables. A feature marked with a dagger (†) is behind a build switch",
+    "(`docs/parity.json`'s `flag`, the switch of `server/features.ts`): it is in the code and tested, and a",
+    "build may say the switch off — then these are not registered at all, and everything they are listed by",
+    "above must say so. The one switch today is `cloud`, and no release build says it on.",
   ];
   const areas = [...new Set(features.map((f) => f.area))];
   for (const area of areas) {
     lines.push("", `## ${area}`, "", "| Feature | REST | CLI | MCP |", "|---|---|---|---|");
     for (const f of features.filter((x) => x.area === area))
-      lines.push(`| ${f.what} | ${cell(f.rest)} | ${cell(f.cli)} | ${cell(f.mcp)} |`);
+      lines.push(`| ${f.what}${f.flag ? " †" : ""} | ${cell(f.rest)} | ${cell(f.cli)} | ${cell(f.mcp)} |`);
   }
   if (notes.length) {
     lines.push("", "## Why", "");

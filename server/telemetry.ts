@@ -10,7 +10,9 @@
  * Load-bearing:
  * - **Nothing is held, measured or sent unless the answer is yes.** `record`, `routeDone` and `fail`
  *   return at once otherwise, so an install that said no — or was never asked — does the work of
- *   one `kv` read the first time and a boolean after.
+ *   one `kv` read the first time and a boolean after. And with the `cloud` switch off
+ *   (`server/features.ts`) nothing is held, measured or sent whatever the stored answer is: these
+ *   features are not in the build, and an address baked in for logs is never read.
  * - **Every event is `cleanEvent`'s before it is held** (`api/protocol/logs.ts`), whoever sent it:
  *   the page's batch, the server's own errors and the route summary alike. A page that sent a
  *   title in a prop has it dropped here.
@@ -41,6 +43,7 @@ import {
   type Props,
 } from "../api/protocol/logs";
 import type { Home } from "./home";
+import { cloudOn } from "./features";
 
 declare const __ANYDAG_LOGS_URL__: string;
 const BUILT_IN = typeof __ANYDAG_LOGS_URL__ === "string" ? __ANYDAG_LOGS_URL__ : "";
@@ -89,6 +92,16 @@ export class Telemetry {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
+  /**
+   * Whether the switch is on. Behind it, `Telemetry` is inert: the routes are not registered
+   * (`server/app.ts`), the question is never drawn and nothing is recorded or sent — whatever the
+   * stored answer says. A consent of `1` in `kv` from before the switch existed stays there unused
+   * (`docs/architecture/server.md`), and nothing reads far enough to send it.
+   */
+  private on(): boolean {
+    return cloudOn(this.env);
+  }
+
   /* -- the answer ---------------------------------------------------------------------------- */
 
   consent(): boolean | null {
@@ -128,9 +141,12 @@ export class Telemetry {
 
   /**
    * Where a batch goes, decided when it is sent: a vault paired after the server started counts.
-   * `ANYDAG_LOGS_URL=off` sends nowhere whatever else is set.
+   * `ANYDAG_LOGS_URL=off` sends nowhere whatever else is set — and with the `cloud` switch off,
+   * nowhere whatever the answer says: this resolver is what keeps a build that baked an address
+   * from ever contacting it.
    */
   destination(): string | null {
+    if (!this.on()) return null;
     const set = this.env.ANYDAG_LOGS_URL?.trim();
     if (set === "off" || set === "0") return null;
     if (set) return endpointOf(set);
@@ -165,7 +181,7 @@ export class Telemetry {
 
   /** Events from the page or the server: each cleaned, the unknown dropped. Answers how many were kept. */
   record(raw: readonly unknown[]): number {
-    if (this.consent() !== true) return 0;
+    if (!this.on() || this.consent() !== true) return 0;
     let kept = 0;
     for (const r of raw.slice(0, MAX_EVENTS)) {
       const e = cleanEvent(r);
@@ -178,13 +194,13 @@ export class Telemetry {
   }
 
   event(name: EventName, props: Props): void {
-    if (this.consent() !== true) return;
+    if (!this.on() || this.consent() !== true) return;
     this.record([{ name, at: new Date().toISOString(), props }]);
   }
 
   /** One request answered, by its route's template — summed until the next send. */
   routeDone(route: string, status: number, ms: number): void {
-    if (this.consent() !== true) return;
+    if (!this.on() || this.consent() !== true) return;
     const t = this.timings.get(route) ?? { count: 0, errors: 0, ms: 0, max: 0 };
     t.count++;
     if (status >= 500) t.errors++;
@@ -195,7 +211,7 @@ export class Telemetry {
 
   /** Something the server did not expect. Only the message and the stack, and both scrubbed. */
   fail(e: unknown, route?: string): void {
-    if (this.consent() !== true) return;
+    if (!this.on() || this.consent() !== true) return;
     const err = e instanceof Error ? e : new Error(String(e));
     this.event("error", {
       where: "server",
@@ -245,7 +261,7 @@ export class Telemetry {
   /** Send what is held, once; a failure loses that batch rather than retrying it for ever. */
   async flush(): Promise<void> {
     if (this.sending) return this.sending;
-    if (this.consent() !== true) return;
+    if (!this.on() || this.consent() !== true) return;
     const to = this.destination();
     if (!to) {
       /* Nowhere to send: nothing is kept for later either. */
@@ -272,8 +288,9 @@ export class Telemetry {
     return this.sending;
   }
 
+  /** A server that stays up sends; the `cloud` switch off, it starts nothing (`server/features.ts`). */
   start(): void {
-    if (this.timer) return;
+    if (this.timer || !this.on()) return;
     this.timer = setInterval(() => void this.flush(), EVERY_MS);
     this.timer.unref?.();
   }

@@ -5,6 +5,12 @@
 
 ## Sync
 
+Everything here is behind one build switch until the server ships: the `cloud` switch of
+[`server.md`](server.md#feature-switches) (`server/features.ts`). It is off in a release build,
+which means no Sync tab, no sync row, no `/api/sync/*`, no loop for a linked vault and no sync MCP
+tools or `anydag sync` commands — everything is kept, and `ANYDAG_CLOUD=on` brings it back. The dev
+server and the test suites say on.
+
 A vault syncs to an **api server** somebody runs — `api/` in this repository, one Node
 process over Postgres (or PGlite when `DATABASE_URL` is unset); its own file is
 [`api.md`](api.md) — **end to end encrypted**: the server holds opaque keys, sealed blobs and

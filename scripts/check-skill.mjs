@@ -234,6 +234,34 @@ if (tools.length === 0) {
   process.exit(1);
 }
 
+/* The same read, for the build's feature switch (`server/features.ts`). `TOOLS` is the whole
+   surface and never shorter; the CLI's table is — with the switch off, the commands that need an
+   AnyDag server are not this CLI's, and the skill's rows about them are the point, not drift. */
+const cloudOn = await (async () => {
+  const { build } = await import("esbuild");
+  const out = path.join(at("node_modules"), ".cache", "check-skill", "features.mjs");
+  await build({
+    absWorkingDir: at("."),
+    stdin: { contents: 'export { cloudOn } from "./server/features";', resolveDir: at("."), loader: "ts" },
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    packages: "external",
+    outfile: out,
+    logLevel: "silent",
+  });
+  const { cloudOn: say } = await import(`${pathToFileURL(out).href}?t=${Date.now()}`);
+  return say;
+})();
+
+/* The command groups behind the switch, read out of `cli/main.ts` rather than copied. */
+const gatedGroups = /\bCLOUD_GROUPS = new Set\(([^)]*)\)/.exec(fs.readFileSync(at("cli/main.ts"), "utf8"))?.[1] ?? "";
+const gated = new Set([...gatedGroups.matchAll(/"([a-z]+)"/g)].map((m) => m[1]));
+if (gated.size === 0) {
+  console.error("could not read CLOUD_GROUPS out of cli/main.ts — this check needs updating");
+  process.exit(1);
+}
+
 const mcpSection = /###\s*Through MCP\b([\s\S]*?)(?:\n###?\s|$)/.exec(skill);
 if (!mcpSection) {
   note("no `### Through MCP` section", "");
@@ -294,6 +322,7 @@ const cliCount = cli.length;
 cli.push("help", "version");
 
 const cliSection = /###\s*Through the CLI\b([\s\S]*?)(?:\n###?\s|$)/.exec(skill);
+const switchOn = cloudOn({ ...process.env });
 if (!cliSection) {
   note("no `### Through the CLI` section", "");
 } else {
@@ -311,6 +340,10 @@ if (!cliSection) {
       (words.length === 1 && cliGroups.includes(words[0]))
     )
       continue;
+    /* With the `cloud` switch off the gated commands are absent from the table by design, and the
+       skill is what says so — its rows are the ones an agent reads first. Naming them here is a
+       claim about the switch, held to the code above, not drift about the table. */
+    if (!switchOn && gated.has(words[0])) continue;
     /* A group followed by a word that is not one of its commands is the rename this exists to catch. */
     note("the skill names a command the CLI has not", `anydag ${words.join(" ")}`);
   }

@@ -46,7 +46,7 @@ diagram language. Link it into your agent's skills folder (for Claude Code, `~/.
 
 ## From a terminal
 
-The `anydag` command also manages vaults, files, sync, the trash and exports:
+The `anydag` command also manages vaults, files, the trash and exports:
 
 ```bash
 anydag serve ~/Notes        # open a vault in a browser on this computer
@@ -56,4 +56,4 @@ anydag help                 # every command
 
 ---
 
-[← Tasks, projects and the calendar](tasks-and-calendar.md) · [Guide](README.md) · [Your files, sync and privacy →](files-and-sync.md)
+[← Tasks, projects and the calendar](tasks-and-calendar.md) · [Guide](README.md) · [Your files →](files.md)

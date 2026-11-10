@@ -4,6 +4,11 @@
 
 ## Logs
 
+Everything here is behind the build's `cloud` switch (`server/features.ts`, the account in
+[`server.md`](server.md#feature-switches)): off in a release build, no membership question is ever
+drawn, no route answers, no batch is resolved to a destination, and any address a build baked in for
+logs is never read. The dev server and the test suites say on.
+
 Anonymous logs from installs whose person said yes, and from no other. Off
 until answered; asked once per install, on the first page anybody opens; changed in Settings →
 Privacy or with `anydag telemetry on|off|ask`.

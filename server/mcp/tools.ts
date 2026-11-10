@@ -1676,7 +1676,6 @@ const trashTools: Tool[] = [
   }),
 ];
 
-/** Every tool, in the order the server lists them. The parity test reads the names from here. */
 /**
  * Sync: what the vault's link says, and a sync now. Pairing and linking are not
  * tools — a passphrase is the person's, typed by them in Settings or a terminal.
@@ -1703,6 +1702,11 @@ const syncTools: Tool[] = [
   }),
 ];
 
+/**
+ * Every tool, in the order the server lists them, the whole surface — the parity test reads the
+ * names from here. What the MCP server *registers* is `listTools`'s, which the `cloud` switch
+ * (`server/features.ts`) cuts to what the build carries.
+ */
 export const TOOLS: Tool[] = [
   ...boardTools,
   ...noteTools,
@@ -1720,3 +1724,16 @@ export const TOOLS: Tool[] = [
   ...grammarTools,
   ...appTools,
 ];
+
+/**
+ * The tools that exist only when the build's `cloud` switch is on (`server/features.ts`): the ones
+ * that reach an AnyDag server. `TOOLS` above stays the whole surface — the parity test and the
+ * skill's check hold it — and `listTools` is what the MCP server registers, asked of the server the
+ * tools run against (`GET /api/health`), so a client can never see a tool whose route is not there.
+ */
+const CLOUD = new Set(["sync_status", "sync_now", "feedback"]);
+
+/** The tools to register: all of them, or only the ones the switch leaves. */
+export function listTools(cloud: boolean): Tool[] {
+  return cloud ? TOOLS : TOOLS.filter((t) => !CLOUD.has(t.name));
+}

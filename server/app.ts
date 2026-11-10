@@ -17,6 +17,7 @@ import { routePath } from "hono/route";
 import { Assistant } from "./chat/live";
 import { defaultHarnesses } from "./chat/harnesses";
 import type { Session } from "./context";
+import { cloudOn } from "./features";
 import { failure } from "./http";
 import { chatGuard, chatRoutes } from "./routes/chat";
 import { docRoutes } from "./routes/docs";
@@ -50,6 +51,9 @@ const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me",
 
 export function createApp(opts: ServerOptions): Hono {
   const s = opts.session;
+  /* Read once per app: every route this app serves answers for the same process, whose environment
+     does not change beneath it. A second app (a CLI's in-process serve) decides for itself. */
+  const cloud = cloudOn(s.env);
   const app = new Hono();
 
   /* -- the gate: the Host, then the token --------------------------------------------------- */
@@ -73,23 +77,27 @@ export function createApp(opts: ServerOptions): Hono {
     await next();
   });
 
-  /* -- logs: how each route answered, by its template, and only once somebody said yes ---------- */
+  /* -- logs: how each route answered, by its template, and only once somebody said yes --
+     behind the `cloud` switch (`server/features.ts`), whose being off is "no server": not even the
+     timings' template is recorded, and nothing is asked. */
 
-  const logs = s.telemetry;
-  app.use("*", async (c, next) => {
-    if (logs.consent() !== true) return next();
-    const start = performance.now();
-    await next();
-    const template = routePath(c, -1);
-    if (
-      !template ||
-      template === "*" ||
-      template.endsWith("/*") ||
-      !(template.startsWith("/__board") || template.startsWith("/api"))
-    )
-      return;
-    logs.routeDone(`${c.req.method} ${template}`, c.res.status, performance.now() - start);
-  });
+  if (cloud) {
+    const logs = s.telemetry;
+    app.use("*", async (c, next) => {
+      if (logs.consent() !== true) return next();
+      const start = performance.now();
+      await next();
+      const template = routePath(c, -1);
+      if (
+        !template ||
+        template === "*" ||
+        template.endsWith("/*") ||
+        !(template.startsWith("/__board") || template.startsWith("/api"))
+      )
+        return;
+      logs.routeDone(`${c.req.method} ${template}`, c.res.status, performance.now() - start);
+    });
+  }
 
   /* -- a chat's own requests: its vault, its mode, its approvals, the recorder (`chat/live.ts`) -- */
 
@@ -112,9 +120,11 @@ export function createApp(opts: ServerOptions): Hono {
   eventRoutes(app, s);
   vaultRoutes(app, s);
   trashRoutes(app, s);
-  syncRoutes(app, s);
-  telemetryRoutes(app, s);
-  feedbackRoutes(app, s, opts.fetch);
+  if (cloud) {
+    syncRoutes(app, s);
+    telemetryRoutes(app, s);
+    feedbackRoutes(app, s, opts.fetch);
+  }
   chatRoutes(app, assistant);
 
   /* -- the page ---------------------------------------------------------------------------- */
@@ -151,9 +161,11 @@ export function createApp(opts: ServerOptions): Hono {
     try {
       return failure(c, e);
     } catch (unknown) {
-      /* Not a refusal any route meant: a defect, and the one kind of error worth a log. */
+      /* Not a refusal any route meant: a defect, and the one kind of error worth a log. Behind the
+         `cloud` switch (`server/features.ts`) the recorder is inert, so even with a stored consent
+         of yes nothing is held or sent — `Telemetry.fail` reads the switch first. */
       const template = routePath(c, -1);
-      logs.fail(unknown, template && template !== "*" ? `${c.req.method} ${template}` : undefined);
+      s.telemetry.fail(unknown, template && template !== "*" ? `${c.req.method} ${template}` : undefined);
       throw unknown;
     }
   });

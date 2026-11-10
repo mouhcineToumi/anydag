@@ -9,7 +9,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 
 import type { Backend } from "./backend";
 import { chatTools } from "./chat";
-import { Picture, TOOLS, ToolError, makeKit, type Kit, type Tool } from "./tools";
+import { Picture, listTools, ToolError, makeKit, type Kit, type Tool } from "./tools";
 
 const INSTRUCTIONS =
   "AnyDag draws technical diagrams from a DSL onto an infinite canvas, kept as plain files in a vault — a folder on this machine. " +
@@ -40,17 +40,44 @@ async function runTool(tool: Tool, args: unknown, kit: Kit) {
   }
 }
 
-export interface ChatMode {
+interface ChatMode {
   id: string;
   /** The chat's own vault: what a document link names when a tool named none. */
   home?: string;
 }
 
-export function buildMcp(backend: Backend, opts: { readOnly: boolean; version?: string; chat?: ChatMode }): McpServer {
+export interface McpOptions {
+  readOnly: boolean;
+  version?: string;
+  chat?: ChatMode;
+  /** The `cloud` switch as the server this runs it answers (`server/features.ts`). Asked from the
+   *  backend when it is not said, so both the in-process one and the running app's decide the list. */
+  cloud?: boolean;
+}
+
+/**
+ * Everything about the server this runs against is read from it, once, before a tool is registered:
+ * with the `cloud` switch off a client must never be offered `sync_status`, `sync_now` or
+ * `feedback`, whose routes are not registered either — and a chat is held to the same list. A call that fails (a server too old to say) says off: a client
+ * is shown less, never more.
+ */
+async function cloudOf(backend: Backend, said: boolean | undefined): Promise<boolean> {
+  if (said !== undefined) return said;
+  try {
+    const got = await backend.call("GET", "/api/health");
+    return got.json?.features?.cloud === true;
+  } catch {
+    /* No answer: the client is offered less, never more. */
+    return false;
+  }
+}
+
+export async function buildMcp(backend: Backend, opts: McpOptions): Promise<McpServer> {
   const kit = makeKit(backend, opts.readOnly, opts.chat?.home);
+  const cloud = await cloudOf(backend, opts.cloud);
   const server = new McpServer({ name: "anydag", version: opts.version ?? "dev" }, { instructions: INSTRUCTIONS });
 
-  for (const tool of opts.chat ? chatTools() : TOOLS) {
+  for (const tool of opts.chat ? chatTools(cloud) : listTools(cloud)) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.input, annotations: { readOnlyHint: !tool.write } },
@@ -85,12 +112,9 @@ export function buildMcp(backend: Backend, opts: { readOnly: boolean; version?: 
 }
 
 /** Serve over stdio until the client goes away. */
-export async function startMcp(
-  backend: Backend,
-  opts: { readOnly: boolean; version?: string; chat?: ChatMode },
-): Promise<McpServer> {
+export async function startMcp(backend: Backend, opts: McpOptions): Promise<McpServer> {
   const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
-  const server = buildMcp(backend, opts);
+  const server = await buildMcp(backend, opts);
   await server.connect(new StdioServerTransport());
   return server;
 }

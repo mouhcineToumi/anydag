@@ -42,6 +42,7 @@ import { me } from "./auth/api";
 import { Boundary } from "./ui/Boundary";
 import { preloadEditor } from "./blocks";
 import { Gate } from "./auth/Gate";
+import { loadFeatures } from "./features";
 import { warmLayout } from "./layout/elk";
 import { watchZone } from "./calendar/usePrefs";
 import { pull } from "./settings/sync";
@@ -116,7 +117,7 @@ async function start(): Promise<void> {
   /* Before the first paint, so the top row never draws under the macOS traffic lights. */
   watchWindowInset();
 
-  const [, account] = await Promise.all([
+  const [, account, features] = await Promise.all([
     facesLoaded().catch(() => undefined),
     me()
       .then((account) => {
@@ -124,6 +125,10 @@ async function start(): Promise<void> {
         return account;
       })
       .catch(() => null),
+    /* What this build may show of the server-backed features — sync, the logs, Send feedback. One
+       unscoped call at boot, with the page's opinion of it coming only from here
+       (`src/features.ts`). Nothing waits for it alone: it lands with the fonts and the session. */
+    loadFeatures(),
   ]);
   let id = "";
   if (account) {
@@ -141,8 +146,9 @@ async function start(): Promise<void> {
     /* The account's time zone is read before anything draws a time. */
     watchZone();
     /* Whether this install sends logs, asked once; the first page asks the person when nobody has
-       answered (`telemetry/Prompt.tsx`). Not awaited: nothing on the page waits on it. */
-    if (id) void startTelemetry();
+       answered (`telemetry/Prompt.tsx`) — and never when the build's `cloud` switch is off
+       (`server/features.ts` says so through `/api/health`): no request at all. Not awaited. */
+    if (id && features?.cloud) void startTelemetry();
   }
 
   createRoot(document.getElementById("root")!).render(

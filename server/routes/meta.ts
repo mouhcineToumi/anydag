@@ -15,6 +15,7 @@ import { completeFor, LlmError } from "../../plugins/generate/llm";
 import { describeProviders, resolveProvider } from "../../plugins/generate/providers";
 import { isDiagramType, type DiagramType } from "../../src/board/types";
 import type { Session } from "../context";
+import { features } from "../features";
 import { zoneIn } from "../frontmatter";
 import { grammar } from "../grammar";
 import { bodyOf, err } from "../http";
@@ -61,6 +62,9 @@ export function metaRoutes(app: Hono, s: Session): void {
       vault: s.any ? s.vault.root : null,
       mcp: "",
       app: "",
+      /* What is in this build, for a page that must not disagree with its server
+         (`server/features.ts`); this one answer is where the page reads the switch. */
+      features: features(s.env),
     }),
   );
 

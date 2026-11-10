@@ -13,6 +13,9 @@ cd "$(dirname "$0")/.."
 
 PORT="${ANYDAG_API_PORT:-3601}"
 export ANYDAG_HOME="${ANYDAG_HOME:-$PWD/.dev-home}"
+# The build's feature switch (`server/features.ts`): dev carries the server-backed features — sync,
+# the logs question, feedback. `ANYDAG_CLOUD=off` puts any of them back off for a session.
+export ANYDAG_CLOUD="${ANYDAG_CLOUD:-on}"
 VAULT="${ANYDAG_VAULT:-$PWD/boards/local}"
 mkdir -p "$VAULT"
 

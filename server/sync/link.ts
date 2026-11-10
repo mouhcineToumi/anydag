@@ -36,6 +36,7 @@ import {
   wrapKey,
 } from "../../api/protocol/crypto";
 import type { VaultKey } from "../../api/protocol/wire";
+import { cloudOn } from "../features";
 import { err } from "../http";
 import type { Vault } from "../vault";
 import { HttpSyncApi, isSyncError } from "./client";
@@ -120,9 +121,11 @@ export class SyncLinks {
     return this.loops.get(id);
   }
 
-  /** A vault was opened: start its loop when it is linked, and do nothing at all when it is not. */
+  /** A vault was opened: start its loop when it is linked, and do nothing at all when it is not —
+   *  nor when the build's `cloud` switch is off (`server/features.ts`), which is "no server": a
+   *  vault linked before the switch existed stays linked in `kv` and on disk, just unused. */
   opened(vault: Vault): void {
-    if (!this.auto || !this.linked(vault.id)) return;
+    if (!cloudOn(this.env) || !this.auto || !this.linked(vault.id)) return;
     const mismatch = this.rootMismatch(vault, this.pairing(vault.id));
     if (mismatch) {
       this.broken.set(vault.id, { state: "paused", reason: mismatch });
