@@ -1254,6 +1254,7 @@ export const MONO: ReadonlySet<string> = new Set([
   "okta",
   "ollama",
   "openai",
+  "opencode",
   "opensearch",
   "opentelemetry",
   "opentofu",
