@@ -17,6 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { PROTOCOL, PROTOCOL_HEADER } from "../protocol/wire";
 import { createApp } from "../server/app";
 import { DiskBlobs } from "../server/blobs/disk";
 import { configFrom, type Config } from "../server/config";
@@ -66,7 +67,11 @@ async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<v
   };
 }
 
-export async function harness(backend: Backend = "pglite", env: Record<string, string> = {}): Promise<Harness> {
+export async function harness(
+  backend: Backend = "pglite",
+  env: Record<string, string> = {},
+  opts: { fetch?: typeof fetch } = {},
+): Promise<Harness> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-api-test-"));
   const config = configFrom({
     ANYDAG_API_DATA: root,
@@ -85,7 +90,7 @@ export async function harness(backend: Backend = "pglite", env: Record<string, s
     },
   };
   const hub = new PokeHub();
-  const app = createApp({ meta, blobs, config, now: () => clock.now, hub, version: "test", pingMs: 50 });
+  const app = createApp({ meta, blobs, config, now: () => clock.now, hub, version: "test", pingMs: 50, ...opts });
   return {
     app,
     meta,
@@ -105,6 +110,8 @@ export async function harness(backend: Backend = "pglite", env: Record<string, s
 
 export interface CallOptions {
   token?: string;
+  /** The protocol the request says it speaks: this build's unless given; `null` says none (0.2.0). */
+  protocol?: string | null;
   json?: unknown;
   bytes?: Uint8Array;
   headers?: Record<string, string>;
@@ -112,6 +119,7 @@ export interface CallOptions {
 
 export function call(h: Harness, method: string, route: string, opts: CallOptions = {}): Promise<Response> {
   const headers: Record<string, string> = { ...opts.headers };
+  if (opts.protocol !== null) headers[PROTOCOL_HEADER] = opts.protocol ?? String(PROTOCOL);
   if (opts.token) headers.authorization = `Bearer ${opts.token}`;
   let body: BodyInit | undefined;
   if (opts.json !== undefined) {

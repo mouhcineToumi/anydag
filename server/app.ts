@@ -21,6 +21,7 @@ import { failure } from "./http";
 import { chatGuard, chatRoutes } from "./routes/chat";
 import { docRoutes } from "./routes/docs";
 import { eventRoutes } from "./routes/events";
+import { feedbackRoutes } from "./routes/feedback";
 import { fileRoutes } from "./routes/files";
 import { folderRoutes } from "./routes/folders";
 import { metaRoutes } from "./routes/meta";
@@ -38,6 +39,8 @@ export interface ServerOptions {
   page: string | null;
   /** The Assistant's runtime; made here when not given. `main.ts` tells it the port once it listens. */
   assistant?: Assistant;
+  /** How the server reaches the feedback relay (`server/feedback.ts`); a test hands in the relay itself. */
+  fetch?: typeof fetch;
 }
 
 const COOKIE = "anydag_token";
@@ -111,6 +114,7 @@ export function createApp(opts: ServerOptions): Hono {
   trashRoutes(app, s);
   syncRoutes(app, s);
   telemetryRoutes(app, s);
+  feedbackRoutes(app, s, opts.fetch);
   chatRoutes(app, assistant);
 
   /* -- the page ---------------------------------------------------------------------------- */

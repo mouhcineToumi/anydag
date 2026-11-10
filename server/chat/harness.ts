@@ -23,7 +23,7 @@ export interface RunOptions {
   model: string;
   /** Claude's `--effort`, OpenCode's `#variant`; absent for the model's own. */
   effort?: string;
-  /** The system prompt: the mode, the vaults in reach, how to cite. Changes between turns. */
+  /** The system prompt: the vaults in reach, how to cite. Changes between turns. */
   system: string;
   /** The person's words — with, on a fresh session that has history, the transcript before them. */
   prompt: string;

@@ -37,3 +37,15 @@ __pycache__/
 # vault's own folder of app state (`.anydag/`).
 .dev-home/
 boards/*/.anydag/
+
+# Secrets. The repository is public, so nothing below may ever be committed: keys and certificates,
+# env files (but their `.example`), and Google Cloud's service-account JSON. `scripts/secrets.sh`
+# scans what is committed; this keeps the usual shapes out of `git add .` in the first place.
+*.pem
+*.key
+*.p12
+*.pfx
+.env.*
+!**/.env.example
+*-credentials.json
+service-account*.json

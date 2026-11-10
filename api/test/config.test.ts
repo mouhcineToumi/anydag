@@ -111,6 +111,9 @@ describe("configFrom", () => {
       "/tmp",
     );
     expect(full).toMatchObject({ feedbackToken: "a-fake-feedback-token-value", feedbackRepo: "owner/repo" });
+    expect(() => configFrom({ ANYDAG_API_FEEDBACK_REPO: "not a repo" }, "/tmp")).toThrow(
+      /ANYDAG_API_FEEDBACK_REPO must be owner\/name/,
+    );
   });
 });
 

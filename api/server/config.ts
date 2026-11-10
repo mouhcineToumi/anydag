@@ -163,6 +163,10 @@ export function configFrom(
   if (trustRaw !== "off" && trustRaw !== "0" && !/^[1-8]$/.test(trustRaw))
     throw new ConfigError(`ANYDAG_API_TRUST_PROXY must be off or a hop count of at most 8, not ${JSON.stringify(trustRaw)}`);
 
+  const feedbackRepo = text("ANYDAG_API_FEEDBACK_REPO");
+  if (feedbackRepo !== null && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(feedbackRepo))
+    throw new ConfigError(`ANYDAG_API_FEEDBACK_REPO must be owner/name, not ${JSON.stringify(feedbackRepo)}`);
+
   const production = env.NODE_ENV === "production";
   if (production && adminToken !== null && adminToken.length < 32)
     throw new ConfigError(
@@ -196,7 +200,7 @@ export function configFrom(
     logs: onOff("ANYDAG_API_LOGS", true),
     feedback: onOff("ANYDAG_API_FEEDBACK", true),
     feedbackToken: text("ANYDAG_API_FEEDBACK_GITHUB_TOKEN"),
-    feedbackRepo: text("ANYDAG_API_FEEDBACK_REPO"),
+    feedbackRepo,
     logsDays,
     trustProxy: trustRaw === "off" ? 0 : Number(trustRaw),
     production,

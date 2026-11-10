@@ -77,6 +77,18 @@ describe("GET /v1", () => {
       feedback: false,
     });
   });
+
+  it("keeps feedback when sync is off: the relay is its own feature, open and token-free", async () => {
+    h = await harness("pglite", {
+      ANYDAG_API_SYNC: "off",
+      ANYDAG_API_FEEDBACK_GITHUB_TOKEN: "github_pat_for_the_tests",
+      ANYDAG_API_FEEDBACK_REPO: "owner/repo",
+    });
+    /* A body the relay refuses before it asks GitHub: a 400 is the route answering, not sync's 404 or a 401. */
+    const res = await call(h, "POST", "/v1/feedback", { protocol: null, json: {} });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("ES_BAD_REQUEST");
+  });
 });
 
 describe("/v1/ready", () => {
@@ -85,6 +97,12 @@ describe("/v1/ready", () => {
     const res = await call(h, "GET", "/v1/ready");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("answers a probe and a discovery that say no sync protocol", async () => {
+    h = await harness("pglite");
+    expect((await call(h, "GET", "/v1/ready", { protocol: null })).status).toBe(200);
+    expect((await call(h, "GET", "/v1", { protocol: null })).status).toBe(200);
   });
 
   it("answers 503, and nothing of the database's own words, when it does not", async () => {

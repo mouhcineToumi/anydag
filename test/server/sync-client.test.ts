@@ -21,7 +21,9 @@ import { conflictName, freshCopy, isJson, isText, mergeContent } from "../../ser
 import { syncs } from "../../server/sync/scope";
 import { SyncState } from "../../server/sync/state";
 import { frontId } from "../../server/ids";
-import { randomKey } from "../../api/protocol/crypto";
+import { keyOf, keysOf, randomKey } from "../../api/protocol/crypto";
+import { MetaRefused, openMeta, sealMeta } from "../../api/protocol/meta";
+import { PROTOCOL, PROTOCOL_HEADER, type Change } from "../../api/protocol/wire";
 import { FakeServer } from "./sync-fake";
 import { tmpFs, TYPES, type TmpFs } from "./sync-tmpfs";
 
@@ -82,11 +84,11 @@ function device(server: FakeServer, vk: Uint8Array, name: string, wrap?: (fs: Tm
   };
 }
 
-function world(n = 2): { server: FakeServer; devs: Device[] } {
+function world(n = 2): { server: FakeServer; devs: Device[]; vk: Uint8Array } {
   const server = new FakeServer();
   const vk = randomKey();
   const devs = ["A", "B", "C"].slice(0, n).map((name) => device(server, vk, name));
-  return { server, devs };
+  return { server, devs, vk };
 }
 
 /** Every device syncs, in order, until a whole round commits nothing. */
@@ -278,11 +280,14 @@ describe("HttpSyncApi", () => {
       seen.push(
         `${init?.method} ${u.replace("https://s.example", "")} ${(init?.headers as Record<string, string> | undefined)?.authorization ?? ""}`,
       );
+      const headers = { [PROTOCOL_HEADER]: String(PROTOCOL) };
       if (u.endsWith("/commit"))
-        return new Response(JSON.stringify({ code: "ES_STALE", message: "stale", conflicts: [] }), { status: 409 });
-      if (init?.method === "HEAD") return new Response(null, { status: 404 });
-      if (u.includes("/changes")) return new Response(JSON.stringify({ changes: [], next: 7, more: false, head: 7, horizon: 1 }));
-      if (u.includes("/key")) return new Response(JSON.stringify({ code: "ES_NOT_FOUND", message: "no key" }), { status: 404 });
+        return new Response(JSON.stringify({ code: "ES_STALE", message: "stale", conflicts: [] }), { status: 409, headers });
+      if (init?.method === "HEAD") return new Response(null, { status: 404, headers });
+      if (u.includes("/changes"))
+        return new Response(JSON.stringify({ changes: [], next: 7, more: false, head: 7, horizon: 1 }), { headers });
+      if (u.includes("/key"))
+        return new Response(JSON.stringify({ code: "ES_NOT_FOUND", message: "no key" }), { status: 404, headers });
       throw new TypeError("connection refused");
     }) as typeof fetch;
     const api = new HttpSyncApi({ url: "https://s.example/", token: "tok", fetch: fetcher, retries: 1, backoff: 1 });
@@ -298,6 +303,181 @@ describe("HttpSyncApi", () => {
     expect(seen).toContain("GET /v1/vaults/v1/changes?since=7&limit=1000 Bearer tok");
     expect(seen).toContain(`HEAD /v1/vaults/v1/blobs/${"b".repeat(43)} Bearer tok`);
     expect(seen.filter((l) => l.startsWith("GET /v1/health"))).toHaveLength(2);
+  });
+  it("refuses an answer from a server of another protocol, and says which side is behind", async () => {
+    const answer = (headers: Record<string, string>, status = 200, body: unknown = { vaults: [] }) =>
+      (async () => new Response(JSON.stringify(body), { status, headers })) as unknown as typeof fetch;
+    const sent: Record<string, string>[] = [];
+    const recording = (async (_url: string | URL | Request, init?: RequestInit) => {
+      sent.push(init?.headers as Record<string, string>);
+      return new Response(JSON.stringify({ vaults: [] }), { headers: { [PROTOCOL_HEADER]: String(PROTOCOL) } });
+    }) as typeof fetch;
+    await new HttpSyncApi({ url: "https://s.example", token: "tok", fetch: recording }).vaults();
+    expect(sent[0]![PROTOCOL_HEADER]).toBe(String(PROTOCOL));
+
+    /* A 0.2.0 server says nothing: it would store and serve metadata this client cannot check. */
+    const old = await new HttpSyncApi({ url: "https://s.example", fetch: answer({}) }).vaults().catch((e: unknown) => e);
+    expect((old as SyncError).code).toBe("ES_PROTOCOL");
+    expect((old as SyncError).message).toMatch(/older than this AnyDag.*Update the sync server/);
+    /* Its refusals too: an ES_* from a server of another protocol is not this protocol's word. */
+    const oldStale = await new HttpSyncApi({
+      url: "https://s.example",
+      fetch: answer({}, 409, { code: "ES_STALE", message: "x" }),
+    })
+      .commit("v", [])
+      .catch((e: unknown) => e);
+    expect((oldStale as SyncError).code).toBe("ES_PROTOCOL");
+    const newer = await new HttpSyncApi({ url: "https://s.example", fetch: answer({ [PROTOCOL_HEADER]: String(PROTOCOL + 1) }) })
+      .vaults()
+      .catch((e: unknown) => e);
+    expect((newer as SyncError).message).toMatch(/update AnyDag/);
+    /* The server's own refusal of this client's protocol is passed on as it said it. */
+    const refused = await new HttpSyncApi({
+      url: "https://s.example",
+      fetch: answer({ [PROTOCOL_HEADER]: String(PROTOCOL + 1) }, 426, {
+        code: "ES_PROTOCOL",
+        message: "update AnyDag, says the server",
+      }),
+    })
+      .vaults()
+      .catch((e: unknown) => e);
+    expect((refused as SyncError).message).toBe("update AnyDag, says the server");
+    /* Health is how a protocol is found out, so it is never refused for one. */
+    expect((await new HttpSyncApi({ url: "https://s.example", fetch: answer({}, 200, { protocol: 1 }) }).health()).protocol).toBe(
+      1,
+    );
+  });
+});
+
+// -- what the server, or a stolen device token, can replay ---------------------------------------
+
+describe("a version that does not belong where it arrived", () => {
+  /** A and B agree on `a.md` and `b.md`. */
+  async function agreed(): Promise<{ server: FakeServer; vk: Uint8Array; a: Device; b: Device; ka: string; kb: string }> {
+    const { server, devs, vk } = world(2);
+    const [a, b] = devs as [Device, Device];
+    a.fs.write("a.md", "alpha\n");
+    a.fs.write("b.md", "beta\n");
+    await settle(server, devs);
+    const k = keysOf(vk);
+    return { server, vk, a, b, ka: keyOf(k.path, "a.md"), kb: keyOf(k.path, "b.md") };
+  }
+  /** What any device token on the account can do: commit a sealed meta and a blob it has seen, again. */
+  const recommit = (server: FakeServer, key: string, blob: string | null, meta: string): void => {
+    const change: Change = { key, parent: server.heads.get(key)?.seq ?? null, blob, meta };
+    server.commit("dev-thief", server.vault, [change]);
+  };
+  /** What the operator can do besides: write the log row it likes, parent included. */
+  const forge = (server: FakeServer, row: { key: string; parent: number | null; blob: string | null; meta: string }): void => {
+    const seq = ++server.seq;
+    const size = row.blob ? server.blobs.get(row.blob)!.byteLength : 0;
+    server.log.push({ seq, ...row, size, device: "dev-operator", at: new Date().toISOString() });
+    server.heads.set(row.key, { key: row.key, seq, parent: row.parent, blob: row.blob, size, meta: row.meta });
+  };
+  const logOf = (server: FakeServer, key: string) => server.log.filter((e) => e.key === key);
+
+  it("refuses a key re-pointed at another file's blob, on a device that has it and on one that does not", async () => {
+    const { server, vk, b, ka, kb } = await agreed();
+    recommit(server, ka, server.heads.get(kb)!.blob, server.heads.get(ka)!.meta);
+    await expect(b.sync()).rejects.toThrow(MetaRefused);
+    expect(b.fs.readText("a.md")).toBe("alpha\n");
+    const before = b.state.cursor();
+    await expect(b.sync()).rejects.toThrow(/re-pointed/);
+    expect(b.state.cursor()).toBe(before); // nothing past the refusal was taken as read
+    const fresh = device(server, vk, "C");
+    await expect(fresh.sync()).rejects.toThrow(MetaRefused);
+    expect(fresh.fs.readText("a.md")).toBe("alpha\n"); // the honest version, and not b.md's bytes
+
+    // The operator can write the parent the seal names; the blob it names is still the seal's.
+    const again = await agreed();
+    const ha = again.server.heads.get(again.ka)!;
+    forge(again.server, { key: again.ka, parent: ha.parent, blob: again.server.heads.get(again.kb)!.blob, meta: ha.meta });
+    for (const d of [again.b, device(again.server, again.vk, "C")]) {
+      await expect(d.sync()).rejects.toThrow(/re-pointed/);
+      expect(d.fs.readText("a.md")).toBe("alpha\n");
+    }
+  });
+
+  it("refuses an older version committed again, by a device token and by the operator", async () => {
+    const { server, a, b, ka } = await agreed();
+    a.fs.write("a.md", "alpha, revised\n");
+    await settle(server, [a, b]);
+    const [v1] = logOf(server, ka);
+    recommit(server, ka, v1!.blob, v1!.meta);
+    await expect(b.sync()).rejects.toThrow(/replayed version/);
+    expect(b.fs.readText("a.md")).toBe("alpha, revised\n");
+
+    const again = await agreed();
+    again.a.fs.write("a.md", "alpha, revised\n");
+    await settle(again.server, [again.a, again.b]);
+    const [w1] = logOf(again.server, again.ka);
+    // The operator can make the parent agree with the seal; it cannot make it newer than ours.
+    forge(again.server, { key: again.ka, parent: w1!.parent, blob: w1!.blob, meta: w1!.meta });
+    await expect(again.b.sync()).rejects.toThrow(/replayed version/);
+    expect(again.b.fs.readText("a.md")).toBe("alpha, revised\n");
+  });
+
+  it("refuses a delete committed again after the file came back, by a device token and by the operator", async () => {
+    const { server, a, b, ka } = await agreed();
+    a.fs.remove("a.md");
+    await settle(server, [a, b]);
+    expect(b.fs.readText("a.md")).toBeNull();
+    a.fs.write("a.md", "alpha, back\n");
+    await settle(server, [a, b]);
+    const tomb = logOf(server, ka).find((e) => e.blob === null)!;
+    recommit(server, ka, null, tomb.meta);
+    await expect(b.sync()).rejects.toThrow(MetaRefused);
+    expect(b.fs.readText("a.md")).toBe("alpha, back\n");
+
+    const again = await agreed();
+    again.a.fs.remove("a.md");
+    await settle(again.server, [again.a, again.b]);
+    again.a.fs.write("a.md", "alpha, back\n");
+    await settle(again.server, [again.a, again.b]);
+    const t = logOf(again.server, again.ka).find((e) => e.blob === null)!;
+    forge(again.server, { key: again.ka, parent: t.parent, blob: null, meta: t.meta });
+    await expect(again.b.sync()).rejects.toThrow(/replayed delete/);
+    expect(again.b.fs.readText("a.md")).toBe("alpha, back\n");
+  });
+
+  it("refuses a meta moved to another key's row, a path of another key, and bytes of another size than sealed", async () => {
+    const { server, b, ka, kb } = await agreed();
+    const hb = server.heads.get(kb)!;
+    forge(server, { key: kb, parent: hb.seq, blob: server.heads.get(ka)!.blob, meta: server.heads.get(ka)!.meta });
+    await expect(b.sync()).rejects.toThrow(/could not open a path's metadata/);
+    expect(b.fs.readText("b.md")).toBe("beta\n");
+
+    /* Sealed by a holder of the vault key, wrongly — what the checks beyond the seal are for. */
+    for (const [meta, why] of [
+      [{ path: "a.md", kind: "file", created: null, mtime: 0, size: 5 }, /another key's path/],
+      [{ path: "b.md", kind: "file", created: null, mtime: 0, size: 99 }, /arrived as 5 bytes, but its metadata says 99/],
+    ] as const) {
+      const again = await agreed();
+      const h = again.server.heads.get(again.kb)!;
+      const at = { key: again.kb, blob: h.blob, parent: h.seq };
+      forge(again.server, { ...at, meta: sealMeta(keysOf(again.vk).enc, at, meta) });
+      await expect(again.b.sync()).rejects.toThrow(why);
+      expect(again.b.fs.readText("b.md")).toBe("beta\n");
+    }
+  });
+
+  it("seals again when a push meets ES_STALE, so the parent the server keeps is the one sealed", async () => {
+    const { server, devs, vk } = world(2);
+    const [a, b] = devs as [Device, Device];
+    a.fs.write("Plan.md", note("7q2m9xk4tb", LINES));
+    await settle(server, devs);
+    a.fs.write("Plan.md", note("7q2m9xk4tb", ["ONE", ...LINES.slice(1)]));
+    b.fs.write("Plan.md", note("7q2m9xk4tb", [...LINES.slice(0, 5), "SIX"]));
+    await b.engine.scan(); // B decides its change over the head both had…
+    await a.sync(); // …A's lands first…
+    await b.engine.push(); // …so B's commit is stale, and B pulls, merges, seals over A's and commits
+    expect(server.commitCalls - server.committed()).toBe(1);
+    await settle(server, devs);
+    const k = keysOf(vk);
+    for (const e of server.log)
+      expect(() => openMeta(k.enc, { key: e.key, blob: e.blob, parent: e.parent }, e.meta)).not.toThrow();
+    expect(a.fs.readText("Plan.md")).toBe(note("7q2m9xk4tb", ["ONE", ...LINES.slice(1, 5), "SIX"]));
+    await same(devs);
   });
 });
 
@@ -574,7 +754,6 @@ describe("the engine", () => {
       home: "v",
       provider: "claude",
       model: "sonnet",
-      mode: "ask",
     };
     const put = (d: Device, m: object) => d.fs.write(`.anydag/chats/${CHAT}/chat.json`, `${JSON.stringify(m, null, 1)}\n`);
     put(a, meta);
@@ -644,5 +823,40 @@ describe("the engine", () => {
     b.engine.touch(["Plan.md"]);
     await b.engine.syncOnce();
     expect(server.commitCalls).toBe(calls);
+  });
+
+  it("hears what sync itself wrote as no change, and a write over it as one (#36)", async () => {
+    const { server, devs } = world(2);
+    const [a, b] = devs as [Device, Device];
+    a.fs.write("deep/Plan.md", note("7q2m9xk4tb", LINES));
+    a.fs.write("old.md", note("8q2m9xk4tb", ["old"]));
+    await settle(server, devs);
+    // B pulled both, into a folder it made: the watcher reports the folder and the files.
+    expect(await b.engine.heard(["deep", "deep/Plan.md", "old.md"])).toBe(false);
+    expect(b.engine.pending()).toBe(0);
+
+    // A pulled delete and an edit: the removal and the new bytes are sync's own.
+    a.fs.remove("old.md");
+    a.fs.write("deep/Plan.md", note("7q2m9xk4tb", [...LINES, "seven"]));
+    await settle(server, devs);
+    expect(b.fs.readText("old.md")).toBeNull();
+    expect(await b.engine.heard(["old.md", "deep/Plan.md"])).toBe(false);
+    expect(b.engine.pending()).toBe(0);
+
+    // The same pull, and a person writes over the file before its event is heard: that is a change.
+    a.fs.write("deep/Plan.md", note("7q2m9xk4tb", [...LINES, "eight"]));
+    await settle(server, devs);
+    b.fs.write("deep/Plan.md", note("7q2m9xk4tb", ["mine", ...LINES, "eight"]));
+    expect(await b.engine.heard(["deep/Plan.md"])).toBe(true);
+    expect(b.engine.pending()).toBe(1);
+    const calls = server.commitCalls;
+    await b.engine.syncOnce();
+    expect(server.commitCalls).toBe(calls + 1);
+
+    // A note is spent by the event it explains: the next event at that path is judged as any other.
+    expect(await b.engine.heard(["old.md"])).toBe(true);
+    // A path sync never wrote is always a change.
+    b.fs.write("new.md", note("9q2m9xk4tb", ["new"]));
+    expect(await b.engine.heard(["new.md"])).toBe(true);
   });
 });

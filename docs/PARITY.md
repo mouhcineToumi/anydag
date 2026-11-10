@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**132 features, 0 gaps, 71 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
+**133 features, 0 gaps, 72 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
@@ -18,6 +18,7 @@ and ✗ is numbered under the tables.
 | The app's preferences — how the window is laid out | `GET /api/settings` `PUT /api/settings` | `settings` | `settings` |
 | Whether this install sends anonymous logs, and where they go — off until the person says yes | `GET /api/telemetry` `PUT /api/telemetry` | `telemetry` | ✗ [1] |
 | The page's own log events — errors, the features used, how fast a page drew | `POST /api/telemetry/events` | ✗ [2] | ✗ [3] |
+| Send a bug or an idea to the maintainers, with files and the text of chosen boards and notes — a public GitHub issue, through the relay; only when the person sends it or asks for it | `GET /api/feedback` `POST /api/feedback` | · | `feedback` |
 
 ## Vaults
 

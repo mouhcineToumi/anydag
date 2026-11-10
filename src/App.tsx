@@ -32,6 +32,7 @@ import { proposedItem } from "@/edit/rewrite";
 import { SelectionBar, type RewriteRun } from "@/edit/SelectionBar";
 import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
+import { FeedbackCard } from "@/feedback/FeedbackCard";
 import { Settings, useSettingsOpen } from "@/settings/Settings";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
@@ -391,7 +392,7 @@ export function App() {
  * `dag:tidy` reaches the page from a script. `dag:chrome` and not `dag:settings`, which is the
  * settings-changed event: one name meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  */
-function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void }) {
+function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void; feedback(): void }) {
   const ref = useRef(on);
   ref.current = on;
   useEffect(() => {
@@ -399,10 +400,22 @@ function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): vo
       const ask = (e as CustomEvent<ChromeAsk>).detail;
       if (ask?.what === "settings") ref.current.settings(ask.tab);
       else if (ask?.what === "search") ref.current.search();
+      else if (ask?.what === "feedback") ref.current.feedback();
     };
     document.addEventListener("dag:chrome", listen);
     return () => document.removeEventListener("dag:chrome", listen);
   }, []);
+}
+
+/**
+ * Whether the feedback card is up. The draft is the card's own and outlives it
+ * (`feedback/FeedbackCard.tsx`); this is only open or shut.
+ */
+function useFeedbackOpen(): { open: boolean; show(): void; close(): void } {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  return { open, show, close };
 }
 
 /**
@@ -480,7 +493,8 @@ function usePageChrome({
   const { name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
   const [browsing, setBrowsing] = useState(false);
   const settings = useSettingsOpen();
-  useChromeRequests({ search: () => setBrowsing(true), settings: settings.show });
+  const feedback = useFeedbackOpen();
+  useChromeRequests({ search: () => setBrowsing(true), settings: settings.show, feedback: feedback.show });
   usePageKeys(snapshot, { settings: settings.toggle, search: () => setBrowsing(true) });
   const chooseTheme = useCallback(
     (n: string) => {
@@ -524,6 +538,7 @@ function usePageChrome({
           onClose={settings.close}
         />
       ) : null}
+      {feedback.open ? <FeedbackCard document={null} onClose={feedback.close} /> : null}
     </>
   );
   return { themeName, openBrowser: () => setBrowsing(true), cards };
@@ -1363,7 +1378,8 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
   /* Settings and Send feedback, which a note could not reach until the sidebar: the note
      page has no dock, and the dock's `⋯` was the only door to either. */
   const settings = useSettingsOpen();
-  useChromeRequests({ search: openBrowser, settings: settings.show });
+  const feedback = useFeedbackOpen();
+  useChromeRequests({ search: openBrowser, settings: settings.show, feedback: feedback.show });
 
   /*
    * Export. The note's text comes from the page showing it, which knows what is
@@ -1595,6 +1611,7 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
           onClose={settings.close}
         />
       ) : null}
+      {feedback.open && !snapshot ? <FeedbackCard document={{ kind: "note", name }} onClose={feedback.close} /> : null}
     </div>
   );
 }
@@ -1674,10 +1691,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      not part of what a shared `?board=…` link means, which is the same argument the theme makes. */
   const settings = useSettingsOpen();
 
-  /* Sending a report. Plain state beside Settings, for the same reason and with one more: there is
-     nowhere else it could live. A draft is not a preference and it is not part of a board, and
-     nothing stores one — closing this card is the end of what was written in it. */
-  useChromeRequests({ search: openBrowser, settings: settings.show });
+  /* Sending feedback. Plain state beside Settings, for the same reason. The draft is not a
+     preference and not part of a board: the card holds it in memory, past a close or a failed send. */
+  const feedback = useFeedbackOpen();
+  useChromeRequests({ search: openBrowser, settings: settings.show, feedback: feedback.show });
 
   /* Choosing a theme now is choosing: a `?theme=` in the URL outranks the stored preference, so a
      pick made while one is present would be recorded and then ignored. */
@@ -2550,6 +2567,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             tab={settings.open.tab}
             onClose={settings.close}
           />
+        ) : null}
+        {feedback.open && !snapshot ? (
+          <FeedbackCard document={board ? { kind: "board", name: board.name } : null} onClose={feedback.close} />
         ) : null}
 
         {editingItem && board ? (

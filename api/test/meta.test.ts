@@ -27,7 +27,14 @@ const D1 = "2099-01-01";
 const D2 = "2099-01-02";
 const D3 = "2099-01-03";
 
-const FREE_PLAN = { id: "free", storage_bytes: null, history_days: null, max_file_bytes: null, devices: null };
+const FREE_PLAN = {
+  id: "free",
+  storage_bytes: null,
+  history_days: null,
+  history_bytes: null,
+  max_file_bytes: null,
+  devices: null,
+};
 const ARGO = { kdf: "argon2id", m: 65536, t: 3, p: 1, salt: "c2FsdA" } as const;
 
 const u = (): string => mint(() => false);
@@ -133,15 +140,30 @@ function contract(label: string, make: () => Promise<Suite>): void {
 
       const b = await account();
       const paid = `plan-${u()}`;
-      await meta.putPlan({ id: paid, storage_bytes: 10_000_000, history_days: 90, max_file_bytes: 1000, devices: 5 });
+      await meta.putPlan({
+        id: paid,
+        storage_bytes: 10_000_000,
+        history_days: 90,
+        history_bytes: null,
+        max_file_bytes: 1000,
+        devices: 5,
+      });
       expect(await meta.plan(paid)).toEqual({
         id: paid,
         storage_bytes: 10_000_000,
         history_days: 90,
+        history_bytes: null,
         max_file_bytes: 1000,
         devices: 5,
       });
-      await meta.putPlan({ id: paid, storage_bytes: 20_000_000, history_days: 30, max_file_bytes: 2000, devices: 6 });
+      await meta.putPlan({
+        id: paid,
+        storage_bytes: 20_000_000,
+        history_days: 30,
+        history_bytes: null,
+        max_file_bytes: 2000,
+        devices: 6,
+      });
       expect((await meta.plan(paid)).storage_bytes).toBe(20_000_000); // upserted, not second-installed
       expect(await meta.plan(`no such plan ${u()}`)).toEqual(FREE_PLAN); // `free`, naming none, limits null
       await meta.setAccountPlan(b.id, paid);
@@ -303,7 +325,7 @@ function contract(label: string, make: () => Promise<Suite>): void {
       const c1 = await meta.commit(v.id, d, [{ key: kA, parent: null, blob: bA, meta: m1 }], day(D1));
       expect(c1).toEqual({ ok: true, seqs: [1] });
       expect(await meta.heads(v.id, "", 10)).toEqual({
-        heads: [{ key: kA, seq: 1, blob: bA, size: 25, meta: m1 }],
+        heads: [{ key: kA, seq: 1, parent: null, blob: bA, size: 25, meta: m1 }],
         seq: 1,
       });
       expect(await meta.changes(v.id, 0, 10)).toEqual({
@@ -335,9 +357,9 @@ function contract(label: string, make: () => Promise<Suite>): void {
       const heads = await meta.heads(v.id, "", 10);
       expect(heads.seq).toBe(4);
       expect(heads.heads).toEqual([
-        { key: kA, seq: 2, blob: bB, size: 7, meta: m2 },
-        { key: oid("kc"), seq: 3, blob: bC, size: 3, meta: m3 },
-        { key: oid("kd"), seq: 4, blob: null, size: 0, meta: m3 },
+        { key: kA, seq: 2, parent: 1, blob: bB, size: 7, meta: m2 }, // a head carries the parent its meta is bound to
+        { key: oid("kc"), seq: 3, parent: null, blob: bC, size: 3, meta: m3 },
+        { key: oid("kd"), seq: 4, parent: null, blob: null, size: 0, meta: m3 },
       ]);
     });
 
@@ -484,13 +506,13 @@ function contract(label: string, make: () => Promise<Suite>): void {
       const first = await meta.heads(v.id, "", 2);
       expect(first).toEqual({
         heads: [
-          { key: oid("ka"), seq: 1, blob: oid("ba"), size: 11, meta: "m0" },
-          { key: oid("kb"), seq: 2, blob: oid("bb"), size: 22, meta: "m1" },
+          { key: oid("ka"), seq: 1, parent: null, blob: oid("ba"), size: 11, meta: "m0" },
+          { key: oid("kb"), seq: 2, parent: null, blob: oid("bb"), size: 22, meta: "m1" },
         ],
         seq: 3,
       });
       expect(await meta.heads(v.id, oid("kb"), 2)).toEqual({
-        heads: [{ key: oid("kc"), seq: 3, blob: oid("bc"), size: 33, meta: "m2" }],
+        heads: [{ key: oid("kc"), seq: 3, parent: null, blob: oid("bc"), size: 33, meta: "m2" }],
         seq: 3,
       });
       expect(await meta.heads(v.id, "z", 2)).toEqual({ heads: [], seq: 3 });
@@ -531,6 +553,29 @@ function contract(label: string, make: () => Promise<Suite>): void {
       expect(await meta.usage({ account: `no account ${u()}` })).toEqual([]);
     });
 
+    it("addBlob under a quota: counts live and pending, never history, and takes the last room once", async () => {
+      const a = await account();
+      const v = await vault(a);
+      const quota = { account: a.id, bytes: 100 };
+      expect(await meta.addBlob(v.id, oid("q-1"), 60, day(D1), quota)).toBe(true);
+      expect(await meta.addBlob(v.id, oid("q-2"), 60, day(D1), quota)).toBe(false);
+      expect(await meta.blobSize(v.id, oid("q-2"))).toBeNull();
+      expect(await meta.addBlob(v.id, oid("q-1"), 60, day(D1), quota)).toBe(true); // held: adds nothing
+      // Two uploads racing for 40 bytes of room: exactly one is written.
+      const raced = await Promise.all([
+        meta.addBlob(v.id, oid("q-3"), 30, day(D1), quota),
+        meta.addBlob(v.id, oid("q-4"), 30, day(D1), quota),
+      ]);
+      expect(raced.filter(Boolean)).toHaveLength(1);
+      expect(await meta.storage(a.id)).toMatchObject({ live: 0, pending: 90, history: 0 });
+      // Committed and then superseded, a blob is history, and the quota stops counting it.
+      seqsOf(await meta.commit(v.id, u(), [{ key: oid("q-k"), parent: null, blob: oid("q-1"), meta: "m" }], day(D2)));
+      const second = raced[0] ? oid("q-3") : oid("q-4");
+      seqsOf(await meta.commit(v.id, u(), [{ key: oid("q-k"), parent: 1, blob: second, meta: "m" }], day(D2)));
+      expect(await meta.storage(a.id)).toMatchObject({ live: 30, pending: 0, history: 60 });
+      expect(await meta.addBlob(v.id, oid("q-5"), 70, day(D2), quota)).toBe(true);
+    });
+
     it("storage: a blob named by several heads is once, and a foreign account's is not ours", async () => {
       const a = await account();
       const foreign = await account();
@@ -564,11 +609,11 @@ function contract(label: string, make: () => Promise<Suite>): void {
       seqsOf(await meta.commit(v2.id, u(), [{ key: oid("k3"), parent: null, blob: bOther, meta: "m" }], day(D3)));
       seqsOf(await meta.commit(v3.id, u(), [{ key: oid("kf"), parent: null, blob: bForeign, meta: "m" }], day(D3)));
 
-      expect(await meta.storage(a.id, v1.id)).toEqual({ live: 40, history: 100, blobs: 2, files: 2 });
-      expect(await meta.storage(a.id, v2.id)).toEqual({ live: 30, history: 0, blobs: 1, files: 1 });
-      expect(await meta.storage(a.id)).toEqual({ live: 70, history: 100, blobs: 3, files: 3 });
-      expect(await meta.storage(foreign.id)).toEqual({ live: 999, history: 0, blobs: 1, files: 1 });
-      expect(await meta.storage(`no such account ${u()}`)).toEqual({ live: 0, history: 0, blobs: 0, files: 0 });
+      expect(await meta.storage(a.id, v1.id)).toEqual({ live: 40, pending: 0, history: 100, blobs: 2, files: 2 });
+      expect(await meta.storage(a.id, v2.id)).toEqual({ live: 30, pending: 0, history: 0, blobs: 1, files: 1 });
+      expect(await meta.storage(a.id)).toEqual({ live: 70, pending: 0, history: 100, blobs: 3, files: 3 });
+      expect(await meta.storage(foreign.id)).toEqual({ live: 999, pending: 0, history: 0, blobs: 1, files: 1 });
+      expect(await meta.storage(`no such account ${u()}`)).toEqual({ live: 0, pending: 0, history: 0, blobs: 0, files: 0 });
     });
 
     it("collect: forgets an unnamed blob old enough, keeps the live heads' one, raises the horizon", async () => {

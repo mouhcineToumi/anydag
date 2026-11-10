@@ -65,7 +65,8 @@ running app's server through `server.json`, or one in this process. It speaks on
 `--json`. See *Parity*.
 
 **Out, and why:** every gesture inside a document and every feature of the app beyond administering a
-vault (MCP has them); undo; `login`/`logout` (no account); `share` and `feedback` (nothing to reach).
+vault (MCP has them); undo; `login`/`logout` (no account); `share` (nothing to reach); `feedback`
+(the MCP `feedback` tool sends it when the person asks; sending feedback is not administering a vault).
 
 ## Parity
 

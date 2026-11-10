@@ -10,7 +10,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 
 | Where | Owns |
 |---|---|
-| `server/main.ts` | `anydag serve <folder>`: bind `127.0.0.1`, mint the token, write `server.json`, print the URL |
+| `server/main.ts` | `anydag serve <folder>`: bind `127.0.0.1`, mint the token, write `server.json`, print the URL, and remove it on `SIGINT`, `SIGTERM` or `SIGHUP` |
 | `server/app.ts` | the gate — the `Host`, then the token — which vault a request means, the routes, and the built page |
 | `server/context.ts` | the `Session`: the open vaults, `?vault=<id>` through `AsyncLocalStorage`, so no route learned there is more than one |
 | `server/vault.ts` | the store over a folder: every kind listed and foldered, names that are titles, ids in frontmatter, attachments, the watcher |
@@ -39,13 +39,26 @@ Seven things are load-bearing:
   the vault, `.git/ .stversions/ *.sync-conflict-* *.icloud .trash/` ignored, the sha1 base, the 409 and
   `merge3` kept, and opening never writes.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
-  there is no sign-in, no session, no share link and no feedback card. Logs are sent only once the
-  person says yes — see *Logs*.
+  there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
+  see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a
+  GitHub token — see *Feedback*.
 - **Generation is the person's key** (`plugins/generate/`): the prompt card's providers
   read it from the environment or `.env.local` in development and, in the desktop app, from the OS
   keychain through `safeStorage`.
 
 `test/server/` is the store contract and the routes in vitest over a real folder and a real index.
+
+## The development server
+
+`npm run dev` is not this server: Vite serves the page and proxies `/__board` and `/api` to
+`anydag serve` on `ANYDAG_API_PORT`, adding the run's token in the proxy (`vite.config.ts`). The
+development vault and `.dev-home/` sit inside Vite's root, so the dev and preview servers bind
+`127.0.0.1` — `ANYDAG_DEV_HOST` is the explicit opt-in for a listener beyond loopback — and
+`server.fs.deny` refuses `.dev-home`, `.anydag`, `.git`, `.claude` and the other credential
+dot-folders in every form (`?raw`, `%2E` and `/@fs`). The proxy still accepts only a loopback
+`Host`, and refuses a request whose `Origin` is not the page's own or whose `Sec-Fetch-Site` is
+`cross-site` or `same-site`, before it attaches the token. `scripts/dev.sh` mints a token per run; `server.json` is
+where `scripts/session.mjs`, the CLI and the e2e suite read it.
 
 ## Vaults
 
@@ -64,10 +77,16 @@ action. A refusal from the server is drawn under the form without moving its but
 | `POST /api/vaults/open` `{path}` · `/create` `{path}` · `/close` `{id}` | open a folder, make one and open it, close one — **never deleting it** |
 | `POST /__board/transfer` `{name, kind, to}` · `{folder, to}` | a file, or a folder whole, to another open vault |
 
-Six things are load-bearing:
+Eight things are load-bearing:
 
 - **Closing never deletes, and nothing in the app removes a vault's folder.** A vault is a folder
   the person already owns; the file manager is where it is renamed or thrown away.
+- **A vault's id belongs to its folder.** A folder whose `.anydag/vault.json` claims an id the home
+  already maps to another folder that still exists and still claims it is a copy: it is given a
+  fresh id, and the original's recent row and sync link are left alone.
+- **Every path the store resolves stays in the vault's real path.** `Vault.abs` follows the root
+  once and refuses an existing component that links out of it; a write checks again immediately
+  before it lands.
 - **A vault inside another is refused**, both ways: one file would be two documents with two
   owners, and the watchers would report every change twice.
 - **An existing `.obsidian/` is never touched**, and every dot-folder is neither listed nor walked.

@@ -82,14 +82,13 @@ export type Settings = {
   };
   /**
    * What a new Assistant chat starts on: the harness and the model its first
-   * turn runs on, and whether it may write. Only a *new* chat reads these — a chat already begun keeps
+   * turn runs on. Only a *new* chat reads these — a chat already begun keeps
    * what it was last sent with, and the composer can change that per turn. `null` is whatever can
    * answer here, with that provider's own default model.
    */
   assistant: {
     provider: "claude" | "opencode" | null;
     model: string | null;
-    mode: "ask" | "edit";
   };
 };
 
@@ -98,7 +97,7 @@ export const DEFAULTS: Settings = {
   paste: { size: "screen", width: 520, maxWidth: null },
   export: { scale: 2, paper: true, margin: 4 },
   llm: { provider: null, model: null, reasoning: null },
-  assistant: { provider: null, model: null, mode: "ask" },
+  assistant: { provider: null, model: null },
 };
 
 /** Where they live. One key holding one object, so a bad value is one `catch` and a reset is one `removeItem`. */
@@ -167,7 +166,6 @@ export function normalise(raw: unknown): Settings {
     assistant: {
       provider: ast.provider === "claude" || ast.provider === "opencode" ? ast.provider : null,
       model: ident(ast.model),
-      mode: ast.mode === "edit" ? "edit" : "ask",
     },
   };
 }

@@ -113,6 +113,9 @@ One line each; the full account with the defect that found it is in
 - **A stub is a claim about another module**; copy it from a route's recorded answer, never invent it.
 - **The token and the `Host` are the whole security model** — both checked on every request; a script
   that `fetch`es the server needs `authed()` from `scripts/session.mjs`.
+- **The repository is public, so a committed secret is a published one.** Secrets live in the
+  environment or a git-ignored `*.local`/`.env.*`; `scripts/secrets.sh` (gitleaks) refuses them in the
+  hook and CI. If one is pushed, revoke it first ([`SECURITY.md`](SECURITY.md)).
 - **A cleanup that matches by prefix must refuse an empty one** — a spec once emptied `boards/local/`.
 - **A screenshot baseline is valid only in the Playwright Docker image.** Regenerate with
   `npm run e2e:docker -- --update-snapshots=all`, read a sample, and commit the images on their own.
@@ -146,6 +149,7 @@ One line each; the full account with the defect that found it is in
 | sync (client) | [`sync.md`](docs/architecture/sync.md) |
 | the Assistant (chat) | [`assistant.md`](docs/architecture/assistant.md) |
 | anonymous logs | [`logs.md`](docs/architecture/logs.md) |
+| Send feedback, the feedback relay | [`feedback.md`](docs/architecture/feedback.md) |
 | the gate, CI, releases | [`gate-and-releases.md`](docs/architecture/gate-and-releases.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), `docs/RELEASING.md` |
 
 Section names in italics inside those files (*Picking a node*, *The time zone*) are listed with their
@@ -156,7 +160,8 @@ card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/`
 
 ## Gate
 
-`npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
+The pre-commit hook first runs `scripts/secrets.sh` (gitleaks over the staged change; CI's `secrets`
+job and the nightly run it too). `npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
 `check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `test/parity.test.ts`,
 vitest). It needs no browser and is the pre-commit hook; CI also runs `npm run lint:promises`. The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)

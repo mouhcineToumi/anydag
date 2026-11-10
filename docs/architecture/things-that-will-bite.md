@@ -96,7 +96,10 @@
   measurement taken during the initial fit divided a scaled rect by 1.
 - **There is no server inside Vite.** The api is the local server (`server/`, Hono):
   `vite.config.ts` proxies `/__board` and `/api` to it with the token, and `npm run dev`
-  (`scripts/dev.sh`) starts it on `boards/local/` before Vite. The live channel is SSE —
+  (`scripts/dev.sh`) starts it on `boards/local/` before Vite. That proxy is a credential boundary
+  too: it refuses a non-loopback `Host`, a foreign `Origin` and a `cross-site`/`same-site`
+  `Sec-Fetch-Site` before it adds the token, and the dev server binds loopback unless
+  `ANYDAG_DEV_HOST` opts into the LAN. The live channel is SSE —
   `src/board/events.ts`, one `EventSource`
   for the page, fanned out to its hooks — and not `import.meta.hot`, which is `undefined` in a build
   and made a built app go quietly stale rather than fail.
@@ -299,6 +302,12 @@
   on its scheme, so neither notices; in a browser it is the `anydag_token` cookie, which rides on
   both with no client change. A token in the query string would be a credential in every log there
   is, which is why `/?token=` is accepted once and then taken out of the address.
+- **A `server.json` names a port, it does not prove who holds it.** The app home is shared with
+  `anydag serve`, and a file an earlier one left behind — a closed terminal, before `SIGHUP` was
+  handled, or a crash — names a port that another local user may be listening on now. The desktop
+  shell sends its per-launch token only to the child it spawned this time: the port from that
+  child's stdout, or a `server.json` whose `pid` and `token` both match (`desktop/launch.ts`). The
+  server removes the file on `SIGINT`, `SIGTERM` and `SIGHUP`, and on its IPC channel closing.
 - **`?snapshot=1` strips the chrome, never the token.** Every Playwright check and both scripts
   open a board that way, and an exemption would be a query string any page on the machine could
   load. `scripts/session.mjs`, `e2e/global-setup.ts` and the CLI's `snapshot` find the token
@@ -662,8 +671,10 @@
   needed: a "simple" `POST` from any website the person has open needs no preflight, so without the
   token any site could write into a vault. The desktop shell adds the header in the main process;
   `anydag serve` prints `/?token=…` once and swaps it for an `httpOnly`, `SameSite=Strict` cookie and
-  a redirect; Vite's proxy adds the header in development. A test or a script that `fetch`es the
-  server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401` as an empty list.
+  a redirect; Vite's proxy adds the header in development, after refusing anything that is not this
+  page. `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script
+  that `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401`
+  as an empty list.
 - **Opening a vault never writes a byte of it.** An existing `.md` with no `id:` is given one only
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
@@ -800,8 +811,10 @@
   the defect behind it (a renamed copy's index row dated by the rename, not its id's created) was the
   engine's. #14 was the same mistake in the collector (the database's `now()`). Give the test
   the clock. **And the other half: a status is a moment.** The sync loop's watcher reports a pull's
-  own writes late, and each batch runs once more and finds nothing to push, so `GET /api/sync` right
-  after a link answered `syncing` in six runs of fifteen on two starved cores. Wait for the loop to be
-  quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state, and prove a push
-  where it lands, on the server. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
+  own writes late, and each batch used to run once more and find nothing to push, so `GET /api/sync`
+  right after a link answered `syncing` in six runs of fifteen on two starved cores. Those echoes
+  wake nothing now (#36, `server/sync/echo.ts`), but a test's own write is still heard late. Wait for
+  the loop to be quiet (`settled()` in `test/server/sync-loop.test.ts`) before asserting a state,
+  prove a push where it lands, on the server, and before asserting that nothing ran, wait for the
+  watcher to catch up (`heardAll()`) and then past the debounce. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
   which starves a run far harder than the same loops spread over every core.

@@ -15,6 +15,8 @@
  * - **No echo.** After applying, the state holds the new sha1, so the watcher's event for that path
  *   finds the disk equal to its base and pushes nothing; and a pull skips a log entry whose key's
  *   state is already at or past it, which is how the device's own commits are not applied twice.
+ *   Nor does that event wake anything: `heard` drops a path whose disk is still what this engine
+ *   last wrote there (`echo.ts`) before it is marked, so it raises no `pending` and arms no debounce.
  * - **A commit is all or nothing, so a rename never lands half**: a delete and a create pushed
  *   together. On the way in, a page that deletes `P` and creates `Q` with `P`'s old blob, while `P`
  *   was edited here, is a rename: the edit follows the file to `Q`.
@@ -26,14 +28,24 @@
  *   keys and both land, but the vault lists one document per name. `settleKinds` moves every one but
  *   the oldest to a numbered name — by created, then path, which every device reads alike — so each
  *   device moves the same file to the same name, and the moves agree when they meet.
+ * - **Nothing is applied that does not belong where it arrived** (`opened`). A sealed `meta` names
+ *   its key, blob and parent, and must match the log entry (or head) it came in; its path must be
+ *   the key's; the bytes must be the size it says; and an entry for a key this device already holds
+ *   must be written over that version or a later one. The server and every device token can
+ *   commit any sealed `meta` and blob they have seen again: each of these is how a re-pointed file,
+ *   a replayed version or a replayed delete is told from a real one. A refusal throws `MetaRefused`
+ *   and the pull stops on it, before anything is written or the cursor moves; the loop says why.
+ * - **A change is sealed in the round that commits it**, over the parent that round read, so an
+ *   `ES_STALE` that pulls and pushes again seals again.
  */
 
 import { classify, unique } from "../names";
 import { blobId, keyOf, keysOf, normalise, openBlob, sealBlob, type VaultKeys } from "../../api/protocol/crypto";
-import { openMeta, sealMeta, type Meta } from "../../api/protocol/meta";
+import { MetaRefused, openMeta, sealMeta, type Meta } from "../../api/protocol/meta";
 import { MAX_CHANGES, MAX_PAGE, type Change, type Head } from "../../api/protocol/wire";
 import { Bases, sha1Of } from "./bases";
 import { isSyncError, type SyncApi } from "./client";
+import { Echoes, FOLDER } from "./echo";
 import { conflictName, freshCopy, mergeContent } from "./merge";
 import { dirSyncs, syncs } from "./scope";
 import type { PathEntry, SyncState } from "./state";
@@ -57,6 +69,7 @@ export interface EngineOptions {
 interface Incoming {
   seq: number;
   key: string;
+  parent: number | null;
   blob: string | null;
   meta: string;
 }
@@ -107,9 +120,11 @@ export class SyncEngine {
   private chain: Promise<unknown> = Promise.resolve();
   /** Files a pull wrote, for `settleKinds` once the page is applied. */
   private arrived = new Set<string>();
+  /** What this engine last wrote at each path, so the watcher's report of it is no change. */
+  private readonly wrote = new Echoes();
 
   constructor(o: EngineOptions) {
-    this.fs = o.fs;
+    this.fs = this.wrote.wrap(o.fs, sha1Of);
     this.api = o.api;
     this.state = o.state;
     this.bases = o.bases;
@@ -151,6 +166,26 @@ export class SyncEngine {
       // A file arriving in a folder that was a marker ends the marker.
       this.markAncestors(rel, (st) => st.kind === "dir" && st.blob !== null);
     }
+  }
+
+  /**
+   * The watcher's paths as the loop hears them: each whose disk is still what this engine last wrote
+   * there is its own write coming back and is dropped; the rest are `touch`ed. Whether any was left —
+   * the loop wakes the push debounce only then.
+   */
+  async heard(rels: string[]): Promise<boolean> {
+    const left: string[] = [];
+    for (const raw of rels) {
+      let rel: string;
+      try {
+        rel = normalise(raw);
+      } catch {
+        continue;
+      }
+      if (!(await this.echo(rel))) left.push(rel);
+    }
+    if (left.length) this.touch(left);
+    return left.length > 0;
   }
 
   pull(): Promise<void> {
@@ -200,6 +235,19 @@ export class SyncEngine {
       const st = this.state.entry(key);
       if (st && want(st)) this.dirty.set(key, st.rel);
     }
+  }
+
+  /** Whether the event for `rel` is this engine's own last write there, unchanged since (`echo.ts`). */
+  private async echo(rel: string): Promise<boolean> {
+    const left = this.wrote.take(rel);
+    if (left === undefined) return false;
+    if (left === FOLDER) {
+      // A folder cannot be read; one the state holds as an empty-folder marker is decided by a push.
+      const st = this.state.entry(this.keyOf(rel));
+      return !(st && st.kind === "dir" && st.blob !== null);
+    }
+    const disk = await this.fs.read(rel);
+    return (disk ? sha1Of(disk) : null) === left;
   }
 
   private async fetchBlob(id: string): Promise<Uint8Array> {
@@ -334,7 +382,12 @@ export class SyncEngine {
       if (!st || st.blob === null) return null;
       const meta: Meta = { path: st.rel, kind: st.kind, created: null, mtime: now, size: 0 };
       return {
-        change: { key: l.key, parent: st.seq, blob: null, meta: sealMeta(this.k.enc, l.key, meta) },
+        change: {
+          key: l.key,
+          parent: st.seq,
+          blob: null,
+          meta: sealMeta(this.k.enc, { key: l.key, blob: null, parent: st.seq }, meta),
+        },
         rel: st.rel,
         kind: st.kind,
         bytes: null,
@@ -354,7 +407,7 @@ export class SyncEngine {
     // A delete's head is a head: `null` only for a key this device has never seen a head for.
     const parent = st ? st.seq : null;
     return {
-      change: { key: l.key, parent, blob, meta: sealMeta(this.k.enc, l.key, meta) },
+      change: { key: l.key, parent, blob, meta: sealMeta(this.k.enc, { key: l.key, blob, parent }, meta) },
       rel: l.rel,
       kind: l.kind,
       bytes: l.bytes,
@@ -463,7 +516,7 @@ export class SyncEngine {
         }
         throw e;
       }
-      await this.applyPage(page.changes.map((c) => ({ seq: c.seq, key: c.key, blob: c.blob, meta: c.meta })));
+      await this.applyPage(page.changes.map((c) => ({ seq: c.seq, key: c.key, parent: c.parent, blob: c.blob, meta: c.meta })));
       cursor = page.next;
       this.state.setCursor(cursor);
       if (!page.more) break;
@@ -482,7 +535,7 @@ export class SyncEngine {
       if (page.next === null) break;
       after = page.next;
     }
-    await this.applyPage(heads.map((h) => ({ seq: h.seq, key: h.key, blob: h.blob, meta: h.meta })));
+    await this.applyPage(heads.map((h) => ({ seq: h.seq, key: h.key, parent: h.parent, blob: h.blob, meta: h.meta })));
     const named = new Set(heads.map((h) => h.key));
     for (const st of this.state.entries()) if (!named.has(st.key)) await this.forget(st);
     this.state.setCursor(first ?? 0);
@@ -555,9 +608,10 @@ export class SyncEngine {
   }
 
   private async applyRename(r: Rename): Promise<void> {
-    const meta = openMeta(this.k.enc, r.create.key, r.create.meta);
+    this.opened(r.del);
+    const meta = this.opened(r.create);
     const rel = normalise(meta.path);
-    const theirs = await this.fetchBlob(r.create.blob!);
+    const theirs = this.sized(meta, await this.fetchBlob(r.create.blob!));
     const base = (await this.baseOf(r.from)) ?? theirs;
     const res = mergeContent(rel, base, r.ours, theirs);
     const fallback = async (): Promise<void> => {
@@ -597,13 +651,41 @@ export class SyncEngine {
     });
   }
 
+  /**
+   * The `meta` of a remote version, once it is known to belong where it arrived: sealed for this
+   * entry's key, blob and parent, naming a path that is this key's, and — for a key this device
+   * already holds — written over the version held here or a later one. A head the server keeps is
+   * always over its key's previous head, so an entry over an older one (or over none, for a key
+   * that has a head here) is an old version committed again.
+   */
+  private opened(e: Incoming): Meta {
+    const meta = openMeta(this.k.enc, { key: e.key, blob: e.blob, parent: e.parent }, e.meta);
+    if (this.keyOf(meta.path) !== e.key)
+      throw new MetaRefused(`the metadata under one key names ${JSON.stringify(meta.path)}, which is another key's path`);
+    const st = this.state.entry(e.key);
+    if (st && (e.parent === null || e.parent < st.seq))
+      throw new MetaRefused(
+        `${e.blob === null ? "a delete" : "a version"} of ${JSON.stringify(meta.path)} written over ${e.parent === null ? "nothing" : `version ${e.parent}`} arrived after version ${st.seq}: a replayed ${e.blob === null ? "delete" : "version"}`,
+      );
+    return meta;
+  }
+
+  /** The plaintext of a remote file, refused unless it is the size its sealed `meta` says. */
+  private sized(meta: Meta, bytes: Uint8Array): Uint8Array {
+    if (bytes.byteLength !== meta.size)
+      throw new MetaRefused(
+        `${JSON.stringify(meta.path)} arrived as ${bytes.byteLength} bytes, but its metadata says ${meta.size}`,
+      );
+    return bytes;
+  }
+
   private async apply(e: Incoming): Promise<void> {
     const st = this.state.entry(e.key);
     if (st && st.seq >= e.seq) return;
-    const meta = openMeta(this.k.enc, e.key, e.meta);
+    const meta = this.opened(e);
     const rel = normalise(meta.path);
     if (meta.kind === "dir") return this.applyDir(e, rel);
-    const theirs = e.blob ? await this.fetchBlob(e.blob) : null;
+    const theirs = e.blob ? this.sized(meta, await this.fetchBlob(e.blob)) : null;
     if (st && st.rel !== rel && st.blob !== null) await this.moveCase(st, rel);
     const here = await this.spelledHere(e.key, rel);
     for (let i = 0; i < CAS_ROUNDS; i++) {

@@ -65,6 +65,7 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `component_delete` | removing a saved component, for good — keeping one is `board_create` under `components/` |
 | `vault_list` · `vault_open` · `vault_create` · `vault_close` · `board_transfer` | the vaults (folders) this app serves, opening a folder as one, making one, closing one — **never deleting its folder** — and moving a file or a whole folder from one vault to another with its id |
 | `settings` · `whoami` · `llm` · `generate` | the person's preferences (change them only when asked); who this is and what is answering; which models could draw; asking one to (it spends money, and you can usually write the DSL) |
+| `feedback` | a bug or an idea sent to AnyDag's maintainers as a **public** GitHub issue — **only when the person asked you to send feedback**, never to report your own trouble; tell them first exactly what goes: their words, each file, the whole text of each board or note they named, and the app's version, system and arch |
 
 Nothing here can see the drawing or tidy it — a snapshot, a tidy and an SVG, PNG or PDF export need
 the page in a browser — and nothing here streams: `base` is how you learn a document moved.

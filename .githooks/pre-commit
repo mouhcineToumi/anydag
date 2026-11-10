@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# `scripts/checks.sh` before every commit: both typechecks, the four `check:*` contracts and the
-# unit suite. About fourteen seconds on an eight-core machine, and a quarter of the CPU
+# `scripts/secrets.sh staged` and then `scripts/checks.sh` before every commit: a secret scan of
+# what the commit records, then both typechecks, the `check:*` contracts and the unit suite. About fourteen seconds on an eight-core machine, and a quarter of the CPU
 # it took, which is the whole argument for it being here rather than on `pre-push` — see the
 # header of that script.
 #
@@ -41,6 +41,11 @@ if [ -n "${ANYDAG_NO_HOOK:-}" ]; then
   echo "pre-commit: skipped (ANYDAG_NO_HOOK)"
   exit 0
 fi
+
+# The secret scan first, and before the node_modules check: it needs neither, takes a fraction of a
+# second, and is the one check whose failure cannot be fixed by a later commit — once pushed, a
+# secret in this public repository is published. Without gitleaks it warns and lets CI catch it.
+bash scripts/secrets.sh staged
 
 if [ ! -d node_modules ]; then
   echo "pre-commit: skipping the checks — no node_modules; run: npm ci"

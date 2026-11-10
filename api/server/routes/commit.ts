@@ -15,6 +15,11 @@
  *   heads are counted per head, so the projection errs high by the size of a duplicate — a limit
  *   that refuses a little early, never one that lets the account past it. It is only computed when
  *   the plan has a limit, because it reads the vault's heads (every limit is null by default).
+ * - **History is held to the plan's allowance after every commit** (`historyAllowance`,
+ *   `Meta.trimHistory`): this vault's oldest superseded versions go first, until the account is
+ *   back under it. A commit only ever adds history to its own vault, so trimming that vault keeps
+ *   the bound. The commit has landed by then: a trim that fails is said on stderr and left to the
+ *   collector, never answered as a failed commit.
  * - **The poke goes after the transaction**, with the last seq: a client woken by it reads
  *   `changes` and finds the commit there.
  */
@@ -22,6 +27,7 @@
 import { Hono } from "hono";
 
 import { BLOB_ID, MAX_CHANGES, MAX_PAGE, type CommitResponse } from "../../protocol/wire";
+import { historyAllowance } from "../gc";
 import type { NewChange } from "../meta/types";
 import { body, HttpError, isObject, type Deps, type Vars } from "./http";
 
@@ -94,6 +100,19 @@ export function commitRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     await deps.usage.bump(v.account, v.id, "changes", changes.length);
     const seqs = result.seqs.map(Number);
     deps.hub.notify(v.id, seqs[seqs.length - 1]!);
+    const allowance = historyAllowance(plan);
+    if (allowance !== null) {
+      try {
+        const trimmed = await deps.meta.trimHistory(v.account, v.id, allowance);
+        if (trimmed.blobs.length)
+          await deps.blobs.delete(
+            v.id,
+            trimmed.blobs.map((b) => b.id),
+          );
+      } catch (e) {
+        console.error(`anydag-api: trimming vault ${v.id}'s history failed: ${(e as Error).message}`);
+      }
+    }
     return c.json({ seqs } satisfies CommitResponse);
   });
 

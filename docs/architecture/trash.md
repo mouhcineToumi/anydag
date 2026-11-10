@@ -24,13 +24,17 @@ kind, or a folder with everything in it — moves the thing to the vault's trash
 | `POST /__board/trash/delete` `{id}` · `POST /__board/trash/empty` | for good: `{id}` · `{ids}` |
 
 `server/vault.ts` owns it (`trash`, `trashFolder`, `trashList`, `restore`, `forget`), `server/trash.ts`
-the days and the answer's shape, `server/routes/trash.ts` the four routes. Eight things are
+the days and the answer's shape, `server/routes/trash.ts` the four routes. Nine things are
 load-bearing:
 
 - **A trashed document is not a document.** It is in no listing, the references index, the search
   corpus or any route that reads by name; its id resolves to nothing, so a reference to it draws as
   missing. Its file keeps its `id:` and the entry keeps its index row — `created`, an attachment's
   title, every image — so a restore puts it back as it was and every reference works again.
+- **The manifest is untrusted.** `entry.json` travels with a synced or shared folder, so restore
+  puts `name` through the vault's own naming rules, requires the `docs` key to be the file that name
+  stores, and keeps the source under the entry's `files/` with no link on the way. Anything else is
+  a damaged entry: a 404, and nothing moves.
 - **One entry is one thing a person deleted**: a file, or a folder with what it held at that moment
   (`holds`, by kind, the folder itself among the folders). Several rows deleted at once are several
   entries, and the notice's Undo restores all of them, last first.

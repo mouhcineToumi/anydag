@@ -34,12 +34,21 @@ const planOf = (r: Row): Plan => ({
   id: String(r.id),
   storage_bytes: (r.storage_bytes as number | null) ?? null,
   history_days: (r.history_days as number | null) ?? null,
+  history_bytes: (r.history_bytes as number | null) ?? null,
   max_file_bytes: (r.max_file_bytes as number | null) ?? null,
   devices: (r.devices as number | null) ?? null,
 });
 
 /** The plan the port answers for anything `plans(id)` does not have: unlimited, always there. */
-const FREE: Plan = { id: "free", storage_bytes: null, history_days: null, max_file_bytes: null, devices: null };
+const FREE: Plan = {
+  id: "free",
+  storage_bytes: null,
+  history_days: null,
+  history_bytes: null,
+  max_file_bytes: null,
+  devices: null,
+};
+const PLAN_COLUMNS = "id, storage_bytes, history_days, history_bytes, max_file_bytes, devices";
 
 const vaultOf = (r: Row): VaultRow => ({
   id: String(r.id),
@@ -82,6 +91,7 @@ const logOf = (r: Row): LogEntry => ({
 const headOf = (r: Row): Head => ({
   key: String(r.key),
   seq: Number(r.seq),
+  parent: r.parent === null || r.parent === undefined ? null : Number(r.parent),
   blob: (r.blob as string | null) ?? null,
   size: Number(r.size),
   meta: String(r.meta),
@@ -176,26 +186,23 @@ export class PgMeta implements Meta {
 
   /** The plan asked for, or `free` when `plans(id)` has nothing — every limit null is unlimited. */
   async plan(id: string): Promise<Plan> {
-    const rows = await this.db.query("select id, storage_bytes, history_days, max_file_bytes, devices from plans where id = $1", [
-      id,
-    ]);
+    const rows = await this.db.query(`select ${PLAN_COLUMNS} from plans where id = $1`, [id]);
     if (rows.length > 0) return planOf(rows[0]!);
-    const free = await this.db.query(
-      "select id, storage_bytes, history_days, max_file_bytes, devices from plans where id = 'free'",
-    );
+    const free = await this.db.query(`select ${PLAN_COLUMNS} from plans where id = 'free'`);
     return free.length === 0 ? { ...FREE } : planOf(free[0]!);
   }
 
   async putPlan(plan: Plan): Promise<void> {
     await this.db.query(
-      `insert into plans (id, storage_bytes, history_days, max_file_bytes, devices)
-       values ($1, $2, $3, $4, $5)
+      `insert into plans (${PLAN_COLUMNS})
+       values ($1, $2, $3, $4, $5, $6)
        on conflict (id) do update
          set storage_bytes = excluded.storage_bytes,
              history_days = excluded.history_days,
+             history_bytes = excluded.history_bytes,
              max_file_bytes = excluded.max_file_bytes,
              devices = excluded.devices`,
-      [plan.id, plan.storage_bytes, plan.history_days, plan.max_file_bytes, plan.devices],
+      [plan.id, plan.storage_bytes, plan.history_days, plan.history_bytes, plan.max_file_bytes, plan.devices],
     );
   }
 
@@ -350,12 +357,40 @@ export class PgMeta implements Meta {
 
   // -- blobs (the index; the bytes are `Blobs`') ----------------------------------------------------
 
-  /** Two devices uploading one id race harmlessly: the first row stands, the second is nothing. */
-  async addBlob(vault: string, id: string, size: number, at?: string): Promise<void> {
-    await this.db.query(
-      "insert into blobs (vault, id, size, created) values ($1, $2, $3, coalesce($4::timestamptz, now())) on conflict (vault, id) do nothing",
-      [vault, id, size, at ?? null],
-    );
+  /**
+   * Two devices uploading one id race harmlessly: the first row stands, the second is nothing. With
+   * a quota, the account's advisory lock serialises every upload of the account between the sum
+   * and the insert, so the last room is taken once.
+   */
+  async addBlob(
+    vault: string,
+    id: string,
+    size: number,
+    at?: string,
+    quota?: { account: string; bytes: number },
+  ): Promise<boolean> {
+    const insert = (q: Db) =>
+      q.query(
+        "insert into blobs (vault, id, size, created) values ($1, $2, $3, coalesce($4::timestamptz, now())) on conflict (vault, id) do nothing",
+        [vault, id, size, at ?? null],
+      );
+    if (quota === undefined) {
+      await insert(this.db);
+      return true;
+    }
+    return this.db.tx(async (q) => {
+      await q.query("select pg_advisory_xact_lock(hashtext('anydag-sync-quota:' || $1::text))", [quota.account]);
+      if ((await q.query("select 1 from blobs where vault = $1 and id = $2", [vault, id])).length > 0) return true;
+      const rows = await q.query<{ used: number }>(
+        `select coalesce(sum(b.size), 0)::int8 used from blobs b join vaults v on v.id = b.vault
+          where v.account = $1
+            and (not b.committed or exists (select 1 from heads h where h.vault = b.vault and h.blob = b.id))`,
+        [quota.account],
+      );
+      if (Number(rows[0]!.used) + size > quota.bytes) return false;
+      await insert(q);
+      return true;
+    });
   }
 
   async blobSize(vault: string, id: string): Promise<number | null> {
@@ -407,6 +442,12 @@ export class PgMeta implements Meta {
         else sizeOf.set(change.blob, Number(rows[0]!.size));
       }
       if (missing.length > 0) return { ok: false, missing };
+      // Named now: no longer pending, so neither the quota's pending sum nor the short window sees it.
+      if (sizeOf.size > 0)
+        await q.query("update blobs set committed = true where vault = $1 and id = any($2::text[]) and not committed", [
+          vault,
+          [...sizeOf.keys()],
+        ]);
 
       // `for update` above holds the row: seq + n lands whole, and the last seq answers after it.
       const landed = await q.query<{ seq: number }>("update vaults set seq = seq + $2 where id = $1 returning seq", [
@@ -425,11 +466,12 @@ export class PgMeta implements Meta {
           [vault, seq, change.key, change.parent, change.blob, size, change.meta, device, at],
         );
         await q.query(
-          `insert into heads (vault, key, seq, blob, size, meta_sealed)
-           values ($1, $2, $3, $4, $5, $6)
+          `insert into heads (vault, key, seq, parent, blob, size, meta_sealed)
+           values ($1, $2, $3, $4, $5, $6, $7)
            on conflict (vault, key) do update
-             set seq = excluded.seq, blob = excluded.blob, size = excluded.size, meta_sealed = excluded.meta_sealed`,
-          [vault, change.key, seq, change.blob, size, change.meta],
+             set seq = excluded.seq, parent = excluded.parent, blob = excluded.blob, size = excluded.size,
+                 meta_sealed = excluded.meta_sealed`,
+          [vault, change.key, seq, change.parent, change.blob, size, change.meta],
         );
         seqs.push(seq);
       }
@@ -455,7 +497,7 @@ export class PgMeta implements Meta {
   async heads(vault: string, after: string, limit: number): Promise<{ heads: Head[]; seq: number }> {
     return this.db.tx(async (q) => {
       const rows = await q.query(
-        "select key, seq, blob, size, meta_sealed as meta from heads where vault = $1 and key > $2 order by key limit $3",
+        "select key, seq, parent, blob, size, meta_sealed as meta from heads where vault = $1 and key > $2 order by key limit $3",
         [vault, after, limit],
       );
       const state = await q.query<{ seq: number }>("select seq from vaults where id = $1", [vault]);
@@ -505,8 +547,8 @@ export class PgMeta implements Meta {
 
   /**
    * One statement, one snapshot: live is what a head still names (a blob named by several heads of
-   * one vault is one row in `blobs`, so it is summed once), history is every other blob row, and
-   * the counts ride the same scope.
+   * one vault is one row in `blobs`, so it is summed once), pending is what no commit has named,
+   * history is every other blob row, and the counts ride the same scope.
    */
   async storage(account: string, vault?: string): Promise<Storage> {
     const scope = vault === undefined ? "v.account = $1" : "v.account = $1 and v.id = $2";
@@ -515,7 +557,10 @@ export class PgMeta implements Meta {
          coalesce((select sum(b.size) from blobs b join vaults v on v.id = b.vault
                     where ${scope} and exists (select 1 from heads h where h.vault = b.vault and h.blob = b.id)), 0)::int8 live,
          coalesce((select sum(b.size) from blobs b join vaults v on v.id = b.vault
-                    where ${scope} and not exists (select 1 from heads h where h.vault = b.vault and h.blob = b.id)), 0)::int8 history,
+                    where ${scope} and not b.committed), 0)::int8 pending,
+         coalesce((select sum(b.size) from blobs b join vaults v on v.id = b.vault
+                    where ${scope} and b.committed
+                      and not exists (select 1 from heads h where h.vault = b.vault and h.blob = b.id)), 0)::int8 history,
          coalesce((select count(*) from blobs b join vaults v on v.id = b.vault
                     where ${scope}), 0)::int8 blobs,
          coalesce((select count(*) from heads h join vaults v on v.id = h.vault
@@ -524,6 +569,7 @@ export class PgMeta implements Meta {
     );
     return {
       live: Number(rows[0]!.live),
+      pending: Number(rows[0]!.pending),
       history: Number(rows[0]!.history),
       blobs: Number(rows[0]!.blobs),
       files: Number(rows[0]!.files),
@@ -536,9 +582,14 @@ export class PgMeta implements Meta {
    * The horizon is a promise to the devices: `changes(since=horizon-1)` sees nothing more. It is
    * raised inside the same transaction that forgets the log rows and the blobs beneath it.
    */
-  async collect(vault: string, before: string): Promise<{ compacted: number; blobs: { id: string; size: number }[] }> {
+  async collect(
+    vault: string,
+    before: string,
+    pendingBefore?: string,
+  ): Promise<{ compacted: number; blobs: { id: string; size: number }[] }> {
     return this.db.tx(async (q) => {
-      const exists = await q.query("select id from vaults where id = $1", [vault]);
+      // The commit's row lock: a commit that found a blob row names it before this can forget it.
+      const exists = await q.query("select id from vaults where id = $1 for update", [vault]);
       if (exists.length === 0) throw new Error(`no vault ${vault}`);
 
       // 1. Log rows older than `before` that are not their key's newest row. The newest row of a key
@@ -562,6 +613,20 @@ export class PgMeta implements Meta {
         [vault, before],
       );
 
+      // 2b. Uploaded and never committed, older than the short window: nobody named it, and the
+      //     quota counted it as long as it was kept.
+      if (pendingBefore !== undefined)
+        forgotten.push(
+          ...(await q.query<{ id: string; size: number }>(
+            `delete from blobs
+              where vault = $1 and not committed and created < $2::timestamptz
+                and not exists (select 1 from heads h where h.vault = $1 and h.blob = blobs.id)
+                and not exists (select 1 from log l where l.vault = $1 and l.blob = blobs.id)
+              returning id, size`,
+            [vault, pendingBefore],
+          )),
+        );
+
       // 3. Nothing left in the log means no cursor older than the next seq can pull anything.
       await q.query(
         `update vaults
@@ -572,6 +637,73 @@ export class PgMeta implements Meta {
 
       return {
         compacted: dropped.length,
+        blobs: forgotten.map((r) => ({ id: String(r.id), size: Number(r.size) })).sort((a, b) => (a.id < b.id ? -1 : 1)),
+      };
+    });
+  }
+
+  /**
+   * History past the allowance, oldest first, under the vault's row lock (the commit's and the
+   * collector's). The account's sum is read again after every step, and the steps grow (1, 2, 4 …
+   * log rows), so a commit that put the account one version over drops about one version, and an
+   * allowance lowered by a lot is reached in a few dozen statements rather than one per row.
+   */
+  async trimHistory(
+    account: string,
+    vault: string,
+    bytes: number,
+  ): Promise<{ compacted: number; blobs: { id: string; size: number }[] }> {
+    return this.db.tx(async (q) => {
+      const exists = await q.query("select id from vaults where id = $1 for update", [vault]);
+      if (exists.length === 0) throw new Error(`no vault ${vault}`);
+      const history = async (): Promise<number> =>
+        Number(
+          (
+            await q.query<{ n: number }>(
+              `select coalesce(sum(b.size), 0)::int8 n from blobs b join vaults v on v.id = b.vault
+                where v.account = $1 and b.committed
+                  and not exists (select 1 from heads h where h.vault = b.vault and h.blob = b.id)`,
+              [account],
+            )
+          )[0]!.n,
+        );
+      const unnamed = (): Promise<{ id: string; size: number }[]> =>
+        q.query<{ id: string; size: number }>(
+          `delete from blobs
+            where vault = $1 and committed
+              and not exists (select 1 from heads h where h.vault = $1 and h.blob = blobs.id)
+              and not exists (select 1 from log l where l.vault = $1 and l.blob = blobs.id)
+            returning id, size`,
+          [vault],
+        );
+
+      let compacted = 0;
+      const forgotten: { id: string; size: number }[] = [];
+      if ((await history()) <= bytes) return { compacted, blobs: forgotten };
+      forgotten.push(...(await unnamed()));
+      for (let step = 1; (await history()) > bytes; step = Math.min(step * 2, 256)) {
+        const dropped = await q.query<{ seq: number }>(
+          `delete from log where vault = $1 and seq in (
+             select l.seq from log l
+              where l.vault = $1
+                and exists (select 1 from log newer where newer.vault = l.vault and newer.key = l.key and newer.seq > l.seq)
+              order by l.seq limit $2)
+           returning seq`,
+          [vault, step],
+        );
+        if (dropped.length === 0) break;
+        compacted += dropped.length;
+        forgotten.push(...(await unnamed()));
+      }
+      if (compacted > 0)
+        await q.query(
+          `update vaults
+              set horizon = coalesce((select min(seq) from log where vault = vaults.id), vaults.seq + 1)
+            where id = $1`,
+          [vault],
+        );
+      return {
+        compacted,
         blobs: forgotten.map((r) => ({ id: String(r.id), size: Number(r.size) })).sort((a, b) => (a.id < b.id ? -1 : 1)),
       };
     });

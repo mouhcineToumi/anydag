@@ -1,5 +1,6 @@
 # What runs on a pull request and on a push to a long-lived branch — the test tiers.
 #
+#   every run                      the secret scan of the commits it adds (`secrets`, below)
 #   pull request into develop      fast tier (typecheck, lint, contracts, unit) + the desktop app on
 #                                  Linux, when something it is made of changed
 #   push to develop                fast tier
@@ -106,6 +107,37 @@ jobs:
           echo "desktop_os=$os" >> "$GITHUB_OUTPUT"
           echo "desktop builds: ${os:-none}"
 
+  # Secrets, in the commits this run adds: a pull request's (base..head), or a push's (before..after;
+  # the whole history for a new branch or a manual run, which have no "before"). The repository is
+  # public, so this is the last stop before a secret is published — and it is the hard stop, since
+  # the pre-commit hook only warns on a machine without gitleaks. The whole history is nightly's.
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/gitleaks
+      - name: The config still catches a planted token
+        run: bash scripts/secrets.sh selftest
+      - name: No secret in the commits this run adds
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            bash scripts/secrets.sh range "$PR_BASE" "$PR_HEAD"
+          elif [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! [[ "$BEFORE" =~ ^0+$ ]] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            bash scripts/secrets.sh range "$BEFORE" "$AFTER"
+          else
+            bash scripts/secrets.sh all
+          fi
+
   checks:
     name: checks
     uses: ./.github/workflows/checks.yml
@@ -141,7 +173,7 @@ jobs:
 
   required:
     name: CI passed
-    needs: [changes, checks, desktop, actionlint]
+    needs: [changes, secrets, checks, desktop, actionlint]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -149,6 +181,7 @@ jobs:
       - name: Everything this run owed passed
         env:
           CHANGES: ${{ needs.changes.result }}
+          SECRETS: ${{ needs.secrets.result }}
           CHECKS: ${{ needs.checks.result }}
           DESKTOP: ${{ needs.desktop.result }}
           DESKTOP_OS: ${{ needs.changes.outputs.desktop_os }}
@@ -164,6 +197,7 @@ jobs:
             fi
           }
           want changes "$CHANGES" true
+          want secrets "$SECRETS" true
           want checks "$CHECKS" true
           want desktop "$DESKTOP" "$([ -n "$DESKTOP_OS" ] && echo true || echo false)"
           want actionlint "$ACTIONLINT" "$([ "$WORKFLOWS" = true ] && echo true || echo false)"

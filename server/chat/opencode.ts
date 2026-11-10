@@ -8,9 +8,9 @@
  *
  * - **The agent's `{file:…}` prompt is read once, when the config loads.** Rewriting `system.md`
  *   under a running `serve` changed nothing, in a fresh session either. The system prompt carries the
- *   mode and the vault scope, so it changes between turns, and a `serve` is therefore keyed by the
+ *   vault scope, so it changes between turns, and a `serve` is therefore keyed by the
  *   prompt it started with: a turn with another one stops it and starts a new one (a session lives in
- *   OpenCode's database, not in the process, so `--session` still resumes). Mode flips are rare.
+ *   OpenCode's database, not in the process, so `--session` still resumes). New grants are rare.
  * - **`GET /api/mcp` says when the MCP server is attached** — `data` is empty for the first second or
  *   two, then `anydag … connected` — which makes the race observable. The adapter waits for it,
  *   then sends the throwaway prompt all the same.

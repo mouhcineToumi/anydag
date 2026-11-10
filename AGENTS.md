@@ -65,6 +65,10 @@ the maintainer sets the label. An issue with no `agent:` label is not ready.
 Run **`npm run checks`** (Biome lint and format check, knip, typecheck, the `check:*` contracts, `docs/parity.json`, unit tests).
 It is also the pre-commit hook; do not skip it with `--no-verify`, and do not push on red. Then:
 
+- **Never commit a secret** — a key, token or password, real or plausible. The repository is public.
+  Use the environment or a git-ignored `*.local` file; the hook and CI run `scripts/secrets.sh`
+  (gitleaks). A fixture that must look real gets an allowance in `.gitleaks.toml` naming the file and
+  the string.
 - **Add or update tests** for the behaviour you changed: unit tests in `test/`, browser checks in `e2e/`.
   A bug fix includes the test that fails without it.
 - **Update the docs** that describe what you changed: the matching file in `docs/architecture/`,

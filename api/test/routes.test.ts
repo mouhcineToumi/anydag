@@ -6,7 +6,15 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { MAX_CHANGES, PAIR_MINUTES, type ChangesResponse, type ErrorBody, type HeadsResponse } from "../protocol/wire";
+import {
+  MAX_CHANGES,
+  PAIR_MINUTES,
+  PROTOCOL,
+  PROTOCOL_HEADER,
+  type ChangesResponse,
+  type ErrorBody,
+  type HeadsResponse,
+} from "../protocol/wire";
 import { collect } from "../server/gc";
 import { mintPairCode } from "../server/routes/pair";
 import { ADMIN, BACKENDS, call, device, harness, upload, vault, wid, type Harness } from "./helpers";
@@ -26,13 +34,50 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
   it.skipIf(skip)("answers health without a token", async () => {
     const res = await call(h, "GET", "/v1/health");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: "test", protocol: 1, mode: "single" });
+    expect(await res.json()).toEqual({ version: "test", protocol: PROTOCOL, mode: "single" });
   });
 
   it.skipIf(skip)("an unknown route is ES_NOT_FOUND in the error shape", async () => {
     const res = await call(h, "GET", "/nope");
     expect(res.status).toBe(404);
     expect((await err(res)).code).toBe("ES_NOT_FOUND");
+  });
+
+  describe("the protocol", () => {
+    it.skipIf(skip)("refuses a device that says another protocol, or none, before anything else", async () => {
+      const me = await device(h);
+      for (const protocol of [null, "1", String(PROTOCOL + 1)]) {
+        const res = await call(h, "GET", "/v1/vaults", { token: me.token, protocol });
+        expect(res.status).toBe(426);
+        const body = await err(res);
+        expect(body.code).toBe("ES_PROTOCOL");
+        expect(body.message).toMatch(protocol === String(PROTOCOL + 1) ? /update the sync server/ : /update AnyDag/);
+      }
+      // A 0.2.0 client cannot pair either: the code is not used up by a client that could not sync.
+      const a = await h.meta.createAccount(`protocol-${name}`);
+      const { code } = await mintPairCode(h.meta, a.id, h.clock.now);
+      const old = await call(h, "POST", "/v1/pair", {
+        protocol: null,
+        json: { code, device: { name: "old", platform: "linux" } },
+      });
+      expect((await err(old)).code).toBe("ES_PROTOCOL");
+      expect((await call(h, "POST", "/v1/pair", { json: { code, device: { name: "new", platform: "linux" } } })).status).toBe(
+        200,
+      );
+      // Health is how a client finds the protocol out, and needs none.
+      expect((await call(h, "GET", "/v1/health", { protocol: null })).status).toBe(200);
+    });
+
+    it.skipIf(skip)("says its protocol on every answer, a refusal included", async () => {
+      const me = await device(h);
+      for (const res of [
+        await call(h, "GET", "/v1/vaults", { token: me.token }),
+        await call(h, "GET", "/v1/vaults/nope/heads", { token: me.token }),
+        await call(h, "GET", "/v1/health"),
+        await call(h, "GET", "/v1/vaults", { token: me.token, protocol: null }),
+      ])
+        expect(res.headers.get(PROTOCOL_HEADER)).toBe(String(PROTOCOL));
+    });
   });
 
   describe("pairing", () => {
@@ -72,13 +117,20 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const notJson = await h.app.request("/v1/pair", {
         method: "POST",
         body: "{nope",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", [PROTOCOL_HEADER]: String(PROTOCOL) },
       });
       expect((await err(notJson)).code).toBe("ES_BAD_REQUEST");
     });
 
     it.skipIf(skip)("a plan's device limit refuses the next pairing with ES_QUOTA", async () => {
-      await h.meta.putPlan({ id: `two-${name}`, storage_bytes: null, history_days: null, max_file_bytes: null, devices: 1 });
+      await h.meta.putPlan({
+        id: `two-${name}`,
+        storage_bytes: null,
+        history_days: null,
+        history_bytes: null,
+        max_file_bytes: null,
+        devices: 1,
+      });
       const a = await h.meta.createAccount(`limited-${name}`, `two-${name}`);
       await device(h, a.name);
       const { code } = await mintPairCode(h.meta, a.id, h.clock.now);
@@ -196,7 +248,7 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       const id = wid("blob-one");
       const head0 = await h.app.request(`/v1/vaults/${v}/blobs/${id}`, {
         method: "HEAD",
-        headers: { authorization: `Bearer ${me.token}` },
+        headers: { authorization: `Bearer ${me.token}`, [PROTOCOL_HEADER]: String(PROTOCOL) },
       });
       expect(head0.status).toBe(404);
 
@@ -205,7 +257,7 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       expect(await put.json()).toEqual({ ok: true, size: 12 });
       const head = await h.app.request(`/v1/vaults/${v}/blobs/${id}`, {
         method: "HEAD",
-        headers: { authorization: `Bearer ${me.token}` },
+        headers: { authorization: `Bearer ${me.token}`, [PROTOCOL_HEADER]: String(PROTOCOL) },
       });
       expect(head.status).toBe(200);
       expect(head.headers.get("content-length")).toBe("12");
@@ -234,14 +286,21 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       );
       const noLength = await h.app.request(`/v1/vaults/${v}/blobs/${wid("nolen")}`, {
         method: "PUT",
-        headers: { authorization: `Bearer ${me.token}` },
+        headers: { authorization: `Bearer ${me.token}`, [PROTOCOL_HEADER]: String(PROTOCOL) },
         body: new ReadableStream({ start: (c) => (c.enqueue(bytes("abc")), c.close()) }),
         duplex: "half",
       } as RequestInit);
       expect(noLength.status).toBe(400);
       expect((await err(noLength)).code).toBe("ES_BAD_REQUEST");
 
-      await h.meta.putPlan({ id: `small-${name}`, storage_bytes: null, history_days: null, max_file_bytes: 4, devices: null });
+      await h.meta.putPlan({
+        id: `small-${name}`,
+        storage_bytes: null,
+        history_days: null,
+        history_bytes: null,
+        max_file_bytes: 4,
+        devices: null,
+      });
       await h.meta.setAccountPlan(me.account, `small-${name}`);
       const big = await upload(h, me.token, v, wid("big"), bytes("too big"));
       expect(big.status).toBe(413);
@@ -417,14 +476,57 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
       expect((await err(await post([{ key, parent: null, blob: null }]))).code).toBe("ES_BAD_REQUEST");
     });
 
+    it.skipIf(skip)("an upload past the quota, counting uploads never committed, is ES_QUOTA", async () => {
+      const me = await device(h);
+      const v = await vault(h, me.token);
+      const other = await vault(h, me.token);
+      await h.meta.putPlan({
+        id: `small-${name}`,
+        storage_bytes: 20,
+        history_days: null,
+        history_bytes: null,
+        max_file_bytes: null,
+        devices: null,
+      });
+      await h.meta.setAccountPlan(me.account, `small-${name}`);
+      const [a, b, c] = [wid("u-a"), wid("u-b"), wid("u-c")];
+      expect((await upload(h, me.token, v, a, bytes("12345678"))).status).toBe(200);
+      expect((await upload(h, me.token, other, b, bytes("12345678"))).status).toBe(200);
+      // 16 bytes pending across the account's vaults, none committed: 8 more would be 24.
+      const over = await upload(h, me.token, v, c, bytes("12345678"));
+      expect(over.status).toBe(413);
+      expect((await err(over)).code).toBe("ES_QUOTA");
+      expect(await h.meta.blobSize(v, c)).toBeNull();
+      // Committing moves bytes from pending to live: still counted, still refused.
+      const ok = await call(h, "POST", `/v1/vaults/${v}/commit`, {
+        token: me.token,
+        json: { changes: [{ key: wid("u-key"), parent: null, blob: a, meta: "m" }] },
+      });
+      expect(ok.status).toBe(200);
+      expect((await err(await upload(h, me.token, v, c, bytes("12345678")))).code).toBe("ES_QUOTA");
+      // An id already held adds nothing, and is answered as before.
+      expect(await (await upload(h, me.token, v, a, bytes("12345678"))).json()).toEqual({ ok: true, size: 8 });
+      expect((await upload(h, me.token, v, c, bytes("1234"))).status).toBe(200);
+      const info = (await (await call(h, "GET", "/v1/account", { token: me.token })).json()) as { used: Record<string, number> };
+      expect(info.used).toMatchObject({ storage_live: 8, storage_pending: 12, storage_history: 0 });
+    });
+
     it.skipIf(skip)("a storage limit refuses a commit past it with ES_QUOTA", async () => {
       const me = await device(h);
       const v = await vault(h, me.token);
-      await h.meta.putPlan({ id: `tiny-${name}`, storage_bytes: 10, history_days: null, max_file_bytes: null, devices: null });
-      await h.meta.setAccountPlan(me.account, `tiny-${name}`);
       const [small, large] = [wid("q-small"), wid("q-large")];
+      // Uploaded before the plan was lowered: the upload's own check (below) would refuse the second.
       await upload(h, me.token, v, small, bytes("12345678"));
       await upload(h, me.token, v, large, bytes("123456789012"));
+      await h.meta.putPlan({
+        id: `tiny-${name}`,
+        storage_bytes: 10,
+        history_days: null,
+        history_bytes: null,
+        max_file_bytes: null,
+        devices: null,
+      });
+      await h.meta.setAccountPlan(me.account, `tiny-${name}`);
       const key = wid("q-key");
       const ok = await call(h, "POST", `/v1/vaults/${v}/commit`, {
         token: me.token,
@@ -612,6 +714,7 @@ describe.each(BACKENDS)("routes on $name", ({ name, skip }) => {
         id: `pro-${name}`,
         storage_bytes: 1000,
         history_days: null,
+        history_bytes: null,
         max_file_bytes: null,
         devices: 5,
       });

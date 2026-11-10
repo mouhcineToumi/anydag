@@ -1,0 +1,5 @@
+{
+  "get": { "destination": "relay.test", "env": { "version": "0.3.0", "os": "linux", "arch": "x64" } },
+  "post": { "url": "https://github.com/mouhcineToumi/anydag/issues/4242" },
+  "failed": { "status": 502, "body": { "error": "GitHub refused to upload a file (500); no issue was made", "code": "ES_UPSTREAM" } }
+}

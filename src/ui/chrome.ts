@@ -10,7 +10,7 @@ import type { SettingsTab } from "@/settings/tabs";
  * — the switcher's *Vault settings…* opens on the vault's own — and one that names
  * none opens where the last one left off.
  */
-export type ChromeRequest = "search" | "settings";
+export type ChromeRequest = "search" | "settings" | "feedback";
 
 export interface ChromeAsk {
   what: ChromeRequest;

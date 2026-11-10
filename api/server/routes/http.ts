@@ -96,6 +96,34 @@ export function qint(
 export const today = (now: Date): string => now.toISOString().slice(0, 10);
 
 /**
+ * A fixed window per key, reset every minute: enough to keep one sender from filling a disk, or
+ * from filling an issue tracker (`feedback.ts` holds its own, with its own numbers).
+ */
+export class Rate {
+  private minute = 0;
+  private seen = new Map<string, number>();
+  private all = 0;
+
+  constructor(
+    private readonly perMinute: number,
+    private readonly allPerMinute: number,
+  ) {}
+
+  allow(key: string, now: number): boolean {
+    const minute = Math.floor(now / 60_000);
+    if (minute !== this.minute) {
+      this.minute = minute;
+      this.seen.clear();
+      this.all = 0;
+    }
+    const n = (this.seen.get(key) ?? 0) + 1;
+    this.seen.set(key, n);
+    this.all++;
+    return n <= this.perMinute && this.all <= this.allPerMinute;
+  }
+}
+
+/**
  * Who is asking, for a rate limit: the address the *last trusted proxy* forwarded, or the socket's
  * own when no proxy is configured (`trustProxy` is `off`, header absent, or fewer entries than the
  * hops promised). Every rate-limited route reads the client through this one helper, so a spoofed

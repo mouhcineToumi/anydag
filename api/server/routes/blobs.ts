@@ -2,6 +2,14 @@
  * `HEAD/PUT/GET /v1/vaults/{v}/blobs/{id}` — sealed bytes in, sealed bytes out.
  *
  * Load-bearing:
+ * - **An upload is counted before a commit names it.** With a `storage_bytes` plan, a PUT is
+ *   refused `ES_QUOTA` when the account's live bytes, plus its pending ones (uploaded, never
+ *   committed), plus this upload would pass the limit — once at its headers, before a byte is read,
+ *   and once more as the row is written (`Meta.addBlob`, under the account's lock), so concurrent
+ *   uploads cannot each take the last room. Superseded history is not counted here: it has an
+ *   allowance of its own (`gc.ts`). Bytes refused at the second check are an orphan file, which
+ *   the collector removes after the hour; deleting them here could delete another upload's copy of
+ *   the same id. Without this, uploading and never committing kept any amount on the server.
  * - **The size is decided before a byte is read.** `Content-Length` is required (`ES_BAD_REQUEST`
  *   without it) and checked against the plan's `max_file_bytes` and the server's own cap
  *   (`ANYDAG_API_MAX_BODY_MB`) first, so an oversized upload is refused at its headers — a 413 for
@@ -65,11 +73,22 @@ export function blobRoutes(deps: Deps): Hono<{ Variables: Vars }> {
     const held = await deps.meta.blobSize(v.id, id);
     if (held !== null) return c.json({ ok: true, size: held });
 
+    const quota = plan.storage_bytes === null ? undefined : { account: v.account, bytes: plan.storage_bytes };
+    const over = (): HttpError =>
+      new HttpError(
+        "ES_QUOTA",
+        `this plan holds ${quota!.bytes} bytes, counting uploads not yet committed; this upload of ${length} would pass it`,
+      );
+    if (quota) {
+      const used = await deps.meta.storage(v.account);
+      if (Number(used.live) + Number(used.pending) + length > quota.bytes) throw over();
+    }
+
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.byteLength !== length)
       throw new HttpError("ES_BAD_REQUEST", `the body was ${bytes.byteLength} bytes, not the ${length} Content-Length said`);
     await deps.blobs.put(v.id, id, bytes);
-    await deps.meta.addBlob(v.id, id, length, deps.now().toISOString());
+    if (!(await deps.meta.addBlob(v.id, id, length, deps.now().toISOString(), quota))) throw over();
     await deps.usage.bump(v.account, v.id, "bytes_up", length);
     return c.json({ ok: true, size: length });
   });

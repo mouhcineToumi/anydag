@@ -39,12 +39,12 @@ export async function planExists(meta: Meta, id: string): Promise<boolean> {
   return (await meta.plan(id)).id === id;
 }
 
-const LIMITS = ["storage_bytes", "history_days", "max_file_bytes", "devices"] as const;
+const LIMITS = ["storage_bytes", "history_days", "history_bytes", "max_file_bytes", "devices"] as const;
 
 export function parsePlan(id: string, v: Record<string, unknown>): Plan {
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(id))
     throw new HttpError("ES_BAD_REQUEST", "a plan id is 1 to 64 letters, digits, dots, dashes or underscores");
-  const plan: Plan = { id, storage_bytes: null, history_days: null, max_file_bytes: null, devices: null };
+  const plan: Plan = { id, storage_bytes: null, history_days: null, history_bytes: null, max_file_bytes: null, devices: null };
   for (const k of LIMITS) {
     const x = v[k];
     if (x === undefined || x === null) continue;
