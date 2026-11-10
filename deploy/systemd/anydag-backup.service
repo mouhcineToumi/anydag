@@ -1,0 +1,18 @@
+# The nightly backup (deploy/backup.sh). Installed by deploy/provision.sh, which writes the
+# checkout's path in place of @DEPLOY@; started by anydag-backup.timer, or by hand:
+#   systemctl start anydag-backup.service && journalctl -u anydag-backup -n 50
+# A failure is reported by backup.sh itself (BACKUP_PING_URL's /fail), and a night with no run at
+# all by that same check's silence.
+[Unit]
+Description=AnyDag api backup to object storage
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@DEPLOY@/backup.sh
+# A backup is a few minutes; one that hangs for an hour has failed.
+TimeoutStartSec=1h
+Nice=10
+IOSchedulingClass=idle

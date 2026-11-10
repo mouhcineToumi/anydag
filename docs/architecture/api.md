@@ -84,10 +84,12 @@ is on, and a release publishes no `anydag-api` binary or image — the server ru
 | `node api/dist/anydag-api.mjs account add <name>` · `pair <account>` | an account · a one-time code a device pairs with |
 | `npm run api:test` · `api:test:pg` · `api:converge` | the suites: the routes over PGlite, the suites on the compose Postgres, a hundred convergence seeds |
 | `docker build api/` · `npm run api:up` | the image (from `api/dist/`; non-root, `.env*` never in the context) · the dev stack up |
-| `deploy/` | the production machine: `deploy/compose.yaml` (Caddy, api, Postgres), `backup.sh`, `restore.sh`, `deploy/README.md` |
+| `deploy/` | the production machine: `deploy/compose.yaml` (Caddy, api, Postgres) and its tunnel override, `backup.sh`, `restore.sh`, `check-disk.sh`, `provision.sh` and the systemd timers, `deploy/README.md` |
 
-`deploy/` is the whole deployment story: bring up, upgrade, watch (`/v1/ready` and disk), back
-up, restore — and the restore is **tested in CI** (`.github/workflows/deploy.yml`), every time
+`deploy/` is the whole deployment story: the machine (`provision.sh`, then the maintainer's own
+steps, in order, in `deploy/README.md`), bring up — directly on a public address, or behind a tunnel
+with `ANYDAG_API_TRUST_PROXY=2` (`compose.tunnel.yaml`) — upgrade, watch (`/v1/ready`, the disk
+and the nightly backup, each an alert), back up, restore — and the restore is **tested in CI** (`.github/workflows/deploy.yml`), every time
 `deploy/` or `api/` changes: a stack with data is backed up, restored into a fresh one, and read
 back. An S3-compatible blob backend is a later step, taken only when the blobs outgrow a cheap
 volume or more than one api instance needs them; `Blobs` stays the only way into file storage,
@@ -107,4 +109,5 @@ spaces, the page's CSS, or `data-dag-*`.
 **Out, and why:** multi-instance scaling (one Postgres, one volume — an S3-compatible backend is
 the precondition, a later step); accounts and sign-in (a follow-up issue; nothing here rules it
 out); a managed cloud database or object store as the default (one cheap machine is the shape);
-and the machine's provisioning itself (#101 — provider, DNS, monitoring).
+and the parts of the machine only the maintainer can do — the provider account, DNS, the secrets,
+the monitoring service's checks (`deploy/README.md`, *The machine*, lists them in order).

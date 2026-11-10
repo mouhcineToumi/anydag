@@ -1,0 +1,47 @@
+# The same stack behind a tunnel, for a machine with no public address it can serve 80 and 443
+# on — a home server behind CGNAT, a connection whose ISP blocks the ports. Cloudflare Tunnel is
+# the one written out here; another tunnel works the same way and has to pass the same check
+# (deploy/README.md, *Behind a tunnel*).
+#
+#   docker compose -f deploy/compose.yaml -f deploy/compose.tunnel.yaml up -d --wait
+#
+# What changes, and why each:
+# - **No published ports.** The tunnel dials out; nothing on the internet reaches this machine,
+#   and the firewall opens nothing but (restricted) SSH.
+# - **TLS ends at the tunnel's edge**, so Caddy serves `http://<domain>` to the tunnel's
+#   connector on the compose network, and requests no certificate (there is no port 80 for an
+#   ACME challenge to reach).
+# - **Two hops.** The edge writes the client's address into `X-Forwarded-For`; Caddy trusts the
+#   connector (`private_ranges`: the compose network) and appends the connector's own address. The
+#   api's rate limiter must count both, or every client is the connector and one person's limit
+#   is everyone's: `ANYDAG_API_TRUST_PROXY=2`.
+# - **`TUNNEL_TOKEN`** is the tunnel's credential, from the provider's dashboard. A secret like
+#   every other: deploy/.env only, never here.
+#
+# In the tunnel's dashboard, the public hostname (api.anydag.com) points at `http://caddy:80`.
+services:
+  caddy:
+    ports: !reset []
+    environment:
+      CADDY_SITE: http://${CADDY_DOMAIN:?set CADDY_DOMAIN in deploy/.env}
+      CADDY_TRUSTED_PROXIES: private_ranges
+
+  api:
+    environment:
+      ANYDAG_API_TRUST_PROXY: "2"
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in deploy/.env — the tunnel's token}
+    depends_on:
+      caddy:
+        condition: service_healthy
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

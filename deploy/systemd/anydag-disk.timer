@@ -1,0 +1,10 @@
+[Unit]
+Description=AnyDag api data disk check, hourly
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
