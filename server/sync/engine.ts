@@ -40,9 +40,9 @@
  */
 
 import { classify, unique } from "../names";
-import { blobId, keyOf, keysOf, normalise, openBlob, sealBlob, type VaultKeys } from "../../sync/protocol/crypto";
-import { MetaRefused, openMeta, sealMeta, type Meta } from "../../sync/protocol/meta";
-import { MAX_CHANGES, MAX_PAGE, type Change, type Head } from "../../sync/protocol/wire";
+import { blobId, keyOf, keysOf, normalise, openBlob, sealBlob, type VaultKeys } from "../../api/protocol/crypto";
+import { MetaRefused, openMeta, sealMeta, type Meta } from "../../api/protocol/meta";
+import { MAX_CHANGES, MAX_PAGE, type Change, type Head } from "../../api/protocol/wire";
 import { Bases, sha1Of } from "./bases";
 import { isSyncError, type SyncApi } from "./client";
 import { Echoes, FOLDER } from "./echo";

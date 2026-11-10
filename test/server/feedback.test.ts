@@ -1,6 +1,6 @@
 /**
  * Feedback on the app's side: `/api/feedback` forwards to the relay, and the relay here is the real
- * one (`sync/server/app.ts`) with a fake GitHub behind it — so what this route sends is what the
+ * one (`api/server/app.ts`) with a fake GitHub behind it — so what this route sends is what the
  * relay reads, and what it answers is what the page gets, which `test/fixtures/feedback.json`
  * records for the browser suite to stand in with.
  */
@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../server/app";
 import { Session } from "../../server/context";
 import { feedbackDestination, feedbackEndpoint } from "../../server/feedback";
-import { harness, type Harness } from "../../sync/test/helpers";
+import { harness, type Harness } from "../../api/test/helpers";
 import { BOARD, makeEnv, NOTE, sweepTemps, write, type Env } from "./helpers";
 
 const FIXTURE = path.join(import.meta.dirname, "..", "fixtures", "feedback.json");
@@ -90,7 +90,11 @@ describe("/api/feedback", () => {
   });
 
   it("sends the text, the files and each ticked board and note through the relay, and answers the issue", async () => {
-    relay = await harness("pglite", { ANYDAG_FEEDBACK_GITHUB_TOKEN: "github_pat_test" }, { fetch: github });
+    relay = await harness(
+      "pglite",
+      { ANYDAG_API_FEEDBACK_GITHUB_TOKEN: "github_pat_test", ANYDAG_API_FEEDBACK_REPO: "mouhcineToumi/anydag" },
+      { fetch: github },
+    );
     write(env.root, "work/plan.board.md", BOARD);
     write(env.root, "diary.md", NOTE);
     const call = await appOf({ ANYDAG_FEEDBACK_URL: RELAY });
@@ -116,7 +120,11 @@ describe("/api/feedback", () => {
   });
 
   it("answers a failed upload with the relay's sentence, and makes no issue", async () => {
-    relay = await harness("pglite", { ANYDAG_FEEDBACK_GITHUB_TOKEN: "github_pat_test" }, { fetch: github });
+    relay = await harness(
+      "pglite",
+      { ANYDAG_API_FEEDBACK_GITHUB_TOKEN: "github_pat_test", ANYDAG_API_FEEDBACK_REPO: "mouhcineToumi/anydag" },
+      { fetch: github },
+    );
     const call = await appOf({ ANYDAG_FEEDBACK_URL: RELAY });
     const got = await call("POST", "/api/feedback", {
       kind: "bug",

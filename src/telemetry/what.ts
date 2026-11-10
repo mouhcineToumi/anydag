@@ -1,7 +1,7 @@
 /**
  * What logs hold and what they never hold, in the words the first-run card and the Privacy tab
  * both say — one list, so the two cannot describe different things. It follows
- * `sync/protocol/logs.ts`'s `EVENTS`; a prop added there wants a line here.
+ * `api/protocol/logs.ts`'s `EVENTS`; a prop added there wants a line here.
  */
 
 export const SENT = [

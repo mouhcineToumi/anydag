@@ -35,7 +35,7 @@ merge. Rulesets on GitHub hold all of it: a pull request for `main`, `develop`, 
 
 **A release is a tag, and the workflow checks where it stands.** `release.yml` runs on `v*` tags that
 are not nightlies: a stable tag must be on `main` and a beta on `release/<core>` or `hotfix/<core>`.
-It runs the whole tier — `checks.yml` with the sync harness and the Postgres suites, `e2e.yml` with
+It runs the whole tier — `checks.yml` with the api's harness and its Postgres suites, `e2e.yml` with
 `scope: full`, the desktop app packaged and opened on Linux, Windows and macOS (signing where the
 secrets allow — see *The desktop app*) — and publishes only when `scripts/check-release-assets.mjs`
 finds every installer and the update feeds for the version's channel.
@@ -128,6 +128,7 @@ by whatever fonts the machine has, and a host's layout is not the image's.
 | `ci.yml` → `secrets` (in `CI passed`) | gitleaks over the commits the pull request or push adds; the selftest first | the same events as `ci.yml` |
 | `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
 | `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
+| `deploy.yml` → `backup and restore` | the api's deployment restored: a stack up, data through Caddy, `backup.sh`, a fresh stack, `restore.sh`, and the data read back | pull requests and pushes that touch `deploy/**` or `api/**`; a weekly cron (Monday 03:15 UTC); a button |
 | `codeql.yml`, `dependency-review.yml` | static security analysis; new dependencies' advisories and licences | pull requests and develop; not required |
 
 `CI passed` and `e2e` are summary jobs: a reusable workflow's jobs do not exist when the job that calls
@@ -144,7 +145,7 @@ for a surface that has one — the tier is under a minute on purpose.
 a remote) → no tests, one line saying so. Otherwise `scripts/e2e-plan.mjs` reads the diff against
 `origin/develop` (else `origin/main`, else the whole suite) and answers with a `--grep`: docs, CI config
 and unit tests run nothing; application code the `@smoke` tier; what can move pixels (`boards/`,
-`icons/`, the drawing layers of `src/`) also `reference.spec.ts`; `sync/` also `sync.spec.ts`; and a
+`icons/`, the drawing layers of `src/`) also `reference.spec.ts`; `api/` and `server/sync/` also `sync.spec.ts`; and a
 change under `e2e/` the specs Playwright's `--only-changed` traces it to. It runs in the image when
 Docker answers, else on the host with no screenshots, and says which. The number of browsers comes from
 the machine (`scripts/e2e-lib.sh`: cores − 2 and free memory at 600 MB a worker, clamped to 1..6) and the

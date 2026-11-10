@@ -34,8 +34,8 @@ import {
   Unsealed,
   unwrapKey,
   wrapKey,
-} from "../../sync/protocol/crypto";
-import type { VaultKey } from "../../sync/protocol/wire";
+} from "../../api/protocol/crypto";
+import type { VaultKey } from "../../api/protocol/wire";
 import { err } from "../http";
 import type { Vault } from "../vault";
 import { HttpSyncApi, isSyncError } from "./client";

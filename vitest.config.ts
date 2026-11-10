@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["test/**/*.test.ts", "sync/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "api/**/*.test.ts"],
     environment: "node",
     /*
      * **Modules are shared between the files a worker runs, and two workers run them.** Isolated,

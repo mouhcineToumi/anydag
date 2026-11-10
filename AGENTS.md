@@ -49,7 +49,7 @@ the maintainer sets the label. An issue with no `agent:` label is not ready.
   `refactor/<slug>`, `test/<slug>`, `ci/<slug>` — for example `fix/142-note-title-focus`.
 - Commits and the **PR title** are [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(notes): …`, `fix(canvas): …`, `docs: …`. CI checks the title. Scopes follow the `area:` labels
-  (`canvas`, `dsl`, `notes`, `tables`, `quizzes`, `tasks-calendar`, `sync`, `desktop`, `cli-mcp`,
+  (`canvas`, `dsl`, `notes`, `tables`, `quizzes`, `tasks-calendar`, `sync`, `api`, `desktop`, `cli-mcp`,
   `assistant`, `ci`).
 - The PR description says `Closes #<issue>` for the `status: ready` issue it implements. CI fails a PR
   into `develop` that does not close one.

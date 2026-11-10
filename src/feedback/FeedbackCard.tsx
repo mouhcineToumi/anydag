@@ -8,7 +8,7 @@ import {
   type FeedbackEnv,
   type FeedbackKind,
   type FeedbackSent,
-} from "../../sync/protocol/feedback";
+} from "../../api/protocol/feedback";
 
 const ICON = { size: 16, strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -64,7 +64,7 @@ function named(f: File): File {
 
 /**
  * Send feedback: a bug or an idea, with files and, ticked, the board or note behind it — made a
- * public GitHub issue by the relay (`sync/server/routes/feedback.ts`), through the app's server.
+ * public GitHub issue by the relay (`api/server/routes/feedback.ts`), through the app's server.
  *
  * Load-bearing:
  * - **It says exactly what leaves before anything does**: the text, each file by name, the whole

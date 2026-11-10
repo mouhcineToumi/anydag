@@ -21,9 +21,9 @@ import { conflictName, freshCopy, isJson, isText, mergeContent } from "../../ser
 import { syncs } from "../../server/sync/scope";
 import { SyncState } from "../../server/sync/state";
 import { frontId } from "../../server/ids";
-import { keyOf, keysOf, randomKey } from "../../sync/protocol/crypto";
-import { MetaRefused, openMeta, sealMeta } from "../../sync/protocol/meta";
-import { PROTOCOL, PROTOCOL_HEADER, type Change } from "../../sync/protocol/wire";
+import { keyOf, keysOf, randomKey } from "../../api/protocol/crypto";
+import { MetaRefused, openMeta, sealMeta } from "../../api/protocol/meta";
+import { PROTOCOL, PROTOCOL_HEADER, type Change } from "../../api/protocol/wire";
 import { FakeServer } from "./sync-fake";
 import { tmpFs, TYPES, type TmpFs } from "./sync-tmpfs";
 

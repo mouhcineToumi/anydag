@@ -1,0 +1,10 @@
+# The build context of anydag-api's image (`docker build api/`): everything but the built bundle,
+# so no `.env*` or `*.local` file, no data directory holding a person's vaults or logs, and no
+# node_modules can enter a build, and no build argument is ever needed. The context carries no
+# file a secret could hide in; the image's only way to be given one is the environment
+# (`api/.env.example`). `dist/` is what `node api/build.mjs` writes — the bundle, the migrations,
+# a manifest for staleness and a package.json naming the runtime dependencies — nothing in it secret.
+*
+!dist/
+!dist/**
+.dockerignore

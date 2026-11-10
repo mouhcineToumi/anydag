@@ -33,8 +33,8 @@ import type {
   Report,
   VaultKey,
   VaultsResponse,
-} from "../../sync/protocol/wire";
-import { MAX_PAGE, PROTOCOL, PROTOCOL_HEADER } from "../../sync/protocol/wire";
+} from "../../api/protocol/wire";
+import { MAX_PAGE, PROTOCOL, PROTOCOL_HEADER } from "../../api/protocol/wire";
 
 export interface SyncApi {
   health(): Promise<Health>;

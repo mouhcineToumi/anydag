@@ -1,7 +1,7 @@
 /**
  * Linking and the sync loop (`server/sync/loop.ts`, `link.ts`, `server/routes/sync.ts`): two and
  * three app sessions — each its own home and vault folder — against one real sync server on a real
- * port (`sync/test/helpers.ts`, PGlite), every step through the app's own `/api/sync` routes.
+ * port (`api/test/helpers.ts`, PGlite), every step through the app's own `/api/sync` routes.
  */
 
 import "./sqlite-shim";
@@ -19,8 +19,8 @@ import { Home } from "../../server/home";
 import { TUNE } from "../../server/sync/loop";
 import type { SyncDevices, SyncLinked, SyncPaired, SyncRemotes, SyncStatus } from "../../server/sync/types";
 import { Vault, type Change } from "../../server/vault";
-import { harness, type Harness } from "../../sync/test/helpers";
-import { mintPairCode } from "../../sync/server/routes/pair";
+import { harness, type Harness } from "../../api/test/helpers";
+import { mintPairCode } from "../../api/server/routes/pair";
 import { makeEnv, NOTE, readText, write, type Env } from "./helpers";
 
 const PASS = "correct horse battery";

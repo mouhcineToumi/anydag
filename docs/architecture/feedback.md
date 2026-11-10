@@ -14,10 +14,10 @@ sending feedback is not administering a vault.
 
 | Where | Owns |
 |---|---|
-| `sync/protocol/feedback.ts` | the kinds, the caps (10 MB, 5 files, the text and document lengths), the MIME rule, `feedbackProblem`, which every hop runs |
+| `api/protocol/feedback.ts` | the kinds, the caps (10 MB, 5 files, the text and document lengths), the MIME rule, `feedbackProblem`, which every hop runs |
 | `src/feedback/FeedbackCard.tsx` | the card: kind, text, files, the tick, the consent list, the draft that survives a close or a failed send |
 | `server/feedback.ts` · `server/routes/feedback.ts` | where it goes, the machine's `env`, reading the ticked documents, the forward |
-| `sync/server/routes/feedback.ts` · `sync/server/github.ts` | `POST /v1/feedback`: rate, caps, the uploads, the issue |
+| `api/server/routes/feedback.ts` · `api/server/github.ts` | `POST /v1/feedback`: rate, caps, the uploads, the issue |
 
 | Route | Does |
 |---|---|
@@ -60,14 +60,15 @@ textarea), `data-dag-feedback*`, and the chrome request `feedback` on `dag:chrom
 
 ## Running the relay
 
-The relay is a route of the sync server (`anydag-sync`), next to `/v1/logs`. It is open, and limits
-stand in for a token.
+The relay is a route of the api server (`anydag-api`, [`api.md`](api.md)), next to `/v1/logs`. It is
+open, and limits stand in for a token; its rate is per client address as `clientAddress` reads it,
+which believes `X-Forwarded-For` only from a proxy `ANYDAG_API_TRUST_PROXY` names.
 
 | Variable | Means |
 |---|---|
-| `ANYDAG_FEEDBACK_GITHUB_TOKEN` | a **fine-grained personal access token** for the maintainer's account, limited to the one repository, with **Issues: read and write**. Unset, the route answers `503 ES_UNAVAILABLE` ("feedback not available"), and the card says so |
-| `ANYDAG_FEEDBACK_REPO` | `owner/name`; `mouhcineToumi/anydag` by default |
-| `ANYDAG_FEEDBACK` | `off` makes the route a `404` |
+| `ANYDAG_API_FEEDBACK_GITHUB_TOKEN` | a **fine-grained personal access token** for the maintainer's account, limited to the one repository, with **Issues: read and write**. Unset, or with no repository, the route answers `503 ES_UNAVAILABLE` ("feedback not available"), and the card says so |
+| `ANYDAG_API_FEEDBACK_REPO` | `owner/name`, with no default: unset, the relay is unavailable as with no token |
+| `ANYDAG_API_FEEDBACK` | `off` makes the route a `404` |
 
 The token belongs to a person, not a GitHub App, because the user-attachments upload endpoint
 (`POST https://uploads.github.com/user-attachments/assets?name=…&content_type=…&repository_id=…`) is

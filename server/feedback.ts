@@ -3,7 +3,7 @@
  *
  * Load-bearing:
  * - **The app holds no GitHub token.** It sends to a relay — `POST /v1/feedback` on a sync server
- *   (`sync/server/routes/feedback.ts`) — and the relay alone holds one. The page never calls the
+ *   (`api/server/routes/feedback.ts`) — and the relay alone holds one. The page never calls the
  *   relay: it asks `POST /api/feedback`, and this forwards.
  * - **Where it goes**: `ANYDAG_FEEDBACK_URL` (an address, or `off`), else the address a release
  *   builds in (`__ANYDAG_FEEDBACK_URL__`, from `ANYDAG_FEEDBACK_BUILD_URL` in `server/build.mjs`),
@@ -21,7 +21,7 @@ import {
   type FeedbackEnv,
   type FeedbackKind,
   type FeedbackSent,
-} from "../sync/protocol/feedback";
+} from "../api/protocol/feedback";
 import { err } from "./http";
 
 declare const __ANYDAG_FEEDBACK_URL__: string;

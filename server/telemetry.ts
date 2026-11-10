@@ -11,7 +11,7 @@
  * - **Nothing is held, measured or sent unless the answer is yes.** `record`, `routeDone` and `fail`
  *   return at once otherwise, so an install that said no — or was never asked — does the work of
  *   one `kv` read the first time and a boolean after.
- * - **Every event is `cleanEvent`'s before it is held** (`sync/protocol/logs.ts`), whoever sent it:
+ * - **Every event is `cleanEvent`'s before it is held** (`api/protocol/logs.ts`), whoever sent it:
  *   the page's batch, the server's own errors and the route summary alike. A page that sent a
  *   title in a prop has it dropped here.
  * - **The answer is the person's, in the app's home**: one per install, not per browser and not per
@@ -39,7 +39,7 @@ import {
   type LogEnv,
   type LogEvent,
   type Props,
-} from "../sync/protocol/logs";
+} from "../api/protocol/logs";
 import type { Home } from "./home";
 
 declare const __ANYDAG_LOGS_URL__: string;

@@ -64,7 +64,7 @@ jobs:
               - "server/**"
               - "cli/**"
               - "src/**"
-              - "sync/**"
+              - "api/**"
               - "plugins/**"
               - "icons/**"
               - "themes/**"

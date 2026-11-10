@@ -1,17 +1,21 @@
 # Sync
 
-> The end-to-end-encrypted sync server and the app's client; the convergence harness.
+> The app's end-to-end-encrypted sync client, its server half in `api/`, and the convergence
+> harness.
 
 ## Sync
 
-A vault syncs to a **sync server** somebody runs — `sync/`, in this repository, one Node
-process over Postgres (or PGlite when `DATABASE_URL` is unset) — **end to end encrypted**: the server
-holds opaque keys, sealed blobs and sealed metadata, and never a path or a byte of a file.
+A vault syncs to an **api server** somebody runs — `api/` in this repository, one Node
+process over Postgres (or PGlite when `DATABASE_URL` is unset); its own file is
+[`api.md`](api.md) — **end to end encrypted**: the server holds opaque keys, sealed blobs and
+sealed metadata, and never a path or a byte of a file. This file is the *client*: what the app
+does about it.
 
 | Where | Owns |
 |---|---|
-| `sync/protocol/wire.ts` · `crypto.ts` · `meta.ts` | every route body, `ES_*` code and `PROTOCOL` · the vault key, its three HKDF subkeys, AES-256-GCM seals bound to what they seal, Argon2id, the recovery code · a path's sealed metadata, bound to its key, blob and parent |
-| `sync/server/` | `anydag-sync serve`, the routes under `/v1`, `Meta` (`meta/pg.ts`) and `DiskBlobs`, pairing, quotas and the history allowance, the usage ledger, `/metrics`, the collector (`gc.ts`), and the admin CLI (`cli.ts`) |
+| `api/protocol/wire.ts` · `crypto.ts` · `meta.ts` | every route body, `ES_*` code and `PROTOCOL` · the vault key, its three HKDF subkeys, AES-256-GCM seals bound to what they seal, Argon2id, the recovery code · a path's sealed metadata, bound to its key, blob and parent |
+| `api/protocol/logs.ts` | what an anonymous log may hold: `EVENTS`, `scrub`, `cleanEvent` and `cleanBatch` (see [`logs.md`](logs.md)) |
+| `api/server/` | the server: `anydag-api serve`, the routes under `/v1`, `Meta` (`meta/pg.ts`) and `DiskBlobs`, pairing, quotas and the history allowance, the usage ledger, `/metrics`, the collector (`gc.ts`), the admin CLI (`cli.ts`), the feature switches |
 | `server/sync/engine.ts` | one pull, push or resync at a time: decisions per key, merges, conflict copies, renames recognised |
 | `server/sync/loop.ts` · `link.ts` | one loop per linked vault (catch-up, poke or a 30 s poll, a 2 s/10 s debounce on raw watcher events that are not sync's own writes) · pair, link, unlink, devices |
 | `server/sync/echo.ts` | what the engine last wrote at each path, so the watcher's report of it wakes nothing |
@@ -20,13 +24,12 @@ holds opaque keys, sealed blobs and sealed metadata, and never a path or a byte 
 
 | Run | Does |
 |---|---|
-| `npm run sync:serve` | build `sync/dist/` and serve on `ANYDAG_SYNC_PORT` (8790), PGlite in `ANYDAG_SYNC_DATA` |
-| `npm run sync:up` · `sync:db` | the server and Postgres in compose · Postgres alone, on `ANYDAG_SYNC_PG_PORT` |
-| `node sync/dist/anydag-sync.mjs account add <name>` · `pair <account>` | an account · a one-time code a device pairs with |
+| `npm run api:serve` · `api:dev` · `api:db` | the api server (old names `sync:*` still answer for one release) · it against Postgres · Postgres alone |
+| `node api/dist/anydag-api.mjs account add <name>` · `pair <account>` | an account · a one-time code a device pairs with |
 | `anydag sync pair <server> <code>` · `link --upload\|--download <remote>\|--merge <remote>` · `status` · `now` · `devices` · `unlink` | the app's side; a passphrase is typed or `--passphrase-file` |
-| `npm run sync:test:pg` · `sync:converge` | the meta, routes and gc suites on the compose Postgres · a hundred convergence seeds |
+| `npm run api:test` · `api:test:pg` · `api:converge` | the protocol, config and route suites over PGlite · meta, routes and gc on the compose Postgres · a hundred convergence seeds |
 
-Eleven things are load-bearing:
+Seventeen things are load-bearing:
 
 - **The model is a file, not an operation.** Per vault the server keeps a head per key and a gapless
   log; a commit is all or nothing and is accepted only if every change's `parent` is its key's head
@@ -35,6 +38,7 @@ Eleven things are load-bearing:
 - **Every write sync makes is a compare-and-set on the sha1 it decided against** (`writeRawIf`,
   `removeRawIf`), so the page or an agent writing in between wins and sync decides again. It writes
   raw: `write`/`create` parse and stamp, and sync puts back exactly the bytes another device committed.
+
 - **No echo.** After applying a version, its bytes are the key's base, so the watcher's event for
   that write finds the disk equal to the base and pushes nothing. **Nor does it wake the loop**
   (#36): the watcher starts with the loop, so the files a pull, a download or a merge wrote come back
@@ -102,14 +106,14 @@ Eleven things are load-bearing:
   device) and a quota are `paused` with a reason; a version refused as not belonging where it
   arrived (*What the server cannot forge*) and a server of another protocol (`ES_PROTOCOL`) are
   `error` with the sentence that says why; the loop never unlinks on its own. The app answers
-  a sync server's `ES_AUTH` as **403**, not 401, which the page would read as its own token gone.
+  an api server's `ES_AUTH` as **403**, not 401, which the page would read as its own token gone.
 - **The feed's event is `dag:vault-sync`**, carrying a `SyncStatus`. `dag:sync` is the preference
   sync's key and stays it.
-- **The convergence harness is the instrument** (`sync/test/converge.test.ts`): one server, two or
+- **The convergence harness is the instrument** (`api/test/converge.test.ts`): one server, two or
   three devices on real vaults, seeded schedules of edits, renames, case renames, deletes, binaries,
   outside writes, stale page saves, offline spells and dropped answers; every seed must end with the
   same bytes everywhere, no token anybody wrote lost, and no dangling or duplicated id. It found
-  every defect in the client the unit tests missed. A printed seed replays with `ANYDAG_SYNC_SEED`.
+  every defect in the client the unit tests missed. A printed seed replays with `ANYDAG_API_SEED`.
   **It runs on its own clock, not the machine's.** A file's birth is a second-resolution instant and
   decides which duplicate keeps an id, so a seed read from the disk was a function of how fast the
   machine ran it: seed 2 held with every birth in one second and failed once a slow run spread them.
@@ -134,9 +138,10 @@ with *Failed to load url sqlite* whenever they shared a worker with another file
 Names claimed, grepped first: `dag-sync-row`, `dag-sync__*`, `dag-sync-spin`, `data-dag-sync-*`, the
 Settings tab `sync`, and the event `dag:vault-sync` (in `test/prefs.test.ts`'s list).
 
-**Out, and why:** hosting it (running it is up to whoever wants it); billing (the usage ledger and
-`/metrics` are in place for when it is decided); chunking a large file; sharing a vault between
-accounts; history a person can browse; and real-time co-editing, which the file model cannot be.
+**Out, and why:** hosting it (the api server's own file is [`api.md`](api.md), and whoever wants it
+runs it); billing (the usage ledger and `/metrics` are in place for when it is decided); chunking a
+large file; sharing a vault between accounts; history a person can browse; and real-time co-editing,
+which the file model cannot be.
 
 ## What the server cannot forge
 
@@ -147,7 +152,7 @@ versions (a **replayed version**, or a **replayed delete**), and every linked de
 so a file could be swapped, rolled back or deleted everywhere. Protocol 2 closes each:
 
 - **A `meta` is sealed with the log entry it belongs to** — `{v: 2, key, blob, parent, …}` inside
-  the seal, under the associated data `meta/v2:<key>` (`sync/protocol/meta.ts`). `openMeta` takes the
+  the seal, under the associated data `meta/v2:<key>` (`api/protocol/meta.ts`). `openMeta` takes the
   entry's `key`, `blob` and `parent` and throws `MetaRefused` unless all three are the sealed ones.
   The server's commit rule makes a device token's replay land over the *current* head, so its parent
   is never the sealed one. A head carries its `parent` too (`heads.parent`), so a device reading
@@ -191,7 +196,7 @@ What a plan's `storage_bytes` counts is **live** bytes (blobs a head names) **pl
   win over the window**: past the allowance, history inside `history_days` goes too, and a device
   offline that long reads `ES_HORIZON` and resyncs.
 - `GET /v1/account` says `storage_pending` beside `storage_live` and `storage_history`;
-  `anydag-sync plan set … --history-bytes N` sets the allowance.
+  `anydag-api plan set … --history-bytes N` sets the allowance.
 
 ## Protocol 2, and an older peer
 
@@ -206,8 +211,9 @@ so nothing is migrated in place:
   can neither read a `meta` it would misread nor write one protocol-2 devices would refuse. The client
   refuses an answer that says another number, or none (a 0.2.0 server, which would not keep `parent`
   on a head or count pending bytes), with `ES_PROTOCOL` and a message naming which side to update.
-  `/v1/health` (whose body says the protocol), `/v1/logs`, the poke stream and `/v1/admin/*` are not
-  checked: nothing they carry changed.
+  `/v1` and `/v1/health` (whose bodies say the protocol), `/v1/ready` (a probe that sends none),
+  `/v1/logs`, `/v1/feedback`, the poke stream and `/v1/admin/*` are not checked: nothing they carry
+  changed.
 - **A protocol-1 `meta` is refused by name.** A 0.2.0 server's database migrates (`002-quota-and-binding.sql`:
   `blobs.committed` backfilled from the log and heads, `heads.parent` from each head's own log row,
   `plans.history_bytes`), but the `meta`s in it are sealed to the key alone: `openMeta` tries the old

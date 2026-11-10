@@ -6,6 +6,12 @@
  *
  * `@parcel/watcher` stays outside the bundle: it is the one native module (N-API, prebuilt), and a
  * `.node` file cannot be inlined.
+ *
+ * **What a build bakes in.** A checkout's build bakes in nothing. The release and nightly
+ * workflows hand this script `ANYDAG_LOGS_BUILD_URL` and `ANYDAG_FEEDBACK_BUILD_URL`
+ * (`https://api.anydag.com/v1/logs` and `/v1/feedback`) — where the running server sends anonymous
+ * logs and the feedback relay to, each after its own yes, and each losing to its runtime override
+ * (`ANYDAG_LOGS_URL`, `ANYDAG_FEEDBACK_URL`). Nothing reads them until #103's `cloud` switch is on.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -15,9 +21,27 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 export const BUNDLE = path.join(here, "dist", "anydag-server.mjs");
 
+/**
+ * What a build bakes in: the version, and — from the two `_BUILD_URL` variables the release and
+ * nightly workflows set (`https://api.anydag.com/v1/logs` and `/v1/feedback`) — where the running
+ * server sends anonymous logs and the feedback relay. A checkout's build bakes in nothing at all,
+ * and nothing reads these until #103's `cloud` switch is on: a build before that contacts nothing.
+ */
+export function defines(env = process.env) {
+  return {
+    __ANYDAG_VERSION__: JSON.stringify(version()),
+    __ANYDAG_LOGS_URL__: JSON.stringify(env.ANYDAG_LOGS_BUILD_URL ?? ""),
+    __ANYDAG_FEEDBACK_URL__: JSON.stringify(env.ANYDAG_FEEDBACK_BUILD_URL ?? ""),
+  };
+}
+
+/** @returns {string} */
+function version() {
+  return fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
+}
+
 export async function build() {
   const { build: esbuild } = await import("esbuild");
-  const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
   await esbuild({
     absWorkingDir: root,
     /* The grammar's worker beside the server (`server/grammar-worker.ts`): `server/grammar.ts` looks
@@ -31,14 +55,8 @@ export async function build() {
     outExtension: { ".js": ".mjs" },
     banner: { js: "import{createRequire as __acr}from'node:module';const require=__acr(import.meta.url);" },
     external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
-    /* Where logs go when nothing at run time says (`server/telemetry.ts`): a release names its own
-       collector with `ANYDAG_LOGS_BUILD_URL`; a checkout's build names none. */
-    define: {
-      __ANYDAG_VERSION__: JSON.stringify(version),
-      __ANYDAG_LOGS_URL__: JSON.stringify(process.env.ANYDAG_LOGS_BUILD_URL ?? ""),
-      /* And where feedback goes (`server/feedback.ts`): an address only, never a token. */
-      __ANYDAG_FEEDBACK_URL__: JSON.stringify(process.env.ANYDAG_FEEDBACK_BUILD_URL ?? ""),
-    },
+    /* Where logs and feedback go when nothing at run time says (#99). */
+    define: defines(),
     logLevel: "warning",
   });
   return BUNDLE;

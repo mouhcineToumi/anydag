@@ -15,7 +15,7 @@
 
 import type { Hono } from "hono";
 
-import type { FeedbackDoc, FeedbackKind } from "../../sync/protocol/feedback";
+import type { FeedbackDoc, FeedbackKind } from "../../api/protocol/feedback";
 import type { Session } from "../context";
 import { feedbackDestination, feedbackEnv, forwardFeedback } from "../feedback";
 import { bodyOf, err, mustRead } from "../http";

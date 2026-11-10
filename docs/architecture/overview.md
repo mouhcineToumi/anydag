@@ -76,7 +76,7 @@ folder. A file moves between vaults with its id. See *Vaults*.
 
 And **it sends nothing about anyone until they say so**: the first page of the app asks once
 whether it may send anonymous logs — errors, which features are used, how fast pages draw — and
-Settings → Privacy changes the answer. They go to a sync server's `POST /v1/logs`. See *Logs*.
+Settings → Privacy changes the answer. They go to an api server's `POST /v1/logs`. See *Logs*.
 
 **Three ways to run it.** The desktop app (`desktop/`, Electron) spawns the server and loads the page
 through its own `anydag://` scheme, adding the token from the main process. `anydag serve <folder>`
