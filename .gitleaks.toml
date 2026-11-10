@@ -17,3 +17,17 @@ condition = "AND"
 paths = ['''^test/llm\.test\.ts$''']
 regexTarget = "match"
 regexes = ['''sk-test-0123456789abcdef''']
+
+[[allowlists]]
+description = "test/server/feedback.test.ts: the repository's own public name, the GitHub repo the feedback route files issues in; not a key"
+condition = "AND"
+paths = ['''^test/server/feedback\.test\.ts$''']
+regexTarget = "match"
+regexes = ['''ANYDAG_API_FEEDBACK_REPO: "mouhcineToumi/anydag"''']
+
+[[allowlists]]
+description = "api/test/feedback.test.ts: the repository's own public name, the GitHub repo the feedback route files issues in; not a key"
+condition = "AND"
+paths = ['''^api/test/feedback\.test\.ts$''']
+regexTarget = "match"
+regexes = ['''ANYDAG_API_FEEDBACK_REPO: "mouhcineToumi/anydag"''']
