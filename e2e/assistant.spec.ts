@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
@@ -53,7 +54,12 @@ test.beforeEach(({}, info) => {
 });
 
 test.afterAll(async ({ request }) => {
+  /* Chats first: a chat in a vault that is closed before its chat is deleted cannot be found. */
   for (const id of chats.splice(0)) await forget(request, id);
+  for (const id of made.splice(0)) {
+    await request.post("/api/vaults/close", { data: { id, forget: true } }).catch(() => undefined);
+  }
+  for (const p of parents.splice(0)) fs.rmSync(p, { recursive: true, force: true });
   for (const s of stems.splice(0)) {
     if (!s.startsWith(`e2e-chat-${run}-`)) continue;
     fs.rmSync(noteFile(s), { force: true });
@@ -189,19 +195,69 @@ test("a fresh chat writes with no switch to flip", async ({ page }) => {
   await expect(page.locator("[data-dag-chat-changes] [data-dag-chat-block]")).toHaveCount(1);
 });
 
-test("a vault granted Read refuses a write", async ({ page, request }) => {
-  const vaults = (
-    (await (await request.get("/api/vaults")).json()) as { vaults: { id: string; open: boolean; default: boolean }[] }
-  ).vaults;
-  const other = vaults.find((v) => v.open && !v.default);
-  test.skip(!other, "only one vault is open here");
-  const name = stem("readonly");
-  await page.goto("/?chat=new");
+/**
+ * A second vault for a grant test: made under a temp directory, with the suite's own put back as the
+ * server's default at once (`e2e/vaults.spec.ts` is the pattern) — **opening a vault makes it the
+ * default**, and the rest of the suite loads pages with no `vault=` and would land wherever that is.
+ */
+let parents: string[] = [];
+const made: string[] = [];
+
+async function secondVault(page: Page, name: string): Promise<string> {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-e2e-grant-"));
+  parents.push(parent);
+  const r = await page.request.post("/api/vaults/create", { data: { parent, name } });
+  expect(r.ok(), await r.text()).toBe(true);
+  const { vault } = (await r.json()) as { vault: { id: string } };
+  made.push(vault.id);
+  await page.request.post("/api/vaults/open", { data: { path: fs.realpathSync(BOARDS) } });
+  return vault.id;
+}
+
+/** The suite's own vault — the one the dev server serves this repository's boards from. */
+async function suiteVaultId(page: Page): Promise<string> {
+  const listed = (await (await page.request.get("/api/vaults")).json()) as { vaults: { id: string; path: string }[] };
+  return listed.vaults.find((v) => v.path === fs.realpathSync(BOARDS))!.id;
+}
+
+test("the scope popover never offers this tab's own vault, and a grant shows and takes back", async ({ page }) => {
+  const other = await secondVault(page, `grant-${run}`);
+  const home = await suiteVaultId(page);
+
+  /* The page is pinned to the second vault, which is open but **not** the server's default — the
+     case a popover that matched the default instead of the tab used to get wrong: it offered this
+     tab's vault under "Grant another vault…", and granting it was refused. */
+  await page.goto(`/?vault=${other}&chat=new`);
   await page.locator("[data-dag-chat-scope]").click();
-  await page.locator(`[data-dag-chat-grant-vault="${other!.id}"][data-dag-chat-grant-mode="ask"]`).click();
+  await expect(page.locator("[data-dag-chat-scope-menu]")).toBeVisible();
+  await expect(page.locator("[data-dag-chat-scope-menu] strong").first()).toHaveText(`grant-${run}`);
+  await expect(page.locator(`[data-dag-chat-grant-vault="${other}"]`)).toHaveCount(0);
+  /* The suite's vault is open, so it is the one on offer. */
+  await expect(page.locator(`[data-dag-chat-grant-vault="${home}"][data-dag-chat-grant-mode="ask"]`)).toBeVisible();
+
+  await page.locator(`[data-dag-chat-grant-vault="${home}"][data-dag-chat-grant-mode="ask"]`).click();
   await chatId(page);
-  await expect(page.locator(`[data-dag-chat-granted="${other!.id}"]`)).toBeVisible();
-  await say(page, `note@${other!.id} ${name} nope`);
+  await expect(page.locator(`[data-dag-chat-granted="${home}"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-chat-grant-vault="${home}"]`)).toHaveCount(0);
+
+  await page.locator(`[data-dag-chat-revoke="${home}"]`).click();
+  await expect(page.locator(`[data-dag-chat-granted="${home}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-dag-chat-grant-vault="${home}"][data-dag-chat-grant-mode="ask"]`)).toBeVisible();
+});
+
+test("a vault granted Read refuses a write", async ({ page }) => {
+  const other = await secondVault(page, `read-${run}`);
+  const home = await suiteVaultId(page);
+  const name = stem("readonly");
+
+  /* The chat is made in the tab's vault, and the suite's is granted Read — so the chat's own vault
+     is not the one being written to, and the guard's refusal is the grant's. */
+  await page.goto(`/?vault=${other}&chat=new`);
+  await page.locator("[data-dag-chat-scope]").click();
+  await page.locator(`[data-dag-chat-grant-vault="${home}"][data-dag-chat-grant-mode="ask"]`).click();
+  await chatId(page);
+  await expect(page.locator(`[data-dag-chat-granted="${home}"]`)).toBeVisible();
+  await say(page, `note@${home} ${name} nope`);
   await expect(page.locator("[data-dag-chat-turn]")).toHaveAttribute("data-dag-chat-status", "done");
   await expect(page.locator("[data-dag-chat-said]").last()).toContainText(`Could not make ${name}`);
   await expect(page.locator("[data-dag-chat-turns] [data-dag-chat-block]")).toHaveCount(0);
@@ -277,4 +333,45 @@ test("the panel keeps the chat it opens onto the page", async ({ page }) => {
   await expect(page.locator("[data-dag-assistant-panel]")).toHaveCount(0);
   await expect(page.locator("[data-dag-chat-turn] [data-dag-chat-asked]")).toHaveText("from the panel");
   await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toHaveAttribute("aria-current", "page");
+});
+
+test("the composer's controls sit on one row, name the model, and the box can be made taller", async ({ page }) => {
+  await page.goto("/?tasks=1");
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+
+  /* One row at the panel's own width: the scope chip and Send share a line, so nothing wrapped. */
+  const scope = await panel.locator("[data-dag-chat-scope]").boundingBox();
+  const send = await panel.locator("[data-dag-chat-send]").boundingBox();
+  expect(scope && send).toBeTruthy();
+  expect(Math.abs(send!.y - scope!.y)).toBeLessThan(8);
+
+  /* The model chip names the model, not the harness — and the effort is never "Default effort". */
+  const model = panel.locator("select[data-dag-chat-model]");
+  await expect(model).toHaveValue(/^(claude|opencode)\|/);
+  const shown = await model.evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? "");
+  expect(shown).not.toContain("·");
+  const effort = await panel
+    .locator("select[data-dag-chat-effort]")
+    .evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? "");
+  expect(effort).not.toBe("Default effort");
+
+  /* The box grows to most of the column, and goes back when it is told to. */
+  const box = panel.locator("[data-dag-chat-input]");
+  const before = (await box.boundingBox())!.height;
+  await panel.locator("[data-dag-chat-expand]").click();
+  const expanded = (await box.boundingBox())!.height;
+  expect(expanded).toBeGreaterThan(before + 100);
+  await panel.locator("[data-dag-chat-expand]").click();
+  expect((await box.boundingBox())!.height).toBeLessThan(before + 20);
+
+  /* And sending it collapses an expanded box. */
+  await panel.locator("[data-dag-chat-expand]").click();
+  await say(page, "taller box, then gone");
+  await expect(panel.locator("[data-dag-chat-turn]").last()).toHaveAttribute("data-dag-chat-status", "done");
+  expect((await box.boundingBox())!.height).toBeLessThan(before + 20);
+
+  /* The chat the panel is now on is this run's to delete (the page never sees its id). */
+  const made = await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat");
+  if (made && made !== "new") chats.push(made);
 });

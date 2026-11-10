@@ -12,6 +12,15 @@ change, every change can be undone, and the scope menu grants another vault Read
 bar's sparkle) and a full page at `?chat=<id>|new|1` with the vault's chats down the side and the
 chat's change blocks in a Changes column.
 
+The composer is one field and one row under it: the scope chip, the model — the provider's mark and
+the model's short name, the harness named only inside the open dropdown — the effort resolved to
+what it will be, `Auto` when the chat keeps the harness's own, an expand toggle for the field, and
+Send or Stop. **A chat that has none yet will live in this tab's vault**, so the scope menu matches
+the tab's vault (`currentVault()`), not the server's default — that moves when another vault opens,
+and a menu that reached for it once offered the tab's own vault under *Grant another vault…*, whose
+buttons were then refused with *a chat always reaches its own vault* and read as doing nothing
+(#118).
+
 | Where | Owns |
 |---|---|
 | `server/chat/store.ts` | `<vault>/.anydag/chats/<id>/`: `chat.json`, one write-once file per turn, one per undo |
