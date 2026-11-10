@@ -9,8 +9,18 @@ OpenCode — their subscription, signed in on this machine — that answers with
 makes and reorganises documents. There is no Ask/Edit switch: the chat's own vault is always read and
 change, every change can be undone, and the scope menu grants another vault Read or Read and change
 (#75). A panel down the right of any page (`space A`, the top
-bar's sparkle) and a full page at `?chat=<id>|new|1` with the vault's chats down the side and the
+bar's sparkle) and a full page at `?chat=<id>|new|1` with every chat down the side and the
 chat's change blocks in a Changes column.
+
+**The page with no chat is a welcome, not an empty thread.** `?chat=new`, or `?chat=1` in a vault
+with none, draws a short greeting with the composer centred under it, focused, and no title:
+the history's New chat row is the only control that says those words. The first message makes the
+chat, the URL becomes its id, and the page turns into the ordinary thread with the heading showing
+its title and the composer at the foot. **The history is every open vault's**, not only this tab's:
+`listChats` asks `/__board/chats?all=1`, so a chat started from the panel of a note in another
+vault is there, and its row names that vault. `Assistant.locate` finds a chat by its id in any open
+vault when the one this tab names does not hold it, which is what lets such a row open and keep
+working.
 
 | Where | Owns |
 |---|---|

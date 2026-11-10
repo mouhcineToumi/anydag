@@ -95,7 +95,7 @@ test("the sidebar's Assistant row opens the page, and a first message makes the 
   await expect(page).toHaveURL(/chat=/);
 
   await page.goto("/?chat=new");
-  await expect(page.locator("[data-dag-chat-empty]")).toBeVisible();
+  await expect(page.locator("[data-dag-chat-welcome]")).toBeVisible();
   await say(page, "hello there");
   const id = await chatId(page);
   const turn = page.locator("[data-dag-chat-turn]");
@@ -107,6 +107,40 @@ test("the sidebar's Assistant row opens the page, and a first message makes the 
   /* The history lists it, under today. */
   await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toBeVisible();
   await expect(page.locator('[data-dag-chat-day="Today"]')).toBeVisible();
+});
+
+test("a fresh page greets with a centred composer, and a panel chat joins the history", async ({ page }) => {
+  await page.goto("/?chat=new");
+  const welcome = page.locator("[data-dag-chat-welcome]");
+  const input = page.locator("[data-dag-chat-input]");
+  await expect(welcome).toBeVisible();
+  await expect(welcome.getByRole("heading", { name: "What can I help you with?" })).toBeVisible();
+  await expect(input).toBeFocused();
+  /* One New chat control, not a button and a heading with the same words. */
+  await expect(page.locator("[data-dag-chat-title]")).toHaveCount(0);
+  /* The composer sits in the middle of the main area, not only in the middle of its column. */
+  const area = (await page.locator(".dag-assistant__main").boundingBox())!;
+  const box = (await page.locator("[data-dag-chat-welcome] [data-dag-chat-composer]").boundingBox())!;
+  expect(Math.abs(box.x + box.width / 2 - (area.x + area.width / 2))).toBeLessThan(2);
+
+  /* A conversation held in the panel is a chat in this vault like any other. */
+  await page.goto("/?tasks=1");
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+  await panel.locator("[data-dag-assistant-panel-new]").click();
+  await say(page, "from a note's panel");
+  await expect(panel.locator("[data-dag-chat-turn]")).toHaveAttribute("data-dag-chat-status", "done");
+  const id = await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat");
+  expect(id).toMatch(/^c[0-9a-z]+$/);
+  chats.push(id!);
+
+  await page.goto("/?chat=new");
+  const row = page.locator(`[data-dag-chat-row="${id}"]`);
+  await expect(row).toBeVisible();
+  await expect(row).not.toHaveAttribute("aria-current", "page");
+  await row.click();
+  await expect(page).toHaveURL(new RegExp(`chat=${id}`));
+  await expect(page.locator("[data-dag-chat-asked]")).toHaveText("from a note's panel");
 });
 
 test("deleting a chat drops its row and lands on New chat", async ({ page }) => {
@@ -122,7 +156,8 @@ test("deleting a chat drops its row and lands on New chat", async ({ page }) => 
   /* The row went with the chat — the list hears the delete's own event — and so did the page. */
   await expect(row).toHaveCount(0);
   await expect(page).toHaveURL(/chat=new/);
-  await expect(page.locator("[data-dag-chat-title]")).toHaveText("New chat");
+  await expect(page.locator("[data-dag-chat-welcome]")).toBeVisible();
+  await expect(page.locator("[data-dag-chat-title]")).toHaveCount(0);
   await expect(page.locator("[data-dag-chat-missing]")).toHaveCount(0);
 
   /* A reload finds it gone from the list too, not just from the page's state. */
