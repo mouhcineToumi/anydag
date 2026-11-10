@@ -23,6 +23,8 @@ let folder = "";
 const board = () => `${folder}/inner/plan`;
 const other = () => `${folder}/other`;
 const note = () => `${folder}/idea`;
+/** A note the empty space's menu made at the top level — outside the folder this file owns. */
+let made = "";
 
 test.beforeEach(({}, info) => {
   id = info.testId.toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -34,6 +36,13 @@ test.beforeEach(({}, info) => {
 });
 test.afterEach(() => {
   fs.rmSync(path.join(BOARDS, folder), { recursive: true, force: true });
+  /* Only what this spec made, and only when it knows the name: the top-level note is outside the
+     folder the beforeEach made. `rmSync` with `force` takes its `.assets` if there is one. */
+  if (made) {
+    fs.rmSync(path.join(BOARDS, `${made}.md`), { force: true });
+    fs.rmSync(path.join(BOARDS, `${made}.assets`), { recursive: true, force: true });
+    made = "";
+  }
 });
 
 const sidebar = (page: Page) => page.locator("[data-dag-sidebar]");
@@ -623,4 +632,100 @@ test("a list not heard yet is said to be loading, and the next page draws the on
   await expect(later.locator("[data-dag-sidebar-loading]")).toHaveCount(0);
   again();
   await later.close();
+});
+
+/*
+ * The two checks for the tree's own space run one after the other, never beside each other: both
+ * make — or refuse to make — a file **at the top level of the vault**, which every worker's vault is
+ * one directory of, and a compare of what is at the top level would read the other's make.
+ */
+test.describe("the tree's empty space", () => {
+  test.describe.configure({ mode: "serial" });
+
+  test("right-clicking the tree's empty space opens the + menu at the pointer, for the top level", async ({ page }) => {
+    /* The browser's own menu is kept off the empty area: the tree answers the context menu event
+     it is aimed at, and this records whether it did — on the way *out*, after the page's
+     handlers have had their say. */
+    await page.addInitScript(() => {
+      const w = window as unknown as { cmPrevented: boolean[] };
+      w.cmPrevented = [];
+      addEventListener("contextmenu", (e) => w.cmPrevented.push(e.defaultPrevented));
+    });
+    /* Tall enough that the menu fits under the pointer, where the empty space is low in the window:
+     the nudge back inside the window (NewMenu) would otherwise move it off the pointer. */
+    await page.setViewportSize({ width: 1200, height: 1500 });
+    await fresh(page, `/?board=${board()}`);
+
+    /* Below the last row: the point is read off it, so the check does not guess where the rows end. */
+    const last = (await page.locator("[data-dag-sidebar-row]").last().boundingBox())!;
+    const at = { x: Math.round(last.x + last.width / 2), y: Math.round(last.y + last.height + 24) };
+    await page.mouse.click(at.x, at.y, { button: "right" });
+    const menu = page.locator("[data-dag-sidebar-new-menu]");
+    await expect(menu).toBeVisible();
+    const shown = (await menu.boundingBox())!;
+    expect(Math.round(shown.x)).toBe(at.x);
+    expect(Math.round(shown.y)).toBe(at.y);
+    expect(await page.evaluate(() => (window as unknown as { cmPrevented: boolean[] }).cmPrevented)).toEqual([true]);
+
+    /* The head names the top level, and that is what its rows make — though the open file is
+     folders-deep, the tree's own space is no file's folder. */
+    await expect(page.locator("[data-dag-sidebar-new-where]")).toHaveAttribute("data-dag-sidebar-new-where", "");
+    await expect(page.locator("[data-dag-sidebar-new-where]")).toHaveText("New at the top level");
+
+    /* Picking Note makes `untitled` (numbered if taken) at the top level of the vault and opens it.
+     The poll waits for the URL to carry a note at all — before the page navigates, it carries none,
+     and an empty value would be a pass about nothing. */
+    await menu.locator('[data-dag-sidebar-new-kind="note"]').click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toMatch(/^[^/]+$/);
+    made = String(new URL(page.url()).searchParams.get("note"));
+    expect(fs.existsSync(path.join(BOARDS, `${made}.md`))).toBe(true);
+    await expect(page.locator("[data-dag-note-view]")).toBeVisible();
+
+    /* And a row is still its own menu: right-clicking one opens the row's, never the New menu. */
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await fileRow(page, note()).click({ button: "right" });
+    await expect(page.locator("[data-dag-sidebar-menu]")).toBeVisible();
+    await expect(menu).toHaveCount(0);
+  });
+
+  test("locked, the empty space's menu is offered with its entries blocked, and makes nothing", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("dag:locked", "1"));
+    await page.setViewportSize({ width: 1200, height: 1500 });
+    await fresh(page, `/?board=${board()}`);
+    /* Nothing was made, wherever it would have gone: the top level has no new note, and the URL
+     no note. Any `.md` that is not a board, a quiz or a table is a note. */
+    const topNotes = () =>
+      fs
+        .readdirSync(BOARDS)
+        .filter(
+          (f) =>
+            f.endsWith(".md") &&
+            !f.endsWith(".board.md") &&
+            !f.endsWith(".quiz.md") &&
+            !f.endsWith(".table.md") &&
+            !f.startsWith("e2e-"),
+        )
+        .sort()
+        .join();
+    const was = topNotes();
+    const last = (await page.locator("[data-dag-sidebar-row]").last().boundingBox())!;
+    await page.mouse.click(Math.round(last.x + last.width / 2), Math.round(last.y + last.height + 24), {
+      button: "right",
+    });
+    const menu = page.locator("[data-dag-sidebar-new-menu]");
+    await expect(menu).toBeVisible();
+    /* Every entry is offered, carries the lock's style, and a press on one is answered. */
+    for (const kind of ["board", "note", "task", "event", "quiz", "table", "folder", "upload"])
+      await expect(menu.locator(`[data-dag-sidebar-new-kind="${kind}"]`)).toHaveAttribute("data-dag-readonly-blocked", "");
+    await expect(menu.locator("[data-dag-sidebar-menu-locked]")).toHaveText("Read only: unlock to make anything.");
+
+    /* The press is kept — `aria-disabled`, never the attribute that deadens a button — so the
+     notice answers it. Playwright refuses an `aria-disabled` target of its own accord, hence `force`. */
+    await menu.locator('[data-dag-sidebar-new-kind="note"]').click({ force: true });
+    await expect(page.locator("[data-dag-readonly-notice]")).toHaveAttribute("data-dag-readonly-notice", "refused");
+    await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(null);
+    await page.waitForTimeout(200);
+    expect(topNotes()).toBe(was);
+  });
 });

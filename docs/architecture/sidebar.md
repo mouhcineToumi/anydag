@@ -49,7 +49,14 @@ Fourteen things are load-bearing:
   folders are open is `dag:sidebar-open`, this browser's and deliberately not synced — view state,
   like a scroll position — written with `writeLocal`, which does not wake the preference sync.
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
-  one menu; a folder's `+` makes things in it. The search dialog carried the same four operations on
+  one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
+  down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
+  Files and the only way a top-level file was made before #121. That menu's `here` is carried in the
+  state that opens it: the `+` says the open file's folder, the tree's space says the top level, and
+  where there is no file to be in the head says *New at the top level* and offers no toggle. The menu
+  opens when the vault is locked — as a row's does — with every entry `aria-disabled` and in the
+  chrome's blocked style, a press answered by the lock's notice; the `+` still refuses before its menu
+  opens. The search dialog carried the same four operations on
   hover icons, and a control in two places is two places to keep in step, so it lost them.
   `Delete` is deliberately not a key: undo is a version of a board's *text* and never reaches the
   file.
