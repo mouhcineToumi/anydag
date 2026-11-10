@@ -299,6 +299,12 @@
   on its scheme, so neither notices; in a browser it is the `anydag_token` cookie, which rides on
   both with no client change. A token in the query string would be a credential in every log there
   is, which is why `/?token=` is accepted once and then taken out of the address.
+- **A `server.json` names a port, it does not prove who holds it.** The app home is shared with
+  `anydag serve`, and a file an earlier one left behind — a closed terminal, before `SIGHUP` was
+  handled, or a crash — names a port that another local user may be listening on now. The desktop
+  shell sends its per-launch token only to the child it spawned this time: the port from that
+  child's stdout, or a `server.json` whose `pid` and `token` both match (`desktop/launch.ts`). The
+  server removes the file on `SIGINT`, `SIGTERM` and `SIGHUP`, and on its IPC channel closing.
 - **`?snapshot=1` strips the chrome, never the token.** Every Playwright check and both scripts
   open a board that way, and an exemption would be a query string any page on the machine could
   load. `scripts/session.mjs`, `e2e/global-setup.ts` and the CLI's `snapshot` find the token

@@ -67,8 +67,11 @@ Eleven things are load-bearing:
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to
-  `127.0.0.1`. The page, its `localStorage` and its `EventSource` live on one stable origin,
-  `anydag://app`, and no script in it ever sees the token.
+  `127.0.0.1`. It is sent only to the port that child reported — on stdout, or in a `server.json`
+  whose `pid` and `token` are this launch's (`desktop/launch.ts`) — because the home is shared with
+  `anydag serve`, and a file an earlier one left behind names a port anybody may hold now. The page,
+  its `localStorage` and its `EventSource` live on one stable origin, `anydag://app`, and no script
+  in it ever sees the token.
 - **Only the page writes.** Chromium gives a custom scheme's handler no `Origin` and runs no CORS
   preflight for it — measured: a sandboxed frame's `POST` with any header it liked reached the
   handler — so the handler asks every write for a per-launch **page key**, which the preload asks
