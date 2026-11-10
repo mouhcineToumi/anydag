@@ -392,6 +392,7 @@ export function Sidebar({
   onAssistant,
   trashOpen = false,
   onTrash,
+  onHome,
   openFolders,
   onFolder,
   shown,
@@ -461,6 +462,8 @@ export function Sidebar({
   /** Whether the Trash page is what is open, and the way there. */
   trashOpen?: boolean;
   onTrash?(): void;
+  /** Home: nothing open, the welcome card. What the AnyDag logo in the head does. */
+  onHome(): void;
   openFolders: ReadonlySet<string>;
   onFolder(path: string, open: boolean): void;
   /** A folder asked for from outside — focus it and bring it into view, once per `n`. */
@@ -1170,11 +1173,21 @@ export function Sidebar({
           column goes — and the mark after it is where the toolbar draws it while the
           column is away, at the same size, so that does not move either. Floating, the column hangs
           under the toolbar, which already carries both, and has no header of its own: the one it
-          had held a second toggle beside the first. */}
+          had held a second toggle beside the first. The mark is the way home: one press from any
+          page back to the welcome card, which is what it is in the toolbar too. */}
       {place === "docked" ? (
         <div className="dag-sidebar__head">
           <span className="dag-sidebar-toggle-slot" aria-hidden="true" />
-          <Lockup size={20} className="dag-sidebar__logo" />
+          <button
+            type="button"
+            className="dag-sidebar__logo"
+            data-dag-sidebar-home=""
+            aria-label="Home"
+            title="Home"
+            onClick={onHome}
+          >
+            <Lockup size={20} />
+          </button>
         </div>
       ) : null}
 
