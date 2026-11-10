@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -156,6 +157,44 @@ test("![ embeds a live board in the note, drawn read-only", async ({ page }) => 
   await expect.poll(() => fs.readFileSync(noteFile(), "utf8")).toContain(`![${target}](dag:${board})`);
   const embed = page.locator(`[data-dag-embed="${board}"][data-dag-embed-kind="board"]`);
   await expect(embed.locator('[data-dag-node="db"]')).toBeVisible();
+});
+
+test("an embed of an id the page has not seen yet is a card until the board arrives, then the board, with no reload", async ({
+  page,
+}) => {
+  /* #123: the Assistant made a board and embedded it in the open note, from outside the page. Here
+     the note names the id first and the board is written after, which is the harder order. */
+  const late = Array.from(createHash("sha1").update(stem).digest())
+    .slice(0, 10)
+    .map((b) => "0123456789abcdefghjkmnpqrstvwxyz"[b & 31])
+    .join("");
+  const lateFile = path.join(BOARDS, `${stem}-late.board.md`);
+  made.push(lateFile);
+  await page.goto(`/?note=${stem}-n`);
+  await ready(page);
+  const loads: string[] = [];
+  page.on("request", (r) => {
+    if (r.resourceType() === "document") loads.push(r.url());
+  });
+
+  fs.writeFileSync(noteFile(), `---\ntitle: The linking note\n---\n# Linking\n\nStart here.\n\n![The late board](dag:${late})\n`);
+  const embed = page.locator(`[data-dag-note-editor] [data-dag-embed="${late}"]`);
+  await expect(embed).toHaveClass(/dag-embed--card/);
+  await expect(embed).toContainText("The late board");
+  await expect(page.locator(".bn-block-content", { hasText: "Start here." })).toBeVisible();
+
+  /* And the first refresh after the board arrives gets no answer — the desktop's requests waited for
+     ever behind six held connections, and a refresh that failed used to wait for the next change. */
+  let dropped = 0;
+  await page.route("**/__board/index*", (route) => (dropped++ === 0 ? route.abort() : route.continue()));
+  fs.writeFileSync(lateFile, boardText().replace(`title: ${target}`, `id: ${late}\ntitle: ${target}`));
+  const drawn = page.locator(`[data-dag-note-editor] [data-dag-embed="${late}"][data-dag-embed-kind="board"]`);
+  await expect(drawn.locator('[data-dag-node="db"]')).toBeVisible({ timeout: 10_000 });
+  await expect(drawn).toHaveAttribute("data-dag-embed-ready", "");
+  expect(dropped).toBeGreaterThan(1);
+  expect(loads).toEqual([]);
+  /* The one request this check refused is on the console; nothing else may be. */
+  problems = problems.filter((p) => !/Failed to load resource: net::ERR_FAILED/.test(p));
 });
 
 test("a note placed on a board is drawn as a card, and a backlink goes back to it", async ({ page }) => {
