@@ -33,7 +33,7 @@ on:
 
 concurrency:
   group: deploy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == "pull_request" }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           age-keygen -o key.txt
-          pub="$(age-keygen -o key.txt 2>&1 >/dev/null | sed -n 's/^Public key: //p')"
+          pub="$(age-keygen -y key.txt)"
           echo "public_key=$pub" >> "$GITHUB_OUTPUT"
 
       - name: The machine's .env — this run's values, none of them real
@@ -90,7 +90,7 @@ jobs:
           # A refused pairing spends its code, so a retry mints a new one; two attempts is two more
           # than a person needs.
           token=""
-          for attempt in 1 2 3; do
+          for _ in 1 2 3; do
             code="$(compose exec -T api node /app/anydag-api.mjs pair ci-user | sed -n 's/^code: *//p')"
             token="$(curl -skS -X POST "$base/v1/pair" -H 'content-type: application/json' \
               -d "{\"code\":\"$code\",\"device\":{\"name\":\"ci\",\"platform\":\"linux\"}}" | jq -r '.token // empty')" && [ -n "$token" ] && break
@@ -105,10 +105,12 @@ jobs:
             -H 'content-type: application/octet-stream' --data-binary @data.bin
           curl -fsSk -X POST "$base/v1/logs" -H 'content-type: application/json' \
             -d "{\"v\":1,\"env\":{\"version\":\"0.0.0-ci\",\"install\":\"0f8fad5b-d9cb-469f-a165-70867728950e\",\"shell\":\"browser\",\"os\":\"linux\",\"arch\":\"x64\",\"locale\":\"en\"},\"events\":[{\"name\":\"app.open\",\"at\":\"2026-11-09T00:00:00Z\",\"props\":{\"page\":\"board\",\"shell\":\"browser\"}}]}"
-          echo "vault=$vault" >> "$GITHUB_OUTPUT"
-          echo "blob=$blob" >> "$GITHUB_OUTPUT"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-          echo "bytes=$(sha256sum data.bin | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "vault=$vault"
+            echo "blob=$blob"
+            echo "token=$token"
+            echo "bytes=$(sha256sum data.bin | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Backup
         run: deploy/backup.sh
@@ -130,7 +132,7 @@ jobs:
           B: ${{ github.workspace }}/backups
         run: |
           set -euo pipefail
-          backup="$(ls "$B" | sort -r | head -n1)"
+          backup="$(find "$B" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -r | head -n1)"
           deploy/restore.sh "$B/$backup" --age key.txt
 
       - name: Read it back
@@ -141,8 +143,8 @@ jobs:
           base="https://localhost"
           compose() { docker compose -f deploy/compose.yaml "$@"; }
           compose exec -T api node /app/anydag-api.mjs account ls | grep -q ci-user
-          curl -fsSk "https://localhost/v1/ready"
-          got="$(curl -fsSk "https://localhost/v1/vaults/${{ steps.data.outputs.vault }}/blobs/${{ steps.data.outputs.blob }}" \
+          curl -fsSk "$base/v1/ready"
+          got="$(curl -fsSk "$base/v1/vaults/${{ steps.data.outputs.vault }}/blobs/${{ steps.data.outputs.blob }}" \
             -H "authorization: Bearer ${{ steps.data.outputs.token }}" | sha256sum | cut -d' ' -f1)"
           [ "$got" = "${{ steps.data.outputs.bytes }}" ] || { echo "the restored blob is not what was backed up" >&2; exit 1; }
           days="$(docker run --rm -v anydag_api_data:/data:ro alpine sh -c 'ls /data/logs/*.jsonl 2>/dev/null | wc -l')"
