@@ -70,7 +70,8 @@ rclone copyto "$NAME" "${BACKUP_REMOTE%/}/$NAME"
 for prefix in daily weekly; do
   keep="$KEEP_DAILY"
   [[ "$prefix" == weekly ]] && keep="$KEEP_WEEKLY"
-  rclone lsf "$BACKUP_REMOTE" --files-only | grep "^${prefix}-" | sort -r | tail -n +"$((keep + 1))" \
+  # `|| true`: a prefix with no backups yet (no weekly one before the first Monday) is not a failure.
+  rclone lsf "$BACKUP_REMOTE" --files-only | { grep "^${prefix}-" || true; } | sort -r | tail -n +"$((keep + 1))" \
     | while IFS= read -r file; do
         rclone deletefile "${BACKUP_REMOTE%/}/$file"
       done
