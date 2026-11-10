@@ -141,6 +141,68 @@ test("the toggle and the mark stay where they are, docked, away and peeking", as
   await expect(toggle(page)).toBeFocused();
 });
 
+test("in the macOS desktop app the top row clears the traffic lights, and full screen gives the room back", async ({ page }) => {
+  /* The window there has no title bar (`desktop/main.ts`, #78). The bridge is `desktop/preload.ts`'s
+     shape: the platform, whether the window is in full screen, and a listener for the change — which
+     the main process calls on `enter-full-screen` and `leave-full-screen`. */
+  await page.addInitScript(() => {
+    const w = window as unknown as { anydagDesktop: unknown; fullScreen: (full: boolean) => void };
+    const listeners: ((full: boolean) => void)[] = [];
+    w.fullScreen = (full) => {
+      for (const l of listeners) l(full);
+    };
+    w.anydagDesktop = {
+      platform: "darwin",
+      isFullScreen: () => false,
+      onFullScreen: (l: (full: boolean) => void) => {
+        listeners.push(l);
+        return () => listeners.splice(listeners.indexOf(l), 1);
+      },
+    };
+  });
+  await fresh(page);
+  await expect(docked(page)).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-dag-window", "inset");
+  const x = async (sel: string) => Math.round((await page.locator(sel).first().boundingBox())!.x);
+  const style = (sel: string, prop: string) =>
+    page
+      .locator(sel)
+      .first()
+      .evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
+
+  /* 16px of the bars' own padding plus the lights' 64: the toggle and its slot move together. */
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(80);
+  expect(await x("[data-dag-sidebar] .dag-sidebar-toggle-slot")).toBe(80);
+  /* Docked, the toolbar starts at the column's edge, far from the lights, and keeps its padding. */
+  await expect(page.locator(".dag-toolbar")).not.toHaveAttribute("data-dag-toolbar-edge");
+  expect(await style(".dag-toolbar", "padding-left")).toBe("16px");
+  /* The page's header is the page's top edge — no rule under it — and still 48px tall. */
+  expect(await style(".dag-toolbar", "border-bottom-width")).toBe("0px");
+  expect(Math.round((await page.locator(".dag-toolbar").boundingBox())!.height)).toBe(48);
+  /* The top row drags the window; the controls in it, and the toggle drawn over it, do not. */
+  expect(await style(".dag-toolbar", "app-region")).toBe("drag");
+  expect(await style(".dag-sidebar__head", "app-region")).toBe("drag");
+  expect(await style("[data-dag-sidebar-toggle]", "app-region")).toBe("no-drag");
+  expect(await style(".dag-toolbar__board", "app-region")).toBe("no-drag");
+
+  /* Away, the toolbar is at the window's edge and keeps the toggle's slot under the toggle. */
+  await page.keyboard.press("Control+Backslash");
+  await expect(sidebar(page)).toHaveCount(0);
+  await expect(page.locator(".dag-toolbar")).toHaveAttribute("data-dag-toolbar-edge", "");
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(80);
+  expect(await x(".dag-toolbar .dag-sidebar-toggle-slot")).toBe(80);
+
+  /* Full screen draws no lights, so the corner is the page's again. */
+  await page.evaluate(() => (window as unknown as { fullScreen: (full: boolean) => void }).fullScreen(true));
+  await expect(page.locator("html")).not.toHaveAttribute("data-dag-window");
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(16);
+  expect(await x(".dag-toolbar .dag-sidebar-toggle-slot")).toBe(16);
+  expect(await style(".dag-toolbar", "app-region")).not.toBe("drag");
+  await page.evaluate(() => (window as unknown as { fullScreen: (full: boolean) => void }).fullScreen(false));
+  await expect(page.locator("html")).toHaveAttribute("data-dag-window", "inset");
+  expect(await x("[data-dag-sidebar-toggle]")).toBe(80);
+});
+
 test("what is open is marked, and the folders above it are opened to show it", async ({ page }) => {
   await fresh(page);
   await expect(fileRow(page, board())).toHaveAttribute("aria-current", "page");

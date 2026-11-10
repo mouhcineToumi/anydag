@@ -148,7 +148,9 @@ export function Toolbar({
     });
 
   return (
-    <header className="dag-toolbar" data-dag-toolbar="">
+    /* `data-dag-toolbar-edge`: the bar is at the window's left edge, which is where the macOS desktop
+       app's traffic lights are (`--window-inset` in `chrome.css`). */
+    <header className="dag-toolbar" data-dag-toolbar="" data-dag-toolbar-edge={away ? "" : undefined}>
       {/* Where `Shell`'s toggle is drawn while the column is away. */}
       {sidebar && away ? <span className="dag-sidebar-toggle-slot" aria-hidden="true" /> : null}
       {/* The mark *and the name*, while the sidebar that otherwise carries them is away.
