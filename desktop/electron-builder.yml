@@ -105,12 +105,13 @@ nsis:
   # `AnyDag Setup 0.2.0.exe` by default: GitHub turns the spaces into dots on upload and
   # `latest.yml` would then name a file the release does not have.
   artifactName: ${productName}-Setup-${version}.${ext}
-# The update channel is not configured here, on purpose: electron-builder reads it off the version
-# (`detectUpdateChannel`, on by default) — `0.2.0` is `latest`, `0.2.0-beta.1` is `beta`,
-# `0.2.0-nightly.202611070230` is `nightly` — and names the files the updater reads after it
-# (`latest.yml`, `beta-linux.yml`, `nightly-mac.yml`…); the app reads the same word back off its own
-# version (`desktop/main.ts`). `desktop/package.mjs` checks the files really are the channel's, and
-# `scripts/check-release-assets.mjs` that a release holds them.
+# The update channel is not configured here: it is the version's pre-release word — `0.2.0` is
+# `latest`, `0.2.0-beta.1` is `beta`, `0.2.0-nightly.202611070230` is `nightly` — and it names the
+# files the updater reads (`latest.yml`, `beta-linux.yml`, `nightly-mac.yml`…); the app reads the same
+# word back off its own version (`desktop/main.ts`). electron-builder's `detectUpdateChannel` does
+# not apply to the `github` provider, so `desktop/package.mjs` passes `-c.publish.channel=<word>` for
+# a pre-release and checks the files really are the channel's; `scripts/check-release-assets.mjs`
+# checks that a release holds them.
 publish:
   provider: github
   owner: mouhcineToumi

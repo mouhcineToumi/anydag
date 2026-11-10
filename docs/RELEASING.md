@@ -151,8 +151,9 @@ refuses a nightly anyway — never runs for one.
 ## Update channels
 
 The channel is **the version's own pre-release word**, and nothing is configured for it.
-electron-builder names the update files after it and electron-updater reads the same word off the
-running version:
+`desktop/package.mjs` hands it to electron-builder (`-c.publish.channel`, which the `github` provider
+does not work out for itself), the update files are named after it, and electron-updater reads the
+same word off the running version:
 
 | The installed build | Is | Reads | Is offered |
 |---|---|---|---|
