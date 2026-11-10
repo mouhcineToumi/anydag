@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 
-import { NOTE_VAULT, TOOLS, ToolError, type Tool } from "./tools";
+import { listTools, NOTE_VAULT, TOOLS, ToolError, type Tool } from "./tools";
 
 /**
  * Never in a chat. Opening or making a vault reaches any folder the person can write to; a chat
@@ -163,9 +163,14 @@ const docTools = DOC_OPS.map(({ op, kinds, description }) => docTool(op, kinds, 
 const tail = `\n${NOTE_VAULT}`;
 const brief = (t: Tool): Tool => (t.description.endsWith(tail) ? { ...t, description: t.description.slice(0, -tail.length) } : t);
 
-/** The tools a chat is offered: every one but `NEVER_IN_CHAT` and the folded per-kind tools. */
-export function chatTools(): Tool[] {
+/** The tools a chat is offered: every one the `cloud` switch leaves (`listTools`), but `NEVER_IN_CHAT` and the folded per-kind tools. */
+export function chatTools(cloud: boolean): Tool[] {
   const allowed = (t: Tool) => !NEVER_IN_CHAT.has(t.name);
-  const base = [...docTools, ...TOOLS.filter((t) => !FOLDED.has(t.name)).map(brief)].filter(allowed);
+  const base = [
+    ...docTools,
+    ...listTools(cloud)
+      .filter((t) => !FOLDED.has(t.name))
+      .map(brief),
+  ].filter(allowed);
   return [...base, changeBlock, vaultRequest];
 }

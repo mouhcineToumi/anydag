@@ -15,10 +15,11 @@ sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and t
 |---|---|---|
 | Account | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
-| | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs* |
+| | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) — logs are all it holds, so a build without them has no tab |
 | | About | the build's `VERSION` and the server's |
 | *the vault's name* | Preferences | the theme, problems, pasted images, and the quiz threshold (the person's, and says so) |
 | | Vault | where it is, where its attachments go, whether a rename updates the `[[wikilinks]]` to it, the open board's unused images, and Close vault — never deleting the folder |
+| | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on, like Privacy |
 | | AI and agents | the prompt card's provider, model and thinking; how to reach this vault from the CLI and MCP |
 | | Import and export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 

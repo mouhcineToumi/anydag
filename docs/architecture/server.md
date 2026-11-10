@@ -60,6 +60,47 @@ dot-folders in every form (`?raw`, `%2E` and `/@fs`). The proxy still accepts on
 `cross-site` or `same-site`, before it attaches the token. `scripts/dev.sh` mints a token per run; `server.json` is
 where `scripts/session.mjs`, the CLI and the e2e suite read it.
 
+## Feature switches
+
+The features that talk to an AnyDag server somebody else runs — **sync, the anonymous logs, Send
+feedback, and any later thing that needs one (accounts, say)** — are behind one
+switch, `cloud`. The server decides it, and everything else asks the server: it is not a preference,
+there is no second copy of the answer in the page bundle, in `localStorage`, or anywhere else.
+
+| Where | Owns |
+|---|---|
+| `server/features.ts` | the read: the build default, the run-time override, the answer |
+| `src/features.ts` | the page's half: one `GET /api/health` at boot, `useFeatures()` for everything gated |
+| `server/routes/meta.ts` | `GET /api/health` now answers `features: { cloud }`, beside the version |
+
+The switch is read as follows, from one function (`cloudOn`):
+
+- **The build bakes it.** `server/build.mjs` and `cli/build.mjs` define `__ANYDAG_CLOUD__` from
+  `ANYDAG_CLOUD_BUILD=on|off`. **Off unless a build says on.** The release workflow never says on, so
+  no release carries the server-backed features; a checkout's own build (`npm run dev` via
+  `scripts/dev.sh`) runs on without baking anything, because the override says on.
+- **The run time overrides it.** `ANYDAG_CLOUD=on` (or `off`) beats the build in everything that
+  reads the environment in this process: the server's routes, the CLI's own answer and help table,
+  the test suite (which defaults to on — see `vitest.config.ts` and `scripts/checks.sh`).
+- **The page asks.** `/api/health` answers it; `/api/sync/*`, `/api/telemetry*`, `/api/feedback` and each
+  later route behind the switch are registered only when it is on, so off they are a plain 404. The sync
+  links start no loop; `Telemetry` (`server/telemetry.ts`) records nothing and never reads an
+  address baked in for logs; the MCP server — and a chat's tool list — leaves out `sync_status`, `sync_now` and `feedback` by asking the same `GET /api/health`
+  (`listTools` in `server/mcp/tools.ts`); the CLI's `sync` group and `telemetry` command answer with
+  one line — *Sync is not available in this build.* — and are out of `anydag --help` when the CLI's
+  own build says off.
+
+Nothing is deleted when the switch is off. A vault that was linked keeps its `key` and `pair.json`
+in the app's home, a consent answer keeps its place in `kv`, and turning the switch on
+(`ANYDAG_CLOUD=on` on any build) resumes them: the loop starts at the next vault open, the next
+page asks the question only if it was never answered. The gates live at the edges — route
+registration, the loop start, the tool list, the component mount — and are guards around code that
+stays built and tested.
+
+`docs/parity.json` marks the gated rows `{"flag": "cloud"}`; `docs/PARITY.md` draws them with a
+dagger. `skills/anydag/SKILL.md` says its sync and telemetry entries exist only when the switch is
+on, and `scripts/check-skill.mjs` tolerates those names in a table that is drawn without them.
+
 ## Vaults
 
 A **vault** is a folder — Obsidian's word and Obsidian's model. The sidebar's first row

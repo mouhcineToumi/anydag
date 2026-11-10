@@ -101,6 +101,7 @@ import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
 import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
+import { useFeatures } from "@/features";
 import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref } from "@/settings/prefs";
 
 /** Lucide at one size and weight, stated once — the dock's rule. */
@@ -525,6 +526,11 @@ export function Sidebar({
       })),
     [boards, notes, quizzes, tables, attachments, titles],
   );
+  /* What the server says this build may show — the sync row is a glance at a server that may not be
+     in it (`src/features.ts`). Mounted or not, never hidden once drawn: the hook under it asks for
+     the status, so its absence here is what keeps a build without the route from polling it. */
+  const features = useFeatures();
+  const cloud = features?.cloud === true;
   const store = useAttachmentsFolder();
   const all = useMemo(() => tree(entries, folders, store), [entries, folders, store]);
   /* How many listed tasks are not done — the count beside Tasks. */
@@ -1858,8 +1864,8 @@ export function Sidebar({
             <span>Trash</span>
           </button>
         ) : null}
-        <SyncRow onOpen={() => ask("settings", "sync")} />
-        <FeedbackRow onFeedback={() => ask("feedback")} />
+        {cloud ? <SyncRow onOpen={() => ask("settings", "sync")} /> : null}
+        {cloud ? <FeedbackRow onFeedback={() => ask("feedback")} /> : null}
         <SettingsRow onSettings={() => ask("settings")} sheet={sheet} />
       </div>
 

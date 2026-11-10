@@ -13,6 +13,12 @@ import { defineConfig } from "@playwright/test";
    second checkout has to be able to move the port. */
 const origin = `http://localhost:${Number(process.env.ANYDAG_PORT) || 3500}`;
 
+/* The build's `cloud` switch (`server/features.ts`) is on for the suite, as `scripts/dev.sh` has it
+   for the server: set here, before the workers fork, so a CLI a spec runs (`sync.spec.ts`'s
+   `anydag sync pair`) carries the same commands as the server it talks to. `cloud.spec.ts` says off
+   on its own page. */
+process.env.ANYDAG_CLOUD ??= "on";
+
 /* **A run on the host is told, once, that its screenshots are not compared** — they are the Docker
    image's (`npm run e2e:docker`: `mcr.microsoft.com/playwright:v<version>-noble`), and CI runs the
    same one. `scripts/e2e-local.sh` sets `ANYDAG_NO_SNAPSHOTS` itself; a run started by hand with a

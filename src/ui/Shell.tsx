@@ -65,6 +65,7 @@ import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
 import { usePanel } from "@/assistant/panelState";
+import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
@@ -311,6 +312,12 @@ export function Shell({
   /* What the last delete moved to the trash, which the notice offers to put back. A counter
      beside it, so a second delete is a second notice with its own time to read it. */
   const [trashed, setTrashed] = useState<{ gone: Gone[]; n: number } | null>(null);
+
+  /* What the server says this build may show of itself — sync, the logs question, Send feedback.
+     One answer at boot (`src/features.ts`); a build without it draws nothing of those, and here is
+     where the question's absence is decided once, not in the prompt's own component. */
+  const features = useFeatures();
+  const cloud = features?.cloud === true;
 
   const mode: "docked" | "overlay" | null = !narrow && docked ? "docked" : peeking || pinned ? "overlay" : null;
 
@@ -939,7 +946,7 @@ export function Shell({
           />
         ) : null}
         <LockNotice />
-        <TelemetryPrompt />
+        {cloud ? <TelemetryPrompt /> : null}
       </SidebarContext.Provider>
     </div>
   );

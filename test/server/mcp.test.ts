@@ -24,7 +24,7 @@ const PLAIN = "```md {#one}\nhi\n```\n";
 
 async function connect(readOnly = false, fetchImpl?: typeof fetch): Promise<Client> {
   const backend = inProcess(createApp({ session, token: "t", page: null, ...(fetchImpl ? { fetch: fetchImpl } : {}) }), "t");
-  const server = buildMcp(backend, { readOnly });
+  const server = await buildMcp(backend, { readOnly });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test", version: "0" });
   await Promise.all([server.connect(a), client.connect(b)]);

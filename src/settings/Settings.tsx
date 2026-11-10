@@ -12,10 +12,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
 import type { BoardTree } from "@/board/useBoard";
+import { useFeatures } from "@/features";
 import { ShortcutList } from "@/edit/Shortcuts";
 import { currentOf } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
@@ -29,7 +30,7 @@ import { PreferencesPane } from "./panes/Preferences";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
 import { VaultPane } from "./panes/Vault";
-import { GROUPS, TAB_LABEL, lastTab, rememberTab, stepTab, type SettingsTab } from "./tabs";
+import { GROUPS, CLOUD_TABS, TABS, TAB_LABEL, lastTab, rememberTab, stepTab, withoutCloudTabs, type SettingsTab } from "./tabs";
 
 const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   calendar: CalendarDays,
@@ -120,6 +121,13 @@ export function Settings({
   onClose(): void;
 }) {
   const [tab, setTabState] = useState<SettingsTab>(() => asked ?? lastTab());
+  /* What the server says this build may show (`src/features.ts`): Privacy (only the logs hold it)
+     and Sync are its tabs. A person reads no sign a server exists on a build without them — nor,
+     while the answer is on its way, which is why the unknown hides them too. */
+  const features = useFeatures();
+  const cloud = features?.cloud === true;
+  const groups = useMemo(() => withoutCloudTabs(GROUPS, cloud), [cloud]);
+  const walked = useMemo(() => groups.flatMap((g) => g.tabs), [groups]);
   /* The tab as of the last key, not the last render: focus follows a step a frame later, so a
      second arrow pressed inside that frame still lands on the old button, and must step from the
      new tab rather than from the button it landed on. */
@@ -128,6 +136,12 @@ export function Settings({
     current.current = t;
     setTabState(t);
   }, []);
+  /* A stored tab that is one of the gated ones moves to the first still drawn — once the server has
+     said off, not while its answer is on its way, so a Sync tab asked for at boot is not lost. */
+  const known = features !== null;
+  useEffect(() => {
+    if (known && !cloud && CLOUD_TABS.includes(tab)) setTab(TABS.find((t) => !CLOUD_TABS.includes(t)) ?? tab);
+  }, [known, cloud, tab, setTab]);
   /* On a narrow window, the list or one tab; on a wide one both are drawn and this changes nothing. */
   const [view, setView] = useState<"list" | "pane">(() => (asked || !narrow() ? "pane" : "list"));
   const vault = currentOf(useVaults());
@@ -152,7 +166,7 @@ export function Settings({
   const focusTab = (t: SettingsTab) => requestAnimationFrame(() => document.getElementById(tabId(t))?.focus());
 
   const onTabKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
-    const next = stepTab(current.current, e.key);
+    const next = stepTab(current.current, e.key, walked);
     if (!next) return;
     e.preventDefault();
     setTab(next);
@@ -217,7 +231,7 @@ export function Settings({
       >
         <nav className="dag-settings-modal__nav" aria-label="Settings">
           <h2 className="dag-settings-modal__title">Settings</h2>
-          {GROUPS.map((g) => {
+          {groups.map((g) => {
             const heading = `${id}-group-${g.group}`;
             return (
               <div key={g.group} className="dag-settings-modal__group">
@@ -294,7 +308,7 @@ export function Settings({
               <CalendarPane />
             ) : tab === "shortcuts" ? (
               <ShortcutList />
-            ) : tab === "privacy" ? (
+            ) : tab === "privacy" && cloud ? (
               <PrivacyPane />
             ) : tab === "about" ? (
               <AboutPane
@@ -307,7 +321,7 @@ export function Settings({
               <PreferencesPane themes={themes} themeName={themeName} onTheme={onTheme} />
             ) : tab === "vault" ? (
               <VaultPane boardName={boardName} />
-            ) : tab === "sync" ? (
+            ) : tab === "sync" && cloud ? (
               <SyncPane />
             ) : tab === "agents" ? (
               <AgentsPane />

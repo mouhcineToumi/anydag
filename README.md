@@ -103,8 +103,7 @@ missed until you get them right.
 
 - **Everything is a plain file** in a folder you choose: notes are Markdown, and so are boards,
   quizzes and tables. Back it up, put it in git, open it in another editor, or leave and keep it all.
-- **Nothing leaves your computer** unless you ask. There is no account and no cloud. The optional
-  sync runs on a server you host, and it is end-to-end encrypted.
+- **Nothing leaves your computer** unless you ask. There is no account and no cloud.
 - **Nothing is lost by accident.** Deleted files wait thirty days in the trash, and a read-only lock
   stops stray edits.
 
@@ -135,7 +134,7 @@ The [guide](docs/guide/README.md) has one page per topic:
 | Reading lists, trackers, CSV | [Tables](docs/guide/tables.md) |
 | To-dos, projects, events | [Tasks, projects and the calendar](docs/guide/tasks-and-calendar.md) |
 | The Assistant, prompt cards, AI agents and the `anydag` command | [AI and agents](docs/guide/ai.md) |
-| Your files, the trash, the lock, sync, anonymous logs | [Your files, sync and privacy](docs/guide/files-and-sync.md) |
+| Your files, the trash, the lock | [Your files](docs/guide/files.md) |
 
 ## For developers
 

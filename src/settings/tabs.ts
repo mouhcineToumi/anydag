@@ -27,6 +27,24 @@ export const GROUPS: readonly { group: SettingsGroup; tabs: readonly SettingsTab
 
 export const TABS: readonly SettingsTab[] = GROUPS.flatMap((g) => g.tabs);
 
+/**
+ * The tabs that describe the app's server-backed features, and are drawn only when the build's
+ * `cloud` switch is on (`server/features.ts`): the logs (Privacy's only content) and sync. Off,
+ * a person reads no sign that a server exists — these two are what would have told them.
+ */
+export const CLOUD_TABS: readonly SettingsTab[] = ["privacy", "sync"];
+
+/** The group's tabs, with the switch's out when it is off. */
+export function withoutCloudTabs(
+  groups: readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[],
+  cloud: boolean,
+): readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[] {
+  if (cloud) return groups;
+  return groups
+    .map((g) => ({ group: g.group, tabs: g.tabs.filter((t) => !CLOUD_TABS.includes(t)) }))
+    .filter((g) => g.tabs.length > 0);
+}
+
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   calendar: "Calendar",
   shortcuts: "Shortcuts",
@@ -64,19 +82,20 @@ export function rememberTab(tab: SettingsTab): void {
 
 /**
  * Where a key moves the selection in the tab list — the WAI vertical tablist: up and down step and
- * wrap, Home and End go to either end, and anything else is not the list's.
+ * wrap, Home and End go to either end, and anything else is not the list's. The list is the one this
+ * modal drew: with the `cloud` switch off its gated tabs are out of it, and so out of the walk.
  */
-export function stepTab(from: SettingsTab, key: string): SettingsTab | null {
-  const i = TABS.indexOf(from);
+export function stepTab(from: SettingsTab, key: string, tabs: readonly SettingsTab[] = TABS): SettingsTab | null {
+  const i = tabs.indexOf(from);
   switch (key) {
     case "ArrowDown":
-      return TABS[(i + 1) % TABS.length]!;
+      return tabs[(i + 1) % tabs.length]!;
     case "ArrowUp":
-      return TABS[(i - 1 + TABS.length) % TABS.length]!;
+      return tabs[(i - 1 + tabs.length) % tabs.length]!;
     case "Home":
-      return TABS[0]!;
+      return tabs[0]!;
     case "End":
-      return TABS[TABS.length - 1]!;
+      return tabs[tabs.length - 1]!;
     default:
       return null;
   }

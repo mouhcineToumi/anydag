@@ -32,6 +32,9 @@ export function defines(env = process.env) {
     __ANYDAG_VERSION__: JSON.stringify(version()),
     __ANYDAG_LOGS_URL__: JSON.stringify(env.ANYDAG_LOGS_BUILD_URL ?? ""),
     __ANYDAG_FEEDBACK_URL__: JSON.stringify(env.ANYDAG_FEEDBACK_BUILD_URL ?? ""),
+    /* `ANYDAG_CLOUD_BUILD=on` is the switch for every server-backed feature (`server/features.ts`):
+       off unless a build says on, and no release does. */
+    __ANYDAG_CLOUD__: JSON.stringify(env.ANYDAG_CLOUD_BUILD === "on" ? "on" : ""),
   };
 }
 
@@ -55,7 +58,8 @@ export async function build() {
     outExtension: { ".js": ".mjs" },
     banner: { js: "import{createRequire as __acr}from'node:module';const require=__acr(import.meta.url);" },
     external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
-    /* Where logs and feedback go when nothing at run time says (#99). */
+    /* Where logs and feedback go when nothing at run time says (#99), and the `cloud` switch
+       (`server/features.ts`, #103). */
     define: defines(),
     logLevel: "warning",
   });

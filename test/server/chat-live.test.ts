@@ -631,7 +631,7 @@ describe("sessions", () => {
 
 describe("the chat's MCP tools", () => {
   it("offers every tool but the never ones, and never the per-kind tools a doc_* stands for", () => {
-    const tools = chatTools().map((t) => t.name);
+    const tools = chatTools(true).map((t) => t.name);
     expect(tools).toEqual(
       expect.arrayContaining(["change_block", "vault_request", "doc_create", "doc_read", "doc_write", "board_patch"]),
     );
@@ -641,7 +641,7 @@ describe("the chat's MCP tools", () => {
   });
 
   it("hands a doc_* call to the kind's own tool, held to that tool's arguments", async () => {
-    const read = chatTools().find((t) => t.name === "doc_read")!;
+    const read = chatTools(true).find((t) => t.name === "doc_read")!;
     const calls: unknown[] = [];
     const kit = {
       readOnly: true,
@@ -668,9 +668,12 @@ describe("the chat's MCP tools", () => {
 describe("the chat's MCP server", () => {
   it("reaches the app with the chat's header, so the guard holds it to the turn", async () => {
     const chat = await newChat();
-    const server = buildMcp(remote(port, TOKEN, { "x-anydag-chat": chat.id }), {
+    /* `cloud` is said: with no turn running the guard refuses even the server's own /api/health,
+       which the MCP server would read as off (it offers less, never more). */
+    const server = await buildMcp(remote(port, TOKEN, { "x-anydag-chat": chat.id }), {
       readOnly: false,
       chat: { id: chat.id, home: env.vault.id },
+      cloud: true,
     });
     const [a, b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test", version: "0" });
@@ -678,7 +681,7 @@ describe("the chat's MCP server", () => {
     try {
       const names = (await client.listTools()).tools.map((t) => t.name).sort();
       expect(names).toEqual(
-        chatTools()
+        chatTools(true)
           .map((t) => t.name)
           .sort(),
       );

@@ -152,6 +152,11 @@ describe("check", () => {
     };
     expect(check(both, real)).toEqual([]);
   });
+
+  it("names the build switches a feature can be behind, and nothing else", () => {
+    expect(check(small({ flag: "cloud" }), real)).toEqual([]);
+    expect(check(small({ flag: "beta" }), real)).toEqual([expect.stringMatching(/has `beta` as its flag/)]);
+  });
 });
 
 describe("render", () => {
@@ -176,5 +181,17 @@ describe("render", () => {
     expect(md).toContain("| First | `GET /a` | `a` | ✗ [1] |");
     expect(md).toContain("| Second | `GET /b` | ✗ [1] | ↳ `x` [2] |");
     expect(md).toContain("1. the same reason, twice over\n2. something else entirely\n");
+  });
+
+  it("marks the features behind a build switch, and says what the mark means", () => {
+    const md = render({
+      features: [
+        { id: "a", area: "One", what: "First", rest: ["GET /a"], cli: ["a"], mcp: ["a"], flag: "cloud" },
+        { id: "b", area: "One", what: "Second", rest: ["GET /b"], cli: ["b"], mcp: ["b"] },
+      ],
+    });
+    expect(md).toContain("| First † | `GET /a` | `a` | `a` |");
+    expect(md).toContain("| Second | `GET /b` | `b` | `b` |");
+    expect(md).toContain("`cloud`");
   });
 });

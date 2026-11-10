@@ -12,7 +12,7 @@ need.
 | [Tables](tables.md) | reading lists, trackers and small databases: typed columns, sorting, filtering, CSV |
 | [Tasks, projects and the calendar](tasks-and-calendar.md) | to-dos with due dates, projects, events, and the calendar that shows them |
 | [AI and agents](ai.md) | the Assistant, prompt cards, and letting an AI agent work in your folder |
-| [Your files, sync and privacy](files-and-sync.md) | what is on your disk, the trash, the read-only lock, end-to-end encrypted sync, anonymous logs |
+| [Your files](files.md) | what is on your disk, the trash, the read-only lock |
 
 These pages are for people using the app. If you want to change its code, read
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md) and the architecture notes in

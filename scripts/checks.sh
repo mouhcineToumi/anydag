@@ -22,6 +22,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The build's feature switch (`server/features.ts`): the suite runs on, so the routes, the tools and
+# the commands it holds are the ones it gates. A test that wants them off passes its own environment
+# (`server/features.ts` reads the override each call); `ANYDAG_CLOUD=off` here happens too.
+export ANYDAG_CLOUD="${ANYDAG_CLOUD:-on}"
+
 # Named steps rather than `set -x`, because the CI job that used to list these as seven separate
 # steps could say which one went red from the step name alone, and running them as one script must
 # not cost that.

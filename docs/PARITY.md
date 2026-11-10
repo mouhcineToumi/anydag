@@ -7,7 +7,10 @@ through each of the three ways in: a route the page calls, an `anydag` command, 
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
 exports, and everything finer is the page's and MCP's, whose columns are complete. The reason for every ↳
-and ✗ is numbered under the tables.
+and ✗ is numbered under the tables. A feature marked with a dagger (†) is behind a build switch
+(`docs/parity.json`'s `flag`, the switch of `server/features.ts`): it is in the code and tested, and a
+build may say the switch off — then these are not registered at all, and everything they are listed by
+above must say so. The one switch today is `cloud`, and no release build says it on.
 
 ## Account
 
@@ -16,9 +19,9 @@ and ✗ is numbered under the tables.
 | The time zone times are read and written in (and the app's one local "account") | `GET /api/auth/me` | · | `whoami` |
 | What is answering: its version, the vault it serves, and whether it is the app or this process | `GET /api/health` | `whoami` | `whoami` |
 | The app's preferences — how the window is laid out | `GET /api/settings` `PUT /api/settings` | `settings` | `settings` |
-| Whether this install sends anonymous logs, and where they go — off until the person says yes | `GET /api/telemetry` `PUT /api/telemetry` | `telemetry` | ✗ [1] |
-| The page's own log events — errors, the features used, how fast a page drew | `POST /api/telemetry/events` | ✗ [2] | ✗ [3] |
-| Send a bug or an idea to the maintainers, with files and the text of chosen boards and notes — a public GitHub issue, through the relay; only when the person sends it or asks for it | `GET /api/feedback` `POST /api/feedback` | · | `feedback` |
+| Whether this install sends anonymous logs, and where they go — off until the person says yes † | `GET /api/telemetry` `PUT /api/telemetry` | `telemetry` | ✗ [1] |
+| The page's own log events — errors, the features used, how fast a page drew † | `POST /api/telemetry/events` | ✗ [2] | ✗ [3] |
+| Send a bug or an idea to the maintainers, with files and the text of chosen boards and notes — a public GitHub issue, through the relay; only when the person sends it or asks for it † | `GET /api/feedback` `POST /api/feedback` | · | `feedback` |
 
 ## Vaults
 
@@ -152,14 +155,14 @@ and ✗ is numbered under the tables.
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Whether a vault syncs to a sync server, and how it is going | `GET /api/sync` | `sync status` | `sync_status` |
-| Pair a vault with a sync server, with a one-time code | `POST /api/sync/pair` | `sync pair` | ✗ [12] |
-| The remote vaults the paired account holds | `GET /api/sync/remotes` | `sync remotes` | ✗ [13] |
-| Link a vault: upload it as a new remote, download a remote into an empty vault, or merge the two | `POST /api/sync/link` | `sync link` | ✗ [12] |
-| Stop syncing a vault, keeping its files and the remote | `POST /api/sync/unlink` | `sync unlink` | ✗ [14] |
-| Pull and push now | `POST /api/sync/now` | `sync now` | `sync_now` |
-| The devices paired into the sync account | `GET /api/sync/devices` | `sync devices` | ✗ [15] |
-| Sign a device out of the sync account | `POST /api/sync/devices/revoke` | `sync devices revoke` | ✗ [16] |
+| Whether a vault syncs to a sync server, and how it is going † | `GET /api/sync` | `sync status` | `sync_status` |
+| Pair a vault with a sync server, with a one-time code † | `POST /api/sync/pair` | `sync pair` | ✗ [12] |
+| The remote vaults the paired account holds † | `GET /api/sync/remotes` | `sync remotes` | ✗ [13] |
+| Link a vault: upload it as a new remote, download a remote into an empty vault, or merge the two † | `POST /api/sync/link` | `sync link` | ✗ [12] |
+| Stop syncing a vault, keeping its files and the remote † | `POST /api/sync/unlink` | `sync unlink` | ✗ [14] |
+| Pull and push now † | `POST /api/sync/now` | `sync now` | `sync_now` |
+| The devices paired into the sync account † | `GET /api/sync/devices` | `sync devices` | ✗ [15] |
+| Sign a device out of the sync account † | `POST /api/sync/devices/revoke` | `sync devices revoke` | ✗ [16] |
 
 ## Inside a board
 
