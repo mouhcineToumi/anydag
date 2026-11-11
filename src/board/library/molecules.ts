@@ -135,7 +135,9 @@ export const MOLECULES: Blueprint[] = [
      * mentioned. So "add an alt fragment" quietly added its messages between two strangers, and a
      * second drop reused the same two, because `x1` itself never appeared in the text for the
      * allocator to see. A fragment says something *about the conversation already there*, so it
-     * names the participants a sequence starts with and the author retypes them.
+     * names the participants a sequence starts with, and the author changes them — a picked
+     * message's From and To, or the source. A fragment round messages already drawn is the
+     * selection bar's Wrap in, which needs no part at all.
      */
     id: "part-sequence-alt",
     layer: 1,

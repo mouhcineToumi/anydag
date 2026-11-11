@@ -1,6 +1,7 @@
 import { declaredAt } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import { renameIds } from "@/dsl/rebind";
+import { seqLineOf } from "@/dsl/sequence";
 import { edgeSpan, statementSpan, topicMoves } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
 
@@ -39,6 +40,11 @@ export interface PickedEdge {
   line: number;
   /** Which arrow along a chain, 0-based. */
   seg: number;
+  /**
+   * The other end of a run, in a sequence: shift-click on a second message picks every message
+   * between the two, which is what Wrap in wraps. Absent for one edge, which is every other dialect.
+   */
+  to?: string;
 }
 
 /**
@@ -73,6 +79,11 @@ export function edgeAt(
   dir: "LR" | "TB" | undefined,
   id: string,
 ): { line: number; seg: number } | null {
+  /* A message is one arrow on one line, and its id is counted rather than parsed — see `seqParts`. */
+  if (type === "sequence") {
+    const line = seqLineOf(body, id);
+    return line === null ? null : { line, seg: 0 };
+  }
   const graph = hasGraph(type) ? parseDiagram(type, body, dir) : null;
   const edge = graph?.edges.find((e) => e.id === id);
   if (!graph || !edge) return null;

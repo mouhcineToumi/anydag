@@ -18,7 +18,7 @@ where the pointer let go, which is the same honesty `resizeOf`'s `aspect` alread
 | `arch` `erd` `state` `class` `usecase` `c4` | onto a card → before or after it, in *its* container · onto a boundary → into it, at its end · onto the frame's padding → out, after the last top-level declaration | `moveStatement` |
 | `flow` `activity` | the same, and a band is a container: onto another lane → into that `lane { }` | `moveStatement` |
 | `mindmap` | onto another topic → re-indented under it, with its subtree | `moveTopic` |
-| `sequence` | a participant header across its neighbour → its `participant` line moves | `moveStatement` |
+| `sequence` | a participant header across its neighbour → its `participant` line moves · a drag between two lifelines → a new message, after the row above the drop | `moveStatement` · `insertStatement` |
 | `chart` | a series or slice across its neighbour → its line moves, which is the order of the bars, the wedges and the legend | `moveStatement` |
 | `timeline` | sideways → a new start date, snapped to a day, the range keeping its length | `redate` |
 | `sketch`, any `layout=fixed` fence | anywhere → `x=`/`y=`, snapped to `metric.grid` | `setGeometry` |

@@ -80,6 +80,14 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | a drag on a picked card, onto a boundary, a band, a sibling or the frame | that statement moved — between brace blocks, into a `lane { }`, past its neighbour, out to the top level |
 | the same drag on a `mindmap` topic · a `timeline` entry · a fixed fence | the topic re-indented under the one it landed on · the entry's date · `x=`/`y=` on that line |
 | a drag on a picked `series` or `slice` | its statement past its neighbour — which is the order of the bars, the wedges and the legend |
+| in a selected `sequence`, a drag from one lifeline to another | `a ->> b : "message"` after the row drawn above where it was let go, picked, with its label open |
+| a click on a sequence message, shift for a run · Delete | the pick, or the run of messages from the first to this one · their lines gone |
+| a picked message's panel: Text, From, To, Arrow, Activates, Ends, Up, Down, Note | that message's line — its label, its ends, `->>` `-->>` `-)` `->`, the `+` / `-` on its target · the line one row along the drawing · a `note over` under it |
+| the selection bar's Wrap in ▾ on a picked message or run | `alt` / `opt` / `loop` / `par` before them, `end` after, and everything between one level deeper |
+| a click on a fragment's tab · its panel's conditions, + else / + and branch, the bin, Unwrap · Delete | the pick · each branch's condition, a new `else` or `and` before `end`, a branch and what is in it, the frame gone and the messages kept · the fragment and everything in it |
+| a double-click on a fragment's tab or a message's label | that branch's condition, or that message's text |
+| a click on a note's tab · its panel's Text and Over | the pick · its words, and the participants it is drawn over |
+| the item view's Add a participant | `participant participant2 "Participant"` after the last one (a participant's Kind is the menu in the row above that names one) |
 | alt + that drag | nothing to the body: the whole diagram moves, as any item does |
 | the properties view's Keep in column · Release | `col=` on the pick's line, or off it |
 | the item view's hue, and Hidden and Id under Advanced | `hue=` on an `md`, a note or an image, `hidden`, and `#id` plus every `edges` reference to it (through `/put`) |
@@ -271,7 +279,9 @@ it is what they are working on in either — and the item's only in Properties, 
   `E_UNKNOWN_KIND` suggests from. Two lists would be two chances to offer a word the parser rejects.
   It is empty for `mindmap`, `timeline`, `gitgraph`, `sequence` and `chart`, whose parsers are their
   own and have no kind word to choose — `series` and `slice` are the statement, not a menu — and the
-  control is left out rather than shown empty.
+  control is left out rather than shown empty. A sequence participant is the exception with a menu
+  of its own, `PARTICIPANT_KINDS`, because its grammar *does* have a kind — see *Sequence messages
+  and fragments*.
 - **A row is edited as a line**, and `rowLines()` is the inverse of `addRow`. A `Row` is what the
   dialect's row grammar made of one — a name, a detail, some tags, an `fk=` — and rebuilding a line
   from that would be the reserialisation `restate.ts` exists to avoid. The line is also the one form
@@ -658,3 +668,67 @@ It reaches the drawing as `data-dag-em` on the title span, and one attribute-sel
 **end** of `nodes.css` covers all eleven title elements. Last in the file on purpose: it shares its
 specificity with every `font-weight: 600` a title class above it sets, and between equals the
 cascade is all there is — higher up, a bold entity name would have lost to `.dag-entity__name`.
+
+### Sequence messages and fragments
+
+A sequence diagram's content is its messages, and until #135 only a participant could be picked:
+a message, a fragment, a note and `activate` were reachable only by typing. They have controls now,
+and a sequence can be built from an empty body without the Source tab. The writers are
+`src/dsl/sequence-write.ts`; what the pointer means is `src/edit/message.ts`, with no pointer in it.
+
+- **A message is drawn, not grown.** `growable()` still excludes `sequence` — a `+` on a participant
+  would put a message between two people on the strength of a click — so a message is a drag from
+  one lifeline to another in a diagram that is already selected (a press on a lifeline of one that
+  is not selects and moves it, as a press anywhere on it does). The sender is the lifeline it
+  started on, the receiver the one nearest where it let go (its own is a message to itself), and the
+  **height** is where the statement goes: after the last row drawn above that point. That is honest
+  in this dialect and nowhere else, because the layout walks the events once, top to bottom, so the
+  drawing order *is* the file's order. The rows — every message, note, fragment head, `else`/`and`
+  and `end`, each with its `y` — are published as `data-dag-layout` (`SeqPlaced.rows`), the channel
+  every other diagram publishes its boxes on; a row that opens a block puts the statement inside
+  it. The new message lands picked with its label open, as the `+` hands over a card.
+- **A pick id is counted, not named.** `msg:3` is the fourth message the file says, `frag:1` the
+  second fragment it opens, `note:0` the first note (`seqParts`), and the layout counts the same
+  walk. An ordinal rather than a line because a line moves with every edit above it and the count
+  only when one is added before it; the colon because it is punctuation to the tokenizer, so no
+  participant id can collide with one. `declaredAt`, `declaredOn` and `edgeAt` answer them, so the
+  caret in Source picks a message, a fragment or a note as it picks a participant.
+- **A message is an edge pick, a fragment and a note are node picks.** A message is drawn by
+  `Edges` and takes the same hit stroke and ring a diagram's edge does; a fragment's or a note's tab
+  carries `data-dag-frag` and `data-dag-branch`, which `Item`'s `nodeUnder` returns as the thing
+  under a press and `nameableUnder` as the thing to rename — the branch says which condition. The
+  panel dispatches on the id: `MessageProps`, `FragmentProps`, `NoteProps` in `Props.tsx`.
+- **Shift picks a run.** `PickedEdge.to` is the far end, and the run is every message between the
+  two in the count — consecutive by construction. **Wrap in ▾** on the selection bar is offered only
+  when the run's first and last message share one list (the top level, or one branch), because a run
+  that starts inside an `else` and ends after its `end` would have to cut the fragment in half; it
+  writes the head before, `end` after and indents what is between, then picks the new fragment.
+- **Up and Down move a message one row along the drawing**, through `moveRow`: up past an `alt`'s
+  head takes it out of the fragment, down past an `else` puts it into the next branch, up from under
+  an `end` puts it into the last branch. The pick follows it, because passing another message
+  changes its place in the count.
+- **The busy bar is Mermaid's `+` and `-`**, written on the target: `a ->> +b` starts `b`'s bar and
+  `b -->> -a` ends `b`'s. The parser read only the trailing form (`a ->> b +`) and the documented
+  Mermaid spelling was an error, so that was fixed with it. Explicit `activate`/`deactivate` lines
+  still parse and draw; the panel offers the mark on the message, which is one control rather than
+  two lines to keep in step.
+- **A hand-off is two lines, because Mermaid cannot say `+` and `-` on one** (#135). A message that
+  starts the receiver's bar *and* ends the sender's is written `web ->> +api : "x"` followed by
+  `deactivate web`, both valid Mermaid; the old one-line `a ->> +b - : "x"` is still read. The panel
+  shows the pair as one message with both boxes ticked. The rule is `pairedDeactivate`: a
+  `deactivate <sender>` directly after a message that has no `-` of its own *is* that message's
+  `-`. So `messageParts` reads it, unticking either box removes exactly its part (the `+`, or the
+  line — touching the old one-line form rewrites it as two), changing the sender renames the line,
+  and everything that moves or cuts by line carries it: `moveRow`, `removeMessage` (what Delete
+  calls), `wrapIn`, and `placeIn` (a statement dropped "after" the message goes after the pair, never
+  between). `Ends` alone stays one line, `b -->> -a`, which is valid Mermaid. These writers are
+  body-level (`setMessageMark(body, line, …)`, `setMessageEnd(body, line, …)`) for that reason.
+- **A participant has no status and no flags.** Its line is two strings, `icon=`, `hue=` and
+  `kind=`, and a bare word after them starts the next statement — so those controls would break the
+  diagram they were used on. It has the Kind menu its grammar has instead — `participantKind` and
+  `setParticipantKind` in `restate.ts`, over `kind=` (off when it says what `participant` or `actor`
+  already draws).
+- **Unwrap keeps the messages, Delete does not.** Delete on a picked fragment takes it with
+  everything in it, the rule a group's Delete follows; Unwrap is the separate button for "take the
+  frame away", for the reason the paragraph on deleting a picked group gives under *Controls on
+  the canvas*.

@@ -36,8 +36,10 @@ import { frameShift, type LaidBox, type LaidOut } from "./build";
  *   thing dragged across its neighbour reorders that list. A sequence's columns are its participant
  *   list; a chart's legend, its bars within a group and its wedges around the circle are all the
  *   declaration order of its `series`/`slice` lines, and nothing else about where a bar sits is a
- *   thing the file can say. A *message* cannot be dragged at all, and not by a rule written here:
- *   only a participant header carries `data-dag-node`, so a message can never be picked.
+ *   thing the file can say. A *message* is not dragged, and not by a rule written here: it is
+ *   picked through its hit stroke as an edge is, and only a participant header carries
+ *   `data-dag-node`, which is what a drag starts from. A message moves a row at a time from its
+ *   panel (`moveRow`), and a new one is drawn between two lifelines (`message.ts`).
  * - `none` — `gitgraph`: a column is a commit and a lane is a branch, both ordinal and both the
  *   file's. There is no drop that means anything, so the drag is refused with a cursor rather than
  *   quietly writing something else.
