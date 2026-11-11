@@ -1151,7 +1151,7 @@ function PickProps({
           />
           <TimelineStatus value={status === "done" || status === "wait" ? status : ""} onSet={(v) => write(setStatus(src, v))} />
         </>
-      ) : controls.status === "all" ? (
+      ) : controls.status === "all" && !bare ? (
         <div className="dag-props__row">
           <select
             className="dag-select dag-props__status"
