@@ -416,8 +416,13 @@ connect handle, `+` and the library atom need. Both spellings draw the same dot 
 title (`parseNode` leaves it empty, as for a figure), so the panel hides the text, colour, icon, status
 and flag controls on one. `grow(…, { pseudo })` writes one off a picked card — a start state pointing at
 it, an end state pointed at, whichever handle asked — and a `+` from a start or end state grows a real
-card, never a second dot. A legacy `[*]` is still not pickable as its own statement (its "declaration"
-is the edge line), so it has no Wrap and no Delete of its own; removing one is deleting its edge.
+card, never a second dot. A legacy `[*]` has no statement of its own (its "declaration" is the edge
+line), so it has no Wrap and no Delete of its own; removing one is deleting its edge. Picked, its
+panel offers one thing instead of controls that would write into the edge: **Make it a start
+state** (or an end state, #145). `convertPseudo` in `build.ts` declares `start start2` above the line
+and puts `start2` where that one `[*]` was — the n-th pseudostate on a line is the n-th `[*]` outside
+quotes, the order `finalize` makes them in — and leaves every other `[*]` as written. The pick follows
+it to the new id. Names claimed: `data-dag-legacy-pseudo`, `data-dag-prop-convert-pseudo`.
 
 **A mindmap grows by indentation, so its `+` writes a line and no edge.** `grow()` returns `null` for
 one — there is no kind word to copy and `a --> b` in a mindmap body is a topic with that for its

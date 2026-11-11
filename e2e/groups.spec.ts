@@ -374,6 +374,27 @@ test("the panel grows a start state in front of a card and an end state behind i
   await expect(page.locator("[data-dag-error]")).toHaveCount(0);
 });
 
+test("a legacy [*] is offered a name, and with one it is a start state like any other", async ({ page }) => {
+  fs.writeFileSync(
+    file,
+    `${BOARD}\n\`\`\`state {#old x=1280 y=0}\nstate open "Open"\nstate shut "Shut"\n\n[*] --> open\nopen --> shut\nshut --> [*]\n\`\`\`\n`,
+  );
+  await open(page);
+  const dot = '[data-dag-item="old"] [data-dag-node^="__start-"]';
+  await pick(page, dot);
+  await page.keyboard.press("Enter");
+  /* No controls that would write into the edge's line: only the explanation and the one button. */
+  await expect(page.locator("[data-dag-legacy-pseudo]")).toHaveAttribute("data-dag-legacy-pseudo", "start");
+  await expect(page.locator("[data-dag-prop-kind]")).toHaveCount(0);
+  await page.locator('[data-dag-prop-convert-pseudo="start"]').click();
+  await expect
+    .poll(() => bodyOf("old"), { timeout: 5_000 })
+    .toBe('state open "Open"\nstate shut "Shut"\n\nstart start2\nstart2 --> open\nopen --> shut\nshut --> [*]\n');
+  /* The pick follows it: the start state now has an id, and the panel is the start state's own. */
+  await expect(page.locator('[data-dag-item="old"] [data-dag-node="start2"][data-dag-picked]')).toHaveCount(1);
+  await expect(page.locator("[data-dag-legacy-pseudo]")).toHaveCount(0);
+});
+
 test("a start state has no title, colour or status to set — and a plus from it grows a real state", async ({ page }) => {
   fs.writeFileSync(file, `\`\`\`state {#life x=0 y=0}\nstart s0\nstate a "A"\n\ns0 --> a\n\`\`\`\n`);
   await open(page);

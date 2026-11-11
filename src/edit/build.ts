@@ -90,6 +90,73 @@ export interface GrowOpts {
   pseudo?: Pseudo;
 }
 
+/** A legacy pseudostate: the `[*]` the parser made `__start-N` or `__end-N` of. */
+export const LEGACY_PSEUDO = /^__(start|end)-(\d+)$/;
+
+/**
+ * A legacy `[*]` given a name of its own: `start start2` declared above the line it is written on,
+ * and that one `[*]` replaced by `start2` (#145).
+ *
+ * A `[*]` is a pseudostate with no statement — each occurrence is its own, made by `finalize` on the
+ * edge's line — so nothing can be linked to it, wrapped, moved or deleted on its own: the panel had
+ * nothing to offer one but the edge's line, which is not its. A declared `start`/`end` draws the same
+ * dot and ring and is a card like any other. Which `[*]` on the line is the one picked is counted the
+ * way `finalize` counts: edge by edge, source before target, so the n-th pseudostate on a line is the
+ * n-th `[*]` in its words (quoted text is skipped). The rest of the line, and every other `[*]`, is
+ * left as it was written.
+ *
+ * `null` for anything that is not a legacy pseudostate here, or when the result would not parse as
+ * cleanly as the body did.
+ */
+export function convertPseudo(
+  item: Pick<BoardItem, "type" | "body" | "dir">,
+  pseudo: string,
+): { body: string; id: string } | null {
+  const m = LEGACY_PSEUDO.exec(pseudo);
+  if (!m || !hasPseudo(item.type)) return null;
+  const kind = m[1] as Pseudo;
+  const before = parseDiagram(item.type, item.body, item.dir);
+  if (!before) return null;
+  const node = before.nodes.find((n) => n.id === pseudo);
+  if (!node) return null;
+  const order = (id: string) => Number(LEGACY_PSEUDO.exec(id)?.[2] ?? -1);
+  const nth = before.nodes
+    .filter((n) => n.line === node.line && LEGACY_PSEUDO.test(n.id))
+    .sort((a, b) => order(a.id) - order(b.id))
+    .findIndex((n) => n.id === pseudo);
+  const lines = item.body.split("\n");
+  const src = lines[node.line - 1];
+  if (src === undefined || nth < 0) return null;
+  const at = nthStar(src, nth);
+  if (at < 0) return null;
+  const id = freshNodeId(item.body, kind);
+  const next = `${src.slice(0, at)}${id}${src.slice(at + 3)}`;
+  const out = [...lines.slice(0, node.line - 1), `${indentOf(src)}${kind} ${id}`, next, ...lines.slice(node.line)].join("\n");
+  const errors = (g: Graph) => g.diagnostics.filter((d) => d.severity === "error").length;
+  const after = parseDiagram(item.type, out, item.dir);
+  if (!after || errors(after) > errors(before) || !after.nodes.some((n) => n.id === id && n.kind === kind)) return null;
+  return { body: out, id };
+}
+
+/** Where the n-th `[*]` outside a quoted string starts, or -1. */
+function nthStar(line: string, n: number): number {
+  let seen = 0;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === "\\" && quoted) {
+      i++;
+      continue;
+    }
+    if (c === '"') quoted = !quoted;
+    else if (!quoted && line.startsWith("[*]", i)) {
+      if (seen++ === n) return i;
+      i += 2;
+    }
+  }
+  return -1;
+}
+
 /**
  * A second card beside the picked one, and the edge between them.
  *
