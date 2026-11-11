@@ -53,7 +53,12 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | the properties view's kind, title, swatches, **B** / **I**, meta, description, flags, status and icon | that one line of the pick's statement, through `src/dsl/restate.ts` — the colour and the emphasis first, which is what somebody reaching into a card came for |
 | the same controls on an item that is one bare node | that node's line, not the fence: a frame has no fill, no kind and no icon to wear |
 | the item view's Advanced disclosure | page, title, subtitle, direction, header, hidden, id, Detach / Re-layout — shut until asked for, and shut again on the next item |
-| its rows list: an edit, a remove, "add a row" | `setRow` / `removeRow` / `addRow` on one line of the pick's `{ }` block |
+| its rows list: an edit, a remove, "add a row" | `setRow` / `removeRow` / `addRow` on one line of the pick's `{ }` block — or, for the rows of a one-line block, on the nth `;`-separated row of the statement's own line |
+| the properties view's Width, on a picked card in an automatic layout | `w=` on that card's line, or off it when the box is emptied — the one size ELK still takes from the author |
+| the properties view's Width and Height, on a picked shape, group or frame in a `sketch` or a `layout=fixed` fence | `w=` / `h=` on that statement — each shape and each container on its own, where the eight handles only scale the whole drawing |
+| the properties view's Direction on a picked group | `dir=LR` / `dir=TB` on the group's line, or off it to follow the diagram |
+| the properties view's Kind on a card carrying `kind=`, and on a sequence participant | the first word, with the `kind=` taken off · `kind=` on the participant (off when it says what `participant` / `actor` already did) |
+| "Update it", on a card or an item that wears a retired flag, and on a body that sets `dir=` | the flag off the line (a `legend` for a retired mark gone) · the body's `dir=` statement moved to the fence's `dir=` — one commit |
 | the properties view on a picked edge or link | the label, the arrow, `quiet` and `hue=` on that segment of the statement |
 | the properties view on a picked `series` or `slice` | its label, its hue, and the run of numbers on that one line — no kind, meta, status or flags, which a chart reads as data |
 | the item view's Form, Stacked, Horizontal, Legend, Value labels, Unit, Min, Max, Categories | one statement of the chart's own body, written where there is none and taken away when it is emptied |
@@ -259,8 +264,13 @@ it is what they are working on in either — and the item's only in Properties, 
   dialect's row grammar made of one — a name, a detail, some tags, an `fk=` — and rebuilding a line
   from that would be the reserialisation `restate.ts` exists to avoid. The line is also the one form
   in which an entity's columns and a class's members are the same shape, so one editor serves both.
-  A row sharing its line with a brace is not listed, for the reason `setRow` refuses one: `{ id
-  uuid pk; slug text }` is two rows on one line and a line number cannot say which.
+  The rows of a one-line block — `{ id uuid pk; slug text }` — share their line, so a line number
+  cannot say which; each is listed with `nth`, its place on the line, and `setRow` / `removeRow`
+  take it as a third argument. The boundary is a `;` outside a quoted string found by walking the
+  characters, **not** the tokenizer's separators: the tokenizer collapses a run of them into one,
+  which is right for a parser and wrong for counting. `setRow` rewrites that one span, and refuses
+  text holding `;`, `{` or `}` — it would be two rows, or no statement. A row sharing its line with
+  a *multi-line* block's brace is still not listed; `addRow` never writes one.
 - **The strings are read through the tokenizer, not off the line.** A regular expression for quoted
   text also matches `icon="two words"` and shifts every slot along by one; `textSlots`' rule is the
   *consecutive* run right after the id, and the panel reads the same run the writer writes.
@@ -268,6 +278,39 @@ it is what they are working on in either — and the item's only in Properties, 
   in it. The ER cardinalities are matched structurally there rather than enumerated — sixty
   spellings would be sixty typos — so a menu built from the table alone would silently drop
   `}o--||` the moment somebody opened it.
+
+**Sizing and describing.** The panel's size, description and kind controls are span writers like the
+rest, and each has one rule worth knowing before changing it:
+
+- **Width is offered where it is the author's to give.** A card in an automatic layout takes `w=` and
+  nothing else (ELK decides the height, and a `h=` there is read and ignored); a shape, a group or a
+  frame in a `sketch` or a `layout=fixed` fence takes `w=` and `h=`. A group in an automatic layout
+  has no box to size — it has a `dir=`, which is its own direction and not the diagram's. A pen
+  stroke gets neither: its box is its points' bounds and only a resize writes it. `setExtent`
+  refuses a size that is not a positive number, and `NumberField`'s `min` keeps the box honest
+  about it. A group is reached by the double-click that renames it, then Escape; a plain click
+  picks cards only.
+- **The description is the string the card draws.** Only `C4Box` draws a third string, so
+  `descriptionSlot(type, word, strings)` in `src/dsl/parse.ts` says which kinds have one and *where*:
+  a C4 `container` and `db` write it as the third string, but a C4 `person` and `extsystem` are
+  documented with two (name, description) and `c4.finish` moves the second into `desc` — until a
+  third is written, which wins. The panel used to offer a "Description" in slot 2 on a person whose
+  real description sat in the field called "Meta"; now the Meta box is left out there and the
+  Description box writes the slot the card reads. A card that draws none is offered none.
+- **`kind=` is read by the parser after the word, so it wins.** `kindOf()` in `Props.tsx` shows the
+  kind the card is drawn as, and `setKind` takes a `kind=` off in the same write — a menu that
+  changed the word under an override changed nothing. A sequence participant has no kind word at
+  all (`participant` and `actor` are one statement), so its menu writes `kind=`, and takes it off
+  when it says what the word already did (`PARTICIPANT_KINDS`, `participantKind`,
+  `setParticipantKind`).
+- **A retired flag is updated from the parser's own lines.** `retiredLines()` (`src/dsl/diagnose.ts`)
+  answers with the lines `W_RETIRED_FLAG` was raised on, and `updateRetired(body, lines)` takes the
+  flag off those lines only — `current` is also a column name, and only the parse knows which it read
+  as a flag. A `legend` for a retired mark goes whole. It is offered on the picked card's own line
+  and, for the whole diagram, in the item view, outside Advanced: it is a thing to fix, not a
+  setting. A body that sets `dir=LR` in a statement of its own (`takeBodyDir`) is the same kind of
+  thing — the statement wins over the fence's, so the Direction control would answer with no change
+  — and "Update it" moves its value to the fence in one op through `editor.replace`.
 
 **Inline rename is an input over the drawing, never `contentEditable` in it**, and there are four
 reasons rather than one. A card's box is arithmetic done in `layout/size.ts` before anything exists

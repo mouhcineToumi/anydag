@@ -74,6 +74,9 @@ const KIND_WORDS: Record<string, NodeKind> = {
   external: "external",
 };
 
+/** The kinds a participant can be drawn as, in the order the panel offers them: `kind=` takes any of them. */
+export const PARTICIPANT_KINDS: readonly string[] = Object.keys(KIND_WORDS);
+
 export function parseSequence(src: string): SequenceModel {
   const diagnostics: Diagnostic[] = [];
 

@@ -188,6 +188,45 @@ export function setModifier(line: string, key: ModifierKey, value: string | null
   return writeModifier(line, key, value);
 }
 
+/**
+ * What `key=` says on this statement, as the author wrote it, or `null` when it is not there.
+ *
+ * The inverse of `setModifier` and read the same way — off the tokens, so `w=` inside a quoted
+ * title is a word in a title — which is why a control that shows a number reads it here and not
+ * with a regular expression over the line.
+ */
+export function readModifier(line: string, key: string): string | null {
+  const at = modifierSpan(lineTokens(line), key);
+  if (!at) return null;
+  const text = line.slice(at[0], at[1]);
+  const value = text.slice(text.indexOf("=") + 1).trim();
+  return value.startsWith('"') && value.endsWith('"') && value.length >= 2 ? value.slice(1, -1) : value;
+}
+
+/**
+ * A card's, a shape's, a group's or a frame's own width or height: `w=` / `h=`, or `null` to take
+ * it off and let the layout decide again.
+ *
+ * Whole pixels, because the file is a document a person reads. A size that is not a positive
+ * number is refused by handing the line back — a `w=0` card is not a size, and a control that
+ * quietly wrote one would be the board that draws nothing. A line that is not a declaration (an
+ * edge, a bare word) is refused for the reason `setKind` refuses it.
+ */
+export function setExtent(line: string, key: "w" | "h", value: number | null): string {
+  const tokens = lineTokens(line);
+  if (idIndex(tokens) === -1 || tokens.some((t) => t.kind === "arrow")) return line;
+  if (value === null) return writeModifier(line, key, null);
+  if (!Number.isFinite(value) || Math.round(value) < 1) return line;
+  return writeModifier(line, key, String(Math.round(value)));
+}
+
+/** The direction a group's own members run in: `dir=LR` or `dir=TB`, or `null` to follow the diagram. */
+export function setGroupDir(line: string, dir: "LR" | "TB" | null): string {
+  const tokens = lineTokens(line);
+  if (idIndex(tokens) !== 1 || tokens.some((t) => t.kind === "arrow")) return line;
+  return writeModifier(line, "dir", dir);
+}
+
 /** Which of a statement's geometry keys a conversion is writing. Absent means "leave it alone". */
 export interface Geometry {
   x?: number;
@@ -339,12 +378,42 @@ export function setDesc(line: string, text: string | null): string {
  * dialect's, and it is already in front of whoever is choosing. What it does check is that the line
  * is a declaration at all, because token 0 of an edge is an id and rewriting that would be a
  * different statement about different things.
+ *
+ * A `kind=` on the line is taken off in the same write. The parser reads it *after* the word, so a
+ * line that kept one would go on drawing the old kind however the word was changed — a menu that
+ * answers and then changes nothing.
  */
 export function setKind(line: string, word: string): string {
   const tokens = lineTokens(line);
   if (tokens[0]?.kind !== "word" || tokens[1]?.kind !== "word") return line;
   if (tokens.some((t) => t.kind === "arrow")) return line;
-  return replaceSpan(line, span(tokens[0]!), word);
+  const out = replaceSpan(line, span(tokens[0]!), word);
+  const over = modifierSpan(lineTokens(out), "kind");
+  return over ? cut(out, over) : out;
+}
+
+/**
+ * The kind a sequence participant is drawn as, from the word it was declared with and its `kind=`.
+ *
+ * A participant has no kind word to choose — `participant` and `actor` are two spellings of one
+ * statement — so its kind is the `kind=` modifier, and the default is what the word says: `actor`
+ * is a person, `participant` is a service. `null` for a line that is not one.
+ */
+export function participantKind(line: string, kinds: readonly string[]): string | null {
+  const tokens = lineTokens(line);
+  const first = tokens[0];
+  if (first?.kind !== "word" || (first.value !== "participant" && first.value !== "actor")) return null;
+  const written = readModifier(line, "kind");
+  return written !== null && kinds.includes(written) ? written : first.value === "actor" ? "person" : "service";
+}
+
+/** Retype a sequence participant: `kind=` written, or taken off when it says what the word already did. */
+export function setParticipantKind(line: string, word: string): string {
+  const tokens = lineTokens(line);
+  const first = tokens[0];
+  if (first?.kind !== "word" || (first.value !== "participant" && first.value !== "actor")) return line;
+  if (tokens[1]?.kind !== "word") return line;
+  return writeModifier(line, "kind", word === (first.value === "actor" ? "person" : "service") ? null : word);
 }
 
 /* ---------------------------------------------------------------------------- across a body */
@@ -455,16 +524,64 @@ export function addRow(body: string, nodeLine: number, rowText: string): string 
 }
 
 /**
+ * The rows of a one-line block, each with its own character span in the line.
+ *
+ * `{ id uuid pk; slug text }` is two rows on one line, and a line number cannot say which — so a row
+ * there is addressed by its **position among the line's rows**, `nth`, and this is what turns that
+ * into bytes. The boundary is a `;` outside a quoted string, found by walking the characters between
+ * the braces rather than by asking the tokenizer for its separators: the tokenizer collapses a run
+ * of them into one, which is right for a parser and wrong for counting. An empty segment (`a;; b`)
+ * is not a row and is not counted.
+ */
+function inlineRows(line: string): { from: number; to: number; text: string }[] {
+  const tokens = lineTokens(line);
+  const open = tokens.find((t) => t.kind === "punct" && t.value === "{");
+  const close = [...tokens].reverse().find((t) => t.kind === "punct" && t.value === "}");
+  if (!open || !close) return [];
+  const [start, end] = [span(open)[1], span(close)[0]];
+  const out: { from: number; to: number; text: string }[] = [];
+  let from = start;
+  let quoted = false;
+  const flush = (to: number) => {
+    const raw = line.slice(from, to);
+    const text = raw.trim();
+    if (text === "") return;
+    const at = from + (raw.length - raw.trimStart().length);
+    out.push({ from: at, to: at + text.length, text });
+  };
+  for (let i = start; i < end; i++) {
+    const c = line[i];
+    if (c === "\\" && quoted) i++;
+    else if (c === '"') quoted = !quoted;
+    else if (c === ";" && !quoted) {
+      flush(i);
+      from = i + 1;
+    }
+  }
+  flush(end);
+  return out;
+}
+
+/**
  * Replace the text of the row on `line`, keeping its indent and its trailing comment.
  *
- * A row sharing its line with the statement's braces is refused: `{ id uuid pk; slug text }` is two
- * rows on one line and a line number cannot say which. That is a property of the format rather than
- * a gap worth a second addressing scheme — and `addRow` never creates one.
+ * A row on a line of its own is addressed by the line. A row sharing its line with the statement's
+ * braces — `{ id uuid pk; slug text }` — is addressed by `nth`, its position on that line, and
+ * rewritten in place so the others and the author's spacing stay as they were. Text that would end
+ * the row or the block (`;`, `{`, `}`) is refused there, because it would make two rows or break
+ * the statement.
  */
-export function setRow(body: string, line: number, text: string): string {
+export function setRow(body: string, line: number, text: string, nth?: number): string {
   const lines = splitLines(body);
   const cur = lines[line - 1];
-  if (cur === undefined || hasBrace(cur)) return body;
+  if (cur === undefined) return body;
+  if (nth !== undefined) {
+    const row = inlineRows(cur)[nth];
+    if (!row || /[;{}]/.test(text)) return body;
+    lines[line - 1] = replaceSpan(cur, [row.from, row.to], text);
+    return lines.join("\n");
+  }
+  if (hasBrace(cur)) return body;
   const at = commentAt(cur);
   lines[line - 1] = `${indentOf(cur)}${text}${at === -1 ? "" : cur.slice(at)}`;
   return lines.join("\n");
@@ -479,14 +596,16 @@ export function setRow(body: string, line: number, text: string): string {
  * edits in the panel is the line they would have typed, which is also the only form in which every
  * dialect's rows are the same shape.
  *
- * A row sharing its line with a brace is left out, for the reason `setRow` refuses one: `{ id uuid
- * pk; slug text }` is two rows on one line and a line number cannot say which. `addRow` never
- * makes one, so this only ever skips rows an author wrote that way.
+ * The rows of a one-line block — `{ id uuid pk; slug text }` — share a line, so each carries `nth`,
+ * its position on it, and `setRow` and `removeRow` take that as a third argument. A row on a line of
+ * its own has no `nth`: the line says which. A row sharing its line with a *multi-line* block's
+ * brace (`  slug text }`) is still left out; `addRow` never writes one.
  */
-export function rowLines(body: string, nodeLine: number): { line: number; text: string }[] {
+export function rowLines(body: string, nodeLine: number): { line: number; text: string; nth?: number }[] {
   const block = blockOf(body, nodeLine);
-  if (!block || block.oneLine) return [];
+  if (!block) return [];
   const lines = splitLines(body);
+  if (block.oneLine) return inlineRows(lines[nodeLine - 1] ?? "").map((row, nth) => ({ line: nodeLine, text: row.text, nth }));
   const out: { line: number; text: string }[] = [];
   for (let n = block.open + 1; n < block.close; n++) {
     const text = lines[n - 1];
@@ -497,11 +616,28 @@ export function rowLines(body: string, nodeLine: number): { line: number; text: 
   return out;
 }
 
-/** Take the row on `line` out. The same refusal as `setRow`, for the same reason. */
-export function removeRow(body: string, line: number): string {
+/**
+ * Take the row on `line` out; `nth` says which when the line holds several, as `setRow` does.
+ *
+ * Taking out the last row of a one-line block leaves `{ }` rather than removing the braces: the
+ * statement is still a card that has rows, and `addRow` writes into exactly that shape.
+ */
+export function removeRow(body: string, line: number, nth?: number): string {
   const lines = splitLines(body);
   const cur = lines[line - 1];
-  if (cur === undefined || hasBrace(cur)) return body;
+  if (cur === undefined) return body;
+  if (nth !== undefined) {
+    const rows = inlineRows(cur);
+    const row = rows[nth];
+    if (!row) return body;
+    const tokens = lineTokens(cur);
+    const open = tokens.find((t) => t.kind === "punct" && t.value === "{")!;
+    const close = [...tokens].reverse().find((t) => t.kind === "punct" && t.value === "}")!;
+    const rest = rows.filter((_, i) => i !== nth).map((r) => r.text);
+    lines[line - 1] = cur.slice(0, span(open)[1]) + (rest.length ? ` ${rest.join("; ")} ` : " ") + cur.slice(span(close)[0]);
+    return lines.join("\n");
+  }
+  if (hasBrace(cur)) return body;
   return dropRange(lines, line - 1, line - 1).join("\n");
 }
 
@@ -969,6 +1105,79 @@ export function moveTopic(body: string, line: number, under: number): string {
   const mark = rest.indexOf(MARK);
   if (mark === -1) return body;
   return [...rest.slice(0, mark), ...reindented, ...rest.slice(mark + 1)].join("\n");
+}
+
+/* ------------------------------------------------------------------- what is out of date */
+
+/**
+ * The words the parser still accepts and warns about (`W_RETIRED_FLAG`): they marked a card once,
+ * and hovering rings it now, so the current form of a statement that wears one is the statement
+ * without it. The parser's own set is private to `common.ts`; this is the same two words, and
+ * `test/restate.test.ts` holds the two together by parsing what these remove.
+ */
+const RETIRED = new Set(["focus", "current"]);
+
+/**
+ * Bring the statements the parser called out as retired up to date: the flag comes off the line, and
+ * a `legend` line explaining a mark that is no longer drawn goes entirely.
+ *
+ * It is handed the **lines** — the `W_RETIRED_FLAG` diagnostics' own — instead of looking for the
+ * words itself, because `current` is also a perfectly good column name and only the parser knows
+ * which ones it read as a flag. On those lines only the tokens before a statement's `{` are
+ * looked at, so a column called `focus` on a one-line entity is left where it is.
+ *
+ * A **declared whole-body conversion**, like `stripCoords`: it is offered as one button that names
+ * what it will do, and everything on every other line is untouched by construction.
+ */
+export function updateRetired(body: string, lines: readonly number[]): string {
+  const out = splitLines(body);
+  const gone: number[] = [];
+  for (const n of new Set(lines)) {
+    const text = out[n - 1];
+    if (text === undefined) continue;
+    const tokens = lineTokens(text);
+    if (tokens[0]?.kind === "word" && tokens[0].value === "legend") {
+      gone.push(n - 1);
+      continue;
+    }
+    let next = text;
+    for (;;) {
+      const all = lineTokens(next);
+      const brace = all.findIndex((t) => t.kind === "punct" && t.value === "{");
+      const had = flagSpan(brace === -1 ? all : all.slice(0, brace), RETIRED);
+      if (!had) break;
+      next = cut(next, had);
+    }
+    out[n - 1] = next;
+  }
+  /* Last first, so a removal does not renumber the ones still to come. */
+  let rest = out;
+  for (const i of gone.sort((a, b) => b - a)) rest = dropRange(rest, i, i);
+  return rest.join("\n");
+}
+
+/**
+ * A `dir=LR` statement in the body, taken out and handed back as the direction it said.
+ *
+ * It is the parser's own and it wins over the fence's `dir=`, which is exactly why it is worth
+ * moving: the Direction control writes the fence, and a body that still sets one over it would
+ * answer the control with no change. The last valid one is what the parser ended on, so that is the
+ * value returned; all of them are removed. `null` when the body has none — and a `dir=` with
+ * anything else on its line (a group's) is not this statement and is never touched.
+ */
+export function takeBodyDir(body: string): { body: string; dir: "LR" | "TB" } | null {
+  const hits: { line: number; dir: "LR" | "TB" }[] = [];
+  for (const [line, tokens] of tokensByLine(body)) {
+    const [key, eq, value] = tokens;
+    if (tokens.length !== 3 || key!.kind !== "word" || key!.value !== "dir") continue;
+    if (eq!.kind !== "punct" || eq!.value !== "=" || value!.kind !== "word") continue;
+    if (value!.value === "LR" || value!.value === "TB") hits.push({ line, dir: value!.value });
+  }
+  const last = hits[hits.length - 1];
+  if (!last) return null;
+  let lines = splitLines(body);
+  for (const h of [...hits].sort((a, b) => b.line - a.line)) lines = dropRange(lines, h.line - 1, h.line - 1);
+  return { body: lines.join("\n"), dir: last.dir };
 }
 
 /* ------------------------------------------------------------------------------ the chart */

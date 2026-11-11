@@ -68,6 +68,26 @@ export function kindsOf(type: string): string[] {
 }
 
 /**
+ * Which string of a statement the card draws as its description, or `null` when it draws none.
+ *
+ * Only `C4Box` draws a third string, and it is reached two ways: any C4 `container`/`db`, and a
+ * `person` or `extsystem` in any dialect that has one. They differ in *where* the sentence is
+ * written, which is why this is a function and not a list of kinds. A C4 `person` and `extsystem`
+ * are documented with two strings — name, description — and `c4.finish` moves the second one into
+ * `desc`; a third string, if there is one, wins. So the slot is 1 until a third is written. Every
+ * other one is the third string, slot 2.
+ *
+ * `word` is the word the statement is declared with (or its `kind=`): the vocabulary is the
+ * dialect's, and the kind it maps to is what decides. `strings` is how many the line has now.
+ */
+export function descriptionSlot(type: string, word: string, strings: number): 1 | 2 | null {
+  const kind = DIALECTS[type as DiagramType]?.kinds[word];
+  if (kind === "person" || kind === "extsystem") return type === "c4" && strings < 3 ? 1 : 2;
+  if (type === "c4" && (kind === "container" || kind === "db")) return 2;
+  return null;
+}
+
+/**
  * Whether a node in this dialect can carry rows — the `{ … }` block under a declaration.
  *
  * `Dialect.row` is the row grammar, and its absence is what "this dialect has no rows" means; a

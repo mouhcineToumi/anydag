@@ -1,4 +1,5 @@
 import { parseChart, type ChartModel } from "./chart";
+import { CODES } from "./codes";
 import type { Diagnostic, Graph } from "./ir";
 import { hasDialect, parseDiagram } from "./parse";
 import { parseSequence, type SequenceModel } from "./sequence";
@@ -39,6 +40,17 @@ export function parseItem(it: Parseable): Model | null {
   if (it.type === "sequence") return parseSequence(it.body);
   if (it.type === "chart") return parseChart(it.body);
   return parseDiagram(it.type, it.body, it.dir, it.aspect, it.layout);
+}
+
+/**
+ * The 1-based lines of an item's **body** the parser read a retired flag on (`W_RETIRED_FLAG`), once
+ * each, in order — what `updateRetired` is handed. Asked of the parser rather than answered by a
+ * scan for the words, because `current` is also a column name and only the parse knows which it
+ * read as a flag.
+ */
+export function retiredLines(it: Parseable): number[] {
+  const found = parseItem(it)?.diagnostics.filter((d) => d.code === CODES.W_RETIRED_FLAG) ?? [];
+  return [...new Set(found.map((d) => d.line))].sort((a, b) => a - b);
 }
 
 interface ItemDiagnostics {
