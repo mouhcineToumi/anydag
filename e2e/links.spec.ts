@@ -128,15 +128,15 @@ test("K opens the links fence, and makes one where there is none", async ({ page
   await expect.poll(read).toContain("```edges");
 });
 
-test("a link naming nothing is one error, and the good links still draw", async ({ page }) => {
+test("a link naming nothing is skipped, and the good links still draw", async ({ page }) => {
   await open(page);
   fs.writeFileSync(file, read().replace('who --> stack.db "reads"', 'who --> stack.db "reads"\nwho --> ghost'));
-  /* In the problems dock, never as a card on the canvas: see `problems.spec.ts`. */
-  await page.locator("[data-dag-problems-pill]").click();
-  await expect(page.locator("[data-dag-problems-row]")).toHaveCount(1);
-  await expect(page.locator('[data-dag-problems-row="EB_LINK_UNKNOWN_ITEM"]')).toBeVisible();
-  await expect(page.locator(".dag-viewport .dag-error")).toHaveCount(0);
   await expect(page.locator(".dag-board-edges [data-dag-edge]")).toHaveCount(1);
+  /* Not a problem a person is told about: there is nothing drawn to act on, and an agent reads
+     `EB_LINK_UNKNOWN_ITEM` from the diagnostics (see `problems.spec.ts`). Never a card either. */
+  await page.waitForTimeout(1500);
+  await expect(page.locator("[data-dag-problems-pill]")).toHaveCount(0);
+  await expect(page.locator(".dag-viewport .dag-error")).toHaveCount(0);
 });
 
 /* ---- the gesture ---- */

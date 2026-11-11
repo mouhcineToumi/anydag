@@ -40,6 +40,7 @@ import { repairFrontmatter, retypeFence } from "@/board/repair";
 import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
 import { gitBranch, gitCommit, gitRenameBranch } from "@/dsl/graph/gitgraph";
+import type { DiagnosticTarget } from "@/dsl/ir";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import {
   outdentTopic,
@@ -409,7 +410,6 @@ export interface EditorCtl {
 interface Reveal {
   id: string;
   node?: string;
-  line?: number;
   n: number;
 }
 
@@ -420,7 +420,7 @@ export interface Editor {
   selected: ReadonlySet<string>;
   /** The item open in the editor panel, if any. */
   editing: string | null;
-  /** A pending "show me this node's line", or this line, for the open item — see `open`/`openAt`. */
+  /** A pending "show me this node's line" for the open item — see `open`. */
   reveal: Reveal | null;
   tool: Tool;
   setTool(tool: Tool): void;
@@ -440,10 +440,11 @@ export interface Editor {
    */
   links(): void;
   /**
-   * Open the panel on an item's source with the caret on one line of its body — the problems
-   * dock's "show me", where the thing to look at is a line rather than a card.
+   * Open the panel on an item with one thing in it picked — the problems' "Show", where what to
+   * look at is the card, group or link a problem concerns, and the panel then holds the control
+   * that fixes it. With no target the item's own fields are what show.
    */
-  openAt(id: string, line: number): void;
+  openOn(id: string, target?: DiagnosticTarget): void;
   /** The link picked on the canvas, if any. Delete removes it; a click anywhere else clears it. */
   pickedLink: string | null;
   pickLink(id: string | null): void;
@@ -1552,18 +1553,20 @@ export function useEditor({
   );
 
   /*
-   * The other way into the panel: a line rather than a card. A diagnostic names a line, and on a
-   * broken body there may be no card to pick at all — the whole point is that the text does not
-   * parse. The source is what shows, because a line is a fact about the text.
+   * The other way into the panel: a problem rather than a click. A diagnostic's target is the thing
+   * its line declares (`diagnoseBoard`), so "Show" picks it the way a click on the canvas would, and
+   * the Properties half is what shows — that is where the control that fixes it is.
    */
-  const openAt = useCallback(
-    (id: string, line: number) => {
+  const openOn = useCallback(
+    (id: string, target?: DiagnosticTarget) => {
       setSelected(new Set([id]));
       setEditing(id);
-      setMode("source");
-      setReveal((prev) => ({ id, line, n: (prev?.n ?? 0) + 1 }));
+      setMode("props");
+      if (!target) return pickNode(id, null);
+      if (target.what === "edge") pickEdgeIn(id, target.id);
+      else pickNode(id, target.id);
     },
-    [setMode],
+    [setMode, pickNode, pickEdgeIn],
   );
 
   const add = useCallback(
@@ -4366,7 +4369,7 @@ export function useEditor({
     redo,
     add,
     links,
-    openAt,
+    openOn,
     pickedLink,
     pickLink,
     pickedNode,

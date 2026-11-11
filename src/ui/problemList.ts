@@ -1,14 +1,23 @@
 import type { Board, BoardItem } from "@/board/types";
-import type { Code } from "@/dsl/codes";
+import { CODES, type Code } from "@/dsl/codes";
 import { diagnoseBoard, parseItem, type Parseable } from "@/dsl/diagnose";
-import type { Diagnostic } from "@/dsl/ir";
+import type { Diagnostic, DiagnosticTarget } from "@/dsl/ir";
+import { detectMermaid } from "@/dsl/mermaid";
 
 /**
- * Everything wrong with a board, as the problems dock and the editor panel list it.
+ * What is wrong with a board that a person can do something about, as the problems dock, the
+ * editor panel and the marker on a diagram's frame show it.
  *
- * The meaning, with no DOM in it: which problems there are, which item each belongs to, and which
- * of them are *new* — the one question the notification asks before it interrupts anybody.
- * `Problems.tsx` is the chrome that shows the answer.
+ * The meaning, with no DOM in it: which problems there are, which item and which thing in it each
+ * concerns, the words a person reads, and which of them are *new* — the one question the
+ * notification asks before it interrupts anybody. `Problems.tsx` is the chrome that shows the answer.
+ *
+ * **Only what a person can act on is here** (#145). A board's text is the app's own format and a
+ * person never sees it, so a missing quote or a word the grammar does not know is not something
+ * they could find, let alone fix: that statement is skipped and the rest is drawn. What stays is a
+ * problem with a control that answers it — a card's icon or colour, a link that ends on nothing, a
+ * Mermaid paste to convert, a board setting the dock can repair. Every diagnostic is still there for
+ * an agent (`board_diagnose`, `/__board/diagnostics`, `anydag snapshot`), which reads the text.
  */
 
 export interface Problem {
@@ -31,6 +40,61 @@ export interface Problem {
   item?: string;
   type?: string;
   page?: string;
+  /** The card, group, lane or edge inside the item that "Show" picks, when the problem is about one. */
+  target?: DiagnosticTarget;
+  /** What a person reads: what is wrong and what to do, in words, with no grammar in them. */
+  words: string;
+  /** A fix the row can carry out itself, beside the control the pick leads to. */
+  fix?: "delete-edge";
+}
+
+/**
+ * The problems a person can act on, and what they read about each.
+ *
+ * `pick` is a problem about one thing in a diagram: the row picks it, and the panel then shows the
+ * control that fixes it. `item` is about the diagram as a whole, and the panel's own controls are
+ * the answer. A code in neither list is not shown to a person at all.
+ */
+const ON_A_PICK: Partial<Record<Code, { words: string; fix?: Problem["fix"] }>> = {
+  [CODES.W_UNKNOWN_ICON]: { words: "A card's icon is not one AnyDag has, so it shows the default. Choose another." },
+  [CODES.W_UNKNOWN_HUE]: { words: "A colour here is not one of the theme's, so none is drawn. Choose one." },
+  [CODES.W_RETIRED_FLAG]: { words: "A card wears a mark that no longer draws anything. Update it from its panel." },
+  [CODES.E_UNKNOWN_ID]: {
+    words: "A link ends on a card that is not there. Point it at another card, or delete it.",
+    fix: "delete-edge",
+  },
+  [CODES.W_MISSING_ROW]: { words: "A link ends on a row the card does not have. Point it at another end." },
+  [CODES.W_CHART_LENGTH]: { words: "A series has a different number of values than the chart has categories." },
+};
+
+/** A board setting `planRepair` can put right; the words the dock says over its repair. */
+const ON_THE_BOARD: Partial<Record<Code, string>> = {
+  [CODES.EB_FRONTMATTER]: "The board's settings could not all be read.",
+  [CODES.EB_UNKNOWN_TYPE]: "A block on this board is of a kind AnyDag does not draw.",
+  [CODES.EB_BAD_LAYOUT]: "A diagram has a layout setting AnyDag does not know.",
+  [CODES.EB_BAD_ASPECT]: "A diagram has a wrapping setting AnyDag cannot read.",
+};
+
+/**
+ * What a person reads about one diagnostic, or `null` when it is not theirs to see.
+ *
+ * `body` is the item's, for the one item-wide case: a Mermaid header means the whole block is
+ * another language, and the panel's Convert is the answer. A Mermaid habit on one line of an
+ * otherwise good body is a statement that could not be read, and is skipped like any other.
+ */
+function shown(d: Diagnostic, body?: string): Pick<Problem, "words" | "fix" | "target"> | null {
+  if (d.code === CODES.E_MERMAID_SYNTAX)
+    return body !== undefined && detectMermaid(body).fatal
+      ? { words: "This diagram is written in Mermaid. Convert it from its panel to draw it." }
+      : null;
+  if (d.code === CODES.W_CHART_EMPTY) return { words: "This chart has no data yet. Add a series from its panel." };
+  const board = ON_THE_BOARD[d.code];
+  if (board) return { words: board };
+  const pick = ON_A_PICK[d.code];
+  /* About a thing that was not drawn — a link from a card that could not be read — there is nothing
+     to pick, and so nothing a person could do from here. */
+  if (!pick || !d.target) return null;
+  return { words: pick.words, fix: pick.fix, target: d.target };
 }
 
 /**
@@ -74,9 +138,13 @@ export function listProblems(board: Board): Problem[] {
   const found = diagnoseBoard(board, diagnosticsOf);
   const byId = new Map(board.items.map((it) => [it.id, it]));
   const out: Problem[] = [];
-  const push = (d: Diagnostic, it: BoardItem | undefined) =>
+  const push = (d: Diagnostic, it: BoardItem | undefined) => {
+    const said = shown(d, it?.body);
+    if (!said) return;
+    /* One Mermaid header is reported on every line it found; the person has one thing to do. */
+    if (d.code === CODES.E_MERMAID_SYNTAX && out.some((p) => p.code === d.code && p.item === it?.id)) return;
     out.push({
-      key: `${d.code}|${it?.id ?? ""}|${d.message}`,
+      key: `${d.code}|${it?.id ?? ""}|${said.target?.id ?? ""}|${d.message}`,
       severity: d.severity,
       code: d.code,
       message: d.message,
@@ -84,7 +152,9 @@ export function listProblems(board: Board): Problem[] {
       item: it?.id,
       type: it?.type,
       page: it?.page,
+      ...said,
     });
+  };
   for (const d of found.board) push(d, itemAt(board.items, d.line));
   for (const x of found.items) for (const d of x.diagnostics) push(d, byId.get(x.id));
   return out.sort((a, b) => a.line - b.line);

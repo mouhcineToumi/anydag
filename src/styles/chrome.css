@@ -1643,15 +1643,29 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 
 /* The dot on a diagram showing its last good drawing. Inside the item's box, top right: `.dag-item`
    clips anything painted outside it. */
-.dag-stale {
+/* A diagram with a problem a person can act on (#145): its frame in the problem colour and a count
+   by its title. Painted by App onto the item, never in a snapshot; an outline and a pseudo-element,
+   so the box `size.ts` measured is the box drawn. `::before`, because `::after` is the selection's. */
+.dag-item[data-dag-problem-count] {
+  outline: 1.5px solid var(--dag-color-dangerBorder);
+  outline-offset: 2px;
+  content-visibility: visible;
+}
+.dag-item[data-dag-problem-count]::before {
+  content: attr(data-dag-problem-count);
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  top: -10px;
+  left: -10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
   background: var(--dag-color-danger);
-  box-shadow: 0 0 0 1.5px var(--dag-color-paper);
+  color: var(--dag-color-paper);
+  font: 600 11px/18px var(--dag-font-sans);
+  text-align: center;
+  pointer-events: none;
   z-index: 3;
 }
 
@@ -2509,38 +2523,44 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 
 /* The open item's problems, under its source: where somebody editing it is already looking. */
+/* The panel's Problems block (#145): at the top, words and the act that answers them. */
 .dag-inspector__problems {
   flex: none;
-  max-height: 140px;
+  max-height: 180px;
   overflow-y: auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-inspector__problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  padding: 4px 8px;
+  padding: 0;
   list-style: none;
-  border-top: 1px solid var(--dag-color-outlineSoft);
 }
 .dag-inspector__problem {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  width: 100%;
+  gap: 4px;
   padding: 4px 8px;
-  font: inherit;
   font-size: 12px;
-  text-align: left;
-  color: var(--dag-color-ink);
-  background: transparent;
-  border: none;
   border-left: 2px solid var(--dag-color-warning);
-  border-radius: var(--dag-metric-radius-small);
-  cursor: pointer;
 }
 .dag-inspector__problem--error { border-left-color: var(--dag-color-danger); }
-.dag-inspector__problem:hover { background: var(--dag-color-paper100); }
-.dag-inspector__problem-where {
-  font-family: var(--dag-font-mono);
-  font-size: 10.5px;
-  color: var(--dag-color-muted);
+.dag-inspector__problem-acts { display: flex; gap: 6px; }
+.dag-inspector__problem-acts:empty { display: none; }
+.dag-inspector__problem-act {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--dag-color-ink);
+  background: none;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 4px;
+  cursor: pointer;
 }
+.dag-inspector__problem-act:hover { background: var(--dag-color-paper100); }
 
 [data-snapshot="1"] .dag-inspector { display: none; }
 
