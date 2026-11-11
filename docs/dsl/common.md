@@ -62,6 +62,10 @@ dropped, not kept and ignored: the card falls back to whatever it would have had
 all — inherited from its group or lane, or a group's own automatic assignment — rather than binding
 a colour nobody set.
 
+On a diagram's **fence line** (`{#infra hue=teal}`) it tints the diagram's own frame — a hairline round
+it and the band behind its header — and nothing inside it: a card with no hue of its own does not take
+the frame's. The panel's *Frame colour* row writes it.
+
 ## Icons
 
 Three vocabularies, picked by how the name is written.

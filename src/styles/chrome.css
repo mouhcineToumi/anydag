@@ -2851,6 +2851,14 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
 .dag-rewrite-dialog__hint { font-size: 11.5px; color: var(--dag-color-muted); }
 .dag-rewrite-dialog .dag-feedback__text:focus { outline: 2px solid var(--dag-color-accentSoft); border-color: var(--dag-color-accent); }
 
+/* The board's own settings: the settings card's shell, with the inspector's field rows inside it. */
+.dag-board-settings { width: 420px; }
+.dag-board-settings__body { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.dag-board-settings__flow { display: flex; gap: 12px; }
+.dag-board-settings__flow .dag-field { flex: 1; }
+.dag-board-settings .dag-field__hint { margin: 0; line-height: 1.5; }
+.dag-board-settings__foot { justify-content: flex-end; margin-top: 12px; }
+
 /* The shortcut sheet: a card over the board, `?` to open, Escape or a click outside to close. */
 .dag-shortcuts__scrim {
   position: absolute;
@@ -3436,6 +3444,11 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   cursor: pointer;
 }
 .dag-problems__row--error { border-left-color: var(--dag-color-danger); }
+/* A repair, in words, under the row it answers — indented to sit under the message, not the code. */
+.dag-problems__fix { display: flex; flex-direction: column; gap: 6px; padding: 2px 8px 8px 12px; }
+.dag-problems__fix-words { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-problems__fix-words--bad { color: var(--dag-color-dangerText); }
+.dag-problems__fix-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dag-problems__row:hover:not(:disabled) { background: var(--dag-color-paper100); }
 .dag-problems__row:disabled { cursor: default; }
 .dag-problems__row .dag-problems__msg { font-size: 12.5px; color: var(--dag-color-ink); }

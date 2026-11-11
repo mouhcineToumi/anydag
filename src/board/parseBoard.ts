@@ -9,6 +9,7 @@ import { parse as parseYaml } from "yaml";
 import { flag, num, str } from "./attrs";
 import { endText, parseLinks } from "./links";
 import { locateItems } from "./locate";
+import { FLOW_DEFAULT } from "./settings";
 import {
   isDiagramType,
   isItemType,
@@ -241,7 +242,7 @@ export function parseBoard(name: string, text: string): Board {
     pages,
     items,
     links,
-    flow: { width: fm.flow?.width ?? 4000, gap: fm.flow?.gap ?? 80 },
+    flow: { width: fm.flow?.width ?? FLOW_DEFAULT.width, gap: fm.flow?.gap ?? FLOW_DEFAULT.gap },
     errors,
   };
 }

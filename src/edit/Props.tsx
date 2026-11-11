@@ -34,6 +34,8 @@ import {
 } from "@/dsl/restate";
 import { ARROWS, tokenize } from "@/dsl/tokenizer";
 
+import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
+
 import { detachable, loneNode } from "./build";
 import { REFUSAL, layered } from "./drag";
 import { IconPicker } from "./IconPicker";
@@ -310,21 +312,36 @@ function ValuesField({
   );
 }
 
-function Hues({ hue, onSet }: { hue: string; onSet(next: string | null): void }) {
+function Hues({
+  hue,
+  onSet,
+  label = "Hue",
+  hook = "data-dag-prop-hue",
+  none = "No hue of its own: inherit",
+}: {
+  hue: string;
+  onSet(next: string | null): void;
+  /** What a screen reader calls the row — a diagram's frame is not the card inside it. */
+  label?: string;
+  /** The attribute each swatch carries, so a check can tell two rows in one panel apart. */
+  hook?: string;
+  none?: string;
+}) {
   return (
-    <div className="dag-props__row" role="group" aria-label="Hue">
+    <div className="dag-props__row" role="group" aria-label={label}>
       <button
         type="button"
         className={hue === "" ? "dag-swatch dag-swatch--none dag-swatch--on" : "dag-swatch dag-swatch--none"}
         aria-pressed={hue === ""}
-        title="No hue of its own: inherit"
+        title={none}
+        data-dag-hue-none=""
         onClick={() => onSet(null)}
       />
       {HUE_ORDER.map((h) => (
         <button
           key={h}
           type="button"
-          data-dag-prop-hue={h}
+          {...{ [hook]: h }}
           className={hue === h ? "dag-swatch dag-swatch--on" : "dag-swatch"}
           style={{ background: `var(--dag-tint-${h})` }}
           aria-pressed={hue === h}
@@ -881,6 +898,71 @@ function ChartProps({ body, onBody }: { body: string; onBody(next: string): void
 
 /* --------------------------------------------------------------------------------- the item */
 
+/**
+ * How a laid-out diagram folds: `aspect=`, the one fence attribute the side handles write and
+ * nothing could take back off.
+ *
+ * Three answers and each is a different thing in the file — *theme default* removes the attribute,
+ * *never wrap* is `aspect=0` (a pipeline that must read as one line), *fold to a shape* is a width
+ * over a height. The handles write the third, so the number box shows what they wrote. A value the
+ * parser rejected (`EB_BAD_ASPECT`) is its own, disabled, option: the select says what the file
+ * holds rather than pretending it says "default", and picking anything replaces it.
+ */
+function Wrapping({ item, editor }: { item: BoardItem; editor: Editor }) {
+  const raw = item.attrs.map.aspect;
+  const choice = aspectChoice(raw);
+  const write = (value: number | null | undefined) => value !== undefined && editor.setAttrs(item.id, { aspect: value });
+  return (
+    <>
+      <label className="dag-field dag-field--row">
+        <span>Wrapping</span>
+        <select
+          className="dag-select"
+          data-dag-item-aspect=""
+          value={choice}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === "ratio") write(aspectAttr("ratio", typeof raw === "number" && raw > 0 ? raw : ASPECT_START));
+            else if (next === "auto" || next === "off") write(aspectAttr(next));
+          }}
+        >
+          <option value="auto">theme default</option>
+          <option value="off">never wrap</option>
+          <option value="ratio">fold to a shape</option>
+          {choice === "invalid" ? (
+            <option value="invalid" disabled>
+              not a number
+            </option>
+          ) : null}
+        </select>
+      </label>
+      {choice === "ratio" ? (
+        <label className="dag-field dag-field--row">
+          <span>Width ÷ height</span>
+          <input
+            className="dag-input"
+            data-dag-item-aspect-ratio=""
+            inputMode="decimal"
+            defaultValue={String(raw)}
+            key={`aspect:${String(raw)}`}
+            onBlur={(e) => {
+              const n = Number(e.target.value.trim());
+              if (e.target.value.trim() !== "" && aspectAttr("ratio", n) !== undefined) write(aspectAttr("ratio", n));
+              else e.target.value = String(raw);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          />
+        </label>
+      ) : null}
+      {choice === "invalid" ? (
+        <p className="dag-field__hint dag-field__hint--bad" data-dag-item-aspect-bad="">
+          The file has <code>aspect={String(raw)}</code>, which is not a shape. Pick one above.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function ItemProps({
   item,
   editor,
@@ -946,6 +1028,25 @@ function ItemProps({
           Click a card to change its colour, kind, icon or text.
         </p>
       )}
+
+      {/*
+       * A diagram's own hue: the tint of its frame — the hairline round it and the band behind its
+       * header — which is a different thing from the hue of a card inside it, so it is labelled and
+       * hooked apart from the row above. *None* first, as on every swatch row, and it is
+       * `hue=` on the fence line, which is all a diagram's frame has to say about colour.
+       */}
+      {diagram ? (
+        <div className="dag-field" data-dag-frame-hue-row="">
+          <span>Frame colour</span>
+          <Hues
+            hue={item.hue ?? ""}
+            label="Frame colour"
+            hook="data-dag-frame-hue"
+            none="No tint on the frame"
+            onSet={(h) => editor.setAttrs(item.id, { hue: h })}
+          />
+        </div>
+      ) : null}
 
       {/* The item's own content, which is not chrome and does not get hidden: a note's checkbox,
           an image's source and a chart's own settings are what the item *is*. */}
@@ -1160,7 +1261,10 @@ function ItemProps({
                 because a fence opened `layout=fixed` has stopped folding. Only a diagram's is a
                 lie worth naming. */}
             {diagram && resizeOfItem(item) === "aspect" ? (
-              <p className="dag-field__hint">The side handles set the shape ELK folds this towards.</p>
+              <>
+                <Wrapping item={item} editor={editor} />
+                <p className="dag-field__hint">The side handles set the shape ELK folds this towards.</p>
+              </>
             ) : null}
           </div>
         ) : null}

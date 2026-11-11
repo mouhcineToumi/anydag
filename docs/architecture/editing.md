@@ -41,6 +41,10 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | the Settings modal (the gear at the sidebar's foot, or `ctrl+,`) | nothing in the board: a preference is not part of what a `?board=…` link means |
 | Settings → Vault's Unused images, then its confirm | the files in *this* board's legacy `.assets/` that no board's text names — never another board's, and never the directory |
 | a diagram's two side handles | `aspect=` — the shape ELK folds to — and `w=` removed |
+| the item view's Advanced → Wrapping, on a laid-out diagram | `aspect=` set to a ratio, to `0` (never wrap), or taken off (the theme's shape) — the one way to take it back off |
+| the item view's Frame colour, on a diagram | `hue=` on the fence line — the tint of the frame's hairline and its title band |
+| the top bar's `⋯` → Board settings | `theme:` and `flow:` in the frontmatter, through a `MetaOp` — only what differs from the default is written |
+| the problems dock's repair, under a row for the settings block, an unknown fence, a bad `layout=` or `aspect=` | the readable settings kept and the rest dropped · the fence's label changed · that one attribute taken off — each one write, so one ctrl+Z |
 | a second click on a card, once its diagram is selected | nothing: a pick is not an edit |
 | a click on an edge's line inside a diagram | nothing, likewise |
 | Delete on a picked card | its statement, its `{ }` block and every edge that named it, gone |
@@ -378,6 +382,53 @@ canvas tool does. Re-parenting one level up is what "ungroup" means, not what "d
 giving Delete two meanings depending on what is picked is the kind of thing a person finds out about
 by losing work. A `dissolveGroup` writer with a button of its own is the honest shape for it, and it
 is not built.
+
+### Settings that had no source-free way in
+
+Four things a person could only change by typing, each now a control (`feat(canvas)` #142, part of
+#132's "no source in the UI"):
+
+- **`aspect=`** has a *Wrapping* select in the item view's Advanced half, on a diagram whose box is
+  the layout's (`resizeOfItem(item) === "aspect"`): *theme default* (the attribute off), *never
+  wrap* (`aspect=0`, a pipeline that must read as one line) and *fold to a shape* with a width ÷
+  height box. The side handles write the third, and nothing could take any of them back — which is
+  the gap. `src/board/settings.ts` holds the rules (`aspectChoice`, `aspectAttr`). A half-typed
+  ratio writes nothing: `Number("")` is `0`, and `0` is *never wrap*, so a box that coerced would turn
+  wrapping off by being empty. A value the parser rejected (`EB_BAD_ASPECT`) is its own disabled
+  option and a sentence, so the select says what the file holds instead of "default".
+- **A diagram's own `hue=`** is drawn: a hairline round the frame and the title band tinted behind
+  the header, in the theme's hue and its tint (`--dag-color-hues-*`, `--dag-tint-*`, which every
+  theme has), with a *Frame colour* swatch row — *none* first — in the item view for every
+  diagram. Three load-bearing things. **It binds `--frame-h`/`--frame-t`, not `--dag-h`/`--dag-t`**
+  (`frameHueVars` beside `hueVars`): every card inside a diagram inherits the second pair, so binding
+  it on the frame would recolour each card that has no hue of its own. **It adds nothing to the
+  box.** The hairline is an inset shadow, not a border, and the band is the header stretched out to
+  the frame's edge by exactly the padding the frame inset it by, with that padding put back inside —
+  `size.ts` measures a frame and the dev size assertion would report any growth. An inset shadow
+  also survives the SVG export, which freezes computed styles of real elements and has no
+  pseudo-element to freeze. **A bare frame has no band to tint** and keeps the hairline (and the
+  group radius it otherwise drops). The two swatch rows in a lone-node diagram's panel are told apart
+  by hook and label: `data-dag-prop-hue` is the node's, `data-dag-frame-hue` the frame's.
+- **The board's frontmatter** — `theme:` and `flow: {width, gap}` — is *Board settings* in the top
+  bar's `⋯`, a card over the board (`src/ui/BoardSettings.tsx`) written through `Editor.setMeta`, one
+  `MetaOp` and one undo entry, as the page tabs write `pages:`. Only what differs from
+  `FLOW_DEFAULT` is written and `flow:` leaves the file when both are the default, so a board nobody
+  changed stays as short as it was; a number outside `FLOW_RANGE` is put back in the box with the
+  range said. *Follow my settings* is **no `theme:` at all**. The board's theme is the one drawn
+  (`pickTheme`, `src/theme/pick.ts`) unless the reader turned on *Use my theme on every board* in
+  Settings → Appearance or the address names one (`?theme=`), so when the window is drawing another
+  theme than the board asks for, the card says which and why (`data-dag-board-theme-note` carries
+  the rule that decided: `board`, `mine`, `address`), instead of a setting that visibly did nothing.
+- **A file that would not parse far enough to have a control** gets a repair in words, under its
+  row in the problems dock (`src/edit/repair.ts` plans it, `Problems.tsx` draws it, `Editor.repair`
+  does it). `EB_FRONTMATTER` keeps every top-level setting that reads on its own, **byte for byte**,
+  and names what it dropped; `EB_UNKNOWN_TYPE` relabels the fence — a select led by the nearest
+  kind — and leaves its text alone; `EB_BAD_LAYOUT` and `EB_BAD_ASPECT` take the one attribute off.
+  The first two go through `put` (`src/board/repair.ts`): no item id addresses a block the parser
+  skipped, and `MetaOp` refuses a block it cannot read so as not to throw away what somebody was
+  half-way through writing. Each checks the file *now* — a relabel is refused if its line no longer
+  says what it was offered for — so a repair clicked after Claude rewrote the file does nothing
+  rather than something to the wrong line.
 
 ### What the panel opens on, and what it opens with
 

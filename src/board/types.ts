@@ -102,7 +102,7 @@ export interface BoardItem {
   subtitle?: string;
   /**
    * The item's own hue — a `md`/`note`/`image` wears it directly (`hueVars()` in `MarkdownItem` and
-   * `ImageItem`); a diagram item may carry one too, though nothing draws it yet. One of
+   * `ImageItem`); a diagram item draws it as the tint of its frame (`frameHueVars()` in `Frame`). One of
    * `HUE_ORDER`; an unknown name is `WB_BAD_HUE` and dropped. Not in `hash` — it is colour only, no
    * layout, so a hue change must not miss the layout cache the way `dir`/`aspect` deliberately do.
    */

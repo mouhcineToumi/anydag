@@ -35,12 +35,14 @@ import { fileStem, saveFile } from "@/export/save";
 import { bindingFor, CHORD_MS, LEADER_CODE, WHICHKEY_MS, type Command } from "@/edit/bindings";
 
 import { renameItemId } from "@/board/rename";
+import { repairFrontmatter, retypeFence } from "@/board/repair";
 import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import { removeEdge, removeNode, replaceLine, setEdgeLabel, setLinkVia, setTitle, stripCoords } from "@/dsl/restate";
 
 import { History } from "./history";
+import type { Fix } from "./repair";
 import {
   appendLink,
   connectSvg,
@@ -541,6 +543,21 @@ export interface Editor {
    */
   replace(id: string, next: { type?: ItemType; body?: string; attrs?: Record<string, AttrValue | null> }): void;
   setAttrs(id: string, attrs: Record<string, AttrValue | null>): void;
+  /**
+   * Set keys in the board's frontmatter, `null` removing one — `theme:` and `flow:`, which the board
+   * settings card writes, beside the `pages:` the page tabs do. One patch, so one undo entry.
+   * Resolves to whether it was written.
+   */
+  setMeta(meta: Record<string, unknown>): Promise<boolean>;
+  /**
+   * Carry out a repair the problems dock offered — the settings block that cannot be read, a fence
+   * of a kind nobody knows, an attribute that is not a value. Resolves to a sentence when it
+   * could not be done and to `null` when it was.
+   *
+   * The first two go through `put`, like `renameItem`: no item id addresses them. The last is an
+   * ordinary attribute patch.
+   */
+  repair(fix: Fix): Promise<string | null>;
   onMarquee(rect: Rect, additive: boolean): void;
   onPaperClick(): void;
   onPaperDoubleClick(at: Point): void;
@@ -3343,6 +3360,35 @@ export function useEditor({
     [commit],
   );
 
+  const setMeta = useCallback((meta: Record<string, unknown>) => commit([{ meta }]), [commit]);
+
+  /**
+   * A repair, written as the version of the file it would be — see `Editor.repair`.
+   *
+   * The text is read **now**, not when the dock drew the button: a fix is offered against one
+   * reading of the board, and `retypeFence` refuses one whose line no longer says what it was
+   * offered for, which is how a repair clicked after Claude rewrote the file does nothing instead
+   * of something to the wrong line.
+   */
+  const repair = useCallback(
+    async (fix: Fix): Promise<string | null> => {
+      if (lockedRef.current) return (refuseLocked(), "read only: unlock to repair it");
+      if (fix.kind === "attr") {
+        return (await commit([{ id: fix.item, attrs: { [fix.key]: null } }])) ? null : "the file changed underneath. Try again";
+      }
+      const cur = handleRef.current.current();
+      if (!cur) return "the board has not loaded yet";
+      const done = fix.kind === "frontmatter" ? repairFrontmatter(cur.text) : retypeFence(cur.text, fix.line, fix.from, fix.to);
+      if (!done.ok) return done.error;
+      const w = await handleRef.current.put(done.text);
+      if (!w) return "the file changed underneath. Try again";
+      history.push(w.before, w.after);
+      setTick((t) => t + 1);
+      return null;
+    },
+    [commit, history],
+  );
+
   /* ---- keys and the clipboard ---- */
 
   /* Where the pointer last was, so a paste lands under it rather than in a corner. */
@@ -3854,6 +3900,8 @@ export function useEditor({
     close,
     setBody,
     setAttrs,
+    setMeta,
+    repair,
     replace,
     onMarquee,
     onPaperClick,
