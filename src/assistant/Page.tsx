@@ -48,12 +48,17 @@ export function AssistantView({
     if (chat.gone) onChat(NEW_CHAT);
   }, [chat.gone, onChat]);
   const nameOf = (vault: string) => vaults?.find((v) => v.id === vault)?.name;
+  /* A chat made from the welcome by something other than a message — a grant from the scope menu —
+     keeps the welcome until its first message. Turning into the thread there would re-mount the
+     composer and close the menu under the click that made the chat. */
+  const [fresh, setFresh] = useState<string | null>(null);
+  const greeting = (id === null || id === fresh) && chat.turns.length === 0 && !chat.live;
 
   return (
     <div className="dag-assistant" data-dag-assistant-page="">
       <History rows={chats.rows} loaded={chats.loaded} current={id} here={here} nameOf={nameOf} onPick={onChat} />
       <section className="dag-assistant__main">
-        {id ? (
+        {id && !greeting ? (
           <Heading
             id={id}
             title={chat.meta?.title ?? row?.title ?? ""}
@@ -70,11 +75,14 @@ export function AssistantView({
           <ChatSurface
             id={id}
             chat={chat}
-            onId={(made) => onChat(made)}
+            onId={(made) => {
+              if (id === null) setFresh(made);
+              onChat(made);
+            }}
             onOpen={onOpen}
             changes
             autofocus
-            welcome={id === null}
+            welcome={greeting}
           />
         )}
       </section>
