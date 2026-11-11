@@ -79,6 +79,12 @@ export interface Question {
   why: string;
   /** No options, and a quote at its end: answered in words and graded by the person. */
   open: boolean;
+  /**
+   * What follows the options or the explanation and is neither (`EQ_STRAY`): the Markdown from the
+   * first such line to the end of the question. The form has no field for it, so it shows it and
+   * offers where to put it; absent when there is none.
+   */
+  stray?: string;
   /** `multi` written on the heading. */
   multiFlag: boolean;
   /** Whether it asks for every correct option: the flag, or more than one ticked. */
@@ -113,15 +119,18 @@ const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 const HEADING = /^ {0,3}##(?=[ \t]|$)(.*)$/;
 /** CommonMark's closing sequence: `## Title ##`. It needs a space before it, or it is the title. */
 const CLOSING = /(?:^|[ \t]+)#+[ \t]*$/;
-/** A trailing `{…}` whose every word is `#id` or a bare word. Anything else is prompt text. */
-const ATTRS = /[ \t]*\{([^{}]*)\}[ \t]*$/;
+/**
+ * A trailing `{…}` whose every word is `#id` or a bare word. Anything else is prompt text, and so is
+ * a brace written `\{` — the escape the form writes when a prompt itself ends in braces.
+ */
+const ATTRS = /[ \t]*(?<!\\)\{([^{}]*)\}[ \t]*$/;
 const ATTR_WORD = /^#?[A-Za-z0-9_-]+$/;
 
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const OPTION = /^ {0,3}[-*+][ \t]+\[([ xX])\](?:[ \t]+(.*?))?[ \t]*$/;
 const QUOTE = /^ {0,3}>/;
-/** `{pin}` at the end of an option's first line. */
-const PIN = /[ \t]*\{pin\}[ \t]*$/;
+/** `{pin}` at the end of an option's first line — not `\{pin}`, which is the words. */
+const PIN = /[ \t]*(?<!\\)\{pin\}[ \t]*$/;
 /** `shuffle: true` in the frontmatter, lenient in case and in its synonyms, as `task:` is. */
 const SHUFFLE = /^shuffle[ \t]*:[ \t]*["']?(?:true|yes|on)["']?[ \t]*$/im;
 
@@ -355,6 +364,7 @@ export function parseQuiz(text: string): Quiz {
       options: b.options,
       why,
       open,
+      ...(b.stray ? { stray: trimBlank(text.slice(b.stray.start, b.last.end).split(/\r?\n/)).join("\n") } : {}),
       multiFlag: h.multi,
       multi: h.multi || correct > 1,
       line: b.line.n,

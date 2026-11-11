@@ -40,6 +40,26 @@ export const OWN_SLASH: Record<string, NoteBlockType> = {
   equation: "equation",
 };
 
+/**
+ * The blocks a form's rich field may hold (`FieldEditor`'s `block` variant): a note's, less the four
+ * that are a quiz's own syntax — a heading starts a question, a task list is the options, a quote at
+ * the end is the answer, and a rule under a line makes it a heading. `test/note-menu.test.ts` holds it
+ * to `NOTE_BLOCKS`, and `test/quiz-builder.test.ts` holds what these write to staying inside one question.
+ */
+export const FIELD_BLOCKS = [
+  "paragraph",
+  "bulletListItem",
+  "numberedListItem",
+  "codeBlock",
+  "table",
+  "image",
+  "embed",
+  "equation",
+] as const satisfies readonly NoteBlockType[];
+
+/** `SLASH`'s keys for a field: the ones whose block is in `FIELD_BLOCKS`. */
+export const FIELD_SLASH_KEYS = SLASH_KEYS.filter((k) => (FIELD_BLOCKS as readonly string[]).includes(SLASH[k]!));
+
 /** What opens the reference picker: a mention's `@`, and the wiki-link `[[` people type from habit. */
 export const REF_TRIGGERS = ["@", "[["] as const;
 

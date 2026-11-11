@@ -488,9 +488,9 @@ function usePageChrome({
   table?: string | null;
   /** And the attachment. */
   file?: string | null;
-}): { themeName: string; openBrowser(): void; cards: ReactNode } {
+}): { themeName: string; scheme: "light" | "dark"; openBrowser(): void; cards: ReactNode } {
   const snapshot = query.get("snapshot") === "1";
-  const { name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
   const [browsing, setBrowsing] = useState(false);
   const settings = useSettingsOpen();
   const feedback = useFeedbackOpen();
@@ -541,7 +541,7 @@ function usePageChrome({
       {feedback.open ? <FeedbackCard document={null} onClose={feedback.close} /> : null}
     </>
   );
-  return { themeName, openBrowser: () => setBrowsing(true), cards };
+  return { themeName, scheme: theme.color.scheme === "dark" ? "dark" : "light", openBrowser: () => setBrowsing(true), cards };
 }
 
 /**
@@ -1044,7 +1044,7 @@ function QuizApp({
   const snapshot = query.get("snapshot") === "1";
   const running = !snapshot && query.get("run") === "1";
   const locked = useLocked() && !snapshot;
-  const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open, quiz: name });
+  const { openBrowser, cards, scheme } = usePageChrome({ query, setQuery, list, open, quiz: name });
   const file = useQuizFile(name);
   const quiz = useMemo(() => parseQuiz(file.text), [file.text]);
   /* A snapshot is ready once the sheet is drawn, boards embedded in it included. */
@@ -1132,7 +1132,7 @@ function QuizApp({
       );
   else
     body = (
-      <QuizEditor text={file.text} onChange={file.change} target={target} onTargetShown={clearTarget}>
+      <QuizEditor name={name} scheme={scheme} text={file.text} onChange={file.change} target={target} onTargetShown={clearTarget}>
         <span
           className="dag-quiz__status"
           data-dag-quiz-saving={file.state.status === "ready" && file.state.saving ? "" : undefined}

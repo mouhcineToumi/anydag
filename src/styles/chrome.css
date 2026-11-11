@@ -4865,45 +4865,49 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-quiz > * { max-width: 760px; margin-inline: auto; }
 /* A field's and a problem list's own `margin` shorthand would undo the centring above. */
-.dag-quiz > .dag-quiz__field,
+.dag-quiz > .dag-quiz__rich,
 .dag-quiz > .dag-quiz__shuffle,
 .dag-quiz > .dag-quiz__problems { margin-inline: auto; }
 .dag-quiz__bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.dag-quiz__mode { display: inline-flex; padding: 2px; background: var(--dag-color-paper100); border: 1px solid var(--dag-color-outlineSoft); border-radius: var(--dag-metric-radius-chip); }
-.dag-quiz__mode > button {
-  padding: 4px 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-quiz__mode > button[aria-checked="true"] { color: var(--dag-color-ink); background: var(--dag-color-card); }
-.dag-quiz__mode > button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-quiz__bar:empty { display: none; }
 .dag-quiz__status { margin-left: auto; font-size: 12px; color: var(--dag-color-muted); }
-.dag-quiz__field {
-  display: block;
+
+/*
+ * A rich field: drawn as what it says until it is opened, then the block editor in the same box. The
+ * box is the field's, so the two look like one control; BlockNote's own gutter and padding are taken
+ * off inside it (`.dag-blocks--field`).
+ */
+.dag-quiz__rich {
   box-sizing: border-box;
-  width: 100%;
   margin: 0 0 10px;
-  padding: 7px 10px;
-  font: inherit;
   font-size: 14px;
   line-height: 1.45;
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
   border-radius: var(--dag-metric-radius-small);
-  resize: vertical;
+  cursor: text;
 }
-.dag-quiz__field::placeholder { color: var(--dag-color-muted); }
-.dag-quiz__field:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -1px; border-color: transparent; }
-.dag-quiz__field[readonly] { color: var(--dag-color-slate); background: var(--dag-color-paper100); }
+.dag-quiz__rich[data-dag-quiz-open-field],
+.dag-quiz__rich:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 1px var(--dag-color-accent); }
+.dag-quiz__rich-view { min-height: 20px; padding: 7px 10px; outline: none; overflow-wrap: anywhere; }
+.dag-quiz__rich-view > :first-child { margin-top: 0; }
+.dag-quiz__rich-view > :last-child { margin-bottom: 0; }
+.dag-quiz__rich-view[aria-readonly="true"] { color: var(--dag-color-slate); background: var(--dag-color-paper100); cursor: default; }
+.dag-quiz__rich--line .dag-quiz__rich-view { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dag-quiz__placeholder { color: var(--dag-color-muted); }
 .dag-quiz__prompt { font-size: 16px; font-weight: 600; }
-.dag-quiz__source-text { min-height: 60vh; font-family: var(--dag-font-mono); font-size: 13px; }
+.dag-quiz__description { margin-bottom: 12px; }
+/* The editor in the field's box, at the field's size: no gutter, no background of its own. */
+.dag-rich-field .dag-blocks--field .bn-editor { padding: 4px 10px; font-size: 14px; line-height: 1.45; background: transparent; }
+.dag-rich-field .dag-blocks--field.bn-root[data-color-scheme] { --bn-colors-editor-background: transparent; }
+.dag-quiz__prompt .dag-rich-field .dag-blocks--field .bn-editor { font-size: 16px; font-weight: 600; }
+/* No empty block after the last to click into, so a field opens at its drawing's height: a field
+   that grew as it opened moved everything under it, and a press on the button below it — *Add an
+   answer*, a tick — was let go over something else and missed. A code block is left with Enter
+   three times or shift+Enter, BlockNote's own keys. */
+.dag-rich-field .dag-blocks--field .bn-trailing-block { display: none; }
+
 .dag-quiz__card {
   margin-bottom: 16px;
   padding: 14px 16px 6px;
@@ -4911,8 +4915,31 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   border: 1px solid var(--dag-color-outlineSoft);
   border-radius: var(--dag-metric-radius-card);
 }
-.dag-quiz__card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dag-quiz__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dag-quiz__card-number { font-size: 13px; font-weight: 600; color: var(--dag-color-slate); }
+.dag-select.dag-quiz__kind { width: auto; min-width: 0; font-size: 12px; }
+/* A handle to drag by: the row moves, the handle says so. */
+.dag-quiz__grip { cursor: grab; touch-action: none; color: var(--dag-color-muted); }
+.dag-quiz__grip:hover:not(:disabled) { color: var(--dag-color-ink); }
+[data-dag-dragging] .dag-quiz__grip { cursor: grabbing; }
+[data-dag-quiz-dragging] { opacity: 0.5; }
+[data-dag-quiz-drop="before"] { box-shadow: 0 -2px 0 var(--dag-color-accent); }
+[data-dag-quiz-drop="after"] { box-shadow: 0 2px 0 var(--dag-color-accent); }
+.dag-quiz__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: -4px 0 10px;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.dag-quiz__more:hover:not(:disabled) { color: var(--dag-color-ink); }
+.dag-quiz__more:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 .dag-quiz__card-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
 .dag-quiz__confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-quiz__confirm > button {
@@ -4926,19 +4953,23 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-quiz__confirm > .dag-quiz__danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); background: var(--dag-color-dangerSoft); }
+.dag-quiz__confirm--line { display: flex; flex-wrap: wrap; margin: 0 0 10px; }
 .dag-quiz__options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 /* At the top of the row, which an option holding a code block makes tall. */
 .dag-quiz__option { display: flex; align-items: flex-start; gap: 6px; }
-.dag-quiz__option > .dag-quiz__field { margin: 0; flex: 1; min-width: 0; }
+.dag-quiz__option > .dag-quiz__rich { margin: 0; flex: 1; min-width: 0; }
 .dag-quiz__option > .dag-check { margin: 11px 4px 0 2px; }
+/* One right answer is a choice of one: a circle, as a radio is everywhere else. */
+.dag-check--round { border-radius: 50%; }
 /* A right answer is ticked in the success colour: it is the key, not a setting. */
 .dag-quiz__option > .dag-check:checked { background: var(--dag-color-success); border-color: var(--dag-color-success); }
+/* No answer is marked: the ticks are where to look. */
+.dag-quiz__card[data-dag-quiz-needs-answer] .dag-quiz__option > .dag-check { border-color: var(--dag-color-dangerBorder); box-shadow: 0 0 0 3px var(--dag-color-dangerSoft); }
 .dag-quiz__option > .dag-icon { margin-top: 2px; }
-.dag-quiz__option-text { resize: none; }
 /* Pressed, a pin wears the accent: the option keeps its place when a run shuffles. */
 .dag-quiz__pin[aria-pressed="true"] { color: var(--dag-color-accent); }
 .dag-quiz__pin[aria-pressed="true"]:disabled { opacity: 0.6; }
-.dag-quiz__option[data-dag-quiz-correct] > .dag-quiz__field { border-color: var(--dag-color-successBorder); }
+.dag-quiz__option[data-dag-quiz-correct] > .dag-quiz__rich { border-color: var(--dag-color-successBorder); }
 .dag-quiz__add-option,
 .dag-quiz__add {
   display: inline-flex;
@@ -4966,9 +4997,34 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-quiz__adds { display: flex; flex-wrap: wrap; gap: 8px; }
 .dag-quiz__empty { margin: 24px auto 12px; font-size: 14px; color: var(--dag-color-muted); }
 .dag-quiz__problems { margin: 0 0 10px; padding: 0; list-style: none; }
-.dag-quiz__problem { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; color: var(--dag-color-warningText); }
+.dag-quiz__problem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 0; font-size: 12px; color: var(--dag-color-warningText); }
 .dag-quiz__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
-.dag-quiz__problem-line { flex: none; font-family: var(--dag-font-mono); color: var(--dag-color-muted); }
+.dag-quiz__fix {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-quiz__fix:hover { border-color: var(--dag-color-slate); }
+.dag-quiz__fix:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+/* The text the form has no field for, shown as it reads, and where it can go. */
+.dag-quiz__stray { flex-basis: 100%; }
+.dag-quiz__stray-text {
+  margin: 4px 0 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border-left: 3px solid var(--dag-color-warningText);
+  border-radius: var(--dag-metric-radius-small);
+}
+.dag-quiz__stray-text > :first-child { margin-top: 0; }
+.dag-quiz__stray-text > :last-child { margin-bottom: 0; }
+.dag-quiz__stray-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
 .dag-quiz__conflict {
   display: flex;
   flex-wrap: wrap;
