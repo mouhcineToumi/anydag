@@ -31,6 +31,9 @@
     "@iconify-json/logos",
     "@iconify-json/simple-icons"
   ],
+  // scripts/brand/mark.mjs renders the PNG icons with librsvg's CLI when it is installed; it is a
+  // system tool, not a package, and the script skips the PNGs without it.
+  "ignoreBinaries": ["rsvg-convert"],
   // e2e/export.spec.ts imports "/src/export/svg.ts" inside page.evaluate(): a URL the Vite dev
   // server answers in the browser, not a file path Node resolves.
   "ignoreUnresolved": ["/src/export/svg.ts"]
