@@ -172,10 +172,7 @@ slice c "Gamma" 25
 
   async function open(page: Page) {
     await page.goto(`/?board=${name}`);
-    await page.evaluate(() => {
-      localStorage.setItem("dag:library", "0");
-      localStorage.setItem("dag:inspector-mode", "props");
-    });
+    await page.evaluate(() => localStorage.setItem("dag:library", "0"));
     await ready(page);
   }
 
@@ -273,6 +270,127 @@ slice c "Gamma" 25
     await page.locator("[data-dag-prop-categories]").fill("One, Two, Three");
     await page.locator("[data-dag-prop-categories]").blur();
     await expect.poll(read, { timeout: 5_000 }).toContain("x One Two Three");
+  });
+
+  test("a donut's centre figure and caption are typed in the panel", async ({ page }) => {
+    await open(page);
+    await page.locator('[data-dag-item="share"]').click();
+    await page.keyboard.press("Enter");
+
+    /* A bar has no hole, so the fields are not offered until the form is a donut. */
+    await expect(page.locator("[data-dag-prop-hero]")).toHaveCount(0);
+    await page.locator("[data-dag-prop-form]").selectOption("donut");
+    await expect(page.locator("[data-dag-prop-hero]")).toHaveCount(1);
+
+    await page.locator("[data-dag-prop-hero]").fill("1.2M");
+    await page.locator("[data-dag-prop-hero]").blur();
+    await expect.poll(read, { timeout: 5_000 }).toMatch(/\ndonut "1\.2M"\n/);
+    await page.locator("[data-dag-prop-hero-label]").fill("users");
+    await page.locator("[data-dag-prop-hero-label]").blur();
+    await expect.poll(read, { timeout: 5_000 }).toContain('donut "1.2M" "users"');
+    await expect(page.locator('[data-dag-item="share"] .dag-chart__text--hero')).toHaveCount(1);
+    await expect(page.locator("[data-dag-error]")).toHaveCount(0);
+
+    /* Emptying the figure takes the caption with it. */
+    await page.locator("[data-dag-prop-hero]").fill("");
+    await page.locator("[data-dag-prop-hero]").blur();
+    await expect.poll(read, { timeout: 5_000 }).toMatch(/\ndonut\n/);
+  });
+
+  test("a legend's key rows are added, retyped and removed in the panel", async ({ page }) => {
+    await open(page);
+    await page.locator('[data-dag-item="rev"]').click();
+    await page.keyboard.press("Enter");
+
+    await page.locator("[data-dag-prop-key-add]").click();
+    await expect.poll(read, { timeout: 5_000 }).toContain('legend solid "New entry"');
+    await page.locator('[data-dag-prop-key-text="0"]').fill("in sync");
+    await page.locator('[data-dag-prop-key-text="0"]').blur();
+    await expect.poll(read, { timeout: 5_000 }).toContain('legend solid "in sync"');
+    await page.locator('[data-dag-prop-key-glyph="0"]').selectOption("dashed");
+    await expect.poll(read, { timeout: 5_000 }).toContain('legend dashed "in sync"');
+    await expect(page.locator('[data-dag-item="rev"] .dag-legend__item')).toHaveCount(1);
+
+    /* The placement is the other `legend` statement and must not be mistaken for a row. */
+    await page.locator("[data-dag-prop-legend]").selectOption("bottom");
+    await expect.poll(read, { timeout: 5_000 }).toContain("legend bottom");
+    expect(read()).toContain('legend dashed "in sync"');
+
+    await page.locator('[data-dag-prop-key-remove="0"]').click();
+    await expect.poll(read, { timeout: 5_000 }).not.toContain("in sync");
+    expect(read()).toContain("legend bottom");
+    await expect(page.locator("[data-dag-error]")).toHaveCount(0);
+  });
+
+  test("a series and a slice are added from the panel, and the new one is picked", async ({ page }) => {
+    await open(page);
+    await page.locator('[data-dag-item="rev"]').click();
+    await page.keyboard.press("Enter");
+
+    await page.locator('[data-dag-prop-chart-add="series"]').click();
+    await expect.poll(read, { timeout: 5_000 }).toContain('series series1 "Series 1" 1 1 1');
+    await expect(page.locator('[data-dag-item="rev"] [data-dag-node]')).toHaveCount(3);
+    /* Picked, so the values it was given are one click from being the person's own. */
+    await expect(page.locator('[data-dag-props="series1"]')).toHaveCount(1);
+    await page.locator("[data-dag-prop-values]").fill("5 6 7");
+    await page.locator("[data-dag-prop-values]").blur();
+    await expect.poll(read, { timeout: 5_000 }).toContain('series series1 "Series 1" 5 6 7');
+
+    await page.locator('[data-dag-item="share"]').click();
+    await page.keyboard.press("Enter");
+    await page.locator('[data-dag-prop-chart-add="slice"]').click();
+    await expect.poll(read, { timeout: 5_000 }).toContain('slice slice1 "Slice 1" 1');
+    await expect(page.locator('[data-dag-item="share"] [data-dag-node]')).toHaveCount(4);
+    await expect(page.locator("[data-dag-error]")).toHaveCount(0);
+  });
+
+  test("a series' id is changed in the panel, and a clash is refused in the box", async ({ page }) => {
+    /* A note beside the charts and links into them: `rev.web` is the series being renamed, the
+       rest are lookalikes that must come through byte for byte. */
+    fs.writeFileSync(
+      file,
+      `${BOARD}
+\`\`\`md {#notes x=0 y=460}
+Why it grew.
+\`\`\`
+
+\`\`\`edges
+notes --> rev.web "why it grew"
+notes --> rev.mob
+notes --> share.a
+notes --> rev
+\`\`\`
+`,
+    );
+    await open(page);
+    await pickMark(page, "rev", "web");
+    await page.keyboard.press("Enter");
+
+    await page.locator("[data-dag-prop-chart-id]").fill("mob");
+    await page.locator("[data-dag-prop-chart-id]").blur();
+    await expect(page.locator("[data-dag-prop-chart-id-error]")).toHaveCount(1);
+    await expect(page.locator("[data-dag-prop-chart-id]")).toHaveValue("web");
+
+    await page.locator("[data-dag-prop-chart-id]").fill("site");
+    await page.locator("[data-dag-prop-chart-id]").blur();
+    await expect.poll(read, { timeout: 5_000 }).toContain('series site "Web" 12 30 21');
+    expect(read()).not.toContain("series web");
+    /* The link that named the series follows it, in the same write; the others stay as written. */
+    expect(read()).toContain('notes --> rev.site "why it grew"');
+    expect(read()).not.toContain("rev.web");
+    expect(read()).toContain("notes --> rev.mob\nnotes --> share.a\nnotes --> rev\n");
+    /* One write, so one undo gives back the series and the link together. */
+    await page.locator(".dag-viewport").focus();
+    await page.keyboard.press("Control+z");
+    await expect.poll(read, { timeout: 15_000 }).toContain('series web "Web" 12 30 21');
+    expect(read()).toContain('notes --> rev.web "why it grew"');
+    expect(read()).not.toContain("rev.site");
+    await page.keyboard.press("Control+Shift+z");
+    await expect.poll(read, { timeout: 15_000 }).toContain('notes --> rev.site "why it grew"');
+    /* The pick followed the id, so the panel is still open on the same series. */
+    await expect(page.locator('[data-dag-props="site"]')).toHaveCount(1);
+    await expect(page.locator('[data-dag-item="rev"] [data-dag-node="site"]')).toHaveCount(1);
+    await expect(page.locator("[data-dag-error]")).toHaveCount(0);
   });
 
   test("a picked slice dragged past its neighbour is a line of the fence moving", async ({ page }) => {

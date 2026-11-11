@@ -117,6 +117,21 @@ test("a save the server could not answer goes again on its own", async ({ page }
   problems = problems.filter((p) => !/status of 503/.test(p));
 });
 
+test("a note whose first read got no answer says so and reads again, rather than staying blank", async ({ page }) => {
+  /* #123: the read that opens a note waited behind the desktop's six held connections, and a page
+     whose read failed drew nothing at all — no text, no title, no word of why — for good. */
+  let refused = 0;
+  await page.route(`**/__board/get?name=${name}&kind=note*`, (route) =>
+    refused < 2 ? (refused++, route.fulfill({ status: 502, body: "anydag: the server is not answering" })) : route.fallback(),
+  );
+  await page.goto(`/?note=${name}`);
+  await expect(page.locator("[data-dag-note-unread]")).toBeVisible();
+  await expect(block(page, "The last paragraph.")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-dag-note-unread]")).toHaveCount(0);
+  expect(refused).toBe(2);
+  problems = problems.filter((p) => !/status of 502/.test(p));
+});
+
 test("a save the server refused waits for the next change", async ({ page }) => {
   /* A 4xx is an answer about the request, and the same request gets the same answer. */
   let puts = 0;
@@ -270,6 +285,33 @@ test("the list shows a note beside the boards, and opens either", async ({ page 
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   expect(new URL(page.url()).searchParams.get("board")).toBeNull();
   await expect(block(page, "The second paragraph.")).toBeVisible();
+});
+
+test("a note's text is on screen before its editor is up, and the editor takes its place", async ({ page }) => {
+  /* The editor's chunk held back, as a first open on a slow machine holds it: its module in dev,
+     its chunk in a build (#120). The text was not on screen until BlockNote was; it is drawn
+     read-only the moment the file is back. */
+  let release = () => {};
+  const held = new Promise<void>((ok) => {
+    release = ok;
+  });
+  await page.route(/\/BlockEditor[^/]*\.(tsx|js)(\?.*)?$/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto(`/?note=${name}`);
+  const first = page.locator("[data-dag-note-first]");
+  await expect(first.getByText("The second paragraph.")).toBeVisible({ timeout: 10_000 });
+  await expect(first.locator("h1", { hasText: "The plan" })).toBeVisible();
+  await expect(page.locator("[data-dag-note-editor]")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.dataset.dagReady)).toBeUndefined();
+  release();
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(block(page, "The second paragraph.")).toBeVisible();
+  /* The two change places in one render: once the editor is up, the stand-in is gone. */
+  await expect(first).toHaveCount(0);
+  await expect(page.getByText("The second paragraph.")).toHaveCount(1);
+  expect(read()).toBe(NOTE);
 });
 
 test("New note makes one, opens it, and names it in its own title", { tag: "@smoke" }, async ({ page }) => {

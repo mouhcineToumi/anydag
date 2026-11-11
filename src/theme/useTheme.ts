@@ -51,9 +51,9 @@ function stored(): string | null {
 }
 
 /**
- * Which theme the board is drawn in.
+ * Which theme a page is drawn in.
  *
- * Three sources, in this order:
+ * Two sources, in this order:
  *
  * 1. **`?theme=`** — an instruction someone put in the URL. `snapshot.mjs --theme` and every
  *    Playwright check are this, and a preference remembered in a browser must not be able to
@@ -63,11 +63,11 @@ function stored(): string | null {
  *    is exactly why it does not belong in the query string. It used to be React state alone, so
  *    every reload threw it away and the dark theme could not be anybody's preference; you could
  *    only ever be *visiting* it.
- * 3. **The board's `theme:` frontmatter**, then the default.
  *
- * The reader's choice beating the board's frontmatter is deliberate and unchanged: switching themes
- * to compare should not snap back the moment Claude rewrites the file. What is new is only that the
- * choice outlives the tab. A board that must be seen in one particular look says so in the URL.
+ * Then the default. **A board is not a source.** It once could say `theme:` in its frontmatter, and
+ * that made the same vault look different board to board and let a document override the person
+ * reading it. The line still parses as YAML and stays in the file untouched — opening a vault never
+ * writes a byte — but nothing reads it (issue #162).
  *
  * **A snapshot reads no storage at all** — source 2 is skipped when `snapshot` is set. `?snapshot=1`
  * means the page is a picture being taken by `snapshot.mjs`, `tidy.mjs` or a Playwright check, and a
@@ -76,14 +76,10 @@ function stored(): string | null {
  * person pointing the snapshot script at a persistent profile got their own theme in the picture and
  * nothing said so. `src/settings/store.ts` states the same rule for everything it owns.
  */
-export function useTheme(
-  explicit?: string,
-  boardTheme?: string,
-  snapshot = false,
-): { theme: Theme; name: string; setName(n: string): void } {
+export function useTheme(explicit?: string, snapshot = false): { theme: Theme; name: string; setName(n: string): void } {
   const [chosen, setChosen] = useState<string | null>(() => (snapshot ? null : stored()));
 
-  const name = known(explicit) ?? chosen ?? known(boardTheme) ?? DEFAULT;
+  const name = known(explicit) ?? chosen ?? DEFAULT;
   const theme = THEMES[name] ?? THEMES[DEFAULT]!;
 
   useEffect(() => {

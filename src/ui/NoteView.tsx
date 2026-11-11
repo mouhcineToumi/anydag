@@ -1,7 +1,7 @@
 import { Calendar, CalendarDays, X } from "lucide-react";
-import { Suspense, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 
-import { BlockEditor, type NoteEditor } from "@/blocks";
+import { useBlockEditor, type NoteEditor } from "@/blocks";
 import { concerns, onNote } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
 import { retitleFile } from "@/board/useBoard";
@@ -27,6 +27,14 @@ import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { TaskGlyph, TaskLine } from "./TaskGlyph";
 
+/**
+ * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
+ * life costs several times what any later one does — measured in the packaged desktop app, about
+ * 45 ms against under 10, and 165 ms at a quarter of the CPU — so the first note opened paints its
+ * text read-only before the editor is mounted at all, rather than in the same commit (#120).
+ */
+let editorMountedBefore = false;
+
 /** A quarter of a second after the last change, as the panel and the prompt card write theirs. */
 const WRITE_AFTER_MS = 250;
 
@@ -46,6 +54,9 @@ interface Opened {
 
 type Status =
   | { kind: "loading" }
+  /** The read that opens the note got no answer — the server did not reply, or replied with a 5xx.
+      It goes again on its own; until it lands there is nothing to draw but this. */
+  | { kind: "unread" }
   | { kind: "ready" }
   | { kind: "missing" }
   | { kind: "deleted" }
@@ -57,9 +68,15 @@ type Status =
 
 const q = (name: string) => `name=${encodeURIComponent(name)}&kind=note`;
 
-/** `opening` is the read that opens the note, which a prefetch may answer; every other is asked now. */
+/**
+ * `opening` is the read that opens the note, which a prefetch may answer; every other is asked now.
+ * `null` is the server saying there is no such note; **a 5xx, or no answer at all, throws** — it is
+ * not an answer about the note, and taking it for "missing" or for nothing is how a note page sat
+ * blank for good (#123).
+ */
 async function fetchNote(name: string, opening = false): Promise<{ text: string; base: string } | null> {
   const r = await (opening ? openDoc("note", name) : fetch(`/__board/get?${q(name)}`));
+  if (r.status >= 500) throw new Error(`the server answered ${r.status}`);
   if (!r.ok) return null;
   return (await r.json()) as { text: string; base: string };
 }
@@ -150,7 +167,8 @@ export interface NoteHandle {
  *
  * Under `?snapshot=1` there is no editor at all: the note is drawn read-only through
  * `react-markdown`, the renderer every board's text already uses, so a picture of a note is a fact
- * about the file.
+ * about the file. The same drawing stands in for the editor on an ordinary open until the editor is
+ * ready, so the text is on screen the moment the file has come back rather than once BlockNote has.
  */
 export function NoteView({
   name,
@@ -191,6 +209,11 @@ export function NoteView({
   handle?: MutableRefObject<NoteHandle | null>;
 }) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  /* Asked for as the page mounts, beside the note's own fetch — and never for a snapshot. */
+  const BlockEditor = useBlockEditor(!snapshot);
+  /* Whether the editor may mount yet: at once once one has come up on this page, and otherwise
+     only after the note's text has been painted without it (`editorMountedBefore`). */
+  const [mountEditor, setMountEditor] = useState(editorMountedBefore);
   /* Read by the writers below at the moment they would write: the bars are disabled while locked,
      and this is the floor under them — the top bar's `⋯` reaches the same writers. */
   const lockedRef = useRef(locked);
@@ -288,16 +311,29 @@ export function NoteView({
     if (held.current && nameRef.current === name) return;
     nameRef.current = name;
     let live = true;
+    let retry: ReturnType<typeof setTimeout> | null = null;
     setStatus({ kind: "loading" });
     setOpened(null);
-    void fetchNote(name, true).then((got) => {
-      if (!live) return;
-      if (!got) return setStatus({ kind: "missing" });
-      openText(got.text, got.base);
-      setStatus({ kind: "ready" });
-    });
+    /* A read that got no answer goes again on its own, as a failed save does, and the page says so
+       meanwhile rather than drawing nothing. */
+    const read = (wait: number, opening: boolean) =>
+      fetchNote(name, opening).then(
+        (got) => {
+          if (!live) return;
+          if (!got) return setStatus({ kind: "missing" });
+          openText(got.text, got.base);
+          setStatus({ kind: "ready" });
+        },
+        () => {
+          if (!live) return;
+          setStatus({ kind: "unread" });
+          retry = setTimeout(() => void read(Math.min(wait * 2, RETRY_LAST_MS), false), wait);
+        },
+      );
+    void read(RETRY_FIRST_MS, true);
     return () => {
       live = false;
+      if (retry) clearTimeout(retry);
     };
   }, [name, openText]);
 
@@ -432,7 +468,7 @@ export function NoteView({
           const to = await retitleFile(from, next, "note", true);
           if (!to) return;
           nameRef.current = to;
-          const got = await fetchNote(to);
+          const got = await fetchNote(to).catch(() => null);
           const h = held.current;
           const f = got ? splitNote(got.text) : null;
           if (got && f && h && f.body === h.text.slice(h.front.length)) {
@@ -559,15 +595,36 @@ export function NoteView({
       if (change.sha1 === held.current?.base) return;
       /* A save is on its way; it will meet this change as a 409 and merge it. */
       if (timer.current || writing.current) return;
-      void fetchNote(nameRef.current).then((got) => {
-        if (!got || got.base === held.current?.base) return;
-        if (timer.current || writing.current) return;
-        adopt(got.text, got.base);
-      });
+      void fetchNote(nameRef.current)
+        .then((got) => {
+          if (!got || got.base === held.current?.base) return;
+          if (timer.current || writing.current) return;
+          adopt(got.text, got.base);
+        })
+        /* The next change asks again; the page keeps the text it has. */
+        .catch(() => undefined);
     });
   }, [name, snapshot, adopt]);
 
+  /* Two frames: the first is the one the text is drawn in, and the editor is mounted once it is on
+     screen. A tab in the background draws no frames, so a timer stands behind them. */
+  useEffect(() => {
+    if (mountEditor || !opened) return;
+    const go = () => setMountEditor(true);
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(go);
+    });
+    const late = setTimeout(go, 250);
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+      clearTimeout(late);
+    };
+  }, [mountEditor, opened]);
+
   const onReady = useCallback((ed: NoteEditor) => {
+    editorMountedBefore = true;
     editor.current = ed;
     if (loaded.current) loaded.current = settle(loaded.current, ed.document());
     setReady(true);
@@ -697,6 +754,11 @@ export function NoteView({
           There is no note called {name}.
         </p>
       ) : null}
+      {status.kind === "unread" ? (
+        <p className="dag-note-view__notice" role="status" data-dag-note-unread="">
+          This note could not be read just now. Trying again…
+        </p>
+      ) : null}
       {status.kind === "deleted" ? (
         <p className="dag-note-view__notice" role="status" data-dag-note-deleted="">
           This note was deleted. What is on screen is not saved anywhere.
@@ -760,20 +822,31 @@ export function NoteView({
           {event ? (
             <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"} />
           ) : null}
-          <Suspense fallback={null}>
-            <BlockEditor
-              key={opened.seq}
-              initial={opened.blocks}
-              onReady={onReady}
-              onChange={onChange}
-              upload={upload}
-              attach={locked ? refuseFiles : attach}
-              resolve={resolve}
-              scheme={scheme}
-              self={self}
-              editable={!locked && status.kind !== "conflict"}
-            />
-          </Suspense>
+          {/* The text first, read-only, while the editor's chunk loads and BlockNote builds itself:
+              on a first open, about 120 ms on a fast machine and 450 at a quarter of its CPU (#120). The editor
+              mounts hidden under it and the two change places in the one render `onReady` causes,
+              so the page never shows both, nor neither. */}
+          {!ready && body !== null ? (
+            <div className="dag-note-view__first" data-dag-note-first="">
+              <NoteMarkdown name={name} body={body} components={refComponents()} />
+            </div>
+          ) : null}
+          <div className="dag-note-view__editor" hidden={!ready}>
+            {BlockEditor && mountEditor ? (
+              <BlockEditor
+                key={opened.seq}
+                initial={opened.blocks}
+                onReady={onReady}
+                onChange={onChange}
+                upload={upload}
+                attach={locked ? refuseFiles : attach}
+                resolve={resolve}
+                scheme={scheme}
+                self={self}
+                editable={!locked && status.kind !== "conflict"}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
     </main>

@@ -14,7 +14,7 @@ const QUIZ_CODES = {
   EQ_NO_PROMPT: "EQ_NO_PROMPT",
   /**
    * A question with no checklist under it and no model answer either. With a `>` quote at its end
-   * it is an open question and this is not said.
+   * it is an open question and this is not said. A flashcard (`card`) with no back says it too.
    */
   EQ_NO_OPTIONS: "EQ_NO_OPTIONS",
   /** One option is not a choice. */
@@ -33,7 +33,10 @@ const QUIZ_CODES = {
   EQ_DUPLICATE_ID: "EQ_DUPLICATE_ID",
   /** A question with no `{#id}` yet. It works; it is given one the first time anything needs it. */
   WQ_NO_ID: "WQ_NO_ID",
-  /** A word in a heading's `{…}` that is neither `#id` nor `multi` — or `multi` on an open question. */
+  /**
+   * A word in a heading's `{…}` that is neither `#id`, `multi` nor `card` — or `multi` on an open
+   * question or a flashcard, or `card` on a question with options.
+   */
   WQ_UNKNOWN_ATTR: "WQ_UNKNOWN_ATTR",
   /** A code block opened and never closed, so everything after it is code and no question. */
   WQ_OPEN_FENCE: "WQ_OPEN_FENCE",

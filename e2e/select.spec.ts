@@ -271,9 +271,11 @@ test("the leader chord adds a note and opens the editor on it", async ({ page })
   await page.locator(".dag-viewport").click({ position: { x: 700, y: 500 } });
   await lead(page, "n");
   await expect.poll(read, { timeout: 5_000 }).toMatch(/```md \{#md-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nNew note\n```/);
-  await expect(page.locator("[data-dag-inspector]")).toBeVisible();
-  await expect(page.locator("[data-dag-body]")).toHaveValue("New note");
-  await expect(page.locator("[data-dag-body]")).toBeFocused();
+  /* The text opens on the card, as rich text — not a panel of Markdown (#145). */
+  const text = page.locator('[data-dag-card-text] [contenteditable="true"]');
+  await expect(text).toBeFocused();
+  await expect(text).toHaveText("New note");
+  await expect(page.locator("[data-dag-inspector]")).toHaveCount(0);
 });
 
 test("a double-click on the paper makes a note there", async ({ page }) => {
@@ -281,26 +283,50 @@ test("a double-click on the paper makes a note there", async ({ page }) => {
   const p = await paper(page);
   await page.mouse.dblclick(p.x + 60, p.y - 60);
   await expect.poll(read, { timeout: 5_000 }).toMatch(/```md \{#md-[a-z0-9]{4} x=-?\d+ y=-?\d+\}\nNew note\n```/);
-  await expect(page.locator("[data-dag-body]")).toBeFocused();
+  await expect(page.locator('[data-dag-card-text] [contenteditable="true"]')).toBeFocused();
 });
 
-test("typing in the editor writes the body, and escape closes it", async ({ page }) => {
+test("typing on a card writes its body as Markdown, and escape closes it", async ({ page }) => {
   await open(page);
   await clickItem(page, "one");
   await page.keyboard.press("Enter");
-  const body = page.locator("[data-dag-body]");
-  await expect(body).toBeFocused();
-  await body.fill("Rewritten **by hand**.");
+  const text = page.locator('[data-dag-card-text="one"] [contenteditable="true"]');
+  await expect(text).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("Rewritten ");
+  /* A mark is the toolbar's or the shortcut's, and the file gets it as Markdown. */
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type("by hand");
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type(".");
   await expect.poll(read, { timeout: 5_000 }).toContain("```md {#one}\nRewritten **by hand**.\n```");
   await expect(page.locator('[data-dag-item="one"] strong')).toHaveText("by hand");
+  /* Only the card it was opened on: the other's bytes are where they were. */
+  expect(read()).toContain("```md {#two}\nThe second item.\n```");
 
   await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-card-text]")).toHaveCount(0);
   await expect(page.locator("[data-dag-inspector]")).toHaveCount(0);
   await expect(page.locator(".dag-viewport")).toBeFocused();
 
   /* The whole run of typing is one undo. */
   await page.keyboard.press("Control+z");
   await expect.poll(read, { timeout: 5_000 }).toBe(BOARD);
+});
+
+test("a card's text opened and left writes nothing, and a press outside closes it", async ({ page }) => {
+  fs.writeFileSync(file, `${BOARD}\n\`\`\`md {#list}\n* one\n*   two\n\n| a |  b |\n|---|---|\n| 1 |  2 |\n\`\`\`\n`);
+  await open(page);
+  const before = read();
+  await page.locator('[data-dag-item="list"]').dblclick();
+  await expect(page.locator('[data-dag-card-text="list"] [contenteditable="true"]')).toBeFocused();
+  await expect(page.locator('[data-dag-card-text="list"] table')).toHaveCount(1);
+  const p = await paper(page);
+  await page.mouse.click(p.x + 60, p.y - 60);
+  await expect(page.locator("[data-dag-card-text]")).toHaveCount(0);
+  /* An agent's bullets and table padding are bytes BlockNote never wrote. */
+  await page.waitForTimeout(600);
+  expect(read()).toBe(before);
 });
 
 test("the editor's fields write the fence line", async ({ page }) => {

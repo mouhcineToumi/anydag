@@ -81,4 +81,15 @@ describe("a round of a run", () => {
     r = goTo(revealIn(goTo(r, 1)), 2);
     expect(tally(r)).toEqual({ right: 0, wrong: 1, skipped: 1 });
   });
+
+  it("answers a flashcard with nothing typed: shown, then judged; unshown or unjudged is a skip", () => {
+    let r = judgeIn(startRound(3), true);
+    expect(r.verdicts[0]).toBeUndefined();
+    r = judgeIn(revealIn(r), true);
+    expect(r.verdicts[0]).toBe(true);
+    r = goTo(revealIn(goTo(r, 1)), 2);
+    r = goTo(r, 3);
+    expect(tally(r)).toEqual({ right: 1, wrong: 0, skipped: 2 });
+    expect(skippedIn(r)).toEqual([1, 2]);
+  });
 });

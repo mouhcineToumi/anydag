@@ -10,6 +10,7 @@
 import type { Hono } from "hono";
 import YAML from "yaml";
 
+import { cardCount, CARDS_MAX, CARDS_MIN, generateCards } from "../../plugins/generate/cards";
 import { generate } from "../../plugins/generate/generate";
 import { completeFor, LlmError } from "../../plugins/generate/llm";
 import { describeProviders, resolveProvider } from "../../plugins/generate/providers";
@@ -25,6 +26,8 @@ import { readPrefs, SETTINGS_MAX, writePrefs, type Scope } from "./prefs";
 
 const PROMPT_MAX = 4000;
 const SOURCE_MAX = 16000;
+/** A note made into flashcards: larger than a diagram's source, since a page of revision notes is the point. */
+const NOTE_MAX = 60000;
 const RUNNING_MAX = 4;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
@@ -121,8 +124,77 @@ export function metaRoutes(app: Hono, s: Session): void {
   app.get("/__board/llm", (c) => c.json(describeProviders(s.env)));
 
   let running = 0;
+
+  /**
+   * One call to the model, held to the route's limits: at most `RUNNING_MAX` at once, a timeout per
+   * attempt, and cancelled when the page goes away. A diagram and a deck of flashcards share all of
+   * it — the provider table, the caps, the timeout — and differ only in the loop `ask` runs.
+   */
+  const spend = async <T>(
+    c: { req: { raw: Request } },
+    body: Record<string, unknown>,
+    ask: (complete: ReturnType<typeof completeFor>, attempts: number, signal: AbortSignal) => Promise<T>,
+  ): Promise<T> => {
+    const reasoning = typeof body.reasoning === "string" && body.reasoning ? body.reasoning : undefined;
+    const resolved = resolveProvider(s.env, {
+      provider: typeof body.provider === "string" ? body.provider : null,
+      model: typeof body.model === "string" ? body.model : null,
+    });
+    if (!resolved.ok) throw err(400, resolved.error);
+    if (running >= RUNNING_MAX) throw err(429, `${RUNNING_MAX} answers are being written already — give it a moment`);
+    const attempts = Number(s.env.ANYDAG_LLM_ATTEMPTS) || 3;
+    const timeout = Number(s.env.ANYDAG_LLM_TIMEOUT) || 120_000;
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(new Error("timeout")), timeout * attempts);
+    c.req.raw.signal.addEventListener("abort", () => stop.abort(new Error("gone")));
+    running++;
+    try {
+      return await ask(completeFor(resolved.value, s.env, { reasoning }), attempts, stop.signal);
+    } catch (e) {
+      if (stop.signal.aborted && (stop.signal.reason as Error)?.message === "timeout")
+        throw err(504, "the model did not answer in time");
+      if (e instanceof LlmError) throw err(502, e.message);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      running--;
+    }
+  };
+
   app.post("/__board/generate", async (c) => {
     const body = await bodyOf(c);
+    const kind = body.kind ?? "diagram";
+    if (kind !== "diagram" && kind !== "flashcards") throw err(400, "`kind` is `diagram` or `flashcards`");
+
+    if (kind === "flashcards") {
+      /* Flashcards for a quiz (#140): from a topic, from a note's text, or from a note with what to
+         focus on. Nothing is written — the page shows the cards and writes the ones kept. */
+      const topic = typeof body.prompt === "string" ? body.prompt.trim() : "";
+      const note = typeof body.source === "string" ? body.source.trim() : "";
+      if (body.source !== undefined && body.source !== null && typeof body.source !== "string")
+        throw err(400, "the source must be a string holding the note's text");
+      if (!topic && !note) throw err(400, "say what the flashcards are about, or choose a note to make them from");
+      if (topic.length > PROMPT_MAX) throw err(413, `a topic is at most ${PROMPT_MAX} characters, this one is ${topic.length}`);
+      if (note.length > NOTE_MAX)
+        throw err(413, `a note is at most ${NOTE_MAX} characters to make flashcards from, this one is ${note.length}`);
+      if (body.count !== undefined && body.count !== null && cardCount(body.count) !== body.count)
+        throw err(400, `\`count\` is a whole number from ${CARDS_MIN} to ${CARDS_MAX}`);
+      const system = await grammar.system(undefined, "flashcards");
+      return c.json(
+        await spend(c, body, (complete, attempts, signal) =>
+          generateCards({
+            ...(topic ? { topic } : {}),
+            ...(note ? { note } : {}),
+            count: cardCount(body.count),
+            system,
+            complete,
+            attempts,
+            signal,
+          }),
+        ),
+      );
+    }
+
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     if (!prompt) throw err(400, "describe the diagram first");
     if (prompt.length > PROMPT_MAX)
@@ -138,43 +210,21 @@ export function metaRoutes(app: Hono, s: Session): void {
       typeof body.from === "string" && /^[a-z]{1,16}$/.test(body.from) && isDiagramType(body.from)
         ? (body.from as DiagramType)
         : undefined;
-    const reasoning = typeof body.reasoning === "string" && body.reasoning ? body.reasoning : undefined;
-    const resolved = resolveProvider(s.env, {
-      provider: typeof body.provider === "string" ? body.provider : null,
-      model: typeof body.model === "string" ? body.model : null,
-    });
-    if (!resolved.ok) throw err(400, resolved.error);
-    if (running >= RUNNING_MAX) throw err(429, `${RUNNING_MAX} diagrams are being drawn already — give it a moment`);
-
     const system = await grammar.system(as, typeof source === "string" ? "rewrite" : "draw");
-    const attempts = Number(s.env.ANYDAG_LLM_ATTEMPTS) || 3;
-    const timeout = Number(s.env.ANYDAG_LLM_TIMEOUT) || 120_000;
-    const stop = new AbortController();
-    const timer = setTimeout(() => stop.abort(new Error("timeout")), timeout * attempts);
-    c.req.raw.signal.addEventListener("abort", () => stop.abort(new Error("gone")));
-    running++;
-    try {
-      return c.json(
-        await generate({
+    return c.json(
+      await spend(c, body, (complete, attempts, signal) =>
+        generate({
           prompt,
           ...(typeof source === "string" ? { source } : {}),
           ...(from ? { from } : {}),
           ...(as ? { as } : {}),
           system,
-          complete: completeFor(resolved.value, s.env, { reasoning }),
+          complete,
           attempts,
-          signal: stop.signal,
+          signal,
         }),
-      );
-    } catch (e) {
-      if (stop.signal.aborted && (stop.signal.reason as Error)?.message === "timeout")
-        throw err(504, "the model did not answer in time");
-      if (e instanceof LlmError) throw err(502, e.message);
-      throw e;
-    } finally {
-      clearTimeout(timer);
-      running--;
-    }
+      ),
+    );
   });
 
   /* -- practice ---------------------------------------------------------------------------- */

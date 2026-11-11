@@ -71,11 +71,6 @@ export const FILE_LIST = "dag:file-list";
 export const TASKS_VIEW = "dag:tasks-view";
 
 /**
- * Which half of a quiz's form this browser last used — its questions or its source. The
- * Tasks page's layout's reason: view state, this browser's, not in `PREF_KEYS`.
- */
-export const QUIZ_MODE = "dag:quiz-mode";
-/**
  * Whether a run's *About this quiz* panel is folded away, `"0"` when it is. The Tasks
  * page's layout's reason: view state, this browser's, not in `PREF_KEYS`.
  */
@@ -130,8 +125,11 @@ export const ATTACHMENTS = "dag:attachments";
  * (`server/relink.ts`), and a CLI or an agent renaming with the app closed reads the same file.
  */
 export const UPDATE_LINKS = "dag:update-links";
-/** Which half of the editor panel is showing, and how wide somebody dragged it. */
-export const INSPECTOR_MODE = "dag:inspector-mode";
+/**
+ * How wide somebody dragged the editor panel. It had a sibling, `dag:inspector-mode` — which half,
+ * Properties or Source, was showing — retired with the Source tab (#145); a value left behind in a
+ * browser or a home is read by nothing.
+ */
 export const INSPECTOR_WIDTH = "dag:inspector-w";
 
 /**
@@ -144,7 +142,6 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
 export const PREF_KEYS = [
   THEME,
   LIBRARY,
-  INSPECTOR_MODE,
   INSPECTOR_WIDTH,
   SIDEBAR,
   SIDEBAR_WIDTH,

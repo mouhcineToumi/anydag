@@ -27,6 +27,8 @@ import { Cursor, tokenize, type LexError } from "./tokenizer";
 
 export interface Participant {
   id: string;
+  /** The line that declares it, 1-based; absent for one invented where it was first mentioned. */
+  line?: number;
   title: string;
   meta?: string;
   kind: NodeKind;
@@ -48,12 +50,23 @@ export type SeqEvent =
       line: number;
     }
   | { t: "activate" | "deactivate"; who: string; line: number }
-  | { t: "fragment"; kind: "alt" | "opt" | "loop" | "par"; branches: Branch[]; line: number }
+  | {
+      t: "fragment";
+      kind: FragmentKind;
+      branches: Branch[];
+      line: number;
+      /** The line of its `end`, or absent when it was never closed. */
+      end?: number;
+    }
   | { t: "note"; over: string[]; text: string; line: number };
+
+export type FragmentKind = "alt" | "opt" | "loop" | "par";
 
 interface Branch {
   label: string;
   events: SeqEvent[];
+  /** The line that opens it: the fragment's own head for the first branch, its `else` or `and` after. */
+  line: number;
 }
 
 export interface SequenceModel {
@@ -73,6 +86,9 @@ const KIND_WORDS: Record<string, NodeKind> = {
   client: "client",
   external: "external",
 };
+
+/** The kinds a participant can be drawn as, in the order the panel offers them: `kind=` takes any of them. */
+export const PARTICIPANT_KINDS: readonly string[] = Object.keys(KIND_WORDS);
 
 export function parseSequence(src: string): SequenceModel {
   const diagnostics: Diagnostic[] = [];
@@ -152,6 +168,7 @@ export function parseSequence(src: string): SequenceModel {
         }
         const p: Participant = {
           id: idTok.value,
+          line: t.line,
           title: strings[0] ?? idTok.value,
           meta: strings[1],
           kind: t.value === "actor" ? "person" : "participant",
@@ -233,19 +250,21 @@ export function parseSequence(src: string): SequenceModel {
         const label = cur.eat("string");
         const branches: Branch[] = [];
         const stop = new Set(["else", "and", "end"]);
-        branches.push({ label: label?.value ?? "", events: readEvents(stop) });
+        branches.push({ label: label?.value ?? "", events: readEvents(stop), line: t.line });
 
         for (;;) {
           const next = cur.peek();
           if (next.kind === "word" && (next.value === "else" || next.value === "and")) {
             cur.next();
             const l = cur.eat("string");
-            branches.push({ label: l?.value ?? "", events: readEvents(stop) });
+            branches.push({ label: l?.value ?? "", events: readEvents(stop), line: next.line });
             continue;
           }
           break;
         }
-        if (!cur.eatWord("end")) {
+        const close = cur.peek();
+        const closed = cur.eatWord("end");
+        if (!closed) {
           diagnostics.push({
             line: t.line,
             code: CODES.E_UNCLOSED_FRAGMENT,
@@ -253,7 +272,13 @@ export function parseSequence(src: string): SequenceModel {
             severity: "error",
           });
         }
-        out.push({ t: "fragment", kind: t.value as "alt", branches, line: t.line });
+        out.push({
+          t: "fragment",
+          kind: t.value as FragmentKind,
+          branches,
+          line: t.line,
+          ...(closed ? { end: close.line } : null),
+        });
         cur.skipSeps();
         continue;
       }
@@ -272,7 +297,18 @@ export function parseSequence(src: string): SequenceModel {
         continue;
       }
       const arrow = cur.next();
-      const to = cur.eat("word");
+      /*
+       * Mermaid's `+`/`-` activates and deactivates in the same line as the message, and it is
+       * written against the target — `a ->>+ b`, `a ->> +b` — which the tokenizer reads as a word
+       * `+` before the target or as part of the target's own word, because `+` and `-` are word
+       * characters. Both are the marker; the trailing form `a ->> b +` is read below as it always was.
+       */
+      let lead = cur.peek().kind === "word" && (cur.peek().value === "+" || cur.peek().value === "-") ? cur.next().value : "";
+      let to = cur.eat("word");
+      if (to && !lead && /^[+-]./.test(to.value)) {
+        lead = to.value[0]!;
+        to = { ...to, value: to.value.slice(1), col: to.col + 1 };
+      }
       if (!to) {
         diagnostics.push({
           line: arrow.line,
@@ -287,8 +323,8 @@ export function parseSequence(src: string): SequenceModel {
       ensure(to.value);
 
       /* Mermaid's `+`/`-` suffix activates and deactivates in the same line as the message. */
-      const plus = cur.eat("word", "+");
-      const minus = cur.eat("word", "-");
+      const plus = lead === "+" || cur.eat("word", "+") !== null;
+      const minus = lead === "-" || cur.eat("word", "-") !== null;
 
       cur.eat("punct", ":");
       const label = cur.eat("string");
@@ -317,4 +353,74 @@ export function parseSequence(src: string): SequenceModel {
   const events = readEvents(new Set());
 
   return { kind: "sequence", participants, events, legend, diagnostics: tidy(diagnostics) };
+}
+
+/* ------------------------------------------------------------------ the things a pick can name */
+
+export type SeqMessage = Extract<SeqEvent, { t: "msg" }>;
+export type SeqFragment = Extract<SeqEvent, { t: "fragment" }>;
+export type SeqNote = Extract<SeqEvent, { t: "note" }>;
+
+/**
+ * Every message, fragment and note in the order the file writes them.
+ *
+ * This is what the pick ids count, and the layout counts the same walk: `msg:3` is the fourth
+ * message the file says, wherever it is nested. An ordinal rather than a line, for the reason an
+ * edge pick carries its line *and* its id — a line moves with every edit above it, and the order of
+ * the messages moves only when one is added or taken away before it. The colon is what keeps them
+ * apart from a participant's id: it is punctuation to the tokenizer, so no author's id can carry one.
+ */
+export function seqParts(events: readonly SeqEvent[]): { messages: SeqMessage[]; fragments: SeqFragment[]; notes: SeqNote[] } {
+  const out = { messages: [] as SeqMessage[], fragments: [] as SeqFragment[], notes: [] as SeqNote[] };
+  const walk = (list: readonly SeqEvent[]) => {
+    for (const e of list) {
+      if (e.t === "msg") out.messages.push(e);
+      else if (e.t === "note") out.notes.push(e);
+      else if (e.t === "fragment") {
+        out.fragments.push(e);
+        for (const b of e.branches) walk(b.events);
+      }
+    }
+  };
+  walk(events);
+  return out;
+}
+
+export const msgId = (n: number) => `msg:${n}`;
+export const fragId = (n: number) => `frag:${n}`;
+export const noteId = (n: number) => `note:${n}`;
+
+/** What a pick id names: `{ what, n }`, or `null` for anything that is not one of the three. */
+export function seqIdOf(id: string): { what: "msg" | "frag" | "note"; n: number } | null {
+  const m = /^(msg|frag|note):(\d+)$/.exec(id);
+  return m ? { what: m[1] as "msg" | "frag" | "note", n: Number(m[2]) } : null;
+}
+
+/** The line a message, fragment or note pick names, in this body — or `null`. */
+export function seqLineOf(body: string, id: string): number | null {
+  const at = seqIdOf(id);
+  if (!at) return null;
+  const parts = seqParts(parseSequence(body).events);
+  const list = at.what === "msg" ? parts.messages : at.what === "frag" ? parts.fragments : parts.notes;
+  return list[at.n]?.line ?? null;
+}
+
+/**
+ * The inverse: which participant, message, fragment or note this line of the body says.
+ *
+ * A fragment answers for every line that is part of its frame — its head, an `else` or `and`, and
+ * its `end` — because each of those is drawn as part of the one box.
+ */
+export function seqIdOn(body: string, line: number): { id: string; what: "node" | "group" | "edge" } | null {
+  const model = parseSequence(body);
+  const p = model.participants.find((x) => x.line === line);
+  if (p) return { id: p.id, what: "node" };
+  const parts = seqParts(model.events);
+  const m = parts.messages.findIndex((x) => x.line === line);
+  if (m !== -1) return { id: msgId(m), what: "edge" };
+  const f = parts.fragments.findIndex((x) => x.end === line || x.branches.some((b) => b.line === line));
+  if (f !== -1) return { id: fragId(f), what: "group" };
+  const n = parts.notes.findIndex((x) => x.line === line);
+  if (n !== -1) return { id: noteId(n), what: "group" };
+  return null;
 }

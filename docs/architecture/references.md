@@ -47,7 +47,9 @@ Ten things are load-bearing:
   `ReactMarkdown` that can hold a reference has to be handed it.
 - **An embed is a block, and a paragraph cannot hold one.** A `dag:` image alone on its line draws
   the target; anywhere else it is a one-line card, because a `<div>` in a `<p>` is a console error
-  and the e2e suite fails on those. A board embedded in a board is a card too — a viewport inside a
+  and the e2e suite fails on those. **An embed that throws is that embed's failure alone**:
+  `EmbedBoundary` draws a card saying it could not be drawn (`data-dag-embed-failed`), and the note
+  around it, the sidebar and the open chat stay — the app's one boundary is a reload screen. A board embedded in a board is a card too — a viewport inside a
   viewport pans two things — and a note embedded in a note stops at one level.
 - **The index is one copy per page, and nothing on the canvas subscribes to it.** It reads every text
   the vault has, so it refreshes at most one wait after the first change rather than after the
@@ -55,7 +57,14 @@ Ten things are load-bearing:
   change arriving while a fetch is out asks again once it lands. The note editor reads it when a
   picker opens and never re-renders on it: handing BlockNote's suggestion menus a new `getItems`
   closes an open menu under the person typing, and only the suite running four notes at once showed
-  it. `BoardApp` does not subscribe either; the open library and the backlinks count do.
+  it. `BoardApp` does not subscribe either; the open library and the backlinks count do. **A refresh
+  that got no answer is asked again on its own**, after a wait that doubles to thirty seconds, and so
+  is the file list (`src/board/refresher.ts`): both used to wait for the feed's next change, which
+  after the Assistant's last write never came (#123). And **an id a reader meets that the loaded
+  index does not know is asked about once** (`seek`): an embed or a link of a board made a moment
+  ago draws it rather than staying a card until somebody else writes. An id is minted before
+  anything can name it, so one fresh answer knows it — unless the target is gone, and then asking
+  once is enough.
 - **A `[[wikilink]]` is resolved through a lookup, never a scan.** `wikiIndex` in
   `src/refs/wikilinks.ts` maps every folded name, every path tail and every title to its documents
   once per list, and `resolveWiki` memoises it on the array (a `WeakMap`, so a list must not be
@@ -105,7 +114,7 @@ Names claimed, grepped first: `dag-ref*`, `dag-embed*`, `dag-backlinks*`, `dag-v
 `dag-view-missing`, `data-dag-ref*`, `data-dag-embed*`, `data-dag-backlink*`, `data-dag-view*` —
 and `dag-embed--placed`, `dag-embed__mark`, `dag-embed__text`, `dag-embed__name`,
 `dag-embed__what`, `dag-embed__open`, `data-dag-embed-placed`, `data-dag-embed-open`,
-`data-dag-embed-missing`.
+`data-dag-embed-missing`, `data-dag-embed-failed`.
 
 **Out, and why:** a references table stored beside the texts (a second copy of what the files say;
 the scan is right for tens of documents and is the thing to replace, with an index kept on write,

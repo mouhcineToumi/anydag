@@ -35,6 +35,14 @@
  * the model answer, which is its explanation too. The run asks for an answer in words, shows the model
  * one, and the person says whether they had it. No checklist and no quote is still `EQ_NO_OPTIONS`.
  *
+ * **`card` on the heading makes it a flashcard**: `## What is MVCC? {#q1a2b3 card}`, the quote at its
+ * end the back. A run shows the front with no box to type in, then the back, and the person says
+ * whether they had it — an open question without the typing. A bare word, as `multi` is, because a
+ * `.card` would not be an attribute word and the whole `{…}` would be read as the prompt, its id lost;
+ * and a build that does not know the word reads it as an open question and warns, so the file still
+ * runs. A card has no options; a card with no back yet is still a card (the form shows it as one)
+ * but not open, and says `EQ_NO_OPTIONS`.
+ *
  * **Every question knows its span**, so a writer (`write.ts`) can rewrite exactly one question and
  * leave every other byte of the file alone — the property a note's span map buys for BlockNote, and
  * cheaper here, because a question is its own span.
@@ -79,8 +87,19 @@ export interface Question {
   why: string;
   /** No options, and a quote at its end: answered in words and graded by the person. */
   open: boolean;
+  /**
+   * What follows the options or the explanation and is neither (`EQ_STRAY`): the Markdown from the
+   * first such line to the end of the question. The form has no field for it, so it shows it and
+   * offers where to put it; absent when there is none.
+   */
+  stray?: string;
   /** `multi` written on the heading. */
   multiFlag: boolean;
+  /**
+   * `card` written on the heading of a question with no options: a flashcard, its back `why`. It is
+   * `open` too once it has a back, so everything that asks an open question asks it.
+   */
+  card: boolean;
   /** Whether it asks for every correct option: the flag, or more than one ticked. */
   multi: boolean;
   /** The heading's line. */
@@ -113,15 +132,18 @@ const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 const HEADING = /^ {0,3}##(?=[ \t]|$)(.*)$/;
 /** CommonMark's closing sequence: `## Title ##`. It needs a space before it, or it is the title. */
 const CLOSING = /(?:^|[ \t]+)#+[ \t]*$/;
-/** A trailing `{…}` whose every word is `#id` or a bare word. Anything else is prompt text. */
-const ATTRS = /[ \t]*\{([^{}]*)\}[ \t]*$/;
+/**
+ * A trailing `{…}` whose every word is `#id` or a bare word. Anything else is prompt text, and so is
+ * a brace written `\{` — the escape the form writes when a prompt itself ends in braces.
+ */
+const ATTRS = /[ \t]*(?<!\\)\{([^{}]*)\}[ \t]*$/;
 const ATTR_WORD = /^#?[A-Za-z0-9_-]+$/;
 
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const OPTION = /^ {0,3}[-*+][ \t]+\[([ xX])\](?:[ \t]+(.*?))?[ \t]*$/;
 const QUOTE = /^ {0,3}>/;
-/** `{pin}` at the end of an option's first line. */
-const PIN = /[ \t]*\{pin\}[ \t]*$/;
+/** `{pin}` at the end of an option's first line — not `\{pin}`, which is the words. */
+const PIN = /[ \t]*(?<!\\)\{pin\}[ \t]*$/;
 /** `shuffle: true` in the frontmatter, lenient in case and in its synonyms, as `task:` is. */
 const SHUFFLE = /^shuffle[ \t]*:[ \t]*["']?(?:true|yes|on)["']?[ \t]*$/im;
 
@@ -217,7 +239,8 @@ interface Heading {
   prompt: string;
   id?: string;
   multi: boolean;
-  /** Words in the `{…}` that are neither `#id` nor `multi`. */
+  card: boolean;
+  /** Words in the `{…}` that are neither `#id`, `multi` nor `card`. */
   unknown: string[];
 }
 
@@ -229,6 +252,7 @@ function headingOf(line: string): Heading | null {
   rest = rest.replace(CLOSING, "").trim();
   let id: string | undefined;
   let multi = false;
+  let card = false;
   const unknown: string[] = [];
   const attrs = ATTRS.exec(rest);
   if (attrs) {
@@ -238,11 +262,12 @@ function headingOf(line: string): Heading | null {
       for (const w of words) {
         if (w.startsWith("#")) id ??= w.slice(1);
         else if (w === "multi") multi = true;
+        else if (w === "card") card = true;
         else unknown.push(w);
       }
     }
   }
-  return { prompt: rest, id, multi, unknown };
+  return { prompt: rest, id, multi, card, unknown };
 }
 
 type Phase = "body" | "options" | "why" | "after";
@@ -348,6 +373,7 @@ export function parseQuiz(text: string): Quiz {
     const body = trimBlank((open ? b.body.slice(0, answer) : b.body).map((l) => l.text)).join("\n");
     const why = open ? unquote(b.body.slice(answer)) : trimBlank(b.why).join("\n");
     const correct = b.options.filter((o) => o.correct).length;
+    const card = h.card && b.options.length === 0;
     const q: Question = {
       ...(h.id !== undefined ? { id: h.id } : {}),
       prompt: h.prompt,
@@ -355,7 +381,9 @@ export function parseQuiz(text: string): Quiz {
       options: b.options,
       why,
       open,
+      ...(b.stray ? { stray: trimBlank(text.slice(b.stray.start, b.last.end).split(/\r?\n/)).join("\n") } : {}),
       multiFlag: h.multi,
+      card,
       multi: h.multi || correct > 1,
       line: b.line.n,
       span: { start: b.line.start, end: b.last.end },
@@ -368,9 +396,13 @@ export function parseQuiz(text: string): Quiz {
           "WQ_UNKNOWN_ATTR",
           b.line.n,
           1,
-          "`multi` means nothing on an open question: it has no options to choose between.",
+          card
+            ? "`multi` means nothing on a flashcard: it has no options to choose between."
+            : "`multi` means nothing on an open question: it has no options to choose between.",
           who,
         );
+    } else if (card) {
+      say("EQ_NO_OPTIONS", b.line.n, 1, "This flashcard has no back. End it with the back as a `>` quote.", who);
     } else if (b.options.length === 0) {
       say(
         "EQ_NO_OPTIONS",
@@ -385,6 +417,14 @@ export function parseQuiz(text: string): Quiz {
       if (correct === 0)
         say("EQ_NO_ANSWER", b.options[0]!.line, 1, "No option is marked correct. Tick the right one with `- [x]`.", who);
       for (const o of b.options) if (!o.text) say("EQ_EMPTY_OPTION", o.line, 1, "This option has no text.", who);
+      if (h.card)
+        say(
+          "WQ_UNKNOWN_ATTR",
+          b.line.n,
+          1,
+          "`card` means nothing on a question with options. Take the checklist out to make it a flashcard.",
+          who,
+        );
     }
     if (b.stray)
       say(
@@ -399,7 +439,7 @@ export function parseQuiz(text: string): Quiz {
         "WQ_UNKNOWN_ATTR",
         b.line.n,
         1,
-        `\`${w}\` means nothing on a question. The heading takes \`{#id}\` and \`multi\`.`,
+        `\`${w}\` means nothing on a question. The heading takes \`{#id}\`, \`multi\` and \`card\`.`,
         who,
       );
     questions.push(q);

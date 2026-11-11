@@ -45,6 +45,16 @@ describe("routeLinks", () => {
     expect(routeLinks({ links: [], boxes: boxes({}), nodeBoxes: new Map(), metric: T.metric }).edges).toEqual([]);
   });
 
+  it("carries the second label through to the drawn one, on its own line", () => {
+    const r = routeLinks({
+      links: [link("a", "b", { label: "Uses", label2: "HTTPS" })],
+      boxes: boxes({ a: { x: 0, y: 0, w: 200, h: 80 }, b: { x: 400, y: 0, w: 200, h: 80 } }),
+      nodeBoxes: new Map(),
+      metric: T.metric,
+    });
+    expect(r.edges[0]!.label).toMatchObject({ text: "Uses", text2: "HTTPS" });
+  });
+
   it("drops a link whose end is not on the page", () => {
     const r = routeLinks({
       links: [link("a", "gone")],

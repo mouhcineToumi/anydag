@@ -8,11 +8,13 @@ Every diagnostic carries a stable `code` from `src/dsl/codes.ts` as well as a me
 the code**; the message is written for a person and may be reworded. `E_`/`W_` is the diagram DSL,
 `EB_`/`ANYDAG_` the board file around it — which is what distinguishes the two grammars that can both
 report "unterminated string" — and `EG_` what the generator says about a model's answer to a prompt
-card, which may parse clean and still be wrong (`EG_WRONG_TYPE`). None of them is drawn on the
+card, which may parse clean and still be wrong (`EG_WRONG_TYPE`), or to a request for flashcards
+(`EG_NOT_A_CARD`: a question the quiz parser reads clean that is not a card). None of them is drawn on the
 canvas — see *Problems* for where a person reads them. `GET /__board/diagnostics?name=` is the same
 parse, server-side, through the same `diagnoseBoard` the page's dock calls, and `anydag snapshot`
 prints it. The
-three `EB_LINK_*` codes ride in `board.errors` and reach that endpoint with no change to it, and the
+three `EB_LINK_*` codes ride in `board.errors` and reach that endpoint with no change to it — an
+unresolved end with a `target` naming the link it left hanging (#173) — and the
 five `*_CHART_*` codes are the only family named for a dialect — everything else `parseChart` raises
 is one of the shared ones, which is what says the statement shape really was inherited.
 
@@ -70,57 +72,104 @@ rather than the arithmetic stand-in the unit tests use, so it is also the better
 
 ## Problems
 
-Where a person reads what is wrong with a board. **Not on the canvas**, which is the whole rule: the
-board's own errors were a red card hung above its content, a diagram's replaced the diagram, and a
-warning was a strip that changed a diagram's size, and none of them could be put away. The canvas is
-the picture. `src/ui/problemList.ts` is the meaning with no DOM in it, `src/ui/Problems.tsx` the dock,
-and the editor panel is the third reader.
+Where a person reads what is wrong with a board — and **only what they can act on** (#145). The DSL
+and the board file are the app's own format and a person never sees them, so a missing quote, a word
+the grammar does not know or a stray line in an `edges` fence is not something they could find, let
+alone fix. Those statements are **skipped**: the rest of the diagram is drawn and nothing is said.
+Every diagnostic is still there for an agent — `board_diagnose`, `/__board/diagnostics`,
+`anydag snapshot` — which reads the text. `src/ui/problemList.ts` is the meaning with no DOM in it
+and decides which diagnostics a person sees; `src/ui/Problems.tsx` is the dock, and the editor panel
+and the frame mark are the other two readers.
 
 | Where | Shows |
 |---|---|
-| the count, bottom centre | errors and warnings on the board, while there are any; a click opens the list |
-| the notification, above it | the first *new* error, with Show and ×, for six seconds |
-| the list | every problem, its code, item, line and page; a row opens it |
-| the editor panel, under the source | the open item's own problems; a row puts the caret on the line |
-| a red dot on a diagram | it is drawing its last good version, not the file's current text |
-| a grey dashed stand-in | a diagram opened broken, with no good version to fall back on |
+| a diagram's frame | an outline in the problem colour and a count by its title, while it has any |
+| the count, bottom centre | how many errors and warnings there are; a click opens the list |
+| the notification, above it | the first *new* error, in words, with Show and ×, for six seconds |
+| the list | every problem, in words, with the kind of item and its page; a row opens it |
+| the panel's Problems block, at the top | the open item's own problems, each with Show and the fix a row can carry out |
+
+What counts as one a person can act on (`shown()` in `problemList.ts`):
+
+- **About one thing that was drawn**, with a control in its panel that answers it:
+  `W_UNKNOWN_ICON` (the icon picker), `W_UNKNOWN_HUE` (the swatches), `W_RETIRED_FLAG` (Update it),
+  `E_UNKNOWN_ID` (a link to a card that is not there — Delete link, in the row), `W_MISSING_ROW`
+  (the link's ends), `W_CHART_LENGTH` (the values), and `EB_LINK_UNKNOWN_ITEM` and
+  `EB_LINK_UNKNOWN_NODE` (a board link to nothing, hanging — Delete link, in the row). "Show" picks it. The same code about a
+  statement that was *not* drawn — an edge out of a card that could not be read — has nothing to
+  pick, and is left out.
+- **About the whole diagram:** a Mermaid paste (`E_MERMAID_SYNTAX` when the header says the block is
+  another language — the panel's Convert) and an empty chart (`W_CHART_EMPTY` — Add a series). A
+  Mermaid habit on one line of a good body is a statement that could not be read, and is skipped.
+- **A board setting the dock can repair:** `EB_FRONTMATTER`, `EB_UNKNOWN_TYPE`, `EB_BAD_LAYOUT`,
+  `EB_BAD_ASPECT` — `planRepair` in `src/edit/repair.ts`, the same box in the dock and the panel.
 
 Six things are load-bearing:
 
+- **A diagnostic's target is the parse's answer.** `diagnoseBoard` sets `target` — the card, group,
+  lane or edge the diagnostic's line declares — through `declaredOn`, once per line. No parser sets
+  it: a parser names the line it was reading, and which thing ended up living there is the whole
+  parse's question. It is on the wire too, so an agent sees what the page would pick.
 - **One question, three askers.** `diagnoseBoard` in `src/dsl/diagnose.ts` is what the dock, the
   panel and `/__board/diagnostics` all call, and `parseItem` is the per-type dispatch `DiagramItem`
   used to spell out by itself. There were two copies of it, and the route's forgot `aspect` and
-  `layout` once already. `test/diagnose.test.ts` holds the new function to the old route's output,
-  byte for byte, on every board in `boards/`. It takes the item's fields structurally rather than a
-  `BoardItem`, so `src/dsl/` still does not know the board format; plain relative imports, because
-  the plugin loads it.
-- **A broken body is never laid out.** `DiagramItem` keeps `drawn` — the last parse with no errors —
-  beside `model`, and `placed` is always `drawn`'s layout. It used to lay out the broken partial
-  parse and then hide it behind the card. A page opened on a broken board has no `drawn`, and that is
-  the one case for the placeholder, which is `inline-block` so it reports its own width: as a block
-  it measured the wrapper sized from its own report and could never be smaller than the 520px guess.
-- **The notification waits and does not repeat.** A second of stillness before it speaks, because
-  the panel writes a quarter-second after each keystroke and a half-typed line is an error per pause.
-  A problem's `key` is `code|item|message` with **no line**, so typing above a broken statement does
-  not make it new; `seen` is the keys at the last settled reading, so × holds until something
-  genuinely new arrives. It never speaks about the item open in the panel or about a warning.
-- **"Show" waits for the page.** A problem on another page switches the page first and opens the
-  panel after, because selecting an item that is not on the drawn page is undone by the effect that
-  keeps `selected` naming things on the paper. `App` holds the request until the page matches.
-- **`editor.openAt(id, line)` is a line, not a pick.** The panel's other caret effect follows the
-  pick, which keeps moving while the caret walks the source; a line asked for once is its own
-  effect, or it would pin the caret against every pick after it. A diagnostic's line is the board
-  file's and the panel counts the body's — `line - item.line`.
-- **`[data-dag-error]` finally exists.** Seventeen e2e assertions checked for it and nothing in `src/`
-  had ever set it, so every one passed by matching nothing. The placeholder carries it now, and all
-  seventeen still pass — which is the first time that meant anything.
+  `layout` once already. `test/diagnose.test.ts` holds it to the route's output on every board in
+  `boards/`. It takes the item's fields structurally rather than a `BoardItem`, so `src/dsl/` still
+  does not know the board format; plain relative imports, because the plugin loads it.
+- **Whatever could be read is drawn.** `DiagramItem` lays out the latest parse, errors and all; the
+  parsers already skip what they could not read. It used to keep the last good drawing behind a red
+  dot, and open a broken body as a grey stand-in — both told a person something was wrong and gave
+  them nothing to do. The stand-in is left only for a layout that itself refused.
+- **`[data-dag-error]` is for tools.** A diagram whose text has an error carries a hidden
+  `data-dag-error` with `data-dag-diagnostics` (the errors, rebased onto the board file). Seventeen
+  e2e assertions check it is absent after a control writes, and nothing in `src/` set it for years,
+  so every one passed by matching nothing; now each one would catch a control that wrote something
+  unreadable.
+- **The notification waits and does not repeat.** A second of stillness before it speaks. A
+  problem's `key` is `code|item|target|message` with **no line**, so a write above it does not make
+  it new; `seen` is the keys at the last settled reading, so × holds until something genuinely new
+  arrives. It never speaks about the item open in the panel or about a warning.
+- **"Show" waits for the page, then picks.** A problem on another page switches the page first and
+  opens the panel after, because selecting an item that is not on the drawn page is undone by the
+  effect that keeps `selected` naming things on the paper. `editor.openOn(id, target)` then opens
+  the panel on the Properties half with the target picked — a node, group or lane through
+  `pickNode`, an edge through the edge pick — so the control that fixes it is what shows.
+
+**A link whose other end is missing hangs from a loose end.** When one end of an edge names nothing
+and the other end is a real card, `finalize` in `src/dsl/common.ts` adds a `loose` node in place of
+the missing one (`__loose-N`, one per line and name, so a chain through the same missing name makes
+one) and points the edge at it. The edge is drawn, leaving the card, and ends on a small dashed
+circle (`LooseEnd` in `src/render/nodes/`, `data-dag-loose` = the name it stood for). Dragging the
+circle onto a card of the same diagram rewrites that one ref in that one statement (`reattachLoose`
+in `src/edit/pick.ts`, through `retargetRef`), which clears the `E_UNKNOWN_ID`; clicking it picks
+the edge, whose panel has Delete. The diagnostic is unchanged — it still names the line and the edge
+— so the dock and the panel still count it until it is answered. A stub is not a card: it is left
+out of `edgeTargets`, `nodeIdsOf` and `declaredOn`, so no menu offers it and no problem targets it.
+An edge with both ends missing, or out of a card that could not be read (`ctx.broken`), gets none;
+there is nothing on the paper to hang it from. Names claimed: `dag-loose`, `data-dag-loose`.
+
+**A board link to nothing hangs the same way** (#173). `resolveLinks` keeps a link with one end
+that resolves, marks the missing end (`loose`), and sets the diagnostic's `target` to
+`{ what: "link", id }` — a board diagnostic's first target, and the reason `DiagnosticTarget.what`
+has a fifth value. The problem's item is the `edges` fence its line is in (`itemAt`), so "Show"
+calls `openOn(fence, target)`, which opens the fence and picks the link, and the panel's row Delete
+goes to `editor.removeLink`. The stub is drawn by `Edges` in the link overlay rather than by a node,
+dragged by `ctl.looseLink`, and written by `reattachLink`; the paragraph on it in
+`links.md` has the rest. `data-dag-loose-link` is claimed beside the two names above.
+
+The frame mark is painted, not rendered (`data-dag-problem-count`, set by `App` the way
+`data-dag-proposed` is): `Item` is memoised and a per-item prop would re-render every diagram
+whenever a count changed. It is an outline and a `::before` badge, so the box `size.ts` measured is
+the box drawn.
 
 Nothing here is computed under `?snapshot=1`: there is no chrome to show it in, and the agent reads
 the same answer from the endpoint. `problems.show` in `src/settings/` is `notify` (the default),
 `badge` (the count only) or `off` (nothing outside the panel). Names claimed, grepped first:
-`dag-problems*`, `data-dag-problems*`, `dag-broken*`, `dag-stale`, `data-dag-stale`,
-`dag-inspector__problem*`, `data-dag-inspector-problems`, `data-dag-setting-problems`.
+`dag-problems*`, `data-dag-problems*`, `dag-broken*`, `data-dag-problem-count`,
+`data-dag-problem-show`, `data-dag-problem-delete`, `dag-inspector__problem*`,
+`data-dag-inspector-problem*`, `data-dag-setting-problems`.
 
 **Out, and why:** the stray `y` that started this almost certainly came in through the panel — K
 and Enter open a fence with the source focused and its caret at offset zero, so the next letter
-typed as a shortcut lands on the body's first line. That is a separate defect and is not fixed here.
+typed as a shortcut lands on the body's first line. That was a separate defect; the box is gone
+for a diagram and a link fence now (#145), so there is no source for a letter to land in.

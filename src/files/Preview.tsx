@@ -9,14 +9,54 @@
  * `url` is where the bytes are and is the caller's to say — `/__board/file?id=` on this server.
  * Nothing here signs in.
  */
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Download } from "lucide-react";
 
 import { SORT_ICON } from "./FileIcon";
 import { downloadName, fileWhat, previewOf, sortOf } from "./types";
 
-/* A chunk of its own, with pdf.js and its worker behind it: nothing else on any page needs them. */
-const PdfViewer = lazy(() => import("./PdfViewer"));
+type Viewer = typeof import("./PdfViewer").default;
+
+/* A chunk of its own, with pdf.js and its worker behind it: nothing else on any page needs them.
+   Kept here once it has come, and handed over in the render that asks for it — **not
+   `React.lazy`**, whose first render suspends even for a loaded module and is then held back by
+   React's 300 ms reveal throttle (`FALLBACK_THROTTLE_MS`). That throttle was most of the first PDF
+   of a session taking 430 ms to draw in the packaged desktop app; the page itself was up in 10
+   (#129, and the same for a note in #120). */
+let viewer: Viewer | null = null;
+let loading: Promise<Viewer> | null = null;
+
+/** The viewer's chunk; every later call is the one already on its way, and a failed load is asked
+    for again next time. */
+export function preloadPdfViewer(): Promise<Viewer> {
+  loading ??= import("./PdfViewer").then(
+    (m) => (viewer = m.default),
+    (e: unknown) => {
+      loading = null;
+      throw e;
+    },
+  );
+  return loading;
+}
+
+/** The viewer, or `null` while its chunk is coming — at once when it has come. A chunk that fails
+    to load is thrown from render, for the page's error boundary, as a lazy's was. */
+function usePdfViewer(): Viewer | null {
+  const [got, setGot] = useState<{ viewer: Viewer } | { failed: unknown } | null>(() => (viewer ? { viewer } : null));
+  useEffect(() => {
+    if (got) return;
+    let live = true;
+    void preloadPdfViewer().then(
+      (v) => live && setGot({ viewer: v }),
+      (failed: unknown) => live && setGot({ failed }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [got]);
+  if (got && "failed" in got) throw got.failed;
+  return got ? got.viewer : null;
+}
 
 /** How much of a text file is shown: past this it is a download, not a page to scroll. */
 const TEXT_SHOWN = 512 * 1024;
@@ -44,11 +84,7 @@ export function FilePreview(props: PreviewProps) {
         </figure>
       );
     case "pdf":
-      return (
-        <Suspense fallback={<div className="dag-pdf" data-dag-pdf="loading" />}>
-          <PdfViewer url={url} title={title} onReady={onReady} />
-        </Suspense>
-      );
+      return <PdfPreview url={url} title={title} onReady={onReady} />;
     case "audio":
       return (
         <Played onReady={onReady}>
@@ -82,6 +118,13 @@ export function FilePreview(props: PreviewProps) {
     default:
       return <FileBlock {...props} />;
   }
+}
+
+/** A PDF: an empty box of the viewer's class while its chunk comes, then the viewer. */
+function PdfPreview({ url, title, onReady }: { url: string; title: string; onReady?(): void }) {
+  const PdfViewer = usePdfViewer();
+  if (!PdfViewer) return <div className="dag-pdf" data-dag-pdf="loading" />;
+  return <PdfViewer url={url} title={title} onReady={onReady} />;
 }
 
 /** A player, with the file's card above it — a recording has no picture of its own to say what it is. */

@@ -52,7 +52,9 @@ Seven things are load-bearing:
   the caret stays — outside the undo history, so ctrl+Z never takes back the other writer's edit. A
   save that meets a moved text is merged with `merge3` against the text both started from, which
   succeeds whenever the two edited different lines; otherwise the page asks, *Keep mine* or *Use
-  theirs*, and writes nothing until it is answered.
+  theirs*, and writes nothing until it is answered. **The read that opens a note is never left
+  blank**: a 5xx or no answer at all is not "there is no such note", so the page says it could not
+  read it (`data-dag-note-unread`) and reads again on the save's own backoff (#123).
 - **One namespace, a `kind` beside the name.** A vault is a folder, so a name is one file:
   `server/names.ts` classifies a path by its suffix (`.board.md`, `.quiz.md`, `.table.md`, `.md` or
   `.note.md` for a note) and refuses a second file that would give a name two kinds. The
@@ -61,10 +63,21 @@ Seven things are load-bearing:
   nothing. The feed says `dag:note`, so no board listener learned to ignore anything. `texts` keys a
   note by its file name, so the unused-image sweep sees what a note names and nothing mistakes one
   for a component, and a note may not live under `components/`.
-- **The editor is a lazy chunk.** `src/blocks/index.ts` is `React.lazy`, so a board never loads
-  BlockNote, TipTap, ProseMirror or Mantine, and `?snapshot=1` of a note draws it through
-  `react-markdown` read-only — a picture of a note is a fact about the file. The 45 visual baselines
-  are therefore untouched by construction. Mantine is **8**, not 9: 9 wants React 19.
+- **The editor is a chunk of its own, and the text never waits for it.** BlockNote, TipTap,
+  ProseMirror and Mantine are imported dynamically (`src/blocks/index.ts`), so a board never loads
+  them, and `?snapshot=1` of a note draws it through `react-markdown` read-only — a
+  picture of a note is a fact about the file. The 45 visual baselines are therefore untouched by
+  construction. On the note's page that same read-only drawing (`data-dag-note-first`) stands in
+  for the editor until it is ready, with the editor mounting hidden under it and the two changing
+  places in one render; the first editor a page builds is mounted only after the text has been
+  painted, because BlockNote's first build costs several times any later one. `useBlockEditor`
+  hands the component over synchronously once it has loaded — **not `React.lazy`**, whose first
+  render suspends even for a loaded module and is then held back by React's 300 ms reveal throttle,
+  which was the whole of a slow first open (#120; *Things that will bite*). `data-dag-ready` still
+  means the editor is up. Mantine is **8**, not 9: 9 wants React 19.
+  Beside it is `FieldEditor`, the one-field editor a quiz's form mounts (see *Quizzes*): the note's
+  bridge, paste (`src/blocks/paste.ts`), references and equations, on a schema cut to
+  `FIELD_BLOCKS`. It is still a `React.lazy`, so the throttle above applies to it.
 - **The colours are the theme's.** `className="dag-blocks"` lands on the editor and on every menu
   BlockNote portals out of it, and `src/styles/blocks.css` sets each `--bn-*` from a `--dag-*` there,
   two classes and an attribute deep so it wins whichever stylesheet loads last. It is chrome in
@@ -102,20 +115,20 @@ Four things about it:
 The read-only note — `?view=1`, `?snapshot=1` — draws the title as the page's `<h1>`
 (`NoteTitleRead`), at the field's size and place; the PDF has its own, `dag-print__title`.
 
-Names claimed, grepped first: `dag-note-view*`, `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
+Names claimed, grepped first: `dag-note-view*` (`dag-note-view__first`, `dag-note-view__editor`), `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
 (a list row), `data-dag-note-view`, `data-dag-note-editor`, `data-dag-note-conflict`,
-`data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`,
+`data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`, `data-dag-note-unread`,
 `data-dag-new-note`, `data-dag-new-note-here`, `data-dag-welcome-note`, `dag-note-title`,
-`data-dag-note-title`, `data-dag-note-title-read`, and the SSE event
+`data-dag-note-title`, `data-dag-note-title-read`, `data-dag-note-first`, and the SSE event
 `dag:note`. `data-dag-note` is one letter from `data-dag-dock`; they are different attributes, and
 a spec that wants one says which.
 
 **Out, and why:** real-time co-editing (BlockNote can, the store is an optimistic sha1 — the same
 refusal the boards make); a diagram inside a note (a fenced
 ` ```arch ` block survives the bridge as a code block, so nothing forecloses it); the GPL `xl-*`
-packages; a note's saved version history (undo is the editor's, for the session); the block editor on
-a board's own `md` cards — the editor exists for a note, a separate file, and a card's body is
-prose in the board file.
+packages; a note's saved version history (undo is the editor's, for the session). A board's own `md` cards
+are edited in the same block editor, on the card, under the same rule — see *An md card's text, in
+place* in `editing.md`.
 
 ## Equations
 

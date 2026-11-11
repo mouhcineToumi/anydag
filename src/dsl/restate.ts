@@ -1,5 +1,6 @@
-import { FORMS, type ChartForm } from "./chart";
+import { FORMS, parseChart, type ChartForm } from "./chart";
 import { declaredAt } from "./declared";
+import { setLabel } from "./graph/timeline";
 import { STATUSES, type Status } from "./ir";
 import { renameIds } from "./rebind";
 import { tokenize, type Token } from "./tokenizer";
@@ -35,9 +36,11 @@ import { tokenize, type Token } from "./tokenizer";
  *
  * `col=` is on the list because it *is* one — the layer a card is kept in, offered by the panel
  * after a drag moved a card past its own. `x=`/`y=` are not, for the reason the doc on
- * `writeModifier` gives: a coordinate is written by a conversion, never picked from a menu.
+ * `writeModifier` gives: a coordinate is written by a conversion, never picked from a menu. `kind=`
+ * is a sequence participant's: there the head word is `participant` or `actor` and the card it
+ * draws is a value, which the Kind menu chooses.
  */
-export type ModifierKey = "hue" | "icon" | "col";
+export type ModifierKey = "hue" | "icon" | "col" | "kind";
 
 /** A bare word in modifier position that is not a status. `quiet` is an edge's; the rest are a node's. */
 export type Flag = "async" | "external" | "quiet" | "bold" | "italic";
@@ -188,6 +191,45 @@ export function setModifier(line: string, key: ModifierKey, value: string | null
   return writeModifier(line, key, value);
 }
 
+/**
+ * What `key=` says on this statement, as the author wrote it, or `null` when it is not there.
+ *
+ * The inverse of `setModifier` and read the same way — off the tokens, so `w=` inside a quoted
+ * title is a word in a title — which is why a control that shows a number reads it here and not
+ * with a regular expression over the line.
+ */
+export function readModifier(line: string, key: string): string | null {
+  const at = modifierSpan(lineTokens(line), key);
+  if (!at) return null;
+  const text = line.slice(at[0], at[1]);
+  const value = text.slice(text.indexOf("=") + 1).trim();
+  return value.startsWith('"') && value.endsWith('"') && value.length >= 2 ? value.slice(1, -1) : value;
+}
+
+/**
+ * A card's, a shape's, a group's or a frame's own width or height: `w=` / `h=`, or `null` to take
+ * it off and let the layout decide again.
+ *
+ * Whole pixels, because the file is a document a person reads. A size that is not a positive
+ * number is refused by handing the line back — a `w=0` card is not a size, and a control that
+ * quietly wrote one would be the board that draws nothing. A line that is not a declaration (an
+ * edge, a bare word) is refused for the reason `setKind` refuses it.
+ */
+export function setExtent(line: string, key: "w" | "h", value: number | null): string {
+  const tokens = lineTokens(line);
+  if (idIndex(tokens) === -1 || tokens.some((t) => t.kind === "arrow")) return line;
+  if (value === null) return writeModifier(line, key, null);
+  if (!Number.isFinite(value) || Math.round(value) < 1) return line;
+  return writeModifier(line, key, String(Math.round(value)));
+}
+
+/** The direction a group's own members run in: `dir=LR` or `dir=TB`, or `null` to follow the diagram. */
+export function setGroupDir(line: string, dir: "LR" | "TB" | null): string {
+  const tokens = lineTokens(line);
+  if (idIndex(tokens) !== 1 || tokens.some((t) => t.kind === "arrow")) return line;
+  return writeModifier(line, "dir", dir);
+}
+
 /** Which of a statement's geometry keys a conversion is writing. Absent means "leave it alone". */
 export interface Geometry {
   x?: number;
@@ -316,9 +358,14 @@ function setTopic(line: string, text: string): string {
   return `${m[1] ?? ""}${m[2] ?? ""}${text}`;
 }
 
-/** The node's name. `type` only matters for `mindmap`, whose line carries nothing else. */
+/**
+ * The node's name. `type` matters for `mindmap`, whose line carries nothing else, and `timeline`,
+ * whose label sits after a date the tokenizer does not read (`..` is an arrow to it) and cannot be
+ * taken off — see `setLabel`.
+ */
 export function setTitle(line: string, text: string | null, type?: string): string {
   if (type === "mindmap") return setTopic(line, text ?? "");
+  if (type === "timeline") return setLabel(line, text ?? "") ?? line;
   return setString(line, 0, text);
 }
 
@@ -339,12 +386,107 @@ export function setDesc(line: string, text: string | null): string {
  * dialect's, and it is already in front of whoever is choosing. What it does check is that the line
  * is a declaration at all, because token 0 of an edge is an id and rewriting that would be a
  * different statement about different things.
+ *
+ * A `kind=` on the line is taken off in the same write. The parser reads it *after* the word, so a
+ * line that kept one would go on drawing the old kind however the word was changed — a menu that
+ * answers and then changes nothing.
  */
 export function setKind(line: string, word: string): string {
   const tokens = lineTokens(line);
   if (tokens[0]?.kind !== "word" || tokens[1]?.kind !== "word") return line;
   if (tokens.some((t) => t.kind === "arrow")) return line;
-  return replaceSpan(line, span(tokens[0]!), word);
+  const out = replaceSpan(line, span(tokens[0]!), word);
+  const over = modifierSpan(lineTokens(out), "kind");
+  return over ? cut(out, over) : out;
+}
+
+/**
+ * The kind a sequence participant is drawn as, from the word it was declared with and its `kind=`.
+ *
+ * A participant has no kind word to choose — `participant` and `actor` are two spellings of one
+ * statement — so its kind is the `kind=` modifier, and the default is what the word says: `actor`
+ * is a person, `participant` is a service. `null` for a line that is not one.
+ */
+export function participantKind(line: string, kinds: readonly string[]): string | null {
+  const tokens = lineTokens(line);
+  const first = tokens[0];
+  if (first?.kind !== "word" || (first.value !== "participant" && first.value !== "actor")) return null;
+  const written = readModifier(line, "kind");
+  return written !== null && kinds.includes(written) ? written : first.value === "actor" ? "person" : "service";
+}
+
+/** Retype a sequence participant: `kind=` written, or taken off when it says what the word already did. */
+export function setParticipantKind(line: string, word: string): string {
+  const tokens = lineTokens(line);
+  const first = tokens[0];
+  if (first?.kind !== "word" || (first.value !== "participant" && first.value !== "actor")) return line;
+  if (tokens[1]?.kind !== "word") return line;
+  return writeModifier(line, "kind", word === (first.value === "actor" ? "person" : "service") ? null : word);
+}
+
+/** The two words that open a container with a brace in the dialects that have both. */
+export type ContainerWord = "group" | "system";
+
+/**
+ * Turn a `group` into a `system`, or back.
+ *
+ * Two spellings of one statement — `usecase` and `c4` take `system` for the boundary of the thing
+ * under discussion, and the rest of the line (id, strings, hue, box) is read the same either way —
+ * so this is the kind swap `setKind` makes, for the only declarations whose first word is not in
+ * `dialect.kinds`. A line that opens with anything else is handed back: `frame` in a sketch is the
+ * same statement as `group` and is not offered, and a node's kind is `setKind`'s to change.
+ */
+export function setContainer(line: string, word: ContainerWord): string {
+  const tokens = lineTokens(line);
+  const first = tokens[0];
+  if (first?.kind !== "word" || (first.value !== "group" && first.value !== "system")) return line;
+  if (tokens[1]?.kind !== "word") return line;
+  return replaceSpan(line, span(first), word);
+}
+
+/** What `wrapStatement` writes round a statement. */
+export interface WrapOpts {
+  /** `group`, `system` or `lane` — the dialect's word for the container; the caller knows which. */
+  word: string;
+  id: string;
+  label: string;
+  /**
+   * The container's own box, for a fence whose coordinates are the author's. Everywhere else the
+   * layout places a container round what is in it and writing one would pin it.
+   */
+  box?: Geometry;
+  /** Where the wrapped statement sits *inside* the new container, for the same fences. */
+  at?: { x: number; y: number };
+}
+
+/**
+ * Put one statement — with the `{ }` block it opens — inside a new container.
+ *
+ * The lines keep every byte they had and gain two spaces of indent, so a card that was at the top
+ * level comes out one level in, and a group that is wrapped carries its children with it at the
+ * same relative depth. Edges are untouched on purpose: they name ids, ids did not change, and an
+ * edge to a card inside a container is exactly as legal as one to a card outside it.
+ *
+ * The container's line is written the way `+` writes a card — `<word> <id> "<label>"` and nothing
+ * the author did not choose — with the brace after any geometry, which is where every dialect's
+ * parser expects it.
+ *
+ * Total, like everything here: a line number that is outside the body, or a line that is blank or
+ * a closing brace, hands the body back, because there is nothing there to wrap.
+ */
+export function wrapStatement(body: string, line: number, opts: WrapOpts): string {
+  const lines = splitLines(body);
+  const first = lines[line - 1];
+  if (first === undefined || first.trim() === "" || /^\s*}/.test(first)) return body;
+  const s = statementSpan(body, line);
+  const pad = indentOf(first);
+
+  const head = `${pad}${opts.word} ${opts.id} ${JSON.stringify(opts.label)}`;
+  const open = `${opts.box ? setGeometry(head, opts.box) : head} {`;
+  const inner = lines.slice(s.from - 1, s.to).map((l) => (l.trim() === "" ? l : `  ${l}`));
+  if (opts.at) inner[0] = setGeometry(inner[0]!, opts.at);
+
+  return [...lines.slice(0, s.from - 1), open, ...inner, `${pad}}`, ...lines.slice(s.to)].join("\n");
 }
 
 /* ---------------------------------------------------------------------------- across a body */
@@ -455,16 +597,64 @@ export function addRow(body: string, nodeLine: number, rowText: string): string 
 }
 
 /**
+ * The rows of a one-line block, each with its own character span in the line.
+ *
+ * `{ id uuid pk; slug text }` is two rows on one line, and a line number cannot say which — so a row
+ * there is addressed by its **position among the line's rows**, `nth`, and this is what turns that
+ * into bytes. The boundary is a `;` outside a quoted string, found by walking the characters between
+ * the braces rather than by asking the tokenizer for its separators: the tokenizer collapses a run
+ * of them into one, which is right for a parser and wrong for counting. An empty segment (`a;; b`)
+ * is not a row and is not counted.
+ */
+function inlineRows(line: string): { from: number; to: number; text: string }[] {
+  const tokens = lineTokens(line);
+  const open = tokens.find((t) => t.kind === "punct" && t.value === "{");
+  const close = [...tokens].reverse().find((t) => t.kind === "punct" && t.value === "}");
+  if (!open || !close) return [];
+  const [start, end] = [span(open)[1], span(close)[0]];
+  const out: { from: number; to: number; text: string }[] = [];
+  let from = start;
+  let quoted = false;
+  const flush = (to: number) => {
+    const raw = line.slice(from, to);
+    const text = raw.trim();
+    if (text === "") return;
+    const at = from + (raw.length - raw.trimStart().length);
+    out.push({ from: at, to: at + text.length, text });
+  };
+  for (let i = start; i < end; i++) {
+    const c = line[i];
+    if (c === "\\" && quoted) i++;
+    else if (c === '"') quoted = !quoted;
+    else if (c === ";" && !quoted) {
+      flush(i);
+      from = i + 1;
+    }
+  }
+  flush(end);
+  return out;
+}
+
+/**
  * Replace the text of the row on `line`, keeping its indent and its trailing comment.
  *
- * A row sharing its line with the statement's braces is refused: `{ id uuid pk; slug text }` is two
- * rows on one line and a line number cannot say which. That is a property of the format rather than
- * a gap worth a second addressing scheme — and `addRow` never creates one.
+ * A row on a line of its own is addressed by the line. A row sharing its line with the statement's
+ * braces — `{ id uuid pk; slug text }` — is addressed by `nth`, its position on that line, and
+ * rewritten in place so the others and the author's spacing stay as they were. Text that would end
+ * the row or the block (`;`, `{`, `}`) is refused there, because it would make two rows or break
+ * the statement.
  */
-export function setRow(body: string, line: number, text: string): string {
+export function setRow(body: string, line: number, text: string, nth?: number): string {
   const lines = splitLines(body);
   const cur = lines[line - 1];
-  if (cur === undefined || hasBrace(cur)) return body;
+  if (cur === undefined) return body;
+  if (nth !== undefined) {
+    const row = inlineRows(cur)[nth];
+    if (!row || /[;{}]/.test(text)) return body;
+    lines[line - 1] = replaceSpan(cur, [row.from, row.to], text);
+    return lines.join("\n");
+  }
+  if (hasBrace(cur)) return body;
   const at = commentAt(cur);
   lines[line - 1] = `${indentOf(cur)}${text}${at === -1 ? "" : cur.slice(at)}`;
   return lines.join("\n");
@@ -479,14 +669,16 @@ export function setRow(body: string, line: number, text: string): string {
  * edits in the panel is the line they would have typed, which is also the only form in which every
  * dialect's rows are the same shape.
  *
- * A row sharing its line with a brace is left out, for the reason `setRow` refuses one: `{ id uuid
- * pk; slug text }` is two rows on one line and a line number cannot say which. `addRow` never
- * makes one, so this only ever skips rows an author wrote that way.
+ * The rows of a one-line block — `{ id uuid pk; slug text }` — share a line, so each carries `nth`,
+ * its position on it, and `setRow` and `removeRow` take that as a third argument. A row on a line of
+ * its own has no `nth`: the line says which. A row sharing its line with a *multi-line* block's
+ * brace (`  slug text }`) is still left out; `addRow` never writes one.
  */
-export function rowLines(body: string, nodeLine: number): { line: number; text: string }[] {
+export function rowLines(body: string, nodeLine: number): { line: number; text: string; nth?: number }[] {
   const block = blockOf(body, nodeLine);
-  if (!block || block.oneLine) return [];
+  if (!block) return [];
   const lines = splitLines(body);
+  if (block.oneLine) return inlineRows(lines[nodeLine - 1] ?? "").map((row, nth) => ({ line: nodeLine, text: row.text, nth }));
   const out: { line: number; text: string }[] = [];
   for (let n = block.open + 1; n < block.close; n++) {
     const text = lines[n - 1];
@@ -497,11 +689,28 @@ export function rowLines(body: string, nodeLine: number): { line: number; text: 
   return out;
 }
 
-/** Take the row on `line` out. The same refusal as `setRow`, for the same reason. */
-export function removeRow(body: string, line: number): string {
+/**
+ * Take the row on `line` out; `nth` says which when the line holds several, as `setRow` does.
+ *
+ * Taking out the last row of a one-line block leaves `{ }` rather than removing the braces: the
+ * statement is still a card that has rows, and `addRow` writes into exactly that shape.
+ */
+export function removeRow(body: string, line: number, nth?: number): string {
   const lines = splitLines(body);
   const cur = lines[line - 1];
-  if (cur === undefined || hasBrace(cur)) return body;
+  if (cur === undefined) return body;
+  if (nth !== undefined) {
+    const rows = inlineRows(cur);
+    const row = rows[nth];
+    if (!row) return body;
+    const tokens = lineTokens(cur);
+    const open = tokens.find((t) => t.kind === "punct" && t.value === "{")!;
+    const close = [...tokens].reverse().find((t) => t.kind === "punct" && t.value === "}")!;
+    const rest = rows.filter((_, i) => i !== nth).map((r) => r.text);
+    lines[line - 1] = cur.slice(0, span(open)[1]) + (rest.length ? ` ${rest.join("; ")} ` : " ") + cur.slice(span(close)[0]);
+    return lines.join("\n");
+  }
+  if (hasBrace(cur)) return body;
   return dropRange(lines, line - 1, line - 1).join("\n");
 }
 
@@ -579,22 +788,47 @@ export function edgeSpan(line: string): EdgeSpan | null {
 }
 
 /**
- * The label on one segment. `seg` picks which arrow on a chain — every edge of `a --> b --> c` is
- * on the same line, so the line alone cannot say which one is meant.
+ * One of an arrow's two strings, on one segment: `0` is the label, `1` is the second one — C4's
+ * technology chip, `a --> b : "Uses" "HTTPS"`.
+ *
+ * `seg` picks which arrow on a chain — every edge of `a --> b --> c` is on the same line, so the
+ * line alone cannot say which one is meant.
+ *
+ * The strings are positional, as a node's title, meta and desc are: clearing the label while the
+ * second one stands behind it leaves `""` in its place, because promoting the technology into the
+ * label's position would be a different diagram. Clearing the second one takes off the `""` that
+ * only held its place, so a line does not keep a pair of empty quotes nobody can see.
  */
-export function setEdgeLabel(line: string, text: string | null, seg = 0): string {
+function setEdgeString(line: string, index: 0 | 1, text: string | null, seg: number): string {
   const e = edgeSpan(line);
   const tail = e?.tails[seg + 1];
   if (!tail) return line;
-  const have = tail.strings[0];
+  const have = tail.strings[index];
   if (text === null) {
     if (!have) return line;
-    /* The second label is C4's technology chip, and it stands behind the first positionally. */
-    if (tail.strings.length > 1) return replaceSpan(line, span(have), '""');
+    if (index < tail.strings.length - 1) return replaceSpan(line, span(have), '""');
+    const before = tail.strings[index - 1];
+    /* Both go in one slice: cutting them one at a time would reread the line between the two. */
+    if (before?.value === "") return cut(line, [span(before)[0], span(have)[1]]);
     return cut(line, span(have));
   }
   if (have) return replaceSpan(line, span(have), JSON.stringify(text));
-  return splice(line, tail.at, JSON.stringify(text));
+  if (index === 1 && tail.strings.length === 0) return splice(line, tail.at, `"" ${JSON.stringify(text)}`);
+  const last = tail.strings[tail.strings.length - 1];
+  return splice(line, last ? span(last)[1] : tail.at, JSON.stringify(text));
+}
+
+/** The label on one segment. See `setEdgeString`. */
+export function setEdgeLabel(line: string, text: string | null, seg = 0): string {
+  return setEdgeString(line, 0, text, seg);
+}
+
+/**
+ * The second string on one segment — C4's technology chip, drawn under the label. Positional, so
+ * writing one on an edge with no label first writes the empty label that holds its place.
+ */
+export function setEdgeLabel2(line: string, text: string | null, seg = 0): string {
+  return setEdgeString(line, 1, text, seg);
 }
 
 /**
@@ -615,6 +849,132 @@ export function setEdgeArrow(line: string, arrow: string, seg = 0): string {
   const tok = e?.arrows[seg];
   if (!tok || !isArrow(arrow)) return line;
   return replaceSpan(line, span(tok), arrow);
+}
+
+/**
+ * Which end of a segment, for the writers below that reach into one: the list of ids the arrow
+ * leaves (`from`) or arrives at (`to`).
+ *
+ * On a chain the two halves share: `a --> b & c --> d` has `b & c` as the first segment's `to` *and*
+ * the second one's `from`, because that is one list in the text. Writing either writes the list.
+ */
+export type EdgeSide = "from" | "to";
+
+const listOf = (e: EdgeSpan, seg: number, side: EdgeSide): RefList | undefined => e.refs[side === "from" ? seg : seg + 1];
+
+/** The ids one end of a segment names, in the order they are written. */
+export function edgeEnds(line: string, seg: number, side: EdgeSide): string[] {
+  const e = edgeSpan(line);
+  const list = e && listOf(e, seg, side);
+  return list ? list.tokens.map((t) => t.value) : [];
+}
+
+/**
+ * Swap one id on one end of a segment for another — the node, group or row (`api.content`) the
+ * arrow runs to. A word the tokenizer would not read as one id is refused, because a control
+ * that writes `a b` into a list is a control that breaks the file.
+ */
+export function setEdgeEnd(line: string, seg: number, side: EdgeSide, index: number, ref: string): string {
+  const e = edgeSpan(line);
+  const tok = e && listOf(e, seg, side)?.tokens[index];
+  if (!tok || !isRef(ref)) return line;
+  return replaceSpan(line, span(tok), ref);
+}
+
+/**
+ * Add an id to one end of a segment: `a --> c` becomes `a & b --> c`, which is a bus, and
+ * `f --> a` becomes `f --> a & b`, which is a fan. The statement stays one statement, so the
+ * router can see one family and draw one trunk with one label — what one line per pair cannot say.
+ *
+ * An id already in the list is not added twice, and a segment whose list is missing is left alone.
+ */
+export function addEdgeEnd(line: string, seg: number, side: EdgeSide, ref: string): string {
+  const e = edgeSpan(line);
+  const list = e && listOf(e, seg, side);
+  if (!list || !isRef(ref) || list.tokens.some((t) => t.value === ref)) return line;
+  return line.slice(0, list.to) + ` & ${ref}` + line.slice(list.to);
+}
+
+/**
+ * Take one id off one end of a segment. The last id on an end stays: an arrow with nothing at one
+ * end is not a statement, and deleting the edge is `removeEdge`'s job, which is the one that says so.
+ */
+export function removeEdgeEnd(line: string, seg: number, side: EdgeSide, index: number): string {
+  const e = edgeSpan(line);
+  const toks = e && listOf(e, seg, side)?.tokens;
+  if (!toks || toks.length < 2 || !toks[index]) return line;
+  /* The `&` goes with the id it joined: the one in front of it, or for the first id the one behind. */
+  if (index === 0) return line.slice(0, span(toks[0]!)[0]) + line.slice(span(toks[1]!)[0]);
+  return line.slice(0, span(toks[index - 1]!)[1]) + line.slice(span(toks[index]!)[1]);
+}
+
+/**
+ * Carry a chain one hop further: `a --> b` becomes `a --> b --> c`.
+ *
+ * At the end of the statement, after everything the last hop wrote, because a label and the
+ * modifiers belong to the hop *before* the arrow that follows them — appending cannot move one onto
+ * the wrong segment. The new hop wears the arrow the chain's last one does, which is the spelling
+ * the author has been using, and carries nothing else.
+ */
+export function appendHop(line: string, ref: string, arrow?: string): string {
+  const e = edgeSpan(line);
+  if (!e || !isRef(ref)) return line;
+  const last = e.arrows[e.arrows.length - 1]!.value;
+  return splice(line, insertAt(line, lineTokens(line)), `${arrow && isArrow(arrow) ? arrow : last} ${ref}`);
+}
+
+/**
+ * Take the last hop off a chain: `a --> b --> c` becomes `a --> b`. A statement with one arrow has
+ * no hop to take off — that is the whole edge, and `removeEdge` deletes those.
+ */
+export function dropHop(line: string): string {
+  const e = edgeSpan(line);
+  if (!e || e.arrows.length < 2) return line;
+  const from = span(e.arrows[e.arrows.length - 1]!)[0];
+  const comment = commentAt(line);
+  const end = comment === -1 ? line.length : comment;
+  return cut(line, [from, end]);
+}
+
+/**
+ * Turn a statement round: `a --> b "label"` becomes `b --> a "label"`.
+ *
+ * The two ref lists trade places and everything else stays where it is. The label is written after
+ * the second list and belongs to the segment, not to either end, so it keeps its place. The arrow
+ * keeps its spelling, so a `--|>` still points from the new first end to the new second.
+ *
+ * Only a statement with one arrow. Reversing one hop of a chain would mean splitting the chain, and
+ * reversing a whole chain is a different statement from the one picked. Either way the line is
+ * returned unchanged, which is what the panel reads as "not offered".
+ */
+export function reverseEdge(line: string): string {
+  const e = edgeSpan(line);
+  if (!e || e.arrows.length !== 1) return line;
+  const [a, z] = [e.refs[0]!, e.refs[1]!];
+  const left = line.slice(a.from, a.to);
+  const right = line.slice(z.from, z.to);
+  return line.slice(0, a.from) + right + line.slice(a.to, z.from) + left + line.slice(z.to);
+}
+
+/**
+ * Every place an edge statement names `from`, named `to` instead — only in its ref lists, never in a
+ * label or a modifier. What a loose stub dropped on a card writes (#145): `api --> ghost` becomes
+ * `api --> db`, and a chain through `ghost` is mended at every hop that named it.
+ */
+export function retargetRef(line: string, from: string, to: string): string {
+  const e = edgeSpan(line);
+  if (!e || !isRef(to)) return line;
+  const hits = e.refs.flatMap((r) => r.tokens).filter((t) => t.value === from);
+  /* Right to left, so each splice leaves the spans still to come where they were. */
+  let out = line;
+  for (const t of hits.reverse()) out = replaceSpan(out, span(t), to);
+  return out;
+}
+
+/** Whether `text` is one id or `id.row`, the way the tokenizer reads a word. */
+function isRef(text: string): boolean {
+  const t = lineTokens(text);
+  return t.length === 1 && t[0]!.kind === "word" && t[0]!.value === text;
 }
 
 /**
@@ -971,6 +1331,313 @@ export function moveTopic(body: string, line: number, under: number): string {
   return [...rest.slice(0, mark), ...reindented, ...rest.slice(mark + 1)].join("\n");
 }
 
+/* ------------------------------------------------------------------- what is out of date */
+
+/**
+ * The words the parser still accepts and warns about (`W_RETIRED_FLAG`): they marked a card once,
+ * and hovering rings it now, so the current form of a statement that wears one is the statement
+ * without it. The parser's own set is private to `common.ts`; this is the same two words, and
+ * `test/restate.test.ts` holds the two together by parsing what these remove.
+ */
+const RETIRED = new Set(["focus", "current"]);
+
+/**
+ * Bring the statements the parser called out as retired up to date: the flag comes off the line, and
+ * a `legend` line explaining a mark that is no longer drawn goes entirely.
+ *
+ * It is handed the **lines** — the `W_RETIRED_FLAG` diagnostics' own — instead of looking for the
+ * words itself, because `current` is also a perfectly good column name and only the parser knows
+ * which ones it read as a flag. On those lines only the tokens before a statement's `{` are
+ * looked at, so a column called `focus` on a one-line entity is left where it is.
+ *
+ * A **declared whole-body conversion**, like `stripCoords`: it is offered as one button that names
+ * what it will do, and everything on every other line is untouched by construction.
+ */
+export function updateRetired(body: string, lines: readonly number[]): string {
+  const out = splitLines(body);
+  const gone: number[] = [];
+  for (const n of new Set(lines)) {
+    const text = out[n - 1];
+    if (text === undefined) continue;
+    const tokens = lineTokens(text);
+    if (tokens[0]?.kind === "word" && tokens[0].value === "legend") {
+      gone.push(n - 1);
+      continue;
+    }
+    let next = text;
+    for (;;) {
+      const all = lineTokens(next);
+      const brace = all.findIndex((t) => t.kind === "punct" && t.value === "{");
+      const had = flagSpan(brace === -1 ? all : all.slice(0, brace), RETIRED);
+      if (!had) break;
+      next = cut(next, had);
+    }
+    out[n - 1] = next;
+  }
+  /* Last first, so a removal does not renumber the ones still to come. */
+  let rest = out;
+  for (const i of gone.sort((a, b) => b - a)) rest = dropRange(rest, i, i);
+  return rest.join("\n");
+}
+
+/**
+ * A `dir=LR` statement in the body, taken out and handed back as the direction it said.
+ *
+ * It is the parser's own and it wins over the fence's `dir=`, which is exactly why it is worth
+ * moving: the Direction control writes the fence, and a body that still sets one over it would
+ * answer the control with no change. The last valid one is what the parser ended on, so that is the
+ * value returned; all of them are removed. `null` when the body has none — and a `dir=` with
+ * anything else on its line (a group's) is not this statement and is never touched.
+ */
+export function takeBodyDir(body: string): { body: string; dir: "LR" | "TB" } | null {
+  const hits: { line: number; dir: "LR" | "TB" }[] = [];
+  for (const [line, tokens] of tokensByLine(body)) {
+    const [key, eq, value] = tokens;
+    if (tokens.length !== 3 || key!.kind !== "word" || key!.value !== "dir") continue;
+    if (eq!.kind !== "punct" || eq!.value !== "=" || value!.kind !== "word") continue;
+    if (value!.value === "LR" || value!.value === "TB") hits.push({ line, dir: value!.value });
+  }
+  const last = hits[hits.length - 1];
+  if (!last) return null;
+  let lines = splitLines(body);
+  for (const h of [...hits].sort((a, b) => b.line - a.line)) lines = dropRange(lines, h.line - 1, h.line - 1);
+  return { body: lines.join("\n"), dir: last.dir };
+}
+
+/* ------------------------------------------------------------ growing and restructuring a mindmap */
+
+/**
+ * One topic line as the parser reads it: where it is, how deep, and which topic it hangs from.
+ *
+ * The parent is found the way `parseMindmap` finds it — pop everything at least as deep, take what
+ * is left — so a file that mixes tabs and spaces, or indents by three, gives the answer the page
+ * draws rather than the one a fixed two-space grid would. Lines are 1-based, which is what every
+ * other writer here takes.
+ */
+interface TopicRow {
+  line: number;
+  depth: number;
+  parent: number | null;
+}
+
+function topicRows(lines: string[]): TopicRow[] {
+  const rows: TopicRow[] = [];
+  const stack: TopicRow[] = [];
+  lines.forEach((text, i) => {
+    if (!topicLine(text)) return;
+    const depth = depthOf(text);
+    while (stack.length && stack[stack.length - 1]!.depth >= depth) stack.pop();
+    const row: TopicRow = { line: i + 1, depth, parent: stack[stack.length - 1]?.line ?? null };
+    rows.push(row);
+    stack.push(row);
+  });
+  return rows;
+}
+
+/** One level of indent, in whatever the author used: a tab if their tree has one, else two spaces. */
+const unitOf = (lines: string[]): string => (lines.some((l) => topicLine(l) && indentOf(l).includes("\t")) ? "\t" : "  ");
+
+/** The topic's parent line, or `null` for the top of the tree — and for a line that is not a topic. */
+export function topicParent(body: string, line: number): number | null {
+  return topicRows(splitLines(body)).find((r) => r.line === line)?.parent ?? null;
+}
+
+/** What a topic can be asked to do, so a control can be offered only where it would act. */
+export interface TopicMoves {
+  /** A child is always possible: the tree has no limit on how wide a topic grows. */
+  child: boolean;
+  /** The top of the tree has no siblings — a second line at depth 0 would be a second root. */
+  sibling: boolean;
+  /** Under the sibling just above it, which is the only thing "indent" can mean in a tree. */
+  indent: boolean;
+  /** Out to the parent's level. Not from directly under the root, which would make a second one. */
+  outdent: boolean;
+  up: boolean;
+  down: boolean;
+  /** Everything but the top, which already is one. */
+  root: boolean;
+}
+
+export function topicMoves(body: string, line: number): TopicMoves {
+  const rows = topicRows(splitLines(body));
+  const at = rows.find((r) => r.line === line);
+  if (!at) return { child: false, sibling: false, indent: false, outdent: false, up: false, down: false, root: false };
+  const sibs = rows.filter((r) => r.parent === at.parent);
+  const i = sibs.indexOf(at);
+  const parent = rows.find((r) => r.line === at.parent);
+  return {
+    child: true,
+    sibling: at.parent !== null,
+    indent: at.parent !== null && i > 0,
+    outdent: parent !== undefined && parent.parent !== null,
+    up: at.parent !== null && i > 0,
+    down: at.parent !== null && i < sibs.length - 1,
+    root: at.parent !== null,
+  };
+}
+
+/**
+ * A new topic: the last child of the one on `line`, or the sibling right after it and its subtree.
+ *
+ * It goes **after** everything the topic holds, so a sibling lands where an outliner puts one — below
+ * the whole branch, not between a parent and its first child — and a child joins the end of the
+ * family. The indent is the one the neighbours already use (the first child's, or one level past the
+ * parent), so a file written with tabs or with four spaces stays that way.
+ *
+ * Returns the new line's number alongside the body, because a topic has no id to hand back: the
+ * parser numbers them as it reads, so the caller finds the new one by parsing and asking for that
+ * line. `null` for a sibling of the top of the tree (that would be a second root) or a line that is
+ * not a topic.
+ */
+export function addTopic(body: string, line: number, as: "child" | "sibling", text = "New topic"): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at) return null;
+  if (as === "sibling" && at.parent === null) return null;
+
+  const own = indentOf(lines[line - 1]!);
+  const first = rows.find((r) => r.parent === line);
+  const indent = as === "sibling" ? own : first ? indentOf(lines[first.line - 1]!) : own + unitOf(lines);
+  const end = topicSpan(body, line).to;
+  return { body: [...lines.slice(0, end), `${indent}${text}`, ...lines.slice(end)].join("\n"), line: end + 1 };
+}
+
+/** A topic edit's answer: the new body, and the line the topic that was acted on now sits on. */
+export interface TopicEdit {
+  body: string;
+  line: number;
+}
+
+/**
+ * Lines `s` moved to sit before the original line index `at`, re-indented so the topic starts at
+ * `indent`. `at` is an index into the lines as they are *now*; the cut shifts what follows it, and
+ * that arithmetic is done here once rather than by every caller.
+ */
+function relocate(lines: string[], s: { from: number; to: number }, at: number, indent: string): TopicEdit {
+  const delta = indent.replace(/\t/g, "  ").length - depthOf(lines[s.from - 1] ?? "");
+  const moved = lines
+    .slice(s.from - 1, s.to)
+    .map((l) =>
+      l.trim() === "" || delta === 0 ? l : delta > 0 ? " ".repeat(delta) + l : l.slice(Math.min(-delta, indentOf(l).length)),
+    );
+  const rest = [...lines.slice(0, s.from - 1), ...lines.slice(s.to)];
+  const to = at >= s.to ? at - moved.length : at;
+  rest.splice(to, 0, ...moved);
+  return { body: rest.join("\n"), line: to + 1 };
+}
+
+/**
+ * Outdent: the topic and its subtree leave their parent and sit right after it, one level out.
+ *
+ * Siblings that were below it stay where they were, under the old parent — the plain reading of
+ * "move this one out", and the one a person can predict. `null` for the top of the tree and for a
+ * child of the top, because the level above that is depth 0 and a mindmap has one root.
+ */
+export function outdentTopic(body: string, line: number): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  const parent = rows.find((r) => r.line === at?.parent);
+  if (!at || !parent || parent.parent === null) return null;
+  return relocate(lines, topicSpan(body, line), topicSpan(body, parent.line).to, indentOf(lines[parent.line - 1]!));
+}
+
+/** Indent: the topic and its subtree become the last children of the sibling just above them. */
+export function indentTopic(body: string, line: number): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at || at.parent === null) return null;
+  const sibs = rows.filter((r) => r.parent === at.parent);
+  const prev = sibs[sibs.indexOf(at) - 1];
+  if (!prev) return null;
+  const first = rows.find((r) => r.parent === prev.line);
+  const indent = first ? indentOf(lines[first.line - 1]!) : indentOf(lines[prev.line - 1]!) + unitOf(lines);
+  return relocate(lines, topicSpan(body, line), topicSpan(body, prev.line).to, indent);
+}
+
+/** Swap a topic, with its subtree, past the sibling above (`-1`) or below (`1`). */
+export function shiftTopic(body: string, line: number, by: -1 | 1): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at || at.parent === null) return null;
+  const sibs = rows.filter((r) => r.parent === at.parent);
+  const next = sibs[sibs.indexOf(at) + by];
+  if (!next) return null;
+  const indent = indentOf(lines[next.line - 1]!);
+  const to = by < 0 ? next.line - 1 : topicSpan(body, next.line).to;
+  return relocate(lines, topicSpan(body, line), to, indent);
+}
+
+/**
+ * Make a topic the root: the tree is turned over so the topic is the top and everything that was
+ * above it hangs below it.
+ *
+ * What "root" means in a tree written as indentation is *the line at depth 0*, so choosing a new one
+ * is re-hanging the tree from it. The topic keeps its own children, and its old parent becomes one
+ * more of them — with its other children under it, and its old parent after those, and so on up to
+ * the old top. Nothing is lost and no topic changes its text; the `root` word moves from the old top
+ * to the new one, because it names the topic the drawing hangs from.
+ *
+ * The whole tree is written out again at one indent unit, which is the one place a writer here
+ * touches lines it was not pointed at: depth *is* the indent, and a branch that changed parent has a
+ * new depth whatever the author typed. A comment or blank line travels with the topic that follows
+ * it. Lines outside the tree (above its top, or after its last topic) are not touched.
+ */
+export function makeRoot(body: string, line: number): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at || at.parent === null) return null;
+
+  const chain: TopicRow[] = [];
+  for (let r: TopicRow | undefined = at; r; r = rows.find((x) => x.line === r!.parent)) chain.push(r);
+  const top = chain[chain.length - 1]!;
+  const range = topicSpan(body, top.line);
+
+  /* A comment or blank is the lead of the topic that follows it, so it stays attached to it when
+     the topics are reordered. Whatever precedes the top, or trails the last topic, is outside the
+     range and is never read. */
+  const lead = new Map<number, string[]>();
+  let carry: string[] = [];
+  for (let n = top.line; n <= range.to; n++) {
+    if (topicLine(lines[n - 1])) {
+      lead.set(n, carry);
+      carry = [];
+    } else carry.push(lines[n - 1]!);
+  }
+
+  const kids = new Map<number, number[]>();
+  for (const r of rows) if (r.parent !== null) kids.set(r.parent, [...(kids.get(r.parent) ?? []), r.line]);
+  const next = (n: number): number[] => {
+    const i = chain.findIndex((c) => c.line === n);
+    if (i === -1) return kids.get(n) ?? [];
+    const was = chain[i - 1]?.line;
+    const up = chain[i + 1]?.line;
+    return [...(kids.get(n) ?? []).filter((k) => k !== was), ...(up === undefined ? [] : [up])];
+  };
+
+  const unit = unitOf(lines);
+  const out: string[] = [];
+  const emit = (n: number, depth: number): void => {
+    out.push(...(lead.get(n) ?? []));
+    const text = lines[n - 1]!.trim();
+    /* Only the two lines that change role touch the word: a deeper topic that merely starts with
+       "root" (a root-cause analysis) is the author's text and stays exactly as written. */
+    const bare = n === line || n === top.line ? text.replace(/^root\b\s*/, "") || text : text;
+    out.push(unit.repeat(depth) + (n === line ? `root ${bare}` : bare));
+    for (const k of next(n)) emit(k, depth + 1);
+  };
+  emit(line, 0);
+
+  return {
+    body: [...lines.slice(0, top.line - 1), ...out, ...lines.slice(range.to)].join("\n"),
+    line: top.line + (lead.get(line)?.length ?? 0),
+  };
+}
+
 /* ------------------------------------------------------------------------------ the chart */
 
 /**
@@ -1104,7 +1771,9 @@ export function setChartOption(
   key: "legend" | "unit" | "min" | "max" | "values",
   value: string | number | boolean | null,
 ): string {
-  const line = headLine(body, new Set([key]));
+  /* `legend` is two statements that share a head word, and this writes the placement one: a key row
+     (`legend solid "…"`) written earlier in the body must not be what a change of placement finds. */
+  const line = key === "legend" ? (legendLines(body).find((l) => !l.glyph)?.line ?? 0) : headLine(body, new Set([key]));
 
   if (value === null || value === false) {
     if (line === 0) return body;
@@ -1164,3 +1833,170 @@ export function setCategories(body: string, labels: readonly string[]): string {
 
 /** The tokenizer's own word shape: a label matching it round-trips bare, and nothing else does. */
 const BARE_LABEL = /^[A-Za-z0-9_*+\-][A-Za-z0-9_.\-/+]*$/;
+
+/* ------------------------------------------------------------------ the centre, the key, the data */
+
+/**
+ * Every `legend` statement of a body, and which of its two meanings each is.
+ *
+ * `legend bottom` places the key and `legend solid "in sync"` adds a row to it; the grammar tells
+ * them apart by whether a string follows the second word, and so does this, off the tokens rather
+ * than a regular expression.
+ */
+function legendLines(body: string): { line: number; glyph: boolean }[] {
+  const by = tokensByLine(body);
+  const out: { line: number; glyph: boolean }[] = [];
+  for (const line of [...by.keys()].sort((a, b) => a - b)) {
+    const t = by.get(line)!;
+    if (t[0]?.kind !== "word" || t[0].value !== "legend") continue;
+    out.push({ line, glyph: t[1]?.kind === "word" && t[2]?.kind === "string" });
+  }
+  return out;
+}
+
+/** A line to put a new chart-level statement on: straight after the form line, else last. */
+function insertAfterForm(body: string, text: string): string {
+  const form = headLine(body, FORM_WORDS);
+  if (form === 0) return body.trim() === "" ? `${text}\n` : `${body.replace(/\n*$/, "")}\n${text}\n`;
+  const lines = splitLines(body);
+  return [...lines.slice(0, form), text, ...lines.slice(form)].join("\n");
+}
+
+/**
+ * A donut's hero — the number in its hole and the word under it — or `null` to take it away.
+ *
+ * It lives on the form line, as strings beside the flags, so the writer swaps only the strings and
+ * leaves the form word, a `%%` comment and any flag exactly where they stood. With no form line the
+ * body is a `bar`, which has no hole, so there is nothing to write and the body comes back as it
+ * was. A caption without a figure is not a thing the grammar has: an empty figure takes both.
+ */
+export function setChartHero(body: string, hero: { value: string; label?: string } | null): string {
+  const line = headLine(body, FORM_WORDS);
+  if (line === 0) return body;
+  const text = splitLines(body)[line - 1]!;
+  const tokens = lineTokens(text);
+  const strings = tokens.filter((t) => t.kind === "string");
+  const value = hero?.value.trim() ?? "";
+  const label = hero?.label?.trim() ?? "";
+  const written = value === "" ? "" : [value, ...(label === "" ? [] : [label])].map((v) => JSON.stringify(v)).join(" ");
+
+  let next = text;
+  /* From the end, so the spans of the strings still to come stay where the tokenizer put them. */
+  for (let i = strings.length - 1; i >= 0; i--) {
+    next = i === 0 && written !== "" ? replaceSpan(next, span(strings[0]!), written) : cut(next, span(strings[i]!));
+  }
+  if (strings.length === 0 && written !== "") next = splice(next, insertAt(next, lineTokens(next)), written);
+  return replaceLine(body, line, next);
+}
+
+/** The key rows of a chart — its `legend <glyph> "text"` statements — in the order they were written. */
+export function chartKeyRows(body: string): { glyph: string; text: string }[] {
+  const by = tokensByLine(body);
+  return legendLines(body)
+    .filter((l) => l.glyph)
+    .map((l) => ({ glyph: by.get(l.line)![1]!.value, text: by.get(l.line)![2]!.value }));
+}
+
+/**
+ * The chart's key rows, replaced by `rows`.
+ *
+ * Rewritten in place and in order: the first row takes the first `legend <glyph> "…"` line, so a
+ * trailing comment on it survives; surplus lines go, and rows past the existing ones are written
+ * after the last of them (after the form line when there is none). A row whose glyph is not one
+ * word, or whose text is empty, is not a statement the grammar can read back, so it is dropped.
+ */
+export function setChartKeyRows(body: string, rows: readonly { glyph: string; text: string }[]): string {
+  const wanted = rows.filter((r) => /^[A-Za-z][A-Za-z0-9_-]*$/.test(r.glyph) && r.text.trim() !== "");
+  const row = (r: { glyph: string; text: string }) => `${r.glyph} ${JSON.stringify(r.text.trim())}`;
+  const had = legendLines(body).filter((l) => l.glyph);
+  let out = body;
+
+  /* Last first, so removing a line never moves one still to be rewritten. */
+  for (let i = had.length - 1; i >= 0; i--) {
+    const line = had[i]!.line;
+    if (i >= wanted.length) {
+      out = dropRange(splitLines(out), line - 1, line - 1).join("\n");
+      continue;
+    }
+    const text = splitLines(out)[line - 1]!;
+    const tokens = lineTokens(text);
+    out = replaceLine(out, line, replaceSpan(text, [span(tokens[1]!)[0], span(tokens[2]!)[1]], row(wanted[i]!)));
+  }
+
+  for (let i = had.length; i < wanted.length; i++) {
+    const last = legendLines(out)
+      .filter((l) => l.glyph)
+      .at(-1);
+    if (!last) {
+      out = insertAfterForm(out, `legend ${row(wanted[i]!)}`);
+      continue;
+    }
+    const lines = splitLines(out);
+    out = [...lines.slice(0, last.line), `legend ${row(wanted[i]!)}`, ...lines.slice(last.line)].join("\n");
+  }
+  return out;
+}
+
+/** Every series and slice id a chart body declares, in declaration order. */
+function chartIds(body: string): string[] {
+  const model = parseChart(body);
+  return [...model.series, ...model.slices].sort((a, b) => a.line - b.line).map((d) => d.id);
+}
+
+/**
+ * A new `series` or a new `slice`, written after the last one the chart has, and the id it was given.
+ *
+ * The id is the kind word with the next free number (`series2`, `slice3`) and the label says the
+ * same in words, because both have to exist before a person can retype either. A series gets one `1`
+ * per category — a bar, a point, a wedge that is there to be seen and picked, where a zero draws
+ * nothing — and a slice its one. No `hue=`: the next unused colour in the theme's list is the
+ * default, and writing one would pin it.
+ */
+export function addChartData(body: string, kind: "series" | "slice"): { body: string; id: string } {
+  const model = parseChart(body);
+  const taken = new Set(chartIds(body));
+  let n = 1;
+  while (taken.has(`${kind}${n}`) && n < 1000) n++;
+  const id = `${kind}${n}`;
+  const count = Math.max(model.categories.length, ...model.series.map((s) => s.values.length), 1);
+  const values = kind === "slice" ? "1" : Array.from({ length: count }, () => "1").join(" ");
+  const text = `${kind} ${id} "${kind === "series" ? "Series" : "Slice"} ${n}" ${values}`;
+
+  const last = [...model.series, ...model.slices].reduce((m, d) => Math.max(m, d.line), 0);
+  if (last === 0) return { body: insertAfterForm(body, text), id };
+  /* After the whole statement: a series line is one line, but the line may be followed by a block. */
+  const to = statementSpan(body, last).to;
+  const lines = splitLines(body);
+  return { body: [...lines.slice(0, to), text, ...lines.slice(to)].join("\n"), id };
+}
+
+/** Why `to` cannot be the id of the series or slice `from`, or `null` when it can. */
+export function chartIdProblem(body: string, from: string, to: string): string | null {
+  if (to === from) return null;
+  if (to === "") return "an id cannot be empty";
+  /* No dot: `chart.web` is an item and the series on it, so the id is the part after the last one. */
+  if (!/^[A-Za-z0-9_-]+$/.test(to)) return "an id is letters, digits, `-` and `_`";
+  if (chartIds(body).includes(to)) return `\`${to}\` is already a series or a slice on this chart`;
+  return null;
+}
+
+/**
+ * Change one series' or slice's id.
+ *
+ * Only the declaration is written, deliberately not `renameId`: that renames every *word* equal to
+ * the id, and in a chart a word is also a category — `x web mobile` beside `series web "Web"` would
+ * lose a column header. A chart's body names an id nowhere but where it declares it, so the one
+ * token is the whole of "every reference in the fence". Anything refused (see `chartIdProblem`)
+ * hands the body back untouched.
+ */
+export function renameChartId(body: string, from: string, to: string): string {
+  if (to === from || chartIdProblem(body, from, to) !== null) return body;
+  const model = parseChart(body);
+  const at = [...model.series, ...model.slices].find((d) => d.id === from);
+  if (!at) return body;
+  const text = splitLines(body)[at.line - 1]!;
+  const tokens = lineTokens(text);
+  const id = idIndex(tokens);
+  if (id === -1 || tokens[id]!.value !== from) return body;
+  return replaceLine(body, at.line, replaceSpan(text, span(tokens[id]!), to));
+}

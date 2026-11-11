@@ -184,6 +184,12 @@ export const CODES = {
    * branch on.
    */
   EG_WRONG_TYPE: "EG_WRONG_TYPE",
+  /**
+   * Flashcards were asked for (#140) and a question in the answer is not one: it has a checklist, or
+   * no `card` on its heading. The quiz parser reads it clean — an open question is a fine question —
+   * so, like `EG_WRONG_TYPE`, it is the generator that has to say so in a way the loop can branch on.
+   */
+  EG_NOT_A_CARD: "EG_NOT_A_CARD",
 } as const;
 
 export type Code = (typeof CODES)[keyof typeof CODES];

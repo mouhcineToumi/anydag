@@ -465,8 +465,8 @@ function parseNode(cur: Cursor, ctx: Ctx, kindWord: Token): void {
     kind,
     /* A card with no title shows its id, which is how `state done` reads. A figure's title is its
        caption and a picture is allowed none, so an unwritten one stays empty rather than
-       printing the id under a house. */
-    title: texts[0]?.value ?? (kind === "figure" ? "" : idTok.value),
+       printing the id under a house. A start or end state draws no text at all. */
+    title: texts[0]?.value ?? (kind === "figure" || kind === "start" || kind === "end" ? "" : idTok.value),
     meta: texts[1]?.value,
     desc: texts[2]?.value,
     rows: [],
@@ -731,6 +731,41 @@ function finalize(ctx: Ctx): void {
     }
   }
 
+  /* An end that names nothing is drawn as a loose stub (#145), so the edge hangs from the end it
+     has and a person can see it, drag it onto a card or delete it. One stub per name per line: a
+     chain through the same missing id meets at one stub, as it would at one card. Only where the
+     other end is drawn — with both ends missing there is nothing for it to hang from — and never for
+     an id whose declaration was rejected: that statement is skipped, and so is everything naming it.
+     The diagnostic is untouched; an agent still reads `E_UNKNOWN_ID`. */
+  const known = new Set([...g.nodes.map((n) => n.id), ...g.groups.map((gr) => gr.id)]);
+  const unknown = (raw: string) => !known.has(raw) && !ctx.broken.has(raw);
+  const stubs = new Map<string, string>();
+  for (const e of g.edges) {
+    const from = unknown(e.from.node) && known.has(e.to.node);
+    const to = unknown(e.to.node) && known.has(e.from.node);
+    if (!from && !to) continue;
+    const ref = from ? e.from : e.to;
+    const key = `${e.line}|${ref.node}`;
+    let id = stubs.get(key);
+    if (id === undefined) {
+      id = `__loose-${stubs.size}`;
+      stubs.set(key, id);
+      /* A chain's middle is one ref shared by both hops, so the second hop finds it already mended. */
+      known.add(id);
+      g.nodes.push({
+        id,
+        kind: "loose",
+        title: "",
+        rows: [],
+        group: undefined,
+        line: e.line,
+        loose: { ref: ref.node, edge: e.id },
+      });
+    }
+    ref.node = id;
+    ref.row = undefined;
+  }
+
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
   const groupById = new Map(g.groups.map((gr) => [gr.id, gr]));
   const laneById = new Map(g.lanes.map((l) => [l.id, l]));
@@ -741,8 +776,9 @@ function finalize(ctx: Ctx): void {
   for (const e of g.edges) {
     const from = byId.get(e.from.node);
     const to = byId.get(e.to.node);
-    if (from && to?.lane && !from.lane && (from.kind === "start" || from.kind === "end")) from.lane = to.lane;
-    if (to && from?.lane && !to.lane && (to.kind === "start" || to.kind === "end")) to.lane = from.lane;
+    const placed = (k: NodeKind) => k === "start" || k === "end" || k === "loose";
+    if (from && to?.lane && !from.lane && placed(from.kind)) from.lane = to.lane;
+    if (to && from?.lane && !to.lane && placed(to.kind)) to.lane = from.lane;
   }
 
   /* A group with no hue takes the next one in the theme's order, so a diagram is legible without

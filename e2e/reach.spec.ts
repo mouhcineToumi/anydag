@@ -82,20 +82,12 @@ test("picking a card and pressing enter opens the panel on that card", async ({ 
   await props(page, '[data-dag-node="api"]');
 
   /* F1 changed what this gesture means. It used to open the *text* with the declaring line
-     selected; it now opens the controls for the thing that was clicked, and the line is one tab
-     away — the DSL is for the reader who wants it, which is the whole of the milestone. */
+     selected; it opens the controls for the thing that was clicked. */
   await expect(page.locator("[data-dag-inspector]")).toBeVisible();
-  await expect(page.locator('[data-dag-mode="props"]')).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "api");
-  /* Properties means controls: the text is behind the other tab, not on screen. */
+  /* The panel is the controls: there is no text behind them to switch to (#145). */
+  await expect(page.locator("[data-dag-mode]")).toHaveCount(0);
   await expect(page.locator("[data-dag-body]")).toHaveCount(0);
-
-  await page.locator('[data-dag-mode="source"]').click();
-  const picked = await page.locator(".dag-inspector textarea").evaluate((el) => {
-    const t = el as HTMLTextAreaElement;
-    return t.value.slice(t.selectionStart, t.selectionEnd);
-  });
-  expect(picked).toContain('service api "The API"');
 });
 
 test("the properties strip writes hue, status and icon onto that one line", async ({ page }) => {
@@ -182,7 +174,9 @@ test("the tabs make a page, move an item onto it, and take it away again", async
 
   /* Move the note onto it, from the panel, and it appears here and leaves page one. */
   await page.locator('[data-dag-page="page-1"]').click();
-  await page.locator('[data-dag-item="note"]').dblclick();
+  await page.locator('[data-dag-item="note"]').click();
+  /* A double-click on a text card opens its words; its settings are the toolbar's Edit. */
+  await page.locator("[data-dag-selbar-edit]").click();
   /* The page select is in the Advanced disclosure now. */
   await page.locator("[data-dag-advanced-toggle]").click();
   await page.locator("[data-dag-item-page]").selectOption("page-2");

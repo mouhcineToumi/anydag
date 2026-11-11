@@ -1,4 +1,4 @@
-import { CalendarPlus, FilePlus2, Pencil, Play, SquareCheckBig, CircleSlash, CalendarX2 } from "lucide-react";
+import { CalendarPlus, FilePlus2, Pencil, SlidersHorizontal, Play, SquareCheckBig, CircleSlash, CalendarX2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { contentBounds, placeItems } from "@/board/flow";
@@ -25,7 +25,10 @@ import { BoardEdges } from "@/render/BoardEdges";
 import { growable } from "@/edit/build";
 import { Inspector } from "@/edit/Inspector";
 import { Library } from "@/edit/Library";
+import { GitLanes } from "@/edit/GitLanes";
 import { NodeHandles } from "@/edit/NodeHandles";
+import { topicHandles } from "@/edit/pick";
+import { CardText } from "@/edit/CardText";
 import { Rename } from "@/edit/Rename";
 import { RewriteDialog } from "@/edit/RewriteDialog";
 import { proposedItem } from "@/edit/rewrite";
@@ -56,8 +59,10 @@ import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
 import { CalendarView } from "@/ui/Calendar";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
+import { BoardSettings } from "@/ui/BoardSettings";
 import { PageBar } from "@/ui/PageBar";
 import { ZoomBar } from "@/ui/ZoomBar";
+import { planRepair } from "@/edit/repair";
 import { listProblems, type Problem } from "@/ui/problemList";
 import { Problems } from "@/ui/Problems";
 import { Toolbar } from "@/ui/Toolbar";
@@ -238,6 +243,9 @@ export function pageQuery(kind: FileKind, target: string | null): Record<string,
   };
 }
 
+/** The keys that say which page is open — `pageQuery`'s own list, and what home clears. */
+const PAGE_KEYS = Object.keys(pageQuery("board", null));
+
 /**
  * A board or a note, and never both on one screen.
  *
@@ -291,6 +299,14 @@ export function App() {
     (run?: QuizzesRun) => setQuery({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
     [setQuery],
   );
+  /* Home: no page open, so `Welcome` renders. Every page's key cleared — the vault, the theme and
+     the rest of the address kept — as a new history entry, so Back returns to the page that was
+     left. What the AnyDag logo does, wherever it is drawn. */
+  const goHome = useCallback(() => {
+    const next = new URLSearchParams(location.search);
+    for (const k of PAGE_KEYS) next.delete(k);
+    go(next);
+  }, [go]);
   const ref = query.get("ref");
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
@@ -377,6 +393,7 @@ export function App() {
       openTrash={openTrash}
       assistantOpen={assistant}
       openAssistant={openAssistantPage}
+      openHome={goHome}
       open={open}
     >
       {page}
@@ -488,9 +505,9 @@ function usePageChrome({
   table?: string | null;
   /** And the attachment. */
   file?: string | null;
-}): { themeName: string; openBrowser(): void; cards: ReactNode } {
+}): { themeName: string; scheme: "light" | "dark"; openBrowser(): void; cards: ReactNode } {
   const snapshot = query.get("snapshot") === "1";
-  const { name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
   const [browsing, setBrowsing] = useState(false);
   const settings = useSettingsOpen();
   const feedback = useFeedbackOpen();
@@ -541,7 +558,7 @@ function usePageChrome({
       {feedback.open ? <FeedbackCard document={null} onClose={feedback.close} /> : null}
     </>
   );
-  return { themeName, openBrowser: () => setBrowsing(true), cards };
+  return { themeName, scheme: theme.color.scheme === "dark" ? "dark" : "light", openBrowser: () => setBrowsing(true), cards };
 }
 
 /**
@@ -1044,7 +1061,7 @@ function QuizApp({
   const snapshot = query.get("snapshot") === "1";
   const running = !snapshot && query.get("run") === "1";
   const locked = useLocked() && !snapshot;
-  const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open, quiz: name });
+  const { openBrowser, cards, scheme } = usePageChrome({ query, setQuery, list, open, quiz: name });
   const file = useQuizFile(name);
   const quiz = useMemo(() => parseQuiz(file.text), [file.text]);
   /* A snapshot is ready once the sheet is drawn, boards embedded in it included. */
@@ -1132,7 +1149,7 @@ function QuizApp({
       );
   else
     body = (
-      <QuizEditor text={file.text} onChange={file.change} target={target} onTargetShown={clearTarget}>
+      <QuizEditor name={name} scheme={scheme} text={file.text} onChange={file.change} target={target} onTargetShown={clearTarget}>
         <span
           className="dag-quiz__status"
           data-dag-quiz-saving={file.state.status === "ready" && file.state.saving ? "" : undefined}
@@ -1319,7 +1336,7 @@ function TableApp({
  */
 function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSearchParams; setQuery: SetQuery; list: BoardTree }) {
   const snapshot = query.get("snapshot") === "1";
-  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
   const { boards, folders, notes } = list;
   const [title, setTitle] = useState<string | undefined>(undefined);
   /* Whether the note is a task, as the page holds it — `undefined` for a plain note. */
@@ -1665,7 +1682,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   /* Read only: the selection, the keys that read and a pan stay; everything that writes is
      not drawn, and `useEditor` refuses it underneath. A snapshot is read-only already. */
   const locked = useLocked() && !snapshot;
-  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, board?.theme, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
 
   /* Whether the board browser is up. Plain state and nothing more: a dialog somebody opened for
      the two seconds it takes to switch boards is not a preference, which is exactly what `SIDEBAR`
@@ -1813,6 +1830,8 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      The text outlives the dialog so "Try again" reopens it as it was left; it belongs to one item,
      and opening the dialog on another starts empty. */
   const [asking, setAsking] = useState(false);
+  /* The card for what this board says about itself — its theme and its flow — opened from the top bar's `⋯`. */
+  const [boardSettings, setBoardSettings] = useState(false);
   const [askFor, setAskFor] = useState<string | null>(null);
   const [askText, setAskText] = useState("");
   const rewriteCtl = useRef<AbortController | null>(null);
@@ -2100,16 +2119,23 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
+  const writingItem =
+    editor.writing && !snapshot && !locked ? (board?.items.find((it) => it.id === editor.writing) ?? null) : null;
 
   /*
-   * Everything wrong with the board, for the dock at the bottom and the panel beside it.
+   * What is wrong with the board that a person can act on, for the dock at the bottom, the panel
+   * beside it and the mark on a diagram's frame — and nothing else (`listProblems`).
    *
-   * Not on the canvas. The board's own errors used to be a red card hung above the content and a
-   * diagram's replaced the diagram, and neither could be put away; a picture of a board is now only
-   * the picture. Nothing is computed under `?snapshot=1`, where there is no chrome to show it in —
-   * the agent reads the same answer from `/__board/diagnostics`, which asks `diagnoseBoard` too.
+   * Not on the canvas as words. The board's own errors used to be a red card hung above the content
+   * and a diagram's replaced the diagram, and neither could be put away. Nothing is computed under
+   * `?snapshot=1`, where there is no chrome to show it in — an agent reads every diagnostic from
+   * `/__board/diagnostics`, which asks `diagnoseBoard` too.
    */
   const problems = useMemo(() => (board && !snapshot ? listProblems(board) : []), [board, snapshot]);
+  /* The text the board was read from: a repair for an unknown fence names a word that is in the text
+     and in no field of the board. Read with the board, so the two are one version of the file. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const repairText = useMemo(() => (board ? (handle.current()?.text ?? null) : null), [board]);
   const {
     problems: { show: problemsShow },
     export: { scale: exportScale },
@@ -2135,16 +2161,39 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
     },
     [page, setQuery],
   );
-  const { openAt } = editor;
+  const { openOn } = editor;
   useEffect(() => {
     if (!showing || !board) return;
     if (showing.page && showing.page !== page) return;
     const it = board.items.find((x) => x.id === showing.item);
     setShowing(null);
     if (!it) return;
-    /* A diagnostic's line is the board file's; the panel counts lines of the body. */
-    openAt(it.id, Math.max(1, showing.line - it.line));
-  }, [showing, page, board, openAt]);
+    /* The thing the problem is about, picked: the panel then shows the control that answers it. */
+    openOn(it.id, showing.target);
+  }, [showing, page, board, openOn]);
+
+  /*
+   * A diagram with a problem a person can act on wears a quiet mark: its frame in the problem colour
+   * and a count by its title (#145). The words and the fix are in the panel, not on the canvas.
+   *
+   * Painted rather than rendered, for the reason `data-dag-proposed` is: `Item` is memoised, and a
+   * per-item prop would re-render every diagram whenever any count changed. No dependency list,
+   * because the item may reach the DOM only after its layout comes back. Chrome: `problems` is empty
+   * under `?snapshot=1`, so a picture of a board never carries it. Styled in chrome.css.
+   */
+  const problemCounts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const p of problems) if (p.item) n.set(p.item, (n.get(p.item) ?? 0) + 1);
+    return n;
+  }, [problems]);
+  useEffect(() => {
+    for (const el of document.querySelectorAll("[data-dag-item][data-dag-problem-count]"))
+      if (!problemCounts.has(el.getAttribute("data-dag-item") ?? "")) el.removeAttribute("data-dag-problem-count");
+    for (const [id, n] of problemCounts) {
+      const el = document.querySelector(`[data-dag-item="${CSS.escape(id)}"]`);
+      if (el && el.getAttribute("data-dag-problem-count") !== String(n)) el.setAttribute("data-dag-problem-count", String(n));
+    }
+  });
 
   const selectedItems = useMemo(() => items.filter((it) => selected.has(it.id)), [items, selected]);
 
@@ -2174,6 +2223,14 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const solo = useSolo(items, nodeBoxes);
 
   const pickedType = pickedNode ? (items.find((it) => it.id === pickedNode.item)?.type ?? "") : "";
+  /* A topic's two `+`: which side each is on depends on where the layout put the topic relative to
+     the root, which only the boxes know. */
+  const pickedTopic = useMemo(() => {
+    if (!pickedNode || pickedType !== "mindmap") return undefined;
+    const it = items.find((x) => x.id === pickedNode.item);
+    const boxes = nodeBoxes.get(pickedNode.item);
+    return it && boxes ? topicHandles(it.body, pickedNode.node, boxes) : undefined;
+  }, [pickedNode, pickedType, items, nodeBoxes]);
   const handedOver = pickedNode !== null && growable(pickedType);
 
   /* Every group on the page and the items in it — what a link may name. */
@@ -2256,6 +2313,16 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                         },
                       ]
                     : []),
+                  /* The board's own settings, which only the file's frontmatter held. A locked board shows
+                     the row greyed, as the menu does for every write. */
+                  {
+                    key: "board-settings",
+                    label: "Board settings",
+                    icon: SlidersHorizontal,
+                    hook: "data-dag-board-settings-open",
+                    disabled: !editor.enabled || locked,
+                    onSelect: () => setBoardSettings(true),
+                  },
                   ...exportRows(boardExports(exportScale), async (kind) => {
                     await editor.exportAs(kind);
                     focusBoard();
@@ -2378,7 +2445,24 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               inside its diagram — and `Item` is memoised and knows nothing about layouts. In the
               layer, so they pan and zoom with the board without arithmetic of their own. */}
           {!snapshot && !locked && pickedNode && pickedBox ? (
-            <NodeHandles ctl={ctl} item={pickedNode.item} type={pickedType} node={pickedNode.node} box={pickedBox} />
+            <NodeHandles
+              ctl={ctl}
+              item={pickedNode.item}
+              type={pickedType}
+              node={pickedNode.node}
+              box={pickedBox}
+              topic={pickedTopic}
+            />
+          ) : null}
+          {/* A selected git graph's lanes as controls — a chip on each name, a `+` past each tip,
+              + New branch under the last. Before the rename box, which opens over a chip. */}
+          {!snapshot && !locked && selectedItems.length === 1 && selectedItems[0]!.type === "gitgraph" ? (
+            <GitLanes
+              editor={editor}
+              item={selectedItems[0]!.id}
+              body={selectedItems[0]!.body}
+              picked={pickedNode?.item === selectedItems[0]!.id ? pickedNode.node : null}
+            />
           ) : null}
           {!snapshot && editor.renaming ? (
             <Rename
@@ -2387,6 +2471,17 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               toBoard={editor.toBoard}
               onCommit={editor.commitRename}
               onCancel={editor.cancelRename}
+            />
+          ) : null}
+          {writingItem && board ? (
+            <CardText
+              key={writingItem.id}
+              item={writingItem}
+              boardName={board.name}
+              scheme={theme.color.scheme === "dark" ? "dark" : "light"}
+              toBoard={editor.toBoard}
+              onChange={editor.setBody}
+              onDone={editor.stopWriting}
             />
           ) : null}
 
@@ -2411,6 +2506,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               picked={editor.pickedLink}
               onBend={snapshot || locked || !ctl ? undefined : ctl.bendLink}
               onStraighten={snapshot || locked || !ctl ? undefined : ctl.straightenLink}
+              onLoose={snapshot || locked || !ctl ? undefined : ctl.looseLink}
             />
           ) : null}
         </Viewport>
@@ -2491,6 +2587,18 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             pageName={(id) => (board.pages.length > 1 ? board.pages.find((p) => p.id === id)?.name : undefined)}
             /* "Show" opens the item's source in the panel, which is an editor. */
             onShow={locked ? () => refuseLocked() : showProblem}
+            repairOf={(p) => (repairText === null ? null : planRepair(repairText, board, p))}
+            onRepair={locked || !editor.enabled ? undefined : editor.repair}
+          />
+        ) : null}
+        {boardSettings && board && !snapshot && !locked ? (
+          <BoardSettings
+            board={board}
+            onMeta={editor.setMeta}
+            onClose={() => {
+              setBoardSettings(false);
+              focusBoard();
+            }}
           />
         ) : null}
         {help && !snapshot ? <Shortcuts onClose={closeHelp} /> : null}
@@ -2579,7 +2687,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             boardName={board.name}
             pages={board.pages}
             boardLinks={board.links}
+            boardItems={board.items}
             problems={editingProblems}
+            repairOf={(p) => (repairText === null ? null : planRepair(repairText, board, p))}
+            onRepair={locked || !editor.enabled ? undefined : editor.repair}
           />
         ) : null}
         {library && board && !snapshot && !locked ? (

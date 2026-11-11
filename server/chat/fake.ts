@@ -9,6 +9,8 @@
  *     block <title>              start a block of changes
  *     note <name> <text…>        make a note
  *     edit <name> <text…>        rewrite a note
+ *     board <name> <flow…>       make a board holding one flow fence
+ *     embed <note> <board>       embed a board in a note, on a line of its own at its foot
  *     delete <name>              delete a note (waits for approval)
  *     read <name>                read a note and cite it
  *     vault <id> [edit]          ask for another vault
@@ -94,6 +96,33 @@ export function fakeHarness(provider: "claude" | "opencode"): Harness {
                 text: `${rest.slice(1).join(" ")}\n`,
               });
               said.push(r.ok ? `Rewrote ${rest[0]}.` : `Could not rewrite ${rest[0]}: ${r.json?.error}`);
+              break;
+            }
+            case "board": {
+              const r = await call("board_create", "POST", `/__board/create${q}`, {
+                name: rest[0],
+                kind: "board",
+                text: `\`\`\`flow {#f x=0 y=0}\n${rest.slice(1).join(" ") || "a --> b"}\n\`\`\`\n`,
+              });
+              said.push(r.ok ? `Made [${r.json.name}](dag:${r.json.id}).` : `Could not make ${rest[0]}: ${r.json?.error}`);
+              break;
+            }
+            case "embed": {
+              /* The board's embed on a line of its own at the foot of the note — what an agent asked
+                 to put a diagram inside a document writes. */
+              const id = (await call("board_list", "GET", "/__board/index")).json?.docs?.find(
+                (d: { name: string; kind: string }) => d.kind === "board" && d.name === rest[1],
+              )?.id;
+              const got = await call("note_read", "GET", `/__board/get?name=${encodeURIComponent(rest[0]!)}&kind=note`);
+              if (!got.ok || !id) {
+                said.push(`Cannot embed ${rest[1]} in ${rest[0]}.`);
+                break;
+              }
+              const r = await call("note_write", "POST", `/__board/put?name=${encodeURIComponent(rest[0]!)}&kind=note`, {
+                base: got.json.base,
+                text: `${String(got.json.text).trimEnd()}\n\n![${rest[1]}](dag:${id})\n`,
+              });
+              said.push(r.ok ? `Embedded [${rest[1]}](dag:${id}) in ${rest[0]}.` : `Could not embed: ${r.json?.error}`);
               break;
             }
             case "delete": {

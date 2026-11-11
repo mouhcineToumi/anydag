@@ -28,7 +28,7 @@ const Said = memo(function Said({ text }: { text: string }) {
 });
 
 /** What a harness is called to the person. */
-export const providerLabel = (p: string): string => (p === "claude" ? "Claude Code" : p === "opencode" ? "OpenCode" : p);
+const providerLabel = (p: string): string => (p === "claude" ? "Claude Code" : p === "opencode" ? "OpenCode" : p);
 
 /** A model's id with the vendor's prefix off, which is how a person says it. */
 export const modelLabel = (id: string): string => id.replace(/^claude-/, "").replace(/^[a-z0-9-]+\//, "");

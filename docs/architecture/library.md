@@ -59,7 +59,15 @@ Seven things are load-bearing:
   meaning, and a fragment brings its own `x=`/`y=` to be placed against whatever is already there.
   (`library/types.ts`'s own header still says "two", and predates `sketch`.)
 
-  **A chart has nothing at layer 1 or 2, and that is the grammar rather than an omission.** A chart
+  **Every dialect with brace containers has a group fragment**, so `fk=<group>` in an ERD and a `group` in
+a class or state diagram can be dropped rather than typed: `part-arch-group`, `part-erd-group`,
+`part-class-group`, `part-state-group` (a `group` holding one card) beside `part-flow-lane`,
+`part-activity-lane`, and the two `system` fragments. `state` and `activity` also have a **Start** and an
+**End** atom (`start ${self}` / `end ${self}`) — declared pseudostates, because a library atom is one
+statement with an id and the connect handle can only end on something that has one. Their ids are
+`begin1` and `finish1`, not `start1`: the `activity` starter already has an `action start`.
+
+**A chart has nothing at layer 1 or 2, and that is the grammar rather than an omission.** A chart
   molecule at either of those layers cannot exist: a fragment is
   appended to a body that already carries a form line, and a second form word is `E_CHART_FORM` — so
   a "bar chart molecule" dropped onto a chart would break the chart it landed on. The forms fold into

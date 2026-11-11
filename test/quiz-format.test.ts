@@ -218,6 +218,36 @@ describe("parseQuiz", () => {
     expect(askable(parseQuiz("## {#a}\n\n> answer\n").questions[0]!)).toBe(false);
   });
 
+  it("reads `card` on a heading as a flashcard, its quote the back", () => {
+    const quiz = parseQuiz("## What is MVCC? {#qc card}\n\nIn Postgres.\n\n> Multi-version\n> concurrency control.\n");
+    const q = quiz.questions[0]!;
+    expect(quiz.diagnostics).toEqual([]);
+    expect(q).toMatchObject({ id: "qc", prompt: "What is MVCC?", body: "In Postgres.", card: true, open: true });
+    expect(q.why).toBe("Multi-version\nconcurrency control.");
+    expect(askable(q)).toBe(true);
+    expect(parseQuiz("## Q {#a}\n\n> answer\n").questions[0]!.card).toBe(false);
+  });
+
+  it("keeps a flashcard with no back a card, says the back is missing, and asks it nowhere", () => {
+    const quiz = parseQuiz("## Term {#qc card}\n");
+    const q = quiz.questions[0]!;
+    expect(q.card).toBe(true);
+    expect(q.open).toBe(false);
+    expect(askable(q)).toBe(false);
+    expect(quiz.diagnostics.map((d) => d.code)).toEqual(["EQ_NO_OPTIONS"]);
+    expect(quiz.diagnostics[0]!.message).toMatch(/no back/);
+  });
+
+  it("warns on `card` beside options or `multi`, and reads a dotted `.card` as prompt text", () => {
+    const withOptions = parseQuiz("## Q {#a card}\n- [x] y\n- [ ] n\n");
+    expect(withOptions.questions[0]!.card).toBe(false);
+    expect(codes("## Q {#a card}\n- [x] y\n- [ ] n\n")).toEqual(["1:WQ_UNKNOWN_ATTR"]);
+    expect(codes("## Q {#a card multi}\n\n> back\n")).toEqual(["1:WQ_UNKNOWN_ATTR"]);
+    const dotted = parseQuiz("## Term {#qd .card}\n\n> back\n").questions[0]!;
+    expect(dotted).toMatchObject({ prompt: "Term {#qd .card}", card: false, open: true });
+    expect(dotted.id).toBeUndefined();
+  });
+
   it("never throws, whatever it is handed", () => {
     for (const text of ["", "\n", "##", "- [x]", "> a", "```", "---\n", "---\ntitle: x\n---"])
       expect(() => parseQuiz(text)).not.toThrow();
@@ -362,6 +392,57 @@ describe("the writers", () => {
     expect(sameQuestion(back, input)).toBe(true);
   });
 
+  it("write a flashcard, read it back a card, and keep its bytes when nothing changed", () => {
+    const input = { id: "qc", prompt: "What is MVCC?", options: [], why: "Multi-version concurrency control.", card: true };
+    const text = renderQuestion(input);
+    expect(text).toBe("## What is MVCC? {#qc card}\n\n> Multi-version concurrency control.\n");
+    const back = parseQuiz(text).questions[0]!;
+    expect(back.card).toBe(true);
+    expect(inputOf(back)).toEqual({
+      id: "qc",
+      prompt: "What is MVCC?",
+      body: "",
+      options: [],
+      why: input.why,
+      multi: false,
+      card: true,
+    });
+    expect(sameQuestion(back, input)).toBe(true);
+    expect(sameQuestion(back, { ...input, card: false })).toBe(false);
+    expect(replaceQuestion(text, "qc", input)).toBe(text);
+    /* An author's spacing and attribute order survive a rewrite that means nothing. */
+    const authored = "## What is MVCC?   {card #qc}\n\n>   Multi-version concurrency control.\n";
+    expect(replaceQuestion(authored, "qc", inputOf(parseQuiz(authored).questions[0]!))).toBe(authored);
+  });
+
+  it("rewrite a flashcard and no other byte, and turn it into an open question and back", () => {
+    const text = SAMPLE + "\n## Term {#qc card}\n\n> back\n";
+    const card = parseQuiz(text).questions.find((q) => q.id === "qc")!;
+    const edited = replaceQuestion(text, "qc", { ...inputOf(card), why: "A new back." });
+    expect(edited).toBe(SAMPLE + "\n## Term {#qc card}\n\n> A new back.\n");
+    const open = replaceQuestion(text, "qc", { ...inputOf(card), card: false });
+    expect(open).toBe(SAMPLE + "\n## Term {#qc}\n\n> back\n");
+    expect(replaceQuestion(open, "qc", { ...inputOf(parseQuiz(open).questions[3]!), card: true })).toBe(text);
+    /* `card` is written only while it means something: a card given options is a choice. */
+    expect(
+      renderQuestion({
+        id: "a",
+        prompt: "Q",
+        card: true,
+        options: [
+          { text: "y", correct: true },
+          { text: "n", correct: false },
+        ],
+      }),
+    ).toMatch(/^## Q \{#a\}\n/);
+  });
+
+  it("add a flashcard with no back yet, and read it as a card", () => {
+    const added = addQuestion(blankQuizText(), { id: "qnew", prompt: "", options: [], card: true });
+    expect(added).toBe("---\ntitle: Untitled\n---\n\n##  {#qnew card}\n");
+    expect(parseQuiz(added).questions[0]!.card).toBe(true);
+  });
+
   it("write multi only where the ticks do not already say it", () => {
     expect(
       renderQuestion({
@@ -433,6 +514,14 @@ describe("the writers", () => {
     expect(q.questions[2]!.multiFlag).toBe(true);
     expect(q.diagnostics).toEqual([]);
     expect(out.split("\n").filter((l) => !l.startsWith("##"))).toEqual(text.split("\n").filter((l) => !l.startsWith("##")));
+  });
+
+  it("stamp an id onto a flashcard and keep it a flashcard", () => {
+    const text = "## Term {card}\n\n> back\n\n## Both {multi card}\n\n> back\n";
+    let n = 0;
+    const { text: out } = stampIds(text, () => `qm${++n}`);
+    expect(out).toBe("## Term {#qm2 card}\n\n> back\n\n## Both {#qm1 multi card}\n\n> back\n");
+    expect(parseQuiz(out).questions.map((q) => q.card)).toEqual([true, true]);
   });
 
   it("set the description, and take it away", () => {

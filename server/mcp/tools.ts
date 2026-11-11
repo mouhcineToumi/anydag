@@ -601,7 +601,7 @@ const noteTools = kindTools("note", {
 
 const quizTools = kindTools("quiz", {
   list: "Every quiz in a vault, with its title, id and how many questions it asks.",
-  read: "One quiz's whole text, and the `base` a write of it must carry.\n\nA quiz is strict Markdown: a `##` heading per question, its options one checklist (`- [x]` right, `- [ ]` wrong), and one `>` quote explaining the answer. An option may run over several lines — every line indented two spaces under it is its own, a fenced code block included — so a snippet goes in its option, not in the prompt. `quiz_questions` answers the same as data.",
+  read: "One quiz's whole text, and the `base` a write of it must carry.\n\nA quiz is strict Markdown: a `##` heading per question, its options one checklist (`- [x]` right, `- [ ]` wrong), and one `>` quote explaining the answer. With no checklist, the closing quote is the answer: an open question, or a flashcard when the heading says `card` (`## What is MVCC? {#q1a2b3 card}`). An option may run over several lines — every line indented two spaces under it is its own, a fenced code block included — so a snippet goes in its option, not in the prompt. `quiz_questions` answers the same as data.",
   create:
     "Make a quiz. The name is settled by the server and may be numbered; with a `title` the file is named after it. Write the questions as `## Question?` then `- [x] right` / `- [ ] wrong` then `> why`, and check it with `quiz_check`. An option may hold a code block, indented two spaces under its `- [ ]` line. A question with no checklist and a `>` quote at its end is answered in words: the quote is its model answer, and the person says whether they had it.",
   write:
@@ -706,7 +706,7 @@ const quizMore: Tool[] = [
   tool({
     name: "quiz_questions",
     description: withNote(
-      "A quiz's questions as data — each one's `id`, prompt, options with `correct` marked, and the explanation — for running it in a conversation: ask, let the person answer, say whether they were right and why, and record it with `quiz_answer`.\n\n" +
+      "A quiz's questions as data — each one's `id`, prompt, options with `correct` marked, and the explanation — for running it in a conversation: ask, let the person answer, say whether they were right and why, and record it with `quiz_answer`. A question with `card: true` is a flashcard: give the prompt, let them think, then show `why` as the back and ask whether they had it.\n\n" +
         "A question's answers are recorded under its `id`. One without an id is given one here, as the page does before a run starts — which writes the quiz; under `--read-only` the ids stay `null` and those questions cannot be recorded.",
     ),
     // Writes only to mint ids, and not at all under --read-only, so it is a read as far as the flag goes.
@@ -1482,12 +1482,15 @@ const grammarTools: Tool[] = [
     name: "generate",
     description: withNote(
       "Ask the model the person configured to draw a diagram — a prompt card's Generate. **It writes nothing**: the answer's `draft` is one checked fence, which you place with `board_patch` (`{insert: …}`) or use to replace an item's body.\n\n" +
-        "`as_type` asks for a diagram type. With `source` — an item's body — it is a rewrite of that diagram rather than a new one, and `from_type` says its type. Provider, model and how hard it thinks are the person's settings unless given; `llm` lists what there is. It spends the person's own key, so only when asked — you can usually write the DSL yourself.",
+        "`as_type` asks for a diagram type. With `source` — an item's body — it is a rewrite of that diagram rather than a new one, and `from_type` says its type. Provider, model and how hard it thinks are the person's settings unless given; `llm` lists what there is. It spends the person's own key, so only when asked — you can usually write the DSL yourself.\n\n" +
+        "`kind: \"flashcards\"` asks for flashcards instead (`count` of them, 10 unless given, 30 at most): `prompt` is the topic — or, with `source` holding a note's text, what to focus on, and may then be empty. The answer's `cards` have each been read by the quiz parser as a flashcard; each one's `markdown` goes into a quiz with `quiz_question_set`, one at a time. Show the person the cards and add only the ones they keep.",
     ),
     // It writes no file, but it spends the person's money; --read-only is about files, so it is allowed.
     write: false,
     input: {
       prompt: z.string(),
+      kind: z.enum(["diagram", "flashcards"]).optional(),
+      count: z.number().int().optional(),
       as_type: z.string().optional(),
       source: z.string().optional(),
       from_type: z.string().optional(),
@@ -1496,11 +1499,13 @@ const grammarTools: Tool[] = [
       reasoning: z.string().optional(),
       vault,
     },
-    run: async ({ prompt, as_type, source, from_type, provider, model, reasoning, vault: v }, kit) => {
+    run: async ({ prompt, kind, count, as_type, source, from_type, provider, model, reasoning, vault: v }, kit) => {
       const mine = (await kit.api("GET", "/api/vault/settings", { vault: v })).settings?.settings ?? {};
       const chosen = mine.llm && typeof mine.llm === "object" ? mine.llm : {};
       const body: Record<string, unknown> = { prompt };
       for (const [k, val] of Object.entries({
+        kind,
+        count,
         as: as_type,
         source,
         from: from_type,
@@ -1546,7 +1551,7 @@ const appTools: Tool[] = [
     name: "settings",
     description:
       "The person's preferences — or, with `set`, a change to them. **Only when they asked.**\n\n" +
-      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`, `llm` — which model a prompt card asks), `dag:theme` and `dag:favourites`; travels with the vault's folder. `app` level: this machine's — how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-mode` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
+      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`, `llm` — which model a prompt card asks), `dag:theme` and `dag:favourites`; travels with the vault's folder. `app` level: this machine's — how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
       NOTE_VAULT,
     // Only a `set` writes; reading is allowed under --read-only.
     write: false,

@@ -1,5 +1,6 @@
 import type { JSX, PointerEvent as ReactPointerEvent } from "react";
 
+import type { LooseStub } from "@/layout/boardRoute";
 import type { MarkerAt, RoutedEdge } from "@/layout/types";
 import type { Theme } from "@/theme/contract";
 
@@ -29,8 +30,10 @@ interface Props {
    * draws all of them (`BoardEdges`); a diagram's edges belong to a memoised `Item`, so which one
    * is picked reaches them as a painted `data-dag-picked` instead — see `paint()` in `useEditor`.
    * Left `undefined` on both sides of a diff, React writes nothing here, so the paint stands.
+   *
+   * `extend` is shift held on the press, which a sequence reads as "and every message up to here".
    */
-  onPick?(id: string): void;
+  onPick?(id: string, extend: boolean): void;
   picked?: string | null;
   /**
    * Bend the picked line through a point: a handle at its middle, pulled.
@@ -44,6 +47,16 @@ interface Props {
   onBend?(id: string, e: ReactPointerEvent<SVGCircleElement>): void;
   /** Straighten it again. Double-click, on the handle, because the handle is the thing to undo. */
   onStraighten?(id: string): void;
+  /**
+   * The loose stubs of links that name nothing at one end (#173), the board layer's alone: a
+   * diagram's own loose end is a node (`LooseEnd`), laid out with its cards.
+   */
+  loose?: readonly LooseStub[];
+  /**
+   * A press on a stub: pull it onto something, or let go where it was to pick its link. Absent
+   * where nothing may be written — a locked board picks on the press, and a snapshot does neither.
+   */
+  onLoose?(link: string, e: ReactPointerEvent<SVGGElement>): void;
 }
 
 const hueVar = (hue: string | undefined) => (hue ? `var(--dag-color-hues-${hue})` : "var(--dag-color-slate)");
@@ -107,7 +120,7 @@ function markerPath(mk: MarkerAt, theme: Theme): JSX.Element | null {
 const surfaceFill = (surface: MarkerAt["surface"]) =>
   surface === "group" ? "var(--dag-color-paper100)" : surface === "card" ? "var(--dag-color-card)" : "var(--dag-color-paper)";
 
-export function Edges({ edges, width, height, theme, onPick, picked, onBend, onStraighten }: Props) {
+export function Edges({ edges, width, height, theme, onPick, picked, onBend, onStraighten, loose, onLoose }: Props) {
   const m = theme.metric.edge;
   /* How hard the line is laid down is a colour decision, not a geometric one — see `ThemeColor`. */
   const op = theme.color.opacity;
@@ -129,7 +142,7 @@ export function Edges({ edges, width, height, theme, onPick, picked, onBend, onS
                 fill="none"
                 onPointerDown={(ev) => {
                   ev.stopPropagation();
-                  onPick(e.id);
+                  onPick(e.id, ev.shiftKey);
                 }}
               />
             ) : null}
@@ -200,6 +213,42 @@ export function Edges({ edges, width, height, theme, onPick, picked, onBend, onS
             ) : null,
           )
         : null}
+
+      {/* Where a hanging link stops: #168's ring — hollow, dashed, in the problem colour, the size of
+          an end state — over the line that runs into it. `.dag-edges` takes no pointer, so a live
+          stub puts it back on itself, as the bend handle does. */}
+      {loose?.map((st) => {
+        const ring = theme.metric.line.rule;
+        const live = onLoose ?? onPick;
+        return (
+          <g
+            key={`${st.link}-loose`}
+            className={live ? "dag-loose dag-loose--live" : "dag-loose"}
+            data-dag-loose={st.ref}
+            data-dag-loose-link={st.link}
+            onPointerDown={
+              live
+                ? (ev) => {
+                    ev.stopPropagation();
+                    if (onLoose) onLoose(st.link, ev);
+                    else onPick?.(st.link, false);
+                  }
+                : undefined
+            }
+          >
+            <title>Not connected — drag onto a card</title>
+            <circle
+              cx={st.x + st.size / 2}
+              cy={st.y + st.size / 2}
+              r={st.size / 2 - ring / 2}
+              fill="var(--dag-color-paper)"
+              stroke="var(--dag-color-danger)"
+              strokeWidth={ring}
+              strokeDasharray={m.dash}
+            />
+          </g>
+        );
+      })}
 
       {/* Labels last, so they sit over the lines they belong to. */}
       {edges.map((e) =>

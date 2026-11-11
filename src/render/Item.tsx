@@ -34,8 +34,16 @@ import { PromptItem } from "./PromptItem";
  */
 function nodeUnder(target: EventTarget | null): string | undefined {
   if (!(target instanceof Element)) return undefined;
-  const hit = target.closest<HTMLElement>("[data-dag-node],[data-dag-title-of]");
-  return hit?.dataset.dagNode ?? hit?.dataset.dagTitleOf ?? undefined;
+  /* A sequence fragment's tab is picked by a click as a card is, so it comes back as the "card" under
+     the pointer; `data-dag-frag` is only ever drawn there. */
+  const hit = target.closest<HTMLElement>("[data-dag-node],[data-dag-title-of],[data-dag-frag]");
+  if (hit) return hit.dataset.dagNode ?? hit.dataset.dagTitleOf ?? hit.dataset.dagFrag ?? undefined;
+  /* A group, a frame or a lane is picked by a click on it as a card is (#145) — it used to take a
+     double-click and an Escape. Asked after the cards, which sit over it, and only inside the
+     drawing: the item's own box carries `data-dag-group` too, and that one is the *board's* group. */
+  const box = target.closest<HTMLElement>("[data-dag-group],[data-dag-lane],[data-dag-lane-label]");
+  if (!box?.closest(".dag-item__body")) return undefined;
+  return box.dataset.dagGroup ?? box.dataset.dagLane ?? box.dataset.dagLaneLabel ?? undefined;
 }
 
 /** Every side and corner, as draw.io has them — for an item whose box is its own. */
@@ -134,7 +142,7 @@ export const Item = memo(
        card picked in it. As fresh closures they re-rendered every card of a diagram on
        each of those, and re-ran its size report, which re-rendered the page. */
     const onSize = useCallback<DiagramProps["onSize"]>((size, nodes) => onMeasure(item.id, size, nodes), [onMeasure, item.id]);
-    const onPickEdge = useCallback((edge: string) => ctl?.pickEdge(item.id, edge), [ctl, item.id]);
+    const onPickEdge = useCallback((edge: string, extend: boolean) => ctl?.pickEdge(item.id, edge, extend), [ctl, item.id]);
 
     const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
       const el = box.current;

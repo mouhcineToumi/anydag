@@ -413,6 +413,14 @@
       "mcp": ["quiz_question_set", "quiz_question_remove", "quiz_question_move"]
     },
     {
+      "id": "quiz.generate",
+      "area": "Quizzes",
+      "what": "Ask a model for flashcards from a topic or a note, and add the ones kept",
+      "rest": ["POST /__board/generate", "POST /__board/quiz"],
+      "cli": {"admin": false},
+      "mcp": {"via": ["generate", "quiz_question_set"], "why": "`generate` with `kind: \"flashcards\"` answers the cards, each read by the quiz parser, and `quiz_question_set` adds each kept one by its `markdown`."}
+    },
+    {
       "id": "quiz.rename",
       "area": "Quizzes",
       "what": "Rename or move a quiz",

@@ -180,12 +180,14 @@ describe("resolving a link against the board", () => {
     expect(b.links[1]?.to).toEqual({ item: "infra", node: "api" });
   });
 
-  it("reports an item nothing on the page is called", () => {
+  it("reports an item nothing on the page is called, and keeps the link hanging from the end it has", () => {
     const b = withLinks("a --> ghost");
     expect(codes(b.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
     expect(b.errors[0]?.line).toBe(14);
     expect(b.errors[0]?.message).toContain("ghost");
-    expect(b.links).toEqual([]);
+    /* #173: kept, the missing end as it was typed, and the problem pointed at the link. */
+    expect(b.links).toMatchObject([{ id: "links-1", from: { item: "a" }, to: { item: "ghost" }, loose: "to" }]);
+    expect(b.errors[0]?.target).toEqual({ what: "link", id: "links-1" });
   });
 
   it("suggests the item it was probably reaching for", () => {
@@ -248,7 +250,7 @@ describe("resolving a link against the board", () => {
       ].join("\n"),
     );
     expect(codes(b.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
-    expect(b.links).toEqual([]);
+    expect(b.links.map((l) => [l.to.item, l.loose])).toEqual([["far", "to"]]);
   });
 
   it("merges several fences in file order, with ids that cannot collide", () => {
@@ -376,7 +378,7 @@ describe("a link that names a group", () => {
       ].join("\n"),
     );
     expect(codes(b.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
-    expect(b.links).toEqual([]);
+    expect(b.links.map((l) => [l.from.item, l.loose])).toEqual([["g1", "from"]]);
   });
 
   it("suggests a group name for a near miss, alongside the item ids", () => {
@@ -388,18 +390,44 @@ describe("a link that names a group", () => {
        rather than quietly anchoring on the group and dropping the half nobody could honour. */
     const b = grouped("g1.thing --> c");
     expect(codes(b.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
-    expect(b.links).toEqual([]);
+    expect(b.links.map((l) => [endText(l.from), l.loose])).toEqual([["g1.thing", "from"]]);
   });
 
-  it("takes the link with it when the group stops existing", () => {
-    /* `resolveLinks` pushes a link only when both ends resolve, so ungrouping makes the line
-       vanish rather than dangle — the rule an unknown item has always followed. */
+  it("leaves the link hanging when the group stops existing", () => {
+    /* Ungrouping leaves the line on the end it still has, from a loose end a person can drag onto
+       something or delete (#173) — the rule an unknown item follows. */
     const b = grouped("g1 --> c");
     expect(b.links).toHaveLength(1);
     const gone = board(
       ["```md {#a}", "one", "```", "", "```md {#c}", "three", "```", "", "```edges {#links}", "g1 --> c", "```", ""].join("\n"),
     );
     expect(codes(gone.errors)).toEqual([CODES.EB_LINK_UNKNOWN_ITEM]);
-    expect(gone.links).toEqual([]);
+    expect(gone.links.map((l) => [l.from.item, l.loose])).toEqual([["g1", "from"]]);
+  });
+});
+
+describe("the second label of a link", () => {
+  it("reads C4's technology chip behind the label", () => {
+    const l = links('a --> b "Uses" "HTTPS"');
+    expect(l.diagnostics).toEqual([]);
+    expect(l.links[0]).toMatchObject({ label: "Uses", label2: "HTTPS" });
+  });
+
+  it("reads it after a Mermaid colon, and before the modifiers", () => {
+    const l = links('a --> b: "Uses" "HTTPS" hue=teal quiet');
+    expect(l.diagnostics).toEqual([]);
+    expect(l.links[0]).toMatchObject({ label: "Uses", label2: "HTTPS", hue: "teal", quiet: true });
+  });
+
+  it("gives each hop of a chain its own", () => {
+    const l = links('a --> b "x" "1" --> c "y" "2"');
+    expect(l.links.map((k) => [k.label, k.label2])).toEqual([
+      ["x", "1"],
+      ["y", "2"],
+    ]);
+  });
+
+  it("is absent when only a label was written", () => {
+    expect(links('a --> b "Uses"').links[0]!.label2).toBeUndefined();
   });
 });

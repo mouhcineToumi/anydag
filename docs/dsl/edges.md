@@ -40,6 +40,7 @@ The split is on the last `.`, and an item whose id contains a dot wins over it.
     a --> b --> c      a chain: two links
     a & b --> c        two sources, one target: two links
     a --> b "label"    a label
+    a --> b "label" "HTTPS"   and a second string under it, as C4's technology chip is
     a --> b: "label"   Mermaid's spelling of the same
     a --> b hue=teal   its own hue, never an endpoint's — an item has none to inherit
     a --> b quiet      a lighter line
@@ -47,6 +48,9 @@ The split is on the last `.`, and an item whose id contains a dot wins over it.
 
 Arrows are the shared vocabulary: `-->` `->` `-.->` `..>` `<->` `-.-` `---` `--` `..`, and the UML
 and sequence heads besides. Each carries its own dash, head and tail.
+
+The second string follows the label, so it is only drawn under one: with no label to hold its
+place, write `""`. A person sets it in the panel on a picked link; both strings are the hop's own.
 
 A label and the modifiers belong to the **hop** just written, not to the statement, so each arrow
 of a chain takes its own: `a --> b via="10,20" --> c via="30,40"`.
@@ -80,8 +84,10 @@ warning and the line is drawn straight.
 | `EB_LINK_UNKNOWN_NODE` | the item is a diagram, and it declares no such node |
 | `WB_BAD_VIA` | `via=` was not one `x,y` pair; the bend is dropped and the line drawn straight |
 
-A link with an end that does not resolve is dropped rather than drawn half-way. The diagnostic is
-the report, and it names the fence's line.
+A link with one end that does not resolve is drawn hanging: from the end it has to a small dashed
+circle, which a person drags onto something to point the link there, or clicks to pick and delete.
+The diagnostic still names the fence's line, and nothing is written until somebody acts. A link with
+**both** ends unresolved has nothing to hang from and is not drawn; the diagnostic is the report.
 
 Deleting an item takes every link that named it, or a card inside it, in the same write — from the
 canvas, a `remove` op over MCP (`board_patch`) — so an `EB_LINK_UNKNOWN_ITEM` means a link was written to

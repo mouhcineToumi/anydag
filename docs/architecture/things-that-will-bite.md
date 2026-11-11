@@ -231,6 +231,10 @@
 - **A hue is bound, never defaulted in a component.** `hueVars()` sets `--dag-h`/`--dag-t` only when
   an element has a hue, and CSS falls back to `--dag-h-default`. Setting the property to an empty
   string would *not* trigger the `var()` fallback, which is why "bind nothing" is the mechanism.
+- **A diagram's own `hue=` is `--frame-h`/`--frame-t`, never `--dag-h`/`--dag-t`.** Every card, band
+  and chip inside a diagram inherits the second pair, so binding it on the frame recolours each card
+  that has no hue of its own, and nothing fails. `frameHueVars()` is the frame's; the tint is an inset
+  shadow and a stretched header, not a border, so `size.ts`'s box is still the box drawn.
 - **A `--dag-metric-*` that is a ratio or a count needs `UNITLESS` in two files.** `donutInner`,
   `minLabelPct`, `maxTicks` and `markerMax` reach the browser as `0.62px` and `6px` otherwise, and
   nothing fails — `applyTheme.ts` holds the list and `check-theme.mjs` mirrors it, and the mirror is
@@ -384,6 +388,22 @@
   the pair it throws `Invalid collection of marks for node text: bold,code`, and parsing HTML it
   silently splits the bold. `src/note/schema.ts` is `Code.extend({ excludes: "" })` through
   `createStyleSpecFromTipTapMark`, which keeps the backtick input rule and `Mod-E`.
+- **`React.lazy` costs 300 ms the first time it renders, loaded or not.** A lazy component suspends
+  on its first render even when its module has long since arrived — a promise's result cannot be
+  read synchronously — and React 19 then holds the boundary's content back until 300 ms after its
+  fallback went up (`FALLBACK_THROTTLE_MS`). The note editor was `lazy`, so the first note of every
+  session put its text on screen 365 ms after the click in the packaged desktop app, and preloading
+  the chunk changed nothing: the editor still came up 320 ms after the page did, and a second note
+  took 40 ms. `useBlockEditor` keeps the loaded module and renders it in the same pass (#120).
+  Anything the person waits on is not behind a `lazy` on the path of a click; a page reached by
+  loading it, like `NoVaultPage`, can be.
+- **A component handed to a BlockNote controller is a component type, so it must be the same one
+  on every render.** `SideMenuController` draws its `sideMenu` as `<sideMenu />`, and the note editor
+  handed it an arrow written in the render: every re-render of the editor — the page re-renders it
+  whenever the index changes — unmounted the side menu and shut a drag-handle menu somebody had
+  just opened. It went unseen while the editor came up late; once it came up before the index had
+  (#120), *the drag handle menu's Delete* failed four runs in twenty-four. `NoteSideMenu` is a
+  component of its own now.
 - **A lazily imported dependency is discovered by Vite at the moment it is first imported.** The
   first note opened in a fresh dev server made Vite re-bundle and reload the page — twice, once per
   layer of the editor — under whoever was looking. `optimizeDeps.include` names the BlockNote and
@@ -818,3 +838,16 @@
   prove a push where it lands, on the server, and before asserting that nothing ran, wait for the
   watcher to catch up (`heardAll()`) and then past the debounce. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
   which starves a run far harder than the same loops spread over every core.
+- **Electron's `net.fetch` is Chromium's network stack, six connections to a host and all.** The
+  desktop shell forwarded every page request through it, so the page's three streams that never end
+  (the change feed, the Assistant's history, the open chat) were half the budget — and a stream the
+  page closed was never let go, because the handler handed the upstream body on and nothing
+  cancelled it. Each reload or switch of chat kept one more for the rest of the launch, and with six
+  held every request waited for ever while nothing failed: a note the Assistant rewrote went blank,
+  the sidebar never listed the board it made, and the chat's link to it said *Nothing has this id
+  any more* (#123). Only the desktop app had it — a browser's own six never saw those streams — so
+  no e2e spec could. `desktop/forward.ts` forwards over `node:http` and lets go on
+  `request.signal`. **And a page's copy of a list must ask again on its own after a failure**: the
+  file list and the reference index used to wait for the feed's next change, which after an agent's
+  last write never comes (`src/board/refresher.ts`). To see the first half again, open six
+  `EventSource`s through a `protocol.handle` that forwards with `net.fetch` and try a seventh request.

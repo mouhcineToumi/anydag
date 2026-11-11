@@ -265,6 +265,48 @@
           "line": 9
         }
       ]
+    },
+    {
+      "name": "a flashcard's heading keeps its id beside card",
+      "text": "## What is MVCC? {#qc card}\n\n> Multi-version concurrency control.\n\n## Next {#qn}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "qc",
+          "line": 1
+        },
+        {
+          "id": "qn",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "name": "a dotted .card is no attribute word: the braces are the prompt's",
+      "text": "## Term {#qd .card}\n\n> back\n",
+      "questions": [
+        {
+          "id": null,
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "a flashcard between an open question and a choice",
+      "text": "## Open {#qo}\n\n> answer\n\n## Card {card #qk}\n\nMore on the front.\n\n> back\n\n## Choice {#qx}\n- [x] y\n- [ ] n\n",
+      "questions": [
+        {
+          "id": "qo",
+          "line": 1
+        },
+        {
+          "id": "qk",
+          "line": 5
+        },
+        {
+          "id": "qx",
+          "line": 11
+        }
+      ]
     }
   ]
 }

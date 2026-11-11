@@ -122,6 +122,12 @@ export type NodeKind =
   // pseudostates and bars
   | "start"
   | "end"
+  /**
+   * The far end of an edge that names nothing (#145): `api --> ghost` with no `ghost` anywhere.
+   * Made by `finalize`, never written, so the edge is drawn from the end it has to a loose stub a
+   * person can drag onto a card or delete. `Node.loose` says what was named.
+   */
+  | "loose"
   | "fork"
   | "join"
   /* sketch: a vocabulary of shapes rather than of things. `line` is not here — a line with no
@@ -173,6 +179,8 @@ export interface Node {
   /** C4's third string; the only kind that wraps to several lines. */
   desc?: string;
   stereotype?: string;
+  /** On a `loose` stub: the id the edge named that nothing declares, and the first edge naming it. */
+  loose?: { ref: string; edge: string };
   rows: Row[];
   /** Class boxes split their rows into attribute and method compartments. */
   compartments?: Row[][];
@@ -288,6 +296,9 @@ export interface LegendEntry {
   text: string;
 }
 
+/** The glyph words `Legend` draws, which is the whole of what `legend <glyph> "…"` can say. */
+export const LEGEND_GLYPHS = ["solid", "dashed", "quiet", "external", "done", "wait", "stop", "port"] as const;
+
 /**
  * Assignment order for anything that did not ask for a hue: groups, lanes, mindmap branches,
  * timeline sections, git branches.
@@ -319,6 +330,20 @@ export interface Diagnostic {
   /** For a program. See `dsl/codes.ts` — stable, and the thing a fix loop branches on. */
   code: Code;
   severity: "error" | "warn";
+  /**
+   * What the line declares, when it declares something that was drawn: the card, group, lane or
+   * edge a person would pick to act on it. Set by `diagnoseBoard`, never by a parser — a parser
+   * names a line, and which thing lives there is the parse's answer, asked once in `declaredOn`.
+   * Absent for a statement that could not be read, which has no drawing to point at.
+   */
+  target?: DiagnosticTarget;
+}
+
+/** The thing a diagnostic concerns, as a pick names it. */
+export interface DiagnosticTarget {
+  /** `link` is a board link in an `edges` fence (#173), by its id in `board.links`; the rest are inside a diagram. */
+  what: "node" | "group" | "lane" | "edge" | "link";
+  id: string;
 }
 
 export interface Graph {

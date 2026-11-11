@@ -275,6 +275,38 @@ function Pseudo({ node, box, theme }: NodeProps) {
   );
 }
 
+/**
+ * Where an edge to nothing ends (#145): a hollow, dashed ring in the problem colour, the size of an
+ * end state. It is a handle more than a drawing — a press on it pulls the edge onto a card, which
+ * `useEditor` reads off `data-dag-loose`.
+ */
+function LooseEnd({ node, box, theme }: NodeProps) {
+  const r = box.w / 2;
+  const ring = theme.metric.line.rule;
+  return (
+    <svg
+      className="dag-pseudo dag-loose"
+      data-dag-node={node.id}
+      data-dag-kind={node.kind}
+      data-dag-loose={node.loose?.ref ?? ""}
+      style={{ left: box.x, top: box.y }}
+      width={box.w}
+      height={box.h}
+    >
+      <title>Not connected — drag onto a card</title>
+      <circle
+        cx={r}
+        cy={r}
+        r={r - ring / 2}
+        fill="var(--dag-color-paper)"
+        stroke="var(--dag-color-danger)"
+        strokeWidth={ring}
+        strokeDasharray={theme.metric.edge.dash}
+      />
+    </svg>
+  );
+}
+
 function Bar({ node, box }: NodeProps) {
   return (
     <div
@@ -348,6 +380,8 @@ export function NodeView(props: NodeProps) {
     case "start":
     case "end":
       return <Pseudo {...props} />;
+    case "loose":
+      return <LooseEnd {...props} />;
     case "fork":
     case "join":
       return <Bar {...props} />;

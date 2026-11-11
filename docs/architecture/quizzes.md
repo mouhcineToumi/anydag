@@ -36,19 +36,23 @@ quiz file, and a question leaves Mistakes after N right answers in a row inside 
     > select * from cd.members where joindate >= '2012-09-01';
     > ```
 
+    ## What is MVCC? {#q3c9d2 card}
+
+    > Multi-version concurrency control: each transaction reads a snapshot.
+
 | Where | What it does with one |
 |---|---|
 | the sidebar | **Quizzes** (with the Mistakes count) opens the Quizzes page; **New** → *Quiz* makes `untitled` titled *Untitled* with no questions and names it in the top bar; a quiz's row wears a cap |
 | the Quizzes page, `?quizzes=1` | Mistakes first, then a card per quiz — questions, how many in Mistakes, Practice — a filter, a folder (with *Practice the folder* once one is chosen), and a box that makes a quiz named after what is typed |
 | a folder's menu in the sidebar | *Practice the quizzes*, when anything under it is a quiz |
-| a quiz's page, `?quiz=` | **Questions** (a card per question, every field Markdown source, an option a text area that grows; *Shuffle the options* and a pin on each option; *Add an open question*) or **Source** (the file and its problems); Practice, Export (the file) |
-| a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; the end says the score, what was skipped and what went into Mistakes |
+| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab: a card per question — a grip to drag it, its kind (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), the question as one rich line, *Add details*, the answers as rows (a grip, a round tick or a box, rich text, a pin while *Shuffle the options* is on), the explanation or model answer; what is wrong said in words on its card, each with a button that fixes it; *Add a flashcard* beside the other two adds, and *Generate flashcards*, which asks a model for cards from a topic or a note and writes the ones kept; Practice, Export (the file) |
+| a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; a flashcard's front with no box, Space or Enter to see the back, and the same `1`/`2`; the end says the score, what was skipped and what went into Mistakes |
 | a board, or a note, embedding one | a card: the title, the questions, how many in Mistakes, Practice |
 | `?view=1` | a run that records nothing |
-| a snapshot | the sheet: every question with its answers marked |
+| a snapshot | the sheet: every question with its answers marked, a flashcard's back under it |
 | Settings | how many right in a row take a question out of Mistakes, 1 to 10 |
 
-Thirteen things are load-bearing:
+Sixteen things are load-bearing:
 
 - **A question is a `##` heading and everything up to the next one**, and only `##` delimits. Fences
   are tracked across the whole file, so a `##` or a `- [ ]` in a code sample is code; and a line that
@@ -75,9 +79,30 @@ Thirteen things are load-bearing:
 - **A run asks what the quiz said when it started**, and the Mistakes run reads the pool once and
   again only on Again — both move under every answer, and a run that followed them would restart
   itself.
-- **A field keeps what is being typed while it has the caret.** The form redraws from the file on
-  every keystroke and the file's prompt is trimmed, so a field showing the file's answer would eat
-  the space before the next word.
+- **The form shows no Markdown, and BlockNote never reads or writes a byte of it.** Every field is
+  drawn read-only (`QuizMarkdown`) until it is clicked or tabbed to; then one `FieldEditor`
+  (`src/blocks/FieldEditor.tsx`, lazy) is mounted in its place — one on the page at a time, so a
+  quiz of fifty questions is not three hundred editors. The field's text goes through
+  `src/note/markdown.ts` both ways (`load`, `settle`, `saved`), so the blocks nobody touched keep their
+  bytes and a field opened and left hands back what it was given, which `sameQuestion` writes as
+  nothing. While it is open the editor's document is the field, so a redraw from the file never eats
+  what is being typed. Two more things keep typing whole: a letter typed while a field opens — the
+  instant after *Add an answer* — is kept by `RichField` and handed to the editor when it binds, and
+  a field opens at its drawing's height (no trailing block), because one that grew moved the button
+  under the pointer and the press missed. A question is a `line` field (one paragraph: Enter goes on to the next
+  field); details, answers and the explanation are `block` fields, whose schema (`FIELD_BLOCKS`) has
+  no heading, task list, quote or rule — each of those is a quiz's own syntax, and a field that
+  could make one could break its question. `promptLine` and `optionLine` escape what would read
+  back as a heading's `{#id}` or a closing `#`, so any words a person types come back as those words.
+- **A problem is said in words on its card, and has a fix there** (`src/ui/quiz/problems.ts`, a
+  `switch` over `QuizCode` ending in `assertNever`). The parser's messages are unchanged, because
+  agents read them through `quiz_check`; the page never shows them, a line number or a character of
+  syntax. Each fix is a one-span writer: `resolveStray` (text after the answer becomes part of it,
+  the question's details, or goes), `reidQuestion` (by index, since two share the id),
+  `cleanHeading` (a setting the app does not know) and `closeFence` (a block left open swallowed the
+  questions after it). A card holding text the form has no field for (`Question.stray`) is read-only
+  until that text has a place, so an edit cannot rewrite it away. A write that would change the
+  shape of the question list other than as asked is refused on its card.
 - **A question in a run is answered once, and a skip is no answer** (`src/ui/quiz/round.ts`).
   Going back to an answered question shows it read-only, because its answer was recorded the moment
   it was given and a second would count twice; a question left unanswered records nothing, never a
@@ -94,10 +119,32 @@ Thirteen things are load-bearing:
   after the quote means there is none — still `EQ_NO_OPTIONS`. Its verdict is the person's, given
   once the answer is showing (`revealIn`, `judgeIn`), and a read-only box takes no typing, so `1`
   and `2` reach the run.
+- **A flashcard is `card` on an open question's heading** (#131): `{#q… card}`, the quote at its
+  end the back, and a run shows the front with nothing to type, then the back, then the same
+  verdict. A bare word, as `multi` is: `.card` is not an attribute word (`ATTR_WORD`), so the whole
+  `{…}` would be read as the prompt and its id lost; and a build that does not know `card` reads an
+  open question and warns, so the file still runs there. `Question.card` is the word on a question
+  with no options — a new card with no back yet is still one, so the form shows it as one, but it
+  is not `open` and says `EQ_NO_OPTIONS` until it has a back. **Every writer that rebuilds a
+  heading's words keeps it** (`headingWords`: `stampIds` and the `set` op), or giving a card its id
+  would make it an open question; `card` beside options is `WQ_UNKNOWN_ATTR` and is not written.
 - **A shuffle is a run's, never the file's**: `optionOrder` draws one order per question
   when a run starts — pinned options at their own index — and the runner keeps it until Again or a
   new list; answering the skipped ones keeps the order seen. A pick is the file's index, so grading
   and what is recorded never see the order. The sheet is the written order.
+- **Flashcards a model wrote are a list to choose from until the person adds them** (#140). *Generate
+  flashcards* opens a dialog (`src/ui/quiz/GenerateCards.tsx`) that asks `/generate` for cards from
+  a topic or one of the vault's notes — the model's half, and the parser check before anything comes
+  back, are *Flashcards from a model* — and shows each with a box, every one kept until unticked.
+  **Nothing is written until *Add*.** Then the kept cards go in through the `set` op
+  (`applyQuizOps`, by way of `addCards` in `src/ui/quiz/generate.ts`), one question's span each at
+  the end, against the quiz as it is then: each is checked again as exactly one askable question and
+  given an id the quiz does not hold, and no other question is stamped, rewritten or moved — so the
+  form's `write`, which stamps every question with no id, is not the path. One card refused is the
+  whole list refused, said in the dialog, and the file unchanged. A dialog rather than draft cards in
+  the form, because a draft in the form is either a question in the file or a kind of card every
+  writer would have to skip, and keeping some of a list is all this needs. The lock hides it with the
+  rest of the form.
 - **One question over the wire is a route**: `src/quiz/ops.ts` through the grammar,
   `POST /__board/quiz` with the table's recompute-on-conflict loop. `set` writes the
   Markdown *as given*, minting an id only for a heading with none, and refuses anything that is not
@@ -112,21 +159,45 @@ Names claimed, grepped first: `dag-quiz*`, `dag-quizzes*`, `dag-run*`, `dag-quiz
 `dag-quiz-page`, `dag-embed--quiz`, `dag-embed__quiz*`, `dag-toolbar__practice`, `data-dag-quiz`
 (a search row), `data-dag-quiz-*`, `data-dag-quizzes*`, `data-dag-run*`, `data-dag-embed-practice`,
 `data-dag-setting-graduate`, `data-dag-sidebar-quizzes*`, `data-dag-sidebar-new-quiz`, the storage
-keys `dag:quiz-mode` and `dag:quiz-about`, the events `dag:quiz` and `dag:practice`, and the query keys `quiz`, `quizzes`
+key `dag:quiz-about`, the events `dag:quiz` and `dag:practice`, and the query keys `quiz`, `quizzes`
 and `run` — and `dag-run__option--block`, `dag-run__option-text--block`,
 `dag-run__answer*`, `dag-run__judge*`, `dag-quiz-sheet__option--block`, `dag-quiz-sheet__open`,
 `dag-quiz__option-text`, `dag-quiz__pin`, `dag-quiz__shuffle`, `dag-quiz__adds`,
 `dag-quizzes__practice-folder`, `dag-quizzes__count`, `data-dag-run-place`, `data-dag-run-open`,
 `data-dag-run-answer`, `data-dag-run-reveal`, `data-dag-run-judge`, `data-dag-run-model`,
 `data-dag-quiz-open`, `data-dag-quiz-pin`, `data-dag-quiz-shuffle`, `data-dag-quiz-add-open`,
-`data-dag-quiz-sheet-open`, `data-dag-quizzes-practice-folder`, and the menu pick `practise`.
+`data-dag-quiz-sheet-open`, `data-dag-quizzes-practice-folder`, and the menu pick `practise` — and,
+for the builder, `dag-rich-field*` (not `dag-field`, the panel's labels), `dag-blocks--field`,
+`data-dag-field-editor`, `dag-quiz__rich*`, `dag-quiz__placeholder`, `dag-quiz__grip`,
+`dag-quiz__kind`, `dag-quiz__more`, `dag-quiz__fix`, `dag-quiz__stray*`, `dag-quiz__list`,
+`dag-quiz__description`, `dag-quiz__problem-words`, `dag-check--round`, `data-dag-quiz-field`,
+`data-dag-quiz-open-field`, `data-dag-quiz-kind*`, `data-dag-quiz-grip`, `data-dag-quiz-dragging`,
+`data-dag-quiz-drop`, `data-dag-quiz-fix`, `data-dag-quiz-stray*`, `data-dag-quiz-refused`,
+`data-dag-quiz-needs-answer`, `data-dag-quiz-add-details` and `data-dag-quiz-drop-answers*` — and, for
+flashcards, `data-dag-quiz-add-flashcard`, `data-dag-run-flashcard`, `data-dag-run-flashcard-tag`,
+`dag-run__flashcard-tag` and `data-dag-quiz-sheet-flashcard` — and, for generating them,
+`data-dag-quiz-generate`, `dag-flashcards*` and `data-dag-flashcards*`. "Card" was taken three times over (the
+form's `dag-quiz__card`, the Quizzes page's `dag-quizzes__card`, an embed's card), which is why every
+name for a flashcard says `flashcard`.
+Retired with the Source tab: `dag:quiz-mode`, `data-dag-quiz-mode`, `data-dag-quiz-source`,
+`data-dag-quiz-multi`, `dag-quiz__mode`, `dag-quiz__source*`, `dag-quiz__field` and
+`dag-quiz__problem-line`.
 
-**Out, and why:** a button that asks a model to generate a quiz (an agent writes one with
-`quiz_create` and `quiz_write`, and runs one in a conversation with `quiz_questions` and
-`quiz_answer`); a pick of questions as a preset (a preset is one quiz file); shuffling the
+**Generating flashcards was out, and is in (#140).** It was left out because an agent already writes
+a quiz — `quiz_create`, `quiz_write`, `quiz_question_set` — and that is still true. But it answers
+only somebody with an agent connected and the habit of asking one; a person revising a subject has
+their notes open in the app and no agent at hand, and writing forty cards by hand is the step that
+stops them. Flashcards are the kind a model gets right most often — a fact and its answer, checked
+at a glance — so the cost of a wrong one is an untick, and the parser and the confirm step are what
+keep that cost there.
+
+**Out, and why:** a button that asks a model to generate multiple-choice or open questions (wrong
+answers that are plausible but wrong are where a model goes astray, and checking one costs more than
+writing it; the flashcard path could carry them later); a pick of questions as a preset (a preset is one quiz file); shuffling the
 *questions* of a run
 (the options shuffle, an author's order of questions being a course's order); grading an open
-answer automatically (the person's verdict is the answer); a recall schedule (records are kept, so
+answer automatically (the person's verdict is the answer); a flashcard asked back to front, and
+importing Anki decks; a recall schedule (records are kept, so
 the counts one needs exist; when to ask again is a design decision); resetting a history, scores
 over time and timers; a printed sheet; and practising on a
 read-only view with a history, which has nowhere to keep it.

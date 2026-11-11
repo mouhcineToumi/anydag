@@ -16,12 +16,16 @@ import { INSPECTOR_WIDTH, readPref, writePref } from "@/settings/prefs";
 import type { BoardLink } from "@/board/types";
 import { isDiagramType, isLinkType, itemName, type BoardItem, type BoardPage, type ItemType } from "@/board/types";
 import { declaredAt, declaredOn } from "@/dsl/declared";
+import { removeEdge } from "@/dsl/restate";
 import { fromMermaid } from "@/dsl/from-mermaid";
 import { detectMermaid } from "@/dsl/mermaid";
 
+import { RepairBox } from "@/ui/Problems";
 import type { Problem } from "@/ui/problemList";
 
 import { segOf } from "./pick";
+import type { Fix, Repair } from "./repair";
+import { linkEndChoices } from "./linkEnds";
 import { Props, type Subject } from "./Props";
 import type { Editor } from "./useEditor";
 
@@ -40,50 +44,26 @@ const MIN_W = 280;
 const MAX_W = 900;
 const DEFAULT_W = 400;
 
-/**
- * Select one line of the box and bring it roughly to the middle.
- *
- * `keepIfInside` is the pick-follows-caret guard: when the box already has focus with its caret
- * inside the line, the caret is what put the pick there and re-selecting the whole line would take
- * it off the character the person had just reached.
- */
-function selectLine(el: HTMLTextAreaElement, text: string, line: number, keepIfInside: boolean): void {
-  const lines = text.split("\n");
-  const at = Math.min(Math.max(1, line), lines.length);
-  const from = lines.slice(0, at - 1).reduce((n, l) => n + l.length + 1, 0);
-  const to = from + (lines[at - 1]?.length ?? 0);
-  if (keepIfInside && document.activeElement === el && el.selectionStart >= from && el.selectionEnd <= to) return;
-  el.focus();
-  el.setSelectionRange(from, to);
-  /* Roughly centred: the line's own offset, less half a box of context. */
-  const lineH = el.scrollHeight / Math.max(1, lines.length);
-  el.scrollTop = Math.max(0, (at - 1) * lineH - el.clientHeight / 2);
-}
-
 function storedWidth(): number {
   const n = Number(readPref(INSPECTOR_WIDTH));
   return Number.isFinite(n) && n >= MIN_W && n <= MAX_W ? n : DEFAULT_W;
 }
 
 /**
- * The editor for one item: what it says, and the few things its fence line says about it.
+ * The panel for one item: its problems, its controls, and the few things its fence line says about it.
  *
- * A panel beside the board rather than a box over the item, because the thing being edited is a
- * *source* — markdown, or a diagram's DSL — and the diagram it produces is the preview. Typing
- * writes the file a quarter of a second after the last keystroke; the watcher and the parser do
- * the rest, so the diagram redraws beside the text as it is typed, through the same path Claude's
- * writes take. There is no second copy of the item's state to keep in step.
+ * **Controls, not text** (#145). A diagram's body is a language, and everything it says has a
+ * control — the item's own fields, and the strip for whatever is picked inside it — so the panel
+ * holds those and the canvas is the rest. There was a *Source* tab beside them, remembered as a
+ * preference; it is gone, not hidden behind a setting (decided on #132). An agent still writes the
+ * DSL, and a person never has to read it.
  *
- * The draft here is the one thing that is not the file: it is what the person has typed, some of
- * which may not have been written yet. An outside change to the item — Claude rewriting it — wins
- * only when nothing is pending; otherwise the draft stands and the next write carries it.
- *
- * **Two halves, and which one is showing is a preference** (F1). *Properties* is the controls — the
- * item's own fields, and the strip for whatever is picked inside it; *Source* is the text those
- * controls are writing. The brief this milestone serves is that a person can change everything
- * without ever seeing the DSL, and the DSL "should appear to the ones who are interested in it";
- * one toggle, remembered in `localStorage` like the panel's width, is the whole of that. Not in the
- * query string: it is a fact about this window, not part of what a shared `?board=…` link means.
+ * Every control hands the whole body back through `onChange`, and the body goes to the file a
+ * quarter of a second after the last change; the watcher and the parser do the rest, through the
+ * same path an agent's writes take. The draft is the one thing that is not the file: an outside
+ * change to the item wins only when nothing is pending; otherwise the draft stands and the next
+ * write carries it. The text box is left only for what is not a language — an image's caption and
+ * a prompt card's request.
  */
 export function Inspector({
   item,
@@ -91,7 +71,10 @@ export function Inspector({
   boardName,
   pages,
   boardLinks,
+  boardItems,
   problems = [],
+  repairOf,
+  onRepair,
 }: {
   item: BoardItem;
   editor: Editor;
@@ -99,19 +82,23 @@ export function Inspector({
   pages: BoardPage[];
   /** Every link on the board, so a picked one can be edited where its statement lives. */
   boardLinks: readonly BoardLink[];
+  /** Every item on the board: what a picked link's ends may be moved onto. */
+  boardItems: readonly BoardItem[];
   /**
    * What is wrong with this item, lines counted in the board file. The panel is where they belong
    * while somebody is typing: the dock stays quiet about the item that is open here.
    */
   problems?: readonly Problem[];
+  /** A board setting's repair, as the dock offers it; absent when the board cannot be written. */
+  repairOf?(p: Problem): Repair | null;
+  onRepair?(fix: Fix): Promise<string | null>;
 }) {
   const [draft, setDraft] = useState(item.body);
   const [width, setWidth] = useState(storedWidth);
   const [sheet, setSheet] = useState<string | null>(null);
   const [showSheet, setShowSheet] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
-  /* What the box holds right now. The reveal effect fires on a counter and must not close over
-     whichever draft happened to be current when it was created. */
+  /* What the box holds right now, for a rename that has to put it back if refused. */
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -159,6 +146,25 @@ export function Inspector({
     timer.current = setTimeout(flush, DEBOUNCE);
   };
 
+  /**
+   * A node of this item renamed: the new body and the board's links to the old name, one write.
+   * The draft stands in at once (the pick is re-pointed against it); a refusal puts it back.
+   */
+  const onRenameNode = (next: string, from: string, to: string) => {
+    const before = draftRef.current;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    pending.current = null;
+    sent.current = next;
+    setDraft(next);
+    void editor.renameNode(item.id, from, to, next).then((err) => {
+      if (!err) return;
+      sent.current = item.body;
+      setDraft(before);
+      editor.pickNode(item.id, from);
+    });
+  };
+
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
       e.preventDefault();
@@ -181,7 +187,10 @@ export function Inspector({
      `edges` fence has one too: it is not a diagram type, and it is still a grammar to look up. */
   const diagram = isDiagramType(item.type);
   const links = isLinkType(item.type);
-  const sheetable = diagram || links;
+  /* A link is changed with the pointer and the panel, never by typing its statement (#145), so its
+     grammar has no sheet to look up. */
+  const sheetable = diagram;
+  const linkEnds = useMemo(() => (links ? linkEndChoices(boardItems, item.page) : undefined), [links, boardItems, item.page]);
   useEffect(() => {
     if (!sheetable || !showSheet) return;
     let live = true;
@@ -240,58 +249,14 @@ export function Inspector({
   }, [pickedNode, pickedEdge, pickedLink, boardLinks, item.id, item.type, item.dir, item.line, draft]);
 
   /*
-   * Put the caret on the pick's line, when the source is what is showing.
-   *
-   * Selecting the line rather than painting a highlight behind it: a `<textarea>` cannot be styled
-   * per line without a second element tracking its wrapping, and the browser's own selection says
-   * "this is the bit you asked for" in a way every reader already knows. `scrollTop` is nudged
-   * because setting a selection scrolls it only just into view, at the very bottom of the box.
-   *
-   * The guard is the load-bearing part. The caret *feeds* the pick, so a person arrowing down the
-   * source changes `subject.line` on every press — and re-selecting the whole line each time would
-   * take the caret off the character they had just reached. The box holding focus with its caret
-   * already inside the line means the caret put the pick there, and there is nothing to do; without
-   * the focus half it also swallowed the *first* placement, because a textarea that has never been
-   * touched reports a caret at offset zero, which is inside line 1. `reveal.n` still triggers
-   * because `open` still bumps it: double-clicking the same card twice has to bring the caret back,
-   * and by then nothing else about the request has changed.
+   * The panel has no Source tab (#145, decided on #132: removed, not hidden behind a setting). A
+   * diagram's body is a language and everything it says has a control, so the panel is those
+   * controls and the canvas. The box below is for what is not a language: an image's caption and a
+   * prompt card's request. An `edges` fence's statements are the links on the canvas, each changed
+   * by picking it, and an `md` card's text is written on the card itself (`CardText`).
    */
-  const reveal = editor.reveal;
-  const revealN = reveal && reveal.id === item.id ? reveal.n : 0;
-  /*
-   * Only a diagram has two halves, and the reason is what the body *is*.
-   *
-   * A diagram's body is a language: everything it says has a control, so the text behind those
-   * controls is genuinely optional and hiding it is the whole point of the milestone. A note's body
-   * is the note, an image's is its caption, an `edges` fence's is its statements and it has no
-   * fence attributes at all — putting any of those behind a tab would hide the item's content from
-   * the person who opened the panel to see it.
-   */
-  const split = isDiagramType(item.type);
-  const mode = split ? editor.mode : "source";
-  const showFields = !split || mode === "props";
-  const showSource = !split || mode === "source";
-  const wantLine = subject?.line ?? 0;
-  useEffect(() => {
-    const el = area.current;
-    if (mode !== "source" || !el || !wantLine) return;
-    selectLine(el, draftRef.current, wantLine, true);
-    /* These three are the whole trigger; the rest is read when one of them fires. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, wantLine, revealN]);
-
-  /*
-   * The same placement for a request that names a line rather than a card — the problems dock's
-   * "show me". Its own effect rather than a third input to the one above, because that one follows
-   * the *pick*, which keeps moving as the caret walks the source; a line asked for once is a single
-   * placement, and folding it in would pin the caret there against every pick that came after.
-   */
-  const askedLine = reveal && reveal.id === item.id ? reveal.line : undefined;
-  useEffect(() => {
-    const el = area.current;
-    if (!el || !askedLine) return;
-    selectLine(el, draftRef.current, askedLine, false);
-  }, [askedLine, revealN, showSource]);
+  const prose = item.type === "md";
+  const showSource = !links && !prose && !diagram;
 
   /* Pulling the panel wider. Painted straight onto the element for the duration — this is the
      `Viewport` split again — and only the settled value reaches React and `localStorage`. */
@@ -366,29 +331,26 @@ export function Inspector({
         </button>
       </header>
 
-      {/* `dag-inspector__mode`, not `dag-tab`: the page tabs have owned that name since M27 and
-          `nodes.css` loads after this file. See the namespace note in docs/architecture/things-that-will-bite.md. */}
-      {split ? (
-        <div className="dag-inspector__modes" role="tablist" aria-label="Editor view">
-          {(
-            [
-              ["props", "Properties"],
-              ["source", "Source"],
-            ] as const
-          ).map(([m, label]) => (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              data-dag-mode={m}
-              aria-selected={mode === m}
-              className={mode === m ? "dag-inspector__mode dag-inspector__mode--on" : "dag-inspector__mode"}
-              onClick={() => editor.setMode(m)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* What is wrong here that a person can act on (#145), at the top, where it is read first:
+          each in words, with Show — which picks the card or link it concerns, so the control that
+          fixes it is the next thing on screen — and the fix itself where a row can carry one out.
+          Nothing about lines, codes or grammar: those are an agent's, and the panel never shows the
+          text they point into. */}
+      {problems.length > 0 ? (
+        <ProblemsBlock
+          problems={problems}
+          onShow={(p) => editor.openOn(item.id, p.target)}
+          onDeleteEdge={(p) => {
+            /* A board link (#173) is taken out of its fence by the editor, as the Delete key does. */
+            if (p.target?.what === "link") return editor.removeLink(p.target.id);
+            const line = p.target ? declaredAt(item.type, draft, p.target.id, item.dir) : null;
+            if (line === null) return;
+            editor.pickNode(item.id, null);
+            onChange(removeEdge(draft, line));
+          }}
+          repairOf={repairOf}
+          onRepair={onRepair}
+        />
       ) : null}
 
       {/* A Mermaid paste, and the one button that turns it into this grammar. Offered only where
@@ -418,7 +380,29 @@ export function Inspector({
        * back through `onChange`, so it goes through this panel's debounce, the same patch and the
        * same undo entry as a keystroke. There is no second write path.
        */}
-      <Props item={item} editor={editor} pages={pages} body={draft} subject={subject} showItem={showFields} onBody={onChange} />
+      <Props
+        item={item}
+        editor={editor}
+        pages={pages}
+        body={draft}
+        subject={subject}
+        showItem
+        onBody={onChange}
+        onRenameNode={onRenameNode}
+        linkEnds={linkEnds}
+      />
+
+      {links && !subject ? (
+        <p className="dag-inspector__hint" data-dag-links-hint="">
+          Click a link on the canvas to change it, or drag from the edge of a card to draw one.
+        </p>
+      ) : null}
+
+      {prose ? (
+        <button type="button" className="dag-button" data-dag-write-card="" onClick={() => editor.write(item.id)}>
+          Edit the text
+        </button>
+      ) : null}
 
       {showSource ? (
         <textarea
@@ -442,40 +426,7 @@ export function Inspector({
           onChange={(e) => onChange(e.target.value)}
           onBlur={flush}
           onKeyDown={onKeyDown}
-          /* `select` fires on a plain caret move too, which is the event wanted here: the caret
-             feeds the pick, so arrowing down the source walks the cards and the strip follows.
-             The draft goes with it because the file may be a quarter of a second behind it. */
-          onSelect={(e) => {
-            const el = e.currentTarget;
-            editor.pickFromLine(item.id, el.value.slice(0, el.selectionStart).split("\n").length, el.value);
-          }}
         />
-      ) : null}
-
-      {/* This item's problems, where somebody editing it is already looking. In both halves: a
-          person who never opens Source still needs to know the diagram is not what the file says,
-          and a click takes them to the line. Counted in the body, the way the box counts. */}
-      {problems.length > 0 ? (
-        <ul className="dag-inspector__problems" data-dag-inspector-problems="">
-          {problems.map((p, i) => {
-            const line = Math.max(1, p.line - item.line);
-            return (
-              <li key={`${p.key}@${p.line}#${i}`}>
-                <button
-                  type="button"
-                  className={`dag-inspector__problem dag-inspector__problem--${p.severity}`}
-                  title="Go to this line"
-                  onClick={() => editor.openAt(item.id, line)}
-                >
-                  <span className="dag-inspector__problem-where">
-                    line {line} · {p.code}
-                  </span>
-                  <span>{p.message}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
       ) : null}
 
       {sheetable && showSheet ? (
@@ -523,5 +474,60 @@ function MermaidOffer({ body, onConvert }: { body: string; onConvert(type: ItemT
         <Wand2 {...ICON} aria-hidden="true" /> Convert
       </button>
     </div>
+  );
+}
+
+/**
+ * The panel's Problems block: what is wrong with this item that a person can do something about.
+ *
+ * `listProblems` has already left out everything else, so every row here has an answer: Show picks
+ * the thing the problem is about, a link that ends on nothing can be deleted from the row, and a
+ * board setting the file got wrong carries its repair, as it does in the dock.
+ */
+function ProblemsBlock({
+  problems,
+  onShow,
+  onDeleteEdge,
+  repairOf,
+  onRepair,
+}: {
+  problems: readonly Problem[];
+  onShow(p: Problem): void;
+  onDeleteEdge(p: Problem): void;
+  repairOf?(p: Problem): Repair | null;
+  onRepair?(fix: Fix): Promise<string | null>;
+}) {
+  return (
+    <section className="dag-inspector__problems" data-dag-inspector-problems="" aria-label="Problems">
+      <ul className="dag-inspector__problem-list">
+        {problems.map((p, i) => (
+          <li
+            key={`${p.key}@${p.line}#${i}`}
+            className={`dag-inspector__problem dag-inspector__problem--${p.severity}`}
+            data-dag-inspector-problem={p.code}
+          >
+            <span className="dag-inspector__problem-words">{p.words}</span>
+            <span className="dag-inspector__problem-acts">
+              {p.target ? (
+                <button type="button" className="dag-inspector__problem-act" data-dag-problem-show="" onClick={() => onShow(p)}>
+                  Show
+                </button>
+              ) : null}
+              {p.fix === "delete-edge" ? (
+                <button
+                  type="button"
+                  className="dag-inspector__problem-act"
+                  data-dag-problem-delete=""
+                  onClick={() => onDeleteEdge(p)}
+                >
+                  Delete link
+                </button>
+              ) : null}
+            </span>
+            {onRepair ? <RepairBox repair={repairOf?.(p) ?? null} code={p.code} onRepair={onRepair} /> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

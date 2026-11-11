@@ -1,31 +1,36 @@
 import type { CSSProperties } from "react";
+import { MARK_DOT, MARK_FRAME, MARK_LINE } from "./markPaths";
 
 /**
- * The AnyDag mark: a frame that does not close, and a stroke that leaves through the gap.
+ * The AnyDag mark: a frame that does not close, and a line drawn with a brush pen that leaves
+ * through the gap toward a dot.
  *
- * The drawing is one 64-unit square. Three sides of a rounded frame, then up the right edge to
- * `y=20`, where it stops; the top edge stops at `x=38`. Between those two ends is a hole, and the
- * stroke — a coil that unwinds, drawn with the pen's `ink` grammar — crosses `x=44` at `y≈15.6` and `y=14`
- * at `x≈48`, so it passes *through* the hole rather than over a line. That is the whole idea and it
- * is why the frame is an open path rather than a `<rect>` with something drawn on top: an overlap
- * reads as a drawing mistake, a gap reads as an escape.
+ * The drawing is one 64-unit square. Three sides of a rounded frame, then up the right edge, where
+ * it stops short of the top; the top edge stops short of the corner too. Between those two ends is
+ * a hole, and the line, a coil that unwinds, passes *through* the hole rather than over the frame.
+ * That is the whole idea, and it is why the frame is open rather than a `<rect>` with something
+ * drawn on top: an overlap reads as a drawing mistake, a gap reads as an escape.
+ *
+ * Both the frame and the line are drawn with one pen whose width changes as it goes. The line lands
+ * light, swells through the loop and lifts off to a point short of the dot; the frame tapers where
+ * it starts and ends at the opening. A `stroke-width` cannot vary along a path, so each is a filled
+ * outline, and the outlines are generated: `scripts/brand/mark.mjs` writes them to `markPaths.ts`
+ * along with every other copy of the mark in the repository. Change the mark there, never here.
  *
  * Two constraints decided how it is coloured, and both come from `scripts/check-literals.mjs`:
  *
- * - **Rule 1, no colour anywhere in `src/`, admits no exceptions.** So the frame and the stroke are
- *   `currentColor` and the node is `var(--dag-color-accent)`. The mark therefore inherits whatever
+ * - **Rule 1, no colour anywhere in `src/`, admits no exceptions.** So the frame and the line are
+ *   `currentColor` and the dot is `var(--dag-color-accent)`. The mark therefore inherits whatever
  *   it is placed in — ink on the toolbar, paper on a dark ground — and the accent comes from the
  *   active theme rather than from the brand's design, which is the same split `chrome.css` already
  *   makes: the brand's design document owns the mark's geometry, `themes/<name>/theme.json` owns what
  *   colour anything in `src/` is drawn in.
  * - **Rule 3, no SVG style literals, is scoped to `src/render/`.** `src/ui/` is chrome and exempt,
- *   which is the reason this file is here and not beside the node views. A `strokeWidth="4.5"` in a
- *   diagram component is a theme key somebody bypassed; here it is the logo's own construction, and
- *   no theme has an opinion about it — the same argument that exempts the height of a zoom button.
+ *   which is the reason this file is here and not beside the node views.
  *
- * `size` is the box, not the stroke: the drawing scales as one. Below about 20px the gap closes up
- * and the coil fills in, which is what `public/favicon.svg` is for — a
- * heavier, opened-up cut of the same drawing. Do not reach for this component at favicon sizes.
+ * `size` is the box, not the line: the drawing scales as one. Below about 20px the line's thin ends
+ * disappear and the coil fills in, which is what `public/favicon.svg` is for — a heavier cut of the
+ * same drawing, from the same script. Do not reach for this component at favicon sizes.
  */
 export function Logo({
   size = 20,
@@ -47,11 +52,9 @@ export function Logo({
       aria-hidden
       focusable="false"
     >
-      <g fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M 38 14 L 16 14 Q 6 14 6 24 L 6 42 Q 6 52 16 52 L 34 52 Q 44 52 44 42 L 44 20" />
-        <path d="M 16 44 C 16 30 24 24 32 28 C 38 31 36 40 30 40 C 24 40 24 32 30 26 C 36 20 45 15 53 11" />
-      </g>
-      <circle cx="57" cy="8" r="4.5" fill="var(--dag-color-accent)" />
+      <path fill="currentColor" d={MARK_FRAME} />
+      <path fill="currentColor" d={MARK_LINE} />
+      <circle cx={MARK_DOT.cx} cy={MARK_DOT.cy} r={MARK_DOT.r} fill="var(--dag-color-accent)" />
     </svg>
   );
 }

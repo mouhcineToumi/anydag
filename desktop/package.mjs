@@ -15,12 +15,15 @@
  *    allow. An empty variable — a secret the repository does not have — counts as absent.
  * 2. **Whether the shell may update itself on macOS**: the shell is rebuilt with `ANYDAG_SIGNED`,
  *    because Squirrel.Mac refuses an update to an ad-hoc-signed app (`desktop/main.ts`).
- * 3. **The update channel.** electron-builder reads it off the version (`0.2.0-nightly.…` is the
- *    `nightly` channel, `0.2.0-beta.1` the `beta` one, a plain `0.2.0` is `latest`), names the files
- *    the updater reads for it (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`) and writes the
- *    channel into the app's own `app-update.yml`; electron-updater reads it back off the running
- *    version. Nothing is configured, which is why it is *checked* here: a build whose version says
- *    one channel and whose update files say another would be an app that never finds its updates.
+ * 3. **The update channel.** It is the version's pre-release word (`0.2.0-nightly.…` is the
+ *    `nightly` channel, `0.2.0-beta.1` the `beta` one, a plain `0.2.0` is `latest`), and it names
+ *    the files the updater reads (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`);
+ *    electron-updater reads the same word back off the running version. **electron-builder does
+ *    not work it out for the `github` provider**: its `detectUpdateChannel` applies only to
+ *    `generic` and the S3-like ones, so without `publish.channel` every build writes `latest*.yml`.
+ *    Hence `-c.publish.channel=<word>` for a pre-release, here. It is also *checked* after the
+ *    build: a build whose version says one channel and whose update files say another would be an
+ *    app that never finds its updates.
  * 4. **The second macOS architecture's watcher.** `npm ci` installs the prebuilt
  *    `@parcel/watcher-darwin-<arch>` of the machine it runs on; the x64 app built on an arm64 runner
  *    needs the other one, fetched with `npm pack` and checked against the lockfile's integrity.
@@ -55,7 +58,12 @@ env.ANYDAG_SIGNED = signing ? "1" : "0";
    is handed no certificate, so the only signing it can do is the ad-hoc one the release does too. */
 if (!signing) env.CSC_FOR_PULL_REQUEST = "true";
 
+const VERSION = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
+/** `nightly` for `0.2.0-nightly.…`, `beta` for `0.2.0-beta.1`, `latest` for a plain `0.2.0`. */
+const CHANNEL = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(VERSION)?.[1] ?? "latest";
+
 const args = ["--config", "desktop/electron-builder.yml", "--publish", "never", ...process.argv.slice(2)];
+if (CHANNEL !== "latest") args.push(`-c.publish.channel=${CHANNEL}`);
 if (process.platform === "darwin" && !signing) args.push("-c.mac.identity=-");
 
 const notarising = process.platform === "darwin" && signing && Boolean(env.APPLE_ID);
@@ -78,9 +86,8 @@ process.exit(run.status ?? 1);
 
 /** The update files electron-builder wrote are the ones this version's channel names. */
 function checkChannelFiles() {
-  const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
-  const pre = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(version)?.[1];
-  const channel = pre ?? "latest";
+  const version = VERSION;
+  const channel = CHANNEL;
   const file =
     process.platform === "darwin"
       ? `${channel}-mac.yml`

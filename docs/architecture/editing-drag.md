@@ -18,11 +18,11 @@ where the pointer let go, which is the same honesty `resizeOf`'s `aspect` alread
 | `arch` `erd` `state` `class` `usecase` `c4` | onto a card → before or after it, in *its* container · onto a boundary → into it, at its end · onto the frame's padding → out, after the last top-level declaration | `moveStatement` |
 | `flow` `activity` | the same, and a band is a container: onto another lane → into that `lane { }` | `moveStatement` |
 | `mindmap` | onto another topic → re-indented under it, with its subtree | `moveTopic` |
-| `sequence` | a participant header across its neighbour → its `participant` line moves | `moveStatement` |
+| `sequence` | a participant header across its neighbour → its `participant` line moves · a drag between two lifelines → a new message, after the row above the drop | `moveStatement` · `insertStatement` |
 | `chart` | a series or slice across its neighbour → its line moves, which is the order of the bars, the wedges and the legend | `moveStatement` |
 | `timeline` | sideways → a new start date, snapped to a day, the range keeping its length | `redate` |
 | `sketch`, any `layout=fixed` fence | anywhere → `x=`/`y=`, snapped to `metric.grid` | `setGeometry` |
-| `gitgraph` | nothing — refused | — |
+| `gitgraph` | a branch's tip onto another lane → that branch merged into the lane's · a commit onto its neighbour on its own lane → the two swapped, where the history allows it | `gitMerge` · `gitMove` |
 
 Ten things are load-bearing.
 
@@ -76,12 +76,17 @@ Ten things are load-bearing.
   frozen `route-quality` totals over the reference boards stand as evidence that this changed
   nothing about how anything is drawn.
 
-Two refusals with reasons. A **`gitgraph` commit** cannot be dragged: a column is a commit and a
-lane is a branch, both ordinal and both the file's, so there is no drop that means anything and
-inventing one would be a gesture that silently rewrote history. The cursor says `not-allowed` and
-the panel carries the line. And a **sequence message** cannot be dragged either, by construction
-rather than by a rule: only a participant header carries `data-dag-node`, so a message can never be
-picked in the first place.
+A **`gitgraph` commit** is dragged only where the history can say what the drop meant. A column is
+a commit and a lane is a branch, both ordinal and both the file's, so a coordinate means nothing —
+but two drops do. The **tip** of a branch let go on another lane (the band, or a commit drawn in
+it) is that branch merged into the lane's: `gitMerge` appends the `checkout` and the `merge`. A
+commit let go on the commit just before or after it on its *own* lane is the two swapped, and
+`gitMove` refuses that unless nothing else descends from the earlier one. Everything else — a
+commit from the middle of a branch over another lane, a drop on the paper — writes nothing. Both
+writers read the whole history, which is why they are in `src/dsl/graph/gitgraph.ts` beside the
+parser rather than in `restate.ts`; see *A git graph's lanes* in `editing.md`. A **sequence
+message** cannot be dragged at all, by construction rather than by a rule: only a participant
+header carries `data-dag-node`, so a message can never be picked in the first place.
 
 `AxisScale` on `Placed.axis` is the timeline's half of this — the three numbers that invert
 `x = ((t − min) / span) · px`, published because a drag along the page is asking for a *value* and
@@ -112,12 +117,10 @@ that list, closed where closing it was honest.
   with no handle. What comes back after an ELK relayout is not to the pixel where the pointer let
   go, and that is the honest answer.
 - **A card knows its line.** `declaredAt()` in `src/dsl/declared.ts` maps a node id to the line that
-  declares it, and the panel selects that line in the source — the browser's own selection, because
-  a `<textarea>` cannot be styled per line without a second element tracking its wrapping.
-  `declaredOn()` is the inverse. **The pick decides; the caret feeds it.** The strip followed
-  the *caret* once, and it follows the *pick* now, with the caret feeding it through `declaredOn`.
-  Still one source of truth, and arrowing down the source still walks the cards — see *Picking a
-  node*.
+  declares it, which is the line every control writes; `declaredOn()` is the inverse, and what turns
+  a diagnostic's line into the thing it is about. **The pick decides.** The strip followed the
+  *caret* in the source box once; it follows the *pick*, and the box is gone (#145) — see *Picking
+  a node*.
 - **The properties strip writes one line.** `src/dsl/restate.ts` sets `hue=`, `icon=` and the status
   flag on a single statement, through the tokenizer — `stop` inside `"we stop here"` is a `string`
   and cannot be mistaken for the flag, and `state done "Done"` keeps its id. Reserialising the IR
@@ -156,7 +159,8 @@ that list, closed where closing it was honest.
 - **The theme choice outlives the tab.** `localStorage`, the same argument as the library's open
   state — a preference about this window, not part of what a `?board=…` link means. `?theme=` still
   outranks it, because `snapshot.mjs --theme` and every Playwright check are that, and a preference
-  remembered in a browser must not change what a screenshot shows.
+  remembered in a browser must not change what a screenshot shows. A board's `theme:` is not a
+  source at all (#162, `settings.md`).
 - **A Mermaid paste converts.** `src/dsl/from-mermaid.ts` is the other half of `detectMermaid`:
   `flowchart`/`graph` → `flow`, `erDiagram` → `erd`, `sequenceDiagram` → `sequence`, and `pie` and
   `xychart-beta` → `chart`. It is offered

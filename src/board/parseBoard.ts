@@ -9,6 +9,7 @@ import { parse as parseYaml } from "yaml";
 import { flag, num, str } from "./attrs";
 import { endText, parseLinks } from "./links";
 import { locateItems } from "./locate";
+import { FLOW_DEFAULT } from "./settings";
 import {
   isDiagramType,
   isItemType,
@@ -47,7 +48,6 @@ export function hashOf(s: string): string {
 
 interface Frontmatter {
   title?: string;
-  theme?: string;
   pages?: (BoardPage | string)[];
   flow?: { width?: number; gap?: number };
 }
@@ -237,11 +237,10 @@ export function parseBoard(name: string, text: string): Board {
        (`test/titles.test.ts`), so the toolbar never calls a board something its sidebar row does not.
        `title: 42` used to reach the toolbar as a number. */
     title: typeof fm.title === "string" && fm.title.trim() ? fm.title.trim() : undefined,
-    theme: fm.theme,
     pages,
     items,
     links,
-    flow: { width: fm.flow?.width ?? 4000, gap: fm.flow?.gap ?? 80 },
+    flow: { width: fm.flow?.width ?? FLOW_DEFAULT.width, gap: fm.flow?.gap ?? FLOW_DEFAULT.gap },
     errors,
   };
 }
@@ -255,9 +254,12 @@ export function parseBoard(name: string, text: string): Board {
  * item literally called `arch1.db`, so the whole string is tried as an id before the split is
  * trusted, exactly as `resolveRefs()` reads a row ref.
  *
- * **An endpoint that does not resolve takes its link with it.** Nothing downstream — routing,
- * drawing, export — then has to carry a case for an end that is not anywhere; the diagnostic is
- * the whole of the report.
+ * **An endpoint that does not resolve leaves its link hanging** (#173), when the other end does: the
+ * link is kept with `loose` naming the missing end, drawn from the end it has to a loose stub, and
+ * the diagnostic carries the link as its `target` so the dock's "Show" can pick it. A person sees
+ * the problem and has something on the paper to fix it with. With **both** ends missing there is
+ * nothing to hang it from, and the link is dropped — the diagnostic is then the whole report, as it
+ * is for a diagram's edge between two names nobody declared.
  */
 function resolveLinks(items: BoardItem[], errors: BoardDiagnostic[]): BoardLink[] {
   const fences = items.filter((it) => isLinkType(it.type));
@@ -312,15 +314,19 @@ function resolveLinks(items: BoardItem[], errors: BoardDiagnostic[]): BoardLink[
 
     /* A chain says `b` twice and a bus says the target once per source, so one wrong id would
        otherwise be reported as many times as it is mentioned. */
-    const said = new Set<string>();
-    const report = (line: number, code: BoardDiagnostic["code"], message: string): void => {
+    const said = new Map<string, BoardDiagnostic>();
+    const report = (line: number, code: BoardDiagnostic["code"], message: string): BoardDiagnostic => {
       const key = `${line}\0${message}`;
-      if (said.has(key)) return;
-      said.add(key);
-      errors.push({ line, code, message, severity: "error" });
+      const had = said.get(key);
+      if (had) return had;
+      const d: BoardDiagnostic = { line, code, message, severity: "error" };
+      said.set(key, d);
+      errors.push(d);
+      return d;
     };
 
-    const resolve = (end: LinkEnd, line: number): LinkEnd | null => {
+    /* An end, or the diagnostic that says why it is not one. */
+    const resolve = (end: LinkEnd, line: number): LinkEnd | BoardDiagnostic => {
       const raw = endText(end);
       if (here.has(raw)) return { item: raw };
 
@@ -341,35 +347,32 @@ function resolveLinks(items: BoardItem[], errors: BoardDiagnostic[]): BoardLink[
            author had in mind is exactly what cannot be known from a name that is in neither. */
         const pool = end.node === undefined ? [...here.keys(), ...groupsHere] : [...here.keys()];
         const guess = nearest(end.item, pool);
-        report(
+        return report(
           line,
           CODES.EB_LINK_UNKNOWN_ITEM,
           guess
             ? `unknown item \`${raw}\`. Did you mean \`${guess}\`?`
             : `unknown item \`${raw}\`: nothing on this board is called that`,
         );
-        return null;
       }
 
       const ids = nodeIds(owner);
       if (ids === null) {
-        report(
+        return report(
           line,
           CODES.EB_LINK_UNKNOWN_NODE,
           `\`${end.item}\` is not a diagram, so it has no node \`${end.node!}\`; link to \`${end.item}\` itself`,
         );
-        return null;
       }
       if (!ids.has(end.node!)) {
         const guess = nearest(end.node!, ids);
-        report(
+        return report(
           line,
           CODES.EB_LINK_UNKNOWN_NODE,
           guess
             ? `\`${end.item}\` has no node \`${end.node!}\`. Did you mean \`${guess}\`?`
             : `\`${end.item}\` has no node \`${end.node!}\``,
         );
-        return null;
       }
       return { item: end.item, node: end.node };
     };
@@ -379,7 +382,19 @@ function resolveLinks(items: BoardItem[], errors: BoardDiagnostic[]): BoardLink[
          the author round the loop twice. */
       const from = resolve(link.from, link.line);
       const to = resolve(link.to, link.line);
-      if (from && to) out.push({ ...link, from, to });
+      const bad = (x: LinkEnd | BoardDiagnostic): x is BoardDiagnostic => "code" in x;
+      if (!bad(from) && !bad(to)) {
+        out.push({ ...link, from, to });
+        continue;
+      }
+      /* One end missing: it hangs from the other. The end that names nothing stays as typed — it is
+         what a drop on a card rewrites — and the problem points at the first link it left hanging,
+         which for a bus or a chain through one wrong name is the statement's first. */
+      if (bad(from) && bad(to)) continue;
+      const loose = bad(from) ? "from" : "to";
+      out.push({ ...link, from: bad(from) ? link.from : from, to: bad(to) ? link.to : to, loose });
+      const d = bad(from) ? from : (to as BoardDiagnostic);
+      d.target ??= { what: "link", id: link.id };
     }
   }
 
@@ -411,7 +426,7 @@ export function nodeIdsOf(it: Pick<BoardItem, "type" | "body" | "dir" | "aspect"
     const g = parseDiagram(it.type, it.body, it.dir, it.aspect, it.layout);
     /* Groups as well as nodes: a link into a group anchors on the group's box, and the router
        already treats one as a node with a row. */
-    if (g) return new Set([...g.nodes.map((n) => n.id), ...g.groups.map((x) => x.id)]);
+    if (g) return new Set([...g.nodes.filter((n) => n.kind !== "loose").map((n) => n.id), ...g.groups.map((x) => x.id)]);
   }
   return null;
 }

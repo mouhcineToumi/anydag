@@ -38,9 +38,12 @@ const SECTIONS: { title: string; rows: [string, string[]][] }[] = [
     rows: [
       ["Pick a card, once its diagram is selected", ["click again"]],
       ["Pick one of its edges", ["click the line"]],
-      ["Its properties, in the panel", ["Enter"]],
+      ["Its properties, in the panel (on a mindmap topic, the toolbar's Edit)", ["Enter"]],
       ["Rename it where it is drawn", ["double-click"]],
       ["Add a card beside it", ["the + on a picked card"]],
+      ["Mindmap topic: a child · a sibling", ["Tab", "Enter"]],
+      ["Mindmap topic: out one level", ["shift", "Tab"]],
+      ["Mindmap topic: past its siblings", ["alt", "arrows"]],
       ["Move it: into a group, a band, or past a card", ["drag a picked card"]],
       ["Move the whole diagram instead", ["alt", "drag"]],
       ["Draw an edge to another card", ["drag a round handle"]],

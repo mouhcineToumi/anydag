@@ -11,7 +11,7 @@
  * and following one goes to `?ref=<id>`, which the page resolves — so renaming or moving a target
  * breaks nothing and changes the title everywhere at once.
  */
-import { createContext, useContext, useEffect, useState } from "react";
+import { Component, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { defaultUrlTransform, type Components } from "react-markdown";
 import {
   ArrowUpRight,
@@ -36,6 +36,7 @@ import { splitNote } from "@/note/format";
 import { PROJECT_LABEL, type Project } from "@/note/project";
 import { STATUS_LABEL, type Task, type TaskStatus } from "@/note/task";
 import { CodePre, MathCode } from "@/render/CodeBlock";
+import { fail } from "@/telemetry/client";
 import { useTheme } from "@/theme/useTheme";
 import { BoardView } from "@/view/BoardView";
 import { NoteMarkdown } from "@/view/NoteRead";
@@ -54,7 +55,7 @@ import { parseDagUrl } from "./extract";
 import { RefLink, WikiLink } from "./RefLink";
 import { follow } from "./follow";
 import { parseWikiUrl, resolveWiki, wikiLabel, wikilinksIn } from "./wikilinks";
-import { hrefFor, titleOf, useIndex } from "./useIndex";
+import { hrefFor, titleOf, useIndex, useSeek } from "./useIndex";
 
 /** Whether the image being drawn is a paragraph of its own — the only place a block may go. */
 const OnItsOwn = createContext(false);
@@ -87,7 +88,7 @@ function RefCard({ id, fallback }: { id: string; fallback: string }) {
 function EmbeddedBoard({ id, name }: { id: string; name: string }) {
   const { board, error } = useBoard(name);
   const query = new URLSearchParams(location.search);
-  const { theme } = useTheme(query.get("theme") ?? undefined, undefined, query.get("snapshot") === "1");
+  const { theme } = useTheme(query.get("theme") ?? undefined, query.get("snapshot") === "1");
   /* `data-dag-embed-ready` once every item has its size — or once there is nothing more coming,
      which a board that would not load is. A note printed to PDF waits on it: a board
      drawn half-way is a PDF of empty frames. */
@@ -548,10 +549,51 @@ interface EmbedProps {
   placed?: boolean;
 }
 
+/**
+ * One embed's failure kept to that embed. An embed draws somebody else's document — a board through
+ * the whole renderer, a note through Markdown — inside the page that holds it, and a throw from any
+ * of that used to reach the app's one boundary and take the page with it: the note around the embed,
+ * the sidebar, the open chat (#123). Here it is a card saying so, with the words the author wrote,
+ * and everything around it stays. Keyed by the id, so an embed made to name another document is
+ * drawn afresh.
+ */
+export class EmbedBoundary extends Component<{ id: string; fallback: string; children: ReactNode }, { broken: boolean }> {
+  override state = { broken: false };
+
+  static getDerivedStateFromError(): { broken: boolean } {
+    return { broken: true };
+  }
+
+  /** Logged as the app's own boundary logs a render failure, when somebody said yes. */
+  override componentDidCatch(error: unknown): void {
+    fail("render", error);
+  }
+
+  override render(): ReactNode {
+    if (!this.state.broken) return this.props.children;
+    return (
+      <span className="dag-embed dag-embed--card dag-embed--missing" data-dag-embed={this.props.id} data-dag-embed-failed="">
+        {this.props.fallback || "A document"} could not be drawn
+      </span>
+    );
+  }
+}
+
 /** An `![…](dag:…)`: the target drawn, or a card where drawing it is not allowed. */
-function RefEmbed({ id, part, fallback, depth, boards, placed }: EmbedProps) {
+function RefEmbed(props: EmbedProps) {
+  return (
+    <EmbedBoundary key={props.id} id={props.id} fallback={props.fallback}>
+      <RefEmbedBody {...props} />
+    </EmbedBoundary>
+  );
+}
+
+function RefEmbedBody({ id, part, fallback, depth, boards, placed }: EmbedProps) {
   const index = useIndex();
   const doc = index.byId.get(id);
+  /* An id the index has not heard of yet — a board the Assistant made a moment ago — is a card until
+     it has, and asking is what makes sure it does. */
+  useSeek(id, !!doc, index.loaded);
   /* In the middle of a line an embed is a card: a drawing is a block, and a paragraph cannot hold one. */
   const own = useContext(OnItsOwn);
   if (!doc && placed && own && depth === 0) return <PlacedMissing id={id} fallback={fallback} gone={index.loaded} />;
@@ -754,6 +796,7 @@ function DagChip({ href, title }: { href: string; title: string }) {
   const index = useIndex();
   const hit = parseDagUrl(href);
   const doc = hit ? index.byId.get(hit.id) : undefined;
+  useSeek(hit?.id, !!doc, index.loaded);
   const missing = !hit || (index.loaded && !doc);
   const to = hit && !missing ? hrefFor(hit.id, hit.part) : undefined;
   return (

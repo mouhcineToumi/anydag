@@ -2,8 +2,8 @@ import { framed, resizeOf, type BoardItem, type ItemType } from "@/board/types";
 import { declaredAt } from "@/dsl/declared";
 import { parseItem } from "@/dsl/diagnose";
 import type { Graph, Node } from "@/dsl/ir";
-import { hasGraph, kindsOf } from "@/dsl/parse";
-import { replaceLine, setGeometry, statementSpan } from "@/dsl/restate";
+import { containersOf, hasGraph, kindsOf, parseDiagram } from "@/dsl/parse";
+import { addTopic, replaceLine, setGeometry, statementSpan, type Geometry } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
 
 import type { Side } from "./connect";
@@ -58,6 +58,14 @@ function kindWordOf(line: string): string | null {
 
 const indentOf = (line: string): string => /^[ \t]*/.exec(line)![0]!;
 
+/** The two words for a pseudostate, in the dialects that have them — `state` and `activity`. */
+export type Pseudo = "start" | "end";
+
+/** Whether this dialect can declare a start or an end state of its own. */
+export const hasPseudo = (type: string): boolean => kindsOf(type).includes("start") && kindsOf(type).includes("end");
+
+const isPseudo = (word: string): word is Pseudo => word === "start" || word === "end";
+
 export interface GrowOpts {
   /** Which handle was pulled: it decides which way the edge points, and where a fixed card lands. */
   side: Side;
@@ -72,6 +80,81 @@ export interface GrowOpts {
   edge: boolean;
   /** Where the new card goes, in a fence whose coordinates are the author's. */
   at?: { x: number; y: number };
+  /**
+   * Grow a start or an end state instead of a copy of the picked card.
+   *
+   * It also decides which way the edge points, whatever `side` says: a start state is where the
+   * flow comes from and an end state is where it goes, and an arrow the wrong way round would be a
+   * diagram that begins at its ending.
+   */
+  pseudo?: Pseudo;
+}
+
+/** A legacy pseudostate: the `[*]` the parser made `__start-N` or `__end-N` of. */
+export const LEGACY_PSEUDO = /^__(start|end)-(\d+)$/;
+
+/**
+ * A legacy `[*]` given a name of its own: `start start2` declared above the line it is written on,
+ * and that one `[*]` replaced by `start2` (#145).
+ *
+ * A `[*]` is a pseudostate with no statement — each occurrence is its own, made by `finalize` on the
+ * edge's line — so nothing can be linked to it, wrapped, moved or deleted on its own: the panel had
+ * nothing to offer one but the edge's line, which is not its. A declared `start`/`end` draws the same
+ * dot and ring and is a card like any other. Which `[*]` on the line is the one picked is counted the
+ * way `finalize` counts: edge by edge, source before target, so the n-th pseudostate on a line is the
+ * n-th `[*]` in its words (quoted text is skipped). The rest of the line, and every other `[*]`, is
+ * left as it was written.
+ *
+ * `null` for anything that is not a legacy pseudostate here, or when the result would not parse as
+ * cleanly as the body did.
+ */
+export function convertPseudo(
+  item: Pick<BoardItem, "type" | "body" | "dir">,
+  pseudo: string,
+): { body: string; id: string } | null {
+  const m = LEGACY_PSEUDO.exec(pseudo);
+  if (!m || !hasPseudo(item.type)) return null;
+  const kind = m[1] as Pseudo;
+  const before = parseDiagram(item.type, item.body, item.dir);
+  if (!before) return null;
+  const node = before.nodes.find((n) => n.id === pseudo);
+  if (!node) return null;
+  const order = (id: string) => Number(LEGACY_PSEUDO.exec(id)?.[2] ?? -1);
+  const nth = before.nodes
+    .filter((n) => n.line === node.line && LEGACY_PSEUDO.test(n.id))
+    .sort((a, b) => order(a.id) - order(b.id))
+    .findIndex((n) => n.id === pseudo);
+  const lines = item.body.split("\n");
+  const src = lines[node.line - 1];
+  if (src === undefined || nth < 0) return null;
+  const at = nthStar(src, nth);
+  if (at < 0) return null;
+  const id = freshNodeId(item.body, kind);
+  const next = `${src.slice(0, at)}${id}${src.slice(at + 3)}`;
+  const out = [...lines.slice(0, node.line - 1), `${indentOf(src)}${kind} ${id}`, next, ...lines.slice(node.line)].join("\n");
+  const errors = (g: Graph) => g.diagnostics.filter((d) => d.severity === "error").length;
+  const after = parseDiagram(item.type, out, item.dir);
+  if (!after || errors(after) > errors(before) || !after.nodes.some((n) => n.id === id && n.kind === kind)) return null;
+  return { body: out, id };
+}
+
+/** Where the n-th `[*]` outside a quoted string starts, or -1. */
+function nthStar(line: string, n: number): number {
+  let seen = 0;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === "\\" && quoted) {
+      i++;
+      continue;
+    }
+    if (c === '"') quoted = !quoted;
+    else if (!quoted && line.startsWith("[*]", i)) {
+      if (seen++ === n) return i;
+      i += 2;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -88,9 +171,11 @@ export interface GrowOpts {
  *
  * `null` when the id is not declared here, or the line it is declared on is not a declaration —
  * a mindmap topic and a sequence participant have no kind word to copy, and inventing one would
- * write a statement in a grammar that does not have it.
+ * write a statement in a grammar that does not have it. A mindmap grows through `growTopic`, which
+ * writes what its grammar has instead: an indented line.
  */
 export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, from: string, opts: GrowOpts): Grown | null {
+  if (opts.pseudo && !hasPseudo(type)) return null;
   const line = declaredAt(type, body, from, dir);
   if (line === null) return null;
 
@@ -100,8 +185,13 @@ export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, f
   const kind = kindWordOf(stmt);
   if (!kind) return null;
 
-  const id = freshNodeId(body, kind);
-  let text = `${indentOf(stmt)}${kind} ${id} ${JSON.stringify(`New ${kind}`)}`;
+  /* Growing from a start or an end state grows a real card: a second dot beside the first is never
+     what the `+` on one was pressed for. `kindsOf` lists the real kinds first, so the first one that
+     is not a pseudostate is the dialect's own word for a card. */
+  const word = opts.pseudo ?? (isPseudo(kind) ? (kindsOf(type).find((k) => !isPseudo(k)) ?? kind) : kind);
+  const id = freshNodeId(body, word);
+  /* A pseudostate draws no text, so it is declared with none — `start start2`, the way `fork f2` is. */
+  let text = `${indentOf(stmt)}${word} ${id}${isPseudo(word) ? "" : ` ${JSON.stringify(`New ${word}`)}`}`;
   if (opts.at) text = setGeometry(text, opts.at);
 
   const span = statementSpan(body, line);
@@ -111,9 +201,33 @@ export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, f
 
   /* East and south grow *forward*, so the picked card is the source; west and north grow back
      towards it. A reader follows an arrow the way they read the page, and a `+` on the left hand
-     side that drew a line pointing right would be an arrow through the card it came from. */
-  const statement = opts.side === "w" || opts.side === "n" ? `${id} --> ${from}` : `${from} --> ${id}`;
+     side that drew a line pointing right would be an arrow through the card it came from. A start
+     state is the exception on both counts: it always points at the card, and an end state is always
+     pointed at. */
+  const back = opts.pseudo ? opts.pseudo === "start" : opts.side === "w" || opts.side === "n";
+  const statement = back ? `${id} --> ${from}` : `${from} --> ${id}`;
   return { body: appendEdge(out.join("\n"), statement), id };
+}
+
+/**
+ * A new mindmap topic, as the child or the sibling of the picked one.
+ *
+ * The mindmap's answer to `grow`, and the reason it is a function of its own rather than a branch
+ * inside it: there is no edge to write and no kind word to copy — the relationship *is* the
+ * indentation, so "child" and "sibling" are the two places a line can go, not two sides of a card.
+ * The new topic's id is the parser's, which numbers topics as it reads, so it is found by parsing
+ * the body that was just written and asking which topic sits on the new line.
+ *
+ * `null` when the topic is not here, or when asking for the sibling of the top of the tree, which
+ * would be a second root.
+ */
+export function growTopic(body: string, from: string, as: "child" | "sibling"): Grown | null {
+  const line = declaredAt("mindmap", body, from, undefined);
+  if (line === null) return null;
+  const made = addTopic(body, line, as);
+  if (!made) return null;
+  const id = parseDiagram("mindmap", made.body, undefined)?.nodes.find((n) => n.line === made.line)?.id;
+  return id === undefined ? null : { body: made.body, id };
 }
 
 /**
@@ -130,6 +244,88 @@ export function appendEdge(body: string, statement: string): string {
   const runOn = tokenize(last, []).some((t) => t.kind === "arrow");
   if (last.trim() === "") return `${statement}`;
   return [...lines, ...(runOn ? [] : [""]), statement].join("\n");
+}
+
+/** What a wrap needs to know: which word opens the container, and which line is wrapped. */
+export interface WrapPlan {
+  word: "group" | "system" | "lane";
+  /** 1-based, in the body: the declaration of the picked card, group or lane. */
+  line: number;
+  /** The picked thing's own container, so a fixed fence can write the new box against it. */
+  parent: string | undefined;
+}
+
+/**
+ * Whether the picked card, group or lane can be wrapped in a new container, and in which.
+ *
+ * **The word is the dialect's, never a choice.** `flow` and `activity` draw swimlanes with a layout
+ * of their own, so what wraps there is a `lane`. `usecase` and `c4` have `system`, and a box drawn
+ * round use cases or containers there is almost always the system's boundary, so a wrap writes
+ * `system` (the Shape control turns it into a plain `group`). Every other dialect has `group`.
+ *
+ * Refused where the result would be a statement the grammar reads differently from what was asked:
+ *
+ * - **A lane inside a lane**, or a lane round a group, or a group in a diagram that has lanes. A file
+ *   uses groups or lanes, not both (`docs/dsl/common.md`), and a band nested in a band is not
+ *   something the lane layout draws.
+ * - **A line that is not the picked thing's own.** The parser says a card inside a one-line lane
+ *   (`lane r "R" { step a "A" }`) is declared on the lane's line, and wrapping *that* line would wrap
+ *   the lane while the panel says it wrapped the card. A legacy `[*]` is declared on an edge for
+ *   the same reason — it has no statement of its own to put inside anything.
+ * - **A body that does not parse clean**, the bar every writer here holds.
+ */
+export function wrapPlan(item: Pick<BoardItem, "type" | "body" | "dir" | "aspect" | "layout">, id: string): WrapPlan | null {
+  const containers = containersOf(item.type);
+  if (containers.length === 0 || kindsOf(item.type).length === 0) return null;
+  const g = parseItem(item);
+  if (!g || g.kind !== "graph" || g.diagnostics.some((d) => d.severity === "error")) return null;
+
+  const node = g.nodes.find((n) => n.id === id);
+  const group = node ? undefined : g.groups.find((x) => x.id === id);
+  const lane = node || group ? undefined : g.lanes.find((x) => x.id === id);
+  const subject = node ?? group ?? lane;
+  if (!subject) return null;
+
+  const word = containers.includes("lane") ? "lane" : containers.includes("system") ? "system" : "group";
+  if (word === "lane" && (lane || node?.lane || g.groups.length > 0)) return null;
+  if (word !== "lane" && g.lanes.length > 0) return null;
+
+  const line = declaredAt(item.type, item.body, id, item.dir);
+  if (line === null || line !== subject.line) return null;
+  const head = tokenize(item.body.split("\n")[line - 1] ?? "", []).filter((t) => t.kind !== "sep" && t.kind !== "eof");
+  if (head[0]?.kind !== "word" || head[1]?.kind !== "word" || head[1].value !== id) return null;
+  if (head.some((t) => t.kind === "arrow")) return null;
+
+  return { word, line, parent: node ? node.group : group?.parent };
+}
+
+/**
+ * The new container's box, for a fence whose coordinates are the author's — a `sketch`, or any
+ * `layout=fixed` fence.
+ *
+ * There a container carries its own `x= y= w= h=` and its children are written against its origin,
+ * so a wrap that wrote only the word would put the card in a container with no box. This one
+ * is `pad` clear of the picked box on every side, and the wrapped statement moves to `(pad, pad)`
+ * inside it: the card stays exactly where it was drawn, and the container appears round it.
+ *
+ * `corner` is where the new box's top-left is in the layout's numbers, for {@link frameShift} —
+ * a fixed layout draws the frame's corner at the origin, so a container reaching past the old
+ * corner would slide the drawing the other way unless the item moves by the same amount.
+ *
+ * `null` when the layout has not published a box for the thing, which is "not laid out yet" and
+ * the one case where there is nothing honest to write.
+ */
+export function wrapGeometry(
+  laid: LaidOut,
+  id: string,
+  parent: string | undefined,
+  pad: number,
+): { box: Geometry; at: { x: number; y: number }; corner: { x: number; y: number } } | null {
+  const b = laid.nodes[id] ?? laid.groups[id];
+  if (!b) return null;
+  const corner = { x: b.x - pad, y: b.y - pad };
+  const at = fileAt(laid, corner, parent);
+  return { box: { ...at, w: b.w + pad * 2, h: b.h + pad * 2 }, at: { x: pad, y: pad }, corner };
 }
 
 /** One box as the layout placed it, in the diagram's own coordinates. */
@@ -159,6 +355,11 @@ export interface LaidOut {
    * Absent from a page older than this field, where the boxes were the whole of it.
    */
   size?: { w: number; h: number };
+  /**
+   * A sequence's rows — every line drawn at a height, with that height (`SeqPlaced.rows`). What a
+   * message drawn with the pointer is placed by. Absent everywhere else.
+   */
+  rows?: { y: number; line: number; inside: boolean }[];
 }
 
 /**
@@ -231,12 +432,17 @@ export const detachable = (type: ItemType): boolean =>
  * breaks the chart it was pressed on. A sequence has arrows, but an arrow there is a *message* — a
  * moment, not a relationship — so growing a participant "with the edge already attached" would put
  * a message between two people on the strength of a click on a plus, which is a different claim
- * from the one every other dialect's `+` makes.
+ * from the one every other dialect's `+` makes. A message is drawn instead, by a drag from one
+ * lifeline to another (`lifelineDrag` in `useEditor`), which says who to whom and when.
  *
  * The item's own connect handles are untouched: a board-level link into a series or a participant
  * is an `edges` fence one layer up, and that grammar owns both ends.
+ *
+ * `gitgraph` is a graph and has no edge statement either: a parent link is the order of the
+ * commands, never a line of its own, so `c1 --> c2` there is an unknown command. Its history grows
+ * from the lanes instead — the `+` at a branch's tip, **+ New branch** — which is `GitLanes`.
  */
-export const growable = (type: string): boolean => hasGraph(type);
+export const growable = (type: string): boolean => hasGraph(type) && type !== "gitgraph";
 
 /**
  * A `sketch` item that is one shape and nothing else — what the library drops for "a circle".
