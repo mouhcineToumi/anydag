@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseBoard } from "@/board/parseBoard";
-import { renameItemId } from "@/board/rename";
+import { renameItemId, renameNodeLinks } from "@/board/rename";
 
 /**
  * Renaming an item across the whole board: its own declaration, and every `edges` reference to it.
@@ -115,5 +115,84 @@ describe("renameItemId", () => {
       ["b", "svc", "c", undefined],
       ["c", undefined, "actor", undefined],
     ]);
+  });
+});
+
+/**
+ * Following a rename of a node *inside* an item: `sales.web` → `sales.online` in every `edges` line,
+ * and nothing else on the board.
+ */
+describe("renameNodeLinks", () => {
+  const CHART = `---
+title: Follow
+---
+
+\`\`\`md {#notes x=0 y=0}
+Why.
+\`\`\`
+
+\`\`\`chart {#sales x=200 y=0}
+bar
+x Q1 Q2
+series web "Web" 1 2
+series webx "Web X" 3 4
+\`\`\`
+
+\`\`\`chart {#shop x=600 y=0}
+bar
+x Q1 Q2
+series web "Web" 5 6
+\`\`\`
+
+\`\`\`edges
+notes --> sales.web "why it grew"
+notes --> sales.webx
+notes --> shop.web
+notes --> sales
+sales.web --> shop.web --> notes hue=teal
+\`\`\`
+`;
+
+  it("renames the node half of an exact item.node reference, keeping the label and the rest", () => {
+    const r = renameNodeLinks(CHART, "sales", "web", "online");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.text).toContain('notes --> sales.online "why it grew"');
+    expect(r.text).toContain("sales.online --> shop.web --> notes hue=teal");
+  });
+
+  it("changes nothing but those references: other nodes, other items and the item itself stay", () => {
+    const r = renameNodeLinks(CHART, "sales", "web", "online");
+    if (!r.ok) throw new Error(r.error);
+    expect(r.text).toContain("notes --> sales.webx\n");
+    expect(r.text).toContain("notes --> shop.web\n");
+    expect(r.text).toContain("notes --> sales\n");
+    /* Every byte outside the two rewritten lines is the original's. */
+    const want = CHART.replace('sales.web "why', 'sales.online "why').replace("sales.web --> shop", "sales.online --> shop");
+    expect(r.text).toBe(want);
+  });
+
+  it("leaves a token alone when it is a whole literal item id", () => {
+    const text = `${CHART}\n\`\`\`md {#sales.web x=0 y=300}\nI am an item.\n\`\`\`\n`;
+    const r = renameNodeLinks(text, "sales", "web", "online");
+    if (!r.ok) throw new Error(r.error);
+    expect(r.text).toBe(text);
+  });
+
+  it("composes with the series rename into a board that still resolves", () => {
+    const withDecl = CHART.replace('series web "Web" 1 2', 'series online "Web" 1 2');
+    const r = renameNodeLinks(withDecl, "sales", "web", "online");
+    if (!r.ok) throw new Error(r.error);
+    const board = parseBoard("t", r.text);
+    expect(board.errors).toEqual([]);
+    expect(board.links.map((l) => `${l.from.item}.${l.from.node ?? ""}`)).toContain("sales.online");
+  });
+
+  it("is a no-op when the board has no link to follow, and refuses an item that is not there", () => {
+    const plain = '```chart {#a x=0 y=0}\nbar\nseries web "W" 1\n```\n';
+    const same = renameNodeLinks(plain, "a", "web", "online");
+    expect(same).toEqual({ ok: true, text: plain });
+    expect(renameNodeLinks(CHART, "ghost", "web", "online").ok).toBe(false);
+    expect(renameNodeLinks(CHART, "sales", "web", "web")).toEqual({ ok: true, text: CHART });
   });
 });

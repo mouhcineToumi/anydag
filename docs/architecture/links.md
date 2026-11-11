@@ -107,6 +107,13 @@ every link naming the removed item — or a card inside it, `arch1.db` for `arch
 that literal id — goes by `removeNode`'s rules, a bus losing a source and a chain split rather than
 joined. Only links *this* patch broke: one that already named nothing is somebody's typing.
 
+**Renaming follows the link.** `renameItemId` rewrites every `edges` line that names a renamed
+item, and `renameNodeLinks` (`src/board/rename.ts`) does the same one level down: renaming a node
+*inside* an item — a chart's series or slice, from the panel — rewrites `<item>.<old>` to
+`<item>.<new>` on every page, exact whole-token matches only, and a token that is a literal item id
+stays that item's. It never touches the item's own fence; the dialect's writer (`renameChartId`)
+does, and the editor writes both as one string, so one undo. Any diagram's rename can reuse it.
+
 **Bending one is `via="320,180"`**, and the one input the router takes that is a person's
 rather than a layout's. A picked link grows a round handle at its middle; pulling it writes the
 point, double-clicking it takes the point off. **The point wins outright**: an edge carrying one

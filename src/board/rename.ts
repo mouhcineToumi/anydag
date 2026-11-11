@@ -122,3 +122,65 @@ export function renameItemId(text: string, from: string, to: string): PatchResul
   for (const e of edits.sort((a, b) => b.from - a.from)) out = out.slice(0, e.from) + e.text + out.slice(e.to);
   return { ok: true, text: out };
 }
+
+/**
+ * One line of an `edges` body with every reference to the node `from` of item `item` renamed `to`:
+ * `sales.web` becomes `sales.online`, and nothing else on the line moves.
+ *
+ * **Exact, whole-token only.** A reference is a ref-list token out of `edgeSpan`, as in
+ * `renameRefs`, and it changes only when it reads `<item>.<from>` letter for letter. `sales`
+ * alone names the item, `sales.web2` another node, `shop.web` another item's node. A token that is
+ * a whole literal item id on this board (`ids`) is that item and not a node of anything, the
+ * priority `resolveLinks` gives it.
+ */
+function renameNodeRefs(line: string, item: string, from: string, to: string, ids: ReadonlySet<string>): string {
+  const e = edgeSpan(line);
+  if (!e) return line;
+  const want = `${item}.${from}`;
+  const cuts: [number, number][] = [];
+  for (const ref of e.refs) {
+    for (const t of ref.tokens) {
+      if (t.value !== want || ids.has(t.value)) continue;
+      const [start] = wordSpan(t);
+      cuts.push([start + item.length + 1, start + want.length]);
+    }
+  }
+  let out = line;
+  for (const c of cuts.sort((a, b) => b[0] - a[0])) out = out.slice(0, c[0]) + to + out.slice(c[1]);
+  return out;
+}
+
+/**
+ * Follow a rename of a node *inside* an item: every `edges` line that names `<item>.<from>` is
+ * rewritten to `<item>.<to>`, on every page, and no other byte of the board changes.
+ *
+ * The other half of `renameItemId`, one level down. It does **not** touch the item's own fence —
+ * how a node is renamed there is the dialect's business (`renameChartId` for a chart's series and
+ * slices), and this takes the text *after* that, so a caller composes the two into one string and
+ * writes it once: one version, one undo. Browser-free, no `@/` aliases.
+ *
+ * Refused (`ok: false`) only when `item` names nothing; a board with no link to follow comes back
+ * unchanged, `ok: true`.
+ */
+export function renameNodeLinks(text: string, item: string, from: string, to: string): PatchResult {
+  if (from === to) return { ok: true, text };
+  const located = locateItems(text, isItemType);
+  if (!located.items.some((it) => it.id === item)) return { ok: false, error: `no item \`${item}\`` };
+  const ids = new Set(located.items.map((it) => it.id));
+  const edits: { from: number; to: number; text: string }[] = [];
+  for (const fence of located.items) {
+    if (!isLinkType(fence.type)) continue;
+    const bodyStart = fence.fence!.openEnd + 1;
+    const lines = fence.body.split("\n");
+    const offsets = lineOffsets(fence.body);
+    lines.forEach((line, i) => {
+      const rewritten = renameNodeRefs(line, item, from, to, ids);
+      if (rewritten === line) return;
+      const at = bodyStart + offsets[i]!;
+      edits.push({ from: at, to: at + line.length, text: rewritten });
+    });
+  }
+  let out = text;
+  for (const e of edits.sort((a, b) => b.from - a.from)) out = out.slice(0, e.from) + e.text + out.slice(e.to);
+  return { ok: true, text: out };
+}

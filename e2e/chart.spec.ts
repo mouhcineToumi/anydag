@@ -348,6 +348,23 @@ slice c "Gamma" 25
   });
 
   test("a series' id is changed in the panel, and a clash is refused in the box", async ({ page }) => {
+    /* A note beside the charts and links into them: `rev.web` is the series being renamed, the
+       rest are lookalikes that must come through byte for byte. */
+    fs.writeFileSync(
+      file,
+      `${BOARD}
+\`\`\`md {#notes x=0 y=460}
+Why it grew.
+\`\`\`
+
+\`\`\`edges
+notes --> rev.web "why it grew"
+notes --> rev.mob
+notes --> share.a
+notes --> rev
+\`\`\`
+`,
+    );
     await open(page);
     await pickMark(page, "rev", "web");
     await page.keyboard.press("Enter");
@@ -361,6 +378,18 @@ slice c "Gamma" 25
     await page.locator("[data-dag-prop-chart-id]").blur();
     await expect.poll(read, { timeout: 5_000 }).toContain('series site "Web" 12 30 21');
     expect(read()).not.toContain("series web");
+    /* The link that named the series follows it, in the same write; the others stay as written. */
+    expect(read()).toContain('notes --> rev.site "why it grew"');
+    expect(read()).not.toContain("rev.web");
+    expect(read()).toContain("notes --> rev.mob\nnotes --> share.a\nnotes --> rev\n");
+    /* One write, so one undo gives back the series and the link together. */
+    await page.locator(".dag-viewport").focus();
+    await page.keyboard.press("Control+z");
+    await expect.poll(read, { timeout: 15_000 }).toContain('series web "Web" 12 30 21');
+    expect(read()).toContain('notes --> rev.web "why it grew"');
+    expect(read()).not.toContain("rev.site");
+    await page.keyboard.press("Control+Shift+z");
+    await expect.poll(read, { timeout: 15_000 }).toContain('notes --> rev.site "why it grew"');
     /* The pick followed the id, so the panel is still open on the same series. */
     await expect(page.locator('[data-dag-props="site"]')).toHaveCount(1);
     await expect(page.locator('[data-dag-item="rev"] [data-dag-node="site"]')).toHaveCount(1);

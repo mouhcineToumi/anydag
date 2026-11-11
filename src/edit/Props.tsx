@@ -138,6 +138,7 @@ export function Props({
   subject,
   showItem,
   onBody,
+  onRenameNode,
 }: {
   item: BoardItem;
   editor: Editor;
@@ -148,6 +149,11 @@ export function Props({
   /** Whether the item's own fields belong on screen: the props half, or an item with no halves. */
   showItem: boolean;
   onBody(next: string): void;
+  /**
+   * The body with a node renamed `from` → `to`, to be written together with the `edges` lines
+   * that name it. Not `onBody`: that is the panel's debounced typing, one fence at a time.
+   */
+  onRenameNode(next: string, from: string, to: string): void;
 }) {
   /* What the parser called out as out of date, read off the *draft* like every other control here.
      Memoised on what a parse reads, so a keystroke in a field that changes nothing about it does
@@ -187,7 +193,9 @@ export function Props({
             ? (to) => {
                 const problem = chartIdProblem(body, subject.id, to);
                 if (problem) return problem;
-                onBody(renameChartId(body, subject.id, to));
+                /* The series declaration and every board link that names `chart.<id>` go in one
+                   write, so one undo: `onBody` would carry the fence alone. */
+                onRenameNode(renameChartId(body, subject.id, to), subject.id, to);
                 /* The pick carries the id, so it has to be told the new one or the panel would
                    find no statement under the old name and close itself. */
                 editor.pickNode(item.id, to);

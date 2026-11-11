@@ -208,9 +208,14 @@ Three more about the pointer — the pick and its controls meeting a model that 
   that renames every word equal to the id, and in a chart a word may be a category (`x web mob`).
   A chart body names an id nowhere but its declaration, so that one token is the whole fence; the
   pick is re-pointed at the new id in the same handler, or the panel would find no statement under
-  the old one and close. A clash (`chartIdProblem`) is refused in the box. Board-level `edges`
-  references to `chart.web` are *not* rewritten — the panel writes one body, and the item-level
-  `renameItemId` that does touch `edges` knows items, not the nodes inside them.
+  the old one and close. A clash (`chartIdProblem`) is refused in the box. **Board links follow**:
+  an `edges` line `notes --> sales.web "why it grew"` becomes `… sales.online …` when `web` is
+  renamed, in the same write as the declaration — `Editor.renameNode` applies the new body, runs
+  `renameNodeLinks` (`src/board/rename.ts`) over the result and `put`s the one string, so the
+  series and its links are a single version and a single undo. Only a token reading
+  `<item>.<old id>` exactly changes; `sales`, `sales.webx` and `shop.web` do not. The dialect keeps
+  the declaration (`renameChartId`) and the board keeps the links, so another diagram's node rename
+  composes the same two halves.
 
 `boards/reference/chart.board.md` is the fourteenth fixture — a grouped bar, a stacked horizontal one
 with `values`, a three-series line with a gap and a written `min`, a five-slice pie, a donut with a
