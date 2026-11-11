@@ -388,6 +388,22 @@
   the pair it throws `Invalid collection of marks for node text: bold,code`, and parsing HTML it
   silently splits the bold. `src/note/schema.ts` is `Code.extend({ excludes: "" })` through
   `createStyleSpecFromTipTapMark`, which keeps the backtick input rule and `Mod-E`.
+- **`React.lazy` costs 300 ms the first time it renders, loaded or not.** A lazy component suspends
+  on its first render even when its module has long since arrived — a promise's result cannot be
+  read synchronously — and React 19 then holds the boundary's content back until 300 ms after its
+  fallback went up (`FALLBACK_THROTTLE_MS`). The note editor was `lazy`, so the first note of every
+  session put its text on screen 365 ms after the click in the packaged desktop app, and preloading
+  the chunk changed nothing: the editor still came up 320 ms after the page did, and a second note
+  took 40 ms. `useBlockEditor` keeps the loaded module and renders it in the same pass (#120).
+  Anything the person waits on is not behind a `lazy` on the path of a click; a page reached by
+  loading it, like `NoVaultPage`, can be.
+- **A component handed to a BlockNote controller is a component type, so it must be the same one
+  on every render.** `SideMenuController` draws its `sideMenu` as `<sideMenu />`, and the note editor
+  handed it an arrow written in the render: every re-render of the editor — the page re-renders it
+  whenever the index changes — unmounted the side menu and shut a drag-handle menu somebody had
+  just opened. It went unseen while the editor came up late; once it came up before the index had
+  (#120), *the drag handle menu's Delete* failed four runs in twenty-four. `NoteSideMenu` is a
+  component of its own now.
 - **A lazily imported dependency is discovered by Vite at the moment it is first imported.** The
   first note opened in a fresh dev server made Vite re-bundle and reload the page — twice, once per
   layer of the editor — under whoever was looking. `optimizeDeps.include` names the BlockNote and

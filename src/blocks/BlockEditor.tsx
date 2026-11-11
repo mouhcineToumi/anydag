@@ -47,6 +47,7 @@ import {
   RemoveBlockItem,
   SideMenu,
   SideMenuController,
+  type SideMenuProps,
   SuggestionMenuController,
   UnnestBlockButton,
   blockTypeSelectItems,
@@ -154,6 +155,17 @@ function NoteDragHandleMenu() {
       </RemoveBlockItem>
     </DragHandleMenu>
   );
+}
+
+/**
+ * The side menu, with that drag-handle menu: a component of its own rather than an arrow in the
+ * render. `SideMenuController` draws what it is given as a component type, so a new arrow on every
+ * render of the editor — and the page re-renders it whenever the index changes — unmounted the side
+ * menu and shut a drag-handle menu somebody had just opened. Measured on the e2e suite: four runs
+ * in twenty-four lost the menu once the editor came up before the index had (#120).
+ */
+function NoteSideMenu(props: SideMenuProps) {
+  return <SideMenu {...props} dragHandleMenu={NoteDragHandleMenu} />;
 }
 
 /** BlockNote's own items, cut to `SLASH`, and ours. The React items keep the core item's `key` at run time; only their type drops it. */
@@ -388,7 +400,7 @@ export default function BlockEditor(props: BlockEditorProps) {
             </FormattingToolbar>
           )}
         />
-        <SideMenuController sideMenu={(p) => <SideMenu {...p} dragHandleMenu={NoteDragHandleMenu} />} />
+        <SideMenuController sideMenu={NoteSideMenu} />
       </BlockNoteView>
     </div>
   );

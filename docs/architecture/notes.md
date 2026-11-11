@@ -63,12 +63,21 @@ Seven things are load-bearing:
   nothing. The feed says `dag:note`, so no board listener learned to ignore anything. `texts` keys a
   note by its file name, so the unused-image sweep sees what a note names and nothing mistakes one
   for a component, and a note may not live under `components/`.
-- **The editor is a lazy chunk.** `src/blocks/index.ts` is `React.lazy`, so a board never loads
-  BlockNote, TipTap, ProseMirror or Mantine, and `?snapshot=1` of a note draws it through
-  `react-markdown` read-only — a picture of a note is a fact about the file. The 45 visual baselines
-  are therefore untouched by construction. Mantine is **8**, not 9: 9 wants React 19. Beside it,
-  lazy the same way, is `FieldEditor`, the one-field editor a quiz's form mounts (see *Quizzes*): the note's
-  bridge, paste (`src/blocks/paste.ts`), references and equations, on a schema cut to `FIELD_BLOCKS`.
+- **The editor is a chunk of its own, and the text never waits for it.** BlockNote, TipTap,
+  ProseMirror and Mantine are imported dynamically (`src/blocks/index.ts`), so a board never loads
+  them, and `?snapshot=1` of a note draws it through `react-markdown` read-only — a
+  picture of a note is a fact about the file. The 45 visual baselines are therefore untouched by
+  construction. On the note's page that same read-only drawing (`data-dag-note-first`) stands in
+  for the editor until it is ready, with the editor mounting hidden under it and the two changing
+  places in one render; the first editor a page builds is mounted only after the text has been
+  painted, because BlockNote's first build costs several times any later one. `useBlockEditor`
+  hands the component over synchronously once it has loaded — **not `React.lazy`**, whose first
+  render suspends even for a loaded module and is then held back by React's 300 ms reveal throttle,
+  which was the whole of a slow first open (#120; *Things that will bite*). `data-dag-ready` still
+  means the editor is up. Mantine is **8**, not 9: 9 wants React 19.
+  Beside it is `FieldEditor`, the one-field editor a quiz's form mounts (see *Quizzes*): the note's
+  bridge, paste (`src/blocks/paste.ts`), references and equations, on a schema cut to
+  `FIELD_BLOCKS`. It is still a `React.lazy`, so the throttle above applies to it.
 - **The colours are the theme's.** `className="dag-blocks"` lands on the editor and on every menu
   BlockNote portals out of it, and `src/styles/blocks.css` sets each `--bn-*` from a `--dag-*` there,
   two classes and an attribute deep so it wins whichever stylesheet loads last. It is chrome in
@@ -106,11 +115,11 @@ Four things about it:
 The read-only note — `?view=1`, `?snapshot=1` — draws the title as the page's `<h1>`
 (`NoteTitleRead`), at the field's size and place; the PDF has its own, `dag-print__title`.
 
-Names claimed, grepped first: `dag-note-view*`, `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
+Names claimed, grepped first: `dag-note-view*` (`dag-note-view__first`, `dag-note-view__editor`), `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
 (a list row), `data-dag-note-view`, `data-dag-note-editor`, `data-dag-note-conflict`,
 `data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`, `data-dag-note-unread`,
 `data-dag-new-note`, `data-dag-new-note-here`, `data-dag-welcome-note`, `dag-note-title`,
-`data-dag-note-title`, `data-dag-note-title-read`, and the SSE event
+`data-dag-note-title`, `data-dag-note-title-read`, `data-dag-note-first`, and the SSE event
 `dag:note`. `data-dag-note` is one letter from `data-dag-dock`; they are different attributes, and
 a spec that wants one says which.
 
