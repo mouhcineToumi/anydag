@@ -568,7 +568,11 @@ Two smaller ones. **Hiding an item from the panel closes the panel**, because th
 `selected` and `editing` naming things that exist filters hidden items out — the same thing ⌃⇧H
 does, and the reason `props.spec.ts` clicks that box rather than `check()`ing it. And **a picked
 board link's controls are reached with Enter**, which opens the `edges` fence its statement lives in;
-a panel that flew open every time somebody clicked a line would be in the way of deleting one.
+a panel that flew open every time somebody clicked a line would be in the way of deleting one. A
+board link to nothing (#173) is picked the same way, by its line or by a click on its loose stub, and
+a press on the stub that travels pulls the missing end onto whatever it is let go over
+(`ctl.looseLink`; the paragraph on it in `links.md`); the problem's "Show" picks it and opens
+the fence's panel in one go, since the person asked about it.
 
 **Deleting a picked group without its children was refused**, deliberately: Delete still removes it
 *with its children*, which is what `removeNode` documents, what `restate.test.ts` freezes, and what every

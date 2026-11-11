@@ -26,7 +26,7 @@ import {
   type DiagramType,
   type ItemType,
 } from "@/board/types";
-import type { BoardHandle, FileKind } from "@/board/useBoard";
+import { assertNever, type BoardHandle, type FileKind } from "@/board/useBoard";
 import { DRAG_SLOP, type Point, type Rect } from "@/canvas/geometry";
 import type { Tool, ViewportHandle } from "@/canvas/Viewport";
 
@@ -76,7 +76,10 @@ import {
   handleAt,
   joinEdge,
   linkStatement,
+  reattachable,
+  reattachLink,
   removeLinkLine,
+  removeLooseLink,
   targetAt,
   wholeCard,
   type Join,
@@ -351,6 +354,11 @@ export interface EditorCtl {
   bendLink(id: string, e: ReactPointerEvent<SVGCircleElement>): void;
   /** The same handle, double-clicked: the bend comes off and the router has the line back. */
   straightenLink(id: string): void;
+  /**
+   * A press on a hanging board link's loose stub (#173): dragged onto an item or a card, the end
+   * that named nothing names that instead; let go where it was, and the link is picked.
+   */
+  looseLink(id: string, e: ReactPointerEvent<SVGGElement>): void;
   /** A double-click on something nameable inside a diagram: open the inline input over it. */
   rename(id: string, el: Element | null): boolean;
   /**
@@ -1552,8 +1560,20 @@ export function useEditor({
       setSelected(new Set([id]));
       setEditing(id);
       if (!target) return pickNode(id, null);
-      if (target.what === "edge") pickEdgeIn(id, target.id);
-      else pickNode(id, target.id);
+      switch (target.what) {
+        case "edge":
+          return pickEdgeIn(id, target.id);
+        /* A board link (#173): `id` is its `edges` fence, open now, and the link is what is picked. */
+        case "link":
+          pickNode(id, null);
+          return setPickedLink(target.id);
+        case "node":
+        case "group":
+        case "lane":
+          return pickNode(id, target.id);
+        default:
+          return assertNever(target.what);
+      }
     },
     [pickNode, pickEdgeIn],
   );
@@ -1645,7 +1665,11 @@ export function useEditor({
       const fence = link && b.items.find((it) => it.id === link.fence);
       if (!link || !fence) return;
       setPickedLink(null);
-      void commit([{ id: fence.id, body: removeLinkLine(fence.body, link.line - fence.line) }]);
+      /* A hanging link (#173) loses the name that is nowhere, by `removeNode`'s rules, so a bus
+         keeps its other sources and a chain the hops that did not run through it. */
+      const line = link.line - fence.line;
+      const body = link.loose ? removeLooseLink(fence.body, line, endText(link[link.loose])) : removeLinkLine(fence.body, line);
+      void commit([{ id: fence.id, body }]);
     },
     [commit],
   );
@@ -3266,6 +3290,89 @@ export function useEditor({
       addEventListener("pointercancel", onUp);
     };
 
+    /**
+     * Pulling a hanging link's loose stub onto something (#173) — `connect` and #168's `looseDrag`
+     * again: the line painted into `.dag-guides` from the stub to the pointer, the drop target read
+     * out of the DOM, one write on release. What a drop may name and what it writes is
+     * `reattachable` and `reattachLink` in `connect.ts`. A press that does not travel is a click,
+     * and picks the link, so Delete and the panel are one key away.
+     */
+    const looseLink: EditorCtl["looseLink"] = (id, e) => {
+      if (e.button !== 0) return;
+      const link = boardRef.current?.links.find((l) => l.id === id);
+      if (!link?.loose) return;
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      const from = toBoard(r.left + r.width / 2, r.top + r.height / 2);
+      const overlay =
+        e.currentTarget.closest<HTMLElement>(".dag-layer")?.querySelector<SVGElement>(".dag-guides") ??
+        document.querySelector<SVGElement>(".dag-guides");
+      const side: ConnectSide = link.loose === "to" ? "e" : "w";
+      const dotR = gridRef.current / 2;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let moved = false;
+      let over: Target | null = null;
+      let marked: HTMLElement | null = null;
+      const mark = (next: HTMLElement | null) => {
+        if (marked === next) return;
+        if (marked) delete marked.dataset.dagDrop;
+        marked = next;
+        if (marked) marked.dataset.dagDrop = "";
+      };
+
+      const onMove = (ev: PointerEvent) => {
+        if (!moved) {
+          if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < DRAG_SLOP) return;
+          moved = true;
+          document.documentElement.dataset.dagConnecting = "";
+        }
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        const hit = targetAt(under);
+        over = hit && reattachable(link, hit) ? wholeCard(hit) : null;
+        mark(
+          over
+            ? ((over.node !== undefined ? under?.closest<HTMLElement>("[data-dag-node]") : null) ??
+                under?.closest<HTMLElement>("[data-dag-item]") ??
+                null)
+            : null,
+        );
+        if (overlay) overlay.innerHTML = connectSvg(from, toBoard(ev.clientX, ev.clientY), side, over !== null, dotR);
+      };
+
+      const onUp = () => {
+        removeEventListener("pointermove", onMove);
+        removeEventListener("pointerup", onUp);
+        removeEventListener("pointercancel", onUp);
+        removeEventListener("keydown", onKey, true);
+        delete document.documentElement.dataset.dagConnecting;
+        mark(null);
+        if (overlay) overlay.innerHTML = "";
+        /* Eat the click that ends the gesture, or the release over an item selects it. */
+        addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
+        if (!moved) return pickLink(id);
+        if (!over) return;
+        /* Read again at the release: the board is one round trip stale after a write. */
+        const now = boardRef.current?.links.find((l) => l.id === id);
+        const spot = linkAt(id);
+        const next = now && spot ? reattachLink(spot.src, now, over) : null;
+        if (spot && next !== null) void commit([{ id: spot.fence.id, body: replaceLine(spot.fence.body, spot.line, next) }]);
+      };
+
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key !== "Escape") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        over = null;
+        onUp();
+      };
+
+      addEventListener("pointermove", onMove);
+      addEventListener("pointerup", onUp);
+      addEventListener("pointercancel", onUp);
+      addEventListener("keydown", onKey, true);
+    };
+
     const straightenLink: EditorCtl["straightenLink"] = (id) => {
       const spot = linkAt(id);
       if (spot) void commit([{ id: spot.fence.id, body: replaceLine(spot.fence.body, spot.line, setLinkVia(spot.src, null)) }]);
@@ -3341,6 +3448,7 @@ export function useEditor({
       connect: held(connect, undefined),
       bendLink: held(bendLink, undefined),
       straightenLink: held(straightenLink, undefined),
+      looseLink: held(looseLink, undefined),
       grow: held(growHandle, undefined),
       growTopic: held(growTopicHandle, undefined),
       rename: held(rename, true),
@@ -3371,6 +3479,7 @@ export function useEditor({
     paint,
     pickNode,
     pickEdge,
+    pickLink,
     clearPick,
     growFrom,
     growTopicFrom,

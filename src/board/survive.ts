@@ -7,11 +7,10 @@ import type { Board, BoardItem } from "./types";
  * What a rewrite of one diagram's body would break elsewhere on the board.
  *
  * A model rewriting an item sees only that item. The rest of the board can point INTO it — an
- * `edges` statement ending on `arch1.db` — and `resolveLinks` pushes a link only when **both** ends
- * resolve, so a rewrite that drops or renames an id does not leave a curve dangling off an empty
- * spot: the whole line vanishes from the drawing, with an error nobody is looking for. Silent
- * disappearance is the failure mode this module exists for, and it answers before the rewrite
- * lands: which ids does something else point at, and does the new body still declare them.
+ * `edges` statement ending on `arch1.db` — and a rewrite that drops or renames an id leaves that link
+ * hanging from a loose end (#173), with an error the person did not cause by hand. A model's rewrite
+ * breaking a link it never saw is the failure mode this module exists for, and it answers before
+ * the rewrite lands: which ids does something else point at, and does the new body still declare them.
  *
  * The declared-ids half is `nodeIdsOf` — the same function `resolveLinks` will judge the landed
  * body with one parse later — so this answer cannot disagree with what the board then decides. The
@@ -39,8 +38,12 @@ export interface Endangered {
 export function referencedInto(board: Board, itemIds: ReadonlySet<string>): Endangered[] {
   const out = new Map<string, Endangered>();
   for (const link of board.links) {
-    for (const end of [link.from, link.to]) {
-      if (end.node === undefined || !itemIds.has(end.item)) continue;
+    for (const [side, end] of [
+      ["from", link.from],
+      ["to", link.to],
+    ] as const) {
+      /* A loose end already names nothing, so a rewrite has nothing of it left to lose. */
+      if (link.loose === side || end.node === undefined || !itemIds.has(end.item)) continue;
       out.set(`${end.item}\0${end.node}`, { item: end.item, node: end.node });
     }
   }

@@ -1,4 +1,5 @@
 import type { Edge } from "@/dsl/ir";
+import { endText } from "@/board/links";
 import type { BoardLink } from "@/board/types";
 import type { ThemeMetric } from "@/theme/contract";
 
@@ -62,14 +63,29 @@ export interface LinkRouteInput {
   metric: ThemeMetric;
 }
 
+/**
+ * Where a link that names nothing at one end stops (#173): a loose stub, in the overlay's
+ * coordinates, beside the end it has. `ref` is the name the missing end was written with.
+ */
+export interface LooseStub {
+  /** The link's id: what a click on the stub picks, and what a drop on a card rewrites. */
+  link: string;
+  ref: string;
+  x: number;
+  y: number;
+  size: number;
+}
+
 export interface LinkRoute {
   edges: RoutedEdge[];
+  /** The loose stubs, one per hanging link. */
+  loose: LooseStub[];
   /** Board-space position of the overlay; every coordinate in `edges` is relative to it. */
   origin: { x: number; y: number };
   size: { w: number; h: number };
 }
 
-const EMPTY: LinkRoute = { edges: [], origin: { x: 0, y: 0 }, size: { w: 0, h: 0 } };
+const EMPTY: LinkRoute = { edges: [], loose: [], origin: { x: 0, y: 0 }, size: { w: 0, h: 0 } };
 
 /**
  * How far outside the items the overlay reaches.
@@ -90,13 +106,17 @@ const marginOf = (m: ThemeMetric) => m.edge.reach.max;
  */
 const inner = (item: string, node: string) => `${item}\0${node}`;
 
+/** The route key for a link's loose stub: `\0` again, which no item id or node id can hold. */
+const stubKey = (link: string) => `\0loose\0${link}`;
+
 export function routeLinks({ links, boxes, nodeBoxes, solo, groups, metric }: LinkRouteInput): LinkRoute {
   if (links.length === 0 || boxes.size === 0) return EMPTY;
 
-  /* Only links whose both ends are on the page can be drawn. `parseBoard` has already reported and
-     dropped the ones that name nothing; this is the same test against what is *placed*, which is a
-     smaller set — an item can be hidden, or on another page. */
-  const live = links.filter((l) => boxes.has(l.from.item) && boxes.has(l.to.item));
+  /* Only links whose ends are on the page can be drawn — both, or for a hanging link the one it has
+     (#173). `parseBoard` has already reported the names that are nowhere; this is the same test
+     against what is *placed*, which is a smaller set — an item can be hidden, or on another page. */
+  const placed = (l: BoardLink, side: "from" | "to") => l.loose === side || boxes.has(l[side].item);
+  const live = links.filter((l) => placed(l, "from") && placed(l, "to"));
   if (live.length === 0) return EMPTY;
 
   /* Which end of a link resolves to a card inside a diagram, and which to the diagram itself. A
@@ -113,8 +133,35 @@ export function routeLinks({ links, boxes, nodeBoxes, solo, groups, metric }: Li
 
   const hosts = new Set<string>();
   for (const l of live) {
-    if (at(l.from.item, l.from.node) !== l.from.item) hosts.add(l.from.item);
-    if (at(l.to.item, l.to.node) !== l.to.item) hosts.add(l.to.item);
+    if (l.loose !== "from" && at(l.from.item, l.from.node) !== l.from.item) hosts.add(l.from.item);
+    if (l.loose !== "to" && at(l.to.item, l.to.node) !== l.to.item) hosts.add(l.to.item);
+  }
+
+  /*
+   * A hanging link's stub, in board space: beside the item its known end is in, on the side the
+   * missing end would have been — after it for a missing target, before it for a missing source —
+   * level with the card it leaves when it leaves one, and a curve's shortest reach out from the
+   * frame, so the line reads as leaving rather than as a mark on the item. Several from one item on
+   * one side stack down, a card's gap apart, so none hides another.
+   */
+  const size = metric.node.end;
+  const stubs: { link: BoardLink; ref: string; x: number; y: number }[] = [];
+  const stacked = new Map<string, number>();
+  for (const l of live) {
+    if (!l.loose) continue;
+    const has = l.loose === "to" ? l.from : l.to;
+    const b = boxes.get(has.item)!;
+    const nb = has.node === undefined ? undefined : nodeBoxes.get(has.item)?.[has.node];
+    const cy = nb ? b.y + nb.y + nb.h / 2 : b.y + b.h / 2;
+    const key = `${has.item}\0${l.loose}`;
+    const k = stacked.get(key) ?? 0;
+    stacked.set(key, k + 1);
+    stubs.push({
+      link: l,
+      ref: endText(l[l.loose]),
+      x: l.loose === "to" ? b.x + b.w + metric.edge.reach.min : b.x - metric.edge.reach.min - size,
+      y: cy - size / 2 + k * (size + metric.node.gap),
+    });
   }
 
   const margin = marginOf(metric);
@@ -137,6 +184,13 @@ export function routeLinks({ links, boxes, nodeBoxes, solo, groups, metric }: Li
     minY = Math.min(minY, l.via.y);
     maxX = Math.max(maxX, l.via.x);
     maxY = Math.max(maxY, l.via.y);
+  }
+  /* A stub sits outside every item, so it counts towards the extent for the bend's reason. */
+  for (const st of stubs) {
+    minX = Math.min(minX, st.x);
+    minY = Math.min(minY, st.y);
+    maxX = Math.max(maxX, st.x + size);
+    maxY = Math.max(maxY, st.y + size);
   }
   const origin = { x: minX - margin, y: minY - margin };
 
@@ -178,10 +232,17 @@ export function routeLinks({ links, boxes, nodeBoxes, solo, groups, metric }: Li
     }
   }
 
+  /* A stub is a circle, and met on its ring. */
+  for (const st of stubs) {
+    const id = stubKey(st.link.id);
+    nodes[id] = { id, x: st.x - origin.x, y: st.y - origin.y, w: size, h: size, rows: {}, surface: "paper", outline: "circle" };
+  }
+
+  const end = (l: BoardLink, side: "from" | "to") => (l.loose === side ? stubKey(l.id) : at(l[side].item, l[side].node));
   const edges: Edge[] = live.map((l) => ({
     id: l.id,
-    from: { node: at(l.from.item, l.from.node) },
-    to: { node: at(l.to.item, l.to.node) },
+    from: { node: end(l, "from") },
+    to: { node: end(l, "to") },
     dash: l.dash,
     quiet: l.quiet === true,
     head: l.head,
@@ -202,6 +263,7 @@ export function routeLinks({ links, boxes, nodeBoxes, solo, groups, metric }: Li
 
   return {
     edges: routeEdges({ nodes, edges, bends: {}, via, metric }),
+    loose: stubs.map((st) => ({ link: st.link.id, ref: st.ref, x: st.x - origin.x, y: st.y - origin.y, size })),
     origin,
     size: { w: maxX - minX + margin * 2, h: maxY - minY + margin * 2 },
   };

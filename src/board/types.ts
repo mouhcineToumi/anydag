@@ -229,6 +229,16 @@ export interface BoardLink {
   via?: { x: number; y: number };
   /** 1-based line in the board file, so a diagnostic can point at it. */
   line: number;
+  /**
+   * The end that names nothing on the page (#173): `api --> ghost` with no `ghost`, or `arch1.nope`
+   * where `arch1` has no such card. That end is kept as it was typed, and the link is drawn from
+   * the end it has to a loose stub a person can drag onto something or delete. Never both ends —
+   * with nothing to hang from, the link is dropped and only the diagnostic says so.
+   *
+   * **Every reader of `from`/`to` that means "a thing on the board" checks this first**: the loose
+   * end is a name, not an item.
+   */
+  loose?: "from" | "to";
 }
 
 /**
@@ -243,6 +253,11 @@ export interface BoardDiagnostic {
   code: Code;
   message: string;
   severity: "error" | "warn";
+  /**
+   * The link the line declares, for a link that hangs from a loose end (#173): what the dock's
+   * "Show" picks. The same field, and the same idea, as a diagram diagnostic's target.
+   */
+  target?: { what: "link"; id: string };
 }
 
 export interface Board {

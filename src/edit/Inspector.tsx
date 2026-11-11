@@ -341,6 +341,8 @@ export function Inspector({
           problems={problems}
           onShow={(p) => editor.openOn(item.id, p.target)}
           onDeleteEdge={(p) => {
+            /* A board link (#173) is taken out of its fence by the editor, as the Delete key does. */
+            if (p.target?.what === "link") return editor.removeLink(p.target.id);
             const line = p.target ? declaredAt(item.type, draft, p.target.id, item.dir) : null;
             if (line === null) return;
             editor.pickNode(item.id, null);
