@@ -14,6 +14,9 @@ import {
   edgeSpan,
   participantKind,
   readModifier,
+  indentTopic,
+  makeRoot,
+  outdentTopic,
   removeRow,
   renameChartId,
   replaceLine,
@@ -44,7 +47,10 @@ import {
   setValues,
   takeBodyDir,
   updateRetired,
+  shiftTopic,
+  topicMoves,
   valuesText,
+  type TopicEdit,
   addRow as writeRow,
   type ContainerWord,
   type Flag,
@@ -203,6 +209,12 @@ export function Props({
               }
             : undefined
         }
+        /* The body and the pick move together: a topic's id is the parser's counter, so the same
+           topic has another one once it has moved. */
+        onTopic={(made) => {
+          onBody(made.body);
+          editor.pickFromLine(item.id, made.line, made.body);
+        }}
         onOut={() => editor.pickNode(item.id, null)}
       />
     );
@@ -532,6 +544,7 @@ function PickProps({
   onPseudo,
   onPick,
   onId,
+  onTopic,
   onOut,
 }: {
   type: string;
@@ -551,6 +564,8 @@ function PickProps({
   onPick(id: string): void;
   /** Rename the picked thing's id; the reason it was refused, or `null`. Given only for a chart. */
   onId?(to: string): string | null;
+  /** A restructured mindmap: the new body, and the line the picked topic now sits on. */
+  onTopic(made: TopicEdit): void;
   onOut(): void;
 }) {
   const { id, what, line, seg } = subject;
@@ -668,6 +683,15 @@ function PickProps({
    */
   const isChart = type === "chart";
   /*
+   * A mindmap line is bare text to end of line, so there is nowhere on it for a modifier or a flag
+   * to go: `hue=coral` and `done` would be written straight into the topic's name. Its colour is
+   * its branch's, from depth, and a topic has no status, icon or flags — so those controls are not
+   * offered, which is the same answer a chart gets for the same kind of reason.
+   */
+  const isMind = type === "mindmap";
+  /* Not `bare` — that is a start or end dot, above. */
+  const plain = isChart || isMind;
+  /*
    * The statement's own strings — its title, meta and desc — read the way `textSlots` reads them:
    * the *consecutive* run right after the id. Not a regular expression over the line, because a
    * quoted modifier value (`icon="two words"`) is a string too and would shift every slot along by
@@ -754,7 +778,7 @@ function PickProps({
         {/* Colour and text style, directly after the kind and the name: what a person
             reaching into a card wants first. The strings and the values below are the thing's own
             content — not chrome — so they keep their place, and keep it *under* these. */}
-        {bare ? null : <Hues hue={hue} onSet={(h) => mod("hue", h)} />}
+        {isMind || bare ? null : <Hues hue={hue} onSet={(h) => mod("hue", h)} />}
         {isNode && !isChart && !bare && kindsOf(type).length > 0 ? (
           <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} />
         ) : null}
@@ -822,7 +846,7 @@ function PickProps({
           />
           <TimelineStatus value={status === "done" || status === "wait" ? status : ""} onSet={(v) => write(setStatus(src, v))} />
         </>
-      ) : isChart || bare ? null : (
+      ) : plain || bare ? null : (
         <div className="dag-props__row">
           <select
             className="dag-select dag-props__status"
@@ -843,7 +867,7 @@ function PickProps({
       {/* The picker writes through the same `mod` the input did — one span in, one span out, the
           author's spacing and comments untouched — and is keyed to the pick so a change of card
           re-reads its mode and text from the line. */}
-      {!isChart && !bare && isNode ? (
+      {!plain && !bare && isNode ? (
         <IconPicker
           key={`${id}:${line}`}
           value={icon}
@@ -853,7 +877,7 @@ function PickProps({
         />
       ) : null}
 
-      {isNode && !isChart && !bare ? (
+      {isNode && !plain && !bare ? (
         <div className="dag-props__row" role="group" aria-label="Flags">
           {NODE_FLAGS.map(({ flag, label }) => (
             <label key={flag} className="dag-field dag-field--row">
@@ -920,6 +944,8 @@ function PickProps({
           onGo={() => onBody(updateRetired(body, [line]))}
         />
       ) : null}
+
+      {isMind && isNode ? <TopicTools body={body} line={line} onTopic={onTopic} /> : null}
 
       {isNode && layered(type, layout) ? <Column written={writtenCol} current={column} onSet={(v) => mod("col", v)} /> : null}
 
@@ -1052,6 +1078,70 @@ function TimelineStatus({ value, onSet }: { value: "" | "done" | "wait"; onSet(n
           onClick={() => value !== v && onSet(v === "" ? null : v)}
         >
           <Icon {...ICON} aria-hidden />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Where a mindmap topic sits in its tree, as five buttons: the structure moves a person would
+ * otherwise make by dragging a topic onto another one, or by retyping its indentation.
+ *
+ * Each is offered only where it would act (`topicMoves` is the same answer the writers give), so a
+ * disabled button is the grammar saying no — the root has no siblings, nothing can be outdented to
+ * depth 0 — rather than a click that quietly does nothing. The keys do the same moves with the pick
+ * held: Shift+Tab, Alt+↑/↓.
+ */
+function TopicTools({ body, line, onTopic }: { body: string; line: number; onTopic(made: TopicEdit): void }) {
+  const can = topicMoves(body, line);
+  const ops: { op: string; label: string; title: string; ok: boolean; run(): TopicEdit | null }[] = [
+    {
+      op: "root",
+      label: "Make root",
+      title: "Hang the whole map from this topic",
+      ok: can.root,
+      run: () => makeRoot(body, line),
+    },
+    {
+      op: "indent",
+      label: "Indent",
+      title: "Make it a child of the topic above it",
+      ok: can.indent,
+      run: () => indentTopic(body, line),
+    },
+    {
+      op: "outdent",
+      label: "Outdent",
+      title: "Move it out one level (Shift+Tab)",
+      ok: can.outdent,
+      run: () => outdentTopic(body, line),
+    },
+    { op: "up", label: "Move up", title: "Past the sibling above (Alt+↑)", ok: can.up, run: () => shiftTopic(body, line, -1) },
+    {
+      op: "down",
+      label: "Move down",
+      title: "Past the sibling below (Alt+↓)",
+      ok: can.down,
+      run: () => shiftTopic(body, line, 1),
+    },
+  ];
+  return (
+    <div className="dag-props__row" role="group" aria-label="Topic">
+      {ops.map(({ op, label, title, ok, run }) => (
+        <button
+          key={op}
+          type="button"
+          className="dag-props__add"
+          data-dag-topic-op={op}
+          title={title}
+          disabled={!ok}
+          onClick={() => {
+            const made = run();
+            if (made) onTopic(made);
+          }}
+        >
           {label}
         </button>
       ))}

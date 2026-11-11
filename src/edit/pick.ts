@@ -1,8 +1,10 @@
 import { declaredAt } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import { renameIds } from "@/dsl/rebind";
-import { edgeSpan, statementSpan } from "@/dsl/restate";
+import { edgeSpan, statementSpan, topicMoves } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
+
+import type { Side } from "./connect";
 
 /**
  * What a *pick* is, and the three questions about one that `restate.ts` does not answer.
@@ -164,4 +166,35 @@ export function duplicateStatement(
   const gap = span.to > span.from ? [""] : [];
   const out = [...lines.slice(0, span.to), ...gap, ...fragment, ...lines.slice(span.to)];
   return { body: out.join("\n"), id: map.get(id) ?? id };
+}
+
+/**
+ * Where a picked mindmap topic wears its two `+`: one for a child, one for a sibling.
+ *
+ * The child's is on the **outer side** — the way away from the root, which is the way the branch
+ * grows on the page, so the new topic appears where the `+` was. That is read off the layout rather
+ * than the file: a radial map puts a topic on whichever side of the root ELK chose, and the file
+ * says nothing about it. The root's own is on the right, because the whole map is round it and a
+ * default has to be somewhere.
+ *
+ * The sibling's is below, or — for a topic that grows up or down the page, where "below" is the
+ * direction its own child goes — to the right. `null` where there is no sibling to make: the top of
+ * the tree, since a second line at depth 0 would be a second root.
+ *
+ * The root is `m0`, which is not a convention but the parser's counter: the first topic read is the
+ * top of the tree, whatever it is called.
+ */
+export function topicHandles(
+  body: string,
+  node: string,
+  boxes: Record<string, { x: number; y: number; w: number; h: number }>,
+): { child: Side; sibling: Side | null } {
+  const line = declaredAt("mindmap", body, node, undefined);
+  const mine = boxes[node];
+  const root = boxes.m0;
+  const dx = mine && root && node !== "m0" ? mine.x + mine.w / 2 - (root.x + root.w / 2) : 1;
+  const dy = mine && root && node !== "m0" ? mine.y + mine.h / 2 - (root.y + root.h / 2) : 0;
+  const child: Side = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "w" : "e") : dy < 0 ? "n" : "s";
+  const sibling: Side = child === "n" || child === "s" ? "e" : "s";
+  return { child, sibling: line !== null && topicMoves(body, line).sibling ? sibling : null };
 }

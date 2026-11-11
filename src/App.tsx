@@ -26,6 +26,7 @@ import { growable } from "@/edit/build";
 import { Inspector } from "@/edit/Inspector";
 import { Library } from "@/edit/Library";
 import { NodeHandles } from "@/edit/NodeHandles";
+import { topicHandles } from "@/edit/pick";
 import { Rename } from "@/edit/Rename";
 import { RewriteDialog } from "@/edit/RewriteDialog";
 import { proposedItem } from "@/edit/rewrite";
@@ -2189,6 +2190,14 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const solo = useSolo(items, nodeBoxes);
 
   const pickedType = pickedNode ? (items.find((it) => it.id === pickedNode.item)?.type ?? "") : "";
+  /* A topic's two `+`: which side each is on depends on where the layout put the topic relative to
+     the root, which only the boxes know. */
+  const pickedTopic = useMemo(() => {
+    if (!pickedNode || pickedType !== "mindmap") return undefined;
+    const it = items.find((x) => x.id === pickedNode.item);
+    const boxes = nodeBoxes.get(pickedNode.item);
+    return it && boxes ? topicHandles(it.body, pickedNode.node, boxes) : undefined;
+  }, [pickedNode, pickedType, items, nodeBoxes]);
   const handedOver = pickedNode !== null && growable(pickedType);
 
   /* Every group on the page and the items in it — what a link may name. */
@@ -2403,7 +2412,14 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               inside its diagram — and `Item` is memoised and knows nothing about layouts. In the
               layer, so they pan and zoom with the board without arithmetic of their own. */}
           {!snapshot && !locked && pickedNode && pickedBox ? (
-            <NodeHandles ctl={ctl} item={pickedNode.item} type={pickedType} node={pickedNode.node} box={pickedBox} />
+            <NodeHandles
+              ctl={ctl}
+              item={pickedNode.item}
+              type={pickedType}
+              node={pickedNode.node}
+              box={pickedBox}
+              topic={pickedTopic}
+            />
           ) : null}
           {!snapshot && editor.renaming ? (
             <Rename

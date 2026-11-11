@@ -2,8 +2,8 @@ import { framed, resizeOf, type BoardItem, type ItemType } from "@/board/types";
 import { declaredAt } from "@/dsl/declared";
 import { parseItem } from "@/dsl/diagnose";
 import type { Graph, Node } from "@/dsl/ir";
-import { containersOf, hasGraph, kindsOf } from "@/dsl/parse";
-import { replaceLine, setGeometry, statementSpan, type Geometry } from "@/dsl/restate";
+import { containersOf, hasGraph, kindsOf, parseDiagram } from "@/dsl/parse";
+import { addTopic, replaceLine, setGeometry, statementSpan, type Geometry } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
 
 import type { Side } from "./connect";
@@ -104,7 +104,8 @@ export interface GrowOpts {
  *
  * `null` when the id is not declared here, or the line it is declared on is not a declaration —
  * a mindmap topic and a sequence participant have no kind word to copy, and inventing one would
- * write a statement in a grammar that does not have it.
+ * write a statement in a grammar that does not have it. A mindmap grows through `growTopic`, which
+ * writes what its grammar has instead: an indented line.
  */
 export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, from: string, opts: GrowOpts): Grown | null {
   if (opts.pseudo && !hasPseudo(type)) return null;
@@ -139,6 +140,27 @@ export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, f
   const back = opts.pseudo ? opts.pseudo === "start" : opts.side === "w" || opts.side === "n";
   const statement = back ? `${id} --> ${from}` : `${from} --> ${id}`;
   return { body: appendEdge(out.join("\n"), statement), id };
+}
+
+/**
+ * A new mindmap topic, as the child or the sibling of the picked one.
+ *
+ * The mindmap's answer to `grow`, and the reason it is a function of its own rather than a branch
+ * inside it: there is no edge to write and no kind word to copy — the relationship *is* the
+ * indentation, so "child" and "sibling" are the two places a line can go, not two sides of a card.
+ * The new topic's id is the parser's, which numbers topics as it reads, so it is found by parsing
+ * the body that was just written and asking which topic sits on the new line.
+ *
+ * `null` when the topic is not here, or when asking for the sibling of the top of the tree, which
+ * would be a second root.
+ */
+export function growTopic(body: string, from: string, as: "child" | "sibling"): Grown | null {
+  const line = declaredAt("mindmap", body, from, undefined);
+  if (line === null) return null;
+  const made = addTopic(body, line, as);
+  if (!made) return null;
+  const id = parseDiagram("mindmap", made.body, undefined)?.nodes.find((n) => n.line === made.line)?.id;
+  return id === undefined ? null : { body: made.body, id };
 }
 
 /**
