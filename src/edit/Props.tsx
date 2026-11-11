@@ -508,7 +508,7 @@ function PickProps({
   body: string;
   subject: Subject;
   /** The word the picked thing could be wrapped in, or `null` where it cannot be — see `wrapPlan`. */
-  wrap: "group" | "lane" | null;
+  wrap: "group" | "system" | "lane" | null;
   onWrap(): void;
   onPseudo(kind: Pseudo): void;
   /** The layer the layout put this card in, if it is the kind of diagram that has layers. */
@@ -881,7 +881,7 @@ function PickProps({
         <div className="dag-props__row" role="group" aria-label="Structure">
           {wrap ? (
             <button type="button" className="dag-props__add" data-dag-prop-wrap={wrap} onClick={onWrap}>
-              Wrap in {wrap === "lane" ? "a lane" : "a group"}
+              Wrap in {wrap === "lane" ? "a lane" : wrap === "system" ? "a system" : "a group"}
             </button>
           ) : null}
           {isNode && hasPseudo(type) && kind !== "start" && kind !== "end" ? (

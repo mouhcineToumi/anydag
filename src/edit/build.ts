@@ -159,7 +159,7 @@ export function appendEdge(body: string, statement: string): string {
 
 /** What a wrap needs to know: which word opens the container, and which line is wrapped. */
 export interface WrapPlan {
-  word: "group" | "lane";
+  word: "group" | "system" | "lane";
   /** 1-based, in the body: the declaration of the picked card, group or lane. */
   line: number;
   /** The picked thing's own container, so a fixed fence can write the new box against it. */
@@ -170,9 +170,9 @@ export interface WrapPlan {
  * Whether the picked card, group or lane can be wrapped in a new container, and in which.
  *
  * **The word is the dialect's, never a choice.** `flow` and `activity` draw swimlanes with a layout
- * of their own, so what wraps there is a `lane`; every other dialect with containers has `group`.
- * `usecase` and `c4` also have `system`, and a wrap writes `group` there too — the Shape control on
- * the new container is how it becomes one, which keeps a wrap one gesture and one word.
+ * of their own, so what wraps there is a `lane`. `usecase` and `c4` have `system`, and a box drawn
+ * round use cases or containers there is almost always the system's boundary, so a wrap writes
+ * `system` (the Shape control turns it into a plain `group`). Every other dialect has `group`.
  *
  * Refused where the result would be a statement the grammar reads differently from what was asked:
  *
@@ -197,9 +197,9 @@ export function wrapPlan(item: Pick<BoardItem, "type" | "body" | "dir" | "aspect
   const subject = node ?? group ?? lane;
   if (!subject) return null;
 
-  const word = containers.includes("lane") ? "lane" : "group";
+  const word = containers.includes("lane") ? "lane" : containers.includes("system") ? "system" : "group";
   if (word === "lane" && (lane || node?.lane || g.groups.length > 0)) return null;
-  if (word === "group" && g.lanes.length > 0) return null;
+  if (word !== "lane" && g.lanes.length > 0) return null;
 
   const line = declaredAt(item.type, item.body, id, item.dir);
   if (line === null || line !== subject.line) return null;

@@ -1750,7 +1750,11 @@ export function useEditor({
     if (!plan) return;
 
     const id = freshNodeId(it.body, plan.word);
-    const opts: WrapOpts = { word: plan.word, id, label: plan.word === "lane" ? "Lane" : "Group" };
+    const opts: WrapOpts = {
+      word: plan.word,
+      id,
+      label: plan.word === "lane" ? "Lane" : plan.word === "system" ? "System" : "Group",
+    };
     let body = it.body;
     let shift = { x: 0, y: 0 };
     if (it.type === "sketch" || it.layout === "fixed") {
@@ -1766,7 +1770,7 @@ export function useEditor({
     }
 
     setPickedNode({ item: it.id, node: id });
-    setRenaming({ item: it.id, id, what: plan.word, seg: 0, text: "" });
+    setRenaming({ item: it.id, id, what: plan.word === "lane" ? "lane" : "group", seg: 0, text: "" });
     writeShifted(it, wrapStatement(body, plan.line, opts), shift);
   }, [bodyOf, laidOutIn, writeShifted]);
 

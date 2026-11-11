@@ -551,12 +551,15 @@ describe("wrapPlan", () => {
       ["erd", `entity user { id uuid pk }`, "user", 1],
       ["class", `class A { +x: int }`, "A", 1],
       ["state", `state a "A"`, "a", 1],
-      ["usecase", `actor u "User"\nusecase c "Do it"`, "c", 2],
-      ["c4", `person p "P" "someone"`, "p", 1],
       ["sketch", `box a "A" x=0 y=0`, "a", 1],
     ] as const) {
       expect(plan(type, body, id), type).toEqual({ word: "group", line, parent: undefined });
     }
+  });
+
+  it("is a system in usecase and c4, whose box round cards is the system's boundary", () => {
+    expect(plan("usecase", `actor u "User"\nusecase c "Do it"`, "c")).toEqual({ word: "system", line: 2, parent: undefined });
+    expect(plan("c4", `person p "P" "someone"`, "p")).toEqual({ word: "system", line: 1, parent: undefined });
   });
 
   it("is a lane in flow and activity", () => {

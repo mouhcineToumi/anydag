@@ -21,7 +21,7 @@ would — a box scales, a drawing's shapes scale, a laid-out diagram only moves 
 
 A **diagram's** `group` is a different thing: a brace in the fence, with a hue, a sublabel, an optional
 `dir=` and — in `usecase` and `c4` — the word `system` for the same statement. The properties view
-writes all of it: Wrap in a group (or a lane), Shape (`group` ↔ `system`) and Direction (`dir=TB|LR`,
+writes all of it: Wrap in a group (a lane in `flow` and `activity`, a `system` in `usecase` and `c4`, where a box round cards is the system's boundary), Shape (`group` ↔ `system`) and Direction (`dir=TB|LR`,
 only where ELK lays the container out — not in a `sketch`, a fixed fence or a lane layout). See
 *Controls on the canvas* in `editing.md`.
 
