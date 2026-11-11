@@ -2503,6 +2503,26 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  * the thing it is renaming through a pan. Its font is copied off the element it covers, which is
  * why nothing here sets one.
  */
+/* An md card's text, open where it is drawn (`CardText`): over the card, on its rectangle, and
+   growing down from it while somebody types. The card's own type size, so nothing jumps. */
+.dag-card-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-metric-radius-small);
+  box-shadow: 0 1px 6px var(--dag-color-shadow);
+}
+.dag-card-text .dag-rich-field .dag-blocks--field .bn-editor {
+  padding: 2px 6px;
+  font-size: var(--dag-type-mdBody);
+  line-height: var(--dag-type-mdLeading);
+}
+
 .dag-rename {
   position: absolute;
   top: 0;

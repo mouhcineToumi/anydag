@@ -294,8 +294,9 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
             <>
               <Tool
                 hook="edit"
-                label="Edit: properties and source"
-                keys="Enter"
+                label={one.type === "md" ? "Edit: the card's settings" : "Edit: properties and source"}
+                /* Enter on an md card opens its text on the card, not this panel (#145). */
+                keys={one.type === "md" ? undefined : "Enter"}
                 word="Edit"
                 onClick={() => editor.ctl.open(one.id)}
               >

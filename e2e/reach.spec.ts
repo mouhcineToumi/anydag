@@ -182,7 +182,9 @@ test("the tabs make a page, move an item onto it, and take it away again", async
 
   /* Move the note onto it, from the panel, and it appears here and leaves page one. */
   await page.locator('[data-dag-page="page-1"]').click();
-  await page.locator('[data-dag-item="note"]').dblclick();
+  await page.locator('[data-dag-item="note"]').click();
+  /* A double-click on a text card opens its words; its settings are the toolbar's Edit. */
+  await page.locator("[data-dag-selbar-edit]").click();
   /* The page select is in the Advanced disclosure now. */
   await page.locator("[data-dag-advanced-toggle]").click();
   await page.locator("[data-dag-item-page]").selectOption("page-2");

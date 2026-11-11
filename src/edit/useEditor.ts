@@ -420,6 +420,12 @@ export interface Editor {
   selected: ReadonlySet<string>;
   /** The item open in the editor panel, if any. */
   editing: string | null;
+  /** The `md` card whose text is open in place as rich text (`CardText`), if any. */
+  writing: string | null;
+  /** Open an `md` card's text where it is drawn. Anything that is not prose opens the panel instead. */
+  write(id: string): void;
+  /** The card's text is finished with: Escape, or a press outside it. Its last write is already made. */
+  stopWriting(): void;
   /** A pending "show me this node's line" for the open item — see `open`. */
   reveal: Reveal | null;
   tool: Tool;
@@ -704,6 +710,7 @@ export function useEditor({
 }: Options): Editor {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editing, setEditing] = useState<string | null>(null);
+  const [writing, setWriting] = useState<string | null>(null);
   /*
    * A request to put the caret on one node's line, once.
    *
@@ -1455,6 +1462,7 @@ export function useEditor({
       const gone = new Set(targets);
       setSelected((prev) => new Set([...prev].filter((id) => !gone.has(id))));
       if (editingRef.current && gone.has(editingRef.current)) setEditing(null);
+      setWriting((w) => (w && gone.has(w) ? null : w));
       void commit(targets.map((id) => ({ id, remove: true as const })));
     },
     [commit],
@@ -1554,6 +1562,31 @@ export function useEditor({
     [pickNode, setMode],
   );
 
+  /**
+   * An `md` card's text, opened where it is drawn (#145). A card's body *is* its content, so the
+   * way in is the card itself, as a note's is its page — not a panel holding the Markdown. The
+   * panel closes: it would be a second editor of the same text. Anything else opens the panel.
+   */
+  const write = useCallback(
+    (id: string) => {
+      /* A card just made is not in the board yet — it is one round trip behind the write — and
+         only `add` and a drop ask for one; the page mounts the editor when the card arrives. */
+      const it = boardRef.current?.items.find((x) => x.id === id);
+      if (it && it.type !== "md") return open(id);
+      setSelected(new Set([id]));
+      setEditing(null);
+      setWriting(id);
+    },
+    [open],
+  );
+
+  /* As the panel's `close`: the sitting is one undo, and the keys are the canvas's again. */
+  const stopWriting = useCallback(() => {
+    setWriting(null);
+    history.seal();
+    viewport.current?.focus();
+  }, [history, viewport]);
+
   /*
    * The other way into the panel: a problem rather than a click. A diagnostic's target is the thing
    * its line declares (`diagnoseBoard`), so "Show" picks it the way a click on the canvas would, and
@@ -1585,15 +1618,14 @@ export function useEditor({
       const kind: ItemType = type === "note" ? "md" : type;
       if (type === "prompt") attrs.w = PROMPT_W;
       void insert([{ type: kind, attrs, body }]).then((ids) => {
-        /* This panel opening is the one a drop is allowed: `add` is only ever called
-           with "md" and "prompt" — `N`, a double-click on the paper, and `P` — and the md case is
-           exactly the exception in the rule `place()` states, an item whose body is prose the
-           canvas has no way to edit. A prompt card takes its text on the card itself, and opening
-           the panel would take the focus straight back off it. */
-        if (ids?.[0] && kind !== "prompt") setEditing(ids[0]);
+        /* The one place a new card takes the focus: `add` is only ever called with "md" and
+           "prompt" — `N`, a double-click on the paper, and `P` — and both are typed into where
+           they land. An md card's text opens on the card as rich text (`write`); a prompt card
+           takes its text on the card itself, and opening the panel would take the focus off it. */
+        if (ids?.[0] && kind !== "prompt") write(ids[0]);
       });
     },
-    [insert, viewport],
+    [insert, viewport, write],
   );
 
   const links = useCallback(() => {
@@ -2221,21 +2253,19 @@ export function useEditor({
       /* A fragment on the paper starts a diagram of its type with just that in it. */
       const body = render(component);
       void insert([{ type: component.type, attrs, body }]).then((ids) => {
-        /* **The panel opens on a new item only when the item's body is prose the canvas has no
-           way to edit** — an `md`, whose body *is* its content and for which the panel is the
-           only text-entry route. Everything else dropped here is reachable on the canvas:
-           double-click renames it and a pick gives it the controls, and a panel opening over all
-           of that was the complaint this closes. A prompt card is typed into where it
-           lands; see `add`, which is the other place this rule is already honoured.
+        /* **A new item takes the focus only when its body is prose** — an `md`, whose body *is*
+           its content: its text opens on the card, as rich text (`write`). Everything else dropped
+           here is reachable on the canvas: double-click renames it and a pick gives it the
+           controls, and a panel opening over all of that was the complaint this closes. A prompt
+           card is typed into where it lands; see `add`, which is the other place this rule holds.
 
            A card that places a note, a task or a board (`noteCard`) is `md` and still not prose: its
-           body is one `![…](dag:…)` line, the canvas draws a card naming the document,
-           and the panel would open on that line of syntax over the card somebody just dropped
-. */
-        if (ids?.[0] && component.type === "md" && !component.id.startsWith(NOTE_CARD)) setEditing(ids[0]);
+           body is one `![…](dag:…)` line, the canvas draws a card naming the document, and an
+           editor opening on it would be over the card somebody just dropped. */
+        if (ids?.[0] && component.type === "md" && !component.id.startsWith(NOTE_CARD)) write(ids[0]);
       });
     },
-    [insert, viewport],
+    [insert, viewport, write],
   );
 
   /*
@@ -3336,6 +3366,8 @@ export function useEditor({
     };
 
     const rename: EditorCtl["rename"] = (id, el) => {
+      /* An md card has no name to retype: its text is the card, and a double-click opens it. */
+      if (boardRef.current?.items.find((x) => x.id === id)?.type === "md") return (write(id), true);
       const at = nameableUnder(el);
       return at ? startRename(id, at) : false;
     };
@@ -3389,6 +3421,7 @@ export function useEditor({
     growFrom,
     growTopicFrom,
     startRename,
+    write,
     nodeDrag,
     looseDrag,
     lifelineDrag,
@@ -4258,7 +4291,7 @@ export function useEditor({
               return open(link.fence);
             }
           }
-          if (sel.size === 1) return (take(), open([...sel][0]!));
+          if (sel.size === 1) return (take(), write([...sel][0]!));
           return;
         case "ArrowLeft":
           if (sel.size) return (take(), nudge(-step, 0));
@@ -4443,6 +4476,7 @@ export function useEditor({
     ungroup,
     viewport,
     visible,
+    write,
   ]);
 
   /* `tick` is what makes `canUndo` a fresh read after a write; the stack itself is not state. */
@@ -4453,6 +4487,9 @@ export function useEditor({
     chord,
     selected,
     editing,
+    writing,
+    write,
+    stopWriting,
     reveal,
     tool,
     setTool,

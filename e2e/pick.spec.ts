@@ -225,12 +225,21 @@ test("which half of the panel is showing outlives a reload", async ({ page }) =>
   await expect(page.locator("[data-dag-body]")).toBeVisible();
 });
 
-test("a note has no halves: its body is the note", async ({ page }) => {
+test("a note has no halves, and its text is written on the card", async ({ page }) => {
   await open(page);
   await tap(page, '[data-dag-item="note"]');
+  /* Enter opens the text where it is drawn, as rich text (#145). */
   await page.keyboard.press("Enter");
+  await expect(page.locator('[data-dag-card-text="note"] [contenteditable="true"]')).toHaveText("A note.");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-card-text]")).toHaveCount(0);
+  /* The panel holds its settings, and no Markdown: the way to the text is the card. */
+  await page.locator("[data-dag-selbar-edit]").click();
   await expect(page.locator("[data-dag-mode]")).toHaveCount(0);
-  await expect(page.locator("[data-dag-body]")).toHaveValue("A note.");
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
+  await page.locator("[data-dag-write-card]").click();
+  await expect(page.locator('[data-dag-card-text="note"] [contenteditable="true"]')).toBeFocused();
+  await expect(page.locator("[data-dag-inspector]")).toHaveCount(0);
 });
 
 /* -------------------------------------------------------------------------------- the edges */

@@ -305,8 +305,11 @@ export function Inspector({
   const mode = split ? editor.mode : "source";
   const showFields = !split || mode === "props";
   /* Except an `edges` fence (#145): its statements are the links on the canvas, each one changed by
-     picking it, so the text behind them is the file's and not the person's. */
-  const showSource = !links && (!split || mode === "source");
+     picking it, so the text behind them is the file's and not the person's. And except an `md`
+     card (#145), whose text is written on the card itself, as rich text (`CardText`): a second
+     editor of the same words here would be a second copy of them. */
+  const prose = item.type === "md";
+  const showSource = !links && !prose && (!split || mode === "source");
   const wantLine = subject?.line ?? 0;
   useEffect(() => {
     const el = area.current;
@@ -477,6 +480,12 @@ export function Inspector({
         <p className="dag-inspector__hint" data-dag-links-hint="">
           Click a link on the canvas to change it, or drag from the edge of a card to draw one.
         </p>
+      ) : null}
+
+      {prose ? (
+        <button type="button" className="dag-button" data-dag-write-card="" onClick={() => editor.write(item.id)}>
+          Edit the text
+        </button>
       ) : null}
 
       {showSource ? (
