@@ -6890,12 +6890,21 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer { position: relative; flex: none; display: flex; flex-direction: column; gap: 6px; margin: 0 20px 16px; padding: 8px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); }
 .dag-chat-composer:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
 .dag-chat-composer__input { width: 100%; box-sizing: border-box; min-height: 24px; max-height: 200px; padding: 4px 4px; resize: none; font: inherit; font-size: 14px; line-height: 1.5; color: var(--dag-color-ink); background: transparent; border: none; outline: none; }
+/* Expanded by its toggle: most of the column, and it goes back on sending (the component clears the state). */
+.dag-chat-composer__input--tall { min-height: 320px; max-height: 60vh; }
 .dag-chat-composer__input::placeholder { color: var(--dag-color-muted); }
 .dag-chat-composer__why { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
-.dag-chat-composer__row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.dag-chat-composer__space { flex: 1; }
+/* One row: scope, then model, effort, expand and Send pushed to the right. Each control can shrink and
+   ellipsize rather than wrap, so a long vault or model name reads shorter instead of pushing Send onto
+   a second line. `field-sizing` sizes a select to what it shows rather than its widest option, where
+   the browser has it; without it the box is that widest option's, which still fits the row. */
+.dag-chat-composer__row { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; }
+.dag-chat-modelpick { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: 220px; flex: 0 1 auto; margin-left: auto; }
+.dag-chat-modelpick .dag-glyph { position: absolute; left: 9px; top: 0; bottom: 0; display: flex; align-items: center; pointer-events: none; }
+.dag-chat-modelpick .dag-chat-picker { min-width: 0; width: 100%; max-width: none; flex: 1 1 auto; padding-left: 29px; }
 .dag-chat-picker { max-width: 220px; height: 28px; font-size: 12px; }
-.dag-chat-picker--effort { max-width: 130px; }
+.dag-chat-picker--effort { max-width: 96px; field-sizing: content; padding-right: 24px; }
+.dag-chat-composer__expand { flex: none; width: 24px; height: 24px; }
 .dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-paper); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }
 .dag-chat-send:disabled { opacity: 0.35; cursor: default; }
 .dag-chat-send:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
