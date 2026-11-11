@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { appendLink, connectable, connectSvg, handleAt, linkStatement, removeLinkLine } from "@/edit/connect";
+import {
+  appendLink,
+  bodyText,
+  connectable,
+  connectSvg,
+  handleAt,
+  joinEdge,
+  linkStatement,
+  removeLinkLine,
+  wholeCard,
+} from "@/edit/connect";
 
 /**
  * Drawing a link with the pointer, minus the pointer.
@@ -88,5 +98,75 @@ describe("connectSvg", () => {
   it("survives a pointer that has not moved off the handle", () => {
     const svg = connectSvg({ x: 5, y: 5 }, { x: 5, y: 5 }, "n", false, 4);
     expect(svg).not.toContain("NaN");
+  });
+});
+
+describe("a drop on a row or a boundary", () => {
+  it("writes the id a diagram's own body uses", () => {
+    expect(bodyText({ item: "d", node: "api" })).toBe("api");
+    expect(bodyText({ item: "d", node: "api", row: "content" })).toBe("api.content");
+    expect(bodyText({ item: "d", node: "intake", boundary: true })).toBe("intake");
+  });
+
+  it("falls back to what an edges fence can name when the link crosses items", () => {
+    expect(wholeCard({ item: "d", node: "api", row: "content" })).toEqual({ item: "d", node: "api" });
+    expect(wholeCard({ item: "d", node: "intake", boundary: true })).toEqual({ item: "d" });
+    expect(wholeCard({ item: "d", node: "api" })).toEqual({ item: "d", node: "api" });
+    expect(linkStatement(wholeCard({ item: "d", node: "api", row: "r" }), { item: "e" })).toBe("d.api --> e");
+  });
+
+  it("still refuses a card to its own row", () => {
+    expect(connectable({ item: "d", node: "api" }, { item: "d", node: "api", row: "content" })).toBe(false);
+    expect(connectable({ item: "d", node: "web" }, { item: "d", node: "api", row: "content" })).toBe(true);
+  });
+});
+
+describe("joinEdge", () => {
+  it("converges a drop onto an existing target into one bus", () => {
+    expect(joinEdge("a --> c", "b", "c", "bus")).toBe("a & b --> c");
+    expect(joinEdge('a --> c "reject"\nx --> y', "b", "c", "bus")).toBe('a & b --> c "reject"\nx --> y');
+  });
+
+  it("fans a drop from an existing source out into one statement", () => {
+    expect(joinEdge("f --> a", "f", "b", "bus")).toBe("f --> a & b");
+    expect(joinEdge("x --> y\nf --> a hue=teal", "f", "b", "bus")).toBe("x --> y\nf --> a & b hue=teal");
+  });
+
+  it("prefers converging, and the first statement in file order", () => {
+    expect(joinEdge("x --> a\nf --> b", "f", "a", "bus")).toBe("x & f --> a\nf --> b");
+    expect(joinEdge("a --> c\nd --> c", "b", "c", "bus")).toBe("a & b --> c\nd --> c");
+  });
+
+  it("does not join into another statement what one already says", () => {
+    expect(joinEdge("f --> a\nx --> a", "f", "a", "bus")).toBe("f --> a\nx --> a");
+  });
+
+  it("leaves a body alone that already says it", () => {
+    expect(joinEdge("a & b --> c", "b", "c", "bus")).toBe("a & b --> c");
+    expect(joinEdge("f --> a & b", "f", "b", "bus")).toBe("f --> a & b");
+  });
+
+  it("only grows the first or the last list of a chain", () => {
+    expect(joinEdge("a --> c --> d", "b", "c", "bus")).toBe("a & b --> c --> d");
+    expect(joinEdge("x --> f --> a", "f", "b", "bus")).toBe("x --> f --> a & b");
+    /* The middle list is two arrows' at once: a drop into it is nobody's bus. */
+    expect(joinEdge("x --> m --> y", "b", "m", "bus")).toBe("x & b --> m --> y");
+  });
+
+  it("returns null when there is nothing to join", () => {
+    expect(joinEdge("a --> b", "x", "y", "bus")).toBeNull();
+    expect(joinEdge("", "x", "y", "bus")).toBeNull();
+    expect(joinEdge('service a "A"', "x", "y", "chain")).toBeNull();
+  });
+
+  it("carries a chain on from the end of a statement", () => {
+    expect(joinEdge("a --> b", "b", "c", "chain")).toBe("a --> b --> c");
+    expect(joinEdge('a -.-> b "x" // n', "b", "c", "chain")).toBe('a -.-> b "x" -.-> c // n');
+    expect(joinEdge("a --> b\nb --> c", "c", "d", "chain")).toBe("a --> b\nb --> c --> d");
+  });
+
+  it("does not continue a chain from a card that is not where a statement ends", () => {
+    expect(joinEdge("a --> b --> c", "b", "d", "chain")).toBeNull();
+    expect(joinEdge("a & b --> c", "a", "d", "chain")).toBeNull();
   });
 });

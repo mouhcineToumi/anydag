@@ -78,6 +78,29 @@ export function edgeAt(
   return { line: edge.line, seg: segOf(body.split("\n")[edge.line - 1] ?? "", onLine.indexOf(edge)) };
 }
 
+/**
+ * What an edge of this diagram may run to or from: its cards, its groups, and the rows inside a card
+ * — `api.content` — which are the three things the grammar lets an arrow name (`docs/dsl/common.md`
+ * rules 4 and 9).
+ *
+ * Read off the parse, because only the parse knows which words are declared; a list kept beside the
+ * text would be the second copy that drifts. Empty for a dialect that has no graph, and a `more`
+ * row is left out: it is a "…and four more" line, not a field an arrow can leave from.
+ */
+export function edgeTargets(
+  type: string,
+  body: string,
+  dir?: "LR" | "TB",
+): { nodes: string[]; groups: string[]; rows: string[] } {
+  const graph = hasGraph(type) ? parseDiagram(type, body, dir) : null;
+  if (!graph) return { nodes: [], groups: [], rows: [] };
+  return {
+    nodes: graph.nodes.map((n) => n.id),
+    groups: graph.groups.map((g) => g.id),
+    rows: graph.nodes.flatMap((n) => n.rows.filter((r) => r.kind !== "more").map((r) => `${n.id}.${r.id}`)),
+  };
+}
+
 /** The label written on one segment of an edge statement, as the author spelled it. */
 export function edgeLabelOf(line: string, seg: number): string {
   return edgeSpan(line)?.tails[seg + 1]?.strings[0]?.value ?? "";

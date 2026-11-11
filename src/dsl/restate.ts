@@ -715,22 +715,47 @@ export function edgeSpan(line: string): EdgeSpan | null {
 }
 
 /**
- * The label on one segment. `seg` picks which arrow on a chain — every edge of `a --> b --> c` is
- * on the same line, so the line alone cannot say which one is meant.
+ * One of an arrow's two strings, on one segment: `0` is the label, `1` is the second one — C4's
+ * technology chip, `a --> b : "Uses" "HTTPS"`.
+ *
+ * `seg` picks which arrow on a chain — every edge of `a --> b --> c` is on the same line, so the
+ * line alone cannot say which one is meant.
+ *
+ * The strings are positional, as a node's title, meta and desc are: clearing the label while the
+ * second one stands behind it leaves `""` in its place, because promoting the technology into the
+ * label's position would be a different diagram. Clearing the second one takes off the `""` that
+ * only held its place, so a line does not keep a pair of empty quotes nobody can see.
  */
-export function setEdgeLabel(line: string, text: string | null, seg = 0): string {
+function setEdgeString(line: string, index: 0 | 1, text: string | null, seg: number): string {
   const e = edgeSpan(line);
   const tail = e?.tails[seg + 1];
   if (!tail) return line;
-  const have = tail.strings[0];
+  const have = tail.strings[index];
   if (text === null) {
     if (!have) return line;
-    /* The second label is C4's technology chip, and it stands behind the first positionally. */
-    if (tail.strings.length > 1) return replaceSpan(line, span(have), '""');
+    if (index < tail.strings.length - 1) return replaceSpan(line, span(have), '""');
+    const before = tail.strings[index - 1];
+    /* Both go in one slice: cutting them one at a time would reread the line between the two. */
+    if (before?.value === "") return cut(line, [span(before)[0], span(have)[1]]);
     return cut(line, span(have));
   }
   if (have) return replaceSpan(line, span(have), JSON.stringify(text));
-  return splice(line, tail.at, JSON.stringify(text));
+  if (index === 1 && tail.strings.length === 0) return splice(line, tail.at, `"" ${JSON.stringify(text)}`);
+  const last = tail.strings[tail.strings.length - 1];
+  return splice(line, last ? span(last)[1] : tail.at, JSON.stringify(text));
+}
+
+/** The label on one segment. See `setEdgeString`. */
+export function setEdgeLabel(line: string, text: string | null, seg = 0): string {
+  return setEdgeString(line, 0, text, seg);
+}
+
+/**
+ * The second string on one segment — C4's technology chip, drawn under the label. Positional, so
+ * writing one on an edge with no label first writes the empty label that holds its place.
+ */
+export function setEdgeLabel2(line: string, text: string | null, seg = 0): string {
+  return setEdgeString(line, 1, text, seg);
 }
 
 /**
@@ -751,6 +776,97 @@ export function setEdgeArrow(line: string, arrow: string, seg = 0): string {
   const tok = e?.arrows[seg];
   if (!tok || !isArrow(arrow)) return line;
   return replaceSpan(line, span(tok), arrow);
+}
+
+/**
+ * Which end of a segment, for the writers below that reach into one: the list of ids the arrow
+ * leaves (`from`) or arrives at (`to`).
+ *
+ * On a chain the two halves share: `a --> b & c --> d` has `b & c` as the first segment's `to` *and*
+ * the second one's `from`, because that is one list in the text. Writing either writes the list.
+ */
+export type EdgeSide = "from" | "to";
+
+const listOf = (e: EdgeSpan, seg: number, side: EdgeSide): RefList | undefined => e.refs[side === "from" ? seg : seg + 1];
+
+/** The ids one end of a segment names, in the order they are written. */
+export function edgeEnds(line: string, seg: number, side: EdgeSide): string[] {
+  const e = edgeSpan(line);
+  const list = e && listOf(e, seg, side);
+  return list ? list.tokens.map((t) => t.value) : [];
+}
+
+/**
+ * Swap one id on one end of a segment for another — the node, group or row (`api.content`) the
+ * arrow runs to. A word the tokenizer would not read as one id is refused, because a control
+ * that writes `a b` into a list is a control that breaks the file.
+ */
+export function setEdgeEnd(line: string, seg: number, side: EdgeSide, index: number, ref: string): string {
+  const e = edgeSpan(line);
+  const tok = e && listOf(e, seg, side)?.tokens[index];
+  if (!tok || !isRef(ref)) return line;
+  return replaceSpan(line, span(tok), ref);
+}
+
+/**
+ * Add an id to one end of a segment: `a --> c` becomes `a & b --> c`, which is a bus, and
+ * `f --> a` becomes `f --> a & b`, which is a fan. The statement stays one statement, so the
+ * router can see one family and draw one trunk with one label — what one line per pair cannot say.
+ *
+ * An id already in the list is not added twice, and a segment whose list is missing is left alone.
+ */
+export function addEdgeEnd(line: string, seg: number, side: EdgeSide, ref: string): string {
+  const e = edgeSpan(line);
+  const list = e && listOf(e, seg, side);
+  if (!list || !isRef(ref) || list.tokens.some((t) => t.value === ref)) return line;
+  return line.slice(0, list.to) + ` & ${ref}` + line.slice(list.to);
+}
+
+/**
+ * Take one id off one end of a segment. The last id on an end stays: an arrow with nothing at one
+ * end is not a statement, and deleting the edge is `removeEdge`'s job, which is the one that says so.
+ */
+export function removeEdgeEnd(line: string, seg: number, side: EdgeSide, index: number): string {
+  const e = edgeSpan(line);
+  const toks = e && listOf(e, seg, side)?.tokens;
+  if (!toks || toks.length < 2 || !toks[index]) return line;
+  /* The `&` goes with the id it joined: the one in front of it, or for the first id the one behind. */
+  if (index === 0) return line.slice(0, span(toks[0]!)[0]) + line.slice(span(toks[1]!)[0]);
+  return line.slice(0, span(toks[index - 1]!)[1]) + line.slice(span(toks[index]!)[1]);
+}
+
+/**
+ * Carry a chain one hop further: `a --> b` becomes `a --> b --> c`.
+ *
+ * At the end of the statement, after everything the last hop wrote, because a label and the
+ * modifiers belong to the hop *before* the arrow that follows them — appending cannot move one onto
+ * the wrong segment. The new hop wears the arrow the chain's last one does, which is the spelling
+ * the author has been using, and carries nothing else.
+ */
+export function appendHop(line: string, ref: string, arrow?: string): string {
+  const e = edgeSpan(line);
+  if (!e || !isRef(ref)) return line;
+  const last = e.arrows[e.arrows.length - 1]!.value;
+  return splice(line, insertAt(line, lineTokens(line)), `${arrow && isArrow(arrow) ? arrow : last} ${ref}`);
+}
+
+/**
+ * Take the last hop off a chain: `a --> b --> c` becomes `a --> b`. A statement with one arrow has
+ * no hop to take off — that is the whole edge, and `removeEdge` deletes those.
+ */
+export function dropHop(line: string): string {
+  const e = edgeSpan(line);
+  if (!e || e.arrows.length < 2) return line;
+  const from = span(e.arrows[e.arrows.length - 1]!)[0];
+  const comment = commentAt(line);
+  const end = comment === -1 ? line.length : comment;
+  return cut(line, [from, end]);
+}
+
+/** Whether `text` is one id or `id.row`, the way the tokenizer reads a word. */
+function isRef(text: string): boolean {
+  const t = lineTokens(text);
+  return t.length === 1 && t[0]!.kind === "word" && t[0]!.value === text;
 }
 
 /**

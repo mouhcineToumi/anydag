@@ -5,6 +5,7 @@ import { freshId, itemsToText, textToItems } from "@/board/clipboard";
 import { importKind, openId, sealId } from "@/board/envelope";
 import { rebind } from "@/dsl/rebind";
 import type { Placement } from "@/board/flow";
+import { endText } from "@/board/links";
 import { appendPart, fileCard, isFragment, NOTE_CARD, noteCard, render, type Component } from "@/board/library";
 import { uploadFile } from "@/files/upload";
 import { saveWithFiles } from "@/files/exportBundle";
@@ -45,12 +46,16 @@ import { History } from "./history";
 import type { Fix } from "./repair";
 import {
   appendLink,
+  bodyText,
   connectSvg,
   connectable,
   handleAt,
+  joinEdge,
   linkStatement,
   removeLinkLine,
   targetAt,
+  wholeCard,
+  type Join,
   type Side as ConnectSide,
   type Target,
 } from "./connect";
@@ -1422,16 +1427,27 @@ export function useEditor({
    * was drawn inside, which is a different picture.
    */
   const addLink = useCallback(
-    (from: Target, to: Target) => {
+    (from: Target, to: Target, join?: Join) => {
       const b = boardRef.current;
       if (!b) return;
       if (from.item === to.item && from.node && to.node) {
         const it = b.items.find((x) => x.id === from.item);
-        if (it && isDiagramType(it.type)) return writeBody(it, appendEdge(it.body, `${from.node} --> ${to.node}`));
+        if (!it || !isDiagramType(it.type)) return;
+        const [a, z] = [bodyText(from), bodyText(to)];
+        /* Shift or alt on the drop folds it into a statement that is already there — a bus, a chain —
+           and a drop with nothing to fold into is the plain edge it always was. */
+        const joined = join ? joinEdge(it.body, a, z, join) : null;
+        return writeBody(it, joined ?? appendEdge(it.body, `${a} --> ${z}`));
+      }
+      /* Across items a row or a boundary cannot be named by an `edges` fence: see `wholeCard`. */
+      const [a, z] = [wholeCard(from), wholeCard(to)];
+      const fence = b.items.find((it) => isLinkType(it.type) && it.page === pageRef.current);
+      const joined = fence && join ? joinEdge(fence.body, endText(a), endText(z), join) : null;
+      if (fence && joined !== null) {
+        if (joined !== fence.body) void commit([{ id: fence.id, body: joined }]);
         return;
       }
-      const statement = linkStatement(from, to);
-      const fence = b.items.find((it) => isLinkType(it.type) && it.page === pageRef.current);
+      const statement = linkStatement(a, z);
       if (fence) void commit([{ id: fence.id, body: appendLink(fence.body, statement) }]);
       else void insert([{ type: "edges", attrs: {}, body: statement }]);
     },
@@ -2605,15 +2621,20 @@ export function useEditor({
         const under = document.elementFromPoint(ev.clientX, ev.clientY);
         const hit = targetAt(under);
         over = hit && connectable(source, hit) ? hit : null;
+        /* The mark is on what the drop will name: the row, the boundary, the card, or the item. */
         mark(
           over
-            ? (under?.closest<HTMLElement>("[data-dag-node]") ?? under?.closest<HTMLElement>("[data-dag-item]") ?? null)
+            ? ((over.row !== undefined ? under?.closest<HTMLElement>("[data-dag-row]") : null) ??
+                (over.boundary ? under?.closest<HTMLElement>("[data-dag-group]") : null) ??
+                under?.closest<HTMLElement>("[data-dag-node]") ??
+                under?.closest<HTMLElement>("[data-dag-item]") ??
+                null)
             : null,
         );
         if (overlay) overlay.innerHTML = connectSvg(from, at, side, over !== null, dotR);
       };
 
-      const onUp = () => {
+      const onUp = (ev?: PointerEvent) => {
         removeEventListener("pointermove", onMove);
         removeEventListener("pointerup", onUp);
         removeEventListener("pointercancel", onUp);
@@ -2623,7 +2644,10 @@ export function useEditor({
         if (overlay) overlay.innerHTML = "";
         /* Eat the click that ends the gesture, or the release over an item selects it. */
         addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
-        if (over) addLink(source, over);
+        /* Read at release, where the person's hand is, rather than at the press: shift to join a bus,
+           alt to carry a chain on. Neither is written anywhere until then. */
+        if (over)
+          addLink(source, over, ev?.type === "pointerup" ? (ev.shiftKey ? "bus" : ev.altKey ? "chain" : undefined) : undefined);
       };
 
       /* Escape abandons it. Captured, because the board's own key handler would take the key first

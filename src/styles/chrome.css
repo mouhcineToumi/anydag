@@ -2126,6 +2126,14 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-props__label { flex: 1; min-width: 80px; }
 .dag-props__arrow { flex: none; font-family: var(--dag-font-mono); }
 
+/* A picked edge's ends: a list per side, an id in it per select, and one more select to add to it. */
+.dag-props__edgeends { display: flex; flex-direction: column; gap: 6px; }
+.dag-props__ends { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dag-props__tag { flex: none; min-width: 34px; font-size: 11px; font-weight: 600; color: var(--dag-color-muted); }
+.dag-props__end { display: inline-flex; align-items: center; gap: 2px; }
+.dag-props__id { max-width: 140px; font-family: var(--dag-font-mono); }
+.dag-props__id--add { color: var(--dag-color-muted); }
+
 /* The properties view proper: the kind, the strings, the flags and the rows. */
 .dag-props__fields { display: flex; flex-direction: column; gap: 8px; }
 .dag-props__out {

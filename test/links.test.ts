@@ -403,3 +403,29 @@ describe("a link that names a group", () => {
     expect(gone.links).toEqual([]);
   });
 });
+
+describe("the second label of a link", () => {
+  it("reads C4's technology chip behind the label", () => {
+    const l = links('a --> b "Uses" "HTTPS"');
+    expect(l.diagnostics).toEqual([]);
+    expect(l.links[0]).toMatchObject({ label: "Uses", label2: "HTTPS" });
+  });
+
+  it("reads it after a Mermaid colon, and before the modifiers", () => {
+    const l = links('a --> b: "Uses" "HTTPS" hue=teal quiet');
+    expect(l.diagnostics).toEqual([]);
+    expect(l.links[0]).toMatchObject({ label: "Uses", label2: "HTTPS", hue: "teal", quiet: true });
+  });
+
+  it("gives each hop of a chain its own", () => {
+    const l = links('a --> b "x" "1" --> c "y" "2"');
+    expect(l.links.map((k) => [k.label, k.label2])).toEqual([
+      ["x", "1"],
+      ["y", "2"],
+    ]);
+  });
+
+  it("is absent when only a label was written", () => {
+    expect(links('a --> b "Uses"').links[0]!.label2).toBeUndefined();
+  });
+});

@@ -22,6 +22,7 @@ import {
   setEdgeFlag,
   setEdgeHue,
   setEdgeLabel,
+  setEdgeLabel2,
   setExtent,
   setFlag,
   setGroupDir,
@@ -47,6 +48,7 @@ import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
 
 import { detachable, loneNode } from "./build";
 import { REFUSAL, layered } from "./drag";
+import { EdgeEnds } from "./EdgeEnds";
 import { IconPicker } from "./IconPicker";
 import type { Editor } from "./useEditor";
 
@@ -514,6 +516,7 @@ function PickProps({
     const span = edgeSpan(src);
     const arrow = span?.arrows[seg]?.value ?? "";
     const label = span?.tails[seg + 1]?.strings[0]?.value ?? "";
+    const label2 = span?.tails[seg + 1]?.strings[1]?.value ?? "";
     const quiet = /(?:^|\s)quiet(?:\s|$)/.test(src.replace(/"[^"]*"/g, '""'));
     /* The tokenizer's own table, plus whatever is written here in case it is not in it — the ER
        cardinalities are matched structurally rather than enumerated, and offering a menu that
@@ -532,6 +535,23 @@ function PickProps({
             defaultValue={label}
             key={`label:${id}:${line}:${seg}:${label}`}
             onBlur={(e) => e.target.value.trim() !== label && write(setEdgeLabel(src, e.target.value.trim() || null, seg))}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          />
+        </div>
+        {/* The second string — C4's technology chip, drawn under the label. Positional behind the
+            label, and drawn only with one, so it waits for one rather than writing a string nothing
+            would show. */}
+        <div className="dag-props__row">
+          <input
+            className="dag-input dag-props__label"
+            data-dag-prop-label2=""
+            aria-label="Technology"
+            placeholder="technology"
+            title={label ? "Drawn under the label, as C4's technology" : "Give the edge a label first"}
+            disabled={!label}
+            defaultValue={label2}
+            key={`label2:${id}:${line}:${seg}:${label2}`}
+            onBlur={(e) => e.target.value.trim() !== label2 && write(setEdgeLabel2(src, e.target.value.trim() || null, seg))}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           />
         </div>
@@ -560,6 +580,9 @@ function PickProps({
             <span>quiet</span>
           </label>
         </div>
+        {/* A board link's ends are items on the page, which this does not list; they are made by the
+            pointer, and the diagram's own edges are the ones with a bus, a chain, a group or a row. */}
+        {subject.link ? null : <EdgeEnds type={type} body={body} src={src} seg={seg} onLine={write} onOut={onOut} />}
         {/* F3 promoted `hue=` in `parseEdge`, so this recolours the line rather than claiming to.
             `finalize()` still derives one from the source where the author wrote none. */}
         <Hues hue={hue} onSet={(h) => write(setEdgeHue(src, h))} />
