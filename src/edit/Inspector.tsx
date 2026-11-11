@@ -159,6 +159,25 @@ export function Inspector({
     timer.current = setTimeout(flush, DEBOUNCE);
   };
 
+  /**
+   * A node of this item renamed: the new body and the board's links to the old name, one write.
+   * The draft stands in at once (the pick is re-pointed against it); a refusal puts it back.
+   */
+  const onRenameNode = (next: string, from: string, to: string) => {
+    const before = draftRef.current;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    pending.current = null;
+    sent.current = next;
+    setDraft(next);
+    void editor.renameNode(item.id, from, to, next).then((err) => {
+      if (!err) return;
+      sent.current = item.body;
+      setDraft(before);
+      editor.pickNode(item.id, from);
+    });
+  };
+
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
       e.preventDefault();
@@ -418,7 +437,16 @@ export function Inspector({
        * back through `onChange`, so it goes through this panel's debounce, the same patch and the
        * same undo entry as a keystroke. There is no second write path.
        */}
-      <Props item={item} editor={editor} pages={pages} body={draft} subject={subject} showItem={showFields} onBody={onChange} />
+      <Props
+        item={item}
+        editor={editor}
+        pages={pages}
+        body={draft}
+        subject={subject}
+        showItem={showFields}
+        onBody={onChange}
+        onRenameNode={onRenameNode}
+      />
 
       {showSource ? (
         <textarea

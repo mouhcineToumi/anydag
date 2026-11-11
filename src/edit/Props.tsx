@@ -4,19 +4,25 @@ import { ChevronDown, CircleCheck, Clock, CornerUpLeft, Minus, Plus, Trash2, typ
 import { isDiagramType, isLinkType, resizeOf, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
 import { moveEntry, parseTimeline, readWhen, sectionOfLine, sectionsOf, setWhen, whenOf } from "@/dsl/graph/timeline";
-import { HUE_ORDER, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
+import { HUE_ORDER, LEGEND_GLYPHS, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
 import { containersOf, descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
 import { PARTICIPANT_KINDS } from "@/dsl/sequence";
 import {
+  addChartData,
+  chartIdProblem,
+  chartKeyRows,
   edgeSpan,
   participantKind,
   readModifier,
   removeRow,
+  renameChartId,
   replaceLine,
   rowLines,
   setCategories,
   setChartFlag,
   setChartForm,
+  setChartHero,
+  setChartKeyRows,
   setChartOption,
   setContainer,
   setDesc,
@@ -132,6 +138,7 @@ export function Props({
   subject,
   showItem,
   onBody,
+  onRenameNode,
 }: {
   item: BoardItem;
   editor: Editor;
@@ -142,6 +149,11 @@ export function Props({
   /** Whether the item's own fields belong on screen: the props half, or an item with no halves. */
   showItem: boolean;
   onBody(next: string): void;
+  /**
+   * The body with a node renamed `from` → `to`, to be written together with the `edges` lines
+   * that name it. Not `onBody`: that is the panel's debounced typing, one fence at a time.
+   */
+  onRenameNode(next: string, from: string, to: string): void;
 }) {
   /* What the parser called out as out of date, read off the *draft* like every other control here.
      Memoised on what a parse reads, so a keystroke in a field that changes nothing about it does
@@ -176,6 +188,21 @@ export function Props({
         retired={retired}
         onBody={onBody}
         onPick={(id) => editor.pickNode(item.id, id)}
+        onId={
+          item.type === "chart" && subject.what === "node"
+            ? (to) => {
+                const problem = chartIdProblem(body, subject.id, to);
+                if (problem) return problem;
+                /* The series declaration and every board link that names `chart.<id>` go in one
+                   write, so one undo: `onBody` would carry the fence alone. */
+                onRenameNode(renameChartId(body, subject.id, to), subject.id, to);
+                /* The pick carries the id, so it has to be told the new one or the panel would
+                   find no statement under the old name and close itself. */
+                editor.pickNode(item.id, to);
+                return null;
+              }
+            : undefined
+        }
         onOut={() => editor.pickNode(item.id, null)}
       />
     );
@@ -504,6 +531,7 @@ function PickProps({
   onWrap,
   onPseudo,
   onPick,
+  onId,
   onOut,
 }: {
   type: string;
@@ -521,6 +549,8 @@ function PickProps({
   onBody(next: string): void;
   /** Re-pick by id: a move renumbers a timeline's entries, and the pick has to follow its entry. */
   onPick(id: string): void;
+  /** Rename the picked thing's id; the reason it was refused, or `null`. Given only for a chart. */
+  onId?(to: string): string | null;
   onOut(): void;
 }) {
   const { id, what, line, seg } = subject;
@@ -685,6 +715,7 @@ function PickProps({
             </select>
           </label>
         ) : null}
+        {isChart && onId ? <ChartId id={id} onId={onId} /> : null}
         {isNode && kinds.length > 0 && kinds.includes(kind) ? (
           <label className="dag-field dag-field--row">
             <span>Kind</span>
@@ -1135,6 +1166,46 @@ function Rows({ type, body, line, onBody }: { type: string; body: string; line: 
 /* -------------------------------------------------------------------------------- the chart */
 
 /**
+ * A series' or slice's id, retyped in place and refused in the box.
+ *
+ * An id is what a board link ends on (`chart.web`) and what the pick is keyed by, so it is a
+ * control of its own beside the label — which is only what the legend says. Refused inline, with
+ * the reason, rather than silently reverted: a clash with another series is the one thing a person
+ * cannot see from here.
+ */
+function ChartId({ id, onId }: { id: string; onId(to: string): string | null }) {
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setError(null), [id]);
+  return (
+    <>
+      <label className="dag-field">
+        <span>Id</span>
+        <input
+          className="dag-input dag-input--mono"
+          data-dag-prop-chart-id=""
+          defaultValue={id}
+          key={`chart-id:${id}`}
+          onFocus={() => setError(null)}
+          onBlur={(e) => {
+            const to = e.target.value.trim();
+            if (to === id) return;
+            const problem = onId(to);
+            setError(problem);
+            if (problem) e.target.value = id;
+          }}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        />
+      </label>
+      {error ? (
+        <p className="dag-field__hint dag-field__hint--bad" data-dag-prop-chart-id-error="">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/**
  * A chart's own settings: its form, its two flags, its four options and its categories.
  *
  * The one *item* view whose controls write the **body** rather than a fence attribute, and that is
@@ -1147,8 +1218,26 @@ function Rows({ type, body, line, onBody }: { type: string; body: string; line: 
  * may have written anywhere in the body and in any order; the pick's half reads its *line*, for the
  * opposite reason (`finalize()` would otherwise offer to write back what a card is already showing).
  */
-function ChartProps({ body, onBody }: { body: string; onBody(next: string): void }) {
+function ChartProps({
+  itemId,
+  editor,
+  body,
+  onBody,
+}: {
+  itemId: string;
+  editor: Editor;
+  body: string;
+  onBody(next: string): void;
+}) {
   const model = useMemo(() => parseChart(body), [body]);
+  const keyRows = useMemo(() => chartKeyRows(body), [body]);
+  /* A new series or slice is picked as it is made: it has no values worth keeping yet, and the
+     panel that opens on it is where they are typed. */
+  const add = (kind: "series" | "slice") => {
+    const made = addChartData(body, kind);
+    onBody(made.body);
+    editor.pickNode(itemId, made.id);
+  };
   const option = (key: "legend" | "unit" | "min" | "max" | "values", value: string | number | boolean | null) =>
     onBody(setChartOption(body, key, value));
 
@@ -1169,6 +1258,28 @@ function ChartProps({ body, onBody }: { body: string; onBody(next: string): void
           ))}
         </select>
       </label>
+
+      {/* The hole's contents: a donut's own, since a pie has no hole and the parser reads the strings
+          off the form line whatever it says. Both fields write one statement, so the caption is
+          saved against the figure as it stands and an emptied figure takes both. */}
+      {model.form === "donut" ? (
+        <>
+          <Field
+            label="Centre figure"
+            hook="data-dag-prop-hero"
+            value={model.hero?.value ?? ""}
+            placeholder="1.2M"
+            onSet={(v) => onBody(setChartHero(body, { value: v, label: model.hero?.label }))}
+          />
+          <Field
+            label="Centre caption"
+            hook="data-dag-prop-hero-label"
+            value={model.hero?.label ?? ""}
+            placeholder="users"
+            onSet={(v) => onBody(setChartHero(body, { value: model.hero?.value ?? "", label: v }))}
+          />
+        </>
+      ) : null}
 
       {/* Only bars stack, and only bars turn on their side. A line has one direction and a wedge
           has none, so the two checkboxes are left out rather than offered and ignored. */}
@@ -1205,6 +1316,80 @@ function ChartProps({ body, onBody }: { body: string; onBody(next: string): void
           <option value="bottom">bottom</option>
         </select>
       </label>
+
+      {/* The key's own rows — `legend solid "in sync"` — are a different statement from the placement
+          above, and a different thing to a reader: the placement says where the swatches go and
+          these explain an encoding the swatches cannot. */}
+      <div className="dag-field">
+        <span>Key rows</span>
+        <div className="dag-props__rows" data-dag-prop-key-rows="">
+          {keyRows.map((row, i) => (
+            <div className="dag-props__rowline" key={`${i}:${row.glyph}:${row.text}`}>
+              <select
+                className="dag-select"
+                data-dag-prop-key-glyph={i}
+                aria-label={`Glyph of key row ${i + 1}`}
+                value={row.glyph}
+                onChange={(e) =>
+                  onBody(
+                    setChartKeyRows(
+                      body,
+                      keyRows.map((r, j) => (j === i ? { ...r, glyph: e.target.value } : r)),
+                    ),
+                  )
+                }
+              >
+                {[...new Set<string>([...LEGEND_GLYPHS, row.glyph])].map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="dag-input"
+                data-dag-prop-key-text={i}
+                aria-label={`Text of key row ${i + 1}`}
+                defaultValue={row.text}
+                onBlur={(e) =>
+                  e.target.value.trim() !== row.text &&
+                  onBody(
+                    setChartKeyRows(
+                      body,
+                      keyRows.map((r, j) => (j === i ? { ...r, text: e.target.value } : r)),
+                    ),
+                  )
+                }
+                onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              />
+              <button
+                type="button"
+                className="dag-icon dag-icon--tiny"
+                data-dag-prop-key-remove={i}
+                aria-label={`Remove key row ${row.text}`}
+                title="Remove this key row"
+                onClick={() =>
+                  onBody(
+                    setChartKeyRows(
+                      body,
+                      keyRows.filter((_, j) => j !== i),
+                    ),
+                  )
+                }
+              >
+                <Trash2 {...ICON} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="dag-props__add"
+            data-dag-prop-key-add=""
+            onClick={() => onBody(setChartKeyRows(body, [...keyRows, { glyph: "solid", text: "New entry" }]))}
+          >
+            <Plus {...ICON} aria-hidden="true" /> Add a key row
+          </button>
+        </div>
+      </div>
 
       <label className="dag-field dag-field--row">
         <input
@@ -1249,6 +1434,16 @@ function ChartProps({ body, onBody }: { body: string; onBody(next: string): void
         placeholder="Q1 Q2 Q3"
         onSet={(v) => onBody(setCategories(body, splitLabels(v)))}
       />
+
+      {/* Both parse in every form — a `series` in a pie is one wedge, a `slice` in a bar chart a
+          category of its own — so both are offered whatever the form is. */}
+      <div className="dag-props__row" role="group" aria-label="Add data">
+        {(["series", "slice"] as const).map((kind) => (
+          <button key={kind} type="button" className="dag-props__add" data-dag-prop-chart-add={kind} onClick={() => add(kind)}>
+            <Plus {...ICON} aria-hidden="true" /> Add a {kind}
+          </button>
+        ))}
+      </div>
     </>
   );
 }
@@ -1423,7 +1618,7 @@ function ItemProps({
         /* The one diagram whose own settings are statements rather than fence attributes: the
             form is a body word on purpose, so `src/board/` never learns what a chart is. */
         item.type === "chart" ? (
-          <ChartProps body={body} onBody={onBody} />
+          <ChartProps itemId={item.id} editor={editor} body={body} onBody={onBody} />
         ) : null
       ) : item.type === "md" ? (
         <label className="dag-field dag-field--row">

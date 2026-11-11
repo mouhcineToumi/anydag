@@ -204,9 +204,13 @@ and a bare `slice` to drop onto a chart that already exists. A new `chart` item 
 grouped bar.
 
 With the item selected, the panel's Properties view is the whole body without the text: Form,
-`stacked` and `horizontal` (bar only), Legend, Value labels, Unit, Min, Max and Categories. A second
-click picks a series or a slice out of the chart, and that gives its Label, its Values (or its
-Value) and the hue swatches; a double-click on a legend row or on a wedge's own number retypes the
+`stacked` and `horizontal` (bar only), the donut's Centre figure and caption (donut only), Legend,
+Key rows (the `legend solid "…"` form: a glyph and a text each), Value labels, Unit, Min, Max and
+Categories, and the *Add a series* / *Add a slice* buttons, which write the next free `series1` /
+`slice1` and pick it. A second
+click picks a series or a slice out of the chart, and that gives its Id, its Label, its Values (or its
+Value) and the hue swatches — a new Id is the declaration alone, refused if another series or slice
+has it; a double-click on a legend row or on a wedge's own number retypes the
 label in place. Dragging a picked series or slice past its neighbour **reorders the statement**,
 which is what moves it in the legend, in every bar group and round the circle.
 

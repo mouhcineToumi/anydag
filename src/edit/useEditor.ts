@@ -13,7 +13,7 @@ import { csvTab } from "@/table/csv";
 import { tableFromCsv } from "@/table/write";
 import { componentFrontmatter } from "@/board/library/saved";
 import { reorderPages } from "@/board/pages";
-import type { MetaOp, NewItem, PatchOp, SetOp } from "@/board/patch";
+import { applyPatch, type MetaOp, type NewItem, type PatchOp, type SetOp } from "@/board/patch";
 import { TEMPLATES } from "@/board/templates";
 import { tidy as tidyBoxes, type TidyBox } from "@/board/tidy";
 import {
@@ -35,7 +35,7 @@ import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
 import { bindingFor, CHORD_MS, LEADER_CODE, WHICHKEY_MS, type Command } from "@/edit/bindings";
 
-import { renameItemId } from "@/board/rename";
+import { renameItemId, renameNodeLinks } from "@/board/rename";
 import { repairFrontmatter, retypeFence } from "@/board/repair";
 import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
@@ -488,6 +488,13 @@ export interface Editor {
    * be done — a name somebody else has, a file that moved underneath — and to `null` when it was.
    */
   renameItem(id: string, to: string): Promise<string | null>;
+  /**
+   * Write `body` as item `id`'s new body — in which a node was renamed `from` → `to` — and rewrite
+   * every `edges` line that named `<id>.<from>` to `<id>.<to>`, **in one write**: one version of
+   * the file, so one undo. The dialect's own rename (`renameChartId`) is the caller's; this only
+   * carries the board half (`renameNodeLinks`). Resolves to a message when it could not be done.
+   */
+  renameNode(id: string, from: string, to: string, body: string): Promise<string | null>;
   /**
    * The two declared conversions between an automatic layout and the author's own coordinates.
    *
@@ -1827,6 +1834,32 @@ export function useEditor({
       setTick((t) => t + 1);
       setSelected(new Set([want]));
       setEditing((prev) => (prev === id ? want : prev));
+      return null;
+    },
+    [history],
+  );
+
+  /**
+   * A node inside an item renamed, and the board's links to it following.
+   *
+   * Through `put` for the reason `renameItem` is: the body op and the `edges` rewrites are spans in
+   * different fences, and the patch route addresses one item at a time. The body goes in first,
+   * through `applyPatch` like any panel write, then `renameNodeLinks` runs over the result; the
+   * one string is written once, with no history key, so the rename is its own undo step.
+   */
+  const renameNode = useCallback(
+    async (id: string, from: string, to: string, body: string): Promise<string | null> => {
+      if (lockedRef.current) return (refuseLocked(), "read only: unlock to rename it");
+      const cur = handleRef.current.current();
+      if (!cur) return "the board has not loaded yet";
+      const patched = applyPatch(cur.text, [{ id, body }]);
+      if (!patched.ok) return patched.error;
+      const done = renameNodeLinks(patched.text, id, from, to);
+      if (!done.ok) return done.error;
+      const w = await handleRef.current.put(done.text);
+      if (!w) return "the file changed underneath. Try again";
+      history.push(w.before, w.after);
+      setTick((t) => t + 1);
       return null;
     },
     [history],
@@ -3980,6 +4013,7 @@ export function useEditor({
     commitRename,
     cancelRename,
     renameItem,
+    renameNode,
     detach: detachItem,
     relayout: relayoutItem,
     place,
