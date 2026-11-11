@@ -932,7 +932,10 @@ export function routeEdges(input: RouteInput): RoutedEdge[] {
             e.label2,
             m,
             a.surface,
-            input.labels?.[e.id] ?? { w: e.label.length * m.edge.labelOffset, h: m.edge.labelOffset },
+            input.labels?.[e.id] ?? {
+              w: Math.max(e.label.length, e.label2?.length ?? 0) * m.edge.labelOffset,
+              h: e.label2 ? m.edge.labelOffset * 2 : m.edge.labelOffset,
+            },
             obstacles,
             outward.get(e.id),
           )

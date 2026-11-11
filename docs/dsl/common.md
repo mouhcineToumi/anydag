@@ -62,6 +62,10 @@ dropped, not kept and ignored: the card falls back to whatever it would have had
 all — inherited from its group or lane, or a group's own automatic assignment — rather than binding
 a colour nobody set.
 
+On a diagram's **fence line** (`{#infra hue=teal}`) it tints the diagram's own frame — a hairline round
+it and the band behind its header — and nothing inside it: a card with no hue of its own does not take
+the frame's. The panel's *Frame colour* row writes it.
+
 ## Icons
 
 Three vocabularies, picked by how the name is written.
@@ -105,6 +109,8 @@ distinct official mark any more — use a concept glyph for those.
     lane  <id> "<label>" [hue=ochre] { ... }                           -- flow / activity only
 
 `system` also opens a group in `usecase` and `c4`. A file uses groups or lanes, not both.
+`dir=TB` or `dir=LR` on a group sets which way the cards inside it run; leave it off and they follow
+the diagram.
 
 ## Edges
 
@@ -125,7 +131,8 @@ distinct official mark any more — use a concept glyph for those.
 | `..>` | dashed, open arrow (depends on) |
 | `\|\|--o{` etc. | ER cardinalities: `\|` one, `o{` many, `..` dashed |
 
-`[*]` is the start pseudostate as a source and the end as a target.
+`[*]` is the start pseudostate as a source and the end as a target. In `state` and `activity`
+`start <id>` and `end <id>` declare the same two with an id of their own.
 
 ## Legend
 

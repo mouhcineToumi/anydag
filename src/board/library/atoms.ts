@@ -137,6 +137,10 @@ export const ATOMS: Blueprint[] = [
     { title: "State", meta: "", flags: "" },
     "s",
   ),
+  /* A start and an end state are declared, not written as `[*]` inside an edge, because a library
+     atom is one statement with an id and a handle can only end on something that has one. */
+  atom("part-state-start", "state", "Start", "state · where it begins — a filled dot.", "Dot", "start ${self}", {}, "begin"),
+  atom("part-state-end", "state", "End", "state · where it ends — a ringed dot.", "Circle", "end ${self}", {}, "finish"),
 
   /* ---- flow ---- */
   atom(
@@ -192,6 +196,17 @@ export const ATOMS: Blueprint[] = [
     "f",
   ),
   atom("part-activity-join", "activity", "Join", "activity · where they come back together.", "Merge", "join ${self}", {}, "j"),
+  atom(
+    "part-activity-start",
+    "activity",
+    "Start",
+    "activity · where it begins — a filled dot.",
+    "Dot",
+    "start ${self}",
+    {},
+    "begin",
+  ),
+  atom("part-activity-end", "activity", "End", "activity · where it ends — a ringed dot.", "Circle", "end ${self}", {}, "finish"),
 
   /* ---- class ---- */
   atom(

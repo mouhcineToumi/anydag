@@ -153,10 +153,22 @@ export function Toolbar({
     <header className="dag-toolbar" data-dag-toolbar="" data-dag-toolbar-edge={away ? "" : undefined}>
       {/* Where `Shell`'s toggle is drawn while the column is away. */}
       {sidebar && away ? <span className="dag-sidebar-toggle-slot" aria-hidden="true" /> : null}
-      {/* The mark *and the name*, while the sidebar that otherwise carries them is away.
+      {/* The mark *and the name*, while the sidebar that otherwise carries them is away — and it
+          is the way home here too, as it is in the column's head: one press to the welcome card.
           `?snapshot=1` drops this whole header, which is what keeps the reference baselines
           independent of it. */}
-      {away ? <Lockup size={20} className="dag-toolbar__logo" /> : null}
+      {away ? (
+        <button
+          type="button"
+          className="dag-toolbar__logo"
+          data-dag-toolbar-home=""
+          aria-label="Home"
+          title="Home"
+          onClick={() => sidebar?.home()}
+        >
+          <Lockup size={20} />
+        </button>
+      ) : null}
 
       <div className="dag-toolbar__where">
         {sidebar && crumbs.length ? (

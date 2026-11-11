@@ -12,8 +12,9 @@ import { BOARDS } from "./boards";
  * statement between two brace blocks, a step between two bands, a topic re-indented, a date
  * rewritten, an `x=`/`y=` in a fence whose coordinates are the author's.
  *
- * The one thing that cannot be read off disk is a refusal, which is the gitgraph case: what is
- * asserted there is that nothing changed and that the cursor said so.
+ * A refusal is read off disk too, as nothing having changed: the gitgraph case below, where a
+ * commit from the middle of a branch has nothing to say to another lane. The writes a gitgraph drag
+ * *does* make — a merge, a swap — are in `gitgraph.spec.ts`.
  *
  * One board per test: the suite runs in parallel and these write to disk.
  */
@@ -264,7 +265,7 @@ test("a timeline entry dragged sideways is re-dated, and a vertical drag writes 
 
 /* ------------------------------------------------------------------------------- gitgraph */
 
-test("a gitgraph commit refuses the drag and says so with the cursor", async ({ page }) => {
+test("a gitgraph commit from the middle of a branch writes nothing on another lane", async ({ page }) => {
   const board = '```gitgraph {#g x=0 y=0}\ncommit "one"\ncommit "two"\nbranch feature\ncommit "three"\n```\n';
   write(board);
   await open(page);
@@ -276,7 +277,7 @@ test("a gitgraph commit refuses the drag and says so with the cursor", async ({ 
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2 + 200, b.y + b.height / 2 + 80, { steps: 12 });
-  await expect(page.locator('html[data-dag-node-drag="refused"]')).toHaveCount(1);
+  await expect(page.locator("html[data-dag-node-drag]")).toHaveCount(1);
   await page.mouse.up();
 
   await page.waitForTimeout(600);

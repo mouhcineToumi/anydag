@@ -13,13 +13,23 @@ import {
   removeRow,
   renameId,
   replaceLine,
+  setContainer,
   setDesc,
   setEdgeArrow,
   setEdgeFlag,
   setEdgeHue,
   setLinkVia,
   setEdgeLabel,
+  setEdgeLabel2,
+  setEdgeEnd,
+  addEdgeEnd,
+  removeEdgeEnd,
+  edgeEnds,
+  appendHop,
+  dropHop,
+  reverseEdge,
   setFlag,
+  setGroupDir,
   setKind,
   setMeta,
   setModifier,
@@ -27,6 +37,7 @@ import {
   setStatus,
   setTitle,
   statementSpan,
+  wrapStatement,
 } from "@/dsl/restate";
 
 /**
@@ -380,6 +391,35 @@ describe("edge writers", () => {
     expect(setEdgeLabel('a --> b "one" --> c', "first", 0)).toBe('a --> b "first" --> c');
   });
 
+  it("writes the second string behind the label", () => {
+    expect(setEdgeLabel2('u --> api "Uses"', "HTTPS")).toBe('u --> api "Uses" "HTTPS"');
+    expect(setEdgeLabel2('u --> api "Uses" "HTTP"', "HTTPS")).toBe('u --> api "Uses" "HTTPS"');
+    expect(setEdgeLabel2('u --> api "Uses" "HTTPS"', null)).toBe('u --> api "Uses"');
+  });
+
+  it("keeps the second string before the modifiers, and after a Mermaid colon", () => {
+    expect(setEdgeLabel2('u --> api "Uses" quiet', "HTTPS")).toBe('u --> api "Uses" "HTTPS" quiet');
+    expect(setEdgeLabel2('u --> api: "Uses" hue=teal', "HTTPS")).toBe('u --> api: "Uses" "HTTPS" hue=teal');
+  });
+
+  it("holds the label's place with an empty string, and takes it off again with the second", () => {
+    expect(setEdgeLabel2("u --> api", "HTTPS")).toBe('u --> api "" "HTTPS"');
+    expect(setEdgeLabel2('u --> api "" "HTTPS"', null)).toBe("u --> api");
+    /* A label somebody wrote stays when only the second one goes. */
+    expect(setEdgeLabel2('u --> api "Uses" "HTTPS"', null)).toBe('u --> api "Uses"');
+  });
+
+  it("writes the second string of one segment of a chain", () => {
+    expect(setEdgeLabel2('a --> b --> c "x"', "tech", 1)).toBe('a --> b --> c "x" "tech"');
+    expect(setEdgeLabel2('a --> b "x" --> c', "tech", 0)).toBe('a --> b "x" "tech" --> c');
+  });
+
+  it("round-trips the second string through the parser", () => {
+    const line = setEdgeLabel2('u --> api "Uses"', "HTTPS");
+    const graph = parseDiagram("c4", `person u "U"\nsystem api "Api"\n${line}`);
+    expect(graph?.edges[0]).toMatchObject({ label: "Uses", label2: "HTTPS" });
+  });
+
   it("swaps an arrow for another the tokenizer knows", () => {
     expect(setEdgeArrow("a --> b", "-.->")).toBe("a -.-> b");
     expect(setEdgeArrow("impl --|> base", "..|>")).toBe("impl ..|> base");
@@ -700,5 +740,211 @@ describe("declaredAt / declaredOn", () => {
        sense, and a caller that guesses at them from the line order guesses wrong. */
     expect(declaredAt("mindmap", map, "m1")).toBe(2);
     expect(declaredOn("mindmap", map, 3)).toEqual({ id: "m3", what: "node" });
+  });
+});
+
+describe("the ends of an edge", () => {
+  it("reads one end's ids in the order written", () => {
+    expect(edgeEnds("a & b --> c", 0, "from")).toEqual(["a", "b"]);
+    expect(edgeEnds("a & b --> c", 0, "to")).toEqual(["c"]);
+    expect(edgeEnds("a --> b & c --> d", 1, "from")).toEqual(["b", "c"]);
+    expect(edgeEnds("not an edge", 0, "from")).toEqual([]);
+  });
+
+  it("swaps an id for a group or a row, and refuses what is not one word", () => {
+    expect(setEdgeEnd("a --> b", 0, "to", 0, "intake")).toBe("a --> intake");
+    expect(setEdgeEnd("api --> store", 0, "from", 0, "api.content")).toBe("api.content --> store");
+    expect(setEdgeEnd("a & b --> c", 0, "from", 1, "z")).toBe("a & z --> c");
+    expect(setEdgeEnd("a --> b", 0, "to", 0, "two words")).toBe("a --> b");
+    expect(setEdgeEnd("a --> b", 0, "to", 3, "x")).toBe("a --> b");
+  });
+
+  it("grows a bus into one statement", () => {
+    expect(addEdgeEnd('a --> c "reject"', 0, "from", "b")).toBe('a & b --> c "reject"');
+    expect(addEdgeEnd("a & b --> c", 0, "from", "d")).toBe("a & b & d --> c");
+  });
+
+  it("grows a fan into one statement", () => {
+    expect(addEdgeEnd("f --> a hue=teal", 0, "to", "b")).toBe("f --> a & b hue=teal");
+  });
+
+  it("does not add an id twice, or to an end that is not there", () => {
+    expect(addEdgeEnd("a & b --> c", 0, "from", "b")).toBe("a & b --> c");
+    expect(addEdgeEnd("a --> b", 4, "to", "z")).toBe("a --> b");
+    expect(addEdgeEnd("a --> b", 0, "to", "not ok")).toBe("a --> b");
+  });
+
+  it("takes an id off a list, with the & that joined it", () => {
+    expect(removeEdgeEnd("a & b & c --> d", 0, "from", 0)).toBe("b & c --> d");
+    expect(removeEdgeEnd("a & b & c --> d", 0, "from", 1)).toBe("a & c --> d");
+    expect(removeEdgeEnd("a & b & c --> d", 0, "from", 2)).toBe("a & b --> d");
+  });
+
+  it("keeps the last id on an end", () => {
+    expect(removeEdgeEnd("a --> b", 0, "to", 0)).toBe("a --> b");
+  });
+
+  it("writes the shared list of a chain once", () => {
+    expect(addEdgeEnd("a --> b --> c", 0, "to", "x")).toBe("a --> b & x --> c");
+    expect(edgeEnds("a --> b & x --> c", 1, "from")).toEqual(["b", "x"]);
+  });
+
+  it("carries a chain one hop on, wearing the chain's arrow, after the last hop's label", () => {
+    expect(appendHop("a --> b", "c")).toBe("a --> b --> c");
+    expect(appendHop('a -.-> b "x" quiet', "c")).toBe('a -.-> b "x" quiet -.-> c');
+    expect(appendHop("a --> b // note", "c")).toBe("a --> b --> c // note");
+    expect(appendHop("a --> b", "c", "-.->")).toBe("a --> b -.-> c");
+    expect(appendHop("a --> b", "two words")).toBe("a --> b");
+  });
+
+  it("takes the last hop of a chain off, and nothing from a single arrow", () => {
+    expect(dropHop("a --> b --> c")).toBe("a --> b");
+    expect(dropHop('a --> b "x" --> c "y" // note')).toBe('a --> b "x" // note');
+    expect(dropHop("a --> b")).toBe("a --> b");
+  });
+
+  it("only writes statements the parser still reads as the same shape", () => {
+    const body = (line: string) => `service a "A"\nservice b "B"\nservice c "C"\n${line}`;
+    const edges = (line: string) => parseDiagram("arch", body(line))?.edges ?? [];
+    expect(edges(addEdgeEnd("a --> c", 0, "from", "b"))).toHaveLength(2);
+    expect(new Set(edges(addEdgeEnd("a --> c", 0, "from", "b")).map((e) => e.bus)).size).toBe(1);
+    expect(edges(appendHop("a --> b", "c"))).toHaveLength(2);
+  });
+});
+
+/**
+ * Wrapping, and a container's own two controls.
+ *
+ * Every case reparses what it wrote: a writer that hands back a body the parser rejects is worse
+ * than one that does nothing, and the interesting claims are about *which container each card ended
+ * up in* rather than about the bytes alone.
+ */
+describe("wrapStatement", () => {
+  const clean = (type: string, body: string) => {
+    const g = parseDiagram(type, body)!;
+    expect(g.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    return g;
+  };
+  const ARCH = `service api "API" icon=server\nstore db "Database"\n\napi --> db "reads"`;
+
+  it("puts one card inside a new group and touches nothing else", () => {
+    const out = wrapStatement(ARCH, 1, { word: "group", id: "group2", label: "Backend" });
+    expect(out).toBe(`group group2 "Backend" {\n  service api "API" icon=server\n}\nstore db "Database"\n\napi --> db "reads"`);
+    const g = clean("arch", out);
+    expect(g.nodes.find((n) => n.id === "api")?.group).toBe("group2");
+    expect(g.nodes.find((n) => n.id === "db")?.group).toBeUndefined();
+    expect(g.edges).toHaveLength(1);
+  });
+
+  it("carries a block with it — a group wrapped keeps its children one level further in", () => {
+    const body = `group a "A" {\n  service x "X"\n\n  service y "Y"\n}\nservice z "Z"`;
+    const out = wrapStatement(body, 1, { word: "group", id: "outer", label: "Outer" });
+    expect(out).toBe(`group outer "Outer" {\n  group a "A" {\n    service x "X"\n\n    service y "Y"\n  }\n}\nservice z "Z"`);
+    const g = clean("arch", out);
+    expect(g.groups.find((x) => x.id === "a")?.parent).toBe("outer");
+    expect(g.nodes.find((n) => n.id === "y")?.group).toBe("a");
+  });
+
+  it("wraps inside the block the card was in, at that block's indent", () => {
+    const body = `group a "A" {\n  service x "X"\n  service y "Y"\n}`;
+    const out = wrapStatement(body, 3, { word: "group", id: "g2", label: "G" });
+    expect(out).toBe(`group a "A" {\n  service x "X"\n  group g2 "G" {\n    service y "Y"\n  }\n}`);
+    expect(clean("arch", out).groups.find((x) => x.id === "g2")?.parent).toBe("a");
+  });
+
+  it("keeps a card's rows block whole", () => {
+    const body = `entity user {\n  id uuid pk\n  email text\n}\nentity org { id uuid pk }`;
+    const out = wrapStatement(body, 1, { word: "group", id: "g", label: "People" });
+    const g = clean("erd", out);
+    expect(g.nodes.find((n) => n.id === "user")?.rows).toHaveLength(2);
+    expect(g.nodes.find((n) => n.id === "user")?.group).toBe("g");
+  });
+
+  it("opens a lane in flow, with the card inside it", () => {
+    const out = wrapStatement(`step a "A"\nstep b "B"\na --> b`, 1, { word: "lane", id: "lane2", label: "Lane" });
+    const g = clean("flow", out);
+    expect(g.nodes.find((n) => n.id === "a")?.lane).toBe("lane2");
+    expect(g.nodes.find((n) => n.id === "b")?.lane).toBeUndefined();
+  });
+
+  it("writes a fixed fence's own box on the container and the card's place inside it", () => {
+    const body = `box a "A" x=100 y=60 w=80 h=40`;
+    const out = wrapStatement(body, 1, {
+      word: "group",
+      id: "g",
+      label: "Frame",
+      box: { x: 76, y: 36, w: 128, h: 88 },
+      at: { x: 24, y: 24 },
+    });
+    expect(out).toBe(`group g "Frame" x=76 y=36 w=128 h=88 {\n  box a "A" w=80 h=40 x=24 y=24\n}`);
+    const g = parseDiagram("sketch", out)!;
+    expect(g.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(g.groups[0]).toMatchObject({ id: "g", x: 76, y: 36, w: 128, h: 88 });
+    expect(g.nodes[0]).toMatchObject({ id: "a", group: "g", x: 24, y: 24 });
+  });
+
+  it("is total: a blank line, a closing brace or a line out of range hands the body back", () => {
+    const body = `group a "A" {\n  service x "X"\n}\n\nservice z "Z"`;
+    for (const line of [0, 3, 4, 99]) expect(wrapStatement(body, line, { word: "group", id: "g", label: "G" })).toBe(body);
+  });
+});
+
+describe("setContainer", () => {
+  it("swaps group for system and back, leaving the rest of the line alone", () => {
+    const line = `group core "Core" "the part we own" hue=teal dir=TB {`;
+    const sys = setContainer(line, "system");
+    expect(sys).toBe(`system core "Core" "the part we own" hue=teal dir=TB {`);
+    expect(setContainer(sys, "group")).toBe(line);
+  });
+
+  it("keeps the indent and a trailing comment", () => {
+    expect(setContainer(`  group a "A" { %% the boundary`, "system")).toBe(`  system a "A" { %% the boundary`);
+  });
+
+  it("reads back through the parser in the two dialects that have `system`", () => {
+    for (const type of ["usecase", "c4"] as const) {
+      const body = `${setContainer('group s "S" {', "system")}\n}`;
+      const g = parseDiagram(type, body)!;
+      expect(g.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+      expect(g.groups[0]?.shape).toBe("system");
+      const back = parseDiagram(type, setContainer(body, "group"))!;
+      expect(back.groups[0]?.shape).toBe("group");
+    }
+  });
+
+  it("refuses a line that is not a group, a system or a declaration", () => {
+    for (const line of [`service api "API"`, `lane l "L" {`, `a --> b`, `group`]) expect(setContainer(line, "system")).toBe(line);
+  });
+});
+
+describe("setGroupDir", () => {
+  it("writes dir= before the brace, and the parser reads it", () => {
+    const line = setGroupDir(`group a "A" hue=teal {`, "TB");
+    expect(line).toBe(`group a "A" hue=teal dir=TB {`);
+    const g = parseDiagram("arch", `${line}\n  service x "X"\n}`)!;
+    expect(g.groups[0]?.dir).toBe("DOWN");
+  });
+
+  it("replaces one that is there, and takes it off with null", () => {
+    expect(setGroupDir(`group a "A" dir=TB {`, "LR")).toBe(`group a "A" dir=LR {`);
+    expect(setGroupDir(`group a "A" dir=TB {`, null)).toBe(`group a "A" {`);
+    expect(setGroupDir(`group a "A" {`, null)).toBe(`group a "A" {`);
+  });
+
+  it("reads LR as RIGHT", () => {
+    const g = parseDiagram("arch", `group a "A" dir=LR {\n  service x "X"\n}`)!;
+    expect(g.groups[0]?.dir).toBe("RIGHT");
+  });
+});
+
+describe("reverseEdge", () => {
+  it("swaps the two ends and keeps the label, the arrow and the modifiers where they were", () => {
+    expect(reverseEdge('who --> stack.db "reads" hue=teal')).toBe('stack.db --> who "reads" hue=teal');
+    expect(reverseEdge("a & b -.-> c")).toBe("c -.-> a & b");
+    expect(reverseEdge("a --|> b")).toBe("b --|> a");
+  });
+  it("leaves a chain alone, and anything that is not an edge", () => {
+    expect(reverseEdge("a --> b --> c")).toBe("a --> b --> c");
+    expect(reverseEdge('service api "API"')).toBe('service api "API"');
   });
 });

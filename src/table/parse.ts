@@ -96,6 +96,8 @@ export interface FilterRule {
 
 /** Where a tab's grid sits: the header line, the delimiter line, and the end of its last row. */
 interface Grid {
+  /** The header line, 1-based — where a column's problem is reported. */
+  line: number;
   header: Span;
   delimiter: Span;
   /** After the last row's newline — where a row appended at the end goes. */
@@ -535,6 +537,7 @@ export function parseTable(text: string): Table {
         const next = lines[i + 1]!;
         c.tab.columns = readColumns(found.header, line, c.tab.id);
         c.tab.grid = {
+          line: line.n,
           header: { start: line.start, end: line.end },
           delimiter: { start: next.start, end: next.end },
           end: next.end,

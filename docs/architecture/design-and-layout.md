@@ -14,7 +14,9 @@ an accent ring the author set, and it is gone — the accent now marks the card 
 nothing else. It was the one status that said something about the author rather than about the
 system, it meant "the subject" in eight dialects and "where a record sits" in `state`, and one mark
 cannot carry two meanings. `focus` and `current` still parse, warn `W_RETIRED_FLAG`, and are
-ignored, so an old board draws.
+ignored, so an old board draws. The properties view offers "Update it" for them — on the card that
+wears one, and for the whole diagram in the item view — which takes the flag off (*Controls on the canvas*,
+`editing.md`).
 
 **A theme is the reader's, not the board's.** Every board draws in the theme chosen in Settings →
 Preferences → Appearance, or the one a `?theme=` URL names; a `theme:` in a board's frontmatter
@@ -40,7 +42,9 @@ Three knobs in `theme.metric.elk`, and each exists because a board looked wrong 
   which is what a person pulling a diagram wider is actually asking for — because the theme's figure
   is a house default for the type, not a fact about every diagram of it: a pipeline drawn as `arch` really is one chain, and the fold that
   saves the average architecture diagram is what destroys that one. Anything but a number ≥ 0 is
-  `EB_BAD_ASPECT`.
+  `EB_BAD_ASPECT`. The item view's *Wrapping* select writes all three states — off the line, `0`, a
+  ratio — and the problems dock's repair for `EB_BAD_ASPECT` takes the bad value off (`editing.md`,
+  *Settings that had no source-free way in*).
 - **`hierarchy`** — `separate` lays each group out on its own and then arranges the boxes; `include`
   is one global pass. `separate` is what makes the ERD look hand-drawn: domains side by side,
   entities stacked, every group hugging its content. Under `include` one direction serves both axes
@@ -122,9 +126,10 @@ Each of these was *refused* rather than deferred:
   `removeNode` documents and `restate.test.ts` freezes. Re-parenting one level up is what *ungroup*
   means, and it wants a `dissolveGroup` writer and a button of its own — see the end of *Controls on
   the canvas*.
-- **Dragging a `gitgraph` commit, or a `sequence` message.** A commit's column and a branch's lane
-  are both ordinal and both the file's, so no drop means anything; a message is not draggable by
-  construction, since only a participant header carries `data-dag-node`. See *Dragging a card*.
+- **A coordinate for a `gitgraph` commit, or dragging a `sequence` message.** A commit's column and
+  a branch's lane are both ordinal and both the file's, so a drag there is a merge or a swap, never
+  a position; a message is not draggable by construction, since only a participant header carries
+  `data-dag-node`. See *Dragging a card*.
 - **A custom colour.** Ten hues, and `check-literals.mjs` is why: a hex typed into a board is a
   colour the theme does not own, and the swatches are `HUE_ORDER`. A chart is where that costs the
   most and it still holds: `color.chartHues` is seven *names*, and past the seventh a series draws

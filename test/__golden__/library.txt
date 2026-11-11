@@ -357,6 +357,27 @@ decision ask1 "Did it work?"
 
 decision ask2 "Did it work?"
 
+## part-activity-end
+type: activity  icon: Circle
+name: End
+desc: activity · where it ends — a ringed dot.
+--- alone
+end finish1
+--- appended twice to its template
+lane a "Actor" hue=teal {
+  action start "Do the first thing"
+  decision ok "Did it work?"
+  action finish "Wrap up"
+}
+
+[*] --> start --> ok
+ok --> finish "yes"
+finish --> [*]
+
+end finish1
+
+end finish2
+
 ## part-activity-fork
 type: activity  icon: GitFork
 name: Fork
@@ -425,6 +446,27 @@ lane lane1 "Who" hue=teal {
 lane lane2 "Who" hue=teal {
   action lane2_1 "Do the thing"
 }
+
+## part-activity-start
+type: activity  icon: Dot
+name: Start
+desc: activity · where it begins — a filled dot.
+--- alone
+start begin1
+--- appended twice to its template
+lane a "Actor" hue=teal {
+  action start "Do the first thing"
+  decision ok "Did it work?"
+  action finish "Wrap up"
+}
+
+[*] --> start --> ok
+ok --> finish "yes"
+finish --> [*]
+
+start begin1
+
+start begin2
 
 ## part-arch-bigquery
 type: arch  icon: Database
@@ -900,6 +942,28 @@ class Type1 { +name: str; +describe() str }
 
 class Type2 { +name: str; +describe() str }
 
+## part-class-group
+type: class  icon: Group
+name: Group
+desc: class · a package of types.
+--- alone
+group grp1 "Package" hue=indigo {
+  class grp1_type { +name: str; +describe() str }
+}
+--- appended twice to its template
+class Thing { +name: str; +describe() str }
+interface Describable { +describe() str }
+
+Thing ..|> Describable
+
+group grp1 "Package" hue=indigo {
+  class grp1_type { +name: str; +describe() str }
+}
+
+group grp2 "Package" hue=indigo {
+  class grp2_type { +name: str; +describe() str }
+}
+
 ## part-class-interface
 type: class  icon: Braces
 name: Interface
@@ -931,6 +995,28 @@ account ||--o{ order "account_id"
 entity table1 { id uuid pk; name text; created_at timestamptz }
 
 entity table2 { id uuid pk; name text; created_at timestamptz }
+
+## part-erd-group
+type: erd  icon: Group
+name: Group
+desc: erd · a domain with a hue, which `fk=` can point at.
+--- alone
+group grp1 "Domain" hue=indigo {
+  entity grp1_table { id uuid pk; name text; created_at timestamptz }
+}
+--- appended twice to its template
+entity account { id uuid pk; email text }
+entity order { id uuid pk; account_id fk; total bigint }
+
+account ||--o{ order "account_id"
+
+group grp1 "Domain" hue=indigo {
+  entity grp1_table { id uuid pk; name text; created_at timestamptz }
+}
+
+group grp2 "Domain" hue=indigo {
+  entity grp2_table { id uuid pk; name text; created_at timestamptz }
+}
 
 ## part-flow-decision
 type: flow  icon: Split
@@ -1578,6 +1664,66 @@ group phone "Sign in" x=0 y=0 w=320 h=440 {
 triangle triangle1 "Triangle"
 
 triangle triangle2 "Triangle"
+
+## part-state-end
+type: state  icon: Circle
+name: End
+desc: state · where it ends — a ringed dot.
+--- alone
+end finish1
+--- appended twice to its template
+state draft "Draft"
+state live "Live" done
+
+[*] --> draft
+draft --> live "publish"
+live --> [*]
+
+end finish1
+
+end finish2
+
+## part-state-group
+type: state  icon: Group
+name: Group
+desc: state · a set of values that belong together.
+--- alone
+group grp1 "Group" hue=teal {
+  state grp1_s "State"
+}
+--- appended twice to its template
+state draft "Draft"
+state live "Live" done
+
+[*] --> draft
+draft --> live "publish"
+live --> [*]
+
+group grp1 "Group" hue=teal {
+  state grp1_s "State"
+}
+
+group grp2 "Group" hue=teal {
+  state grp2_s "State"
+}
+
+## part-state-start
+type: state  icon: Dot
+name: Start
+desc: state · where it begins — a filled dot.
+--- alone
+start begin1
+--- appended twice to its template
+state draft "Draft"
+state live "Live" done
+
+[*] --> draft
+draft --> live "publish"
+live --> [*]
+
+start begin1
+
+start begin2
 
 ## part-state-state
 type: state  icon: CircleDot

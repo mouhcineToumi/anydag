@@ -68,6 +68,41 @@ export function kindsOf(type: string): string[] {
 }
 
 /**
+ * Which string of a statement the card draws as its description, or `null` when it draws none.
+ *
+ * Only `C4Box` draws a third string, and it is reached two ways: any C4 `container`/`db`, and a
+ * `person` or `extsystem` in any dialect that has one. They differ in *where* the sentence is
+ * written, which is why this is a function and not a list of kinds. A C4 `person` and `extsystem`
+ * are documented with two strings — name, description — and `c4.finish` moves the second one into
+ * `desc`; a third string, if there is one, wins. So the slot is 1 until a third is written. Every
+ * other one is the third string, slot 2.
+ *
+ * `word` is the word the statement is declared with (or its `kind=`): the vocabulary is the
+ * dialect's, and the kind it maps to is what decides. `strings` is how many the line has now.
+ */
+export function descriptionSlot(type: string, word: string, strings: number): 1 | 2 | null {
+  const kind = DIALECTS[type as DiagramType]?.kinds[word];
+  if (kind === "person" || kind === "extsystem") return type === "c4" && strings < 3 ? 1 : 2;
+  if (type === "c4" && (kind === "container" || kind === "db")) return 2;
+  return null;
+}
+
+/**
+ * The words that open a container in this dialect, in the order the grammar lists them: `group`
+ * everywhere there is one, `system` as well in `usecase` and `c4`, `frame` as well in `sketch`, and
+ * `lane` in the two that have bands. Empty for a dialect with no brace containers — a mindmap, a
+ * timeline, a gitgraph, a sequence and a chart nest by position, not by brace.
+ *
+ * Read off the dialect rather than listed beside it, for the reason `kindsOf` is: the control that
+ * offers a word and the parser that rejects it cannot then disagree.
+ */
+export function containersOf(type: string): string[] {
+  const dialect = DIALECTS[type as DiagramType];
+  if (!dialect) return [];
+  return [...(dialect.groupWords ?? ["group"]), ...(dialect.lanes ? ["lane"] : [])];
+}
+
+/**
  * Whether a node in this dialect can carry rows — the `{ … }` block under a declaration.
  *
  * `Dialect.row` is the row grammar, and its absence is what "this dialect has no rows" means; a

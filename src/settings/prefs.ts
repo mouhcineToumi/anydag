@@ -71,11 +71,6 @@ export const FILE_LIST = "dag:file-list";
 export const TASKS_VIEW = "dag:tasks-view";
 
 /**
- * Which half of a quiz's form this browser last used — its questions or its source. The
- * Tasks page's layout's reason: view state, this browser's, not in `PREF_KEYS`.
- */
-export const QUIZ_MODE = "dag:quiz-mode";
-/**
  * Whether a run's *About this quiz* panel is folded away, `"0"` when it is. The Tasks
  * page's layout's reason: view state, this browser's, not in `PREF_KEYS`.
  */

@@ -16,6 +16,8 @@ interface Props {
     remove(id: string): void;
     reorder(id: string, before: string | null): void;
   };
+  /** How many problems a page has, by page id: a count beside its name, so one on a page nobody is looking at shows. Pages absent or at 0 show none. */
+  flags?: Readonly<Record<string, number>>;
   /** What one is called, in the labels: a board's pages, a table's tabs. */
   noun?: "page" | "tab";
 }
@@ -33,7 +35,7 @@ interface Props {
  * `.dag-body` and `.dag-viewport`, whose `flex: 1; min-width: 0` contract every selector in
  * `canvas.css` is written against — a real risk for a cosmetic gain.
  */
-export function PageBar({ pages, page, onPage, edit, noun = "page" }: Props) {
+export function PageBar({ pages, page, onPage, edit, flags, noun = "page" }: Props) {
   /* Which tab is being renamed, if any. Local: nothing outside the strip cares. */
   const [renaming, setRenaming] = useState<string | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
@@ -151,7 +153,7 @@ export function PageBar({ pages, page, onPage, edit, noun = "page" }: Props) {
                 data-dag-page={p.id}
                 aria-selected={p.id === page}
                 tabIndex={p.id === page ? 0 : -1}
-                className={p.id === page ? "dag-tab dag-tab--on" : "dag-tab"}
+                className={`${p.id === page ? "dag-tab dag-tab--on" : "dag-tab"}${flags?.[p.id] ? " dag-tab--flagged" : ""}`}
                 /* The whole name, since the tab itself shows one truncated line of it. */
                 title={p.name}
                 onPointerDown={onPointerDown(p.id)}
@@ -161,7 +163,20 @@ export function PageBar({ pages, page, onPage, edit, noun = "page" }: Props) {
                 }}
                 onDoubleClick={() => edit && setRenaming(p.id)}
               >
-                {p.name}
+                {flags?.[p.id] ? (
+                  <>
+                    <span className="dag-tab__label">{p.name}</span>
+                    <span
+                      className="dag-tab__flag"
+                      data-dag-page-flag={flags[p.id]}
+                      aria-label={`${flags[p.id]} ${flags[p.id] === 1 ? "problem" : "problems"}`}
+                    >
+                      {flags[p.id]}
+                    </span>
+                  </>
+                ) : (
+                  p.name
+                )}
               </button>
               {edit && pages.length > 1 && p.id === page ? (
                 <button

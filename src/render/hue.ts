@@ -27,3 +27,21 @@ export function hueVars(hue: Hue | undefined): CSSProperties {
     "--dag-t": `var(--dag-tint-${hue})`,
   } as CSSProperties;
 }
+
+/**
+ * A diagram's own hue, bound for its frame — **not** `hueVars()`.
+ *
+ * `--dag-h` and `--dag-t` are read by every card, band and chip inside a diagram through
+ * inheritance, with the theme's default hue behind them. Binding them on the frame would recolour
+ * every card in it that has no hue of its own, which is the opposite of what a person who tints a
+ * diagram's frame meant. These two names are read by the frame's border and its title band and by
+ * nothing else; they carry no `--dag-` prefix for the reason `--inspector-w` does not — a theme has
+ * no opinion about them, it only has the hues they point at.
+ */
+export function frameHueVars(hue: Hue | undefined): CSSProperties {
+  if (!hue) return {};
+  return {
+    "--frame-h": `var(--dag-color-hues-${hue})`,
+    "--frame-t": `var(--dag-tint-${hue})`,
+  } as CSSProperties;
+}

@@ -177,12 +177,15 @@ export class Assistant {
     }
   }
 
-  /** Where a chat lives: the vault named, else any open vault that holds it. */
+  /** Where a chat lives: the vault named first, then any other open vault that holds it. */
   locate(chat: string, vault?: string | null): { root: string; vault: string; meta: ChatMeta } {
     if (!validChatId(chat)) throw err(400, `\`${chat}\` is not a chat id`);
     const live = this.live.get(chat);
     if (live) return { root: live.root, vault: live.meta.home, meta: live.meta };
-    const tried = vault ? [this.s.pick(vault).vault] : this.s.served();
+    /* The page's history lists every open vault, so a row from another one opens by id even though
+       this tab names its own vault on every request. `pick` still refuses a vault that is not open. */
+    const named = vault ? this.s.pick(vault).vault : null;
+    const tried = named ? [named, ...this.s.served().filter((v) => v.id !== named.id)] : this.s.served();
     for (const v of tried) {
       const meta = this.store.meta(v.root, chat);
       if (meta) return { root: v.root, vault: v.id, meta };
