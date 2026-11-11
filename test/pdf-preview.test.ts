@@ -25,8 +25,10 @@ const pdf = () =>
 
 describe("the PDF preview", () => {
   /* One test, and the first render of a PDF in this module's life: a lazy that had rendered once
-     before, and suspended then, would have resolved by now and drawn the viewer too. */
-  it("draws the viewer itself in the first render after the chunk has come", async () => {
+     before, and suspended then, would have resolved by now and drawn the viewer too. The chunk is
+     pdf.js, imported cold: on a CI runner sharing two cores with the rest of the suite it has taken
+     past vitest's 5 s, so the test is given the time the import needs. */
+  it("draws the viewer itself in the first render after the chunk has come", { timeout: 30_000 }, async () => {
     await preloadPdfViewer();
     const markup = pdf();
     expect(markup).not.toContain('data-dag-pdf="loading"></div>');
