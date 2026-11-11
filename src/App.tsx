@@ -242,6 +242,9 @@ export function pageQuery(kind: FileKind, target: string | null): Record<string,
   };
 }
 
+/** The keys that say which page is open — `pageQuery`'s own list, and what home clears. */
+const PAGE_KEYS = Object.keys(pageQuery("board", null));
+
 /**
  * A board or a note, and never both on one screen.
  *
@@ -295,6 +298,14 @@ export function App() {
     (run?: QuizzesRun) => setQuery({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
     [setQuery],
   );
+  /* Home: no page open, so `Welcome` renders. Every page's key cleared — the vault, the theme and
+     the rest of the address kept — as a new history entry, so Back returns to the page that was
+     left. What the AnyDag logo does, wherever it is drawn. */
+  const goHome = useCallback(() => {
+    const next = new URLSearchParams(location.search);
+    for (const k of PAGE_KEYS) next.delete(k);
+    go(next);
+  }, [go]);
   const ref = query.get("ref");
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
@@ -381,6 +392,7 @@ export function App() {
       openTrash={openTrash}
       assistantOpen={assistant}
       openAssistant={openAssistantPage}
+      openHome={goHome}
       open={open}
     >
       {page}

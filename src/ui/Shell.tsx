@@ -99,6 +99,11 @@ export interface SidebarControl {
   retitle(kind: FileKind, name: string, title: string): void;
   /** A listed file's permanent id, which a link to it carries. */
   idOf(name: string): string | undefined;
+  /**
+   * Home: nothing open, the welcome card, as a new history entry so Back comes back here. What
+   * the AnyDag logo does — the column's own while it is docked, the toolbar's while it is away.
+   */
+  home(): void;
 }
 
 const SidebarContext = createContext<SidebarControl | null>(null);
@@ -225,6 +230,7 @@ export function Shell({
   openTrash,
   assistantOpen,
   openAssistant,
+  openHome,
   open,
   children,
 }: {
@@ -274,6 +280,8 @@ export function Shell({
   /** The Assistant page (`?chat=`), and the way to it — on a chat, or `1` for the newest. */
   assistantOpen: boolean;
   openAssistant(chat?: string | null): void;
+  /** Home: nothing open, the welcome card, as a new history entry — what the AnyDag logo does. */
+  openHome(): void;
   open(kind: FileKind, name: string | null): void;
   children: ReactNode;
 }) {
@@ -798,8 +806,8 @@ export function Shell({
 
   const idOf = useCallback((name: string) => ids[name], [ids]);
   const ctl = useMemo<SidebarControl>(
-    () => ({ docked: mode === "docked", reveal, create, renamed, retitle, idOf }),
-    [mode, reveal, create, renamed, retitle, idOf],
+    () => ({ docked: mode === "docked", reveal, create, renamed, retitle, idOf, home: openHome }),
+    [mode, reveal, create, renamed, retitle, idOf, openHome],
   );
 
   /* What Undo did with what came back: a favourite is a favourite again, under the name it has now,
@@ -911,6 +919,7 @@ export function Shell({
               openTrash();
               dismiss();
             }}
+            onHome={openHome}
             openFolders={openFolders}
             onFolder={(path, isOpen) =>
               setFolders((had) => {
