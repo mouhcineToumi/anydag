@@ -211,6 +211,15 @@ an edge says had to be typed into a fence. A **pick** is that missing thing: `pi
   turns into an accidental edit. A press on a card that is *already* picked drags the **card** —
   the structural move, see *Dragging a card* — and `alt` on that press falls through to the item
   drag, which moves the diagram.
+- **A group, a frame or a lane is picked by the same click** (#145). `nodeUnder` in `Item.tsx` asks
+  for a card first — cards are drawn over their containers — and then for the `data-dag-group`,
+  `data-dag-lane` or `data-dag-lane-label` under the pointer, *inside the drawing*: the item's own
+  box carries `data-dag-group` too, and that is the board's group, not one of the diagram's. A click
+  on the empty inside of a container picks the container; a click on the diagram outside any clears
+  the pick. It used to take a double-click, which opens the rename, and an Escape to put it away. A
+  press on a picked container moves the diagram (there is no card for `nodeDrag` to drag), and only
+  a picked **card** comes forward (`z-index`): a picked group raised over its own cards took every
+  click meant for them.
 - **A pick is not part of `selected`, for the reason `pickedLink` is not.** A card cannot be
   marquee'd, grouped, copied or moved as an item, and widening the selection to hold two kinds of
   thing would put a `typeof` in every place that reads it. It clears on every change to `selected`
@@ -314,8 +323,7 @@ rest, and each has one rule worth knowing before changing it:
   has no box to size — it has a `dir=`, which is its own direction and not the diagram's. A pen
   stroke gets neither: its box is its points' bounds and only a resize writes it. `setExtent`
   refuses a size that is not a positive number, and `NumberField`'s `min` keeps the box honest
-  about it. A group is reached by the double-click that renames it, then Escape; a plain click
-  picks cards only.
+  about it. A group is picked by a click on it, as a card is (*Picking a node*).
 - **The description is the string the card draws.** Only `C4Box` draws a third string, so
   `descriptionSlot(type, word, strings)` in `src/dsl/parse.ts` says which kinds have one and *where*:
   a C4 `container` and `db` write it as the third string, but a C4 `person` and `extsystem` are
