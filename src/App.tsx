@@ -2670,6 +2670,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             boardName={board.name}
             pages={board.pages}
             boardLinks={board.links}
+            boardItems={board.items}
             problems={editingProblems}
             repairOf={(p) => (repairText === null ? null : planRepair(repairText, board, p))}
             onRepair={locked || !editor.enabled ? undefined : editor.repair}

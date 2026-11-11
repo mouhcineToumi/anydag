@@ -2524,6 +2524,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 
 /* The open item's problems, under its source: where somebody editing it is already looking. */
 /* The panel's Problems block (#145): at the top, words and the act that answers them. */
+/* An `edges` fence with no link picked: what to do instead of reading its statements (#145). */
+.dag-inspector__hint { margin: 10px 14px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+
 .dag-inspector__problems {
   flex: none;
   max-height: 180px;

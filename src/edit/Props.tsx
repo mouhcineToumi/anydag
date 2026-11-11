@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
+  ArrowLeftRight,
   ArrowUp,
   ChevronDown,
   CircleCheck,
@@ -27,6 +28,7 @@ import {
   edgeSpan,
   participantKind,
   readModifier,
+  reverseEdge,
   indentTopic,
   makeRoot,
   outdentTopic,
@@ -97,7 +99,8 @@ import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
 
 import { detachable, freshNodeId, hasPseudo, loneNode, wrapPlan, type Pseudo } from "./build";
 import { layered } from "./drag";
-import { EdgeEnds } from "./EdgeEnds";
+import { EdgeEnds, type EndChoices } from "./EdgeEnds";
+import { edgeTargets } from "./pick";
 import { IconPicker } from "./IconPicker";
 import type { Editor } from "./useEditor";
 
@@ -127,6 +130,18 @@ import type { Editor } from "./useEditor";
  */
 
 /** What the panel is showing controls for, and where in the body it is written. */
+/**
+ * The lines a board link is offered, in words. Each spelling is one the tokenizer reads and
+ * `parseLinks` draws: dashed or not, and which ends wear a head.
+ */
+const LINK_LINES: readonly (readonly [string, string])[] = [
+  ["-->", "Arrow"],
+  ["-.->", "Dashed arrow"],
+  ["<->", "Arrow both ways"],
+  ["---", "Line"],
+  ["-.-", "Dashed line"],
+];
+
 export interface Subject {
   id: string;
   what: "node" | "group" | "lane" | "edge";
@@ -179,10 +194,13 @@ export function Props({
   showItem,
   onBody,
   onRenameNode,
+  linkEnds,
 }: {
   item: BoardItem;
   editor: Editor;
   pages: BoardPage[];
+  /** What a board link's ends may name, when this is an `edges` fence. */
+  linkEnds?: EndChoices;
   /** The panel's draft — what the person is looking at, which may be ahead of the file. */
   body: string;
   subject: Subject | null;
@@ -254,6 +272,8 @@ export function Props({
         }}
         onOut={() => editor.pickNode(item.id, null)}
         onRepick={(id, what) => (what === "edge" ? editor.pickEdge(item.id, id) : editor.pickNode(item.id, id))}
+        linkEnds={linkEnds}
+        onDeleteLink={subject.link ? () => editor.removeLink(subject.id) : undefined}
       />
     );
   }
@@ -694,11 +714,17 @@ function PickProps({
   onTopic,
   onOut,
   onRepick,
+  linkEnds,
+  onDeleteLink,
 }: {
   type: string;
   layout?: "fixed";
   body: string;
   subject: Subject;
+  /** What a board link's ends may name — the items on its page and their cards. Only for a link. */
+  linkEnds?: EndChoices;
+  /** Take the picked board link out of its fence. Only for a link. */
+  onDeleteLink?(): void;
   /** The word the picked thing could be wrapped in, or `null` where it cannot be — see `wrapPlan`. */
   wrap: "group" | "system" | "lane" | null;
   onWrap(): void;
@@ -745,10 +771,24 @@ function PickProps({
        cardinalities are matched structurally rather than enumerated, and offering a menu that
        silently drops `}o--||` would be worse than offering none. */
     const spellings = [...new Set([arrow, ...ARROWS.map(([text]) => text)])].filter(Boolean);
+    const link = subject.link === true;
+    /* A diagram's edge may name its cards, groups and rows; a board link names items on its page
+       and the cards inside them, which only the board knows, so the panel hands those in. */
+    const ends: EndChoices = link
+      ? (linkEnds ?? [])
+      : (() => {
+          const all = edgeTargets(type, body);
+          return [
+            ["Cards", all.nodes],
+            ["Groups", all.groups],
+            ["Rows", all.rows],
+          ] as const;
+        })();
+    const reversed = reverseEdge(src);
 
     return (
       <div className="dag-props" data-dag-props={id}>
-        <Head what={subject.link ? "link" : "edge"} id={id} line={line} onOut={onOut} />
+        <Head what={link ? "link" : "edge"} id={id} line={line} onOut={onOut} />
         <div className="dag-props__row">
           <input
             className="dag-input dag-props__label"
@@ -768,9 +808,9 @@ function PickProps({
           <input
             className="dag-input dag-props__label"
             data-dag-prop-label2=""
-            aria-label="Technology"
-            placeholder="technology"
-            title={label ? "Drawn under the label, as C4's technology" : "Give the edge a label first"}
+            aria-label={link ? "Second label" : "Technology"}
+            placeholder={link ? "second label" : "technology"}
+            title={label ? "Drawn under the label" : `Give the ${link ? "link" : "edge"} a label first`}
             disabled={!label}
             defaultValue={label2}
             key={`label2:${id}:${line}:${seg}:${label2}`}
@@ -779,19 +819,40 @@ function PickProps({
           />
         </div>
         <div className="dag-props__row">
-          <select
-            className="dag-select dag-props__arrow"
-            data-dag-prop-arrow=""
-            aria-label="Arrow"
-            value={arrow}
-            onChange={(e) => write(setEdgeArrow(src, e.target.value, seg))}
-          >
-            {spellings.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
+          {/* A board link's line is said in words: the arrow spellings are the file's, and a person
+              never reads the file. Anything else already written — a `--|>` an agent chose — is
+              offered as itself, so the menu never claims the line says something it does not. */}
+          {link ? (
+            <select
+              className="dag-select dag-props__arrow"
+              data-dag-prop-arrow=""
+              data-dag-prop-line=""
+              aria-label="Line"
+              value={arrow}
+              onChange={(e) => write(setEdgeArrow(src, e.target.value, seg))}
+            >
+              {LINK_LINES.some(([a]) => a === arrow) ? null : <option value={arrow}>{arrow}</option>}
+              {LINK_LINES.map(([a, words]) => (
+                <option key={a} value={a}>
+                  {words}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              className="dag-select dag-props__arrow"
+              data-dag-prop-arrow=""
+              aria-label="Arrow"
+              value={arrow}
+              onChange={(e) => write(setEdgeArrow(src, e.target.value, seg))}
+            >
+              {spellings.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          )}
           <label className="dag-field dag-field--row">
             <input
               type="checkbox"
@@ -803,12 +864,38 @@ function PickProps({
             <span>quiet</span>
           </label>
         </div>
-        {/* A board link's ends are items on the page, which this does not list; they are made by the
-            pointer, and the diagram's own edges are the ones with a bus, a chain, a group or a row. */}
-        {subject.link ? null : <EdgeEnds type={type} body={body} src={src} seg={seg} onLine={write} onOut={onOut} />}
+        <EdgeEnds choices={ends} src={src} seg={seg} onLine={write} onOut={onOut} />
         {/* F3 promoted `hue=` in `parseEdge`, so this recolours the line rather than claiming to.
             `finalize()` still derives one from the source where the author wrote none. */}
         <Hues hue={hue} onSet={(h) => write(setEdgeHue(src, h))} />
+        {link ? (
+          <div className="dag-props__row">
+            {/* Only a statement with one arrow turns round: a hop of a chain would have to be split
+                off first, and the writer leaves the line alone, which is what hides the button. */}
+            {reversed !== src ? (
+              <button
+                type="button"
+                className="dag-props__add"
+                data-dag-prop-reverse=""
+                title="Swap the two ends: the link points the other way"
+                onClick={() => write(reversed)}
+              >
+                <ArrowLeftRight {...ICON} aria-hidden="true" /> Reverse
+              </button>
+            ) : null}
+            {onDeleteLink ? (
+              <button
+                type="button"
+                className="dag-props__add"
+                data-dag-prop-delete=""
+                title="Delete this link (Delete)"
+                onClick={onDeleteLink}
+              >
+                <Trash2 {...ICON} aria-hidden="true" /> Delete
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }

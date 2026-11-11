@@ -27,6 +27,7 @@ import {
   edgeEnds,
   appendHop,
   dropHop,
+  reverseEdge,
   setFlag,
   setGroupDir,
   setKind,
@@ -933,5 +934,17 @@ describe("setGroupDir", () => {
   it("reads LR as RIGHT", () => {
     const g = parseDiagram("arch", `group a "A" dir=LR {\n  service x "X"\n}`)!;
     expect(g.groups[0]?.dir).toBe("RIGHT");
+  });
+});
+
+describe("reverseEdge", () => {
+  it("swaps the two ends and keeps the label, the arrow and the modifiers where they were", () => {
+    expect(reverseEdge('who --> stack.db "reads" hue=teal')).toBe('stack.db --> who "reads" hue=teal');
+    expect(reverseEdge("a & b -.-> c")).toBe("c -.-> a & b");
+    expect(reverseEdge("a --|> b")).toBe("b --|> a");
+  });
+  it("leaves a chain alone, and anything that is not an edge", () => {
+    expect(reverseEdge("a --> b --> c")).toBe("a --> b --> c");
+    expect(reverseEdge('service api "API"')).toBe('service api "API"');
   });
 });
