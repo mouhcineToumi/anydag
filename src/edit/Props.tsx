@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CircleCheck, Clock, CornerUpLeft, Minus, Plus, Trash2, type LucideIcon } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  CircleCheck,
+  Clock,
+  CornerUpLeft,
+  Minus,
+  Plus,
+  StickyNote,
+  Trash2,
+  Ungroup,
+  type LucideIcon,
+} from "lucide-react";
 
 import { isDiagramType, isLinkType, resizeOf, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
 import { moveEntry, parseTimeline, readWhen, sectionOfLine, sectionsOf, setWhen, whenOf } from "@/dsl/graph/timeline";
 import { HUE_ORDER, LEGEND_GLYPHS, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
 import { containersOf, descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
-import { PARTICIPANT_KINDS } from "@/dsl/sequence";
 import {
   addChartData,
   chartIdProblem,
@@ -57,11 +69,32 @@ import {
   type ModifierKey,
 } from "@/dsl/restate";
 import { retiredLines } from "@/dsl/diagnose";
+import { parseSequence, PARTICIPANT_KINDS, seqIdOf, seqIdOn } from "@/dsl/sequence";
+import {
+  addBranch,
+  branchesOf,
+  insertParticipant,
+  insertStatement,
+  MESSAGE_ARROWS,
+  messageParts,
+  moveRow,
+  noteParts,
+  noteStatement,
+  removeBranch,
+  setBranchLabel,
+  setMessageArrow,
+  setMessageEnd,
+  setMessageMark,
+  setMessageText,
+  setNoteOver,
+  setNoteText,
+  unwrap,
+} from "@/dsl/sequence-write";
 import { ARROWS, tokenize } from "@/dsl/tokenizer";
 
 import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
 
-import { detachable, hasPseudo, loneNode, wrapPlan, type Pseudo } from "./build";
+import { detachable, freshNodeId, hasPseudo, loneNode, wrapPlan, type Pseudo } from "./build";
 import { REFUSAL, layered } from "./drag";
 import { EdgeEnds } from "./EdgeEnds";
 import { IconPicker } from "./IconPicker";
@@ -216,6 +249,7 @@ export function Props({
           editor.pickFromLine(item.id, made.line, made.body);
         }}
         onOut={() => editor.pickNode(item.id, null)}
+        onRepick={(id, what) => (what === "edge" ? editor.pickEdge(item.id, id) : editor.pickNode(item.id, id))}
       />
     );
   }
@@ -546,6 +580,7 @@ function PickProps({
   onId,
   onTopic,
   onOut,
+  onRepick,
 }: {
   type: string;
   layout?: "fixed";
@@ -567,8 +602,17 @@ function PickProps({
   /** A restructured mindmap: the new body, and the line the picked topic now sits on. */
   onTopic(made: TopicEdit): void;
   onOut(): void;
+  /** Pick something else in this item — what a control that moved or made a thing hands over to. */
+  onRepick(id: string, what: "edge" | "node"): void;
 }) {
   const { id, what, line, seg } = subject;
+  /* A sequence's message, fragment and note have panels of their own: none of them is a card. */
+  const seq = type === "sequence" ? seqIdOf(id) : null;
+  if (type === "sequence" && what === "edge") {
+    return <MessageProps body={body} subject={subject} onBody={onBody} onOut={onOut} onRepick={onRepick} />;
+  }
+  if (seq?.what === "frag") return <FragmentProps body={body} subject={subject} onBody={onBody} onOut={onOut} />;
+  if (seq?.what === "note") return <NoteProps body={body} subject={subject} onBody={onBody} onOut={onOut} />;
   const src = body.split("\n")[line - 1] ?? "";
   const write = (next: string) => onBody(replaceLine(body, line, next));
   const mod = (key: ModifierKey, value: string | null) => write(setModifier(src, key, value));
@@ -691,6 +735,11 @@ function PickProps({
   const isMind = type === "mindmap";
   /* Not `bare` — that is a start or end dot, above. */
   const plain = isChart || isMind;
+   * A sequence participant parses its own line: two strings, `icon=`, `hue=` and `kind=`, and a bare
+   * word after them is read as the start of the next statement — so a status or a flag would break
+   * the diagram it was set on. It gets the Kind menu its grammar has instead, and no status or flags.
+   */
+  const isSeq = type === "sequence";
   /*
    * The statement's own strings — its title, meta and desc — read the way `textSlots` reads them:
    * the *consecutive* run right after the id. Not a regular expression over the line, because a
@@ -846,7 +895,7 @@ function PickProps({
           />
           <TimelineStatus value={status === "done" || status === "wait" ? status : ""} onSet={(v) => write(setStatus(src, v))} />
         </>
-      ) : plain || bare ? null : (
+      ) : plain || bare || isSeq ? null : (
         <div className="dag-props__row">
           <select
             className="dag-select dag-props__status"
@@ -877,7 +926,7 @@ function PickProps({
         />
       ) : null}
 
-      {isNode && !plain && !bare ? (
+      {isNode && !plain && !bare && !isSeq ? (
         <div className="dag-props__row" role="group" aria-label="Flags">
           {NODE_FLAGS.map(({ flag, label }) => (
             <label key={flag} className="dag-field dag-field--row">
@@ -1250,6 +1299,317 @@ function Rows({ type, body, line, onBody }: { type: string; body: string; line: 
         <Plus {...ICON} aria-hidden="true" /> Add a row
       </button>
     </div>
+  );
+}
+
+/* ----------------------------------------------------------------------------- a sequence */
+
+/** Every participant, as the menus offer them: the id the line writes and the name it is drawn under. */
+function useParticipants(body: string): { id: string; title: string }[] {
+  return useMemo(() => parseSequence(body).participants.map((p) => ({ id: p.id, title: p.title })), [body]);
+}
+
+/**
+ * A message: what it says, who sends it, who receives it, what kind of arrow, and the busy bar.
+ *
+ * Every control is a writer from `sequence-write.ts` over the message's own line. Moving it is a
+ * row at a time through the drawing (`moveRow`), and the pick follows it: a message that passes
+ * another changes its place in the count, and the panel has to keep showing the one that moved.
+ */
+function MessageProps({
+  body,
+  subject,
+  onBody,
+  onOut,
+  onRepick,
+}: {
+  body: string;
+  subject: Subject;
+  onBody(next: string): void;
+  onOut(): void;
+  onRepick(id: string, what: "edge" | "node"): void;
+}) {
+  const { id, line } = subject;
+  const src = body.split("\n")[line - 1] ?? "";
+  const write = (next: string) => onBody(replaceLine(body, line, next));
+  const people = useParticipants(body);
+  const m = messageParts(src);
+  if (!m) return null;
+  const named = (who: string) => people.find((p) => p.id === who)?.title ?? who;
+  /* What is on the line goes first, so a spelling the four do not name (`--)`) is still shown. */
+  const arrows = MESSAGE_ARROWS.some((a) => a.arrow === m.arrow)
+    ? MESSAGE_ARROWS
+    : [{ arrow: m.arrow, name: m.arrow }, ...MESSAGE_ARROWS];
+  const move = (dir: -1 | 1) => {
+    const out = moveRow(body, line, dir);
+    if (!out) return;
+    onBody(out.body);
+    const now = seqIdOn(out.body, out.line);
+    if (now && now.id !== id) onRepick(now.id, "edge");
+  };
+  const note = () => {
+    const over = m.from === m.to ? [m.from] : [m.from, m.to];
+    const out = insertStatement(body, { line, inside: false }, noteStatement(over, "note"));
+    onBody(out.body);
+    const now = seqIdOn(out.body, out.line);
+    if (now) onRepick(now.id, "node");
+  };
+  const who = (end: "from" | "to", hook: string) => (
+    <label className="dag-field dag-field--row">
+      <span>{end === "from" ? "From" : "To"}</span>
+      <select
+        className="dag-select"
+        {...{ [hook]: "" }}
+        value={m[end]}
+        onChange={(e) => write(setMessageEnd(src, end, e.target.value))}
+      >
+        {people.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  return (
+    <div className="dag-props" data-dag-props={id}>
+      <Head what="message" id={id} line={line} onOut={onOut} />
+      <div className="dag-props__fields">
+        <Field
+          label="Text"
+          hook="data-dag-prop-label"
+          value={m.text}
+          onSet={(v) => write(setMessageText(src, v.trim() || null))}
+        />
+        {who("from", "data-dag-prop-from")}
+        {who("to", "data-dag-prop-to")}
+        <label className="dag-field dag-field--row">
+          <span>Arrow</span>
+          <select
+            className="dag-select"
+            data-dag-prop-arrow=""
+            value={m.arrow}
+            onChange={(e) => write(setMessageArrow(src, e.target.value))}
+          >
+            {arrows.map((a) => (
+              <option key={a.arrow} value={a.arrow}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {/* Mermaid's `+` and `-`: the busy bar starts at the receiver, or ends at the sender. */}
+      <div className="dag-props__row" role="group" aria-label="Activation">
+        <label className="dag-field dag-field--row">
+          <input
+            type="checkbox"
+            className="dag-check"
+            data-dag-prop-activate=""
+            checked={m.activates}
+            onChange={(e) => write(setMessageMark(src, "+", e.target.checked))}
+          />
+          <span>Activates {named(m.to)}</span>
+        </label>
+        <label className="dag-field dag-field--row">
+          <input
+            type="checkbox"
+            className="dag-check"
+            data-dag-prop-deactivate=""
+            checked={m.deactivates}
+            onChange={(e) => write(setMessageMark(src, "-", e.target.checked))}
+          />
+          <span>Ends {named(m.from)}'s activation</span>
+        </label>
+      </div>
+      <div className="dag-props__row">
+        <button
+          type="button"
+          className="dag-props__add"
+          data-dag-prop-move="up"
+          title="Move it up one row"
+          onClick={() => move(-1)}
+        >
+          <ArrowUp {...ICON} aria-hidden="true" /> Up
+        </button>
+        <button
+          type="button"
+          className="dag-props__add"
+          data-dag-prop-move="down"
+          title="Move it down one row"
+          onClick={() => move(1)}
+        >
+          <ArrowDown {...ICON} aria-hidden="true" /> Down
+        </button>
+        <button
+          type="button"
+          className="dag-props__add"
+          data-dag-prop-note-add=""
+          title="A note under this message"
+          onClick={note}
+        >
+          <StickyNote {...ICON} aria-hidden="true" /> Note
+        </button>
+      </div>
+      <p className="dag-field__hint">Shift-click another message to pick the run between them, then Wrap in from the bar.</p>
+    </div>
+  );
+}
+
+/**
+ * A fragment: the condition on each branch, another branch, and Unwrap.
+ *
+ * Each branch is its own line — the head for the first, an `else` or an `and` after — so each field
+ * writes one line, and the line numbers come from the parse of the draft rather than from the pick.
+ */
+function FragmentProps({
+  body,
+  subject,
+  onBody,
+  onOut,
+}: {
+  body: string;
+  subject: Subject;
+  onBody(next: string): void;
+  onOut(): void;
+}) {
+  const { id, line } = subject;
+  const frag = branchesOf(body, line);
+  if (!frag) return null;
+  const lines = body.split("\n");
+  const more = frag.kind === "alt" ? "else" : frag.kind === "par" ? "and" : null;
+  return (
+    <div className="dag-props" data-dag-props={id}>
+      <Head what={frag.kind} id={id} line={line} onOut={onOut} />
+      <div className="dag-props__fields">
+        {frag.branches.map((b, i) => (
+          <div className="dag-props__rowline" key={`${b.line}:${b.label}`}>
+            <Field
+              label={i === 0 ? (frag.kind === "loop" ? "Repeats" : frag.kind === "par" ? "Branch" : "Condition") : (more ?? "")}
+              hook={`data-dag-prop-branch-${i}`}
+              value={b.label}
+              onSet={(v) => onBody(replaceLine(body, b.line, setBranchLabel(lines[b.line - 1] ?? "", v.trim() || null)))}
+            />
+            {i > 0 ? (
+              <button
+                type="button"
+                className="dag-icon dag-icon--tiny"
+                data-dag-prop-branch-remove={i}
+                aria-label={`Remove the ${more} branch`}
+                title="Remove this branch and what is in it"
+                onClick={() => onBody(removeBranch(body, b.line))}
+              >
+                <Trash2 {...ICON} aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <div className="dag-props__row">
+        {more ? (
+          <button
+            type="button"
+            className="dag-props__add"
+            data-dag-prop-branch-add=""
+            onClick={() => {
+              const out = addBranch(body, line);
+              if (out) onBody(out.body);
+            }}
+          >
+            <Plus {...ICON} aria-hidden="true" /> {more} branch
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="dag-props__add"
+          data-dag-prop-unwrap=""
+          title="Take the frame away and keep the messages"
+          onClick={() => {
+            onBody(unwrap(body, line));
+            onOut();
+          }}
+        >
+          <Ungroup {...ICON} aria-hidden="true" /> Unwrap
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A note: its words, and which participants it is drawn over — one at least. */
+function NoteProps({
+  body,
+  subject,
+  onBody,
+  onOut,
+}: {
+  body: string;
+  subject: Subject;
+  onBody(next: string): void;
+  onOut(): void;
+}) {
+  const { id, line } = subject;
+  const src = body.split("\n")[line - 1] ?? "";
+  const write = (next: string) => onBody(replaceLine(body, line, next));
+  const people = useParticipants(body);
+  const n = noteParts(src);
+  if (!n) return null;
+  return (
+    <div className="dag-props" data-dag-props={id}>
+      <Head what="note" id={id} line={line} onOut={onOut} />
+      <div className="dag-props__fields">
+        <Field
+          label="Text"
+          hook="data-dag-prop-note-text"
+          value={n.text}
+          onSet={(v) => v.trim() && write(setNoteText(src, v.trim()))}
+        />
+      </div>
+      <div className="dag-props__row" role="group" aria-label="Over">
+        {people.map((p) => (
+          <label key={p.id} className="dag-field dag-field--row">
+            <input
+              type="checkbox"
+              className="dag-check"
+              data-dag-prop-over={p.id}
+              checked={n.over.includes(p.id)}
+              onChange={(e) =>
+                write(
+                  setNoteOver(
+                    src,
+                    people.map((q) => q.id).filter((q) => (q === p.id ? e.target.checked : n.over.includes(q))),
+                  ),
+                )
+              }
+            />
+            <span>{p.title}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A sequence's own item view: the one thing it needs that nothing on the canvas can start, which is
+ * a participant — a message is drawn between two lifelines, so with none there is nowhere to draw.
+ */
+function SequenceProps({ body, onBody }: { body: string; onBody(next: string): void }) {
+  return (
+    <>
+      <button
+        type="button"
+        className="dag-props__add"
+        data-dag-seq-participant-add=""
+        onClick={() => onBody(insertParticipant(body, freshNodeId(body, "participant"), "Participant"))}
+      >
+        <Plus {...ICON} aria-hidden="true" /> Add a participant
+      </button>
+      <p className="dag-field__hint">
+        Drag from one lifeline to another to draw a message. Click a message or a fragment's tab to change it.
+      </p>
+    </>
   );
 }
 
@@ -1709,6 +2069,8 @@ function ItemProps({
             form is a body word on purpose, so `src/board/` never learns what a chart is. */
         item.type === "chart" ? (
           <ChartProps itemId={item.id} editor={editor} body={body} onBody={onBody} />
+        ) : item.type === "sequence" ? (
+          <SequenceProps body={body} onBody={onBody} />
         ) : null
       ) : item.type === "md" ? (
         <label className="dag-field dag-field--row">

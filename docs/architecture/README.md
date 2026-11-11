@@ -98,6 +98,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | References, ids and the read-only view | [`references.md`](references.md) |
 | Running the relay | [`feedback.md`](feedback.md) |
 | Search | [`search.md`](search.md) |
+| Sequence messages and fragments | [`editing.md`](editing.md) |
 | Settings | [`settings.md`](settings.md) |
 | Settings that had no source-free way in | [`editing.md`](editing.md) |
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |

@@ -79,8 +79,10 @@ export interface DiagramProps {
    * absence is what stops the hit strokes being drawn at all, so a snapshot is unchanged by any of
    * this. The ring on the picked edge does *not* come back down as a prop: it is painted onto the
    * element, because `Item` is memoised and this would be a per-node prop on it.
+   *
+   * `extend` is shift held: a sequence's messages are picked as a run, for Wrap in.
    */
-  onPickEdge?(id: string): void;
+  onPickEdge?(id: string, extend: boolean): void;
 }
 
 /**
@@ -262,7 +264,12 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
         {!placed ? (
           <div className="dag-diagram dag-diagram--pending" />
         ) : placed.kind === "sequence" ? (
-          <SequenceView placed={placed} participants={(view as SequenceModel).participants} theme={theme} />
+          <SequenceView
+            placed={placed}
+            participants={(view as SequenceModel).participants}
+            theme={theme}
+            onPickEdge={onPickEdge}
+          />
         ) : placed.kind === "chart" ? (
           <ChartBody placed={placed} theme={theme} id={item.id} />
         ) : (
@@ -536,7 +543,7 @@ function GraphBody({
   graph: Graph;
   placed: Extract<Layout, { kind: "graph" }>;
   theme: Theme;
-  onPickEdge?(id: string): void;
+  onPickEdge?(id: string, extend: boolean): void;
 }) {
   /* A strip is placed above the origin (a timeline section bar). The body has to reserve that room
      or it is clipped by the frame's rule. */

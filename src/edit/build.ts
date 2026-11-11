@@ -288,6 +288,11 @@ export interface LaidOut {
    * Absent from a page older than this field, where the boxes were the whole of it.
    */
   size?: { w: number; h: number };
+  /**
+   * A sequence's rows — every line drawn at a height, with that height (`SeqPlaced.rows`). What a
+   * message drawn with the pointer is placed by. Absent everywhere else.
+   */
+  rows?: { y: number; line: number; inside: boolean }[];
 }
 
 /**
@@ -360,7 +365,8 @@ export const detachable = (type: ItemType): boolean =>
  * breaks the chart it was pressed on. A sequence has arrows, but an arrow there is a *message* — a
  * moment, not a relationship — so growing a participant "with the edge already attached" would put
  * a message between two people on the strength of a click on a plus, which is a different claim
- * from the one every other dialect's `+` makes.
+ * from the one every other dialect's `+` makes. A message is drawn instead, by a drag from one
+ * lifeline to another (`lifelineDrag` in `useEditor`), which says who to whom and when.
  *
  * The item's own connect handles are untouched: a board-level link into a series or a participant
  * is an `edges` fence one layer up, and that grammar owns both ends.

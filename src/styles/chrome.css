@@ -1825,6 +1825,38 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 [data-dag-connecting] .dag-edge-hit { pointer-events: none; }
 
 /*
+ * A sequence: the lifeline a message is drawn from, the message being drawn, and the tab a
+ * fragment is picked by.
+ *
+ * The lifeline's stroke is `.dag-edge-hit`'s answer to a hairline nobody can hit, and only drawn
+ * with a pointer to use it (`SequenceView`'s `live`). It answers the pointer on a diagram that is
+ * not selected too, because a press there is how the diagram gets selected and moved; the crosshair
+ * only says "draw from here" once a press there would.
+ */
+.dag-lifeline-hit {
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+}
+[data-dag-selected] .dag-lifeline-hit { cursor: crosshair; }
+[data-dag-drawing] .dag-lifeline-hit,
+[data-dag-drawing] .dag-edge-hit { pointer-events: none; }
+.dag-msg-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.dag-msg-ghost path {
+  fill: none;
+  stroke: var(--dag-color-accent);
+  stroke-width: 2px;
+  stroke-dasharray: 6 4;
+}
+[data-dag-selected] .dag-frag-tab[data-dag-frag] { cursor: pointer; }
+
+/*
  * The bend handle at a picked link's middle: pull it, and the line goes through the point.
  *
  * Drawn only for the one line that is picked, and only on the board layer — a fixed point between
@@ -1864,7 +1896,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  */
 [data-dag-node][data-dag-picked],
 [data-dag-group][data-dag-picked],
-[data-dag-lane][data-dag-picked] {
+[data-dag-lane][data-dag-picked],
+[data-dag-frag][data-dag-picked] {
   outline: 2px solid var(--dag-color-accent);
   outline-offset: 2px;
   z-index: 2;

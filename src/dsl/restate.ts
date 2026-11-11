@@ -35,9 +35,11 @@ import { tokenize, type Token } from "./tokenizer";
  *
  * `col=` is on the list because it *is* one — the layer a card is kept in, offered by the panel
  * after a drag moved a card past its own. `x=`/`y=` are not, for the reason the doc on
- * `writeModifier` gives: a coordinate is written by a conversion, never picked from a menu.
+ * `writeModifier` gives: a coordinate is written by a conversion, never picked from a menu. `kind=`
+ * is a sequence participant's: there the head word is `participant` or `actor` and the card it
+ * draws is a value, which the Kind menu chooses.
  */
-export type ModifierKey = "hue" | "icon" | "col";
+export type ModifierKey = "hue" | "icon" | "col" | "kind";
 
 /** A bare word in modifier position that is not a status. `quiet` is an edge's; the rest are a node's. */
 export type Flag = "async" | "external" | "quiet" | "bold" | "italic";

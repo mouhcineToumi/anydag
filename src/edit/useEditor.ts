@@ -53,6 +53,8 @@ import {
   wrapStatement,
   type WrapOpts,
 } from "@/dsl/restate";
+import { seqIdOf, type FragmentKind } from "@/dsl/sequence";
+import { branchesOf, noteParts, removeFragment, setBranchLabel, setMessageText, setNoteText } from "@/dsl/sequence-write";
 
 import { History } from "./history";
 import type { Fix } from "./repair";
@@ -97,6 +99,7 @@ import {
 } from "./build";
 import { columnOf, dragMode, dropEdit, type Over } from "./drag";
 import { duplicateStatement, edgeAt, edgeLabelOf, type PickedEdge, type PickedNode } from "./pick";
+import { columnAt as lifelineAt, drawMessage, runOf, slotAt, wrapRun } from "./message";
 import { guidesToSvg, snapBox, union, type Box } from "./snap";
 import { framesOf, groupOf, memberOf, memberOps, minimum, paintOf, place as placeMember, type Member } from "./resize";
 import { inkStatement } from "./ink";
@@ -267,11 +270,15 @@ export interface Renaming {
  * own share has to sit over the wedge beside it — so a legend row and a wedge's label are outside
  * the `<g>` that carries the id, and nesting cannot answer for them.
  */
-function nameableUnder(el: Element | null): { id: string; what: Renaming["what"] } | null {
-  const hit = el?.closest<HTMLElement>("[data-dag-node],[data-dag-group],[data-dag-lane],[data-dag-edge],[data-dag-title-of]");
+function nameableUnder(el: Element | null): { id: string; what: Renaming["what"]; seg?: number } | null {
+  const hit = el?.closest<HTMLElement>(
+    "[data-dag-node],[data-dag-group],[data-dag-lane],[data-dag-edge],[data-dag-title-of],[data-dag-frag]",
+  );
   if (!hit) return null;
   const d = hit.dataset;
   if (d.dagTitleOf) return { id: d.dagTitleOf, what: "node" };
+  /* A sequence fragment's tab, or a note's: a container to rename, and which of its branches. */
+  if (d.dagFrag) return { id: d.dagFrag, what: "group", seg: Number(d.dagBranch ?? 0) };
   if (d.dagNode) return { id: d.dagNode, what: "node" };
   if (d.dagGroup) return { id: d.dagGroup, what: "group" };
   if (d.dagLane) return { id: d.dagLane, what: "lane" };
@@ -296,8 +303,11 @@ export interface EditorCtl {
    * of what a diagram looks like.
    */
   press(id: string, e: ReactPointerEvent, el: HTMLDivElement, node?: string): boolean;
-  /** Pick one of this item's own edges, by the id the parser gave it. */
-  pickEdge(item: string, id: string | null): void;
+  /**
+   * Pick one of this item's own edges, by the id the parser gave it. `extend` is shift held, which
+   * in a sequence picks every message from the one already picked to this one.
+   */
+  pickEdge(item: string, id: string | null, extend?: boolean): void;
   /** A press on the resize handle. */
   resize(id: string, e: ReactPointerEvent, el: HTMLDivElement, dir: Dir): void;
   /**
@@ -438,7 +448,12 @@ export interface Editor {
   pickedNode: PickedNode | null;
   pickedEdge: PickedEdge | null;
   pickNode(item: string, node: string | null): void;
-  pickEdge(item: string, id: string | null): void;
+  pickEdge(item: string, id: string | null, extend?: boolean): void;
+  /**
+   * The picked message, or run of messages, wrapped in a new fragment — the selection bar's Wrap in.
+   * The fragment is picked once it is written, so its panel is the next thing a person sees.
+   */
+  wrapMessages(kind: FragmentKind): void;
   /**
    * What Delete and ctrl+D do, as a button: the pick first, then the selection.
    *
@@ -826,12 +841,15 @@ export function useEditor({
    * effect below re-applies it regardless, which is what makes a pick nobody painted work: the
    * caret feeder, and the copy ctrl+D has not laid out yet.
    */
-  const painted = useRef<Element | null>(null);
-  const paint = useCallback((el: Element | null) => {
-    if (painted.current === el) return;
-    painted.current?.removeAttribute("data-dag-picked");
-    painted.current = el;
-    el?.setAttribute("data-dag-picked", "");
+  const painted = useRef<Element[]>([]);
+  /* A list, because a sequence's messages are picked as a run: every one of them wears the ring. */
+  const paint = useCallback((el: Element | readonly (Element | null)[] | null) => {
+    const next = (Array.isArray(el) ? el : [el]).filter((x): x is Element => x !== null);
+    const was = painted.current;
+    if (was.length === next.length && was.every((x, i) => x === next[i])) return;
+    for (const x of was) if (!next.includes(x)) x.removeAttribute("data-dag-picked");
+    for (const x of next) x.setAttribute("data-dag-picked", "");
+    painted.current = next;
   }, []);
 
   /*
@@ -852,8 +870,11 @@ export function useEditor({
     const q = CSS.escape(pickedNode ? pickedNode.node : pickedEdge!.id);
     paint(
       pickedNode
-        ? (find(`[data-dag-node="${q}"]`) ?? find(`[data-dag-group="${q}"]`) ?? find(`[data-dag-lane="${q}"]`))
-        : find(`[data-dag-edge="${q}"]`),
+        ? (find(`[data-dag-node="${q}"]`) ??
+            find(`[data-dag-group="${q}"]`) ??
+            find(`[data-dag-lane="${q}"]`) ??
+            find(`[data-dag-frag="${q}"]`))
+        : runOf(pickedEdge!).map((id) => find(`[data-dag-edge="${CSS.escape(id)}"]`)),
     );
   });
 
@@ -880,18 +901,28 @@ export function useEditor({
     setSelected((prev) => (prev.size === 1 && prev.has(item) ? prev : new Set([item])));
   }, []);
 
-  const pickEdge = useCallback((item: string, id: string | null, body?: string) => {
+  const pickEdgeIn = useCallback((item: string, id: string | null, body?: string, extend = false) => {
     setPickedNode(null);
     setPickedLink(null);
     if (id === null) return setPickedEdge(null);
     const it = boardRef.current?.items.find((x) => x.id === item);
     const at = it && edgeAt(it.type, body ?? it.body, it.dir, id);
     if (!it || !at) return setPickedEdge(null);
-    setPickedEdge((prev) => (prev && prev.item === item && prev.id === id ? prev : { item, id, ...at }));
+    /* Shift on a second message of the same sequence stretches the pick into a run, which is what
+       Wrap in wraps; the first message stays the pick, so the panel keeps showing it. */
+    const prev = pickedEdgeRef.current;
+    if (extend && it.type === "sequence" && prev && prev.item === item && prev.id !== id && seqIdOf(prev.id)?.what === "msg") {
+      setPickedEdge({ ...prev, to: id });
+    } else setPickedEdge((p) => (p && p.item === item && p.id === id && !p.to ? p : { item, id, ...at }));
     /* The hit stroke stops the press reaching `Item`, so nothing else would select the diagram —
        and an unselected item's pick is cleared by the rule above the moment it is set. */
     setSelected((prev) => (prev.size === 1 && prev.has(item) ? prev : new Set([item])));
   }, []);
+
+  const pickEdge = useCallback(
+    (item: string, id: string | null, extend?: boolean) => pickEdgeIn(item, id, undefined, extend),
+    [pickEdgeIn],
+  );
 
   const pickFromLine = useCallback(
     (item: string, line: number, body?: string) => {
@@ -899,10 +930,10 @@ export function useEditor({
       if (!it) return;
       const at = declaredOn(it.type, body ?? it.body, line, it.dir);
       if (!at) return clearPick();
-      if (at.what === "edge") pickEdge(item, at.id, body);
+      if (at.what === "edge") pickEdgeIn(item, at.id, body);
       else pickNode(item, at.id);
     },
-    [clearPick, pickEdge, pickNode],
+    [clearPick, pickEdgeIn, pickNode],
   );
 
   const setMode = useCallback((next: InspectorMode) => {
@@ -951,6 +982,13 @@ export function useEditor({
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
     setPickedNode(null);
+    /* A sequence's fragment goes with everything in it, as a group does; a note is its one line. */
+    const seq = it.type === "sequence" ? seqIdOf(p.node) : null;
+    const line = seq ? declaredAt(it.type, it.body, p.node) : null;
+    if (seq && line !== null) {
+      writeBody(it, seq.what === "frag" ? removeFragment(it.body, line) : removeEdge(it.body, line));
+      return;
+    }
     writeBody(it, removeNode(it.body, p.node, { type: it.type, dir: it.dir }));
   }, [bodyOf, writeBody]);
 
@@ -959,6 +997,18 @@ export function useEditor({
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
     setPickedEdge(null);
+    /* A run of messages goes together, from the bottom up so the lines above stay where they are. */
+    if (p.to) {
+      const lines = runOf(p)
+        .map((id) => declaredAt(it.type, it.body, id, it.dir))
+        .filter((l): l is number => l !== null)
+        .sort((a, b) => b - a);
+      writeBody(
+        it,
+        lines.reduce((body, l) => removeEdge(body, l), it.body),
+      );
+      return;
+    }
     /* The id is what the pick actually holds, so it is asked first; the line it was picked at is
        the fallback for the case `declaredAt` cannot answer — a node happening to be called `e3`. */
     writeBody(it, removeEdge(it.body, declaredAt(it.type, it.body, p.id, it.dir) ?? p.line));
@@ -975,9 +1025,23 @@ export function useEditor({
    * box and then write it back as the title.
    */
   const startRename = useCallback(
-    (item: string, at: { id: string; what: Renaming["what"] }): boolean => {
+    (item: string, at: { id: string; what: Renaming["what"]; seg?: number }): boolean => {
       const it = bodyOf(item);
       if (!it || !isDiagramType(it.type)) return false;
+      /* A sequence's fragment and note: a branch's condition, a note's words — read off the line. */
+      const seq = it.type === "sequence" && at.what === "group" ? seqIdOf(at.id) : null;
+      if (seq) {
+        const line = declaredAt(it.type, it.body, at.id);
+        if (line === null) return false;
+        const seg = at.seg ?? 0;
+        const text =
+          seq.what === "note"
+            ? (noteParts(it.body.split("\n")[line - 1] ?? "")?.text ?? "")
+            : (branchesOf(it.body, line)?.branches[seg]?.label ?? "");
+        pickNode(item, at.id);
+        setRenaming({ item, id: at.id, what: "group", seg, text });
+        return true;
+      }
       if (at.what === "edge") {
         const where = edgeAt(it.type, it.body, it.dir, at.id);
         if (!where) return false;
@@ -1031,6 +1095,23 @@ export function useEditor({
       const trimmed = text.trim();
       const line = declaredAt(it.type, it.body, r.id, it.dir);
       if (line === null) return;
+      /* A sequence writes its own: a message's label keeps its colon, a branch is found by its
+         index, and a note always has words — an empty box on one writes nothing. */
+      const seq = it.type === "sequence" ? seqIdOf(r.id) : null;
+      if (seq) {
+        const at = seq.what === "frag" ? (branchesOf(it.body, line)?.branches[r.seg]?.line ?? line) : line;
+        const own = it.body.split("\n")[at - 1] ?? "";
+        const next =
+          seq.what === "msg"
+            ? setMessageText(own, trimmed || null)
+            : seq.what === "frag"
+              ? setBranchLabel(own, trimmed || null)
+              : trimmed
+                ? setNoteText(own, trimmed)
+                : own;
+        writeBody(it, replaceLine(it.body, at, next));
+        return;
+      }
       const src = it.body.split("\n")[line - 1] ?? "";
       /* An empty box on a *label* means "take the label off", which the grammar can say. An empty
          box on a card does not: a nameless card would draw as nothing, and a mindmap topic *is*
@@ -1056,6 +1137,8 @@ export function useEditor({
     const p = pickedNodeRef.current;
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
+    /* A fragment or a note is counted, not named: there is no id to copy it under. */
+    if (it.type === "sequence" && seqIdOf(p.node)) return;
     const made = duplicateStatement(it.type, it.body, p.node, it.dir);
     if (!made) return;
     setPickedNode({ item: it.id, node: made.id });
@@ -1694,6 +1777,132 @@ export function useEditor({
   );
 
   /**
+   * Drawing a message: a drag from one lifeline to another, in a sequence that is already selected.
+   *
+   * The drop says three things and all three are read off what the layout published, never off the
+   * pixel: the lifeline it started on is the sender, the one nearest where it let go is the receiver
+   * (its own is a message to itself), and the **height** is which statement it goes after — the
+   * rows the layout drew, because in this dialect the drawing order is the file's order. What
+   * lands is one statement, `a ->> b : "message"`, picked and with its label open for typing, the
+   * way the `+` hands over a new card.
+   *
+   * Painted while it runs, like every gesture here: a dashed line in the diagram's own coordinates
+   * from the sender's lifeline to the receiver's, at the pointer's height, and the receiver's card
+   * marked as a drop target. Nothing reaches React until the release. The diagram's own size is the
+   * scale — `offsetWidth` is the layout's width and the client rect is that times the zoom — so no
+   * `data-zoom` arithmetic is needed to turn the pointer into the layout's numbers.
+   */
+  const lifelineDrag = useCallback(
+    (id: string, from: string, e: ReactPointerEvent, el: HTMLElement): boolean => {
+      const it = bodyOf(id);
+      const diagram = el.querySelector<HTMLElement>(".dag-diagram");
+      const laid = laidOutIn(id);
+      if (!it || it.type !== "sequence" || !diagram || !laid?.nodes[from]) return false;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      const centre = (who: string) => {
+        const b = laid.nodes[who]!;
+        return b.x + b.w / 2;
+      };
+      const local = (ev: PointerEvent) => {
+        const r = diagram.getBoundingClientRect();
+        return {
+          x: ((ev.clientX - r.left) / (r.width || 1)) * diagram.offsetWidth,
+          y: ((ev.clientY - r.top) / (r.height || 1)) * diagram.offsetHeight,
+        };
+      };
+
+      let moved = false;
+      let cancelled = false;
+      let at = { x: 0, y: 0 };
+      let to: string | null = null;
+      let ghost: SVGSVGElement | null = null;
+      let marked: HTMLElement | null = null;
+      const mark = (next: HTMLElement | null) => {
+        if (marked === next) return;
+        if (marked) delete marked.dataset.dagDrop;
+        marked = next;
+        if (marked) marked.dataset.dagDrop = "";
+      };
+
+      const onMove = (ev: PointerEvent) => {
+        if (!moved) {
+          if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < DRAG_SLOP) return;
+          moved = true;
+          const ns = "http://www.w3.org/2000/svg";
+          ghost = document.createElementNS(ns, "svg");
+          ghost.setAttribute("class", "dag-msg-ghost");
+          ghost.setAttribute("width", String(diagram.offsetWidth));
+          ghost.setAttribute("height", String(diagram.offsetHeight));
+          ghost.appendChild(document.createElementNS(ns, "path"));
+          diagram.appendChild(ghost);
+          document.documentElement.dataset.dagDrawing = "";
+        }
+        at = local(ev);
+        to = lifelineAt(laid.nodes, at.x);
+        const x0 = centre(from);
+        const x1 = to ? centre(to) : at.x;
+        /* A message to itself loops out to the right and back, as the layout draws one. */
+        const d =
+          to === from
+            ? `M${x0},${at.y} c${laid.nodes[from]!.w / 2},0 ${laid.nodes[from]!.w / 2},${laid.nodes[from]!.h / 2} 0,${laid.nodes[from]!.h / 2}`
+            : `M${x0},${at.y} L${x1},${at.y}`;
+        ghost?.firstElementChild?.setAttribute("d", d);
+        mark(to ? diagram.querySelector<HTMLElement>(`[data-dag-node="${CSS.escape(to)}"]`) : null);
+      };
+
+      const onUp = () => {
+        removeEventListener("pointermove", onMove);
+        removeEventListener("pointerup", onUp);
+        removeEventListener("pointercancel", onUp);
+        removeEventListener("keydown", onKey, true);
+        mark(null);
+        ghost?.remove();
+        delete document.documentElement.dataset.dagDrawing;
+        if (!moved || cancelled || !to) return;
+        addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
+        /* The board is one round trip stale after a write, so the body is read again here. */
+        const cur = bodyOf(id);
+        const made = cur && drawMessage(cur.body, from, to, slotAt(laid.rows ?? [], at.y));
+        if (!cur || !made) return;
+        writeBody(cur, made.body);
+        setPickedNode(null);
+        setPickedEdge({ item: id, id: made.id, line: made.line, seg: 0 });
+        setRenaming({ item: id, id: made.id, what: "edge", seg: 0, text: "message" });
+      };
+
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key !== "Escape") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        cancelled = true;
+        onUp();
+      };
+
+      addEventListener("pointermove", onMove);
+      addEventListener("pointerup", onUp);
+      addEventListener("pointercancel", onUp);
+      addEventListener("keydown", onKey, true);
+      return true;
+    },
+    [bodyOf, laidOutIn, writeBody],
+  );
+
+  const wrapMessages = useCallback(
+    (kind: FragmentKind) => {
+      const p = pickedEdgeRef.current;
+      const it = p && bodyOf(p.item);
+      if (!p || !it || it.type !== "sequence") return;
+      const out = wrapRun(it.body, p, kind);
+      if (!out) return;
+      writeBody(it, out.body);
+      setPickedEdge(null);
+      setPickedNode({ item: it.id, node: out.id });
+    },
+    [bodyOf, writeBody],
+  );
+
+  /**
    * A second card beside the picked one, with an edge to it, and the rename already open on it.
    *
    * draw.io's hover arrow, and the single biggest way of *building* a diagram without typing. The
@@ -2191,6 +2400,13 @@ export function useEditor({
       setPickedLink(null);
 
       const was = selectedRef.current;
+
+      /* A sequence that is already the selection: a press on a lifeline draws a message from it.
+         Unselected, the same press selects and moves the diagram, as a press anywhere on it does. */
+      const life = (e.target as Element | null)?.closest<HTMLElement>("[data-dag-lifeline]")?.dataset.dagLifeline;
+      if (life !== undefined && !e.shiftKey && !e.altKey && !lockedRef.current && was.size === 1 && was.has(id)) {
+        if (lifelineDrag(id, life, e, el)) return true;
+      }
 
       /*
        * The second click picks the card out of the diagram.
@@ -3011,6 +3227,7 @@ export function useEditor({
     growTopicFrom,
     startRename,
     nodeDrag,
+    lifelineDrag,
     writePrompt,
     generateFor,
     acceptDraft,
@@ -4090,6 +4307,7 @@ export function useEditor({
     pickedEdge,
     pickNode,
     pickEdge,
+    wrapMessages,
     removeSelection,
     duplicateSelection,
     wrapPicked,
