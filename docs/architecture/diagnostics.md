@@ -132,6 +132,19 @@ Six things are load-bearing:
   the panel on the Properties half with the target picked — a node, group or lane through
   `pickNode`, an edge through the edge pick — so the control that fixes it is what shows.
 
+**A link whose other end is missing hangs from a loose end.** When one end of an edge names nothing
+and the other end is a real card, `finalize` in `src/dsl/common.ts` adds a `loose` node in place of
+the missing one (`__loose-N`, one per line and name, so a chain through the same missing name makes
+one) and points the edge at it. The edge is drawn, leaving the card, and ends on a small dashed
+circle (`LooseEnd` in `src/render/nodes/`, `data-dag-loose` = the name it stood for). Dragging the
+circle onto a card of the same diagram rewrites that one ref in that one statement (`reattachLoose`
+in `src/edit/pick.ts`, through `retargetRef`), which clears the `E_UNKNOWN_ID`; clicking it picks
+the edge, whose panel has Delete. The diagnostic is unchanged — it still names the line and the edge
+— so the dock and the panel still count it until it is answered. A stub is not a card: it is left
+out of `edgeTargets`, `nodeIdsOf` and `declaredOn`, so no menu offers it and no problem targets it.
+An edge with both ends missing, or out of a card that could not be read (`ctx.broken`), gets none;
+there is nothing on the paper to hang it from. Names claimed: `dag-loose`, `data-dag-loose`.
+
 The frame mark is painted, not rendered (`data-dag-problem-count`, set by `App` the way
 `data-dag-proposed` is): `Item` is memoised and a per-item prop would re-render every diagram
 whenever a count changed. It is an outline and a `::before` badge, so the box `size.ts` measured is

@@ -412,7 +412,7 @@ export function nodeIdsOf(it: Pick<BoardItem, "type" | "body" | "dir" | "aspect"
     const g = parseDiagram(it.type, it.body, it.dir, it.aspect, it.layout);
     /* Groups as well as nodes: a link into a group anchors on the group's box, and the router
        already treats one as a node with a row. */
-    if (g) return new Set([...g.nodes.map((n) => n.id), ...g.groups.map((x) => x.id)]);
+    if (g) return new Set([...g.nodes.filter((n) => n.kind !== "loose").map((n) => n.id), ...g.groups.map((x) => x.id)]);
   }
   return null;
 }

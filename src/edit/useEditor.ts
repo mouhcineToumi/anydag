@@ -108,7 +108,7 @@ import {
   type Pseudo,
 } from "./build";
 import { columnOf, dragMode, dropEdit, type Over } from "./drag";
-import { duplicateStatement, edgeAt, edgeLabelOf, type PickedEdge, type PickedNode } from "./pick";
+import { duplicateStatement, edgeAt, edgeLabelOf, looseOf, reattachLoose, type PickedEdge, type PickedNode } from "./pick";
 import { columnAt as lifelineAt, drawMessage, runOf, slotAt, wrapRun } from "./message";
 import { guidesToSvg, snapBox, union, type Box } from "./snap";
 import { framesOf, groupOf, memberOf, memberOps, minimum, paintOf, place as placeMember, type Member } from "./resize";
@@ -2291,6 +2291,93 @@ export function useEditor({
     [viewport],
   );
 
+  /**
+   * A press on a loose stub (#145) — the end of an edge that names nothing. Dragged onto a card in
+   * the same diagram it names that card instead, which is how a hanging edge is mended without the
+   * text; let go anywhere else and nothing is written. A press that does not travel is a click, and
+   * picks the edge, so Delete and the panel's ends are one more key away.
+   *
+   * The line is painted the way `connect` paints one, from the stub to the pointer, into the guides
+   * layer; the meaning — which word on which line becomes what — is `reattachLoose` in `pick.ts`.
+   */
+  const looseDrag = useCallback(
+    (id: string, stub: string, e: ReactPointerEvent, el: HTMLElement): boolean => {
+      const it = bodyOf(id);
+      if (!it) return false;
+      const at = looseOf(it.type, it.body, stub, it.dir, it.layout);
+      const dot = el.querySelector<HTMLElement | SVGElement>(`[data-dag-node="${CSS.escape(stub)}"]`);
+      if (!at || !dot) return false;
+      e.stopPropagation();
+      e.preventDefault();
+      const r = dot.getBoundingClientRect();
+      const from = toBoard(r.left + r.width / 2, r.top + r.height / 2);
+      const overlay = el.closest<HTMLElement>(".dag-layer")?.querySelector<SVGElement>(".dag-guides") ?? null;
+      const dotR = gridRef.current / 2;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let moved = false;
+      let over: string | null = null;
+      let marked: HTMLElement | null = null;
+      const mark = (next: HTMLElement | null) => {
+        if (marked === next) return;
+        if (marked) delete marked.dataset.dagDrop;
+        marked = next;
+        if (marked) marked.dataset.dagDrop = "";
+      };
+
+      const onMove = (ev: PointerEvent) => {
+        if (!moved) {
+          if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < DRAG_SLOP) return;
+          moved = true;
+          document.documentElement.dataset.dagConnecting = "";
+        }
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        const hit = targetAt(under);
+        /* A card or a boundary of this same diagram, and never another stub. */
+        over = hit && hit.item === id && hit.node !== undefined && !hit.node.startsWith("__") ? bodyText(hit) : null;
+        mark(
+          over === null
+            ? null
+            : ((hit?.boundary ? under?.closest<HTMLElement>("[data-dag-group]") : null) ??
+                under?.closest<HTMLElement>("[data-dag-node]") ??
+                null),
+        );
+        if (overlay) overlay.innerHTML = connectSvg(from, toBoard(ev.clientX, ev.clientY), "e", over !== null, dotR);
+      };
+
+      const onUp = () => {
+        removeEventListener("pointermove", onMove);
+        removeEventListener("pointerup", onUp);
+        removeEventListener("pointercancel", onUp);
+        removeEventListener("keydown", onKey, true);
+        delete document.documentElement.dataset.dagConnecting;
+        mark(null);
+        if (overlay) overlay.innerHTML = "";
+        addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
+        if (!moved) return pickEdgeIn(id, at.edge);
+        if (over === null) return;
+        const cur = bodyOf(id);
+        const next = cur && reattachLoose(cur.type, cur.body, stub, over, cur.dir, cur.layout);
+        if (cur && next) writeBody(cur, next);
+      };
+
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key !== "Escape") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        over = null;
+        onUp();
+      };
+
+      addEventListener("pointermove", onMove);
+      addEventListener("pointerup", onUp);
+      addEventListener("pointercancel", onUp);
+      addEventListener("keydown", onKey, true);
+      return true;
+    },
+    [bodyOf, toBoard, pickEdgeIn, writeBody],
+  );
+
   const onLibraryRef = useRef(onLibrary);
   onLibraryRef.current = onLibrary;
   const onLibraryOpenRef = useRef(onLibraryOpen);
@@ -2496,6 +2583,11 @@ export function useEditor({
        * whole diagram as it always did, which is the only way to move a board whose every diagram
        * has a card picked in it without letting go of the pick first.
        */
+      /* A loose stub is a handle, not a card: there is nothing to pick on it, and pressing it pulls
+         the edge it ends onto a card (#145). */
+      if (node?.startsWith("__loose-") && !e.shiftKey && was.size === 1 && was.has(id) && !lockedRef.current) {
+        if (looseDrag(id, node, e, el)) return true;
+      }
       if (node && !e.shiftKey && was.size === 1 && was.has(id)) {
         const cur = pickedNodeRef.current;
         if (!cur || cur.item !== id || cur.node !== node) {
@@ -3298,6 +3390,7 @@ export function useEditor({
     growTopicFrom,
     startRename,
     nodeDrag,
+    looseDrag,
     lifelineDrag,
     writePrompt,
     generateFor,

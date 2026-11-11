@@ -950,6 +950,21 @@ export function reverseEdge(line: string): string {
   return line.slice(0, a.from) + right + line.slice(a.to, z.from) + left + line.slice(z.to);
 }
 
+/**
+ * Every place an edge statement names `from`, named `to` instead — only in its ref lists, never in a
+ * label or a modifier. What a loose stub dropped on a card writes (#145): `api --> ghost` becomes
+ * `api --> db`, and a chain through `ghost` is mended at every hop that named it.
+ */
+export function retargetRef(line: string, from: string, to: string): string {
+  const e = edgeSpan(line);
+  if (!e || !isRef(to)) return line;
+  const hits = e.refs.flatMap((r) => r.tokens).filter((t) => t.value === from);
+  /* Right to left, so each splice leaves the spans still to come where they were. */
+  let out = line;
+  for (const t of hits.reverse()) out = replaceSpan(out, span(t), to);
+  return out;
+}
+
 /** Whether `text` is one id or `id.row`, the way the tokenizer reads a word. */
 function isRef(text: string): boolean {
   const t = lineTokens(text);

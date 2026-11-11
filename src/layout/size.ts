@@ -90,6 +90,7 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
     case "start":
       return { w: m.node.start, h: m.node.start, rowY };
     case "end":
+    case "loose":
       return { w: m.node.end, h: m.node.end, rowY };
     case "fork":
     case "join":

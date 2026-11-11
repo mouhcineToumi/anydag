@@ -114,7 +114,8 @@ export function declaredOn(
   }
   const graph = hasGraph(type) ? parseDiagram(type, body, dir) : null;
   if (!graph) return null;
-  const node = graph.nodes.find((n) => n.line === line);
+  /* A loose stub carries the line of the edge it ends, and is not declared there: the edge is. */
+  const node = graph.nodes.find((n) => n.line === line && n.kind !== "loose");
   if (node) return { id: node.id, what: "node" };
   const group = graph.groups.find((g) => g.line === line);
   if (group) return { id: group.id, what: "group" };
