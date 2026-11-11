@@ -193,6 +193,29 @@ Three more about the pointer — the pick and its controls meeting a model that 
   `orderDrop` had to learn that `DECLARES` is per dialect: it scanned back for `participant|actor`
   only, so a series dropped on a leading half found nothing and went `toTop` — above the `bar` line,
   a data statement standing in front of the statement that says what shape the chart is.
+- **Every statement has a control, so the Source tab is not needed to reach one.** A donut's hero is
+  two fields (Centre figure, Centre caption) shown for a `donut` only, written by `setChartHero` as
+  the *strings* on the form line, so a flag or a `%%` comment beside them stays; an emptied figure
+  takes the caption too, because the grammar has no caption without a figure. The key's rows
+  (`legend solid "…"`) are a list — glyph select, text, remove, add — read by `chartKeyRows` and
+  written by `setChartKeyRows`, which rewrites the n-th row in place. `legend` is **two statements
+  under one word**, so `setChartOption("legend", …)` (the placement select) finds only the one with
+  no string behind its second word; before it did, a row written earlier in the body was the line a
+  change of placement replaced. *Add a series* / *Add a slice* is `addChartData`: the next free
+  `series1`/`slice1`, one `1` per category (a zero draws nothing, and the new mark is picked so its
+  Values field is the next thing typed into), written after the last data statement. A pick's **Id**
+  is `renameChartId`, which writes the declaration token only and is deliberately *not* `renameId`:
+  that renames every word equal to the id, and in a chart a word may be a category (`x web mob`).
+  A chart body names an id nowhere but its declaration, so that one token is the whole fence; the
+  pick is re-pointed at the new id in the same handler, or the panel would find no statement under
+  the old one and close. A clash (`chartIdProblem`) is refused in the box. **Board links follow**:
+  an `edges` line `notes --> sales.web "why it grew"` becomes `… sales.online …` when `web` is
+  renamed, in the same write as the declaration — `Editor.renameNode` applies the new body, runs
+  `renameNodeLinks` (`src/board/rename.ts`) over the result and `put`s the one string, so the
+  series and its links are a single version and a single undo. Only a token reading
+  `<item>.<old id>` exactly changes; `sales`, `sales.webx` and `shop.web` do not. The dialect keeps
+  the declaration (`renameChartId`) and the board keeps the links, so another diagram's node rename
+  composes the same two halves.
 
 `boards/reference/chart.board.md` is the fourteenth fixture — a grouped bar, a stacked horizontal one
 with `values`, a three-series line with a gap and a written `min`, a five-slice pie, a donut with a

@@ -118,7 +118,10 @@ test("K opens the links fence, and makes one where there is none", async ({ page
   await page.locator(".dag-viewport").click({ position: { x: 20, y: 20 } });
   await lead(page, "k");
   await expect(page.locator("[data-dag-inspector]")).toHaveCount(1);
-  await expect(page.locator("[data-dag-body]")).toHaveValue(/who --> stack\.db/);
+  /* The links are changed on the canvas, so the panel says how rather than showing their text
+     (#145) — which is also the end of a letter typed after K landing in the fence's first line. */
+  await expect(page.locator("[data-dag-links-hint]")).toBeVisible();
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
 
   /* On a board with no fence, the same key writes one. */
   fs.writeFileSync(file, BOARD.replace(/```edges[\s\S]*?```\n/, ""));
@@ -128,15 +131,15 @@ test("K opens the links fence, and makes one where there is none", async ({ page
   await expect.poll(read).toContain("```edges");
 });
 
-test("a link naming nothing is one error, and the good links still draw", async ({ page }) => {
+test("a link naming nothing is skipped, and the good links still draw", async ({ page }) => {
   await open(page);
   fs.writeFileSync(file, read().replace('who --> stack.db "reads"', 'who --> stack.db "reads"\nwho --> ghost'));
-  /* In the problems dock, never as a card on the canvas: see `problems.spec.ts`. */
-  await page.locator("[data-dag-problems-pill]").click();
-  await expect(page.locator("[data-dag-problems-row]")).toHaveCount(1);
-  await expect(page.locator('[data-dag-problems-row="EB_LINK_UNKNOWN_ITEM"]')).toBeVisible();
-  await expect(page.locator(".dag-viewport .dag-error")).toHaveCount(0);
   await expect(page.locator(".dag-board-edges [data-dag-edge]")).toHaveCount(1);
+  /* Not a problem a person is told about: there is nothing drawn to act on, and an agent reads
+     `EB_LINK_UNKNOWN_ITEM` from the diagnostics (see `problems.spec.ts`). Never a card either. */
+  await page.waitForTimeout(1500);
+  await expect(page.locator("[data-dag-problems-pill]")).toHaveCount(0);
+  await expect(page.locator(".dag-viewport .dag-error")).toHaveCount(0);
 });
 
 /* ---- the gesture ---- */
@@ -229,6 +232,35 @@ test("a link is picked by clicking it, and Delete takes its line out", async ({ 
   await expect(page.locator(".dag-board-edges")).toHaveCount(0);
   /* The fence stays, empty, so the next link has somewhere to go. */
   expect(read()).toContain("```edges");
+});
+
+test("a picked link's panel changes it in words: label, line, ends, reverse, delete", async ({ page }) => {
+  await open(page);
+  await page.locator(".dag-board-edges .dag-edge-hit").click({ force: true });
+  await page.keyboard.press("Enter");
+  const props = page.locator("[data-dag-props]");
+  await expect(props).toBeVisible();
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
+
+  await props.locator("[data-dag-prop-label]").fill("writes");
+  await props.locator("[data-dag-prop-label]").press("Enter");
+  await expect.poll(read).toContain('who --> stack.db "writes"');
+
+  /* The line in words, never the arrow's spelling. */
+  await expect(props.locator("[data-dag-prop-line] option").first()).toHaveText("Arrow");
+  await props.locator("[data-dag-prop-line]").selectOption({ label: "Dashed arrow" });
+  await expect.poll(read).toContain('who -.-> stack.db "writes"');
+
+  /* An end moves onto another card of the same diagram. */
+  await props.locator('[data-dag-prop-end="to:0"]').selectOption("stack.api");
+  await expect.poll(read).toContain('who -.-> stack.api "writes"');
+
+  await props.locator("[data-dag-prop-reverse]").click();
+  await expect.poll(read).toContain('stack.api -.-> who "writes"');
+
+  await props.locator("[data-dag-prop-delete]").click();
+  await expect.poll(read).not.toContain("stack.api -.-> who");
+  await expect(page.locator(".dag-board-edges")).toHaveCount(0);
 });
 
 test("deleting an item takes the links that named it, in one undo, and leaves nothing to report", async ({ page }) => {

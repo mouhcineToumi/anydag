@@ -507,6 +507,9 @@
         "claude"
       ]
     },
+    "opencode": {
+      "mono": "opencode"
+    },
     "mistral-ai": {
       "color": "mistral-ai",
       "mono": "mistralai",

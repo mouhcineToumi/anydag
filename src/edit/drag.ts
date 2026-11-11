@@ -1,4 +1,5 @@
 import { declaredAt } from "@/dsl/declared";
+import { gitMerge, gitMetaOf, gitMove } from "@/dsl/graph/gitgraph";
 import { redate } from "@/dsl/graph/timeline";
 import type { Graph } from "@/dsl/ir";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
@@ -36,26 +37,24 @@ import { frameShift, type LaidBox, type LaidOut } from "./build";
  *   thing dragged across its neighbour reorders that list. A sequence's columns are its participant
  *   list; a chart's legend, its bars within a group and its wedges around the circle are all the
  *   declaration order of its `series`/`slice` lines, and nothing else about where a bar sits is a
- *   thing the file can say. A *message* cannot be dragged at all, and not by a rule written here:
- *   only a participant header carries `data-dag-node`, so a message can never be picked.
- * - `none` — `gitgraph`: a column is a commit and a lane is a branch, both ordinal and both the
- *   file's. There is no drop that means anything, so the drag is refused with a cursor rather than
- *   quietly writing something else.
+ *   thing the file can say. A *message* is not dragged, and not by a rule written here: it is
+ *   picked through its hit stroke as an edge is, and only a participant header carries
+ *   `data-dag-node`, which is what a drag starts from. A message moves a row at a time from its
+ *   panel (`moveRow`), and a new one is drawn between two lifelines (`message.ts`).
+ * - `history` — `gitgraph`: a column is a commit and a lane is a branch, both ordinal and both the
+ *   file's, so a drop can only mean something the history can say. A branch's tip let go on another
+ *   lane is a merge into that branch; a commit let go on its neighbour along its own lane is the two
+ *   swapped, where nothing else descends from the earlier one. Anything else writes nothing.
  */
-export type DragMode = "structure" | "fixed" | "date" | "order" | "none";
+export type DragMode = "structure" | "fixed" | "date" | "order" | "history";
 
 export function dragMode(type: string, layout?: string): DragMode {
   if (type === "sketch" || layout === "fixed") return "fixed";
-  if (type === "gitgraph") return "none";
+  if (type === "gitgraph") return "history";
   if (type === "timeline") return "date";
   if (type === "sequence" || type === "chart") return "order";
   return "structure";
 }
-
-/** What a refused dialect has to say for itself, in the one line the panel shows. */
-export const REFUSAL: Record<string, string> = {
-  gitgraph: "Commits are ordered by the file, so a drag cannot move one.",
-};
 
 /**
  * Whether ELK is the thing placing this fence — the one place `col=` says anything.
@@ -132,7 +131,6 @@ export function dropBody(d: Drop): string | null {
 /** `dropBody` and the corner's travel — see `DropEdit`. */
 export function dropEdit(d: Drop): DropEdit | null {
   const mode = dragMode(d.type, d.layout);
-  if (mode === "none") return null;
 
   const graph = hasGraph(d.type) ? parseDiagram(d.type, d.body, d.dir, undefined, d.layout) : null;
   const line = declaredAt(d.type, d.body, d.node, d.dir);
@@ -148,6 +146,7 @@ export function dropEdit(d: Drop): DropEdit | null {
 
   if (d.over === null) return null;
   if (mode === "order") return still(orderDrop(d, line));
+  if (mode === "history") return still(historyDrop(d));
   if (d.type === "mindmap") return still(topicDrop(d, line));
   return graph ? still(structuralDrop(d, graph, line)) : null;
 }
@@ -308,6 +307,31 @@ function idAt(graph: Graph, line: number): string | undefined {
 function moved(body: string, line: number, target: Parameters<typeof moveStatement>[2]): string | null {
   const next = moveStatement(body, line, target);
   return next === body ? null : next;
+}
+
+/* -------------------------------------------------------------------------------- gitgraph */
+
+/**
+ * A commit let go somewhere in its git graph.
+ *
+ * The lane under the pointer is what the drop names — the band itself, or a commit drawn in it. On
+ * another lane, and from a branch's tip, it is that branch merged into the lane's: the tip is the
+ * branch, as far as a merge is concerned, and a commit from the middle of a branch has nothing to
+ * say to a lane it is not on. On its own lane, let go on the commit just before or just after it,
+ * it is the two swapped — `gitMove` decides whether the history allows that and refuses otherwise.
+ */
+function historyDrop(d: Drop): string | null {
+  const meta = gitMetaOf(parseDiagram(d.type, d.body, d.dir)!);
+  const own = meta.branchOf[d.node];
+  if (own === undefined || d.over === null) return null;
+  const lane = d.over.what === "lane" ? d.over.id : d.over.what === "node" ? meta.branchOf[d.over.id] : undefined;
+  if (lane === undefined) return null;
+
+  if (lane !== own) return meta.tips[own] === d.node ? (gitMerge(d.body, own, lane)?.body ?? null) : null;
+  if (d.over.what !== "node" || d.over.id === d.node) return null;
+  const at = meta.column[d.over.id] ?? 0;
+  const from = meta.column[d.node] ?? 0;
+  return gitMove(d.body, d.node, at < from ? -1 : 1)?.body ?? null;
 }
 
 /* --------------------------------------------------------------------------------- mindmap */

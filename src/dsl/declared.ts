@@ -1,5 +1,6 @@
 import { parseChart } from "./chart";
 import { hasGraph, parseDiagram } from "./parse";
+import { seqIdOn, seqLineOf } from "./sequence";
 import { tokenize } from "./tokenizer";
 
 /**
@@ -30,6 +31,12 @@ const chartDeclarations = (body: string): { id: string; line: number }[] => {
 };
 
 export function declaredAt(type: string, body: string, id: string, dir?: "LR" | "TB"): number | null {
+  /* A sequence's message, fragment and note are counted rather than named (`msg:3`) — see
+     `seqParts`. The colon keeps them apart from any participant, which the scan below finds. */
+  if (type === "sequence") {
+    const at = seqLineOf(body, id);
+    if (at !== null) return at;
+  }
   if (type === "chart") {
     const found = chartDeclarations(body).find((d) => d.id === id);
     if (found) return found.line;
@@ -97,6 +104,8 @@ export function declaredOn(
   line: number,
   dir?: "LR" | "TB",
 ): { id: string; what: "node" | "group" | "lane" | "edge" } | null {
+  /* A message answers as an edge, a fragment or a note as a group — the frame they are drawn in. */
+  if (type === "sequence") return seqIdOn(body, line);
   if (type === "chart") {
     const found = chartDeclarations(body).find((d) => d.line === line);
     /* A series and a slice are both `node` to whatever asks: a thing inside the item that a pick

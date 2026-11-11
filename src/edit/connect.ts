@@ -1,5 +1,6 @@
 import { endText } from "@/board/links";
 import type { LinkEnd } from "@/board/types";
+import { addEdgeEnd, appendHop, edgeSpan, type EdgeSpan } from "@/dsl/restate";
 import type { Box } from "./snap";
 
 /**
@@ -22,6 +23,17 @@ export interface Target {
   node?: string;
   /** `item` names a group. See `targetAt`, and `LinkEnd` for what the link then anchors on. */
   group?: boolean;
+  /**
+   * A row inside `node` — `api.content`. Only a diagram's own edge can name one: a board link
+   * splits on the last dot, so `d.api.content` would read as a node called `content` in an item
+   * called `d.api`. See `wholeCard`.
+   */
+  row?: string;
+  /**
+   * `node` is a group's boundary inside the diagram, not a card: `workspace --> intake`. The same
+   * restriction as a row, for the same reason — a link's far end must be a card the diagram declares.
+   */
+  boundary?: boolean;
 }
 
 /**
@@ -55,10 +67,42 @@ export function targetAt(el: Element | null): Target | null {
   const inside = node && item.contains(node) ? node.dataset.dagNode : undefined;
   const group = item.dataset.dagGroup;
   const lone = inside !== undefined && item.querySelectorAll("[data-dag-node]").length === 1;
-  if (inside && !(lone && group)) return { item: item.dataset.dagItem, node: inside };
+  if (inside && !(lone && group)) {
+    /* A row is a port on the card it is in, and it wins over the card the way a card wins over the
+       item: the highlight says which, and a drop on the header is still the whole card. */
+    const row = el?.closest<HTMLElement>("[data-dag-row]");
+    const port = row && node?.contains(row) ? row.dataset.dagRow : undefined;
+    return { item: item.dataset.dagItem, node: inside, ...(port ? { row: port } : null) };
+  }
+  /* A boundary inside the diagram, which is `data-dag-group` on something that is *not* the item —
+     `closest` finds the item's own first when the pointer is over bare paper inside it, so the
+     answer is only trusted when it is a different element. No card under the pointer, or the card
+     would have answered above. */
+  const bound = el?.closest<HTMLElement>("[data-dag-group]");
+  if (bound && bound !== item && item.contains(bound) && bound.dataset.dagGroup) {
+    return { item: item.dataset.dagItem, node: bound.dataset.dagGroup, boundary: true };
+  }
   if (group) return { item: group, group: true };
   return { item: item.dataset.dagItem };
 }
+
+/**
+ * The same end with what only a diagram's own body can say taken off — a row becomes its card, a
+ * boundary becomes its diagram — for a link that crosses between items.
+ *
+ * `d.api.content` and `d.workspace` are not endpoints an `edges` fence can resolve (it splits on the
+ * last dot and looks the node up among the cards), so writing them would draw a diagnostic instead
+ * of a line. Falling back to the nearest thing it *can* name is what a drop is asking for anyway:
+ * the person pointed at that diagram.
+ */
+export function wholeCard(t: Target): Target {
+  if (t.boundary) return { item: t.item };
+  if (t.row !== undefined) return { item: t.item, node: t.node };
+  return t;
+}
+
+/** The id a diagram's own body writes for this end: a card, a boundary, or `card.row`. */
+export const bodyText = (t: Target): string => (t.row !== undefined ? `${t.node}.${t.row}` : (t.node ?? t.item));
 
 /** The line an `edges` fence gains when a link is drawn. */
 export const linkStatement = (from: LinkEnd, to: LinkEnd): string => `${endText(from)} --> ${endText(to)}`;
@@ -84,6 +128,63 @@ export function removeLinkLine(body: string, line: number): string {
   /* A body that is now nothing but blank lines is nothing: the fence stays, empty, rather than
      accumulating the whitespace of every link that was ever deleted from it. */
   return lines.join("\n").trim() === "" ? "" : lines.join("\n");
+}
+
+/**
+ * How a drop folds into a statement that is already there, instead of adding one of its own.
+ *
+ * - `bus` — `a --> c` and a drop from `b` onto `c` becomes `a & b --> c`; a drop *from* `f` where
+ *   `f --> a` already stands becomes `f --> a & b`. One statement, so state draws one trunk and one
+ *   label, which a line per pair cannot say.
+ * - `chain` — a drop from the end of `a --> b` (from `b`) onto `c` becomes `a --> b --> c`.
+ *
+ * `null` when there is no statement to join, and the caller writes a new line the way it always did.
+ */
+export type Join = "bus" | "chain";
+
+/**
+ * A body with the drop folded into a statement of it, or `null` when there is none to fold into, or
+ * the body unchanged when the two are already joined.
+ *
+ * The ends are compared as written — the text a person would have typed — and only a statement
+ * whose end is *exactly* the one dropped on (or dragged from) is joined: with `a & b --> c` and `d --> c`
+ * both standing, a drop onto `c` could mean either, and picking by file order is the one answer
+ * that needs no guess about intent. Converging is tried before fanning out. A middle list of a chain
+ * is shared by two arrows, so a bus only ever grows a statement's first list or its last.
+ */
+export function joinEdge(body: string, from: string, to: string, how: Join): string | null {
+  const lines = body.split("\n");
+  const parsed: { at: number; e: EdgeSpan }[] = [];
+  lines.forEach((text, at) => {
+    const e = edgeSpan(text);
+    if (e) parsed.push({ at, e });
+  });
+  const only = (list: EdgeSpan["refs"][number] | undefined, id: string) =>
+    list?.tokens.length === 1 && list.tokens[0]!.value === id;
+  const put = (at: number, next: string) => lines.map((l, i) => (i === at ? next : l)).join("\n");
+
+  if (how === "chain") {
+    for (const { at, e } of parsed) {
+      if (only(e.refs[e.refs.length - 1], from)) return put(at, appendHop(lines[at]!, to));
+    }
+    return null;
+  }
+
+  /* Already said, in any statement: nothing to write. Checked first, or a drop that repeats an edge
+     would join its source into some *other* statement that happens to end at the same card. */
+  for (const { e } of parsed) {
+    for (let k = 0; k < e.arrows.length; k++) {
+      const [l, r] = [e.refs[k]!, e.refs[k + 1]!];
+      if (l.tokens.some((t) => t.value === from) && r.tokens.some((t) => t.value === to)) return body;
+    }
+  }
+  for (const { at, e } of parsed) {
+    if (only(e.refs[1], to)) return put(at, addEdgeEnd(lines[at]!, 0, "from", from));
+  }
+  for (const { at, e } of parsed) {
+    if (only(e.refs[e.refs.length - 2], from)) return put(at, addEdgeEnd(lines[at]!, e.arrows.length - 1, "to", to));
+  }
+  return null;
 }
 
 /** Whether a link may be drawn between these two ends: not to itself, and not to its own card. */

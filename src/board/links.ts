@@ -218,6 +218,9 @@ export function parseLinks(body: string, baseLine: number, idPrefix: string): Pa
       /* Label and modifiers belong to the hop just read, not to the statement — which is what makes
          `a --> b "one" --> c "two"` mean what it says. `parseEdge` reads them in the same place. */
       const text = label();
+      /* The second string, C4's technology chip: `a --> b "Uses" "HTTPS"`. Only after a label, as in
+         a diagram, where it is positional — the empty label that holds its place is `""`. */
+      const text2 = text === undefined ? undefined : cur.eat("string")?.value;
       const mods = modifiers();
       if (spoiled) return;
       for (const from of left) {
@@ -231,6 +234,7 @@ export function parseLinks(body: string, baseLine: number, idPrefix: string): Pa
             head: spec.head,
             tail: spec.tail,
             label: text,
+            label2: text2,
             hue: mods.hue,
             quiet: mods.quiet,
             via: mods.via,

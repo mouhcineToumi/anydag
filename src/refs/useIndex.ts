@@ -8,9 +8,10 @@
  * board is a write and the index reads every text the account has — a refetch per drag, per tab,
  * would be the most expensive thing the page did.
  */
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { onBoard, onBoards, onNote, onQuiz, onTable } from "@/board/events";
+import { refresher } from "@/board/refresher";
 import type { FileKind } from "@/board/useBoard";
 
 import type { Project } from "@/note/project";
@@ -50,49 +51,35 @@ let current: RefIndex = EMPTY;
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let off: (() => void) | null = null;
-let inflight: Promise<void> | null = null;
-/* A change arrived while a fetch was out, so what that fetch brings back may already be old. */
-let stale = false;
 /* The last answer as the server sent it, to tell a new answer from the same one again. */
 let said = "";
+/* Ids a reader met that the index did not know, each asked about once — see `seek`. */
+const sought = new Set<string>();
 
 /** After a change, how long to wait for more before asking again. */
 const SETTLE = 800;
 
-function load(): Promise<void> {
-  /* One request at a time; a caller arriving while one is out waits for that one — and a change
-     arriving while one is out asks again once it lands, or the page keeps the answer from before
-     the change for as long as nothing else happens to change. */
-  if (inflight) {
-    stale = true;
-    return inflight;
-  }
-  inflight = fetchIndex().finally(() => {
-    inflight = null;
-    if (stale) {
-      stale = false;
-      void load();
-    }
-  });
-  return inflight;
-}
+/* One request at a time; a caller arriving while one is out waits for that one — and a change
+   arriving while one is out asks again once it lands, or the page keeps the answer from before the
+   change for as long as nothing else happens to change. A request that gets no answer is asked again
+   on its own, after a wait (`refresher`): waiting for the feed's next change left the index without
+   a board the Assistant had just made, for good, once the Assistant had stopped writing (#123). */
+const index = refresher(fetchIndex);
+const load = (): Promise<void> => index.ask();
 
-async function fetchIndex(): Promise<void> {
-  try {
-    const r = await fetch("/__board/index");
-    if (!r.ok) return;
-    const body = await r.text();
-    /* Most writes change nothing this says — a drag moves a card, a keystroke changes a word — and
-       the same answer as a fresh object re-rendered every reader: the backlinks, the open library,
-       and on a note page the editor under the caret, once a second while somebody typed. */
-    if (current.loaded && body === said) return;
-    said = body;
-    const { docs } = JSON.parse(body) as { docs: IndexDoc[] };
-    current = { docs, byId: new Map(docs.map((d) => [d.id, d])), loaded: true };
-    for (const l of listeners) l();
-  } catch {
-    /* The feed will say when something changes, and that is the next attempt. */
-  }
+async function fetchIndex(): Promise<boolean> {
+  const r = await fetch("/__board/index");
+  if (!r.ok) return false;
+  const body = await r.text();
+  /* Most writes change nothing this says — a drag moves a card, a keystroke changes a word — and
+     the same answer as a fresh object re-rendered every reader: the backlinks, the open library,
+     and on a note page the editor under the caret, once a second while somebody typed. */
+  if (current.loaded && body === said) return true;
+  const { docs } = JSON.parse(body) as { docs: IndexDoc[] };
+  said = body;
+  current = { docs, byId: new Map(docs.map((d) => [d.id, d])), loaded: true };
+  for (const l of listeners) l();
+  return true;
 }
 
 /* At most one wait after the first change, not after the last: a debounce that restarts on every
@@ -125,8 +112,30 @@ function subscribe(listen: () => void): () => void {
     if (listeners.size === 0 && off) {
       off();
       off = null;
+      index.cancel();
     }
   };
+}
+
+/**
+ * A reader met `id` and the index, which has answered, does not know it: ask the server again, once
+ * per id. An id is minted by the server before anything can name it, so the first answer asked
+ * for after something named it knows it — unless the document is gone, and then asking once is
+ * enough. This is what makes an embed of a board the page has not heard of yet draw it, rather than
+ * staying a card until somebody else happens to write: the feed's change for the new board can be
+ * missed (a stream reconnecting, a tab that dozed), and the note naming it arrives on its own.
+ */
+export function seek(id: string): void {
+  if (!current.loaded || current.byId.has(id) || sought.has(id)) return;
+  sought.add(id);
+  soon();
+}
+
+/** `seek`, from a component, for as long as it draws `id` and the index does not know it. */
+export function useSeek(id: string | undefined, known: boolean, loaded: boolean): void {
+  useEffect(() => {
+    if (id && loaded && !known) seek(id);
+  }, [id, known, loaded]);
 }
 
 /**

@@ -45,6 +45,9 @@ function nameElement(r: Renaming): HTMLElement | null {
      box over the bars. `data-dag-title-of` is where that name actually is. Asked before the host, and
      not as a fallback after it, for exactly that reason. */
   const labelled = find(`[data-dag-title-of="${q}"]`);
+  /* A sequence fragment's branches are tabs of one frame: the one being renamed is `seg`. */
+  const tab = find(`[data-dag-frag="${q}"][data-dag-branch="${r.seg}"]`);
+  if (tab) return tab.querySelector<HTMLElement>("[data-dag-title]") ?? tab;
   if (labelled) return labelled;
   const host = find(`[data-dag-${r.what}="${q}"]`);
   /* A topic chip and the two pseudostates draw their text as the element itself, or draw none;

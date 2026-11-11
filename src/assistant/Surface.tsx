@@ -21,6 +21,7 @@ export function ChatSurface({
   onOpen,
   autofocus,
   changes,
+  welcome,
 }: {
   id: string | null;
   chat: ReturnType<typeof useChat>;
@@ -30,6 +31,8 @@ export function ChatSurface({
   autofocus?: boolean;
   /** Draw the chat's blocks in a column of their own beside the thread — the page's, not the panel's. */
   changes?: boolean;
+  /** A page with no chat yet: greet the person and centre the composer, rather than show an empty thread. */
+  welcome?: boolean;
 }) {
   const models = useModels();
   const [sending, setSending] = useState(false);
@@ -128,44 +131,72 @@ export function ChatSurface({
 
   const meta = chat.meta;
   const empty = chat.turns.length === 0 && !chat.live;
+  const first = welcome && empty;
   /* Newest first: what was just done is what somebody has come to undo. */
   const blocks = [...chat.turns, ...(chat.live ? [chat.live] : [])]
     .flatMap((t) => t.blocks.map((block) => ({ turn: t.id, block })))
     .reverse();
+  const noticeLine = notice ? (
+    <p className="dag-chat-error dag-chat-error--inline" role="alert" data-dag-chat-notice="">
+      {notice}
+    </p>
+  ) : null;
+  const composer = (
+    <Composer
+      meta={meta}
+      models={models}
+      running={running}
+      autofocus={autofocus}
+      onSend={(t, c) => void send(t, c)}
+      onStop={() => id && void stopTurn(id).catch(say)}
+      onGrant={(c, v, m) => void grant(c, v, m)}
+    />
+  );
   const column = (
-    <div className="dag-chat" data-dag-chat={id ?? "new"} data-dag-chat-running={running ? "" : undefined}>
-      <div
-        className="dag-chat__scroll"
-        ref={scroller}
-        data-dag-chat-scroll=""
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        }}
-      >
-        {empty ? (
-          <Empty />
-        ) : (
-          <Turns turns={chat.turns} live={chat.live} typing={chat.typing} undos={chat.undos} device={chat.device} a={actions} />
-        )}
-      </div>
-      {notice ? (
-        <p className="dag-chat-error dag-chat-error--inline" role="alert" data-dag-chat-notice="">
-          {notice}
-        </p>
-      ) : null}
-      <Composer
-        meta={meta}
-        models={models}
-        running={running}
-        autofocus={autofocus}
-        onSend={(t, c) => void send(t, c)}
-        onStop={() => id && void stopTurn(id).catch(say)}
-        onGrant={(c, v, m) => void grant(c, v, m)}
-      />
+    <div
+      className={first ? "dag-chat dag-chat--welcome" : "dag-chat"}
+      data-dag-chat={id ?? "new"}
+      data-dag-chat-running={running ? "" : undefined}
+    >
+      {first ? (
+        <div className="dag-chat-welcome" data-dag-chat-welcome="">
+          <h1 className="dag-chat-welcome__title">What can I help you with?</h1>
+          <p className="dag-chat-welcome__line">Ask about this vault, or ask for a change.</p>
+          {noticeLine}
+          {composer}
+        </div>
+      ) : (
+        <>
+          <div
+            className="dag-chat__scroll"
+            ref={scroller}
+            data-dag-chat-scroll=""
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            }}
+          >
+            {empty ? (
+              <Empty />
+            ) : (
+              <Turns
+                turns={chat.turns}
+                live={chat.live}
+                typing={chat.typing}
+                undos={chat.undos}
+                device={chat.device}
+                a={actions}
+              />
+            )}
+          </div>
+          {noticeLine}
+          {composer}
+        </>
+      )}
     </div>
   );
-  if (!changes) return column;
+  /* A page with no chat yet has nothing to change, and a Changes column beside a greeting is furniture. */
+  if (!changes || first) return column;
   return (
     <div className="dag-chat-with-changes">
       {column}

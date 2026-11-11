@@ -15,7 +15,7 @@
  * second note, whose lazy had already resolved, took 40 ms. So the module is kept here once it
  * has loaded, and `useBlockEditor` hands it over in the very render that asks for it.
  */
-import { useEffect, useState } from "react";
+import { lazy, useEffect, useState } from "react";
 
 export type { NoteEditor } from "./BlockEditor";
 
@@ -58,3 +58,12 @@ export function useBlockEditor(wanted = true): Editor | null {
   if (got && "failed" in got) throw got.failed;
   return wanted && got ? got.editor : null;
 }
+
+/**
+ * A form's rich field — a quiz's prompt, option or explanation — asked for when a quiz's form opens.
+ * Still `React.lazy`, so it is subject to the 300 ms reveal throttle described above; only the
+ * note's editor has been moved off it.
+ */
+export const preloadFieldEditor = () => import("./FieldEditor");
+
+export const FieldEditor = lazy(preloadFieldEditor);

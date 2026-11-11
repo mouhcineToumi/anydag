@@ -84,12 +84,19 @@ through its own `anydag://` scheme, adding the token from the main process. `any
 `npm run dev` → <http://localhost:3500/?board=demo> is Vite in front of that server on `boards/local/`,
 with `.dev-home/` as the app's home. See *The local server* and *The desktop app*.
 
-**The mark is drawn three times, and that is deliberate.** `desktop/icon.png`, `public/favicon.svg`
-and `src/ui/Logo.tsx` — the last as JSX, because no colour may appear in `src/`: the component draws
-in `currentColor` and `var(--dag-color-accent)`. The path data is shared and nothing checks it, so
-moving one means moving the others. There are two cuts: the full mark (stroke 4.5, a coil of one and
-a half turns) and the favicon cut (stroke 6, one turn, a wider opening), because below about 20px
-the full mark's gap fills in. **The frame is an open path, never a `<rect>`** with the stroke drawn
-over it: the two open ends are the mark, and anything that "tidies" them closed has destroyed it.
+**The mark is drawn once, by `scripts/brand/mark.mjs`, and written everywhere it appears:**
+`src/ui/markPaths.ts` (which `src/ui/Logo.tsx` fills with `currentColor` and
+`var(--dag-color-accent)`, because no colour may appear in `src/`), the favicons in `public/` and
+`site/assets/`, the logos and wordmarks in `docs/assets/` and `site/assets/`, and, rendered with
+`@resvg/resvg-js`, `desktop/icon.png` and the two `apple-touch-icon.png`. Change the script and re-run
+it; never hand-edit one copy. The mark is a brush-pen drawing, so every line in it is a filled
+outline rather than a stroke: the line lands light, swells through the loop and lifts off to a point
+short of the dot, and the frame tapers where it starts and ends at the opening. It thins toward the
+dot rather than swelling, which is what keeps it reading as drawn rather than thrown. There are two
+cuts: the full mark, and the favicon cut (a heavier pen with less contrast, one turn of the coil, a
+wider opening), because below about 20px the full mark's thin ends disappear and its gap fills in.
+**The frame is open, never a `<rect>`** with the line drawn over it: the two open ends are the mark,
+and anything that "tidies" them closed has destroyed it. `site/assets/og.png`, the social card,
+carries the wordmark too and is not generated; recapture it with the site's screenshots.
 `index.html` points at a real icon file because the Playwright run fails on any console output and a
 full Chromium asks for one; an icon that 404s would fail the gate.

@@ -5,7 +5,7 @@ import path from "node:path";
 import { parseBoard } from "@/board/parseBoard";
 import { isDiagramType } from "@/board/types";
 import { parseChart } from "@/dsl/chart";
-import { hasGraph, parseDiagram } from "@/dsl/parse";
+import { containersOf, hasGraph, parseDiagram } from "@/dsl/parse";
 import { parseSequence } from "@/dsl/sequence";
 
 const DIR = path.resolve(__dirname, "../boards/local/reference");
@@ -198,5 +198,22 @@ root AnyDag
     const [, structure, dataModel, behaviour] = g.nodes;
     expect(structure!.hue).toBe(dataModel!.hue);
     expect(structure!.hue).not.toBe(behaviour!.hue);
+  });
+});
+
+describe("containersOf", () => {
+  it("lists the words that open a brace container, from the dialect itself", () => {
+    expect(containersOf("arch")).toEqual(["group"]);
+    expect(containersOf("erd")).toEqual(["group"]);
+    expect(containersOf("state")).toEqual(["group"]);
+    expect(containersOf("usecase")).toEqual(["group", "system"]);
+    expect(containersOf("c4")).toEqual(["group", "system"]);
+    expect(containersOf("sketch")).toEqual(["group", "frame"]);
+    expect(containersOf("flow")).toEqual(["group", "lane"]);
+    expect(containersOf("activity")).toEqual(["group", "lane"]);
+  });
+
+  it("is empty where nesting is by position, and for a type with no dialect", () => {
+    for (const t of ["mindmap", "timeline", "gitgraph", "sequence", "chart", "md"]) expect(containersOf(t), t).toEqual([]);
   });
 });

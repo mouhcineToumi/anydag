@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { concerns, onBoard, onBoards, onFile, onNote, onQuiz, onTable, type BoardChange } from "./events";
 import { GUESSED, guessed, shown, tick } from "./guess";
+import { refresher } from "./refresher";
 import type { SavedComponent } from "./library/saved";
 import { parseBoard } from "./parseBoard";
 import { openDoc } from "./prefetch";
@@ -404,33 +405,22 @@ export function useBoardList(who: string | null = null): BoardTree {
     /* **One request out at a time, and one more behind it at most** — however many changes arrive
        meanwhile, the one queued answers them all, the way `useIndex` coalesces. A list asked once
        per change fills the browser's six connections under a burst, and a note's own fetch queued
-       behind them reaches the server after a rename has moved the file and answers 404. */
-    let out = false;
-    let again = false;
-    const load = (): void => {
-      if (out) {
-        again = true;
-        return;
-      }
-      out = true;
+       behind them reaches the server after a rename has moved the file and answers 404. **A list
+       that did not arrive is asked for again on its own**, and an answer that is not a list is not
+       drawn as one: an error's body read as a listing was an empty sidebar, and a failure waited for
+       the next change, which after the Assistant's last write never came (#123). */
+    const lister = refresher(async () => {
       const asked = tick();
-      void fetch("/__board/list")
-        .then((r) => r.json() as Promise<BoardTree>)
-        .then((d) => {
-          if (!live) return;
-          setTree(treeOf(d, true));
-          setStamp(asked);
-          shown(asked);
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          out = false;
-          if (again && live) {
-            again = false;
-            load();
-          }
-        });
-    };
+      const r = await fetch("/__board/list");
+      if (!r.ok) return false;
+      const d = (await r.json()) as BoardTree;
+      if (!live) return true;
+      setTree(treeOf(d, true));
+      setStamp(asked);
+      shown(asked);
+      return true;
+    });
+    const load = (): void => void lister.ask();
     load();
     /* A file appearing or going away is a change to the list, and so is one whose title moved
  — a title is in the text, so an agent's edit or the sidebar's rename changes what a
@@ -486,7 +476,7 @@ export function useBoardList(who: string | null = null): BoardTree {
         return { ...was, titles, tasks, projects, events, questions };
       });
       /* A list already on its way was asked before this change, and would put the old title back. */
-      if (out) again = true;
+      lister.stale();
     };
     const offBoard = onBoard(changed("board"));
     const offNote = onNote(changed("note"));
@@ -497,6 +487,7 @@ export function useBoardList(who: string | null = null): BoardTree {
     const offTree = onBoards(() => void load());
     return () => {
       live = false;
+      lister.cancel();
       offBoard();
       offNote();
       offQuiz();

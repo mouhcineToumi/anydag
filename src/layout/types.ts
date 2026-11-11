@@ -134,6 +134,8 @@ export interface SeqPlaced {
   activations: { x: number; y0: number; y1: number; hue?: string }[];
   messages: RoutedEdge[];
   fragments: {
+    /** What a pick names it by: `frag:N` or `note:N`, counted in the order the file opens them. */
+    id: string;
     box: Box;
     /** y of each `else` / `and` rule inside the box. */
     dividers: number[];
@@ -141,6 +143,15 @@ export interface SeqPlaced {
     /** A note is a fragment box with no operator — one tab, no dividers. */
     note?: boolean;
   }[];
+  /**
+   * Every line of the body that is drawn at a height, with that height: a message, a note, a
+   * fragment's head, each `else` / `and`, and its `end`.
+   *
+   * What a message drawn with the pointer is placed by — the drop height is read against these and
+   * the new statement goes after the last one above it. `inside` is a line that opens a block, so a
+   * statement placed after it belongs in the block rather than beside it.
+   */
+  rows: { y: number; line: number; inside: boolean }[];
 }
 
 /* ------------------------------------------------------------------ charts */

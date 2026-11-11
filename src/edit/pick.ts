@@ -1,8 +1,11 @@
 import { declaredAt } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import { renameIds } from "@/dsl/rebind";
-import { edgeSpan, statementSpan } from "@/dsl/restate";
+import { seqLineOf } from "@/dsl/sequence";
+import { edgeSpan, statementSpan, topicMoves } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
+
+import type { Side } from "./connect";
 
 /**
  * What a *pick* is, and the three questions about one that `restate.ts` does not answer.
@@ -37,6 +40,11 @@ export interface PickedEdge {
   line: number;
   /** Which arrow along a chain, 0-based. */
   seg: number;
+  /**
+   * The other end of a run, in a sequence: shift-click on a second message picks every message
+   * between the two, which is what Wrap in wraps. Absent for one edge, which is every other dialect.
+   */
+  to?: string;
 }
 
 /**
@@ -71,11 +79,39 @@ export function edgeAt(
   dir: "LR" | "TB" | undefined,
   id: string,
 ): { line: number; seg: number } | null {
+  /* A message is one arrow on one line, and its id is counted rather than parsed — see `seqParts`. */
+  if (type === "sequence") {
+    const line = seqLineOf(body, id);
+    return line === null ? null : { line, seg: 0 };
+  }
   const graph = hasGraph(type) ? parseDiagram(type, body, dir) : null;
   const edge = graph?.edges.find((e) => e.id === id);
   if (!graph || !edge) return null;
   const onLine = graph.edges.filter((e) => e.line === edge.line);
   return { line: edge.line, seg: segOf(body.split("\n")[edge.line - 1] ?? "", onLine.indexOf(edge)) };
+}
+
+/**
+ * What an edge of this diagram may run to or from: its cards, its groups, and the rows inside a card
+ * — `api.content` — which are the three things the grammar lets an arrow name (`docs/dsl/common.md`
+ * rules 4 and 9).
+ *
+ * Read off the parse, because only the parse knows which words are declared; a list kept beside the
+ * text would be the second copy that drifts. Empty for a dialect that has no graph, and a `more`
+ * row is left out: it is a "…and four more" line, not a field an arrow can leave from.
+ */
+export function edgeTargets(
+  type: string,
+  body: string,
+  dir?: "LR" | "TB",
+): { nodes: string[]; groups: string[]; rows: string[] } {
+  const graph = hasGraph(type) ? parseDiagram(type, body, dir) : null;
+  if (!graph) return { nodes: [], groups: [], rows: [] };
+  return {
+    nodes: graph.nodes.map((n) => n.id),
+    groups: graph.groups.map((g) => g.id),
+    rows: graph.nodes.flatMap((n) => n.rows.filter((r) => r.kind !== "more").map((r) => `${n.id}.${r.id}`)),
+  };
 }
 
 /** The label written on one segment of an edge statement, as the author spelled it. */
@@ -141,4 +177,35 @@ export function duplicateStatement(
   const gap = span.to > span.from ? [""] : [];
   const out = [...lines.slice(0, span.to), ...gap, ...fragment, ...lines.slice(span.to)];
   return { body: out.join("\n"), id: map.get(id) ?? id };
+}
+
+/**
+ * Where a picked mindmap topic wears its two `+`: one for a child, one for a sibling.
+ *
+ * The child's is on the **outer side** — the way away from the root, which is the way the branch
+ * grows on the page, so the new topic appears where the `+` was. That is read off the layout rather
+ * than the file: a radial map puts a topic on whichever side of the root ELK chose, and the file
+ * says nothing about it. The root's own is on the right, because the whole map is round it and a
+ * default has to be somewhere.
+ *
+ * The sibling's is below, or — for a topic that grows up or down the page, where "below" is the
+ * direction its own child goes — to the right. `null` where there is no sibling to make: the top of
+ * the tree, since a second line at depth 0 would be a second root.
+ *
+ * The root is `m0`, which is not a convention but the parser's counter: the first topic read is the
+ * top of the tree, whatever it is called.
+ */
+export function topicHandles(
+  body: string,
+  node: string,
+  boxes: Record<string, { x: number; y: number; w: number; h: number }>,
+): { child: Side; sibling: Side | null } {
+  const line = declaredAt("mindmap", body, node, undefined);
+  const mine = boxes[node];
+  const root = boxes.m0;
+  const dx = mine && root && node !== "m0" ? mine.x + mine.w / 2 - (root.x + root.w / 2) : 1;
+  const dy = mine && root && node !== "m0" ? mine.y + mine.h / 2 - (root.y + root.h / 2) : 0;
+  const child: Side = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "w" : "e") : dy < 0 ? "n" : "s";
+  const sibling: Side = child === "n" || child === "s" ? "e" : "s";
+  return { child, sibling: line !== null && topicMoves(body, line).sibling ? sibling : null };
 }

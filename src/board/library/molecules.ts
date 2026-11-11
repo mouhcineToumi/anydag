@@ -27,6 +27,42 @@ export const MOLECULES: Blueprint[] = [
     parts: [{ use: "part-arch-service", props: { id: "${parent}_svc", meta: "" } }],
   },
   {
+    id: "part-erd-group",
+    layer: 1,
+    type: "erd",
+    name: "Group",
+    description: "erd · a domain with a hue, which `fk=` can point at.",
+    icon: "Group",
+    slot: "grp",
+    source: 'group ${self} "${title}" hue=${hue} {\n  ${children}\n}',
+    props: { title: "Domain", hue: "indigo" },
+    parts: [{ use: "part-erd-entity", props: { id: "${parent}_table" } }],
+  },
+  {
+    id: "part-state-group",
+    layer: 1,
+    type: "state",
+    name: "Group",
+    description: "state · a set of values that belong together.",
+    icon: "Group",
+    slot: "grp",
+    source: 'group ${self} "${title}" hue=${hue} {\n  ${children}\n}',
+    props: { title: "Group", hue: "teal" },
+    parts: [{ use: "part-state-state", props: { id: "${parent}_s" } }],
+  },
+  {
+    id: "part-class-group",
+    layer: 1,
+    type: "class",
+    name: "Group",
+    description: "class · a package of types.",
+    icon: "Group",
+    slot: "grp",
+    source: 'group ${self} "${title}" hue=${hue} {\n  ${children}\n}',
+    props: { title: "Package", hue: "indigo" },
+    parts: [{ use: "part-class-class", props: { id: "${parent}_type" } }],
+  },
+  {
     id: "part-arch-service-rows",
     layer: 1,
     type: "arch",
@@ -99,7 +135,9 @@ export const MOLECULES: Blueprint[] = [
      * mentioned. So "add an alt fragment" quietly added its messages between two strangers, and a
      * second drop reused the same two, because `x1` itself never appeared in the text for the
      * allocator to see. A fragment says something *about the conversation already there*, so it
-     * names the participants a sequence starts with and the author retypes them.
+     * names the participants a sequence starts with, and the author changes them — a picked
+     * message's From and To, or the source. A fragment round messages already drawn is the
+     * selection bar's Wrap in, which needs no part at all.
      */
     id: "part-sequence-alt",
     layer: 1,

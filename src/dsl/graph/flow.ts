@@ -28,12 +28,23 @@ export const flow: Dialect = {
  *     join j1
  *     f1 --> html & pdf & charge --> j1 --> ready
  *
+ * `start s0` and `end e0` declare the filled dot and the ringed one with an id, the way `fork f1` does a bar;
+ * `[*]` inside an edge still draws the same two.
+ *
  * The bars are solid ink. That is the one place ink is a fill rather than a text colour, and it is
  * what makes them read as grammar rather than as another node.
  */
 export const activity: Dialect = {
   type: "activity",
   dir: "LR",
-  kinds: { action: "action", step: "action", decision: "decision", fork: "fork", join: "join" },
+  kinds: {
+    action: "action",
+    step: "action",
+    decision: "decision",
+    fork: "fork",
+    join: "join",
+    start: "start",
+    end: "end",
+  },
   lanes: true,
 };

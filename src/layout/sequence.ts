@@ -1,4 +1,4 @@
-import type { SeqEvent, SequenceModel } from "@/dsl/sequence";
+import { fragId, msgId, noteId, type SeqEvent, type SequenceModel } from "@/dsl/sequence";
 import type { Theme } from "@/theme/contract";
 
 import { fontOf, getMeasurer } from "./measure";
@@ -70,6 +70,9 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
   const messages: RoutedEdge[] = [];
   const fragments: SeqPlaced["fragments"] = [];
   const activations: SeqPlaced["activations"] = [];
+  const rows: SeqPlaced["rows"] = [];
+  let fragN = 0;
+  let noteN = 0;
 
   /* One stack per participant: `activate` pushes a start y, `deactivate` pops it and emits the bar.
      Anything still open at the end is closed at the last row, because an unclosed activation is a
@@ -115,11 +118,13 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
         const x0 = Math.min(...cols) - m.node.participantW / 2;
         const x1 = Math.max(...cols) + m.node.participantW / 2;
         fragments.push({
+          id: noteId(noteN++),
           box: { x: x0, y: y - 20, w: x1 - x0, h: 44 },
           dividers: [],
           tabs: [{ y: y - 20, kind: "note", text: e.text }],
           note: true,
         });
+        rows.push({ y, line: e.line, inside: false });
         y += s.rowPitch;
         continue;
       }
@@ -141,6 +146,10 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
         const x1 = (cols.length ? Math.max(...cols) : colX[0]!) + s.fragmentPadRight;
 
         const top = y - s.rowPitch / 2;
+        /* Counted before the branches are walked, so the ids run in the order the file opens them —
+           which is the order `seqParts` counts — while the boxes are pushed after their children. */
+        const id = fragId(fragN++);
+        rows.push({ y: top, line: e.line, inside: true });
         const tabs: SeqPlaced["fragments"][number]["tabs"] = [];
         const dividers: number[] = [];
 
@@ -148,6 +157,7 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
           if (i > 0) {
             y += s.elseH / 2;
             dividers.push(y - s.rowPitch / 2);
+            rows.push({ y: y - s.rowPitch / 2, line: b.line, inside: true });
             tabs.push({ y: y - s.rowPitch / 2, kind: e.kind === "par" ? "and" : "else", text: b.label });
             y += s.elseH / 2;
           } else {
@@ -158,7 +168,8 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
         });
         y += s.endH;
 
-        fragments.push({ box: { x: x0, y: top, w: x1 - x0, h: y - s.rowPitch / 2 - top }, dividers, tabs });
+        if (e.end !== undefined) rows.push({ y: y - s.rowPitch / 2, line: e.end, inside: false });
+        fragments.push({ id, box: { x: x0, y: top, w: x1 - x0, h: y - s.rowPitch / 2 - top }, dividers, tabs });
         continue;
       }
 
@@ -169,6 +180,7 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
       const ai = index.get(e.from);
       const bi = index.get(e.to);
       if (ai === undefined || bi === undefined) continue;
+      rows.push({ y, line: e.line, inside: false });
 
       const dash = e.style === "return";
       const hue = hueOf.get(e.from);
@@ -180,7 +192,7 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
         const reach = s.colGap;
         const y1 = y + s.rowPitch * 0.6;
         messages.push({
-          id: `m${seq++}`,
+          id: msgId(seq++),
           d: `M${at},${y} C${at + reach},${y} ${at + reach},${y1} ${at},${y1}`,
           hue,
           dash,
@@ -200,7 +212,7 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
       const to = edgeX(e.to, -dir as 1 | -1);
 
       messages.push({
-        id: `m${seq++}`,
+        id: msgId(seq++),
         d: `M${from},${y} L${to},${y}`,
         hue,
         dash,
@@ -242,5 +254,6 @@ export function layoutSequence(model: SequenceModel, theme: Theme): SeqPlaced {
     activations,
     messages,
     fragments,
+    rows,
   };
 }
