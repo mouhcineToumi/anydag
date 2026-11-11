@@ -64,6 +64,15 @@ left in a folder is not listed or served. Both file routes answer a
 `Range` with a 206 (`byteRange` in `server/uploads.ts`): a `<video>` will not seek without one, and
 Safari will not play one at all. The size limit is `ANYDAG_UPLOAD_MAX_MB`, 512 by default.
 
+**The PDF viewer is a chunk of its own**, with pdf.js behind it, imported the first time a PDF is
+drawn (`preloadPdfViewer` in `src/files/Preview.tsx`) and kept once it has come — **not
+`React.lazy`**, whose first render suspends even for a loaded module and is then held back by
+React's 300 ms reveal throttle. That throttle was most of the first PDF of a session taking 430 ms
+to draw in the packaged desktop app, with the page up in 10 (#129; the same as a note's editor in
+#120). Measured there now, on a one-page PDF: the chunk is in about 30 ms after the click, pdf.js
+opens the document in about 85 more — a worker started for each document, the file fetched and
+parsed — and draws the page in about 16; 160 ms in all, and 335 at a quarter of the CPU.
+
 The change feed says `dag:file` for an attachment, carrying its title, so a row is redrawn in place;
 `useFiles` keeps the page's list of them, and the file's page draws nothing until that list says the
 file exists — an `<img>` pointed at a missing file is a 404 on the console, which fails the suite.
