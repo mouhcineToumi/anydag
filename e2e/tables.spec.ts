@@ -300,6 +300,23 @@ test("a row with too many cells is marked, and widening the table keeps them", a
   await expect(page.locator("[data-dag-grid-flag]")).toHaveCount(0);
 });
 
+test("a tab with problems shows their count in the strip, and loses it when they are mended", async ({ page }) => {
+  const wide = TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer | Paris |");
+  const name = write("pipeline", wide);
+  await open(page, name);
+  /* On Deals, nothing is wrong; People, the tab nobody is looking at, says it has one. */
+  await expect(page.locator('[data-dag-page="deals"] [data-dag-page-flag]')).toHaveCount(0);
+  const badge = page.locator('[data-dag-page="people"] [data-dag-page-flag]');
+  await expect(badge).toHaveText("1");
+  await expect(badge).toHaveAttribute("aria-label", "1 problem");
+  await page.locator('[data-dag-page="people"]').click();
+  await expect(page).toHaveURL(/tab=people/);
+  await page.locator('[data-dag-grid-flag="row"]').click();
+  await page.locator('[data-dag-tablepage-fix="trim-row"]').click();
+  await expect.poll(() => read("pipeline")).toBe(TABLE);
+  await expect(page.locator("[data-dag-page-flag]")).toHaveCount(0);
+});
+
 test("a column with a setting it does not know is marked on its header, and Remove it takes only that off", async ({ page }) => {
   const odd = TABLE.replace("Amount {#amount number}", "Amount {#amount number numbr w=150}");
   const name = write("pipeline", odd);

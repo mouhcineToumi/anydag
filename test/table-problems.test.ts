@@ -20,7 +20,7 @@ import {
   widenToRow,
   wrapLooseTable,
 } from "../src/table/write";
-import { aboveGrid, fixLabel, problemsOf, repair, said, type Fix, type Problem } from "../src/ui/table/problems";
+import { aboveGrid, countByTab, fixLabel, problemsOf, repair, said, type Fix, type Problem } from "../src/ui/table/problems";
 
 const problems = (text: string): Problem[] => problemsOf(text, parseTable(text));
 const codesOf = (text: string): string[] => tableDiagnostics(parseTable(text)).map((d) => d.code);
@@ -293,5 +293,74 @@ describe("what mends each problem", () => {
     /* Past the first tab, a table is no longer loose. */
     const after = `${HEAD}## T {#t}\n\n${GRID}`;
     expect(wrapLooseTable(after, 7)).toBe(after);
+  });
+});
+
+describe("what the tab strip counts", () => {
+  it("counts the problems on each tab, and none for the file's own", () => {
+    const text = `${HEAD}Words.\n\n| A | B |\n| - | - |\n| 1 | 2 |\n\n## A {#a sort="gone"}\n\n${GRID}\n## B {#b}\n\n${GRID}\n## C {#c}\n\n| X {#x} | Y {#y} |\n| --- | --- |\n| 1 {#r1} | 2 | 3 | 4 |\n| 5 {#r2} | 6 | 7 |\n`;
+    const all = problems(text);
+    expect(all.some((p) => p.where.kind === "file")).toBe(true);
+    expect(countByTab(all, 3)).toEqual([1, 0, 2]);
+    expect(countByTab([], 2)).toEqual([0, 0]);
+  });
+
+  it("counts a column's, a row's and a cell's problem on its tab", () => {
+    const text = `${HEAD}## A {#a}\n\n| X {#x} | Y {#x number} |\n| --- | --- |\n| 1 {#r1} | lots |\n`;
+    expect(
+      problems(text)
+        .map((p) => p.where.kind)
+        .sort(),
+    ).toEqual(["cell", "column"]);
+    expect(countByTab(problems(text), 1)).toEqual([2]);
+  });
+});
+
+describe("every problem shown is one the page can mend", () => {
+  const FILES: Record<string, string> = {
+    tabId: `${HEAD}## A {#t}\n\n${GRID}\n## B {#t}\n\n${GRID}`,
+    columnId: `${HEAD}## A {#a}\n\n| X {#x} | Y {#x} |\n| --- | --- |\n| 1 {#r1} | 2 |\n`,
+    rowId: `${HEAD}## A {#a}\n\n${GRID.replace("{#rb}", "{#ra}")}`,
+    unknown: `${HEAD}## A {#a colour=red}\n\n| X {#x numbr} | Y {#y h=3} |\n| --- | --- |\n| 1 {#r1} | 2 |\n`,
+    cell: `${HEAD}## A {#a}\n\n| Name {#n} | Stage {#s select options="Lead,Won"} | Due {#d date} | N {#m number} |\n| --- | --- | --- | --- |\n| Acme {#r1} | Lost | tomorrow | lots |\n`,
+    width: `${HEAD}## A {#a}\n\n| X {#x} | Y {#y} |\n| --- | --- |\n| 1 {#r1} | 2 | 3 | 4 |\n`,
+    stray: `${HEAD}## A {#a}\n\n${GRID}\nSome words under the table.\n`,
+    noGrid: `${HEAD}## A {#a}\n\nJust words.\n`,
+    sort: `${HEAD}## A {#a sort="gone:desc, ???"}\n\n${GRID}`,
+    filter: `${HEAD}## A {#a filter="nope; missing=3"}\n\n${GRID}`,
+    fence: `${HEAD}## A {#a}\n\n${GRID}\n\`\`\`\nnever closed\n`,
+    fenceAbove: `${HEAD}\`\`\`\nnever closed\n`,
+    loose: `${HEAD}Words.\n\n| A | B |\n| - | - |\n| 1 | 2 |\n\n## T {#t}\n\n${GRID}`,
+  };
+  const count = (text: string, code: string) => problems(text).filter((p) => p.code === code).length;
+
+  it("has a button for it, and each button leaves one fewer of that kind", () => {
+    const seen = new Set<string>();
+    for (const [what, text] of Object.entries(FILES)) {
+      const all = problems(text);
+      expect(all.length, what).toBeGreaterThan(0);
+      for (const p of all) {
+        seen.add(p.code);
+        expect(p.fixes.length, `${what}: ${p.code}`).toBeGreaterThan(0);
+        for (const f of p.fixes) {
+          const after = repair(stampTable(text), p, f);
+          expect(count(after, p.code), `${what}: ${p.code} ${f.kind}`).toBeLessThan(count(text, p.code));
+        }
+      }
+    }
+    /* Every code the page shows was reached; the two it does not show are the page's own business. */
+    expect([...seen].sort()).toEqual(
+      [
+        "ET_DUPLICATE_ID",
+        "WT_BAD_FILTER",
+        "WT_BAD_SORT",
+        "WT_CELL",
+        "WT_LOOSE_TABLE",
+        "WT_OPEN_FENCE",
+        "WT_ROW_WIDTH",
+        "WT_STRAY",
+        "WT_UNKNOWN_ATTR",
+      ].sort(),
+    );
   });
 });

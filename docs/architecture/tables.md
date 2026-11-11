@@ -83,7 +83,9 @@ Ten things are load-bearing:
   tab) in a list above the grid; a **column's** (a shared id, a word that is not a type) on a mark in
   its header; a **row's** (a shared id, too many cells) and its **cells'** (`WT_CELL`, also the cell's
   `title`) on a mark in its gutter. The bar's status says how many in the whole file and its button goes
-  to the first, switching tab. `WT_NO_ID` and `WT_EMPTY` are not shown: an id is the file's business
+  to the first, switching tab, and a tab with problems carries their count on its tab in the strip
+  (`PageBar`'s `flags`, from `countByTab`; the file's own belong to no tab), so one on a tab nobody is
+  looking at shows. `WT_NO_ID` and `WT_EMPTY` are not shown: an id is the file's business
   and the empty state has its own button. A row has no `WT_UNKNOWN_ATTR` — its braces are attributes
   only when they hold nothing but an id and a height. Each fix is one `repair` in `problems.ts` over
   one writer in `write.ts`, addressed **by position** and written like any change, so it is one undo:
@@ -93,6 +95,7 @@ Ten things are load-bearing:
   rules that read, `closeFence`, `wrapLooseTable`. Each looks again at what it was asked to mend and
   returns the text it was given when that is no longer wrong. A write that goes by id while two things
   share one is refused with a word that says so (`only` in `TablePage.tsx`).
+- **Every problem shown is one the person can fix or act on from the page; one they could not is prevented by the app or left unshown, never flagged** (`test/table-problems.test.ts` holds each shown code to a button that removes it).
 - **CSV is a conversion, never a format.** `src/table/csv.ts` reads RFC 4180 with the delimiter
   sniffed among `,`, `;` and a tab, and a column's type inferred from its values; a tab goes out as
   every row in its sort order, unfiltered — a filter hides rows from a person, not from a file they

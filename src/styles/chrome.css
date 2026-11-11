@@ -355,6 +355,24 @@
   cursor: pointer;
 }
 .dag-tab__close:hover { color: var(--dag-color-danger); }
+/* A page with problems: its name truncates, its count does not. */
+.dag-tab--flagged { display: inline-flex; align-items: center; gap: 6px; }
+.dag-tab__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dag-tab__flag {
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 999px;
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border: 1px solid var(--dag-color-warning);
+}
 .dag-tab__add {
   display: inline-flex;
   align-items: center;

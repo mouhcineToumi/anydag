@@ -23,7 +23,7 @@ import { TableFrame, keysOf, rowCount, tablePart } from "@/view/TableRead";
 
 import { Grid, Pop, type At, type Edit } from "./Grid";
 import { ProblemList } from "./ProblemList";
-import { aboveGrid, problemsOf, repair, tabOfProblem, type Fix, type Problem } from "./problems";
+import { aboveGrid, countByTab, problemsOf, repair, tabOfProblem, type Fix, type Problem } from "./problems";
 
 /**
  * A table's own page — `?table=<name>&tab=<id>`.
@@ -128,6 +128,11 @@ export function TablePage({
   }
 
   const tabKeys = useMemo(() => keysOf(table.tabs), [table]);
+  /* The count on each tab in the strip, so a problem on a tab nobody is looking at shows. */
+  const flags = useMemo(() => {
+    const counts = countByTab(problems, table.tabs.length);
+    return Object.fromEntries(tabKeys.map((k, i) => [k, counts[i]!]));
+  }, [problems, table, tabKeys]);
   const current = ready ? tabFor(table, tabParam) : undefined;
   const currentKey = current ? tabKeys[table.tabs.indexOf(current)]! : null;
 
@@ -494,6 +499,7 @@ export function TablePage({
           page={currentKey}
           onPage={onTab}
           edit={locked ? undefined : tabEdit}
+          flags={flags}
           noun="tab"
         />
       ) : null}

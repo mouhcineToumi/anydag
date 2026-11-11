@@ -325,6 +325,16 @@ export function problemsOf(text: string, table: Table): Problem[] {
 export const aboveGrid = (problems: readonly Problem[], tab: number): Problem[] =>
   problems.filter((p) => p.where.kind === "file" || (p.where.kind === "tab" && p.where.tab === tab));
 
+/** How many problems each tab has, by its place in the file — the count on its tab in the strip. The file's own belong to no tab. */
+export function countByTab(problems: readonly Problem[], tabs: number): number[] {
+  const out = Array.from({ length: tabs }, () => 0);
+  for (const p of problems) {
+    const t = tabOfProblem(p);
+    if (t !== null && t < tabs) out[t]!++;
+  }
+  return out;
+}
+
 /** Where a problem is, as a place a person can go to: its tab, or `null` for the file. */
 export const tabOfProblem = (p: Problem): number | null => (p.where.kind === "file" ? null : p.where.tab);
 
