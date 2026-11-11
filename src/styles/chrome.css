@@ -6800,6 +6800,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-assistant__row[aria-current="page"] { background: var(--dag-color-paper200); font-weight: 600; }
 .dag-assistant__row:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 .dag-assistant__rowtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-assistant__rowvault { flex: none; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--dag-color-muted); }
 .dag-assistant__live { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-color-accent); }
 .dag-assistant__none { margin: 8px; font-size: 12px; color: var(--dag-color-muted); }
 
@@ -6826,6 +6827,11 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* The chat: the thread scrolls, the composer holds the foot. */
 .dag-chat-with-changes { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
 .dag-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.dag-chat--welcome { justify-content: center; align-items: center; padding: 40px 24px 96px; }
+.dag-chat-welcome { display: flex; flex-direction: column; gap: 10px; width: min(680px, 100%); }
+.dag-chat-welcome__title { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; text-align: center; color: var(--dag-color-ink); }
+.dag-chat-welcome__line { margin: 0 0 8px; font-size: 14px; text-align: center; color: var(--dag-color-slate); }
+.dag-chat-welcome .dag-chat-composer { margin: 0; }
 .dag-chat__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 20px 8px; }
 .dag-chat-turns { display: flex; flex-direction: column; gap: 28px; max-width: 760px; margin-inline: auto; }
 .dag-chat-turn { display: flex; flex-direction: column; gap: 8px; }

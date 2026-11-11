@@ -34,7 +34,8 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 
 const q = (id: string) => encodeURIComponent(id);
 
-export const listChats = async (): Promise<ChatRow[]> => (await call<{ chats: ChatRow[] }>("/__board/chats")).chats;
+/** Every chat in every vault the server has open — a panel chat may be in another one. */
+export const listChats = async (): Promise<ChatRow[]> => (await call<{ chats: ChatRow[] }>("/__board/chats?all=1")).chats;
 
 export const loadModels = async (): Promise<ProviderModels[]> =>
   (await call<{ providers: ProviderModels[] }>("/__board/chat/models")).providers;
