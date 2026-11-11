@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { Board } from "@/board/types";
 import { FLOW_DEFAULT, FLOW_RANGE, flowMeta, themeMeta } from "@/board/settings";
+import type { ThemeSource } from "@/theme/pick";
 
 const ICON = { size: 16, strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -11,6 +12,8 @@ interface Props {
   /** Every theme there is, and the one this window is drawing in. */
   themes: readonly string[];
   themeName: string;
+  /** Which rule chose `themeName` (`pickTheme`), so the card can say why. */
+  themeSource: ThemeSource;
   /** `Editor.setMeta`: the keys to set in the frontmatter, `null` removing one. */
   onMeta(meta: Record<string, unknown>): Promise<boolean>;
   onClose(): void;
@@ -28,15 +31,15 @@ interface Props {
  * **Three things about the theme row.** It is the *board's* theme, `theme:` in the file, not the
  * Settings preference — that one is about the window and is not part of what a `?board=…` link
  * means. *Follow my settings* is no `theme:` at all, not a word that happens to name the default.
- * And the reader's own choice still outranks the file (`useTheme`), so when the two differ the card
- * says which one this window is showing and why, instead of leaving a person wondering why a
- * setting they just made drew nothing.
+ * And the board's theme is the one drawn, unless the reader turned on *Use my theme on every board*
+ * or the address names one (`pickTheme`) — so when this window is drawing another, the card says
+ * which one and why, instead of leaving a person wondering why a setting they just made drew nothing.
  *
  * **Flow is only what differs from the default.** Each number is committed when its box loses
  * focus, as `Field` does, and refused in the box — put back, with the range said — when it is not a
  * number the control may write.
  */
-export function BoardSettings({ board, themes, themeName, onMeta, onClose }: Props) {
+export function BoardSettings({ board, themes, themeName, themeSource, onMeta, onClose }: Props) {
   const [width, setWidth] = useState(String(board.flow.width));
   const [gap, setGap] = useState(String(board.flow.gap));
   const [refused, setRefused] = useState<string | null>(null);
@@ -105,13 +108,9 @@ export function BoardSettings({ board, themes, themeName, onMeta, onClose }: Pro
               ))}
             </select>
           </label>
-          {board.theme && themeName !== board.theme ? (
-            <p className="dag-field__hint" data-dag-board-theme-note="">
-              This window is drawing {themeName}: a theme chosen in Settings comes before the board’s.
-            </p>
-          ) : (
-            <p className="dag-field__hint">The look this board asks for. Anyone opening it gets it, unless they chose another.</p>
-          )}
+          <p className="dag-field__hint" data-dag-board-theme-note={board.theme ? themeSource : ""}>
+            {themeNote(board.theme, themeName, themeSource)}
+          </p>
 
           <div className="dag-board-settings__flow" role="group" aria-label="Flow">
             <label className="dag-field">
@@ -159,4 +158,20 @@ export function BoardSettings({ board, themes, themeName, onMeta, onClose }: Pro
       </section>
     </div>
   );
+}
+
+/** What the theme row says under it: what is shown, and when it is not the board's, why not. */
+function themeNote(boardTheme: string | undefined, drawn: string, source: ThemeSource): string {
+  if (!boardTheme) return "The look this board asks for. With none, it is drawn in the theme chosen in Settings.";
+  switch (source) {
+    case "board":
+      return "The look this board asks for. Anyone opening it sees it, unless they turned on “Use my theme on every board” in Settings.";
+    case "mine":
+      return `This window is drawing ${drawn}, your own theme: “Use my theme on every board” is on in Settings.`;
+    case "address":
+      return `This window is drawing ${drawn}, the theme named in the page’s address, which comes before the board’s.`;
+    case "own":
+    case "default":
+      return `${boardTheme} is not installed here, so this window is drawing ${drawn}.`;
+  }
 }

@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
 import { pageMore } from "./more";
+import { openSettings } from "./sidebar";
 
 /**
  * The settings a board and a fence had that only typing reached: `aspect=`, a diagram's own `hue=`,
@@ -206,13 +207,62 @@ test("a flow number the control may not write is put back in the box, with the r
   expect(read()).toBe(BOARD);
 });
 
-test("the card says so when the window is showing another theme than the board asks for", async ({ page }) => {
+test("the card says so when the address names another theme than the board asks for", async ({ page }) => {
   fs.writeFileSync(file, BOARD.replace("title: Settings", "title: Settings\ntheme: neutral"));
   await page.goto(`/?board=${name}&theme=paper`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await pageMore(page, "data-dag-board-settings-open");
   await expect(page.locator("[data-dag-board-theme]")).toHaveValue("neutral");
+  await expect(page.locator("[data-dag-board-theme-note]")).toHaveAttribute("data-dag-board-theme-note", "address");
   await expect(page.locator("[data-dag-board-theme-note]")).toContainText("paper");
+});
+
+test("a board's own theme beats the reader's, unless they use their theme on every board", async ({ page }) => {
+  fs.writeFileSync(file, BOARD.replace("title: Settings", "title: Settings\ntheme: neutral"));
+  await page.goto(`/?board=${name}`);
+  await page.evaluate(() => localStorage.setItem("dag:library", "0"));
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-theme", "neutral");
+
+  /* The reader picks a dark theme in Settings: the board still asks for its own, and gets it. */
+  await openSettings(page, "preferences");
+  const own = page.locator("[data-dag-setting-own-theme]");
+  await expect(own).not.toBeChecked();
+  await page.locator("[data-dag-setting-theme]").selectOption("paper-dark");
+  await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("paper-dark");
+  await expect(html).toHaveAttribute("data-theme", "neutral");
+
+  /* Turned on, the reader's theme is drawn over the board's — and the file is not touched. */
+  await own.click();
+  await expect(html).toHaveAttribute("data-theme", "paper-dark");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
+  await pageMore(page, "data-dag-board-settings-open");
+  await expect(page.locator("[data-dag-board-theme]")).toHaveValue("neutral");
+  const note = page.locator("[data-dag-board-theme-note]");
+  await expect(note).toHaveAttribute("data-dag-board-theme-note", "mine");
+  await expect(note).toContainText("paper-dark");
+  expect(read()).toContain("theme: neutral");
+  await page.keyboard.press("Escape");
+
+  /* And off again, the board's own look comes back. */
+  await openSettings(page, "preferences");
+  await page.locator("[data-dag-setting-own-theme]").click();
+  await expect(html).toHaveAttribute("data-theme", "neutral");
+  await page.keyboard.press("Escape");
+  await pageMore(page, "data-dag-board-settings-open");
+  await expect(page.locator("[data-dag-board-theme-note]")).toHaveAttribute("data-dag-board-theme-note", "board");
+});
+
+test("a board that asks for no theme is drawn in the reader's, whatever the switch says", async ({ page }) => {
+  await open(page);
+  await openSettings(page, "preferences");
+  await page.locator("[data-dag-setting-theme]").selectOption("paper-dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "paper-dark");
+  await page.keyboard.press("Escape");
+  await pageMore(page, "data-dag-board-settings-open");
+  await expect(page.locator("[data-dag-board-theme-note]")).toContainText("Settings");
 });
 
 test("Escape closes the card and leaves the board as it was", async ({ page }) => {

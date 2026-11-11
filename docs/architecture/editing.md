@@ -414,9 +414,11 @@ Four things a person could only change by typing, each now a control (`feat(canv
   `MetaOp` and one undo entry, as the page tabs write `pages:`. Only what differs from
   `FLOW_DEFAULT` is written and `flow:` leaves the file when both are the default, so a board nobody
   changed stays as short as it was; a number outside `FLOW_RANGE` is put back in the box with the
-  range said. *Follow my settings* is **no `theme:` at all**. The reader's own theme still outranks
-  the file's (`useTheme`'s order, deliberate), so when the window is drawing another theme than the
-  board asks for the card says which, instead of a setting that visibly did nothing.
+  range said. *Follow my settings* is **no `theme:` at all**. The board's theme is the one drawn
+  (`pickTheme`, `src/theme/pick.ts`) unless the reader turned on *Use my theme on every board* in
+  Settings → Appearance or the address names one (`?theme=`), so when the window is drawing another
+  theme than the board asks for, the card says which and why (`data-dag-board-theme-note` carries
+  the rule that decided: `board`, `mine`, `address`), instead of a setting that visibly did nothing.
 - **A file that would not parse far enough to have a control** gets a repair in words, under its
   row in the problems dock (`src/edit/repair.ts` plans it, `Problems.tsx` draws it, `Editor.repair`
   does it). `EB_FRONTMATTER` keeps every top-level setting that reads on its own, **byte for byte**,

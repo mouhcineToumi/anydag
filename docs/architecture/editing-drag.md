@@ -156,7 +156,8 @@ that list, closed where closing it was honest.
 - **The theme choice outlives the tab.** `localStorage`, the same argument as the library's open
   state — a preference about this window, not part of what a `?board=…` link means. `?theme=` still
   outranks it, because `snapshot.mjs --theme` and every Playwright check are that, and a preference
-  remembered in a browser must not change what a screenshot shows.
+  remembered in a browser must not change what a screenshot shows. A board's own `theme:` comes
+  before it unless the reader turned on *Use my theme on every board* (`settings.md`).
 - **A Mermaid paste converts.** `src/dsl/from-mermaid.ts` is the other half of `detectMermaid`:
   `flowchart`/`graph` → `flow`, `erDiagram` → `erd`, `sequenceDiagram` → `sequence`, and `pie` and
   `xychart-beta` → `chart`. It is offered
