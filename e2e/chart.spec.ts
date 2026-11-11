@@ -172,10 +172,7 @@ slice c "Gamma" 25
 
   async function open(page: Page) {
     await page.goto(`/?board=${name}`);
-    await page.evaluate(() => {
-      localStorage.setItem("dag:library", "0");
-      localStorage.setItem("dag:inspector-mode", "props");
-    });
+    await page.evaluate(() => localStorage.setItem("dag:library", "0"));
     await ready(page);
   }
 

@@ -44,50 +44,26 @@ const MIN_W = 280;
 const MAX_W = 900;
 const DEFAULT_W = 400;
 
-/**
- * Select one line of the box and bring it roughly to the middle.
- *
- * `keepIfInside` is the pick-follows-caret guard: when the box already has focus with its caret
- * inside the line, the caret is what put the pick there and re-selecting the whole line would take
- * it off the character the person had just reached.
- */
-function selectLine(el: HTMLTextAreaElement, text: string, line: number, keepIfInside: boolean): void {
-  const lines = text.split("\n");
-  const at = Math.min(Math.max(1, line), lines.length);
-  const from = lines.slice(0, at - 1).reduce((n, l) => n + l.length + 1, 0);
-  const to = from + (lines[at - 1]?.length ?? 0);
-  if (keepIfInside && document.activeElement === el && el.selectionStart >= from && el.selectionEnd <= to) return;
-  el.focus();
-  el.setSelectionRange(from, to);
-  /* Roughly centred: the line's own offset, less half a box of context. */
-  const lineH = el.scrollHeight / Math.max(1, lines.length);
-  el.scrollTop = Math.max(0, (at - 1) * lineH - el.clientHeight / 2);
-}
-
 function storedWidth(): number {
   const n = Number(readPref(INSPECTOR_WIDTH));
   return Number.isFinite(n) && n >= MIN_W && n <= MAX_W ? n : DEFAULT_W;
 }
 
 /**
- * The editor for one item: what it says, and the few things its fence line says about it.
+ * The panel for one item: its problems, its controls, and the few things its fence line says about it.
  *
- * A panel beside the board rather than a box over the item, because the thing being edited is a
- * *source* — markdown, or a diagram's DSL — and the diagram it produces is the preview. Typing
- * writes the file a quarter of a second after the last keystroke; the watcher and the parser do
- * the rest, so the diagram redraws beside the text as it is typed, through the same path Claude's
- * writes take. There is no second copy of the item's state to keep in step.
+ * **Controls, not text** (#145). A diagram's body is a language, and everything it says has a
+ * control — the item's own fields, and the strip for whatever is picked inside it — so the panel
+ * holds those and the canvas is the rest. There was a *Source* tab beside them, remembered as a
+ * preference; it is gone, not hidden behind a setting (decided on #132). An agent still writes the
+ * DSL, and a person never has to read it.
  *
- * The draft here is the one thing that is not the file: it is what the person has typed, some of
- * which may not have been written yet. An outside change to the item — Claude rewriting it — wins
- * only when nothing is pending; otherwise the draft stands and the next write carries it.
- *
- * **Two halves, and which one is showing is a preference** (F1). *Properties* is the controls — the
- * item's own fields, and the strip for whatever is picked inside it; *Source* is the text those
- * controls are writing. The brief this milestone serves is that a person can change everything
- * without ever seeing the DSL, and the DSL "should appear to the ones who are interested in it";
- * one toggle, remembered in `localStorage` like the panel's width, is the whole of that. Not in the
- * query string: it is a fact about this window, not part of what a shared `?board=…` link means.
+ * Every control hands the whole body back through `onChange`, and the body goes to the file a
+ * quarter of a second after the last change; the watcher and the parser do the rest, through the
+ * same path an agent's writes take. The draft is the one thing that is not the file: an outside
+ * change to the item wins only when nothing is pending; otherwise the draft stands and the next
+ * write carries it. The text box is left only for what is not a language — an image's caption and
+ * a prompt card's request.
  */
 export function Inspector({
   item,
@@ -122,8 +98,7 @@ export function Inspector({
   const [sheet, setSheet] = useState<string | null>(null);
   const [showSheet, setShowSheet] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
-  /* What the box holds right now. The reveal effect fires on a counter and must not close over
-     whichever draft happened to be current when it was created. */
+  /* What the box holds right now, for a rename that has to put it back if refused. */
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -274,50 +249,14 @@ export function Inspector({
   }, [pickedNode, pickedEdge, pickedLink, boardLinks, item.id, item.type, item.dir, item.line, draft]);
 
   /*
-   * Put the caret on the pick's line, when the source is what is showing.
-   *
-   * Selecting the line rather than painting a highlight behind it: a `<textarea>` cannot be styled
-   * per line without a second element tracking its wrapping, and the browser's own selection says
-   * "this is the bit you asked for" in a way every reader already knows. `scrollTop` is nudged
-   * because setting a selection scrolls it only just into view, at the very bottom of the box.
-   *
-   * The guard is the load-bearing part. The caret *feeds* the pick, so a person arrowing down the
-   * source changes `subject.line` on every press — and re-selecting the whole line each time would
-   * take the caret off the character they had just reached. The box holding focus with its caret
-   * already inside the line means the caret put the pick there, and there is nothing to do; without
-   * the focus half it also swallowed the *first* placement, because a textarea that has never been
-   * touched reports a caret at offset zero, which is inside line 1. `reveal.n` still triggers
-   * because `open` still bumps it: double-clicking the same card twice has to bring the caret back,
-   * and by then nothing else about the request has changed.
+   * The panel has no Source tab (#145, decided on #132: removed, not hidden behind a setting). A
+   * diagram's body is a language and everything it says has a control, so the panel is those
+   * controls and the canvas. The box below is for what is not a language: an image's caption and a
+   * prompt card's request. An `edges` fence's statements are the links on the canvas, each changed
+   * by picking it, and an `md` card's text is written on the card itself (`CardText`).
    */
-  const reveal = editor.reveal;
-  const revealN = reveal && reveal.id === item.id ? reveal.n : 0;
-  /*
-   * Only a diagram has two halves, and the reason is what the body *is*.
-   *
-   * A diagram's body is a language: everything it says has a control, so the text behind those
-   * controls is genuinely optional and hiding it is the whole point of the milestone. A note's body
-   * is the note, an image's is its caption, an `edges` fence's is its statements and it has no
-   * fence attributes at all — putting any of those behind a tab would hide the item's content from
-   * the person who opened the panel to see it.
-   */
-  const split = isDiagramType(item.type);
-  const mode = split ? editor.mode : "source";
-  const showFields = !split || mode === "props";
-  /* Except an `edges` fence (#145): its statements are the links on the canvas, each one changed by
-     picking it, so the text behind them is the file's and not the person's. And except an `md`
-     card (#145), whose text is written on the card itself, as rich text (`CardText`): a second
-     editor of the same words here would be a second copy of them. */
   const prose = item.type === "md";
-  const showSource = !links && !prose && (!split || mode === "source");
-  const wantLine = subject?.line ?? 0;
-  useEffect(() => {
-    const el = area.current;
-    if (mode !== "source" || !el || !wantLine) return;
-    selectLine(el, draftRef.current, wantLine, true);
-    /* These three are the whole trigger; the rest is read when one of them fires. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, wantLine, revealN]);
+  const showSource = !links && !prose && !diagram;
 
   /* Pulling the panel wider. Painted straight onto the element for the duration — this is the
      `Viewport` split again — and only the settled value reaches React and `localStorage`. */
@@ -392,31 +331,6 @@ export function Inspector({
         </button>
       </header>
 
-      {/* `dag-inspector__mode`, not `dag-tab`: the page tabs have owned that name since M27 and
-          `nodes.css` loads after this file. See the namespace note in docs/architecture/things-that-will-bite.md. */}
-      {split ? (
-        <div className="dag-inspector__modes" role="tablist" aria-label="Editor view">
-          {(
-            [
-              ["props", "Properties"],
-              ["source", "Source"],
-            ] as const
-          ).map(([m, label]) => (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              data-dag-mode={m}
-              aria-selected={mode === m}
-              className={mode === m ? "dag-inspector__mode dag-inspector__mode--on" : "dag-inspector__mode"}
-              onClick={() => editor.setMode(m)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
       {/* What is wrong here that a person can act on (#145), at the top, where it is read first:
           each in words, with Show — which picks the card or link it concerns, so the control that
           fixes it is the next thing on screen — and the fix itself where a row can carry one out.
@@ -470,7 +384,7 @@ export function Inspector({
         pages={pages}
         body={draft}
         subject={subject}
-        showItem={showFields}
+        showItem
         onBody={onChange}
         onRenameNode={onRenameNode}
         linkEnds={linkEnds}
@@ -510,13 +424,6 @@ export function Inspector({
           onChange={(e) => onChange(e.target.value)}
           onBlur={flush}
           onKeyDown={onKeyDown}
-          /* `select` fires on a plain caret move too, which is the event wanted here: the caret
-             feeds the pick, so arrowing down the source walks the cards and the strip follows.
-             The draft goes with it because the file may be a quarter of a second behind it. */
-          onSelect={(e) => {
-            const el = e.currentTarget;
-            editor.pickFromLine(item.id, el.value.slice(0, el.selectionStart).split("\n").length, el.value);
-          }}
         />
       ) : null}
 

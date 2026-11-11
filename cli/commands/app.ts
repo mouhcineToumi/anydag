@@ -2,7 +2,6 @@ import {
   CALENDAR_HIDE,
   FAVOURITES,
   ATTACHMENTS,
-  INSPECTOR_MODE,
   LIBRARY,
   SIDEBAR,
   THEME,
@@ -51,7 +50,6 @@ const PREFS: Record<string, string> = {
   theme: THEME,
   library: LIBRARY,
   sidebar: SIDEBAR,
-  "inspector.mode": INSPECTOR_MODE,
   favourites: FAVOURITES,
   /* The vault's attachments folder, relative to its root. */
   attachments: ATTACHMENTS,
@@ -132,7 +130,7 @@ export const APP: Command[] = [
     summary: "this account's preferences, and the vault's; key=value changes them, key= puts one back to its default",
     help:
       `Keys: theme (${THEMES.join(", ")}), favourites (a comma list of file names), ${SETTINGS_KEYS.join(", ")}. ` +
-      "Those are the vault's, the one --vault names; library, sidebar, inspector.mode, calendar.weekStart (0 for Sunday " +
+      "Those are the vault's, the one --vault names; library, sidebar, calendar.weekStart (0 for Sunday " +
       "to 6 for Saturday; Monday, 1, when unset) and calendar.hide (a comma list of task, event, note: what the calendar leaves " +
       "out) are the account's. " +
       "A value the page could not honour is put back to its default, the way the page itself reads one. An open " +
