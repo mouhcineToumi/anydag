@@ -8,7 +8,8 @@ Every diagnostic carries a stable `code` from `src/dsl/codes.ts` as well as a me
 the code**; the message is written for a person and may be reworded. `E_`/`W_` is the diagram DSL,
 `EB_`/`ANYDAG_` the board file around it — which is what distinguishes the two grammars that can both
 report "unterminated string" — and `EG_` what the generator says about a model's answer to a prompt
-card, which may parse clean and still be wrong (`EG_WRONG_TYPE`). None of them is drawn on the
+card, which may parse clean and still be wrong (`EG_WRONG_TYPE`), or to a request for flashcards
+(`EG_NOT_A_CARD`: a question the quiz parser reads clean that is not a card). None of them is drawn on the
 canvas — see *Problems* for where a person reads them. `GET /__board/diagnostics?name=` is the same
 parse, server-side, through the same `diagnoseBoard` the page's dock calls, and `anydag snapshot`
 prints it. The

@@ -158,7 +158,7 @@ export const grammar = {
     ),
   search: searchIn,
   fences: (text: string) => call<Doc>("POST", "/fences", { text }),
-  system: async (as: string | undefined, mode: "draw" | "rewrite") =>
+  system: async (as: string | undefined, mode: "draw" | "rewrite" | "flashcards") =>
     (await call<{ system: string }>("GET", "/system", undefined, { as, mode })).system,
   library: (query: { id?: string; type?: string; q?: string }) => call<Doc>("GET", "/library", undefined, query),
   icons: (query: { q?: string; mode?: string }) => call<Doc>("GET", "/icons", undefined, query),

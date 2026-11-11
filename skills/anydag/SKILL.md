@@ -64,7 +64,7 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `sync_status` · `sync_now` | whether the vault syncs to a sync server and how it is going (`state`, `pending`, `conflicts`, `last`), and a pull-and-push now — **only in builds with the `cloud` switch on: if they are not in the tool list, this build has none**. Pairing and linking are the person's — they take a one-time code and a passphrase, typed in Settings → Sync or `anydag sync` — so there is no tool for either; a vault that is not linked says `unlinked` |
 | `component_delete` | removing a saved component, for good — keeping one is `board_create` under `components/` |
 | `vault_list` · `vault_open` · `vault_create` · `vault_close` · `board_transfer` | the vaults (folders) this app serves, opening a folder as one, making one, closing one — **never deleting its folder** — and moving a file or a whole folder from one vault to another with its id |
-| `settings` · `whoami` · `llm` · `generate` | the person's preferences (change them only when asked); who this is and what is answering; which models could draw; asking one to (it spends money, and you can usually write the DSL) |
+| `settings` · `whoami` · `llm` · `generate` | the person's preferences (change them only when asked); who this is and what is answering; which models could draw; asking one to (it spends money, and you can usually write the DSL) — or, with `kind: "flashcards"`, asking one for flashcards from a topic or a note's text, each already read by the quiz parser |
 | `feedback` | a bug or an idea sent to AnyDag's maintainers as a **public** GitHub issue — **only when the person asked you to send feedback**, never to report your own trouble; tell them first exactly what goes: their words, each file, the whole text of each board or note they named, and the app's version, system and arch |
 
 Nothing here can see the drawing or tidy it — a snapshot, a tidy and an SVG, PNG or PDF export need
@@ -639,6 +639,11 @@ training, a drill. It is strict Markdown:
       > Multi-version concurrency control: each transaction reads a snapshot, so readers never
       > block writers.
 
+- **A person can have a model write flashcards in the app**: the quiz page's *Generate flashcards*
+  takes a topic or one of their notes, shows the cards with a box each, and adds only the ones kept.
+  You write cards yourself — from a note you read with `note_read`, with `quiz_question_set` — and
+  `generate` with `kind: "flashcards"` is for when the person asks for *their* model to do it; show
+  them what comes back and add only what they keep.
 - **`{#id}` names the question**, and a person's record of it is kept against that name, so keep an
   id when you rewrite a question and never reuse one for a different question. You may leave it off
   — `q` and six characters are written in the first time the quiz is edited or answered — but when

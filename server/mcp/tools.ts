@@ -1482,12 +1482,15 @@ const grammarTools: Tool[] = [
     name: "generate",
     description: withNote(
       "Ask the model the person configured to draw a diagram — a prompt card's Generate. **It writes nothing**: the answer's `draft` is one checked fence, which you place with `board_patch` (`{insert: …}`) or use to replace an item's body.\n\n" +
-        "`as_type` asks for a diagram type. With `source` — an item's body — it is a rewrite of that diagram rather than a new one, and `from_type` says its type. Provider, model and how hard it thinks are the person's settings unless given; `llm` lists what there is. It spends the person's own key, so only when asked — you can usually write the DSL yourself.",
+        "`as_type` asks for a diagram type. With `source` — an item's body — it is a rewrite of that diagram rather than a new one, and `from_type` says its type. Provider, model and how hard it thinks are the person's settings unless given; `llm` lists what there is. It spends the person's own key, so only when asked — you can usually write the DSL yourself.\n\n" +
+        "`kind: \"flashcards\"` asks for flashcards instead (`count` of them, 10 unless given, 30 at most): `prompt` is the topic — or, with `source` holding a note's text, what to focus on, and may then be empty. The answer's `cards` have each been read by the quiz parser as a flashcard; each one's `markdown` goes into a quiz with `quiz_question_set`, one at a time. Show the person the cards and add only the ones they keep.",
     ),
     // It writes no file, but it spends the person's money; --read-only is about files, so it is allowed.
     write: false,
     input: {
       prompt: z.string(),
+      kind: z.enum(["diagram", "flashcards"]).optional(),
+      count: z.number().int().optional(),
       as_type: z.string().optional(),
       source: z.string().optional(),
       from_type: z.string().optional(),
@@ -1496,11 +1499,13 @@ const grammarTools: Tool[] = [
       reasoning: z.string().optional(),
       vault,
     },
-    run: async ({ prompt, as_type, source, from_type, provider, model, reasoning, vault: v }, kit) => {
+    run: async ({ prompt, kind, count, as_type, source, from_type, provider, model, reasoning, vault: v }, kit) => {
       const mine = (await kit.api("GET", "/api/vault/settings", { vault: v })).settings?.settings ?? {};
       const chosen = mine.llm && typeof mine.llm === "object" ? mine.llm : {};
       const body: Record<string, unknown> = { prompt };
       for (const [k, val] of Object.entries({
+        kind,
+        count,
         as: as_type,
         source,
         from: from_type,

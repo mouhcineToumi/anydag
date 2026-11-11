@@ -31,7 +31,7 @@ the file for that area, not to a new place.
 | [`charts.md`](charts.md) | The `chart` dialect: its model, scales, colour, and the pointer's relationship to it. |
 | [`getting-around.md`](getting-around.md) | Pan, zoom and the pan modifier. |
 | [`settings.md`](settings.md) | Preferences, the Settings modal, and why a snapshot reads none of them. |
-| [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, and rewriting an existing diagram. |
+| [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz. |
 | [`sidebar.md`](sidebar.md) | The shell, the file tree and its operations, selection, the search dialog, folders and the page tabs. |
 | [`icons.md`](icons.md) | Four vocabularies behind one `icon=` attribute, and where the art lives. |
 | [`editing.md`](editing.md) | Every gesture is a write to the board file: the table of gestures, the leader key, picking inside a diagram, the controls and text emphasis. |
@@ -71,6 +71,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Editing on the canvas | [`editing.md`](editing.md) |
 | Equations | [`notes.md`](notes.md) |
 | Feedback | [`feedback.md`](feedback.md) |
+| Flashcards from a model | [`prompt-cards.md`](prompt-cards.md) |
 | Folders | [`sidebar.md`](sidebar.md) |
 | Gate | [`gate-and-releases.md`](gate-and-releases.md) |
 | Geometric shapes | [`free-canvas.md`](free-canvas.md) |

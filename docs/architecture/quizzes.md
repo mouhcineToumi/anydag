@@ -45,14 +45,14 @@ quiz file, and a question leaves Mistakes after N right answers in a row inside 
 | the sidebar | **Quizzes** (with the Mistakes count) opens the Quizzes page; **New** → *Quiz* makes `untitled` titled *Untitled* with no questions and names it in the top bar; a quiz's row wears a cap |
 | the Quizzes page, `?quizzes=1` | Mistakes first, then a card per quiz — questions, how many in Mistakes, Practice — a filter, a folder (with *Practice the folder* once one is chosen), and a box that makes a quiz named after what is typed |
 | a folder's menu in the sidebar | *Practice the quizzes*, when anything under it is a quiz |
-| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab: a card per question — a grip to drag it, its kind (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), the question as one rich line, *Add details*, the answers as rows (a grip, a round tick or a box, rich text, a pin while *Shuffle the options* is on), the explanation or model answer; what is wrong said in words on its card, each with a button that fixes it; *Add a flashcard* beside the other two adds; Practice, Export (the file) |
+| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab: a card per question — a grip to drag it, its kind (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), the question as one rich line, *Add details*, the answers as rows (a grip, a round tick or a box, rich text, a pin while *Shuffle the options* is on), the explanation or model answer; what is wrong said in words on its card, each with a button that fixes it; *Add a flashcard* beside the other two adds, and *Generate flashcards*, which asks a model for cards from a topic or a note and writes the ones kept; Practice, Export (the file) |
 | a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; a flashcard's front with no box, Space or Enter to see the back, and the same `1`/`2`; the end says the score, what was skipped and what went into Mistakes |
 | a board, or a note, embedding one | a card: the title, the questions, how many in Mistakes, Practice |
 | `?view=1` | a run that records nothing |
 | a snapshot | the sheet: every question with its answers marked, a flashcard's back under it |
 | Settings | how many right in a row take a question out of Mistakes, 1 to 10 |
 
-Fifteen things are load-bearing:
+Sixteen things are load-bearing:
 
 - **A question is a `##` heading and everything up to the next one**, and only `##` delimits. Fences
   are tracked across the whole file, so a `##` or a `- [ ]` in a code sample is code; and a line that
@@ -132,6 +132,19 @@ Fifteen things are load-bearing:
   when a run starts — pinned options at their own index — and the runner keeps it until Again or a
   new list; answering the skipped ones keeps the order seen. A pick is the file's index, so grading
   and what is recorded never see the order. The sheet is the written order.
+- **Flashcards a model wrote are a list to choose from until the person adds them** (#140). *Generate
+  flashcards* opens a dialog (`src/ui/quiz/GenerateCards.tsx`) that asks `/generate` for cards from
+  a topic or one of the vault's notes — the model's half, and the parser check before anything comes
+  back, are *Flashcards from a model* — and shows each with a box, every one kept until unticked.
+  **Nothing is written until *Add*.** Then the kept cards go in through the `set` op
+  (`applyQuizOps`, by way of `addCards` in `src/ui/quiz/generate.ts`), one question's span each at
+  the end, against the quiz as it is then: each is checked again as exactly one askable question and
+  given an id the quiz does not hold, and no other question is stamped, rewritten or moved — so the
+  form's `write`, which stamps every question with no id, is not the path. One card refused is the
+  whole list refused, said in the dialog, and the file unchanged. A dialog rather than draft cards in
+  the form, because a draft in the form is either a question in the file or a kind of card every
+  writer would have to skip, and keeping some of a list is all this needs. The lock hides it with the
+  rest of the form.
 - **One question over the wire is a route**: `src/quiz/ops.ts` through the grammar,
   `POST /__board/quiz` with the table's recompute-on-conflict loop. `set` writes the
   Markdown *as given*, minting an id only for a heading with none, and refuses anything that is not
@@ -162,16 +175,25 @@ for the builder, `dag-rich-field*` (not `dag-field`, the panel's labels), `dag-b
 `data-dag-quiz-drop`, `data-dag-quiz-fix`, `data-dag-quiz-stray*`, `data-dag-quiz-refused`,
 `data-dag-quiz-needs-answer`, `data-dag-quiz-add-details` and `data-dag-quiz-drop-answers*` — and, for
 flashcards, `data-dag-quiz-add-flashcard`, `data-dag-run-flashcard`, `data-dag-run-flashcard-tag`,
-`dag-run__flashcard-tag` and `data-dag-quiz-sheet-flashcard`. "Card" was taken three times over (the
+`dag-run__flashcard-tag` and `data-dag-quiz-sheet-flashcard` — and, for generating them,
+`data-dag-quiz-generate`, `dag-flashcards*` and `data-dag-flashcards*`. "Card" was taken three times over (the
 form's `dag-quiz__card`, the Quizzes page's `dag-quizzes__card`, an embed's card), which is why every
 name for a flashcard says `flashcard`.
 Retired with the Source tab: `dag:quiz-mode`, `data-dag-quiz-mode`, `data-dag-quiz-source`,
 `data-dag-quiz-multi`, `dag-quiz__mode`, `dag-quiz__source*`, `dag-quiz__field` and
 `dag-quiz__problem-line`.
 
-**Out, and why:** a button that asks a model to generate a quiz (an agent writes one with
-`quiz_create` and `quiz_write`, and runs one in a conversation with `quiz_questions` and
-`quiz_answer`; generating flashcards in the app is proposed in #140, not yet decided); a pick of questions as a preset (a preset is one quiz file); shuffling the
+**Generating flashcards was out, and is in (#140).** It was left out because an agent already writes
+a quiz — `quiz_create`, `quiz_write`, `quiz_question_set` — and that is still true. But it answers
+only somebody with an agent connected and the habit of asking one; a person revising a subject has
+their notes open in the app and no agent at hand, and writing forty cards by hand is the step that
+stops them. Flashcards are the kind a model gets right most often — a fact and its answer, checked
+at a glance — so the cost of a wrong one is an untick, and the parser and the confirm step are what
+keep that cost there.
+
+**Out, and why:** a button that asks a model to generate multiple-choice or open questions (wrong
+answers that are plausible but wrong are where a model goes astray, and checking one costs more than
+writing it; the flashcard path could carry them later); a pick of questions as a preset (a preset is one quiz file); shuffling the
 *questions* of a run
 (the options shuffle, an author's order of questions being a course's order); grading an open
 answer automatically (the person's verdict is the answer); a flashcard asked back to front, and

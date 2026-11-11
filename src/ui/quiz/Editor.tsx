@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Copy, GripVertical, Pin, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, GripVertical, Pin, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { preloadFieldEditor } from "@/blocks";
@@ -25,6 +25,8 @@ import {
 import { ownAssets } from "@/render/assets";
 import { startDrag } from "@/ui/pointerDrag";
 
+import { addCards } from "./generate";
+import { GenerateCards } from "./GenerateCards";
 import { said, fixLabel, type Fix, type Said } from "./problems";
 import { FieldHostContext, focusField, RichField, type FieldHost } from "./RichField";
 import { QuizMarkdown } from "./QuizMarkdown";
@@ -600,6 +602,8 @@ export function QuizEditor({
   const quiz = useMemo(() => parseQuiz(text), [text]);
   const [focus, setFocus] = useState<string | null>(null);
   const [refused, setRefused] = useState<{ key: string; why: string } | null>(null);
+  /* The flashcards dialog (#140): open while a model's cards are asked for and chosen from. */
+  const [generating, setGenerating] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   /*
@@ -819,7 +823,32 @@ export function QuizEditor({
             <Plus size={16} strokeWidth={2} aria-hidden="true" />
             Add a flashcard
           </button>
+          <button
+            type="button"
+            className="dag-quiz__add"
+            data-dag-quiz-generate=""
+            title="A model writes flashcards from a topic or a note; you choose which to keep"
+            onClick={() => setGenerating(true)}
+          >
+            <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
+            Generate flashcards
+          </button>
         </div>
+        {generating ? (
+          <GenerateCards
+            name={name}
+            /* The kept cards go in at the end through the `set` op, against the quiz as it is *now*
+               — the answer took seconds, and the file may have moved meanwhile. No question is
+               stamped on the way (the form's `write` would), so nothing else in the file changes. */
+            onAdd={(markdown) => {
+              const done = addCards(text, markdown);
+              if (!done.ok) return done.error;
+              onChange(done.text);
+              return null;
+            }}
+            onClose={() => setGenerating(false)}
+          />
+        ) : null}
       </div>
     </FieldHostContext.Provider>
   );

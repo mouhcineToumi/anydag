@@ -24,7 +24,7 @@ import { CODES, type Code } from "../src/dsl/codes";
 import { diagnoseBoard } from "../src/dsl/diagnose";
 import type { Diagnostic } from "../src/dsl/ir";
 import { check, extract, feedback, type Draft } from "../plugins/generate/generate";
-import { systemPrompt } from "../plugins/generate/system";
+import { cardsSystemPrompt, systemPrompt } from "../plugins/generate/system";
 
 /**
  * The grammar layer: every route under `/__dsl`, implemented as function calls.
@@ -467,6 +467,8 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
     const wanted = query.get("as") ?? undefined;
     if (wanted !== undefined && !isDiagramType(wanted)) return bad(400, `not a diagram type \`${wanted}\``);
     const mode = query.get("mode") === "rewrite" ? "rewrite" : "draw";
+    /* Flashcards (#140) are told how to write a card, and nothing about any diagram. */
+    if (query.get("mode") === "flashcards") return ok({ system: cardsSystemPrompt({ docsRoot: DOCS_ROOT }) });
     return ok({
       system: systemPrompt({ docsRoot: DOCS_ROOT, as: wanted as DiagramType | undefined, mode }),
     });
