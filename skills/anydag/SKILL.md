@@ -629,6 +629,16 @@ training, a drill. It is strict Markdown:
       >
       > `>=` keeps the first day itself.
 
+- **`card` on the heading makes an open question a flashcard**: the run shows the front with no box
+  to type in, the person thinks of the answer, shows the back (the quote), and says whether they had
+  it. Write cards for terms, definitions and facts to recall, a quote of a paragraph or less as the
+  back. A bare word, beside the id — `{#q… card}`, never `.card` — and no checklist:
+
+      ## What is MVCC? {#q3c9d2 card}
+
+      > Multi-version concurrency control: each transaction reads a snapshot, so readers never
+      > block writers.
+
 - **`{#id}` names the question**, and a person's record of it is kept against that name, so keep an
   id when you rewrite a question and never reuse one for a different question. You may leave it off
   — `q` and six characters are written in the first time the quiz is edited or answered — but when
@@ -640,14 +650,14 @@ on the code:
 | Code | Means |
 |---|---|
 | `EQ_NO_PROMPT` | a `##` with nothing but its `{…}` |
-| `EQ_NO_OPTIONS` | no checklist under a question, and no `>` quote ending it to make it an open question |
+| `EQ_NO_OPTIONS` | no checklist under a question, and no `>` quote ending it to make it an open question — or a `card` with no back |
 | `EQ_ONE_OPTION` | only one option |
 | `EQ_NO_ANSWER` | no option ticked `[x]` |
 | `EQ_EMPTY_OPTION` | a `- [ ]` with no text |
 | `EQ_STRAY` | something after the options that is not the one `>` explanation |
 | `EQ_DUPLICATE_ID` | two questions with one `{#id}` |
 | `WQ_NO_ID` | a question with no id yet — fine, one is written in later |
-| `WQ_UNKNOWN_ATTR` | a word in the heading's `{…}` other than `#id` and `multi`, or `multi` on an open question |
+| `WQ_UNKNOWN_ATTR` | a word in the heading's `{…}` other than `#id`, `multi` and `card`; `multi` on an open question or a card; `card` on a question with options |
 | `WQ_OPEN_FENCE` | a code block never closed, so everything after it is code |
 | `WQ_EMPTY` | no questions yet |
 

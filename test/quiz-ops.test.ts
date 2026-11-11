@@ -122,4 +122,13 @@ describe("one question at a time", () => {
     expect(qs.find((q) => q.id === "qk")!.options[0]!.text).toBe("This\n```sql\nselect 1;\n```");
     expect(others(text, "qo", "qk")).toEqual(others(QUIZ));
   });
+
+  it("sets a flashcard, its minted id beside `card`, and refuses one with no back", () => {
+    const { text, ids } = apply([{ op: "set", markdown: "## What is MVCC? {card}\n\n> Multi-version concurrency control." }]);
+    const id = ids[0]!;
+    expect(text.endsWith(`## What is MVCC? {#${id} card}\n\n> Multi-version concurrency control.\n`)).toBe(true);
+    expect(parseQuiz(text).questions.find((q) => q.id === id)!.card).toBe(true);
+    expect(others(text, id)).toEqual(others(QUIZ));
+    expect(applyQuizOps(QUIZ, [{ op: "set", markdown: "## Term {card}" }])).toMatchObject({ ok: false, status: 400 });
+  });
 });

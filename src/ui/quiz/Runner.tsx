@@ -33,9 +33,12 @@ import { answerIn, goTo, judgeIn, pickIn, revealIn, skippedIn, startRound, tally
  * monospaced when the model answer is code — then *Show the answer*, then *I got it* or *I missed
  * it*, which is the answer recorded. Nothing grades the words: they are the person's, for comparing.
  *
+ * **A flashcard is an open question with nothing to type**: the front, *Show the back* (Space or
+ * Enter), then the same verdict. Moving on before judging it is a skip, as on any question.
+ *
  * Keys, for somebody drilling a hundred questions: `1`–`9` pick an option, Enter checks and then
  * moves on, ← and → go back and forward; on an open question ctrl+Enter shows the answer from the
- * text box, and `1` and `2` say whether it was had. Only while no text field has the caret — the
+ * text box, and `1` and `2` say whether it was had; on a flashcard Space shows the back. Only while no text field has the caret — the
  * page around it may have one.
  */
 
@@ -208,6 +211,7 @@ export function Runner({
   const verdict = state.verdicts[at];
   const checked = verdict !== undefined;
   const open = current?.question.open ?? false;
+  const card = current?.question.card ?? false;
   const shown = state.shown[at] ?? false;
 
   /* `keep` is a round of what this run already showed — the skipped ones — so their order stays. */
@@ -276,7 +280,12 @@ export function Runner({
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {});
   onKey.current = (e: KeyboardEvent) => {
     if (done || !current || e.ctrlKey || e.metaKey || e.altKey || typingIn(e.target)) return;
-    if (open && (e.key === "1" || e.key === "2")) {
+    if (card && e.key === " ") {
+      /* A button somebody tabbed to answers its own Space. Prevented either way: the page must not scroll. */
+      if ((e.target as HTMLElement | null)?.tagName === "BUTTON") return;
+      e.preventDefault();
+      if (!shown) reveal();
+    } else if (open && (e.key === "1" || e.key === "2")) {
       if (shown && !checked) {
         e.preventDefault();
         judge(e.key === "1");
@@ -396,6 +405,7 @@ export function Runner({
       data-dag-run-question={q.id ?? `L${q.line}`}
       data-dag-run-checked={checked ? (right ? "right" : "wrong") : undefined}
       data-dag-run-open={q.open ? "" : undefined}
+      data-dag-run-flashcard={q.card ? "" : undefined}
       ref={root}
       tabIndex={-1}
     >
@@ -405,6 +415,11 @@ export function Runner({
             <span className="dag-run__where">
               {showSource ? `${current!.quiz.title ?? name} · ` : ""}
               Question {at + 1} of {asked.length}
+              {q.card ? (
+                <span className="dag-run__flashcard-tag" data-dag-run-flashcard-tag="">
+                  Flashcard
+                </span>
+              ) : null}
             </span>
             <span className="dag-run__progress" aria-hidden="true">
               <span className="dag-run__progress-bar" style={{ width: `${(answered / asked.length) * 100}%` }} />
@@ -436,13 +451,15 @@ export function Runner({
             <QuizMarkdown name={name} md={q.body} />
           </div>
           <p className="dag-run__hint">
-            {q.open
-              ? "Write your answer, then compare it with the model answer."
-              : multi
-                ? "Choose every correct answer."
-                : "Choose one answer."}
+            {q.card
+              ? "Think of the answer, then show the back."
+              : q.open
+                ? "Write your answer, then compare it with the model answer."
+                : multi
+                  ? "Choose every correct answer."
+                  : "Choose one answer."}
           </p>
-          {q.open ? (
+          {q.card ? null : q.open ? (
             <OpenAnswer
               text={state.typed[at] ?? ""}
               code={CODE.test(q.why)}
@@ -491,7 +508,9 @@ export function Runner({
           )}
           {q.open && shown ? (
             <div className="dag-run__verdict" data-dag-run-verdict={checked ? (right ? "right" : "wrong") : "open"}>
-              <p className="dag-run__verdict-line">{checked ? (right ? "You had it." : "You missed it.") : "The model answer"}</p>
+              <p className="dag-run__verdict-line">
+                {checked ? (right ? "You had it." : "You missed it.") : q.card ? "The back" : "The model answer"}
+              </p>
               <div className="dag-run__why dag-md" data-dag-run-model="">
                 <QuizMarkdown name={name} md={q.why} />
               </div>
@@ -542,10 +561,10 @@ export function Runner({
                   type="button"
                   className="dag-run__button dag-run__button--primary"
                   data-dag-run-reveal=""
-                  title="Show the model answer (Enter, or Ctrl+Enter in the box)"
+                  title={q.card ? "Show the back (Space or Enter)" : "Show the model answer (Enter, or Ctrl+Enter in the box)"}
                   onClick={reveal}
                 >
-                  Show the answer
+                  {q.card ? "Show the back" : "Show the answer"}
                 </button>
               )
             ) : checked ? null : (
@@ -633,7 +652,11 @@ export function Sheet({
             <div className="dag-md">
               <QuizMarkdown name={name} md={q.body} />
             </div>
-            {q.open ? (
+            {q.card ? (
+              <p className="dag-quiz-sheet__open" data-dag-quiz-sheet-flashcard="">
+                Flashcard. The back:
+              </p>
+            ) : q.open ? (
               <p className="dag-quiz-sheet__open" data-dag-quiz-sheet-open="">
                 Answered in words. The model answer:
               </p>

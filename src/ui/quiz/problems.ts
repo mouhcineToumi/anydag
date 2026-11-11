@@ -37,7 +37,9 @@ export function said(d: QuizDiagnostic, q?: Question): Said | null {
     case "EQ_NO_PROMPT":
       return say("This question doesn't ask anything yet.", { kind: "focus", field: "prompt" });
     case "EQ_NO_OPTIONS":
-      return say("Write the model answer, or make this a multiple-choice question.", { kind: "focus", field: "why" });
+      return q?.card
+        ? say("Write the back of this flashcard.", { kind: "focus", field: "why" })
+        : say("Write the model answer, or make this a multiple-choice question.", { kind: "focus", field: "why" });
     case "EQ_ONE_OPTION":
       return say("Add at least one more answer to choose from.", { kind: "add-option" });
     case "EQ_NO_ANSWER":

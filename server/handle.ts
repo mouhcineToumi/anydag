@@ -302,6 +302,8 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
         why: q.why,
         /* No options: answered in words, `why` its model answer. */
         open: q.open,
+        /* `card` on its heading: a flashcard — show the prompt, then `why` as the back, with nothing typed. */
+        card: q.card,
         multi: q.multi,
         line: q.line,
       })),

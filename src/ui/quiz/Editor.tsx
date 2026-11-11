@@ -53,15 +53,20 @@ import { QuizMarkdown } from "./QuizMarkdown";
  * the card says so.
  */
 
-type Kind = "one" | "several" | "written";
+type Kind = "one" | "several" | "written" | "card";
 
-const kindOf = (q: Question): Kind => (q.options.length === 0 ? "written" : q.multi ? "several" : "one");
+const kindOf = (q: Question): Kind => (q.card ? "card" : q.options.length === 0 ? "written" : q.multi ? "several" : "one");
 
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "one", label: "One right answer" },
   { kind: "several", label: "Several right answers" },
   { kind: "written", label: "Answered in words" },
+  /* A front and a back: no box to type in, the back shown, then whether they had it. */
+  { kind: "card", label: "Flashcard" },
 ];
+
+/** The kinds with no answers to choose from: a model answer, or a card's back. */
+const wordsOnly = (k: Kind): k is "written" | "card" => k === "written" || k === "card";
 
 /** The problems on the lines of one question: from its heading to the line before the next one. */
 function problemsOf(diagnostics: QuizDiagnostic[], questions: Question[], i: number): QuizDiagnostic[] {
@@ -216,8 +221,9 @@ function QuestionCard({
   const card = useRef<HTMLElement>(null);
   const optionList = useRef<HTMLDivElement>(null);
   const [asking, setAsking] = useState(false);
-  /* Turning a question with answers into one answered in words drops them: asked first. */
-  const [dropping, setDropping] = useState(false);
+  /* Turning a question with answers into one answered in words, or a flashcard, drops them: asked
+     first, and the kind it was turning into is kept for the answer. */
+  const [dropping, setDropping] = useState<"written" | "card" | null>(null);
   const [details, setDetails] = useState(false);
   /* An answer just added: it opens as it is drawn, in the same render as the press, so a letter
      typed straight after is never the page's. Let go once it has. */
@@ -254,13 +260,14 @@ function QuestionCard({
 
   const setKind = (next: Kind) => {
     if (next === kind) return;
-    if (next === "written") {
-      if (input.options.some((o) => o.text.trim())) return setDropping(true);
-      return onEdit({ ...input, options: [], multi: false });
+    if (wordsOnly(next)) {
+      if (input.options.some((o) => o.text.trim())) return setDropping(next);
+      return onEdit({ ...input, options: [], multi: false, card: next === "card" });
     }
-    if (kind === "written")
+    if (wordsOnly(kind))
       return onEdit({
         ...input,
+        card: false,
         multi: next === "several",
         options: [
           { text: "", correct: true },
@@ -390,19 +397,21 @@ function QuestionCard({
       </header>
       {dropping ? (
         <p className="dag-quiz__confirm dag-quiz__confirm--line" data-dag-quiz-drop-answers="">
-          <span>Answered in words, this question has no answers to choose from. Remove them?</span>
+          <span>
+            {dropping === "card" ? "A flashcard" : "Answered in words, this question"} has no answers to choose from. Remove them?
+          </span>
           <button
             type="button"
             className="dag-quiz__danger"
             data-dag-quiz-drop-answers-yes=""
             onClick={() => {
-              setDropping(false);
-              onEdit({ ...input, options: [], multi: false });
+              setDropping(null);
+              onEdit({ ...input, options: [], multi: false, card: dropping === "card" });
             }}
           >
             Remove them
           </button>
-          <button type="button" onClick={() => setDropping(false)}>
+          <button type="button" onClick={() => setDropping(null)}>
             Cancel
           </button>
         </p>
@@ -415,8 +424,8 @@ function QuestionCard({
       ) : null}
       <RichField
         variant="line"
-        label="Question"
-        placeholder="What do you want to ask?"
+        label={kind === "card" ? "Front" : "Question"}
+        placeholder={kind === "card" ? "The front: a question, a term, a prompt" : "What do you want to ask?"}
         md={q.prompt}
         readOnly={held}
         autoFocus={focus}
@@ -429,7 +438,11 @@ function QuestionCard({
         <RichField
           variant="block"
           label="Details"
-          placeholder="More to the question: a code sample, a picture, an equation"
+          placeholder={
+            kind === "card"
+              ? "More on the front: a code sample, a picture, an equation"
+              : "More to the question: a code sample, a picture, an equation"
+          }
           md={q.body}
           readOnly={held}
           autoFocus={details && !q.body.trim()}
@@ -448,7 +461,7 @@ function QuestionCard({
           Add details
         </button>
       )}
-      {kind === "written" ? null : (
+      {wordsOnly(kind) ? null : (
         <div className="dag-quiz__options" role="list" aria-label="Answers" ref={optionList}>
           {q.options.map((o, i) => (
             <div
@@ -538,11 +551,13 @@ function QuestionCard({
       )}
       <RichField
         variant="block"
-        label={kind === "written" ? "Model answer" : "Explanation"}
+        label={kind === "card" ? "Back" : kind === "written" ? "Model answer" : "Explanation"}
         placeholder={
-          kind === "written"
-            ? "The answer, shown once they have written theirs"
-            : "Why the answer is right, shown after answering (optional)"
+          kind === "card"
+            ? "The back: the answer, shown once they have thought of theirs"
+            : kind === "written"
+              ? "The answer, shown once they have written theirs"
+              : "Why the answer is right, shown after answering (optional)"
         }
         md={q.why}
         readOnly={held}
@@ -668,19 +683,21 @@ export function QuizEditor({
 
   const idAt = (qs: Question[], i: number) => qs[i]!.id!;
 
-  /** A question at the end: two answers to fill in, or none — answered in words. */
-  const add = (open = false) => {
+  /** A question at the end: two answers to fill in, or none — answered in words, or a flashcard. */
+  const add = (kind: "choice" | "written" | "card" = "choice") => {
     const id = mintQuestionId(new Set(quiz.questions.flatMap((q) => (q.id ? [q.id] : []))));
     write(null, (t) =>
       addQuestion(t, {
         id,
         prompt: "",
-        options: open
-          ? []
-          : [
-              { text: "", correct: true },
-              { text: "", correct: false },
-            ],
+        options:
+          kind === "choice"
+            ? [
+                { text: "", correct: true },
+                { text: "", correct: false },
+              ]
+            : [],
+        ...(kind === "card" ? { card: true } : {}),
       }),
     );
     setFocus(id);
@@ -787,10 +804,20 @@ export function QuizEditor({
             className="dag-quiz__add"
             data-dag-quiz-add-open=""
             title="A question answered in words, compared with a model answer"
-            onClick={() => add(true)}
+            onClick={() => add("written")}
           >
             <Plus size={16} strokeWidth={2} aria-hidden="true" />
             Add a question answered in words
+          </button>
+          <button
+            type="button"
+            className="dag-quiz__add"
+            data-dag-quiz-add-flashcard=""
+            title="A front and a back: think of the answer, show the back, say whether you had it"
+            onClick={() => add("card")}
+          >
+            <Plus size={16} strokeWidth={2} aria-hidden="true" />
+            Add a flashcard
           </button>
         </div>
       </div>

@@ -601,7 +601,7 @@ const noteTools = kindTools("note", {
 
 const quizTools = kindTools("quiz", {
   list: "Every quiz in a vault, with its title, id and how many questions it asks.",
-  read: "One quiz's whole text, and the `base` a write of it must carry.\n\nA quiz is strict Markdown: a `##` heading per question, its options one checklist (`- [x]` right, `- [ ]` wrong), and one `>` quote explaining the answer. An option may run over several lines — every line indented two spaces under it is its own, a fenced code block included — so a snippet goes in its option, not in the prompt. `quiz_questions` answers the same as data.",
+  read: "One quiz's whole text, and the `base` a write of it must carry.\n\nA quiz is strict Markdown: a `##` heading per question, its options one checklist (`- [x]` right, `- [ ]` wrong), and one `>` quote explaining the answer. With no checklist, the closing quote is the answer: an open question, or a flashcard when the heading says `card` (`## What is MVCC? {#q1a2b3 card}`). An option may run over several lines — every line indented two spaces under it is its own, a fenced code block included — so a snippet goes in its option, not in the prompt. `quiz_questions` answers the same as data.",
   create:
     "Make a quiz. The name is settled by the server and may be numbered; with a `title` the file is named after it. Write the questions as `## Question?` then `- [x] right` / `- [ ] wrong` then `> why`, and check it with `quiz_check`. An option may hold a code block, indented two spaces under its `- [ ]` line. A question with no checklist and a `>` quote at its end is answered in words: the quote is its model answer, and the person says whether they had it.",
   write:
@@ -706,7 +706,7 @@ const quizMore: Tool[] = [
   tool({
     name: "quiz_questions",
     description: withNote(
-      "A quiz's questions as data — each one's `id`, prompt, options with `correct` marked, and the explanation — for running it in a conversation: ask, let the person answer, say whether they were right and why, and record it with `quiz_answer`.\n\n" +
+      "A quiz's questions as data — each one's `id`, prompt, options with `correct` marked, and the explanation — for running it in a conversation: ask, let the person answer, say whether they were right and why, and record it with `quiz_answer`. A question with `card: true` is a flashcard: give the prompt, let them think, then show `why` as the back and ask whether they had it.\n\n" +
         "A question's answers are recorded under its `id`. One without an id is given one here, as the page does before a run starts — which writes the quiz; under `--read-only` the ids stay `null` and those questions cannot be recorded.",
     ),
     // Writes only to mint ids, and not at all under --read-only, so it is a read as far as the flag goes.
