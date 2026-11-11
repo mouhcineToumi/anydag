@@ -306,7 +306,7 @@
     "elk": {
       "colGap": { "arch": 80, "erd": 64, "state": 80, "class": 48, "usecase": 120, "c4": 80, "mindmap": 80, "timeline": 40, "gitgraph": 40 },
       "rowGap": { "arch": 24, "erd": 32, "state": 40, "class": 32, "usecase": 64, "c4": 200, "mindmap": 40, "flow": 24, "activity": 24, "timeline": 24, "gitgraph": 24 },
-      "aspect": { "arch": 1.6, "erd": 1.4, "state": 0, "class": 1.6, "usecase": 2.2, "c4": 1.4, "mindmap": 1.2, "flow": 0, "activity": 0, "timeline": 0, "gitgraph": 0 },
+      "aspect": { "arch": 1.6, "erd": 1.4, "state": 0, "class": 1.6, "usecase": 2.2, "c4": 1.4, "mindmap": 0, "flow": 0, "activity": 0, "timeline": 0, "gitgraph": 0 },
       "hierarchy": { "arch": "include", "erd": "separate", "state": "include", "class": "separate", "usecase": "separate", "c4": "separate", "mindmap": "include", "flow": "include", "activity": "include", "timeline": "include", "gitgraph": "include" }
     },
     "grid": 8

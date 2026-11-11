@@ -37,7 +37,10 @@ Three knobs in `theme.metric.elk`, and each exists because a board looked wrong 
   delivery chain beside the cloud). ELK folds a long chain into rows to hit the target.
   **`aspect: 0` turns wrapping off**, which is what `state`, `flow` and `activity` want: a funnel
   that wraps stops reading as a funnel, and ELK reorders the states to fit the target rather than
-  leaving them in the order they were written. **A board can override it on the fence** — an
+  leaving them in the order they were written. A `mindmap` is `0` too: it was `1.2` until 0.4.0,
+  and ELK folded any map wider than that into rows, drawing grandchildren under the root, left of
+  the topic they hang from. Big maps are tall and never tripped it; the small map a person grows
+  from the keyboard always did (`e2e/mindmap.spec.ts`, *a small map is never folded*). **A board can override it on the fence** — an
   `arch` item opened `{#pipeline aspect=0}` — **and a diagram's two side handles now write it**,
   which is what a person pulling a diagram wider is actually asking for — because the theme's figure
   is a house default for the type, not a fact about every diagram of it: a pipeline drawn as `arch` really is one chain, and the fold that

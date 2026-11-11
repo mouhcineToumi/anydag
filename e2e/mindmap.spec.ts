@@ -152,6 +152,30 @@ test("Shift+Tab from directly under the root writes nothing — that would be a 
   expect(bodyOf()).toBe(MAP);
 });
 
+/* ----------------------------------------------------------------------------- the layout */
+
+test("a small map is never folded: every topic is drawn to the right of the topic it hangs from", async ({ page }) => {
+  /* The theme once aimed a mindmap at an aspect of 1.2, and ELK's wrapping folded a map wider than
+     that into rows — Arch and Erd drawn under the root, left of the Dialects they hang from. A big
+     map is tall and never tripped it; the small one a person grows from the keyboard always did. */
+  await open(page);
+  const box = async (name: string) =>
+    (await page
+      .locator("[data-dag-node]")
+      .filter({ hasText: new RegExp(`^${name}$`) })
+      .boundingBox())!;
+  for (const [child, parent] of [
+    ["Dialects", "Board"],
+    ["Arch", "Dialects"],
+    ["Erd", "Dialects"],
+    ["Editing", "Board"],
+  ] as const) {
+    const c = await box(child);
+    const p = await box(parent);
+    expect(c.x, `${child} right of ${parent}`).toBeGreaterThan(p.x + p.width);
+  }
+});
+
 /* ------------------------------------------------------------------------------ the panel */
 
 test("the panel offers no hue, status, icon or flags on a topic: a mindmap line is its name", async ({ page }) => {
