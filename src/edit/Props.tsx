@@ -97,7 +97,7 @@ import { ARROWS, tokenize } from "@/dsl/tokenizer";
 
 import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
 
-import { detachable, freshNodeId, hasPseudo, loneNode, wrapPlan, type Pseudo } from "./build";
+import { convertPseudo, detachable, freshNodeId, hasPseudo, LEGACY_PSEUDO, loneNode, wrapPlan, type Pseudo } from "./build";
 import { layered } from "./drag";
 import { EdgeEnds, type EndChoices } from "./EdgeEnds";
 import { edgeTargets } from "./pick";
@@ -813,6 +813,37 @@ function PickProps({
   }
   if (seq?.what === "frag") return <FragmentProps body={body} subject={subject} onBody={onBody} onOut={onOut} />;
   if (seq?.what === "note") return <NoteProps body={body} subject={subject} onBody={onBody} onOut={onOut} />;
+  /* A `[*]` has no line of its own — the one it was picked on is its edge's — so every control
+     below would write into the edge. What it can be offered is a name, which makes it a start or an
+     end state like any other (#145). */
+  const legacy = what === "node" ? LEGACY_PSEUDO.exec(id) : null;
+  if (legacy) {
+    const made = convertPseudo({ type: type as BoardItem["type"], body, dir: undefined }, id);
+    const word = legacy[1] === "start" ? "start" : "end";
+    return (
+      <div className="dag-props" data-dag-props={id}>
+        <p className="dag-inspector__hint" data-dag-legacy-pseudo={word}>
+          This {word} is written as <code>[*]</code>, so nothing else can link to it. Give it a name and it is a {word} state like
+          any other.
+        </p>
+        <div className="dag-props__row" role="group" aria-label="Structure">
+          <button
+            type="button"
+            className="dag-props__add"
+            data-dag-prop-convert-pseudo={word}
+            disabled={!made}
+            onClick={() => {
+              if (!made) return;
+              onBody(made.body);
+              onRepick(made.id, "node");
+            }}
+          >
+            Make it a {word} state
+          </button>
+        </div>
+      </div>
+    );
+  }
   const src = body.split("\n")[line - 1] ?? "";
   const write = (next: string) => onBody(replaceLine(body, line, next));
   const mod = (key: ModifierKey, value: string | null) => write(setModifier(src, key, value));
