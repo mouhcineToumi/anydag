@@ -16,12 +16,15 @@ import { INSPECTOR_WIDTH, readPref, writePref } from "@/settings/prefs";
 import type { BoardLink } from "@/board/types";
 import { isDiagramType, isLinkType, itemName, type BoardItem, type BoardPage, type ItemType } from "@/board/types";
 import { declaredAt, declaredOn } from "@/dsl/declared";
+import { removeEdge } from "@/dsl/restate";
 import { fromMermaid } from "@/dsl/from-mermaid";
 import { detectMermaid } from "@/dsl/mermaid";
 
+import { RepairBox } from "@/ui/Problems";
 import type { Problem } from "@/ui/problemList";
 
 import { segOf } from "./pick";
+import type { Fix, Repair } from "./repair";
 import { Props, type Subject } from "./Props";
 import type { Editor } from "./useEditor";
 
@@ -92,6 +95,8 @@ export function Inspector({
   pages,
   boardLinks,
   problems = [],
+  repairOf,
+  onRepair,
 }: {
   item: BoardItem;
   editor: Editor;
@@ -104,6 +109,9 @@ export function Inspector({
    * while somebody is typing: the dock stays quiet about the item that is open here.
    */
   problems?: readonly Problem[];
+  /** A board setting's repair, as the dock offers it; absent when the board cannot be written. */
+  repairOf?(p: Problem): Repair | null;
+  onRepair?(fix: Fix): Promise<string | null>;
 }) {
   const [draft, setDraft] = useState(item.body);
   const [width, setWidth] = useState(storedWidth);
@@ -299,19 +307,6 @@ export function Inspector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, wantLine, revealN]);
 
-  /*
-   * The same placement for a request that names a line rather than a card — the problems dock's
-   * "show me". Its own effect rather than a third input to the one above, because that one follows
-   * the *pick*, which keeps moving as the caret walks the source; a line asked for once is a single
-   * placement, and folding it in would pin the caret there against every pick that came after.
-   */
-  const askedLine = reveal && reveal.id === item.id ? reveal.line : undefined;
-  useEffect(() => {
-    const el = area.current;
-    if (!el || !askedLine) return;
-    selectLine(el, draftRef.current, askedLine, false);
-  }, [askedLine, revealN, showSource]);
-
   /* Pulling the panel wider. Painted straight onto the element for the duration — this is the
      `Viewport` split again — and only the settled value reaches React and `localStorage`. */
   const onGrip = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -410,6 +405,26 @@ export function Inspector({
         </div>
       ) : null}
 
+      {/* What is wrong here that a person can act on (#145), at the top, where it is read first:
+          each in words, with Show — which picks the card or link it concerns, so the control that
+          fixes it is the next thing on screen — and the fix itself where a row can carry one out.
+          Nothing about lines, codes or grammar: those are an agent's, and the panel never shows the
+          text they point into. */}
+      {problems.length > 0 ? (
+        <ProblemsBlock
+          problems={problems}
+          onShow={(p) => editor.openOn(item.id, p.target)}
+          onDeleteEdge={(p) => {
+            const line = p.target ? declaredAt(item.type, draft, p.target.id, item.dir) : null;
+            if (line === null) return;
+            editor.pickNode(item.id, null);
+            onChange(removeEdge(draft, line));
+          }}
+          repairOf={repairOf}
+          onRepair={onRepair}
+        />
+      ) : null}
+
       {/* A Mermaid paste, and the one button that turns it into this grammar. Offered only where
           the detector is already certain — a header means the block is another language end to end
           — so nothing that merely resembles Mermaid can be rewritten by accident. In both halves,
@@ -480,32 +495,6 @@ export function Inspector({
         />
       ) : null}
 
-      {/* This item's problems, where somebody editing it is already looking. In both halves: a
-          person who never opens Source still needs to know the diagram is not what the file says,
-          and a click takes them to the line. Counted in the body, the way the box counts. */}
-      {problems.length > 0 ? (
-        <ul className="dag-inspector__problems" data-dag-inspector-problems="">
-          {problems.map((p, i) => {
-            const line = Math.max(1, p.line - item.line);
-            return (
-              <li key={`${p.key}@${p.line}#${i}`}>
-                <button
-                  type="button"
-                  className={`dag-inspector__problem dag-inspector__problem--${p.severity}`}
-                  title="Go to this line"
-                  onClick={() => editor.openAt(item.id, line)}
-                >
-                  <span className="dag-inspector__problem-where">
-                    line {line} · {p.code}
-                  </span>
-                  <span>{p.message}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-
       {sheetable && showSheet ? (
         <div className="dag-inspector__sheet dag-md">
           {sheet === null ? <p>Loading…</p> : <ReactMarkdown components={SHEET}>{sheet}</ReactMarkdown>}
@@ -551,5 +540,60 @@ function MermaidOffer({ body, onConvert }: { body: string; onConvert(type: ItemT
         <Wand2 {...ICON} aria-hidden="true" /> Convert
       </button>
     </div>
+  );
+}
+
+/**
+ * The panel's Problems block: what is wrong with this item that a person can do something about.
+ *
+ * `listProblems` has already left out everything else, so every row here has an answer: Show picks
+ * the thing the problem is about, a link that ends on nothing can be deleted from the row, and a
+ * board setting the file got wrong carries its repair, as it does in the dock.
+ */
+function ProblemsBlock({
+  problems,
+  onShow,
+  onDeleteEdge,
+  repairOf,
+  onRepair,
+}: {
+  problems: readonly Problem[];
+  onShow(p: Problem): void;
+  onDeleteEdge(p: Problem): void;
+  repairOf?(p: Problem): Repair | null;
+  onRepair?(fix: Fix): Promise<string | null>;
+}) {
+  return (
+    <section className="dag-inspector__problems" data-dag-inspector-problems="" aria-label="Problems">
+      <ul className="dag-inspector__problem-list">
+        {problems.map((p, i) => (
+          <li
+            key={`${p.key}@${p.line}#${i}`}
+            className={`dag-inspector__problem dag-inspector__problem--${p.severity}`}
+            data-dag-inspector-problem={p.code}
+          >
+            <span className="dag-inspector__problem-words">{p.words}</span>
+            <span className="dag-inspector__problem-acts">
+              {p.target ? (
+                <button type="button" className="dag-inspector__problem-act" data-dag-problem-show="" onClick={() => onShow(p)}>
+                  Show
+                </button>
+              ) : null}
+              {p.fix === "delete-edge" ? (
+                <button
+                  type="button"
+                  className="dag-inspector__problem-act"
+                  data-dag-problem-delete=""
+                  onClick={() => onDeleteEdge(p)}
+                >
+                  Delete link
+                </button>
+              ) : null}
+            </span>
+            {onRepair ? <RepairBox repair={repairOf?.(p) ?? null} code={p.code} onRepair={onRepair} /> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

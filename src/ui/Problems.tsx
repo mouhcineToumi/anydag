@@ -22,7 +22,7 @@ interface Props {
   editing: string | null;
   /** A page's name, for the list — a problem on another page says which. */
   pageName(id: string): string | undefined;
-  /** "Show me": the item's source, with the caret on the line. */
+  /** "Show me": the item open in the panel, with the thing the problem concerns picked. */
   onShow(p: Problem): void;
   /**
    * What a problem can be put right with, in words: `planRepair`'s answer for it, or `null` when the
@@ -101,6 +101,9 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
   if (show === "off" || problems.length === 0) return null;
 
   const first = toast?.[0];
+  /* Where it is, in a person's words: the kind of thing, and the page when there are several. */
+  const where = (p: Problem) =>
+    [p.type ? itemName(p.type) : "", p.page && pageName(p.page) ? pageName(p.page) : ""].filter(Boolean).join(" · ");
   const go = (p: Problem) => {
     setOpen(false);
     setToast(null);
@@ -125,15 +128,11 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
                   className={`dag-problems__row dag-problems__row--${p.severity}`}
                   data-dag-problems-row={p.code}
                   disabled={!p.item}
-                  title={p.item ? "Open it at this line" : undefined}
+                  title={p.item ? "Show it" : undefined}
                   onClick={() => go(p)}
                 >
-                  <span className="dag-problems__code">{p.code}</span>
-                  <span className="dag-problems__msg">{p.message}</span>
-                  <span className="dag-problems__where">
-                    {p.item ? `${p.item} · ` : ""}line {p.line}
-                    {p.page && pageName(p.page) ? ` · ${pageName(p.page)}` : ""}
-                  </span>
+                  <span className="dag-problems__msg">{p.words}</span>
+                  {where(p) ? <span className="dag-problems__where">{where(p)}</span> : null}
                 </button>
                 {/* Under the row and not in it: a button inside a button is not a thing. */}
                 {onRepair ? <RepairBox repair={repairOf?.(p) ?? null} code={p.code} onRepair={onRepair} /> : null}
@@ -152,11 +151,9 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
         >
           <AlertCircle {...ICON} aria-hidden="true" className="dag-problems__icon" />
           <span className="dag-problems__text">
-            <span className="dag-problems__code">
-              {first.code} · line {first.line}
-            </span>
+            {where(first) ? <span className="dag-problems__code">{where(first)}</span> : null}
             <span className="dag-problems__msg">
-              {first.message}
+              {first.words}
               {toast!.length > 1 ? ` (and ${toast!.length - 1} more)` : ""}
             </span>
           </span>
@@ -203,7 +200,7 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
  * comes back as a sentence when it could not be done, and the row disappears when it was, because
  * the problem it stood for has.
  */
-function RepairBox({
+export function RepairBox({
   repair,
   code,
   onRepair,

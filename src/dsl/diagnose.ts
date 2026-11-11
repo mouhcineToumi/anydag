@@ -1,6 +1,7 @@
 import { parseChart, type ChartModel } from "./chart";
 import { CODES } from "./codes";
-import type { Diagnostic, Graph } from "./ir";
+import { declaredOn } from "./declared";
+import type { Diagnostic, DiagnosticTarget, Graph } from "./ir";
 import { hasDialect, parseDiagram } from "./parse";
 import { parseSequence, type SequenceModel } from "./sequence";
 
@@ -75,6 +76,23 @@ interface Diagnosable {
 }
 
 /**
+ * Each diagnostic with the thing its line declares, while the line is still the body's.
+ *
+ * Asked of the parse (`declaredOn`) rather than carried by every parser: a parser knows the line it
+ * was reading, and which card, group or edge ended up living there is the whole parse's answer.
+ * Once per line, because several diagnostics on one statement are common and each ask is a parse.
+ */
+function targeted(it: Parseable, found: Diagnostic[]): Diagnostic[] {
+  if (found.length === 0) return found;
+  const at = new Map<number, DiagnosticTarget | null>();
+  return found.map((d) => {
+    if (!at.has(d.line)) at.set(d.line, declaredOn(it.type, it.body, d.line, it.dir));
+    const target = at.get(d.line);
+    return target ? { ...d, target: { what: target.what, id: target.id } } : d;
+  });
+}
+
+/**
  * Every diagnostic on the board: the file's own, then each diagram's, in file order.
  *
  * `diagnosticsOf` is the item's diagnostics *before* rebasing, and defaults to a fresh parse. The
@@ -90,7 +108,7 @@ export function diagnoseBoard(
     .map((it) => ({
       id: it.id,
       type: it.type,
-      diagnostics: diagnosticsOf(it).map((d) => ({ ...d, line: it.line + d.line })),
+      diagnostics: targeted(it, diagnosticsOf(it)).map((d) => ({ ...d, line: it.line + d.line })),
     }))
     .filter((x) => x.diagnostics.length > 0);
 

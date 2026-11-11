@@ -2115,12 +2115,13 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
 
   /*
-   * Everything wrong with the board, for the dock at the bottom and the panel beside it.
+   * What is wrong with the board that a person can act on, for the dock at the bottom, the panel
+   * beside it and the mark on a diagram's frame — and nothing else (`listProblems`).
    *
-   * Not on the canvas. The board's own errors used to be a red card hung above the content and a
-   * diagram's replaced the diagram, and neither could be put away; a picture of a board is now only
-   * the picture. Nothing is computed under `?snapshot=1`, where there is no chrome to show it in —
-   * the agent reads the same answer from `/__board/diagnostics`, which asks `diagnoseBoard` too.
+   * Not on the canvas as words. The board's own errors used to be a red card hung above the content
+   * and a diagram's replaced the diagram, and neither could be put away. Nothing is computed under
+   * `?snapshot=1`, where there is no chrome to show it in — an agent reads every diagnostic from
+   * `/__board/diagnostics`, which asks `diagnoseBoard` too.
    */
   const problems = useMemo(() => (board && !snapshot ? listProblems(board) : []), [board, snapshot]);
   /* The text the board was read from: a repair for an unknown fence names a word that is in the text
@@ -2152,16 +2153,39 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
     },
     [page, setQuery],
   );
-  const { openAt } = editor;
+  const { openOn } = editor;
   useEffect(() => {
     if (!showing || !board) return;
     if (showing.page && showing.page !== page) return;
     const it = board.items.find((x) => x.id === showing.item);
     setShowing(null);
     if (!it) return;
-    /* A diagnostic's line is the board file's; the panel counts lines of the body. */
-    openAt(it.id, Math.max(1, showing.line - it.line));
-  }, [showing, page, board, openAt]);
+    /* The thing the problem is about, picked: the panel then shows the control that answers it. */
+    openOn(it.id, showing.target);
+  }, [showing, page, board, openOn]);
+
+  /*
+   * A diagram with a problem a person can act on wears a quiet mark: its frame in the problem colour
+   * and a count by its title (#145). The words and the fix are in the panel, not on the canvas.
+   *
+   * Painted rather than rendered, for the reason `data-dag-proposed` is: `Item` is memoised, and a
+   * per-item prop would re-render every diagram whenever any count changed. No dependency list,
+   * because the item may reach the DOM only after its layout comes back. Chrome: `problems` is empty
+   * under `?snapshot=1`, so a picture of a board never carries it. Styled in chrome.css.
+   */
+  const problemCounts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const p of problems) if (p.item) n.set(p.item, (n.get(p.item) ?? 0) + 1);
+    return n;
+  }, [problems]);
+  useEffect(() => {
+    for (const el of document.querySelectorAll("[data-dag-item][data-dag-problem-count]"))
+      if (!problemCounts.has(el.getAttribute("data-dag-item") ?? "")) el.removeAttribute("data-dag-problem-count");
+    for (const [id, n] of problemCounts) {
+      const el = document.querySelector(`[data-dag-item="${CSS.escape(id)}"]`);
+      if (el && el.getAttribute("data-dag-problem-count") !== String(n)) el.setAttribute("data-dag-problem-count", String(n));
+    }
+  });
 
   const selectedItems = useMemo(() => items.filter((it) => selected.has(it.id)), [items, selected]);
 
@@ -2647,6 +2671,8 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             pages={board.pages}
             boardLinks={board.links}
             problems={editingProblems}
+            repairOf={(p) => (repairText === null ? null : planRepair(repairText, board, p))}
+            onRepair={locked || !editor.enabled ? undefined : editor.repair}
           />
         ) : null}
         {library && board && !snapshot && !locked ? (
