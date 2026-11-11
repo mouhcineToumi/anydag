@@ -698,6 +698,67 @@ function NodeStyle({ type, body, node, onBody }: { type: string; body: string; n
   );
 }
 
+/**
+ * Which of a statement's words this pick can be offered, read off the parser that would read them.
+ *
+ * A control that writes a word the type's parser rejects breaks the diagram; one that writes a
+ * word it reads past is a click that changes nothing. Both are the panel claiming something the
+ * grammar does not say, so the answer is derived from the parser rather than from the renderer:
+ *
+ * - the nine dialects `parseWith` reads pass a node through `modifiers()` (`dsl/common.ts`), which
+ *   is where `hue=`, `icon=`, a status and the flags are read; a group takes `hue=` and its second
+ *   string as a sublabel, and a lane takes `hue=` and one string — so the answer follows `what`;
+ * - a `chart` reads `hue=` but no status or flag (a bare word is a value), and draws no second
+ *   string (`dsl/chart.ts`);
+ * - a `sequence` participant reads its two strings, `icon=`, `hue=` and `kind=`, and a bare word
+ *   after them is the next statement (`dsl/sequence.ts`);
+ * - a `timeline` entry's tail is read for `done` and `wait` only — its hue is its section's, and
+ *   every other word, a second string included, is read past (`dsl/graph/timeline.ts`);
+ * - a `gitgraph` commit is a command: the first quoted string is its message and everything else
+ *   on the line is read past (`dsl/graph/gitgraph.ts`). Its own panel is `GitProps`, which offers
+ *   the tag, the order and a branch instead;
+ * - a mindmap topic is its line (`dsl/graph/mindmap.ts`).
+ */
+export interface PickControls {
+  /** `hue=` is read and drawn. */
+  hue: boolean;
+  /** `"all"` for the four statuses, `"done-wait"` for a timeline entry, `"none"` for no status. */
+  status: "all" | "done-wait" | "none";
+  /** `async` / `external` are read. */
+  flags: boolean;
+  /** `icon=` is read and drawn. */
+  icon: boolean;
+  /** A second string is read and drawn under the title. */
+  meta: boolean;
+  /** `bold` / `italic`, the two flags the text-style control writes. */
+  em: boolean;
+}
+
+const NO_WORDS: PickControls = { hue: false, status: "none", flags: false, icon: false, meta: false, em: false };
+
+export function pickControls(type: string, what: Subject["what"]): PickControls {
+  if (type === "timeline") {
+    return what === "node" ? { ...NO_WORDS, status: "done-wait" } : { ...NO_WORDS, hue: what === "group" };
+  }
+  if (type === "gitgraph" || type === "mindmap") return NO_WORDS;
+  if (type === "sequence") {
+    /* A message, a fragment and a note never reach `PickProps` — they have panels of their own. */
+    return what === "node" ? { hue: true, status: "none", flags: false, icon: true, meta: true, em: false } : NO_WORDS;
+  }
+  if (type === "chart") return { ...NO_WORDS, hue: true };
+  /* The nine `parseWith` dialects. A node's line goes through `modifiers()`; a group reads its
+     hue and its sublabel; a lane reads its hue and one string. */
+  const node = what === "node";
+  return {
+    hue: true,
+    status: node ? "all" : "none",
+    flags: node,
+    icon: node,
+    meta: node || what === "group",
+    em: node,
+  };
+}
+
 function PickProps({
   type,
   layout,
@@ -933,14 +994,8 @@ function PickProps({
    * offered, which is the same answer a chart gets for the same kind of reason.
    */
   const isMind = type === "mindmap";
-  /* Not `bare` — that is a start or end dot, above. */
-  const plain = isChart || isMind;
-  /*
-   * A sequence participant parses its own line: two strings, `icon=`, `hue=` and `kind=`, and a bare
-   * word after them is read as the start of the next statement — so a status or a flag would break
-   * the diagram it was set on. It gets the Kind menu its grammar has instead, and no status or flags.
-   */
-  const isSeq = type === "sequence";
+  /* Which of the words below this type's parser reads — see `pickControls`. */
+  const controls = pickControls(type, what);
   /*
    * The statement's own strings — its title, meta and desc — read the way `textSlots` reads them:
    * the *consecutive* run right after the id. Not a regular expression over the line, because a
@@ -1028,12 +1083,10 @@ function PickProps({
         {/* Colour and text style, directly after the kind and the name: what a person
             reaching into a card wants first. The strings and the values below are the thing's own
             content — not chrome — so they keep their place, and keep it *under* these. */}
-        {isMind || bare ? null : <Hues hue={hue} onSet={(h) => mod("hue", h)} />}
-        {isNode && !isChart && !bare && kindsOf(type).length > 0 ? (
-          <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} />
-        ) : null}
+        {controls.hue && !bare ? <Hues hue={hue} onSet={(h) => mod("hue", h)} /> : null}
+        {controls.em && !bare ? <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} /> : null}
 
-        {type === "mindmap" || isChart || bare || descAt === 1 ? null : (
+        {!controls.meta || bare || descAt === 1 ? null : (
           <Field
             label={what === "group" ? "Sublabel" : "Meta"}
             hook="data-dag-prop-meta"
@@ -1096,7 +1149,7 @@ function PickProps({
           />
           <TimelineStatus value={status === "done" || status === "wait" ? status : ""} onSet={(v) => write(setStatus(src, v))} />
         </>
-      ) : plain || bare || isSeq ? null : (
+      ) : controls.status === "all" ? (
         <div className="dag-props__row">
           <select
             className="dag-select dag-props__status"
@@ -1113,11 +1166,11 @@ function PickProps({
             ))}
           </select>
         </div>
-      )}
+      ) : null}
       {/* The picker writes through the same `mod` the input did — one span in, one span out, the
           author's spacing and comments untouched — and is keyed to the pick so a change of card
           re-reads its mode and text from the line. */}
-      {!plain && !bare && isNode ? (
+      {controls.icon && !bare ? (
         <IconPicker
           key={`${id}:${line}`}
           value={icon}
@@ -1127,7 +1180,7 @@ function PickProps({
         />
       ) : null}
 
-      {isNode && !plain && !bare && !isSeq ? (
+      {controls.flags && !bare ? (
         <div className="dag-props__row" role="group" aria-label="Flags">
           {NODE_FLAGS.map(({ flag, label }) => (
             <label key={flag} className="dag-field dag-field--row">

@@ -452,6 +452,16 @@ or `done` written onto a topic is part of its name (`Topic hue=coral`), because 
 no modifier. Its colour is its branch's, from depth. A chart is left out of the same controls for the
 same reason, one dialect over.
 
+**The same answer holds for a timeline entry, a gitgraph commit and a sequence participant, and
+`pickControls` in `Props.tsx` is the gate the statement controls read.** A timeline entry's tail is
+read for `done` and `wait` only, so its panel is the date, the section and a three-option status —
+no hue, icon, flags or meta; a section keeps its hue, because `parseTimeline` reads that one. A
+gitgraph commit is a command whose first quoted string is its whole message, so `Props` sends it to
+its own `GitProps` panel — message, tag, order, branch — and offers no statement word. A bare word
+after a sequence participant's two strings is read as the next statement, so
+`participant api "API" done` is `E_EXPECTED_ARROW`; it keeps `hue=`, `icon=` and `kind=` and loses
+the status and flags. `test/props-gate.test.ts` holds the gate to each parser.
+
 **In a fixed fence the coordinate is the placement, so the edge is a separate claim only a drag
 makes.** Everywhere else the edge *is* the placement — ELK has no reason to put an unconnected card
 anywhere near the one it grew from — which is why a plain click writes one there and not here. The
