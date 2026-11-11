@@ -106,3 +106,12 @@ export function systemPrompt({ docsRoot, as, mode }: SystemOptions): string {
     .filter(Boolean)
     .join("\n\n");
 }
+
+/**
+ * What a model is told before it is asked for flashcards (#140): `docs/generate/flashcards.md` and
+ * nothing else. The quiz format a card is written in is said there in the few lines a card needs — a
+ * card is a heading and a quote — and `cards.ts` reads the answer with the real parser, so a sheet
+ * that drifted from the format would be caught on the first reply rather than believed.
+ */
+export const cardsSystemPrompt = ({ docsRoot }: Pick<SystemOptions, "docsRoot">): string =>
+  read(path.join(docsRoot, "generate", "flashcards.md"));

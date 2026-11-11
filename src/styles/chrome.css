@@ -6968,3 +6968,29 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 @media (prefers-reduced-motion: reduce) {
   .dag-chat-tool__chev { transition: none; }
 }
+
+/* -- Generate flashcards (#140) -------------------------------------------------------------- */
+/* The quiz page's dialog: the settings card's shell, put on the body and fixed over the window, the
+   feedback card's way — inside the quiz column it covered only the column. Names are
+   `dag-flashcards*`, grepped first: "card" is taken three times over on a quiz's page alone. */
+.dag-settings__scrim.dag-flashcards__scrim { position: fixed; z-index: 50; background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent); }
+.dag-flashcards { width: 560px; display: flex; flex-direction: column; }
+.dag-flashcards__from { display: flex; gap: 16px; margin: 0 0 8px; }
+.dag-flashcards__from .dag-quiz__check { margin: 0; }
+.dag-flashcards__note-pick { width: 100%; margin: 0 0 8px; }
+.dag-flashcards__count { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--dag-color-slate); }
+.dag-flashcards__count .dag-input { width: 72px; }
+.dag-flashcards__foot { align-items: center; justify-content: space-between; margin-top: 12px; }
+.dag-flashcards__running { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dag-color-slate); }
+.dag-flashcards__error { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-dangerText); }
+.dag-flashcards__note { margin: 10px 0 0; font-size: 12px; color: var(--dag-color-muted); }
+.dag-flashcards__list { margin: 0; padding: 0; list-style: none; overflow: auto; max-height: 55vh; border-top: 1px solid var(--dag-color-outline); }
+.dag-flashcards__card { display: flex; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--dag-color-outline); }
+.dag-flashcards__keep { padding-top: 2px; }
+.dag-flashcards__faces { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; }
+.dag-flashcards__front { font-weight: 600; color: var(--dag-color-ink); }
+.dag-flashcards__more, .dag-flashcards__back { color: var(--dag-color-slate); }
+.dag-flashcards__back { margin-top: 4px; padding-left: 10px; border-left: 2px solid var(--dag-color-outline); }
+.dag-flashcards__faces p { margin: 0; }
+.dag-flashcards__faces p + p { margin-top: 4px; }
+.dag-flashcards__card:has(.dag-check:not(:checked)) .dag-flashcards__faces { opacity: 0.5; }

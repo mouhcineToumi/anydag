@@ -1,6 +1,6 @@
 # Prompt cards and prompt to edit
 
-> A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, and rewriting an existing diagram.
+> A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz.
 
 ## Prompt cards
 
@@ -223,3 +223,51 @@ purpose is to change something, and a real edge all the same.
 bodies is a design question, and it is refused with a reason rather than half-done; and letting the
 model rename an id, which `renameItemId` could carry across the board's `edges` fences but which
 nothing yet asks it to.
+
+## Flashcards from a model
+
+The same route writes a deck of flashcards for a quiz (#140). The quiz page's *Generate flashcards*
+opens a dialog: a topic typed, or a note of the vault chosen with what to focus on, and how many
+(ten unless said, one to thirty). `POST /__board/generate {kind: "flashcards", prompt, source?, count}`
+— `prompt` the topic, `source` the note's text with its frontmatter off — answers
+`{ok, cards, problems, attempts, error?}`, and nothing is written until the person has seen the
+cards and kept some. Where the kept ones land is *Quizzes*; this is the model's half.
+
+It shares everything around the loop with a diagram's: the provider table and the person's choice in
+Settings, both adapters, the four-at-once limit, the timeout per attempt and the cancel when the page
+goes away (`spend` in `server/routes/meta.ts`). A topic is held to the description's 4 000 characters
+and a note to 60 000 of its own, since a page of revision notes is the whole point. The MCP
+`generate` tool takes the same `kind` and `count`, and an agent lands each card with
+`quiz_question_set`.
+
+Four things are load-bearing:
+
+- **The check is the real quiz parser.** `plugins/generate/cards.ts` reads the reply with
+  `parseQuiz` — the parser the quiz page runs — after unwrapping a deck fenced whole, and keeps only
+  a question that is a flashcard (`card` on its heading, no checklist) and askable (a front and a
+  `>` back). An open question without the word, or one with options, parses clean as a quiz and is
+  still not a card: that is `EG_NOT_A_CARD`, the generator's own code, as `EG_WRONG_TYPE` is for a
+  diagram in the wrong type. A preamble before the first `##` is dropped, and so are the id-shaped
+  warnings (`WQ_NO_ID`, `EQ_DUPLICATE_ID`), since ids are not the model's.
+- **The fix loop sends back problems by card and code** — `card 3 (“What is WAL?”) EQ_NO_OPTIONS —
+  …`, never a line number the model would have to count — and asks for the whole deck again. The
+  best attempt wins: the most cards, then the fewest problems. A deck the model never got whole
+  still answers with the cards that passed and the problems of the ones that did not, which the
+  dialog counts as *left out* rather than showing; only an answer with no card at all is `ok: false`,
+  with what the model said instead, quoted, so a refusal reads as one.
+- **Neither the id nor the form is the model's.** A card comes back as `renderQuestion` writes it,
+  `## Front {card}` and the quote, with any id the model wrote dropped — the writer mints one against
+  the quiz the card lands in, which the server never sees.
+- **The system prompt is a file**, `docs/generate/flashcards.md`, served by the grammar's `/system`
+  as `mode=flashcards` — the prompt card's rule. It says what a card is in the few lines a card
+  needs rather than carrying the skill's quiz section; a sheet that drifted from the format would be
+  caught by the parser on the first reply, and `test/generate-cards.test.ts` holds its own example to
+  reading clean.
+
+`e2e/quiz-generate.spec.ts` mocks `/generate`, as the prompt card's spec does.
+
+**Deliberately out**: generating multiple-choice or open questions (the same loop could hold them,
+with a different keep rule); telling the model which cards the quiz already has, so a second deck
+on one topic may repeat the first and the person unticks the repeats; and a note's own menu item —
+the quiz is where the cards land, so the quiz is where they are asked for, and a note is one of the
+two things they can be made from.
