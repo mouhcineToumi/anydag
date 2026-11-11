@@ -99,6 +99,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Running the relay | [`feedback.md`](feedback.md) |
 | Search | [`search.md`](search.md) |
 | Settings | [`settings.md`](settings.md) |
+| Settings that had no source-free way in | [`editing.md`](editing.md) |
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Sync | [`sync.md`](sync.md) |
 | The api server | [`api.md`](api.md) |

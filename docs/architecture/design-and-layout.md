@@ -29,7 +29,9 @@ Three knobs in `theme.metric.elk`, and each exists because a board looked wrong 
   which is what a person pulling a diagram wider is actually asking for — because the theme's figure
   is a house default for the type, not a fact about every diagram of it: a pipeline drawn as `arch` really is one chain, and the fold that
   saves the average architecture diagram is what destroys that one. Anything but a number ≥ 0 is
-  `EB_BAD_ASPECT`.
+  `EB_BAD_ASPECT`. The item view's *Wrapping* select writes all three states — off the line, `0`, a
+  ratio — and the problems dock's repair for `EB_BAD_ASPECT` takes the bad value off (`editing.md`,
+  *Settings that had no source-free way in*).
 - **`hierarchy`** — `separate` lays each group out on its own and then arranges the boxes; `include`
   is one global pass. `separate` is what makes the ERD look hand-drawn: domains side by side,
   entities stacked, every group hugging its content. Under `include` one direction serves both axes

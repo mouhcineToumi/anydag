@@ -45,6 +45,7 @@
 | `build.ts` | what the `+` appends and what Detach rewrites, as text over text | the DOM: the boxes reach it through `data-dag-layout` |
 | `drag.ts` | what a drop inside a diagram *means* — a statement moving, a topic re-indenting, a date | the pointer; it is handed a target and a fraction |
 | `Props.tsx` | one control per thing a statement can say, for a node, an edge, a link or the item | which line it writes — `declaredAt` answers that |
+| `repair.ts` | what a problem about the file itself can be put right with, in words — the plan and the fix as data | the pointer, React; it never writes: `Editor.repair` does, through `src/board/repair.ts` |
 | `Rename.tsx` | the input over the drawing, and where the drawing put the text | how a card was sized (`size.ts` sizes a card, never the text in it) |
 | `NodeHandles.tsx` | the four link handles and the four `+` handles on a picked card | `Item`: it is placed by `App` in board coordinates |
 | `connect.ts`, `snap.ts`, `history.ts` | what may join what · where a dragged box wants to land · undo as versions of the file | all three: the pointer |

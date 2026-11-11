@@ -1,4 +1,4 @@
-import { CalendarPlus, FilePlus2, Pencil, Play, SquareCheckBig, CircleSlash, CalendarX2 } from "lucide-react";
+import { CalendarPlus, FilePlus2, Pencil, SlidersHorizontal, Play, SquareCheckBig, CircleSlash, CalendarX2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { contentBounds, placeItems } from "@/board/flow";
@@ -56,8 +56,10 @@ import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
 import { CalendarView } from "@/ui/Calendar";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
+import { BoardSettings } from "@/ui/BoardSettings";
 import { PageBar } from "@/ui/PageBar";
 import { ZoomBar } from "@/ui/ZoomBar";
+import { planRepair } from "@/edit/repair";
 import { listProblems, type Problem } from "@/ui/problemList";
 import { Problems } from "@/ui/Problems";
 import { Toolbar } from "@/ui/Toolbar";
@@ -1813,6 +1815,8 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      The text outlives the dialog so "Try again" reopens it as it was left; it belongs to one item,
      and opening the dialog on another starts empty. */
   const [asking, setAsking] = useState(false);
+  /* The card for what this board says about itself — its theme and its flow — opened from the top bar's `⋯`. */
+  const [boardSettings, setBoardSettings] = useState(false);
   const [askFor, setAskFor] = useState<string | null>(null);
   const [askText, setAskText] = useState("");
   const rewriteCtl = useRef<AbortController | null>(null);
@@ -2110,6 +2114,10 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
    * the agent reads the same answer from `/__board/diagnostics`, which asks `diagnoseBoard` too.
    */
   const problems = useMemo(() => (board && !snapshot ? listProblems(board) : []), [board, snapshot]);
+  /* The text the board was read from: a repair for an unknown fence names a word that is in the text
+     and in no field of the board. Read with the board, so the two are one version of the file. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const repairText = useMemo(() => (board ? (handle.current()?.text ?? null) : null), [board]);
   const {
     problems: { show: problemsShow },
     export: { scale: exportScale },
@@ -2256,6 +2264,16 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                         },
                       ]
                     : []),
+                  /* The board's own settings, which only the file's frontmatter held. A locked board shows
+                     the row greyed, as the menu does for every write. */
+                  {
+                    key: "board-settings",
+                    label: "Board settings",
+                    icon: SlidersHorizontal,
+                    hook: "data-dag-board-settings-open",
+                    disabled: !editor.enabled || locked,
+                    onSelect: () => setBoardSettings(true),
+                  },
                   ...exportRows(boardExports(exportScale), async (kind) => {
                     await editor.exportAs(kind);
                     focusBoard();
@@ -2491,6 +2509,20 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             pageName={(id) => (board.pages.length > 1 ? board.pages.find((p) => p.id === id)?.name : undefined)}
             /* "Show" opens the item's source in the panel, which is an editor. */
             onShow={locked ? () => refuseLocked() : showProblem}
+            repairOf={(p) => (repairText === null ? null : planRepair(repairText, board, p))}
+            onRepair={locked || !editor.enabled ? undefined : editor.repair}
+          />
+        ) : null}
+        {boardSettings && board && !snapshot && !locked ? (
+          <BoardSettings
+            board={board}
+            themes={THEME_NAMES}
+            themeName={themeName}
+            onMeta={editor.setMeta}
+            onClose={() => {
+              setBoardSettings(false);
+              focusBoard();
+            }}
           />
         ) : null}
         {help && !snapshot ? <Shortcuts onClose={closeHelp} /> : null}
