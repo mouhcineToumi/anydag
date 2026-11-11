@@ -6,7 +6,7 @@ import type { MetaOp } from "./patch";
  *
  * **Browser-free**, like everything beside it: the panel's controls and a test read the same rules.
  * Two groups live here because both are things the file said only in text until a control was made
- * for them — the board's frontmatter (`theme:` and `flow:`, beside the `pages:` the page tabs
+ * for them — the board's frontmatter (`flow:`, beside the `pages:` the page tabs
  * write) and the one fence attribute whose only way in was typing it (`aspect=`).
  */
 
@@ -23,16 +23,6 @@ export const FLOW_DEFAULT = { width: 4000, gap: 80 } as const;
  * is a row of one, with nothing to say why.
  */
 export const FLOW_RANGE = { width: { min: 320, max: 20000 }, gap: { min: 0, max: 400 } } as const;
-
-/**
- * `theme:` set to a theme, or off the file.
- *
- * `null` is "follow the reader": a board with no `theme:` is drawn in whatever the window is set to,
- * and the frontmatter should say nothing at all rather than carry a word that means the same.
- */
-export function themeMeta(name: string | null): MetaOp {
-  return { meta: { theme: name && name.trim() ? name.trim() : null } };
-}
 
 /**
  * `flow:` for these two numbers — or `null` when one of them is not a number the control may write.

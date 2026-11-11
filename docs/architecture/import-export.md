@@ -12,7 +12,10 @@ lives in `useEditor.importFiles()`, reached by a file drop on the board or Impor
 **Export is at the end of the top bar** — `src/ui/Export.tsx`, on a board and
 on a note — and not in the `⋯` any more: it was found there by nobody, and a note has no dock. A board
 saves as SVG, as PNG at the export scale the menu states, or as its `.board.md`;
-a note as **a PDF** or its `.note.md`. Four things about the PDF:
+a note as **a PDF** or its `.note.md`. **An exported board is the theme on screen**, which is the
+reader's choice or the default — a board no longer carries a theme of its own (issue #162). The
+CLI's `anydag board export` opens `?snapshot=1`, which reads no preference, so that file is the
+default theme; a `?theme=` in the URL is the way to name another. Four things about the PDF:
 
 - **It is the browser's own print** (`src/export/print.ts`, `printAs`; Electron's `printToPDF` in the
   desktop app), which is the only way a page can make a PDF whose text is text. The title is the document's for the length of the dialog,

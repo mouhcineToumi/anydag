@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 
 import { readPractice, setGraduate } from "@/ui/quiz/practice";
 
-import { OWN_THEME, readFlag, writeFlag } from "../prefs";
 import { resetSettings, writeSettings, type PasteSize, type ProblemsShow } from "../store";
 import { useSettings } from "../useSettings";
-import { Switch, TextField } from "@/ui/controls";
+import { TextField } from "@/ui/controls";
 
 import { Field, Group, Reset } from "./common";
 
@@ -62,7 +61,6 @@ export function PreferencesPane({
             ))}
           </select>
         </Field>
-        <OwnTheme />
       </Group>
 
       <Group title="Problems">
@@ -135,29 +133,6 @@ export function PreferencesPane({
 
       <Reset what="problems and pasted images (the theme stays)" onReset={() => resetSettings(["problems", "paste"])} />
     </>
-  );
-}
-
-/**
- * Whether the theme above is drawn on every board, over a board's own `theme:`. Off: a board that
- * names a theme is drawn in it, and the theme above is for the boards that do not.
- */
-function OwnTheme() {
-  const [on, setOn] = useState(() => readFlag(OWN_THEME, false));
-  return (
-    <Field
-      label="Use my theme on every board"
-      hint="Off: a board that asks for a theme is drawn in it, and your theme is for the rest. On: every board is drawn in your theme."
-    >
-      <Switch
-        data-dag-setting-own-theme=""
-        checked={on}
-        onChange={(e) => {
-          setOn(e.target.checked);
-          writeFlag(OWN_THEME, e.target.checked);
-        }}
-      />
-    </Field>
   );
 }
 

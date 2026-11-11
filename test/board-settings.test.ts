@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { parseBoard } from "@/board/parseBoard";
 import { applyPatch } from "@/board/patch";
 import { repairFrontmatter, retypeFence } from "@/board/repair";
-import { ASPECT_START, FLOW_DEFAULT, aspectAttr, aspectChoice, flowMeta, themeMeta } from "@/board/settings";
+import { ASPECT_START, FLOW_DEFAULT, aspectAttr, aspectChoice, flowMeta } from "@/board/settings";
 import { CODES } from "@/dsl/codes";
 import { planRepair, repairable } from "@/edit/repair";
 import { Frame } from "@/render/Frame";
@@ -13,7 +13,7 @@ import { frameHueVars } from "@/render/hue";
 import { THEMES } from "@/theme/useTheme";
 
 /**
- * The settings a board has that only the file's text said: `theme:` and `flow:` in the frontmatter,
+ * The settings a board has that only the file's text said: `flow:` in the frontmatter,
  * a fence's `aspect=`, a diagram's own `hue=` — and the repairs for what would not parse far enough
  * to have a control. Each writer is checked against `applyPatch`/`parseBoard`, the two things that
  * decide what the file means, not against a string it was expected to equal.
@@ -25,22 +25,8 @@ const apply = (text: string, meta: Record<string, unknown>) => {
   return r.text;
 };
 
-describe("theme: and flow:", () => {
+describe("flow:", () => {
   const board = "```arch {#a}\nservice api\n```\n";
-
-  it("themeMeta writes the word and null takes it off", () => {
-    const set = apply(board, themeMeta("paper-dark").meta);
-    expect(set.startsWith("---\ntheme: paper-dark\n---\n")).toBe(true);
-    expect(parseBoard("b", set).theme).toBe("paper-dark");
-
-    const off = apply(set, themeMeta(null).meta);
-    expect(off).toBe(board);
-    expect(parseBoard("b", off).theme).toBeUndefined();
-  });
-
-  it("an empty name is no theme, not a theme called nothing", () => {
-    expect(themeMeta("  ").meta).toEqual({ theme: null });
-  });
 
   it("flowMeta writes only what differs from the default", () => {
     expect(flowMeta(2000, FLOW_DEFAULT.gap)?.meta).toEqual({ flow: { width: 2000 } });
@@ -66,9 +52,9 @@ describe("theme: and flow:", () => {
 
   it("keeps the keys it does not know, and the pages", () => {
     const text = "---\ntitle: T\npages:\n  - id: page-1\n    name: One\nextra: kept\n---\n\n```md {#a}\nx\n```\n";
-    const out = apply(text, themeMeta("neutral").meta);
+    const out = apply(text, flowMeta(2000, 40)!.meta);
     const b = parseBoard("b", out);
-    expect(b.theme).toBe("neutral");
+    expect(b.flow).toEqual({ width: 2000, gap: 40 });
     expect(b.title).toBe("T");
     expect(b.pages.map((p) => p.name)).toEqual(["One"]);
     expect(out).toContain("extra: kept");

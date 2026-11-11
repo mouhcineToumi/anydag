@@ -18,6 +18,17 @@ ignored, so an old board draws. The properties view offers "Update it" for them 
 wears one, and for the whole diagram in the item view — which takes the flag off (*Controls on the canvas*,
 `editing.md`).
 
+**A theme is the reader's, not the board's.** Every board draws in the theme chosen in Settings →
+Preferences → Appearance, or the one a `?theme=` URL names; a `theme:` in a board's frontmatter
+changes nothing on screen. The line is ordinary frontmatter and stays in the file untouched — opening
+a vault never writes a byte — so a board written before this decision keeps its text and simply draws
+in the reader's theme. **It is not a diagnostic either**: a person has no action for a frontmatter
+line that changes nothing, and the rule here is that a person only sees problems they can act on —
+a one-click removal needs a board settings card to sit in, and there is none. Snapshots and the
+CLI's exports open `?snapshot=1`, which reads no preference, so they use the app's default theme
+unless the URL names one. This is the same refusal as the accent one layer out: a document may not
+decide how its reader sees it, and one vault must look the same board to board.
+
 ## Layout, per diagram type
 
 Three knobs in `theme.metric.elk`, and each exists because a board looked wrong without it:

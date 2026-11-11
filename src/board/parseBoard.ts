@@ -48,7 +48,6 @@ export function hashOf(s: string): string {
 
 interface Frontmatter {
   title?: string;
-  theme?: string;
   pages?: (BoardPage | string)[];
   flow?: { width?: number; gap?: number };
 }
@@ -238,7 +237,6 @@ export function parseBoard(name: string, text: string): Board {
        (`test/titles.test.ts`), so the toolbar never calls a board something its sidebar row does not.
        `title: 42` used to reach the toolbar as a number. */
     title: typeof fm.title === "string" && fm.title.trim() ? fm.title.trim() : undefined,
-    theme: fm.theme,
     pages,
     items,
     links,

@@ -88,7 +88,7 @@ function RefCard({ id, fallback }: { id: string; fallback: string }) {
 function EmbeddedBoard({ id, name }: { id: string; name: string }) {
   const { board, error } = useBoard(name);
   const query = new URLSearchParams(location.search);
-  const { theme } = useTheme(query.get("theme") ?? undefined, undefined, query.get("snapshot") === "1");
+  const { theme } = useTheme(query.get("theme") ?? undefined, query.get("snapshot") === "1");
   /* `data-dag-embed-ready` once every item has its size — or once there is nothing more coming,
      which a board that would not load is. A note printed to PDF waits on it: a board
      drawn half-way is a PDF of empty frames. */

@@ -43,7 +43,7 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | a diagram's two side handles | `aspect=` — the shape ELK folds to — and `w=` removed |
 | the item view's Advanced → Wrapping, on a laid-out diagram | `aspect=` set to a ratio, to `0` (never wrap), or taken off (the theme's shape) — the one way to take it back off |
 | the item view's Frame colour, on a diagram | `hue=` on the fence line — the tint of the frame's hairline and its title band |
-| the top bar's `⋯` → Board settings | `theme:` and `flow:` in the frontmatter, through a `MetaOp` — only what differs from the default is written |
+| the top bar's `⋯` → Board settings | `flow:` in the frontmatter, through a `MetaOp` — only what differs from the default is written |
 | the problems dock's repair, under a row for the settings block, an unknown fence, a bad `layout=` or `aspect=` | the readable settings kept and the rest dropped · the fence's label changed · that one attribute taken off — each one write, so one ctrl+Z |
 | a second click on a card, once its diagram is selected | nothing: a pick is not an edit |
 | a click on an edge's line inside a diagram | nothing, likewise |
@@ -583,16 +583,13 @@ Four things a person could only change by typing, each now a control (`feat(canv
   pseudo-element to freeze. **A bare frame has no band to tint** and keeps the hairline (and the
   group radius it otherwise drops). The two swatch rows in a lone-node diagram's panel are told apart
   by hook and label: `data-dag-prop-hue` is the node's, `data-dag-frame-hue` the frame's.
-- **The board's frontmatter** — `theme:` and `flow: {width, gap}` — is *Board settings* in the top
+- **The board's frontmatter** — `flow: {width, gap}` — is *Board settings* in the top
   bar's `⋯`, a card over the board (`src/ui/BoardSettings.tsx`) written through `Editor.setMeta`, one
   `MetaOp` and one undo entry, as the page tabs write `pages:`. Only what differs from
   `FLOW_DEFAULT` is written and `flow:` leaves the file when both are the default, so a board nobody
   changed stays as short as it was; a number outside `FLOW_RANGE` is put back in the box with the
-  range said. *Follow my settings* is **no `theme:` at all**. The board's theme is the one drawn
-  (`pickTheme`, `src/theme/pick.ts`) unless the reader turned on *Use my theme on every board* in
-  Settings → Appearance or the address names one (`?theme=`), so when the window is drawing another
-  theme than the board asks for, the card says which and why (`data-dag-board-theme-note` carries
-  the rule that decided: `board`, `mine`, `address`), instead of a setting that visibly did nothing.
+  range said. **There is no theme row**: a theme is the reader's, never the board's (#162), so a
+  `theme:` in the frontmatter is left in the file and read by nothing (`design-and-layout.md`).
 - **A file that would not parse far enough to have a control** gets a repair in words, under its
   row in the problems dock (`src/edit/repair.ts` plans it, `Problems.tsx` draws it, `Editor.repair`
   does it). `EB_FRONTMATTER` keeps every top-level setting that reads on its own, **byte for byte**,

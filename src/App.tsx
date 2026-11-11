@@ -506,7 +506,7 @@ function usePageChrome({
   file?: string | null;
 }): { themeName: string; scheme: "light" | "dark"; openBrowser(): void; cards: ReactNode } {
   const snapshot = query.get("snapshot") === "1";
-  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
   const [browsing, setBrowsing] = useState(false);
   const settings = useSettingsOpen();
   const feedback = useFeedbackOpen();
@@ -1335,7 +1335,7 @@ function TableApp({
  */
 function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSearchParams; setQuery: SetQuery; list: BoardTree }) {
   const snapshot = query.get("snapshot") === "1";
-  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
   const { boards, folders, notes } = list;
   const [title, setTitle] = useState<string | undefined>(undefined);
   /* Whether the note is a task, as the page holds it — `undefined` for a plain note. */
@@ -1681,14 +1681,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   /* Read only: the selection, the keys that read and a pan stay; everything that writes is
      not drawn, and `useEditor` refuses it underneath. A snapshot is read-only already. */
   const locked = useLocked() && !snapshot;
-  /* `ownTheme` is the reader's own pick, which Settings shows; `themeName` is what is drawn. */
-  const {
-    theme,
-    name: themeName,
-    own: ownTheme,
-    source: themeSource,
-    setName: setTheme,
-  } = useTheme(query.get("theme") ?? undefined, board?.theme, snapshot);
+  const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
 
   /* Whether the board browser is up. Plain state and nothing more: a dialog somebody opened for
      the two seconds it takes to switch boards is not a preference, which is exactly what `SIDEBAR`
@@ -2586,9 +2579,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         {boardSettings && board && !snapshot && !locked ? (
           <BoardSettings
             board={board}
-            themes={THEME_NAMES}
-            themeName={themeName}
-            themeSource={themeSource}
             onMeta={editor.setMeta}
             onClose={() => {
               setBoardSettings(false);
@@ -2663,7 +2653,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         {settings.open && !snapshot ? (
           <Settings
             themes={THEME_NAMES}
-            themeName={ownTheme}
+            themeName={themeName}
             onTheme={chooseTheme}
             boardName={board?.name ?? null}
             list={list}

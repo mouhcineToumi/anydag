@@ -179,13 +179,7 @@ describe("the preference list", () => {
     expect(ACCOUNT_PREF_KEYS.filter((k) => (VAULT_PREF_KEYS as readonly string[]).includes(k))).toEqual([]);
     /* The settings card and the favourites switch with the vault, and how
        the window is laid out does not. */
-    expect([...VAULT_PREF_KEYS].sort()).toEqual([
-      "dag:attachments",
-      "dag:favourites",
-      "dag:own-theme",
-      "dag:theme",
-      "dag:update-links",
-    ]);
+    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:theme", "dag:update-links"]);
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {

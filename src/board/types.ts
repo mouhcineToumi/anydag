@@ -248,7 +248,6 @@ export interface BoardDiagnostic {
 export interface Board {
   name: string;
   title?: string;
-  theme?: string;
   pages: BoardPage[];
   items: BoardItem[];
   /** Every link on the board, from every `edges` fence, in file order. */
