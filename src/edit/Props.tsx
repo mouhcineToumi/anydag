@@ -735,6 +735,7 @@ function PickProps({
   const isMind = type === "mindmap";
   /* Not `bare` — that is a start or end dot, above. */
   const plain = isChart || isMind;
+  /*
    * A sequence participant parses its own line: two strings, `icon=`, `hue=` and `kind=`, and a bare
    * word after them is read as the start of the next statement — so a status or a flag would break
    * the diagram it was set on. It gets the Kind menu its grammar has instead, and no status or flags.

@@ -87,7 +87,7 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | a click on a fragment's tab · its panel's conditions, + else / + and branch, the bin, Unwrap · Delete | the pick · each branch's condition, a new `else` or `and` before `end`, a branch and what is in it, the frame gone and the messages kept · the fragment and everything in it |
 | a double-click on a fragment's tab or a message's label | that branch's condition, or that message's text |
 | a click on a note's tab · its panel's Text and Over | the pick · its words, and the participants it is drawn over |
-| a picked participant's Kind · the item view's Add a participant | `actor`, or `participant` with `kind=store`/`db`/`client`/`external` · `participant participant2 "Participant"` after the last one |
+| the item view's Add a participant | `participant participant2 "Participant"` after the last one (a participant's Kind is the menu in the row above that names one) |
 | alt + that drag | nothing to the body: the whole diagram moves, as any item does |
 | the properties view's Keep in column · Release | `col=` on the pick's line, or off it |
 | the item view's hue, and Hidden and Id under Advanced | `hue=` on an `md`, a note or an image, `hidden`, and `#id` plus every `edges` reference to it (through `/put`) |
@@ -725,8 +725,9 @@ and a sequence can be built from an empty body without the Source tab. The write
   body-level (`setMessageMark(body, line, …)`, `setMessageEnd(body, line, …)`) for that reason.
 - **A participant has no status and no flags.** Its line is two strings, `icon=`, `hue=` and
   `kind=`, and a bare word after them starts the next statement — so those controls would break the
-  diagram they were used on. It has the Kind menu its grammar has instead: `actor` is a head word,
-  the rest are `kind=` values, and the writer decides which to write.
+  diagram they were used on. It has the Kind menu its grammar has instead — `participantKind` and
+  `setParticipantKind` in `restate.ts`, over `kind=` (off when it says what `participant` or `actor`
+  already draws).
 - **Unwrap keeps the messages, Delete does not.** Delete on a picked fragment takes it with
   everything in it, the rule a group's Delete follows; Unwrap is the separate button for "take the
   frame away", for the reason the paragraph on deleting a picked group gives under *Controls on
