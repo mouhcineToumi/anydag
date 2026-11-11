@@ -14,11 +14,14 @@ import { describe, expect, it } from "vitest";
 import { blocksToMd, load, saved, settle, type NoteBlock } from "../src/note/markdown";
 import { parseQuiz } from "../src/quiz/parse";
 import {
+  atQuestion,
   cleanHeading,
   closeFence,
   inputOf,
+  moveQuestion,
   promptLine,
   reidQuestion,
+  removeQuestion,
   renderQuestion,
   replaceQuestion,
   resolveStray,
@@ -95,6 +98,16 @@ describe("repairs", () => {
     const out = reidQuestion(text, 1, () => "qnew");
     expect(out).toBe("## A {#qa}\n- [x] a\n- [ ] b\n\n## B {#qnew multi}\n- [x] c\n- [ ] d\n");
     expect(codes(out)).toEqual([]);
+  });
+
+  it("delete and move the second of two questions sharing an id, not the first", () => {
+    const text = "## A {#qa}\n- [x] a\n- [ ] b\n\n## B {#qa}\n- [x] c\n- [ ] d\n";
+    const prompts = (t: string) => parseQuiz(t).questions.map((q) => q.prompt);
+    expect(prompts(atQuestion(text, 1, removeQuestion))).toEqual(["A"]);
+    expect(prompts(atQuestion(text, 1, (t, id) => moveQuestion(t, id, 0)))).toEqual(["B", "A"]);
+    expect(codes(atQuestion(text, 1, (t, id) => moveQuestion(t, id, 0)))).toEqual([]);
+    /* The first of the pair is found by its id as it is, and nothing else is rewritten. */
+    expect(atQuestion(text, 0, removeQuestion)).toBe(removeQuestion(text, "qa"));
   });
 
   it("take words a heading does not know off it, and multi off an open question", () => {

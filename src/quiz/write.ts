@@ -298,6 +298,22 @@ export function reidQuestion(text: string, index: number, mint: (taken: Readonly
 }
 
 /**
+ * `fn` applied to the question at `index`, by its id. Every writer finds a question by id, so the
+ * second of two sharing one (`EQ_DUPLICATE_ID`) would be found as the first, and a delete or a move
+ * on it would act on the other question. Such a question is given an id of its own first. The text
+ * must be stamped: a question with no id is left as it is.
+ */
+export function atQuestion(text: string, index: number, fn: (text: string, id: string) => string): string {
+  const questions = parseQuiz(text).questions;
+  const id = questions[index]?.id;
+  if (id === undefined) return text;
+  if (questions.findIndex((q) => q.id === id) === index) return fn(text, id);
+  const own = reidQuestion(text, index);
+  const fresh = parseQuiz(own).questions[index]?.id;
+  return fresh === undefined ? text : fn(own, fresh);
+}
+
+/**
  * The text with question `id`'s heading saying only what a heading can — its id, and `multi` where a
  * question has options to choose between (`WQ_UNKNOWN_ATTR`).
  */

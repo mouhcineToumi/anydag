@@ -13,6 +13,7 @@ import {
   mintQuestionId,
   moveQuestion,
   reidQuestion,
+  atQuestion,
   removeQuestion,
   replaceQuestion,
   resolveStray,
@@ -727,7 +728,9 @@ export function QuizEditor({
         {quiz.questions.length === 0 ? <p className="dag-quiz__empty">No questions yet.</p> : null}
         <div className="dag-quiz__list" ref={list}>
           {quiz.questions.map((q, i) => {
-            const key = keyOf(q);
+            /* The second of two sharing an id is keyed by its line, so React keeps two cards apart. */
+            const shared = q.id !== undefined && quiz.questions.findIndex((x) => x.id === q.id) !== i;
+            const key = shared ? `line-${q.line}` : keyOf(q);
             return (
               <QuestionCard
                 key={key}
@@ -740,8 +743,8 @@ export function QuizEditor({
                 shuffle={quiz.shuffle}
                 refused={refused?.key === key ? refused.why : null}
                 onEdit={(input) => write(key, (t, qs) => replaceQuestion(t, idAt(qs, i), { ...input, id: idAt(qs, i) }))}
-                onMove={(to) => write(null, (t, qs) => moveQuestion(t, idAt(qs, i), to))}
-                onRemove={() => write(null, (t, qs) => removeQuestion(t, idAt(qs, i)))}
+                onMove={(to) => write(null, (t) => atQuestion(t, i, (u, id) => moveQuestion(u, id, to)))}
+                onRemove={() => write(null, (t) => atQuestion(t, i, removeQuestion))}
                 onDuplicate={() => {
                   const id = mintQuestionId(new Set(quiz.questions.flatMap((x) => (x.id ? [x.id] : []))));
                   write(null, (t, qs) => addQuestion(t, { ...inputOf(qs[i]!), id }, i + 1));
@@ -754,16 +757,16 @@ export function QuizEditor({
                     case "close-fence":
                       return onChange(closeFence(text, how.line));
                     case "clean":
-                      return write(null, (t, qs) => cleanHeading(t, idAt(qs, i)));
+                      return write(null, (t) => atQuestion(t, i, cleanHeading));
                     case "stray":
-                      return write(null, (t, qs) => resolveStray(t, idAt(qs, i), how.to));
+                      return write(null, (t) => atQuestion(t, i, (u, id) => resolveStray(u, id, how.to)));
                     default:
                       return assertNever(how);
                   }
                 }}
                 onDragStart={(e) =>
                   dragRow(e, e.currentTarget.closest<HTMLElement>(".dag-quiz__card"), cards, (to) =>
-                    write(null, (t, qs) => moveQuestion(t, idAt(qs, i), to)),
+                    write(null, (t) => atQuestion(t, i, (u, id) => moveQuestion(u, id, to))),
                   )
                 }
                 onNext={() => {
