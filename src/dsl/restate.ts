@@ -930,6 +930,26 @@ export function dropHop(line: string): string {
   return cut(line, [from, end]);
 }
 
+/**
+ * Turn a statement round: `a --> b "label"` becomes `b --> a "label"`.
+ *
+ * The two ref lists trade places and everything else stays where it is. The label is written after
+ * the second list and belongs to the segment, not to either end, so it keeps its place. The arrow
+ * keeps its spelling, so a `--|>` still points from the new first end to the new second.
+ *
+ * Only a statement with one arrow. Reversing one hop of a chain would mean splitting the chain, and
+ * reversing a whole chain is a different statement from the one picked. Either way the line is
+ * returned unchanged, which is what the panel reads as "not offered".
+ */
+export function reverseEdge(line: string): string {
+  const e = edgeSpan(line);
+  if (!e || e.arrows.length !== 1) return line;
+  const [a, z] = [e.refs[0]!, e.refs[1]!];
+  const left = line.slice(a.from, a.to);
+  const right = line.slice(z.from, z.to);
+  return line.slice(0, a.from) + right + line.slice(a.to, z.from) + left + line.slice(z.to);
+}
+
 /** Whether `text` is one id or `id.row`, the way the tokenizer reads a word. */
 function isRef(text: string): boolean {
   const t = lineTokens(text);

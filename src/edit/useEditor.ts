@@ -448,6 +448,8 @@ export interface Editor {
   /** The link picked on the canvas, if any. Delete removes it; a click anywhere else clears it. */
   pickedLink: string | null;
   pickLink(id: string | null): void;
+  /** Take one board link out of its `edges` fence: its statement's line goes. */
+  removeLink(id: string): void;
   /**
    * The card, group or lane picked *inside* a diagram, and the edge segment beside it.
    *
@@ -4372,6 +4374,7 @@ export function useEditor({
     openOn,
     pickedLink,
     pickLink,
+    removeLink,
     pickedNode,
     pickedEdge,
     pickNode,

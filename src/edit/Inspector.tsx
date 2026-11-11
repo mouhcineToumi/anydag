@@ -25,6 +25,7 @@ import type { Problem } from "@/ui/problemList";
 
 import { segOf } from "./pick";
 import type { Fix, Repair } from "./repair";
+import { linkEndChoices } from "./linkEnds";
 import { Props, type Subject } from "./Props";
 import type { Editor } from "./useEditor";
 
@@ -94,6 +95,7 @@ export function Inspector({
   boardName,
   pages,
   boardLinks,
+  boardItems,
   problems = [],
   repairOf,
   onRepair,
@@ -104,6 +106,8 @@ export function Inspector({
   pages: BoardPage[];
   /** Every link on the board, so a picked one can be edited where its statement lives. */
   boardLinks: readonly BoardLink[];
+  /** Every item on the board: what a picked link's ends may be moved onto. */
+  boardItems: readonly BoardItem[];
   /**
    * What is wrong with this item, lines counted in the board file. The panel is where they belong
    * while somebody is typing: the dock stays quiet about the item that is open here.
@@ -208,7 +212,10 @@ export function Inspector({
      `edges` fence has one too: it is not a diagram type, and it is still a grammar to look up. */
   const diagram = isDiagramType(item.type);
   const links = isLinkType(item.type);
-  const sheetable = diagram || links;
+  /* A link is changed with the pointer and the panel, never by typing its statement (#145), so its
+     grammar has no sheet to look up. */
+  const sheetable = diagram;
+  const linkEnds = useMemo(() => (links ? linkEndChoices(boardItems, item.page) : undefined), [links, boardItems, item.page]);
   useEffect(() => {
     if (!sheetable || !showSheet) return;
     let live = true;
@@ -297,7 +304,9 @@ export function Inspector({
   const split = isDiagramType(item.type);
   const mode = split ? editor.mode : "source";
   const showFields = !split || mode === "props";
-  const showSource = !split || mode === "source";
+  /* Except an `edges` fence (#145): its statements are the links on the canvas, each one changed by
+     picking it, so the text behind them is the file's and not the person's. */
+  const showSource = !links && (!split || mode === "source");
   const wantLine = subject?.line ?? 0;
   useEffect(() => {
     const el = area.current;
@@ -461,7 +470,14 @@ export function Inspector({
         showItem={showFields}
         onBody={onChange}
         onRenameNode={onRenameNode}
+        linkEnds={linkEnds}
       />
+
+      {links && !subject ? (
+        <p className="dag-inspector__hint" data-dag-links-hint="">
+          Click a link on the canvas to change it, or drag from the edge of a card to draw one.
+        </p>
+      ) : null}
 
       {showSource ? (
         <textarea

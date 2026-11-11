@@ -2,7 +2,8 @@ import { X } from "lucide-react";
 
 import { addEdgeEnd, appendHop, dropHop, edgeEnds, edgeSpan, removeEdgeEnd, setEdgeEnd, type EdgeSide } from "@/dsl/restate";
 
-import { edgeTargets } from "./pick";
+/** What an end may name, in menu sections: a heading and the ids under it. Empty sections are left out. */
+export type EndChoices = readonly (readonly [string, readonly string[]])[];
 
 /**
  * The ends of a picked edge: what it leaves, what it arrives at, and where it goes on from there.
@@ -15,24 +16,22 @@ import { edgeTargets } from "./pick";
  * - **A chain** — `a --> b --> c`. "Then" appends a hop wearing the chain's own arrow, and "Last hop"
  *   takes it off again. Both act on the end of the *statement*, whichever hop is picked, because a
  *   chain has one end and the person who has just carried it on is still looking at the first hop.
- * - **A group or a row** — `workspace --> intake`, `api.content --> store`. Every select offers the
- *   diagram's cards, then its groups, then its rows, because those are the three things an arrow
- *   may name.
+ * - **A group or a row** — `workspace --> intake`, `api.content --> store`. Every select offers what
+ *   the caller hands it in `choices`: for a diagram its cards, then its groups, then its rows; for a
+ *   board link the items on the page, then each diagram's cards as `item.node`.
  *
  * It writes the one line it was handed and nothing else, through the span writers in `restate.ts`
  * — which is also why it renders nothing for a line it cannot read.
  */
 export function EdgeEnds({
-  type,
-  body,
+  choices,
   src,
   seg,
   onLine,
   onOut,
 }: {
-  type: string;
-  /** The diagram's draft body, which is where the candidates are read from. */
-  body: string;
+  /** What each end may name, read by the caller from the draft it is showing. */
+  choices: EndChoices;
   /** The picked statement's line, as it is now. */
   src: string;
   seg: number;
@@ -42,7 +41,7 @@ export function EdgeEnds({
 }) {
   const e = edgeSpan(src);
   if (!e) return null;
-  const all = edgeTargets(type, body);
+  const known = new Set(choices.flatMap(([, ids]) => ids));
   /* The chain's own spelling, from its last arrow: that is where a new hop is added, whichever
      segment is picked — the statement has one end, and it is not necessarily this segment's. */
   const arrow = e.arrows[e.arrows.length - 1]?.value ?? "-->";
@@ -50,15 +49,11 @@ export function EdgeEnds({
 
   const options = (taken: string[], keep?: string) => {
     const free = (ids: string[]) => ids.filter((id) => !taken.includes(id) || id === keep);
-    const groups: [string, string[]][] = [
-      ["Cards", free(all.nodes)],
-      ["Groups", free(all.groups)],
-      ["Rows", free(all.rows)],
-    ];
-    return groups
+    return choices
+      .map(([label, ids]) => [label, free([...ids])] as const)
       .filter(([, ids]) => ids.length > 0)
-      .map(([label, ids]) => (
-        <optgroup key={label} label={label}>
+      .map(([label, ids], i) => (
+        <optgroup key={`${i}:${label}`} label={label}>
           {ids.map((id) => (
             <option key={id} value={id}>
               {id}
@@ -85,7 +80,7 @@ export function EdgeEnds({
             >
               {/* The current id is always offered, even where the diagram does not declare it: a
                   menu that cannot show what the line says would claim the line says something else. */}
-              {[...all.nodes, ...all.groups, ...all.rows].includes(id) ? null : <option value={id}>{id}</option>}
+              {known.has(id) ? null : <option value={id}>{id}</option>}
               {options(ids, id)}
             </select>
             {ids.length > 1 ? (

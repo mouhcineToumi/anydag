@@ -118,7 +118,10 @@ test("K opens the links fence, and makes one where there is none", async ({ page
   await page.locator(".dag-viewport").click({ position: { x: 20, y: 20 } });
   await lead(page, "k");
   await expect(page.locator("[data-dag-inspector]")).toHaveCount(1);
-  await expect(page.locator("[data-dag-body]")).toHaveValue(/who --> stack\.db/);
+  /* The links are changed on the canvas, so the panel says how rather than showing their text
+     (#145) — which is also the end of a letter typed after K landing in the fence's first line. */
+  await expect(page.locator("[data-dag-links-hint]")).toBeVisible();
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
 
   /* On a board with no fence, the same key writes one. */
   fs.writeFileSync(file, BOARD.replace(/```edges[\s\S]*?```\n/, ""));
@@ -229,6 +232,35 @@ test("a link is picked by clicking it, and Delete takes its line out", async ({ 
   await expect(page.locator(".dag-board-edges")).toHaveCount(0);
   /* The fence stays, empty, so the next link has somewhere to go. */
   expect(read()).toContain("```edges");
+});
+
+test("a picked link's panel changes it in words: label, line, ends, reverse, delete", async ({ page }) => {
+  await open(page);
+  await page.locator(".dag-board-edges .dag-edge-hit").click({ force: true });
+  await page.keyboard.press("Enter");
+  const props = page.locator("[data-dag-props]");
+  await expect(props).toBeVisible();
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
+
+  await props.locator("[data-dag-prop-label]").fill("writes");
+  await props.locator("[data-dag-prop-label]").press("Enter");
+  await expect.poll(read).toContain('who --> stack.db "writes"');
+
+  /* The line in words, never the arrow's spelling. */
+  await expect(props.locator("[data-dag-prop-line] option").first()).toHaveText("Arrow");
+  await props.locator("[data-dag-prop-line]").selectOption({ label: "Dashed arrow" });
+  await expect.poll(read).toContain('who -.-> stack.db "writes"');
+
+  /* An end moves onto another card of the same diagram. */
+  await props.locator('[data-dag-prop-end="to:0"]').selectOption("stack.api");
+  await expect.poll(read).toContain('who -.-> stack.api "writes"');
+
+  await props.locator("[data-dag-prop-reverse]").click();
+  await expect.poll(read).toContain('stack.api -.-> who "writes"');
+
+  await props.locator("[data-dag-prop-delete]").click();
+  await expect.poll(read).not.toContain("stack.api -.-> who");
+  await expect(page.locator(".dag-board-edges")).toHaveCount(0);
 });
 
 test("deleting an item takes the links that named it, in one undo, and leaves nothing to report", async ({ page }) => {

@@ -35,7 +35,13 @@ else.
 Five things about the links are load-bearing:
 
 - **`edges` is a fence, not frontmatter**, because a fence is an item: the panel edits it,
-  `applyPatch` writes it, undo covers it, the clipboard carries it. It draws nothing and takes no
+  `applyPatch` writes it, undo covers it, the clipboard carries it. **The panel never shows its
+  text** (#145): a link is picked on the canvas, Enter opens the fence on it, and its controls are
+  the whole of what a person changes — the ends (`EdgeEnds`, fed by `linkEndChoices` in
+  `src/edit/linkEnds.ts`, which offers exactly what `resolveLinks` accepts: the page's items, each
+  diagram's cards as `item.node`, and the board groups), the label and the second one, the line in
+  words (`LINK_LINES` in `Props.tsx`, never an arrow spelling), Reverse (`reverseEdge`, one arrow
+  only) and Delete. With nothing picked the fence says how to pick or draw one. It draws nothing and takes no
   position, which is why `placeItems` and the paper both skip it — the second is not tidiness.
   `ready` waits for every item on the paper to report a measured size, and one that never renders
   never reports, so `data-dag-ready` would never fire and every Playwright check would hang.
