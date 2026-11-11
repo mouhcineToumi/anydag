@@ -210,6 +210,33 @@ export function setWhen(line: string, start: string, end: string | null): string
   return `${m[1]}${start}${end === null ? "" : `${sep}${end}`}${line.slice(m[0].length)}`;
 }
 
+/**
+ * An entry's label, read where `parseTimeline` reads it: the first quoted string after the date or
+ * the range. Not `textSlots` — the tokenizer reads a range's `..` as an arrow, so to it a ranged
+ * entry is an edge with no title at all. A section line is matched by the same pattern (its
+ * `section` is the "date"), and its name is its label.
+ */
+const LABEL = /^(\s*\S+(?:\s*\.\.\s*\S+)?\s+)"([^"]*)"/;
+
+/** The label, or `null` for a line that has none to read. */
+export function labelOf(line: string): string | null {
+  return LABEL.exec(line)?.[2] ?? null;
+}
+
+/**
+ * Write an entry's (or a section's) label, one span in and one out.
+ *
+ * The label is required — `2026` alone is `E_BAD_DATE` — so clearing it writes `""` rather than
+ * taking the string off. The parser reads the label up to the next `"` with no escapes, so a `"`
+ * typed into it is written as `'`: a `\"` would end the label at the backslash. `null` for a line
+ * with no label to rewrite.
+ */
+export function setLabel(line: string, text: string): string | null {
+  const m = LABEL.exec(line);
+  if (!m) return null;
+  return `${m[1]}"${text.replace(/"/g, "'")}"${line.slice(m[0].length)}`;
+}
+
 /* ------------------------------------------------------------------------- choosing a section */
 
 const SECTION = /^\s*section\s+"([^"]*)"/;

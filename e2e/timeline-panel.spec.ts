@@ -126,3 +126,27 @@ test("the status picker offers none, done and wait, each with an icon", async ({
   await page.locator('[data-dag-prop-status-option="none"]').click();
   await expect.poll(read, { timeout: 5_000 }).toContain('  2026-03 .. 2026-06 "Build"\n');
 });
+
+test("a ranged entry offers its title and none of the words the timeline reads past", async ({ page }) => {
+  await open(page);
+  await props(page, "Build");
+
+  /* `parseTimeline` reads an entry's tail for `done` and `wait` only (#156). */
+  for (const hook of [
+    "data-dag-prop-hue",
+    "data-dag-prop-em",
+    "data-dag-prop-meta",
+    "data-dag-prop-icon",
+    "data-dag-prop-flag",
+  ]) {
+    await expect(page.locator(`[${hook}]`)).toHaveCount(0);
+  }
+
+  /* The tokenizer reads `..` as an arrow, so the title is read and written where the parser reads it. */
+  const title = page.locator("[data-dag-prop-title]");
+  await expect(title).toHaveValue("Build");
+  await title.fill("Ship");
+  await title.press("Enter");
+  await expect.poll(read, { timeout: 5_000 }).toContain('  2026-03 .. 2026-06 "Ship" wait\n');
+  await expect(page.locator("[data-dag-error]")).toHaveCount(0);
+});
