@@ -178,8 +178,9 @@ both and tell the person rather than deleting either.
    ```
 
    Three themes: `paper` is the default, `paper-dark` is the dark one, and `neutral` is
-   cool greys and system fonts. `--theme <name>` renders in another; a board can pin one with
-   `theme:` in its frontmatter. They share every metric, so switching costs no re-layout.
+   cool greys and system fonts. `--theme <name>` renders in another. A theme is the reader's
+   setting, never part of a board: a `theme:` in frontmatter is ignored, so do not write one.
+   They share every metric, so switching costs no re-layout.
 4. **Read what it printed.** `anydag snapshot` exits `4` when the board has errors and prints one line per
    diagnostic: a stable code, the line in *your* board file, and a message.
 

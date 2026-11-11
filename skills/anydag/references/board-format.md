@@ -6,7 +6,6 @@ markdown item, so a board reads as a document in an editor and lays out as a boa
 ````md
 ---
 title: HunterOS — the shape of it
-theme: paper          # optional; `neutral` is the other one
 ---
 
 Any prose here becomes a markdown item.
@@ -28,6 +27,11 @@ An optional caption.
 entity workspace { id uuid pk; slug text }
 ```
 ````
+
+**The theme is the reader's, not the board's.** A board's frontmatter may carry `title:` and
+`pages:`, but a `theme:` line is ignored: every board draws in the theme the person chose in
+Settings, and nothing writes a theme into a board. Leave an existing line where it is — an edit
+keeps it byte for byte — and do not add one to a new board.
 
 ## The fence line
 

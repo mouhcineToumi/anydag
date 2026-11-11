@@ -64,9 +64,12 @@ Six things are load-bearing:
   board that way, and a picture of a board must be a fact about the board rather than about whoever
   last opened it on this machine. The guarantee held **by accident** at first, because a fresh
   browser context has empty storage; a person pointing the snapshot script at a persistent profile
-  got their own theme in the picture and nothing said so. `readSettings()` and `useTheme`'s third
-  argument are the mechanism. The query is read *per call*, never cached at module load: `App`
-  rewrites it with `replaceState` as boards and pages are opened.
+  got their own theme in the picture and nothing said so. `readSettings()` and `useTheme`'s second
+  argument are the mechanism. A snapshot is therefore drawn in the app's default theme unless the
+  URL names one with `?theme=`, which is the explicit instruction the snapshot tools pass. The board
+  contributes nothing: a `theme:` in its frontmatter is not read (issue #162). The query is read
+  *per call*, never cached at module load: `App` rewrites it with `replaceState` as boards and pages
+  are opened.
 - **A setting is read at the moment of the gesture, never threaded through `Item`.** `readSettings()`
   is a plain function called inside `onPaste`, `importFiles`, `exportAs` and the toolbar's per-item PNG.
   `useSettings()` — a `useSyncExternalStore` over a `dag:settings` window event — exists for the two
@@ -88,9 +91,12 @@ Six things are load-bearing:
   every frame but the first. **And only a paste is**: an image imported or dropped from the computer
   is an attachment, kept exactly as it was uploaded, and the placement rule decides only its `w=`.
 - **The theme `<select>` became the gear** — net zero in a row that was thinned deliberately. The
-  theme keeps its own `dag:theme` key and its three sources in the same order (`?theme=` beats the stored
-  choice beats the board's `theme:` beats the default): it is the one preference with a third source
-  and its own test, and folding it into the object would be a migration for a key that is not wrong.
+  theme keeps its own `dag:theme` key and its two sources in the same order (`?theme=` beats the stored
+  choice, then the default): it is the one preference with an explicit URL source and its own test,
+  and folding it into the object would be a migration for a key that is not wrong. **A board is not a
+  third source.** Its `theme:` was one until issue #162, which made a document able to override the
+  person reading it and the same vault look different board to board; the line is still parsed as
+  ordinary frontmatter and left in the file untouched, and nothing reads it or writes it.
   Choosing a theme while a `?theme=` is present clears the query key, because choosing now is choosing.
 - **The modal takes focus and owns its own Escape.** `typing()` in `useEditor` counts a focused
   `BUTTON`, `SELECT` or `INPUT` as somebody typing and leaves the keys alone — correctly — so the
@@ -139,7 +145,8 @@ dialog and the welcome card all read it.
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);
 a config file the server reads (it would put a person's preference into every visual baseline, and
 `src/board/` could not read one anyway); per-board settings (the file already says what it can, in
-frontmatter and in `w=`); un-embedding the fonts from an export (the layout was measured against the
+frontmatter and in `w=`, and a theme is not one of them — it is the reader's, see *Settings* above);
+un-embedding the fonts from an export (the layout was measured against the
 theme's face, so a file without it is a different diagram); and the window keys — the library and
 the inspector's mode and width — which each have a control where they act. (There were five; the
 board list's went with the column.)

@@ -126,7 +126,7 @@ function OwnerEnd({ id, edit }: { id?: string | null; edit: string }) {
 }
 
 function Missing({ what }: { what: string }) {
-  useTheme(undefined, undefined, true);
+  useTheme(undefined, true);
   return (
     <div className="dag-app dag-app--view" data-dag-view="missing">
       <p className="dag-view-missing">Nothing to show: {what}.</p>
@@ -156,7 +156,7 @@ function BoardPage({ name }: { name: string }) {
 function BoardFrame({ board, bar }: { board: Board | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
   const [page, setPage] = useState<string | null>(query.get("page"));
-  const { theme } = useTheme(query.get("theme") ?? undefined, board?.theme, query.get("snapshot") === "1");
+  const { theme } = useTheme(query.get("theme") ?? undefined, query.get("snapshot") === "1");
   const viewport = useRef<ViewportHandle>(null);
 
   const shown = page && board?.pages.some((p) => p.id === page) ? page : (board?.pages[0]?.id ?? "page-1");
@@ -238,7 +238,7 @@ function NotePage({ name }: { name: string }) {
  */
 function NoteFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
-  useTheme(query.get("theme") ?? undefined, undefined, query.get("snapshot") === "1");
+  useTheme(query.get("theme") ?? undefined, query.get("snapshot") === "1");
 
   /* The same signal a board raises when it is drawn, so a snapshot of a view waits on one thing. */
   useEffect(() => {
@@ -342,7 +342,7 @@ function FileFrame({
   bar: ReactNode;
 }) {
   const query = new URLSearchParams(location.search);
-  useTheme(query.get("theme") ?? undefined, undefined, query.get("snapshot") === "1");
+  useTheme(query.get("theme") ?? undefined, query.get("snapshot") === "1");
   return (
     <div className="dag-app dag-app--file dag-app--view" data-dag-view="file">
       {bar}
@@ -407,7 +407,7 @@ function QuizPage({ name }: { name: string }) {
 function QuizFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
   const snapshot = query.get("snapshot") === "1";
-  useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  useTheme(query.get("theme") ?? undefined, snapshot);
 
   /* Ready once drawn: its equations and the boards embedded in it. */
   const root = useRef<HTMLDivElement>(null);

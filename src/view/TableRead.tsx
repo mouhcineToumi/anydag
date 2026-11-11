@@ -241,7 +241,7 @@ export function tablePart(part: string | null | undefined): { tab?: string; row?
 export function TableFrame({ name, text, bar }: { name: string; text: string | null; bar: ReactNode }) {
   const query = new URLSearchParams(location.search);
   const snapshot = query.get("snapshot") === "1";
-  useTheme(query.get("theme") ?? undefined, undefined, snapshot);
+  useTheme(query.get("theme") ?? undefined, snapshot);
   const table = useMemo(() => (text === null ? null : parseTable(text)), [text]);
   const target = useMemo(() => tablePart(decodeURIComponent(location.hash.slice(1))), []);
   const [tab, setTab] = useState<string | null>(query.get("tab") ?? target.tab ?? null);

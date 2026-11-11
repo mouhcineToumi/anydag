@@ -19,6 +19,7 @@ const DIR = BOARDS;
 
 const BOARD = `---
 title: Settings scratch
+theme: paper-dark
 ---
 
 \`\`\`md {#one x=0 y=0 w=320}
@@ -183,7 +184,7 @@ test("a tab's reset puts back what that tab shows, and nothing on another tab", 
   await expect(page.locator("[data-dag-setting-paste-size]")).toHaveValue("screen");
   /* The fixed-width field is only there for the rule that uses it. */
   await expect(page.locator("[data-dag-setting-paste-width]")).toHaveCount(0);
-  /* The theme is its own key, with a third source — a board's frontmatter — and its own test. */
+  /* The theme is its own key, with its own sources and its own test; a board is not one of them. */
   await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("neutral");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 
@@ -192,6 +193,29 @@ test("a tab's reset puts back what that tab shows, and nothing on another tab", 
   await expect(page.locator("[data-dag-setting-export-scale]")).toHaveValue("4");
   await page.locator("[data-dag-setting-reset]").click();
   await expect(page.locator("[data-dag-setting-export-scale]")).toHaveValue("2");
+});
+
+test("a board's theme: changes nothing; the reader's choice and the snapshot default do", async ({ page }) => {
+  /* The fixture carries `theme: paper-dark`; the app's default is paper. */
+  await open(page);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
+  /* Opening it wrote nothing. */
+  expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
+
+  /* The reader's own choice is what draws the board now. */
+  await openSettings(page, "preferences");
+  await page.locator("[data-dag-setting-theme]").selectOption("neutral");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
+
+  /* A snapshot reads no preference, and the board still contributes nothing: the default. */
+  await page.goto(`/?board=${name}&snapshot=1`);
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
+
+  /* `?theme=` is an explicit instruction and still wins: `snapshot.mjs --theme` is that. */
+  await page.goto(`/?board=${name}&theme=neutral&snapshot=1`);
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 });
 
 test("the arrow keys walk the tabs across both groups, and the last tab is where it opens next", async ({ page }) => {
