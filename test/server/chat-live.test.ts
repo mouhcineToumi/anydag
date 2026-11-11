@@ -162,6 +162,20 @@ describe("a turn", () => {
     expect((await api("GET", "/__board/chats?all=1")).json.chats).toHaveLength(1);
   });
 
+  it("lists every open vault's chats, and opens one by id from a page in another vault", async () => {
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-other-"));
+    temps.push(other);
+    const v2 = session.openFolder(other).id;
+    const chat = await newChat({ vault: v2 });
+
+    const all = (await api("GET", "/__board/chats?all=1")).json.chats as { id: string; vault: string }[];
+    expect(all.find((r) => r.id === chat.id)?.vault).toBe(v2);
+    /* This page names its own vault, as every tab does; the chat is still found by its id. */
+    const read = await api("GET", `/__board/chat?id=${chat.id}&vault=${encodeURIComponent(env.vault.id)}`);
+    expect(read.status).toBe(200);
+    expect(read.json.vault).toBe(v2);
+  });
+
   it("refuses a second turn while one is running, and stops one", async () => {
     const chat = await newChat();
     const ended = new Promise<Turn>((resolve) => assistant.listen(chat.id, (e) => e.type === "end" && resolve(e.turn)));
