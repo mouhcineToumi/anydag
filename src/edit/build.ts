@@ -2,8 +2,8 @@ import { framed, resizeOf, type BoardItem, type ItemType } from "@/board/types";
 import { declaredAt } from "@/dsl/declared";
 import { parseItem } from "@/dsl/diagnose";
 import type { Graph, Node } from "@/dsl/ir";
-import { hasGraph, kindsOf } from "@/dsl/parse";
-import { replaceLine, setGeometry, statementSpan } from "@/dsl/restate";
+import { containersOf, hasGraph, kindsOf } from "@/dsl/parse";
+import { replaceLine, setGeometry, statementSpan, type Geometry } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
 
 import type { Side } from "./connect";
@@ -58,6 +58,14 @@ function kindWordOf(line: string): string | null {
 
 const indentOf = (line: string): string => /^[ \t]*/.exec(line)![0]!;
 
+/** The two words for a pseudostate, in the dialects that have them — `state` and `activity`. */
+export type Pseudo = "start" | "end";
+
+/** Whether this dialect can declare a start or an end state of its own. */
+export const hasPseudo = (type: string): boolean => kindsOf(type).includes("start") && kindsOf(type).includes("end");
+
+const isPseudo = (word: string): word is Pseudo => word === "start" || word === "end";
+
 export interface GrowOpts {
   /** Which handle was pulled: it decides which way the edge points, and where a fixed card lands. */
   side: Side;
@@ -72,6 +80,14 @@ export interface GrowOpts {
   edge: boolean;
   /** Where the new card goes, in a fence whose coordinates are the author's. */
   at?: { x: number; y: number };
+  /**
+   * Grow a start or an end state instead of a copy of the picked card.
+   *
+   * It also decides which way the edge points, whatever `side` says: a start state is where the
+   * flow comes from and an end state is where it goes, and an arrow the wrong way round would be a
+   * diagram that begins at its ending.
+   */
+  pseudo?: Pseudo;
 }
 
 /**
@@ -91,6 +107,7 @@ export interface GrowOpts {
  * write a statement in a grammar that does not have it.
  */
 export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, from: string, opts: GrowOpts): Grown | null {
+  if (opts.pseudo && !hasPseudo(type)) return null;
   const line = declaredAt(type, body, from, dir);
   if (line === null) return null;
 
@@ -100,8 +117,13 @@ export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, f
   const kind = kindWordOf(stmt);
   if (!kind) return null;
 
-  const id = freshNodeId(body, kind);
-  let text = `${indentOf(stmt)}${kind} ${id} ${JSON.stringify(`New ${kind}`)}`;
+  /* Growing from a start or an end state grows a real card: a second dot beside the first is never
+     what the `+` on one was pressed for. `kindsOf` lists the real kinds first, so the first one that
+     is not a pseudostate is the dialect's own word for a card. */
+  const word = opts.pseudo ?? (isPseudo(kind) ? (kindsOf(type).find((k) => !isPseudo(k)) ?? kind) : kind);
+  const id = freshNodeId(body, word);
+  /* A pseudostate draws no text, so it is declared with none — `start start2`, the way `fork f2` is. */
+  let text = `${indentOf(stmt)}${word} ${id}${isPseudo(word) ? "" : ` ${JSON.stringify(`New ${word}`)}`}`;
   if (opts.at) text = setGeometry(text, opts.at);
 
   const span = statementSpan(body, line);
@@ -111,8 +133,11 @@ export function grow(type: string, body: string, dir: "LR" | "TB" | undefined, f
 
   /* East and south grow *forward*, so the picked card is the source; west and north grow back
      towards it. A reader follows an arrow the way they read the page, and a `+` on the left hand
-     side that drew a line pointing right would be an arrow through the card it came from. */
-  const statement = opts.side === "w" || opts.side === "n" ? `${id} --> ${from}` : `${from} --> ${id}`;
+     side that drew a line pointing right would be an arrow through the card it came from. A start
+     state is the exception on both counts: it always points at the card, and an end state is always
+     pointed at. */
+  const back = opts.pseudo ? opts.pseudo === "start" : opts.side === "w" || opts.side === "n";
+  const statement = back ? `${id} --> ${from}` : `${from} --> ${id}`;
   return { body: appendEdge(out.join("\n"), statement), id };
 }
 
@@ -130,6 +155,88 @@ export function appendEdge(body: string, statement: string): string {
   const runOn = tokenize(last, []).some((t) => t.kind === "arrow");
   if (last.trim() === "") return `${statement}`;
   return [...lines, ...(runOn ? [] : [""]), statement].join("\n");
+}
+
+/** What a wrap needs to know: which word opens the container, and which line is wrapped. */
+export interface WrapPlan {
+  word: "group" | "system" | "lane";
+  /** 1-based, in the body: the declaration of the picked card, group or lane. */
+  line: number;
+  /** The picked thing's own container, so a fixed fence can write the new box against it. */
+  parent: string | undefined;
+}
+
+/**
+ * Whether the picked card, group or lane can be wrapped in a new container, and in which.
+ *
+ * **The word is the dialect's, never a choice.** `flow` and `activity` draw swimlanes with a layout
+ * of their own, so what wraps there is a `lane`. `usecase` and `c4` have `system`, and a box drawn
+ * round use cases or containers there is almost always the system's boundary, so a wrap writes
+ * `system` (the Shape control turns it into a plain `group`). Every other dialect has `group`.
+ *
+ * Refused where the result would be a statement the grammar reads differently from what was asked:
+ *
+ * - **A lane inside a lane**, or a lane round a group, or a group in a diagram that has lanes. A file
+ *   uses groups or lanes, not both (`docs/dsl/common.md`), and a band nested in a band is not
+ *   something the lane layout draws.
+ * - **A line that is not the picked thing's own.** The parser says a card inside a one-line lane
+ *   (`lane r "R" { step a "A" }`) is declared on the lane's line, and wrapping *that* line would wrap
+ *   the lane while the panel says it wrapped the card. A legacy `[*]` is declared on an edge for
+ *   the same reason — it has no statement of its own to put inside anything.
+ * - **A body that does not parse clean**, the bar every writer here holds.
+ */
+export function wrapPlan(item: Pick<BoardItem, "type" | "body" | "dir" | "aspect" | "layout">, id: string): WrapPlan | null {
+  const containers = containersOf(item.type);
+  if (containers.length === 0 || kindsOf(item.type).length === 0) return null;
+  const g = parseItem(item);
+  if (!g || g.kind !== "graph" || g.diagnostics.some((d) => d.severity === "error")) return null;
+
+  const node = g.nodes.find((n) => n.id === id);
+  const group = node ? undefined : g.groups.find((x) => x.id === id);
+  const lane = node || group ? undefined : g.lanes.find((x) => x.id === id);
+  const subject = node ?? group ?? lane;
+  if (!subject) return null;
+
+  const word = containers.includes("lane") ? "lane" : containers.includes("system") ? "system" : "group";
+  if (word === "lane" && (lane || node?.lane || g.groups.length > 0)) return null;
+  if (word !== "lane" && g.lanes.length > 0) return null;
+
+  const line = declaredAt(item.type, item.body, id, item.dir);
+  if (line === null || line !== subject.line) return null;
+  const head = tokenize(item.body.split("\n")[line - 1] ?? "", []).filter((t) => t.kind !== "sep" && t.kind !== "eof");
+  if (head[0]?.kind !== "word" || head[1]?.kind !== "word" || head[1].value !== id) return null;
+  if (head.some((t) => t.kind === "arrow")) return null;
+
+  return { word, line, parent: node ? node.group : group?.parent };
+}
+
+/**
+ * The new container's box, for a fence whose coordinates are the author's — a `sketch`, or any
+ * `layout=fixed` fence.
+ *
+ * There a container carries its own `x= y= w= h=` and its children are written against its origin,
+ * so a wrap that wrote only the word would put the card in a container with no box. This one
+ * is `pad` clear of the picked box on every side, and the wrapped statement moves to `(pad, pad)`
+ * inside it: the card stays exactly where it was drawn, and the container appears round it.
+ *
+ * `corner` is where the new box's top-left is in the layout's numbers, for {@link frameShift} —
+ * a fixed layout draws the frame's corner at the origin, so a container reaching past the old
+ * corner would slide the drawing the other way unless the item moves by the same amount.
+ *
+ * `null` when the layout has not published a box for the thing, which is "not laid out yet" and
+ * the one case where there is nothing honest to write.
+ */
+export function wrapGeometry(
+  laid: LaidOut,
+  id: string,
+  parent: string | undefined,
+  pad: number,
+): { box: Geometry; at: { x: number; y: number }; corner: { x: number; y: number } } | null {
+  const b = laid.nodes[id] ?? laid.groups[id];
+  if (!b) return null;
+  const corner = { x: b.x - pad, y: b.y - pad };
+  const at = fileAt(laid, corner, parent);
+  return { box: { ...at, w: b.w + pad * 2, h: b.h + pad * 2 }, at: { x: pad, y: pad }, corner };
 }
 
 /** One box as the layout placed it, in the diagram's own coordinates. */

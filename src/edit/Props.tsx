@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, CornerUpLeft, Plus, Trash2 } from "lucide-react";
 
-import { isDiagramType, isLinkType, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
+import { isDiagramType, isLinkType, resizeOf, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
 import { HUE_ORDER, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
-import { descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
+import { containersOf, descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
 import { PARTICIPANT_KINDS } from "@/dsl/sequence";
 import {
   edgeSpan,
@@ -17,6 +17,7 @@ import {
   setChartFlag,
   setChartForm,
   setChartOption,
+  setContainer,
   setDesc,
   setEdgeArrow,
   setEdgeFlag,
@@ -38,6 +39,7 @@ import {
   updateRetired,
   valuesText,
   addRow as writeRow,
+  type ContainerWord,
   type Flag,
   type ModifierKey,
 } from "@/dsl/restate";
@@ -46,7 +48,7 @@ import { ARROWS, tokenize } from "@/dsl/tokenizer";
 
 import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
 
-import { detachable, loneNode } from "./build";
+import { detachable, hasPseudo, loneNode, wrapPlan, type Pseudo } from "./build";
 import { REFUSAL, layered } from "./drag";
 import { EdgeEnds } from "./EdgeEnds";
 import { IconPicker } from "./IconPicker";
@@ -151,6 +153,10 @@ export function Props({
     [item.type, item.dir, item.aspect, item.layout, body],
   );
   if (subject) {
+    /* Asked of the *draft*, which is what the person is looking at; `wrapPicked` asks again of the
+       file at the moment of the click, so a draft that is a quarter of a second ahead is refused
+       there rather than written wrong. */
+    const wrap = subject.what === "edge" || subject.link ? null : wrapPlan({ ...item, body }, subject.id);
     /* `pickNode(item, null)` is how a pick is let go: it clears the node, the edge and the board
        link in one, which is what Escape does one layer up. */
     return (
@@ -159,6 +165,9 @@ export function Props({
         layout={item.layout}
         body={body}
         subject={subject}
+        wrap={wrap?.word ?? null}
+        onWrap={() => editor.wrapPicked()}
+        onPseudo={(kind) => editor.growPseudo(kind)}
         /* Read every render, like the pick's own ring: the layout's answer lives on the page and
            there is no signal from inside a memoised, asynchronously laid out subtree to depend on.
            One `querySelector` is cheaper than inventing one — the argument `paint()` already makes. */
@@ -486,15 +495,22 @@ function PickProps({
   layout,
   body,
   subject,
+  wrap,
   column,
   retired,
   onBody,
+  onWrap,
+  onPseudo,
   onOut,
 }: {
   type: string;
   layout?: "fixed";
   body: string;
   subject: Subject;
+  /** The word the picked thing could be wrapped in, or `null` where it cannot be — see `wrapPlan`. */
+  wrap: "group" | "system" | "lane" | null;
+  onWrap(): void;
+  onPseudo(kind: Pseudo): void;
   /** The layer the layout put this card in, if it is the kind of diagram that has layers. */
   column: number | null;
   /** The body lines the parser read a retired flag on, so the picked line can offer to drop its own. */
@@ -592,6 +608,8 @@ function PickProps({
 
   const kinds = kindsOf(type);
   const kind = kindOf(src, kinds);
+  /* The word the line opens with, whatever `kind=` says: what tells a `group` from a `system`. */
+  const first = /^\s*([A-Za-z0-9_-]+)\s/.exec(src)?.[1] ?? "";
   const isNode = what === "node";
   /* A sequence participant has no kind word to choose — `kind=` is how it is told apart — so it
      gets a menu of its own, written the way the parser reads it. `null` for any other statement. */
@@ -600,8 +618,12 @@ function PickProps({
      a group and a frame each have a box of their own to size. Elsewhere only a card's width is
      the author's to give: ELK decides everything else, and a height or a group's box written there
      is read and then ignored. A stroke's box is its points' bounds and is written only by a resize. */
+  /* A start or an end state is a dot and a ring: it has no text, colour, icon, status or size to choose,
+     so offering them would be offering writes the drawing ignores. Kind stays — it is how one
+     becomes the other, or a real state. */
+  const bare = isNode && hasPseudo(type) && (kind === "start" || kind === "end");
   const placed = type === "sketch" || layout === "fixed";
-  const sizable = kinds.length > 0 && kind !== "ink" && (isNode || (what === "group" && placed));
+  const sizable = kinds.length > 0 && kind !== "ink" && !bare && (isNode || (what === "group" && placed));
   const retiredHere = retired.includes(line) ? retiredOn(src) : [];
   /*
    * A chart statement is `<kind> <id> "Label" <values…>`, so every writer above already fits it —
@@ -673,28 +695,32 @@ function PickProps({
           </label>
         ) : null}
 
-        <Field
-          label={isChart ? "Label" : "Title"}
-          hook="data-dag-prop-title"
-          value={type === "mindmap" ? src.replace(/^[ \t]*(root\s+)?/, "") : slot(0)}
-          placeholder={id}
-          onSet={(v) => {
-            /* A mindmap line *is* its title — indentation is the grammar and there is no id to
-               hang a string off — so clearing it would leave a blank line where a statement was.
-               Everywhere else an empty box means the title comes off, which the grammar can say. */
-            const t = v.trim();
-            if (type === "mindmap" && t === "") return;
-            write(setTitle(src, t || null, type));
-          }}
-        />
+        {bare ? null : (
+          <Field
+            label={isChart ? "Label" : "Title"}
+            hook="data-dag-prop-title"
+            value={type === "mindmap" ? src.replace(/^[ \t]*(root\s+)?/, "") : slot(0)}
+            placeholder={id}
+            onSet={(v) => {
+              /* A mindmap line *is* its title — indentation is the grammar and there is no id to
+                 hang a string off — so clearing it would leave a blank line where a statement was.
+                 Everywhere else an empty box means the title comes off, which the grammar can say. */
+              const t = v.trim();
+              if (type === "mindmap" && t === "") return;
+              write(setTitle(src, t || null, type));
+            }}
+          />
+        )}
 
         {/* Colour and text style, directly after the kind and the name: what a person
             reaching into a card wants first. The strings and the values below are the thing's own
             content — not chrome — so they keep their place, and keep it *under* these. */}
-        <Hues hue={hue} onSet={(h) => mod("hue", h)} />
-        {isNode && !isChart && kindsOf(type).length > 0 ? <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} /> : null}
+        {bare ? null : <Hues hue={hue} onSet={(h) => mod("hue", h)} />}
+        {isNode && !isChart && !bare && kindsOf(type).length > 0 ? (
+          <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} />
+        ) : null}
 
-        {type === "mindmap" || isChart || descAt === 1 ? null : (
+        {type === "mindmap" || isChart || bare || descAt === 1 ? null : (
           <Field
             label={what === "group" ? "Sublabel" : "Meta"}
             hook="data-dag-prop-meta"
@@ -702,6 +728,22 @@ function PickProps({
             onSet={(v) => write(setMeta(src, v.trim() || null))}
           />
         )}
+        {/* A boundary's own two choices, which are the only things about a container that are not
+            its name, its colour or what is in it. Read off the *line*, as the hue is. */}
+        {what === "group" && containersOf(type).includes("system") && (first === "group" || first === "system") ? (
+          <label className="dag-field dag-field--row">
+            <span>Shape</span>
+            <select
+              className="dag-select"
+              data-dag-prop-shape=""
+              value={first}
+              onChange={(e) => write(setContainer(src, e.target.value as ContainerWord))}
+            >
+              <option value="group">group</option>
+              <option value="system">system</option>
+            </select>
+          </label>
+        ) : null}
         {/* The data itself, which is the whole reason this dialect exists. */}
         {isChart ? (
           <ValuesField
@@ -725,7 +767,7 @@ function PickProps({
           position a chart reads its values from, so `done` on a `series` line is `E_CHART_VALUE` —
           the control would break the chart it was used on. An icon merely does nothing there: it
           parses and is checked, and a series is named by its swatch. */}
-      {isChart ? null : (
+      {isChart || bare ? null : (
         <div className="dag-props__row">
           <select
             className="dag-select dag-props__status"
@@ -746,7 +788,7 @@ function PickProps({
       {/* The picker writes through the same `mod` the input did — one span in, one span out, the
           author's spacing and comments untouched — and is keyed to the pick so a change of card
           re-reads its mode and text from the line. */}
-      {!isChart && isNode ? (
+      {!isChart && !bare && isNode ? (
         <IconPicker
           key={`${id}:${line}`}
           value={icon}
@@ -756,7 +798,7 @@ function PickProps({
         />
       ) : null}
 
-      {isNode && !isChart ? (
+      {isNode && !isChart && !bare ? (
         <div className="dag-props__row" role="group" aria-label="Flags">
           {NODE_FLAGS.map(({ flag, label }) => (
             <label key={flag} className="dag-field dag-field--row">
@@ -798,8 +840,9 @@ function PickProps({
       ) : null}
 
       {/* A group's own direction: `dir=` on its line, which sets the way *its* members run and
-          nothing about the diagram's. Meaningless where the author places everything. */}
-      {what === "group" && kinds.length > 0 && !placed ? (
+          nothing about the diagram's. Meaningless where the author places everything, and in the
+          layouts that are not ELK's, which have no container to run anything through. */}
+      {what === "group" && kinds.length > 0 && !placed && resizeOf(type as BoardItem["type"]) === "aspect" ? (
         <label className="dag-field dag-field--row">
           <span>Direction</span>
           <select
@@ -830,6 +873,29 @@ function PickProps({
       {REFUSAL[type] ? <p className="dag-field__hint">{REFUSAL[type]}</p> : null}
 
       {isNode && hasRows(type) ? <Rows type={type} body={body} line={line} onBody={onBody} /> : null}
+
+      {/* Structure, which is what a person who has built a few cards comes back to the panel for:
+          put this inside a boundary, or give the flow a beginning and an end. Each is the one
+          writer `+` and ctrl+G stand on, as a button that says what it will write. */}
+      {wrap || (isNode && hasPseudo(type) && kind !== "start" && kind !== "end") ? (
+        <div className="dag-props__row" role="group" aria-label="Structure">
+          {wrap ? (
+            <button type="button" className="dag-props__add" data-dag-prop-wrap={wrap} onClick={onWrap}>
+              Wrap in {wrap === "lane" ? "a lane" : wrap === "system" ? "a system" : "a group"}
+            </button>
+          ) : null}
+          {isNode && hasPseudo(type) && kind !== "start" && kind !== "end" ? (
+            <>
+              <button type="button" className="dag-props__add" data-dag-prop-pseudo="start" onClick={() => onPseudo("start")}>
+                Add start
+              </button>
+              <button type="button" className="dag-props__add" data-dag-prop-pseudo="end" onClick={() => onPseudo("end")}>
+                Add end
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

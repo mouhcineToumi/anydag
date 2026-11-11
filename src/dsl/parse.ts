@@ -88,6 +88,21 @@ export function descriptionSlot(type: string, word: string, strings: number): 1 
 }
 
 /**
+ * The words that open a container in this dialect, in the order the grammar lists them: `group`
+ * everywhere there is one, `system` as well in `usecase` and `c4`, `frame` as well in `sketch`, and
+ * `lane` in the two that have bands. Empty for a dialect with no brace containers — a mindmap, a
+ * timeline, a gitgraph, a sequence and a chart nest by position, not by brace.
+ *
+ * Read off the dialect rather than listed beside it, for the reason `kindsOf` is: the control that
+ * offers a word and the parser that rejects it cannot then disagree.
+ */
+export function containersOf(type: string): string[] {
+  const dialect = DIALECTS[type as DiagramType];
+  if (!dialect) return [];
+  return [...(dialect.groupWords ?? ["group"]), ...(dialect.lanes ? ["lane"] : [])];
+}
+
+/**
  * Whether a node in this dialect can carry rows — the `{ … }` block under a declaration.
  *
  * `Dialect.row` is the row grammar, and its absence is what "this dialect has no rows" means; a

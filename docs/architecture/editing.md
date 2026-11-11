@@ -66,6 +66,10 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | the item view's Form, Stacked, Horizontal, Legend, Value labels, Unit, Min, Max, Categories | one statement of the chart's own body, written where there is none and taken away when it is emptied |
 | a double-click on a card, a group, a band, an edge label, or a chart's legend row or wedge share | that one name, through `setTitle` or `setEdgeLabel` — Enter commits, Escape reverts |
 | the `+` on a picked card | `<kind> <fresh> "New <kind>"` after the picked statement, in its block, plus the edge — one commit |
+| the properties view's Wrap in a group / a lane, on a picked card, group or lane | that statement and its `{ }` block moved one level in, under a new `group <id> "Group" {` — a `lane` in `flow` and `activity`, a `system` in `usecase` and `c4` — and the rename open on it; in a fixed fence the container also gets its own `x= y= w= h=` and the card its place inside it |
+| the properties view's Shape, on a picked group in `usecase` or `c4` | the line's first word, `group` or `system` |
+| the properties view's Add start · Add end, on a picked card in `state` or `activity` | `start <id>` (or `end <id>`) after the picked statement, in its block, plus `<id> --> picked` (or `picked --> <id>`) — one commit |
+| the library's Start · End (`state`, `activity`) · its Group (`erd`, `class`, `state`) | a `start <id>` / `end <id>` statement, or a `group` holding one card, appended to the diagram |
 | a round handle on a picked card, dropped on another card in the same diagram | `a --> b` appended to that diagram's body, never to `edges` |
 | the same drop on a card's row, or on a group's boundary | `a --> card.row` · `a --> group` in the diagram's body; across two items it names the whole card, which is all an `edges` fence can say |
 | the same drop with shift held · with alt held | folded into a statement that is there — `a --> c` and a drop from `b` onto `c` is `a & b --> c`; `f --> a` and a drop from `f` onto `b` is `f --> a & b` · carried on, `a --> b` from `b` onto `c` is `a --> b --> c`; with nothing to join, the plain edge |
@@ -357,6 +361,37 @@ picked *line*, not out of the IR, because the IR holds the renderer's kind and s
 one of those — `store` and `db` are both a cylinder, and growing a `db` should write `db`. One
 commit, so one ctrl+Z takes back the card and its edge together; two would make undo mean "leave a
 card nothing points at". Then the new card is picked and the rename opens on it.
+
+**Wrap is a statement writer too, and it is gated by what the grammar can say.** `wrapStatement` in
+`src/dsl/restate.ts` takes a statement and the `{ }` block it opens, indents them two spaces and puts a
+container line above and a `}` below; edges are not touched, because they name ids and no id changed.
+`wrapPlan` in `build.ts` is the gate and picks the word — `lane` in the two dialects that draw
+swimlanes, `group` in every other one that has containers (`containersOf(type)`, read off the dialect so
+the button and the parser cannot disagree) — and refuses where the result would not mean what was
+asked: a lane in a lane, a lane round a group, a group in a body with lanes (a file uses groups *or*
+lanes), a card on the same line as another statement (`lane r "R" { step a "A" }` declares `a` on the
+lane's line, and wrapping that line wraps the lane), a legacy `[*]` (declared on an edge), and a body
+that does not parse clean. `usecase` and `c4` wrap in a `group` as everywhere else; the Shape control
+on the new container is how it becomes a `system`, which keeps a wrap one gesture with one word.
+
+**A fixed fence's container carries its own box.** There the layout does not place a container round
+what is in it, so `wrapGeometry` reads the picked box off `data-dag-layout`, draws the container one
+`gridRef × 2` clear of it, and writes the card at that padding inside it — the card does not move, the
+container appears round it. It is the `+`'s three steps over again, for the same reasons: pin what is
+unplaced first, write in the file's numbers (`fileAt`, relative to the card's own container), and move
+the item by what the new corner took from the frame's (`frameShift`).
+
+**Start and end states are declared, not only written as `[*]`.** `start <id>` and `end <id>` are kind
+words in `state` and `activity` (`kinds` in the dialect, so the Kind menu offers them and `E_UNKNOWN_KIND`
+lists them). A `[*]` is only ever written *inside* an edge, so there is nothing for a handle to end on
+until the edge exists and nothing for the library to drop; a declared one has an id, which is all the
+connect handle, `+` and the library atom need. Both spellings draw the same dot and ring, and one
+`end` can take several edges, which `[*]` cannot (each mention is its own bullseye). They take no
+title (`parseNode` leaves it empty, as for a figure), so the panel hides the text, colour, icon, status
+and flag controls on one. `grow(…, { pseudo })` writes one off a picked card — a start state pointing at
+it, an end state pointed at, whichever handle asked — and a `+` from a start or end state grows a real
+card, never a second dot. A legacy `[*]` is still not pickable as its own statement (its "declaration"
+is the edge line), so it has no Wrap and no Delete of its own; removing one is deleting its edge.
 
 **In a fixed fence the coordinate is the placement, so the edge is a separate claim only a drag
 makes.** Everywhere else the edge *is* the placement — ELK has no reason to put an unconnected card

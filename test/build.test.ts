@@ -11,9 +11,12 @@ import {
   freshNodeId,
   grow,
   growable,
+  hasPseudo,
   pinUnplaced,
   scaleFixed,
   soleCard,
+  wrapGeometry,
+  wrapPlan,
   type LaidOut,
 } from "../src/edit/build";
 import { parseDiagram } from "../src/dsl/parse";
@@ -464,5 +467,161 @@ describe("rowLines", () => {
       { line: 1, text: "id uuid pk", nth: 0 },
       { line: 1, text: "slug text", nth: 1 },
     ]);
+  });
+});
+
+describe("start and end states", () => {
+  const STATE = `state draft "Draft"\nstate live "Live"\n\ndraft --> live "publish"`;
+
+  it("are declared with an id, in state and in activity only", () => {
+    expect(hasPseudo("state")).toBe(true);
+    expect(hasPseudo("activity")).toBe(true);
+    for (const t of ["flow", "arch", "erd", "class", "sketch", "mindmap", "sequence", "chart"]) expect(hasPseudo(t)).toBe(false);
+  });
+
+  it("parse as the same dot and ring `[*]` draws, with no text", () => {
+    const g = clean("state", `start s0\nend e0\nstate a "A"\ns0 --> a --> e0`);
+    expect(g.nodes.find((n) => n.id === "s0")).toMatchObject({ kind: "start", title: "" });
+    expect(g.nodes.find((n) => n.id === "e0")).toMatchObject({ kind: "end", title: "" });
+    expect(g.edges.map((e) => [e.from.node, e.to.node])).toEqual([
+      ["s0", "a"],
+      ["a", "e0"],
+    ]);
+  });
+
+  it("let several edges share one end, which `[*]` cannot", () => {
+    const g = clean("state", `state a "A"\nstate b "B"\nend done\na --> done\nb --> done`);
+    expect(g.nodes.filter((n) => n.kind === "end")).toHaveLength(1);
+  });
+
+  it("mix with `[*]` in one body", () => {
+    const g = clean("activity", `start s0\naction a "A"\ns0 --> a --> [*]`);
+    expect(g.nodes.filter((n) => n.kind === "start" || n.kind === "end")).toHaveLength(2);
+  });
+
+  it("are not words in a dialect that has no pseudostate", () => {
+    const g = parseDiagram("flow", `start s0`)!;
+    expect(g.diagnostics.some((d) => d.severity === "error")).toBe(true);
+  });
+
+  it("grow a start state in front of the picked card, edge pointing at it", () => {
+    const made = grow("state", STATE, undefined, "draft", { side: "e", edge: true, pseudo: "start" })!;
+    expect(made.id).toBe("start2");
+    expect(made.body).toBe(`state draft "Draft"\nstart start2\nstate live "Live"\n\ndraft --> live "publish"\nstart2 --> draft`);
+    clean("state", made.body);
+  });
+
+  it("grow an end state behind the picked card whichever side asked", () => {
+    const made = grow("state", STATE, undefined, "live", { side: "w", edge: true, pseudo: "end" })!;
+    expect(made.body).toContain("end end2");
+    expect(made.body.endsWith("live --> end2")).toBe(true);
+    clean("state", made.body);
+  });
+
+  it("grow a real card from a start state, never a second dot", () => {
+    const body = `start s0\nstate a "A"\ns0 --> a`;
+    const made = grow("state", body, undefined, "s0", { side: "e", edge: true })!;
+    expect(made.body).toContain(`state state2 "New state"`);
+    const g = clean("state", made.body);
+    expect(g.nodes.filter((n) => n.kind === "start")).toHaveLength(1);
+    expect(grow("activity", `start s0`, undefined, "s0", { side: "e", edge: true })!.body).toContain(
+      `action action2 "New action"`,
+    );
+  });
+
+  it("refuse where the dialect has none", () => {
+    expect(grow("flow", `step a "A"`, undefined, "a", { side: "e", edge: true, pseudo: "start" })).toBeNull();
+  });
+
+  it("grow inside the group the picked card is in", () => {
+    const body = `group g "G" {\n  state a "A"\n}`;
+    const made = grow("state", body, undefined, "a", { side: "e", edge: true, pseudo: "end" })!;
+    expect(clean("state", made.body).nodes.find((n) => n.id === "end2")?.group).toBe("g");
+  });
+});
+
+describe("wrapPlan", () => {
+  const plan = (type: string, body: string, id: string) =>
+    wrapPlan({ type: type as never, body, dir: undefined, aspect: undefined, layout: undefined }, id);
+  const ARCH = `service api "API"\nstore db "DB"\napi --> db`;
+
+  it("is a group in the dialects that have groups, and says which line", () => {
+    for (const [type, body, id, line] of [
+      ["arch", ARCH, "api", 1],
+      ["erd", `entity user { id uuid pk }`, "user", 1],
+      ["class", `class A { +x: int }`, "A", 1],
+      ["state", `state a "A"`, "a", 1],
+      ["sketch", `box a "A" x=0 y=0`, "a", 1],
+    ] as const) {
+      expect(plan(type, body, id), type).toEqual({ word: "group", line, parent: undefined });
+    }
+  });
+
+  it("is a system in usecase and c4, whose box round cards is the system's boundary", () => {
+    expect(plan("usecase", `actor u "User"\nusecase c "Do it"`, "c")).toEqual({ word: "system", line: 2, parent: undefined });
+    expect(plan("c4", `person p "P" "someone"`, "p")).toEqual({ word: "system", line: 1, parent: undefined });
+  });
+
+  it("is a lane in flow and activity", () => {
+    expect(plan("flow", `step a "A"\nstep b "B"`, "a")?.word).toBe("lane");
+    expect(plan("activity", `action a "A"`, "a")?.word).toBe("lane");
+  });
+
+  it("wraps a group in a group, and says what its parent is", () => {
+    const body = `group a "A" {\n  group b "B" {\n    service x "X"\n  }\n}`;
+    expect(plan("arch", body, "b")).toEqual({ word: "group", line: 2, parent: "a" });
+    expect(plan("arch", body, "x")).toEqual({ word: "group", line: 3, parent: "b" });
+  });
+
+  it("will not nest a lane, or wrap a lane, or mix lanes and groups", () => {
+    const laned = `lane l "L" {\n  step a "A"\n}\nstep b "B"`;
+    expect(plan("flow", laned, "a")).toBeNull();
+    expect(plan("flow", laned, "l")).toBeNull();
+    expect(plan("flow", laned, "b")?.word).toBe("lane");
+    expect(plan("arch", `group g "G" {\n  service a "A"\n}`, "a")?.word).toBe("group");
+  });
+
+  it("refuses a card that shares its line with another statement", () => {
+    expect(plan("flow", `lane l "L" { step a "A" }`, "a")).toBeNull();
+  });
+
+  it("refuses a legacy `[*]`, which has no statement of its own", () => {
+    expect(plan("state", `state a "A"\n[*] --> a`, "__start-0")).toBeNull();
+  });
+
+  it("refuses an edge, an unknown id, a body with errors and a dialect with no containers", () => {
+    expect(plan("arch", ARCH, "e1")).toBeNull();
+    expect(plan("arch", ARCH, "nope")).toBeNull();
+    expect(plan("arch", `service api "API"\napi --> ghost`, "api")).toBeNull();
+    for (const type of ["mindmap", "timeline", "gitgraph", "sequence", "chart"])
+      expect(plan(type, "root x", "m1"), type).toBeNull();
+  });
+});
+
+describe("wrapGeometry", () => {
+  const laid: LaidOut = {
+    nodes: { a: { x: 100, y: 60, w: 80, h: 40 }, b: { x: 30, y: 30, w: 50, h: 20 } },
+    groups: { g: { x: 20, y: 20, w: 200, h: 200 } },
+    origin: { x: 5, y: 7 },
+  };
+
+  it("draws the container pad clear of the card on every side and puts the card at pad inside", () => {
+    expect(wrapGeometry(laid, "a", undefined, 24)).toEqual({
+      box: { x: 81, y: 43, w: 128, h: 88 },
+      at: { x: 24, y: 24 },
+      corner: { x: 76, y: 36 },
+    });
+  });
+
+  it("writes the box against the card's own container, when it has one", () => {
+    expect(wrapGeometry(laid, "b", "g", 10)?.box).toEqual({ x: 0, y: 0, w: 70, h: 40 });
+  });
+
+  it("wraps a group by its own box", () => {
+    expect(wrapGeometry(laid, "g", undefined, 8)?.box).toMatchObject({ w: 216, h: 216 });
+  });
+
+  it("has nothing to write for a box the layout never published", () => {
+    expect(wrapGeometry(laid, "nope", undefined, 24)).toBeNull();
   });
 });

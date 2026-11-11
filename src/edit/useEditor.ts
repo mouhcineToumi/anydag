@@ -40,7 +40,17 @@ import { repairFrontmatter, retypeFence } from "@/board/repair";
 import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
-import { removeEdge, removeNode, replaceLine, setEdgeLabel, setLinkVia, setTitle, stripCoords } from "@/dsl/restate";
+import {
+  removeEdge,
+  removeNode,
+  replaceLine,
+  setEdgeLabel,
+  setLinkVia,
+  setTitle,
+  stripCoords,
+  wrapStatement,
+  type WrapOpts,
+} from "@/dsl/restate";
 
 import { History } from "./history";
 import type { Fix } from "./repair";
@@ -71,12 +81,16 @@ import {
   freshNodeId,
   grow,
   growable,
+  hasPseudo,
   loneShape,
   pinUnplaced,
   resizeShape,
   scaleFixed,
   soleCard,
+  wrapGeometry,
+  wrapPlan,
   type LaidOut,
+  type Pseudo,
 } from "./build";
 import { columnOf, dragMode, dropEdit, type Over } from "./drag";
 import { duplicateStatement, edgeAt, edgeLabelOf, type PickedEdge, type PickedNode } from "./pick";
@@ -426,6 +440,17 @@ export interface Editor {
    */
   removeSelection(): void;
   duplicateSelection(): void;
+  /**
+   * Put the picked card, group or lane inside a new container — a `group`, or a `lane` in `flow` and
+   * `activity` — and open the rename on it. One commit, so one ctrl+Z takes the container off.
+   * Does nothing where `wrapPlan` says no, which the panel reads to leave the button out.
+   */
+  wrapPicked(): void;
+  /**
+   * Grow a start or an end state off the picked card, with its edge: the `+` for the one thing a
+   * `+` cannot say, which is that the new card is not another copy of this one.
+   */
+  growPseudo(kind: Pseudo): void;
   /**
    * Which layer the layout put a card in, counted off the drawing — the number `col=` would pin.
    *
@@ -1660,10 +1685,11 @@ export function useEditor({
    * commits would make "undo" mean "leave a card nothing points at".
    */
   const growFrom = useCallback(
-    (side: ConnectSide, dragged: boolean) => {
+    (side: ConnectSide, dragged: boolean, pseudo?: Pseudo) => {
       const p = pickedNodeRef.current;
       const it = p && bodyOf(p.item);
       if (!p || !it || !isDiagramType(it.type)) return;
+      if (pseudo && !hasPseudo(it.type)) return;
       /* The handles are not drawn where a dialect has no edge to write (`growable`), so this is the
          belt to that brace: a `+` on a chart would append `web --> mob`, which is `E_UNKNOWN_KIND`
          in a chart body — a gesture that breaks the thing it was pressed on. */
@@ -1693,14 +1719,60 @@ export function useEditor({
         }
       }
 
-      const made = grow(it.type, body, it.dir, p.node, { side, edge: !fixed || dragged, at });
+      const made = grow(it.type, body, it.dir, p.node, { side, edge: !fixed || dragged || pseudo !== undefined, at, pseudo });
       if (!made) return;
       setPickedNode({ item: it.id, node: made.id });
-      setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
+      /* A start or an end state draws no text, so there is nothing to name. */
+      if (!pseudo) setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
       writeShifted(it, made.body, shift);
     },
     [bodyOf, laidOutIn, writeShifted],
   );
+
+  /** A start state goes in front of the picked card and an end state behind it; see `GrowOpts.pseudo`. */
+  const growPseudo = useCallback((kind: Pseudo) => growFrom(kind === "start" ? "w" : "e", false, kind), [growFrom]);
+
+  /**
+   * Wrap the picked thing in a new container.
+   *
+   * The statement is rewritten by `wrapStatement` and nothing else in the body moves. A fixed fence
+   * is the one place that needs more than the word, because there the container carries its own
+   * box: it is read off the layout (`wrapGeometry`), the unplaced cards are pinned first so that
+   * giving one of them a coordinate does not send the rest below it, and the item moves by whatever
+   * the new box took from the frame's corner — the three things `+` does in the same fence, for the
+   * same reasons.
+   */
+  const wrapPicked = useCallback(() => {
+    const p = pickedNodeRef.current;
+    const it = p && bodyOf(p.item);
+    if (!p || !it || !isDiagramType(it.type)) return;
+    const plan = wrapPlan(it, p.node);
+    if (!plan) return;
+
+    const id = freshNodeId(it.body, plan.word);
+    const opts: WrapOpts = {
+      word: plan.word,
+      id,
+      label: plan.word === "lane" ? "Lane" : plan.word === "system" ? "System" : "Group",
+    };
+    let body = it.body;
+    let shift = { x: 0, y: 0 };
+    if (it.type === "sketch" || it.layout === "fixed") {
+      const laid = laidOutIn(p.item);
+      const graph = laid ? parseDiagram(it.type, it.body, it.dir, it.aspect, it.layout) : null;
+      const geo = laid && graph ? wrapGeometry(laid, p.node, plan.parent, gridRef.current * 2) : null;
+      if (!laid || !graph || !geo) return;
+      body = pinUnplaced(graph, laid, it.body);
+      opts.box = geo.box;
+      opts.at = geo.at;
+      const was = cornerOf(laid);
+      shift = frameShift(was, { x: Math.min(was.x, geo.corner.x), y: Math.min(was.y, geo.corner.y) });
+    }
+
+    setPickedNode({ item: it.id, node: id });
+    setRenaming({ item: it.id, id, what: plan.word === "lane" ? "lane" : "group", seg: 0, text: "" });
+    writeShifted(it, wrapStatement(body, plan.line, opts), shift);
+  }, [bodyOf, laidOutIn, writeShifted]);
 
   /**
    * Detach: the diagram keeps exactly the drawing it has, and the coordinates become the author's.
@@ -3898,6 +3970,8 @@ export function useEditor({
     pickEdge,
     removeSelection,
     duplicateSelection,
+    wrapPicked,
+    growPseudo,
     columnOf: columnAt,
     pickFromLine,
     mode,

@@ -13,6 +13,7 @@ import {
   removeRow,
   renameId,
   replaceLine,
+  setContainer,
   setDesc,
   setEdgeArrow,
   setEdgeFlag,
@@ -27,6 +28,7 @@ import {
   appendHop,
   dropHop,
   setFlag,
+  setGroupDir,
   setKind,
   setMeta,
   setModifier,
@@ -34,6 +36,7 @@ import {
   setStatus,
   setTitle,
   statementSpan,
+  wrapStatement,
 } from "@/dsl/restate";
 
 /**
@@ -805,5 +808,130 @@ describe("the ends of an edge", () => {
     expect(edges(addEdgeEnd("a --> c", 0, "from", "b"))).toHaveLength(2);
     expect(new Set(edges(addEdgeEnd("a --> c", 0, "from", "b")).map((e) => e.bus)).size).toBe(1);
     expect(edges(appendHop("a --> b", "c"))).toHaveLength(2);
+  });
+});
+
+/**
+ * Wrapping, and a container's own two controls.
+ *
+ * Every case reparses what it wrote: a writer that hands back a body the parser rejects is worse
+ * than one that does nothing, and the interesting claims are about *which container each card ended
+ * up in* rather than about the bytes alone.
+ */
+describe("wrapStatement", () => {
+  const clean = (type: string, body: string) => {
+    const g = parseDiagram(type, body)!;
+    expect(g.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    return g;
+  };
+  const ARCH = `service api "API" icon=server\nstore db "Database"\n\napi --> db "reads"`;
+
+  it("puts one card inside a new group and touches nothing else", () => {
+    const out = wrapStatement(ARCH, 1, { word: "group", id: "group2", label: "Backend" });
+    expect(out).toBe(`group group2 "Backend" {\n  service api "API" icon=server\n}\nstore db "Database"\n\napi --> db "reads"`);
+    const g = clean("arch", out);
+    expect(g.nodes.find((n) => n.id === "api")?.group).toBe("group2");
+    expect(g.nodes.find((n) => n.id === "db")?.group).toBeUndefined();
+    expect(g.edges).toHaveLength(1);
+  });
+
+  it("carries a block with it — a group wrapped keeps its children one level further in", () => {
+    const body = `group a "A" {\n  service x "X"\n\n  service y "Y"\n}\nservice z "Z"`;
+    const out = wrapStatement(body, 1, { word: "group", id: "outer", label: "Outer" });
+    expect(out).toBe(`group outer "Outer" {\n  group a "A" {\n    service x "X"\n\n    service y "Y"\n  }\n}\nservice z "Z"`);
+    const g = clean("arch", out);
+    expect(g.groups.find((x) => x.id === "a")?.parent).toBe("outer");
+    expect(g.nodes.find((n) => n.id === "y")?.group).toBe("a");
+  });
+
+  it("wraps inside the block the card was in, at that block's indent", () => {
+    const body = `group a "A" {\n  service x "X"\n  service y "Y"\n}`;
+    const out = wrapStatement(body, 3, { word: "group", id: "g2", label: "G" });
+    expect(out).toBe(`group a "A" {\n  service x "X"\n  group g2 "G" {\n    service y "Y"\n  }\n}`);
+    expect(clean("arch", out).groups.find((x) => x.id === "g2")?.parent).toBe("a");
+  });
+
+  it("keeps a card's rows block whole", () => {
+    const body = `entity user {\n  id uuid pk\n  email text\n}\nentity org { id uuid pk }`;
+    const out = wrapStatement(body, 1, { word: "group", id: "g", label: "People" });
+    const g = clean("erd", out);
+    expect(g.nodes.find((n) => n.id === "user")?.rows).toHaveLength(2);
+    expect(g.nodes.find((n) => n.id === "user")?.group).toBe("g");
+  });
+
+  it("opens a lane in flow, with the card inside it", () => {
+    const out = wrapStatement(`step a "A"\nstep b "B"\na --> b`, 1, { word: "lane", id: "lane2", label: "Lane" });
+    const g = clean("flow", out);
+    expect(g.nodes.find((n) => n.id === "a")?.lane).toBe("lane2");
+    expect(g.nodes.find((n) => n.id === "b")?.lane).toBeUndefined();
+  });
+
+  it("writes a fixed fence's own box on the container and the card's place inside it", () => {
+    const body = `box a "A" x=100 y=60 w=80 h=40`;
+    const out = wrapStatement(body, 1, {
+      word: "group",
+      id: "g",
+      label: "Frame",
+      box: { x: 76, y: 36, w: 128, h: 88 },
+      at: { x: 24, y: 24 },
+    });
+    expect(out).toBe(`group g "Frame" x=76 y=36 w=128 h=88 {\n  box a "A" w=80 h=40 x=24 y=24\n}`);
+    const g = parseDiagram("sketch", out)!;
+    expect(g.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(g.groups[0]).toMatchObject({ id: "g", x: 76, y: 36, w: 128, h: 88 });
+    expect(g.nodes[0]).toMatchObject({ id: "a", group: "g", x: 24, y: 24 });
+  });
+
+  it("is total: a blank line, a closing brace or a line out of range hands the body back", () => {
+    const body = `group a "A" {\n  service x "X"\n}\n\nservice z "Z"`;
+    for (const line of [0, 3, 4, 99]) expect(wrapStatement(body, line, { word: "group", id: "g", label: "G" })).toBe(body);
+  });
+});
+
+describe("setContainer", () => {
+  it("swaps group for system and back, leaving the rest of the line alone", () => {
+    const line = `group core "Core" "the part we own" hue=teal dir=TB {`;
+    const sys = setContainer(line, "system");
+    expect(sys).toBe(`system core "Core" "the part we own" hue=teal dir=TB {`);
+    expect(setContainer(sys, "group")).toBe(line);
+  });
+
+  it("keeps the indent and a trailing comment", () => {
+    expect(setContainer(`  group a "A" { %% the boundary`, "system")).toBe(`  system a "A" { %% the boundary`);
+  });
+
+  it("reads back through the parser in the two dialects that have `system`", () => {
+    for (const type of ["usecase", "c4"] as const) {
+      const body = `${setContainer('group s "S" {', "system")}\n}`;
+      const g = parseDiagram(type, body)!;
+      expect(g.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+      expect(g.groups[0]?.shape).toBe("system");
+      const back = parseDiagram(type, setContainer(body, "group"))!;
+      expect(back.groups[0]?.shape).toBe("group");
+    }
+  });
+
+  it("refuses a line that is not a group, a system or a declaration", () => {
+    for (const line of [`service api "API"`, `lane l "L" {`, `a --> b`, `group`]) expect(setContainer(line, "system")).toBe(line);
+  });
+});
+
+describe("setGroupDir", () => {
+  it("writes dir= before the brace, and the parser reads it", () => {
+    const line = setGroupDir(`group a "A" hue=teal {`, "TB");
+    expect(line).toBe(`group a "A" hue=teal dir=TB {`);
+    const g = parseDiagram("arch", `${line}\n  service x "X"\n}`)!;
+    expect(g.groups[0]?.dir).toBe("DOWN");
+  });
+
+  it("replaces one that is there, and takes it off with null", () => {
+    expect(setGroupDir(`group a "A" dir=TB {`, "LR")).toBe(`group a "A" dir=LR {`);
+    expect(setGroupDir(`group a "A" dir=TB {`, null)).toBe(`group a "A" {`);
+    expect(setGroupDir(`group a "A" {`, null)).toBe(`group a "A" {`);
+  });
+
+  it("reads LR as RIGHT", () => {
+    const g = parseDiagram("arch", `group a "A" dir=LR {\n  service x "X"\n}`)!;
+    expect(g.groups[0]?.dir).toBe("RIGHT");
   });
 });
