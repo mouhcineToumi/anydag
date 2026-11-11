@@ -35,7 +35,13 @@ else.
 Five things about the links are load-bearing:
 
 - **`edges` is a fence, not frontmatter**, because a fence is an item: the panel edits it,
-  `applyPatch` writes it, undo covers it, the clipboard carries it. It draws nothing and takes no
+  `applyPatch` writes it, undo covers it, the clipboard carries it. **The panel never shows its
+  text** (#145): a link is picked on the canvas, Enter opens the fence on it, and its controls are
+  the whole of what a person changes — the ends (`EdgeEnds`, fed by `linkEndChoices` in
+  `src/edit/linkEnds.ts`, which offers exactly what `resolveLinks` accepts: the page's items, each
+  diagram's cards as `item.node`, and the board groups), the label and the second one, the line in
+  words (`LINK_LINES` in `Props.tsx`, never an arrow spelling), Reverse (`reverseEdge`, one arrow
+  only) and Delete. With nothing picked the fence says how to pick or draw one. It draws nothing and takes no
   position, which is why `placeItems` and the paper both skip it — the second is not tidiness.
   `ready` waits for every item on the paper to report a measured size, and one that never renders
   never reports, so `data-dag-ready` would never fire and every Playwright check would hang.
@@ -106,6 +112,13 @@ on a fence nobody touched. It is `applyPatch`'s, not the gesture's, so the CLI a
 every link naming the removed item — or a card inside it, `arch1.db` for `arch1` unless an item has
 that literal id — goes by `removeNode`'s rules, a bus losing a source and a chain split rather than
 joined. Only links *this* patch broke: one that already named nothing is somebody's typing.
+
+**Renaming follows the link.** `renameItemId` rewrites every `edges` line that names a renamed
+item, and `renameNodeLinks` (`src/board/rename.ts`) does the same one level down: renaming a node
+*inside* an item — a chart's series or slice, from the panel — rewrites `<item>.<old>` to
+`<item>.<new>` on every page, exact whole-token matches only, and a token that is a literal item id
+stays that item's. It never touches the item's own fence; the dialect's writer (`renameChartId`)
+does, and the editor writes both as one string, so one undo. Any diagram's rename can reuse it.
 
 **Bending one is `via="320,180"`**, and the one input the router takes that is a person's
 rather than a layout's. A picked link grows a round handle at its middle; pulling it writes the

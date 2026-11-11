@@ -1,15 +1,21 @@
-import { ArrowUp, ChevronDown, Layers, Square } from "lucide-react";
+import { ArrowUp, ChevronDown, Layers, Square, UnfoldVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
+import { Icon } from "@/render/Icon";
+import { MONO } from "@/render/icon-index";
 import { useSettings } from "@/settings/useSettings";
-import { loadVaults, type Vault } from "@/vault/api";
+import { currentVault } from "@/vault/current";
+import { loadVaults } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
 
-import { modelLabel, providerLabel } from "./Thread";
+import { modelLabel } from "./Thread";
+import { scopeOf } from "./scope";
 import type { ChatMeta, Mode, Provider, ProviderModels } from "./types";
-import { grantsOf } from "./types";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+/** The mark a provider draws beside its model: a brand silhouette in the chrome's own ink. */
+const PROVIDER_MARK: Record<Provider, string> = { claude: "anthropic", opencode: "opencode" };
 
 /** What the next turn is sent with: the model it runs on and how hard it thinks. */
 export interface Choice {
@@ -34,6 +40,9 @@ function defaultChoice(
   const model = at && at === wanted && pref.model ? pref.model : (at?.default ?? "claude-sonnet-5-5");
   return { provider, model, effort: "" };
 }
+
+/** A model's own short name, which is what a person says: the label, with a vendor's prefix off. */
+const shortModel = (m: { id: string; label: string }): string => modelLabel(m.label || m.id);
 
 export interface ComposerProps {
   meta: ChatMeta | null;
@@ -60,17 +69,20 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
   useEffect(() => setOver({}), [meta?.id, meta?.provider, meta?.model, meta?.effort]);
   const choice: Choice = { ...base, ...over };
   const [text, setText] = useState("");
+  const [tall, setTall] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (autofocus) box.current?.focus();
   }, [autofocus, meta?.id]);
-  /* Grows with what is typed, to a ceiling the stylesheet sets. */
+  useEffect(() => setTall(false), [meta?.id]);
+  /* Grows with what is typed, to a ceiling the stylesheet sets — unless the person has expanded it,
+     where the box is the expanded one and the ceiling is the stylesheet's other one. */
   useEffect(() => {
     const el = box.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
+    if (!tall) el.style.height = `${el.scrollHeight}px`;
+  }, [text, tall]);
 
   const at = models?.find((m) => m.provider === choice.provider);
   const unavailable = at && !at.available ? at : null;
@@ -81,6 +93,7 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
     if (!can) return;
     onSend(text.trim(), choice);
     setText("");
+    setTall(false);
   };
   const key = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
@@ -92,7 +105,7 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
     <div className="dag-chat-composer" data-dag-chat-composer="">
       <textarea
         ref={box}
-        className="dag-chat-composer__input"
+        className={`dag-chat-composer__input${tall ? " dag-chat-composer__input--tall" : ""}`}
         data-dag-chat-input=""
         rows={1}
         value={text}
@@ -108,38 +121,36 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
       ) : null}
       <div className="dag-chat-composer__row">
         <Scope meta={meta} onGrant={(vault, mode) => onGrant(choice, vault, mode)} />
-        <span className="dag-chat-composer__space" />
-        <select
-          className="dag-select dag-chat-picker"
-          data-dag-chat-model=""
-          aria-label="Provider and model"
-          value={`${choice.provider}|${choice.model}`}
-          onChange={(e) => {
-            const [provider, ...rest] = e.target.value.split("|");
-            setOver((o) => ({ ...o, provider: provider as Provider, model: rest.join("|") }));
-          }}
-        >
-          {(models ?? []).map((p) => {
-            const list =
-              p.models.some((m) => m.id === choice.model) || p.provider !== choice.provider
-                ? p.models
-                : [{ id: choice.model, label: choice.model }, ...p.models];
-            return (
-              <optgroup key={p.provider} label={p.available ? p.label : `${p.label} (unavailable)`} disabled={!p.available}>
-                {list.map((m) => (
-                  <option key={m.id} value={`${p.provider}|${m.id}`} disabled={!p.available}>
-                    {p.label} · {m.label}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-          {!models ? (
-            <option value={`${choice.provider}|${choice.model}`}>
-              {providerLabel(choice.provider)} · {modelLabel(choice.model)}
-            </option>
-          ) : null}
-        </select>
+        <span className="dag-chat-modelpick">
+          <ProviderMark provider={choice.provider} />
+          <select
+            className="dag-select dag-chat-picker"
+            data-dag-chat-model=""
+            aria-label="Model"
+            value={`${choice.provider}|${choice.model}`}
+            onChange={(e) => {
+              const [provider, ...rest] = e.target.value.split("|");
+              setOver((o) => ({ ...o, provider: provider as Provider, model: rest.join("|") }));
+            }}
+          >
+            {(models ?? []).map((p) => {
+              const list =
+                p.models.some((m) => m.id === choice.model) || p.provider !== choice.provider
+                  ? p.models
+                  : [{ id: choice.model, label: choice.model }, ...p.models];
+              return (
+                <optgroup key={p.provider} label={p.available ? p.label : `${p.label} (unavailable)`} disabled={!p.available}>
+                  {list.map((m) => (
+                    <option key={m.id} value={`${p.provider}|${m.id}`} disabled={!p.available}>
+                      {shortModel(m)}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+            {!models ? <option value={`${choice.provider}|${choice.model}`}>{modelLabel(choice.model)}</option> : null}
+          </select>
+        </span>
         <select
           className="dag-select dag-chat-picker dag-chat-picker--effort"
           data-dag-chat-effort=""
@@ -149,10 +160,21 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
         >
           {efforts.map((x) => (
             <option key={x} value={x}>
-              {x === "" ? "Default effort" : `${x.charAt(0).toUpperCase()}${x.slice(1)} effort`}
+              {x === "" ? "Auto" : `${x.charAt(0).toUpperCase()}${x.slice(1)}`}
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className="dag-icon dag-chat-composer__expand"
+          data-dag-chat-expand=""
+          aria-label={tall ? "Collapse the message box" : "Expand the message box"}
+          aria-pressed={tall}
+          title={tall ? "Collapse" : "Expand"}
+          onClick={() => setTall((v) => !v)}
+        >
+          <UnfoldVertical {...ICON} aria-hidden="true" />
+        </button>
         {running ? (
           <button
             type="button"
@@ -182,6 +204,17 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
   );
 }
 
+/** The provider's logo: the bundle's silhouette, which takes the chrome's ink. A name the bundle
+ * does not have — an icon set that has stopped carrying one — draws the Layers glyph instead. */
+function ProviderMark({ provider }: { provider: Provider }) {
+  const name = PROVIDER_MARK[provider];
+  return MONO.has(name) ? (
+    <Icon icon={{ mode: "mono", name }} size={ICON.size} stroke={ICON.strokeWidth} />
+  ) : (
+    <Layers {...ICON} aria-hidden="true" />
+  );
+}
+
 /**
  * What the chat reaches: its own vault, and any others the person has granted. A grant is a vault
  * and a mode — read, or change too — and the agent can only ask; the card in the thread is where it
@@ -190,6 +223,7 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
 function Scope({ meta, onGrant }: { meta: ChatMeta | null; onGrant(vault: string, mode: Mode | null): void }) {
   const [open, setOpen] = useState(false);
   const vaults = useVaults();
+  const view = useMemo(() => scopeOf(vaults, currentVault(), meta), [vaults, meta]);
   const wrap = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -210,12 +244,6 @@ function Scope({ meta, onGrant }: { meta: ChatMeta | null; onGrant(vault: string
     };
   }, [open]);
 
-  const granted = meta ? grantsOf(meta) : {};
-  const named = (id: string): string => vaults?.find((v) => v.id === id)?.name ?? "another vault";
-  const here = (v: Vault) => v.id === meta?.home || (!meta && v.default);
-  const home = meta ? named(meta.home) : (vaults?.find((v) => v.default)?.name ?? "This vault");
-  const extra = Object.keys(granted).length;
-  const others = (vaults ?? []).filter((v) => v.open && !here(v) && !granted[v.id]);
   return (
     <div className="dag-chat-scope" ref={wrap}>
       <button
@@ -228,28 +256,28 @@ function Scope({ meta, onGrant }: { meta: ChatMeta | null; onGrant(vault: string
         onClick={() => setOpen((v) => !v)}
       >
         <Layers {...ICON} aria-hidden="true" />
-        <span>{home}</span>
-        {extra ? <span className="dag-chat-scope__more">+{extra}</span> : null}
+        <span>{view.home}</span>
+        {view.granted.length ? <span className="dag-chat-scope__more">+{view.granted.length}</span> : null}
         <ChevronDown {...ICON} aria-hidden="true" />
       </button>
       {open ? (
         <div className="dag-chat-scope__menu" role="menu" data-dag-chat-scope-menu="">
           <p className="dag-chat-scope__line">
-            <strong>{home}</strong>
+            <strong>{view.home}</strong>
             <span>this vault, always</span>
           </p>
-          {Object.entries(granted).map(([id, g]) => (
-            <p className="dag-chat-scope__line" key={id} data-dag-chat-granted={id}>
-              <strong>{named(id)}</strong>
+          {view.granted.map((g) => (
+            <p className="dag-chat-scope__line" key={g.id} data-dag-chat-granted={g.id}>
+              <strong>{g.name}</strong>
               <span>{g.mode === "edit" ? "read and change" : "read only"}</span>
-              <button type="button" className="dag-button" data-dag-chat-revoke={id} onClick={() => onGrant(id, null)}>
+              <button type="button" className="dag-button" data-dag-chat-revoke={g.id} onClick={() => onGrant(g.id, null)}>
                 Take back
               </button>
             </p>
           ))}
           <p className="dag-chat-scope__title">Grant another vault…</p>
-          {others.length ? (
-            others.map((v) => (
+          {view.others.length ? (
+            view.others.map((v) => (
               <p className="dag-chat-scope__line" key={v.id}>
                 <strong>{v.name}</strong>
                 <button

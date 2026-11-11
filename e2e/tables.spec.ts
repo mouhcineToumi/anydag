@@ -193,22 +193,168 @@ test("the tabs are the strip along the bottom: one is added, renamed and opened"
   expect(read("pipeline").startsWith(TABLE)).toBe(true);
 });
 
-test("Source is the file, with its problems under it, and the grid will not guess between two rows with one id", async ({
+test("there is no Source: two rows with one id are marked on the second, refused with a word, and mended with a button", async ({
   page,
 }) => {
   const twice = TABLE.replace("{#rinit}", "{#rglob}");
   const name = write("pipeline", twice);
   await open(page, name);
-  await expect(page.locator("[data-dag-tablepage-status]")).toContainText("1 problem");
+  await expect(page.locator("[data-dag-tablepage-mode]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-tablepage-source]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-tablepage-status]")).toContainText("1 problem in the file");
+  /* The mark is on the row it is about, not on the one that was first. */
+  await expect(page.locator("[data-dag-grid-flag]")).toHaveCount(1);
+  await expect(page.locator('tr[data-dag-grid-row-index="2"] [data-dag-grid-flag="row"]')).toBeVisible();
   /* A write to the second `rglob` would land on the first; it is refused, and says why. */
   await page.locator('[data-dag-grid-at="2:1"]').click();
   await page.keyboard.type("1");
   await page.keyboard.press("Enter");
   await expect(page.locator("[data-dag-tablepage-status]")).toContainText("two rows share the id `rglob`");
   expect(read("pipeline")).toBe(twice);
-  await page.locator("[data-dag-tablepage-mode]").click();
-  await expect(page.locator("[data-dag-tablepage-source]")).toHaveValue(twice);
-  await expect(page.locator('[data-dag-tablepage-problem="ET_DUPLICATE_ID"]')).toBeVisible();
+
+  await page.locator('[data-dag-grid-flag="row"]').click();
+  const card = page.locator('[data-dag-tablepage-problem="ET_DUPLICATE_ID"]');
+  await expect(card).toContainText("This row shares its identity with another one");
+  await card.locator('[data-dag-tablepage-fix="reid"]').click();
+  await expect.poll(() => read("pipeline")).toMatch(/\| Initech \{#r[0-9a-z]{5}\} \| 900 \|/);
+  expect(read("pipeline")).toContain("| Globex {#rglob} | 300 |");
+  await expect(page.locator("[data-dag-grid-flag]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-tablepage-status]")).not.toContainText("problem");
+  /* Mended, the second row takes an edit again. */
+  await page.locator('[data-dag-grid-at="2:1"]').click();
+  await page.keyboard.type("1");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => read("pipeline")).toMatch(/\| Initech \{#r[0-9a-z]{5}\} \| 9001 \|/);
+});
+
+test("a tab's problems are above its grid, in words, and each button writes one change", async ({ page }) => {
+  const broken = TABLE.replace(
+    "## Deals {#deals}",
+    '## Deals {#deals sort="gone:desc, amount" filter="stage!=Lost; nope" colour=red}',
+  );
+  const name = write("pipeline", broken);
+  await open(page, name);
+  const status = page.locator("[data-dag-tablepage-status]");
+  await expect(status).toContainText("3 problems in the file");
+  const issues = page.locator("[data-dag-tablepage-issues]");
+  await expect(issues.locator('[data-dag-tablepage-problem="WT_BAD_SORT"]')).toContainText(
+    "This tab is sorted by “gone”, a column it doesn't have.",
+  );
+  await expect(issues.locator('[data-dag-tablepage-problem="WT_BAD_FILTER"]')).toContainText(
+    "The filter “nope” is not one the app can read.",
+  );
+  await expect(issues.locator('[data-dag-tablepage-problem="WT_UNKNOWN_ATTR"]')).toContainText("“colour”");
+
+  await issues.locator('[data-dag-tablepage-problem="WT_BAD_SORT"] [data-dag-tablepage-fix]').click();
+  await expect.poll(() => read("pipeline")).toContain('{#deals sort=amount filter="stage!=Lost; nope" colour=red}');
+  await issues.locator('[data-dag-tablepage-problem="WT_BAD_FILTER"] [data-dag-tablepage-fix]').click();
+  await expect.poll(() => read("pipeline")).toContain('{#deals sort=amount filter="stage!=Lost" colour=red}');
+  await issues.locator('[data-dag-tablepage-problem="WT_UNKNOWN_ATTR"] [data-dag-tablepage-fix]').click();
+  await expect.poll(() => read("pipeline")).toContain('## Deals {#deals sort=amount filter="stage!=Lost"}');
+  await expect(issues).toHaveCount(0);
+  await expect(status).not.toContainText("problem");
+  /* Every row is byte for byte what it was. */
+  expect(read("pipeline").endsWith(TABLE.slice(TABLE.indexOf("| Name {#name}")))).toBe(true);
+});
+
+test("a cell its column cannot read says so on the cell, and its row's mark mends it", async ({ page }) => {
+  const odd = TABLE.replace("| Globex {#rglob} | 300 | Lead |", "| Globex {#rglob} | lots | Cold |");
+  const name = write("pipeline", odd);
+  await open(page, name);
+  await expect(page.locator("[data-dag-tablepage-status]")).toContainText("2 problems in the file");
+  await expect(page.locator('[data-dag-grid-at="1:1"]')).toHaveAttribute(
+    "title",
+    "“lots” is not a number, which the column “Amount” holds.",
+  );
+  /* Both are on the one row, whose mark opens both. */
+  await expect(page.locator("[data-dag-grid-flag]")).toHaveCount(1);
+  await page.locator('[data-dag-grid-flag="row"]').click();
+  const cards = page.locator('[data-dag-tablepage-problem="WT_CELL"]');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(1)).toContainText("“Cold” is not one of the column's choices");
+  await cards.nth(1).locator('[data-dag-tablepage-fix="add-option"]').click();
+  await expect.poll(() => read("pipeline")).toContain('options="Lead,Won,Lost,Cold"');
+  await page.locator('[data-dag-grid-flag="row"]').click();
+  await page.locator('[data-dag-tablepage-fix="clear-cell"]').click();
+  await expect.poll(() => read("pipeline")).toContain("| Globex {#rglob} | | Cold |");
+  await expect(page.locator("[data-dag-grid-flag]")).toHaveCount(0);
+});
+
+test("a row with too many cells is marked, and widening the table keeps them", async ({ page }) => {
+  const wide = TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer | Paris |");
+  const name = write("pipeline", wide);
+  await open(page, name);
+  /* The problem is on the People tab, so the bar says how many and its button goes there. */
+  await expect(page.locator("[data-dag-tablepage-status]")).toContainText("1 problem in the file");
+  await page.locator("[data-dag-tablepage-show]").click();
+  await expect(page).toHaveURL(/tab=people/);
+  const mark = page.locator('[data-dag-grid-flag="row"]');
+  await expect(mark).toBeFocused();
+  await mark.click();
+  await expect(page.locator('[data-dag-tablepage-problem="WT_ROW_WIDTH"]')).toContainText(
+    "This row has 1 more cell than the table has columns, so it isn't shown.",
+  );
+  await page.locator('[data-dag-tablepage-fix="widen"]').click();
+  await expect.poll(() => read("pipeline")).toContain("| Name {#name} | Role {#role} | Column 3 {#column-3} |");
+  expect(read("pipeline")).toContain("| Ada {#rada1} | Engineer | Paris |");
+  await expect(page.locator("[data-dag-grid-flag]")).toHaveCount(0);
+});
+
+test("a tab with problems shows their count in the strip, and loses it when they are mended", async ({ page }) => {
+  const wide = TABLE.replace("| Ada {#rada1} | Engineer |", "| Ada {#rada1} | Engineer | Paris |");
+  const name = write("pipeline", wide);
+  await open(page, name);
+  /* On Deals, nothing is wrong; People, the tab nobody is looking at, says it has one. */
+  await expect(page.locator('[data-dag-page="deals"] [data-dag-page-flag]')).toHaveCount(0);
+  const badge = page.locator('[data-dag-page="people"] [data-dag-page-flag]');
+  await expect(badge).toHaveText("1");
+  await expect(badge).toHaveAttribute("aria-label", "1 problem");
+  await page.locator('[data-dag-page="people"]').click();
+  await expect(page).toHaveURL(/tab=people/);
+  await page.locator('[data-dag-grid-flag="row"]').click();
+  await page.locator('[data-dag-tablepage-fix="trim-row"]').click();
+  await expect.poll(() => read("pipeline")).toBe(TABLE);
+  await expect(page.locator("[data-dag-page-flag]")).toHaveCount(0);
+});
+
+test("a column with a setting it does not know is marked on its header, and Remove it takes only that off", async ({ page }) => {
+  const odd = TABLE.replace("Amount {#amount number}", "Amount {#amount number numbr w=150}");
+  const name = write("pipeline", odd);
+  await open(page, name);
+  const mark = page.locator('th[data-dag-grid-col="amount"] [data-dag-grid-flag="column"]');
+  await expect(mark).toBeVisible();
+  await mark.click();
+  await expect(page.locator('[data-dag-tablepage-problem="WT_UNKNOWN_ATTR"]')).toContainText(
+    "“numbr” is not a column type. A column is one of text, number, date, checkbox, select, link.",
+  );
+  await page.locator('[data-dag-tablepage-fix="clean"]').click();
+  await expect.poll(() => read("pipeline")).toBe(TABLE.replace("Amount {#amount number}", "Amount {#amount number w=150}"));
+});
+
+test("text under a tab is shown before it is removed, and an open code block is ended", async ({ page }) => {
+  const stray = TABLE.replace("## People {#people}", "Notes nobody can see.\n\n## People {#people}");
+  const name = write("pipeline", stray);
+  await open(page, name);
+  const card = page.locator('[data-dag-tablepage-problem="WT_STRAY"]');
+  await expect(card).toContainText("There is text under this tab that is not part of its table");
+  await expect(card.locator("pre")).toHaveText("Notes nobody can see.");
+  await card.locator('[data-dag-tablepage-fix="drop-stray"]').click();
+  await expect.poll(() => read("pipeline")).toBe(TABLE);
+
+  fs.writeFileSync(tableFile("pipeline"), `${TABLE.replace("## People", "```\nnever closed\n\n## People")}`);
+  await expect(page.locator('[data-dag-tablepage-problem="WT_OPEN_FENCE"]')).toContainText("A code block here never ends");
+  await page.locator('[data-dag-tablepage-fix="close-fence"]').click();
+  await expect.poll(() => read("pipeline")).toContain("```\nnever closed\n```\n\n## People");
+});
+
+test("a table above the first tab is put in a tab of its own", async ({ page }) => {
+  const loose = TABLE.replace("Deals this quarter.\n", "Deals this quarter.\n\n| A | B |\n| - | - |\n| 1 | 2 |\n");
+  const name = write("pipeline", loose);
+  await open(page, name);
+  const card = page.locator('[data-dag-tablepage-problem="WT_LOOSE_TABLE"]');
+  await expect(card).toContainText("This table is above the first tab");
+  await card.locator('[data-dag-tablepage-fix="wrap-table"]').click();
+  await expect.poll(() => read("pipeline")).toContain("Deals this quarter.\n\n## Tab 3\n\n| A | B |");
 });
 
 test("a CSV comes in as a tab, and a tab goes out as CSV", async ({ page }) => {

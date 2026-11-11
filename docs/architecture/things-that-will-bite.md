@@ -231,6 +231,10 @@
 - **A hue is bound, never defaulted in a component.** `hueVars()` sets `--dag-h`/`--dag-t` only when
   an element has a hue, and CSS falls back to `--dag-h-default`. Setting the property to an empty
   string would *not* trigger the `var()` fallback, which is why "bind nothing" is the mechanism.
+- **A diagram's own `hue=` is `--frame-h`/`--frame-t`, never `--dag-h`/`--dag-t`.** Every card, band
+  and chip inside a diagram inherits the second pair, so binding it on the frame recolours each card
+  that has no hue of its own, and nothing fails. `frameHueVars()` is the frame's; the tint is an inset
+  shadow and a stretched header, not a border, so `size.ts`'s box is still the box drawn.
 - **A `--dag-metric-*` that is a ratio or a count needs `UNITLESS` in two files.** `donutInner`,
   `minLabelPct`, `maxTicks` and `markerMax` reach the browser as `0.62px` and `6px` otherwise, and
   nothing fails — `applyTheme.ts` holds the list and `check-theme.mjs` mirrors it, and the mirror is

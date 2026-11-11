@@ -465,8 +465,8 @@ function parseNode(cur: Cursor, ctx: Ctx, kindWord: Token): void {
     kind,
     /* A card with no title shows its id, which is how `state done` reads. A figure's title is its
        caption and a picture is allowed none, so an unwritten one stays empty rather than
-       printing the id under a house. */
-    title: texts[0]?.value ?? (kind === "figure" ? "" : idTok.value),
+       printing the id under a house. A start or end state draws no text at all. */
+    title: texts[0]?.value ?? (kind === "figure" || kind === "start" || kind === "end" ? "" : idTok.value),
     meta: texts[1]?.value,
     desc: texts[2]?.value,
     rows: [],

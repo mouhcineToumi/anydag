@@ -26,6 +26,9 @@ const SIDES: ConnectSide[] = ["n", "s", "e", "w"];
  * The container takes no pointer, so the card underneath is still clickable everywhere the handles
  * themselves are not — a pick has to be able to move to the next card without letting go first.
  *
+ * **A mindmap topic wears two `+` and no dots**: a child on the side it grows away from the root and a
+ * sibling below, because for a tree written as indentation those are the two places a line can go.
+ *
  * **Both families are the dialect's to have**, which is `growable()`: each writes an edge, and two
  * dialects have nothing to write one with. A picked series therefore wears no handles at all, and
  * the item's own are still there once Escape lets go of the pick.
@@ -36,6 +39,7 @@ export function NodeHandles({
   type,
   node,
   box,
+  topic,
 }: {
   ctl: EditorCtl;
   item: string;
@@ -43,12 +47,44 @@ export function NodeHandles({
   type: string;
   node: string;
   box: { x: number; y: number; w: number; h: number };
+  /** A mindmap topic's two `+` sides — see `topicHandles`. Present exactly when the pick is one. */
+  topic?: { child: ConnectSide; sibling: ConnectSide | null };
 }) {
   const onConnect = (side: ConnectSide) => (e: ReactPointerEvent<HTMLDivElement>) =>
     ctl.connect(item, e, e.currentTarget, side, { node, box });
   const onGrow = (side: ConnectSide) => (e: ReactPointerEvent<HTMLDivElement>) => ctl.grow(item, e, e.currentTarget, side);
 
   if (!growable(type)) return null;
+
+  /* A topic is linked to its parent by being indented under it, so the round connect handles have
+     nothing to write — an `a --> b` in a mindmap body is a topic with that for its name — and its `+`
+     are not "a card on this side" but the two places a line can go. */
+  if (topic) {
+    const plus = (as: "child" | "sibling", side: ConnectSide) => (
+      <div
+        key={as}
+        className="dag-plus"
+        data-dag-plus={side}
+        data-dag-topic-plus={as}
+        role="button"
+        aria-label={as === "child" ? "Add a child topic" : "Add a sibling topic"}
+        title={as === "child" ? "Add a child topic (Tab)" : "Add a sibling topic (Enter)"}
+        onPointerDown={(e) => ctl.growTopic(e, as)}
+      >
+        +
+      </div>
+    );
+    return (
+      <div
+        className="dag-nodetools"
+        data-dag-node-tools={node}
+        style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h }}
+      >
+        {plus("child", topic.child)}
+        {topic.sibling ? plus("sibling", topic.sibling) : null}
+      </div>
+    );
+  }
 
   return (
     <div

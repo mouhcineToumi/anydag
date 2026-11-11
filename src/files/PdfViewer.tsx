@@ -6,9 +6,10 @@
  * iOS Safari draws the first page of one in a frame and stops, and a headless snapshot draws
  * nothing at all. This draws the same pages, the same way, in all three.
  *
- * **Loaded the first time a PDF is opened**, never before: this module is a lazy chunk
- * (`Preview.tsx`), and pdf.js's worker is a file of its own that the browser fetches only then. A
- * board, a note and a snapshot of either never pay for it.
+ * **Loaded the first time a PDF is opened**, never before: this module is a chunk of its own,
+ * imported by `Preview.tsx` — and not through `React.lazy`, whose first render cost 300 ms (#129) —
+ * and pdf.js's worker is a file of its own that the browser fetches only then. A board, a note and a
+ * snapshot of either never pay for it.
  *
  * Each page is a canvas drawn at the width of the column and the density of the screen, and **only
  * once it is near the view** — a two-hundred-page report opened to read its summary draws its first

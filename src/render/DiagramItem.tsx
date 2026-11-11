@@ -79,8 +79,10 @@ export interface DiagramProps {
    * absence is what stops the hit strokes being drawn at all, so a snapshot is unchanged by any of
    * this. The ring on the picked edge does *not* come back down as a prop: it is painted onto the
    * element, because `Item` is memoised and this would be a per-node prop on it.
+   *
+   * `extend` is shift held: a sequence's messages are picked as a run, for Wrap in.
    */
-  onPickEdge?(id: string): void;
+  onPickEdge?(id: string, extend: boolean): void;
 }
 
 /**
@@ -113,10 +115,10 @@ function chartBox(item: BoardItem, theme: Theme): { w: number; h: number } {
  * change to the diagram still redraws it.
  */
 export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPickEdge }: DiagramProps) {
-  /* The latest parse, errors and all — what the dot and the placeholder report. */
+  /* The latest parse, errors and all — what is drawn, and what the marker for tools reports. */
   const [model, setModel] = useState<Model | null>(null);
-  /* The latest parse with no errors: the one that is drawn. It trails `model` while the body is
-     broken, and `placed` is always its layout, because a broken parse is never laid out. */
+  /* The parse `placed` is the layout of. It is `model` once that has been laid out; between the two
+     it is the one still on screen, so a new parse never draws against an old layout. */
   const [drawn, setDrawn] = useState<Model | null>(null);
   const [placed, setPlaced] = useState<Layout | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -127,9 +129,10 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
     const parsed = parseItem(item);
     setModel(parsed);
     if (!parsed) return;
-    /* Laying out a broken parse is what used to put a half-drawn diagram behind the error card.
-       The last good drawing and its layout stay exactly as they were instead. */
-    if (parsed.diagnostics.some((d) => d.severity === "error")) return;
+    /* Everything that could be read is drawn, errors or not (#145). A statement the parser could not
+       read is skipped — it is in the app's own format, which a person never sees, so the drawing is
+       the honest answer and the diagnostics are for an agent. It used to keep the last good drawing
+       behind a red dot, which told a person something was wrong and gave them nothing to do. */
     setDrawn(parsed);
 
     /* A chart is the one type whose *box* changes its layout — `resizeOf("chart")` is `box`, so
@@ -236,23 +239,21 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
 
   if (!model) return <PendingItem item={item} />;
 
-  /* Rebased onto the board file, because that is the file someone will open. Warnings are not
-     here: they never stop a drawing, and the dock is where they are read. */
+  /* Rebased onto the board file, because that is the file an agent will read. Warnings are not
+     here: they never stop a statement being drawn. */
   const problems: Shown[] = model.diagnostics
     .filter((d) => d.severity === "error")
     .map((d) => ({ line: item.line + d.line, code: d.code, message: d.message }));
-  if (failed) problems.push({ line: item.line, code: CODES.E_UNEXPECTED, message: failed });
 
-  /* Nothing good to fall back on: the page was opened on a body that has never parsed. */
-  if (problems.length > 0 && (!drawn || !placed)) {
+  /* The one thing that leaves nothing to draw: the layout itself refused. */
+  if (failed && !placed) {
     return (
       <Failed onSize={onSize}>
-        <BrokenItem what={item.type} messages={problems} />
+        <BrokenItem what={item.type} messages={[{ line: item.line, code: CODES.E_UNEXPECTED, message: failed }]} />
       </Failed>
     );
   }
 
-  /* `drawn` is `model` whenever the body parses, so this is the current drawing or the last good one. */
   const view = drawn ?? model;
   const width = item.w ?? (placed ? placed.size.w + (bare ? m.barePad : m.pad) * 2 : 520);
 
@@ -262,7 +263,12 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
         {!placed ? (
           <div className="dag-diagram dag-diagram--pending" />
         ) : placed.kind === "sequence" ? (
-          <SequenceView placed={placed} participants={(view as SequenceModel).participants} theme={theme} />
+          <SequenceView
+            placed={placed}
+            participants={(view as SequenceModel).participants}
+            theme={theme}
+            onPickEdge={onPickEdge}
+          />
         ) : placed.kind === "chart" ? (
           <ChartBody placed={placed} theme={theme} id={item.id} />
         ) : (
@@ -271,30 +277,21 @@ export const DiagramItem = memo(function DiagramItem({ item, theme, onSize, onPi
 
         {legend.length > 0 ? <Legend entries={legend} theme={theme} /> : null}
       </Frame>
-      {problems.length > 0 ? <Stale messages={problems} /> : null}
+      {problems.length > 0 ? <Unread messages={problems} /> : null}
     </>
   );
 });
 
 /**
- * The dot on a diagram that is showing its last good drawing rather than the file's current text.
+ * What a tool reading the page learns about statements that were skipped — and a person, nothing.
  *
- * Placed against the item and *inside* its box — `.dag-item` is `content-visibility: auto`, which
- * clips anything drawn outside it — and outside the frame, so the frame's size is what it was. It
- * carries `data-dag-diagnostics`, the attribute every error surface here has always published, so a
- * tool reading the DOM still finds what went wrong; the words are in its tooltip and in the dock.
+ * Hidden: a statement that could not be read is not something a person can act on (#145), so
+ * nothing is drawn for it. `data-dag-error` and `data-dag-diagnostics` are the two attributes every
+ * check and script has always asked "is anything broken?" with, and they keep their meaning: an e2e
+ * spec that writes through a control still finds out when the control wrote something unreadable.
  */
-function Stale({ messages }: { messages: Shown[] }) {
-  const first = messages[0]!;
-  const more = messages.length > 1 ? ` (and ${messages.length - 1} more)` : "";
-  return (
-    <span
-      className="dag-stale"
-      data-dag-stale=""
-      data-dag-diagnostics={JSON.stringify(messages)}
-      title={`Showing the last version that worked. Line ${first.line}: ${first.message}${more}`}
-    />
-  );
+function Unread({ messages }: { messages: Shown[] }) {
+  return <span hidden data-dag-error="" data-dag-diagnostics={JSON.stringify(messages)} />;
 }
 
 /**
@@ -536,7 +533,7 @@ function GraphBody({
   graph: Graph;
   placed: Extract<Layout, { kind: "graph" }>;
   theme: Theme;
-  onPickEdge?(id: string): void;
+  onPickEdge?(id: string, extend: boolean): void;
 }) {
   /* A strip is placed above the origin (a timeline section bar). The body has to reserve that room
      or it is clipped by the frame's rule. */

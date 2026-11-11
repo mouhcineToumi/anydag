@@ -274,6 +274,15 @@ describe("the guard", () => {
     expect(exists(env.root, "log.md")).toBe(true);
   });
 
+  it("refuses a grant for the chat's own vault, so a popover that offers it reads as buttons that do nothing", async () => {
+    const chat = await newChat();
+    const r = await api("POST", "/__board/chat/grant", { id: chat.id, vault: env.vault.id, mode: "ask" });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toMatch(/own vault/);
+    const meta = (await api("GET", `/__board/chat?id=${chat.id}`)).json.chat;
+    expect(meta[`grant:${env.vault.id}`]).toBeUndefined();
+  });
+
   it("refuses a write to a vault granted read, with code read-only, and changes nothing", async () => {
     const other = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-other-"));
     temps.push(other);

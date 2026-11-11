@@ -187,6 +187,7 @@ export function routeLinks({ links, boxes, nodeBoxes, solo, groups, metric }: Li
     head: l.head,
     tail: l.tail,
     label: l.label,
+    label2: l.label2,
     hue: l.hue,
     line: l.line,
   }));
