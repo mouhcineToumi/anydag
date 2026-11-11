@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CornerUpLeft, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, CircleCheck, Clock, CornerUpLeft, Minus, Plus, Trash2, type LucideIcon } from "lucide-react";
 
 import { isDiagramType, isLinkType, resizeOf, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
+import { moveEntry, parseTimeline, readWhen, sectionOfLine, sectionsOf, setWhen, whenOf } from "@/dsl/graph/timeline";
 import { HUE_ORDER, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
 import { containersOf, descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
 import { PARTICIPANT_KINDS } from "@/dsl/sequence";
@@ -174,6 +175,7 @@ export function Props({
         column={subject.what === "node" ? editor.columnOf(item.id, subject.id) : null}
         retired={retired}
         onBody={onBody}
+        onPick={(id) => editor.pickNode(item.id, id)}
         onOut={() => editor.pickNode(item.id, null)}
       />
     );
@@ -501,6 +503,7 @@ function PickProps({
   onBody,
   onWrap,
   onPseudo,
+  onPick,
   onOut,
 }: {
   type: string;
@@ -516,6 +519,8 @@ function PickProps({
   /** The body lines the parser read a retired flag on, so the picked line can offer to drop its own. */
   retired: readonly number[];
   onBody(next: string): void;
+  /** Re-pick by id: a move renumbers a timeline's entries, and the pick has to follow its entry. */
+  onPick(id: string): void;
   onOut(): void;
 }) {
   const { id, what, line, seg } = subject;
@@ -650,6 +655,9 @@ function PickProps({
   const descAt = isNode && !isChart ? descriptionSlot(type, kind, strings.length) : null;
   const status = STATUSES.find((s) => new RegExp(`(?:^|\\s)${s}(?:\\s|$)`).test(src.replace(/"[^"]*"/g, '""'))) ?? "";
   const icon = /(?:^|\s)icon=([A-Za-z0-9_:.-]+)/.exec(src)?.[1] ?? "";
+  /* A timeline entry is its own dialect — a date, a label and the two words it reads — so its
+     panel is the date, the section and a status picker, not the card controls below. */
+  const entry = type === "timeline" && isNode;
   const writtenCol = /(?:^|\s)col=(\d+)/.exec(src)?.[1] ?? "";
   const flagOn = (f: Flag) => new RegExp(`(?:^|\\s)${f}(?:\\s|$)`).test(src.replace(/"[^"]*"/g, '""'));
 
@@ -767,7 +775,23 @@ function PickProps({
           position a chart reads its values from, so `done` on a `series` line is `E_CHART_VALUE` —
           the control would break the chart it was used on. An icon merely does nothing there: it
           parses and is checked, and a series is named by its swatch. */}
-      {isChart || bare ? null : (
+      {entry ? (
+        <>
+          <TimelineWhen key={`${id}:${whenOf(src)}`} src={src} onSet={(start, end) => write(setWhen(src, start, end) ?? src)} />
+          <TimelineSection
+            body={body}
+            line={line}
+            onMove={(to) => {
+              const moved = moveEntry(body, line, to);
+              if (!moved) return;
+              onBody(moved.body);
+              const at = parseTimeline(moved.body).nodes.find((n) => n.line === moved.line);
+              if (at) onPick(at.id);
+            }}
+          />
+          <TimelineStatus value={status === "done" || status === "wait" ? status : ""} onSet={(v) => write(setStatus(src, v))} />
+        </>
+      ) : isChart || bare ? null : (
         <div className="dag-props__row">
           <select
             className="dag-select dag-props__status"
@@ -896,6 +920,110 @@ function PickProps({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The When field of a timeline entry: one line of free text for the date, or the two dates.
+ *
+ * Free text rather than a date input because the grammar's precision is the point — `2026`,
+ * `2026-03` and `2026-03-01` are three different claims, and a native date picker can only make
+ * the third. What is typed is read by `readWhen`, echoed back in words under the field so a person
+ * sees how it was understood before it is written, and written as the grammar's own spelling at the
+ * precision typed. Nothing is written while the text cannot be read, so a half-typed date never
+ * reaches the file; clearing the end of a range is typing a point.
+ */
+function TimelineWhen({ src, onSet }: { src: string; onSet(start: string, end: string | null): void }) {
+  const written = whenOf(src);
+  const [text, setText] = useState(written);
+  const read = readWhen(text);
+  const commit = () => {
+    if (!read.ok || text.trim() === written) return;
+    onSet(read.start, read.end);
+  };
+  return (
+    <div className="dag-props__fields">
+      <label className="dag-field">
+        <span>When</span>
+        <input
+          className="dag-input"
+          data-dag-prop-when=""
+          value={text}
+          placeholder="Mar 2026 → Jun 2026"
+          spellCheck={false}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        />
+      </label>
+      <p
+        className={read.ok ? "dag-field__hint" : "dag-field__hint dag-field__hint--bad"}
+        data-dag-prop-when-echo={read.ok ? "ok" : "bad"}
+      >
+        {read.ok ? `Understood: ${read.echo}` : `${read.why[0]!.toUpperCase()}${read.why.slice(1)}`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Which section an entry is in. An entry belongs to the nearest `section` above it, so choosing one
+ * moves the entry's line to the end of that section — see `moveEntry`. Left out of a timeline that
+ * has no sections: there would be nothing to choose.
+ */
+function TimelineSection({ body, line, onMove }: { body: string; line: number; onMove(to: number | null): void }) {
+  const sections = sectionsOf(body);
+  if (sections.length === 0) return null;
+  const at = sectionOfLine(body, line);
+  return (
+    <label className="dag-field dag-field--row">
+      <span>Section</span>
+      <select
+        className="dag-select"
+        data-dag-prop-section=""
+        value={at === null ? "" : String(at)}
+        onChange={(e) => onMove(e.target.value === "" ? null : Number(e.target.value))}
+      >
+        <option value="">no section</option>
+        {sections.map((s) => (
+          <option key={s.line} value={s.line}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** What a timeline reads, and nothing else: `stop` and `muted` are other dialects' words. */
+const TIMELINE_STATUS: { value: "" | "done" | "wait"; label: string; Icon: LucideIcon }[] = [
+  { value: "", label: "None", Icon: Minus },
+  { value: "done", label: "Done", Icon: CircleCheck },
+  { value: "wait", label: "Wait", Icon: Clock },
+];
+
+/**
+ * The status picker for a timeline entry: an icon on each option, which a native `<select>` cannot
+ * hold. Three buttons in a radio group — the choice is one of three and they all fit on a row.
+ */
+function TimelineStatus({ value, onSet }: { value: "" | "done" | "wait"; onSet(next: "done" | "wait" | null): void }) {
+  return (
+    <div className="dag-props__row" role="radiogroup" aria-label="Status" data-dag-prop-status="">
+      {TIMELINE_STATUS.map(({ value: v, label, Icon }) => (
+        <button
+          key={v || "none"}
+          type="button"
+          role="radio"
+          aria-checked={value === v}
+          data-dag-prop-status-option={v || "none"}
+          className={`dag-props__choice${value === v ? " dag-props__choice--on" : ""}`}
+          onClick={() => value !== v && onSet(v === "" ? null : v)}
+        >
+          <Icon {...ICON} aria-hidden />
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

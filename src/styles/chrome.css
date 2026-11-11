@@ -2337,6 +2337,24 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-props__em:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
 .dag-props__em--on { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
 
+/* The status picker on a timeline entry: three options, each an icon and a word, one on. */
+.dag-props__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-small);
+  cursor: pointer;
+}
+.dag-props__choice:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+.dag-props__choice--on { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+
 /*
  * The handles on a picked card: four to link from, four to grow from.
  *
