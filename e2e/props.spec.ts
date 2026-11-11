@@ -176,7 +176,8 @@ test("a picked edge writes its label, its arrow and its hue", async ({ page }) =
 test("a note takes a hue, and hidden takes it off the canvas", async ({ page }) => {
   await open(page);
   await page.locator('[data-dag-item="note"]').click();
-  await page.keyboard.press("Enter");
+  /* Enter on a text card opens its words; its settings are the toolbar's Edit. */
+  await page.locator("[data-dag-selbar-edit]").click();
 
   await page.locator('[data-dag-prop-hue="teal"]').click();
   await expect.poll(read, { timeout: 5_000 }).toMatch(/#note[^\n]*hue=teal/);

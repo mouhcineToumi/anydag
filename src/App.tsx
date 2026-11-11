@@ -28,6 +28,7 @@ import { Library } from "@/edit/Library";
 import { GitLanes } from "@/edit/GitLanes";
 import { NodeHandles } from "@/edit/NodeHandles";
 import { topicHandles } from "@/edit/pick";
+import { CardText } from "@/edit/CardText";
 import { Rename } from "@/edit/Rename";
 import { RewriteDialog } from "@/edit/RewriteDialog";
 import { proposedItem } from "@/edit/rewrite";
@@ -2118,6 +2119,8 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
+  const writingItem =
+    editor.writing && !snapshot && !locked ? (board?.items.find((it) => it.id === editor.writing) ?? null) : null;
 
   /*
    * What is wrong with the board that a person can act on, for the dock at the bottom, the panel
@@ -2468,6 +2471,17 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               toBoard={editor.toBoard}
               onCommit={editor.commitRename}
               onCancel={editor.cancelRename}
+            />
+          ) : null}
+          {writingItem && board ? (
+            <CardText
+              key={writingItem.id}
+              item={writingItem}
+              boardName={board.name}
+              scheme={theme.color.scheme === "dark" ? "dark" : "light"}
+              toBoard={editor.toBoard}
+              onChange={editor.setBody}
+              onDone={editor.stopWriting}
             />
           ) : null}
 

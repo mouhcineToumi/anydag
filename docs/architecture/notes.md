@@ -126,9 +126,9 @@ a spec that wants one says which.
 **Out, and why:** real-time co-editing (BlockNote can, the store is an optimistic sha1 — the same
 refusal the boards make); a diagram inside a note (a fenced
 ` ```arch ` block survives the bridge as a code block, so nothing forecloses it); the GPL `xl-*`
-packages; a note's saved version history (undo is the editor's, for the session); the block editor on
-a board's own `md` cards — the editor exists for a note, a separate file, and a card's body is
-prose in the board file.
+packages; a note's saved version history (undo is the editor's, for the session). A board's own `md` cards
+are edited in the same block editor, on the card, under the same rule — see *An md card's text, in
+place* in `editing.md`.
 
 ## Equations
 

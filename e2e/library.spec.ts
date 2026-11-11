@@ -89,8 +89,10 @@ test("a click adds the component in the middle of the view and opens it for edit
   await expect
     .poll(read, { timeout: 5_000 })
     .toMatch(/```md \{#md-[a-z0-9]{4} w=520 x=-?\d+ y=-?\d+\}\n\| name \| type \| note \|/);
-  await expect(page.locator("[data-dag-inspector]")).toBeVisible();
-  await expect(page.locator("[data-dag-body]")).toHaveValue(/\| name \| type \| note \|/);
+  /* Its text opens on the card, as rich text: a table to type into, not its Markdown (#145). */
+  await expect(page.locator('[data-dag-card-text] [contenteditable="true"]')).toBeFocused();
+  await expect(page.locator("[data-dag-card-text] table")).toHaveCount(1);
+  await expect(page.locator("[data-dag-inspector]")).toHaveCount(0);
   await expect(page.locator('[data-dag-type="md"] table')).toHaveCount(1);
 });
 

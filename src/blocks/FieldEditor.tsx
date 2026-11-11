@@ -16,6 +16,8 @@
  *   lists, no quotes and no rule: each of those is part of a quiz's own syntax (a `##` starts a
  *   question, a `- [ ]` is an option, a closing quote is the answer, and `---` under a line is a
  *   heading), and a field that could make one could break the question it is in.
+ * - `card` — everything a note can hold: a board's `md` card is free Markdown in a fence of its own,
+ *   so nothing it says can break the syntax around it, and it is edited where it is drawn.
  *
  * Which file the Markdown goes into is the caller's business: this knows blocks, as `BlockEditor` does.
  */
@@ -45,12 +47,18 @@ import { readIndex } from "@/refs/useIndex";
 
 import { codeBlock } from "./code";
 import { EquationButton, equationBlock, insertEquation, mathInline, mathKeys } from "./math";
-import { FIELD_BLOCKS, FIELD_SLASH_KEYS, REF_TRIGGERS } from "./menus";
+import { FIELD_BLOCKS, FIELD_SLASH_KEYS, REF_TRIGGERS, SLASH_KEYS } from "./menus";
 import { markdownPaste } from "./paste";
 import { EMBED_TRIGGER, embedBlock, embedFor, refFor, refInline, refItems } from "./refs";
 import { syntaxColours } from "./syntax";
 
 const inlineContentSpecs = { ...noteSchema.inlineContentSpecs, ref: refInline, math: mathInline };
+
+const cardSchema = BlockNoteSchema.create({
+  blockSpecs: { ...noteSchema.blockSpecs, codeBlock: codeBlock(), embed: embedBlock(), equation: equationBlock() },
+  inlineContentSpecs,
+  styleSpecs: noteSchema.styleSpecs,
+});
 
 const lineSchema = BlockNoteSchema.create({
   blockSpecs: { paragraph: noteSchema.blockSpecs.paragraph },
@@ -70,7 +78,7 @@ const blockSchema = BlockNoteSchema.create({
 export interface FieldEditorProps {
   /** The field's Markdown, read once when the editor is made: while it is open, the editor's document is the field. */
   md: string;
-  variant: "line" | "block";
+  variant: "line" | "block" | "card";
   /** The field's Markdown after a change a person made — only when it differs from what was handed back last. */
   onChange(md: string): void;
   /** Store a picture and say what the Markdown should call it. */
@@ -97,7 +105,7 @@ export interface FieldEditorProps {
  */
 function opening(md: string, variant: FieldEditorProps["variant"]): { blocks: NoteBlock[]; loaded: Loaded } {
   const first = load(md);
-  if (variant === "block" || first.blocks.every((b) => b.type === "paragraph")) return first;
+  if (variant !== "line" || first.blocks.every((b) => b.type === "paragraph")) return first;
   return { blocks: [{ type: "paragraph", content: [{ type: "text", text: md, styles: {} }] as never }], loaded: load("").loaded };
 }
 
@@ -115,7 +123,7 @@ export default function FieldEditor(props: FieldEditorProps) {
 
   const editor = useCreateBlockNote(
     {
-      schema: (variant === "line" ? lineSchema : blockSchema) as typeof blockSchema,
+      schema: (variant === "line" ? lineSchema : variant === "card" ? cardSchema : blockSchema) as typeof blockSchema,
       extensions: [mathKeys, syntaxColours],
       initialContent: (start.blocks.length ? start.blocks : undefined) as never,
       uploadFile: (file: File) => latest.current.upload(file),
@@ -150,7 +158,7 @@ export default function FieldEditor(props: FieldEditorProps) {
           else editor.insertBlocks([embedFor(d)] as never, at, "after");
         }),
       slash: async (query: string) => {
-        const allowed = new Set<string>(FIELD_SLASH_KEYS);
+        const allowed = new Set<string>(variant === "card" ? SLASH_KEYS : FIELD_SLASH_KEYS);
         const items = getDefaultReactSlashMenuItems(editor).filter((i) => allowed.has((i as { key?: string }).key ?? ""));
         const ours: typeof items = [
           {
@@ -180,13 +188,15 @@ export default function FieldEditor(props: FieldEditorProps) {
         return filterSuggestionItems(items, query);
       },
     }),
-    [editor],
+    [editor, variant],
   );
 
   const typeItems = useMemo(
     () =>
-      blockTypeSelectItems(editor).filter((i) => (FIELD_BLOCKS as readonly string[]).includes(i.type) && !i.props?.isToggleable),
-    [editor],
+      blockTypeSelectItems(editor).filter(
+        (i) => (variant === "card" || (FIELD_BLOCKS as readonly string[]).includes(i.type)) && !i.props?.isToggleable,
+      ),
+    [editor, variant],
   );
 
   const onChange = () => {
@@ -224,15 +234,15 @@ export default function FieldEditor(props: FieldEditorProps) {
         aria-label={props.label}
         data-dag-field-editor={variant}
       >
-        {variant === "block" ? <SuggestionMenuController triggerCharacter="/" getItems={pickers.slash} /> : null}
+        {variant !== "line" ? <SuggestionMenuController triggerCharacter="/" getItems={pickers.slash} /> : null}
         {REF_TRIGGERS.map((trigger) => (
           <SuggestionMenuController key={trigger} triggerCharacter={trigger} getItems={pickers.ref} />
         ))}
-        {variant === "block" ? <SuggestionMenuController triggerCharacter={EMBED_TRIGGER} getItems={pickers.embed} /> : null}
+        {variant !== "line" ? <SuggestionMenuController triggerCharacter={EMBED_TRIGGER} getItems={pickers.embed} /> : null}
         <FormattingToolbarController
           formattingToolbar={() => (
             <FormattingToolbar>
-              {variant === "block" ? <BlockTypeSelect key="type" items={typeItems} /> : null}
+              {variant !== "line" ? <BlockTypeSelect key="type" items={typeItems} /> : null}
               <BasicTextStyleButton key="bold" basicTextStyle="bold" />
               <BasicTextStyleButton key="italic" basicTextStyle="italic" />
               <BasicTextStyleButton key="strike" basicTextStyle="strike" />

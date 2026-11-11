@@ -19,8 +19,9 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | Delete / Backspace, or cut | the block gone, the blank line that separated it, and every link that named it or a card in it |
 | ctrl+D, or paste | a block appended, with a fresh id |
 | the editor panel (Enter, the toolbar's Edit, or a double-click where there is nothing to rename) | the body between the fences; `title=`, `subtitle=`, `dir=`, `note` |
-| `space N`, or a double-click on the paper | a new `md` item, from `src/board/templates.ts` |
-| the library (`space L`): click, or drag onto the board | a new item from `src/board/library/`; a fragment onto a diagram appends to its body — and the panel stays shut unless what landed is an `md` |
+| `space N`, or a double-click on the paper | a new `md` item, from `src/board/templates.ts`, its text open on the card |
+| a double-click on an `md` card, or Enter with it selected | its text, as rich text on the card — see *An md card's text, in place* |
+| the library (`space L`): click, or drag onto the board | a new item from `src/board/library/`; a fragment onto a diagram appends to its body — and nothing opens unless what landed is an `md`, whose text opens on the card |
 | arrows, shift for ten | `x=`/`y=`, one grid step |
 | ctrl+G, ctrl+shift+G | `group=<name>` on every selected fence line, or off it |
 | the eight handles on a group's dashed box, every member selected | each member's `x=`/`y=`, and its `w=`/`h=` — or its shapes' own, in a drawing — scaled together; a laid-out diagram only moves |
@@ -663,15 +664,36 @@ handles. The controls are the lanes instead, which are already drawn: `src/edit/
 The panel used to open uninvited: **it opened on every drop**, and what it opened on was
 the frame. Three rules hold, and the first is the one that matters.
 
-**A drop opens the panel only when the item's body is prose the canvas cannot edit.** That is `md` —
-a note, a paragraph, a table — whose body *is* its content and for which the panel is the only way
-in. A diagram, a sketch, a shape, a chart: nothing opens, and the person works on the drawing, which
-is where every gesture already is. The rule is stated in `place()` and honoured in `add()`, which
-needed no change to honour it: `add` is only ever called with `"md"` and `"prompt"` — `N`, a
-double-click on the paper, and `P` — so the md case *is* the exception and the prompt card was
-already exempt for its own reason. That line is a second place the panel
-opens itself; it is the one place it should, and the comment there says so, because the next reader
-will otherwise fix it.
+**A drop opens nothing unless the item's body is prose, and prose opens on the card.** That is `md`
+— a note, a paragraph, a table — whose body *is* its content: its text opens where it is drawn, as
+rich text (*An md card's text, in place*). A diagram, a sketch, a shape, a chart: nothing opens, and
+the person works on the drawing, which is where every gesture already is. The rule is stated in
+`place()` and honoured in `add()`: `add` is only ever called with `"md"` and `"prompt"` — `N`, a
+double-click on the paper, and `P` — and both are typed into where they land. A card that places a
+note, a task or a board (`noteCard`) is `md` and still not prose, and opens nothing.
+
+### An md card's text, in place
+
+An `md` card is edited as rich text on the card itself (#145), and the panel holds no Markdown for
+one: it has the card's settings and an **Edit the text** button. A double-click on the card, Enter
+with it selected, and a new card (`N`, a double-click on the paper, the library) open it; Escape, or
+a press anywhere outside the box and its menus, closes it.
+
+- **BlockNote never reads or writes a byte of the card**, as it never does a note's (*Notes*):
+  `CardText` (`src/edit/`) hosts `FieldEditor`'s `card` variant — every block a note can hold — and
+  the body goes in and out through `src/note/markdown.ts`. A block nobody touched keeps the bytes it
+  was written with, so an agent's `*` bullets and table padding survive an edit beside them, and a
+  card opened and left writes nothing.
+- **Over the card, not in it**, for `Rename`'s reasons: a box in the layer on the card's own
+  rectangle, growing down while somebody types; the card under it is redrawn from the file.
+- **Each change is the panel's write**: `setBody`, 250 ms after the last keystroke, under the
+  `body:<id>` key, so one sitting is one undo, sealed when the box closes.
+- **A card just made is not in the board yet** (one round trip stale): `write` opens on the id, and
+  the page mounts the box when the card arrives.
+- **The editor's chunk is fetched the first time a card is opened.** `?snapshot=1` and `?view=1`
+  never reach `CardText`.
+
+Names claimed, grepped first: `dag-card-text`, `data-dag-card-text`, `data-dag-write-card`.
 
 **A one-node item shows that node.** A shape dropped from the library is an item holding exactly one
 node, and the item's frame has no fill, no kind and no icon while the node has all three — so the
