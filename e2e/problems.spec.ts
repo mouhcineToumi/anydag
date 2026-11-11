@@ -99,9 +99,46 @@ test("Show opens the panel on the link, with the problem at the top", async ({ p
   const block = page.locator("[data-dag-inspector-problems]");
   await expect(block).toContainText("not there");
   await expect(block).not.toContainText("E_UNKNOWN_ID");
-  /* The link is what is picked, so its controls are the panel's. It is not drawn yet — a link with
-     no card at one end has nowhere to go until it is drawn hanging (the next part of #145). */
+  /* The link is what is picked, drawn hanging from the card it has, and its controls are the panel's. */
+  await expect(page.locator('[data-dag-item="stack"] [data-dag-edge][data-dag-picked]')).toHaveCount(1);
   await expect(page.locator("[data-dag-props] [data-dag-prop-arrow]")).toHaveCount(1);
+});
+
+/** A third card to drop the loose end on. */
+const LOOSE = GHOST.replace("api --> db", 'service web "Web" icon=server\napi --> db');
+
+test("a link to nothing hangs from its card, and its loose end dropped on a card mends it", async ({ page }) => {
+  await open(page, LOOSE);
+  const stack = page.locator('[data-dag-item="stack"]');
+  const stub = stack.locator('[data-dag-loose="ghost"]');
+  await expect(stub).toBeVisible();
+  await expect(stack.locator("[data-dag-edge]")).toHaveCount(2);
+
+  /* The diagram first, as for a card: the first click takes the container. */
+  await stack.locator('[data-dag-node="api"]').click();
+  const from = (await stub.boundingBox())!;
+  const to = (await stack.locator('[data-dag-node="web"]').boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+  await expect(page.locator(".dag-connect")).toHaveCount(1);
+  await page.mouse.up();
+
+  await expect.poll(() => fs.readFileSync(file, "utf8")).toContain("api --> web");
+  expect(fs.readFileSync(file, "utf8")).not.toContain("ghost");
+  await expect(stub).toHaveCount(0);
+  await expect(pill(page)).toHaveCount(0);
+});
+
+test("a click on a loose end picks its link, and Delete takes it out", async ({ page }) => {
+  await open(page, LOOSE);
+  const stack = page.locator('[data-dag-item="stack"]');
+  await stack.locator('[data-dag-node="api"]').click();
+  await stack.locator('[data-dag-loose="ghost"]').click();
+  await expect(stack.locator("[data-dag-edge][data-dag-picked]")).toHaveCount(1);
+  await page.keyboard.press("Delete");
+  await expect.poll(() => fs.readFileSync(file, "utf8")).not.toContain("ghost");
+  expect(fs.readFileSync(file, "utf8")).toContain("api --> db");
 });
 
 test("the count opens the list, and a row opens the panel", async ({ page }) => {

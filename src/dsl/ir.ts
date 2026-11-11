@@ -122,6 +122,12 @@ export type NodeKind =
   // pseudostates and bars
   | "start"
   | "end"
+  /**
+   * The far end of an edge that names nothing (#145): `api --> ghost` with no `ghost` anywhere.
+   * Made by `finalize`, never written, so the edge is drawn from the end it has to a loose stub a
+   * person can drag onto a card or delete. `Node.loose` says what was named.
+   */
+  | "loose"
   | "fork"
   | "join"
   /* sketch: a vocabulary of shapes rather than of things. `line` is not here — a line with no
@@ -173,6 +179,8 @@ export interface Node {
   /** C4's third string; the only kind that wraps to several lines. */
   desc?: string;
   stereotype?: string;
+  /** On a `loose` stub: the id the edge named that nothing declares, and the first edge naming it. */
+  loose?: { ref: string; edge: string };
   rows: Row[];
   /** Class boxes split their rows into attribute and method compartments. */
   compartments?: Row[][];

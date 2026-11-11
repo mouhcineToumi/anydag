@@ -2,7 +2,7 @@ import { declaredAt } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import { renameIds } from "@/dsl/rebind";
 import { seqLineOf } from "@/dsl/sequence";
-import { edgeSpan, statementSpan, topicMoves } from "@/dsl/restate";
+import { edgeSpan, replaceLine, retargetRef, statementSpan, topicMoves } from "@/dsl/restate";
 import { tokenize } from "@/dsl/tokenizer";
 
 import type { Side } from "./connect";
@@ -107,11 +107,50 @@ export function edgeTargets(
 ): { nodes: string[]; groups: string[]; rows: string[] } {
   const graph = hasGraph(type) ? parseDiagram(type, body, dir) : null;
   if (!graph) return { nodes: [], groups: [], rows: [] };
+  /* A loose stub is where an edge to nothing ends, not something an edge can be pointed at. */
+  const cards = graph.nodes.filter((n) => n.kind !== "loose");
   return {
-    nodes: graph.nodes.map((n) => n.id),
+    nodes: cards.map((n) => n.id),
     groups: graph.groups.map((g) => g.id),
-    rows: graph.nodes.flatMap((n) => n.rows.filter((r) => r.kind !== "more").map((r) => `${n.id}.${r.id}`)),
+    rows: cards.flatMap((n) => n.rows.filter((r) => r.kind !== "more").map((r) => `${n.id}.${r.id}`)),
   };
+}
+
+/**
+ * A loose stub (#145): the id its edge named, the line that names it, and the edge to pick when the
+ * stub is clicked. `null` for anything that is not one.
+ */
+export function looseOf(
+  type: string,
+  body: string,
+  stub: string,
+  dir?: "LR" | "TB",
+  layout?: "fixed",
+): { ref: string; line: number; edge: string } | null {
+  if (!stub.startsWith("__loose-") || !hasGraph(type)) return null;
+  const n = parseDiagram(type, body, dir, undefined, layout)?.nodes.find((x) => x.id === stub);
+  return n?.loose ? { ref: n.loose.ref, line: n.line, edge: n.loose.edge } : null;
+}
+
+/**
+ * The body with a loose stub dropped on `to`: the missing id on its line becomes `to`, so the edge
+ * that hung from one card now runs to another. `null` when there is nothing to write — not a stub,
+ * or dropped back on itself.
+ */
+export function reattachLoose(
+  type: string,
+  body: string,
+  stub: string,
+  to: string,
+  dir?: "LR" | "TB",
+  layout?: "fixed",
+): string | null {
+  const at = looseOf(type, body, stub, dir, layout);
+  if (!at || to.startsWith("__")) return null;
+  const src = body.split("\n")[at.line - 1];
+  if (src === undefined) return null;
+  const next = retargetRef(src, at.ref, to);
+  return next === src ? null : replaceLine(body, at.line, next);
 }
 
 /** The label written on one segment of an edge statement, as the author spelled it. */
