@@ -209,6 +209,11 @@ describe("growable", () => {
     expect(growable("chart")).toBe(false);
     expect(growable("sequence")).toBe(false);
   });
+
+  it("is false for a git graph, whose parent links are the order of its commands", () => {
+    /* `c1 --> c2` in a gitgraph body is an unknown command; its history grows from the lanes. */
+    expect(growable("gitgraph")).toBe(false);
+  });
 });
 
 describe("fixedGraph", () => {

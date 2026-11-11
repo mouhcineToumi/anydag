@@ -88,6 +88,9 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | a double-click on a fragment's tab or a message's label | that branch's condition, or that message's text |
 | a click on a note's tab · its panel's Text and Over | the pick · its words, and the participants it is drawn over |
 | the item view's Add a participant | `participant participant2 "Participant"` after the last one (a participant's Kind is the menu in the row above that names one) |
+| a selected `gitgraph`'s `+` past a branch's tip · **+ New branch** · a click on a branch's name | `commit "New commit"` on that branch, after the `checkout` it needs · `branch <fresh>` and a commit, off the picked commit or the current tip · that branch renamed in every statement that names it |
+| a drag on a picked `gitgraph` commit | a branch's tip onto another lane: `merge` into that branch · onto its neighbour on its own lane: the two swapped, where the history allows |
+| a picked `gitgraph` commit's Message, Tag, Earlier / Later, New branch from here | its label · a `tag` line after it · a swap with its neighbour · a branch off it |
 | alt + that drag | nothing to the body: the whole diagram moves, as any item does |
 | the properties view's Keep in column · Release | `col=` on the pick's line, or off it |
 | the item view's hue, and Hidden and Id under Advanced | `hue=` on an `md`, a note or an image, `hidden`, and `#id` plus every `edges` reference to it (through `/put`) |
@@ -600,6 +603,50 @@ Four things a person could only change by typing, each now a control (`feat(canv
   half-way through writing. Each checks the file *now* — a relabel is refused if its line no longer
   says what it was offered for — so a repair clicked after Claude rewrote the file does nothing
   rather than something to the wrong line.
+
+### A git graph's lanes
+
+A gitgraph is a list of commands run against a HEAD — `commit`, `branch`, `checkout`, `merge`,
+`tag` — so almost nothing a person wants to say about one is "the line for this thing". Commit on
+this branch, start a branch here, merge that into this: each is a command written at the right
+point in the history, with the `checkout` that puts HEAD there. A card's `+` has no edge to write
+(`c1 --> c2` is an unknown command), so `growable()` is false for it and a picked commit wears no
+handles. The controls are the lanes instead, which are already drawn: `src/edit/GitLanes.tsx`.
+
+- **The chrome is the selected graph's, and editing chrome only.** While exactly one gitgraph is
+  selected, `App` draws a chip over each branch name, a `+` just past each branch's tip and
+  **+ New branch** under the last lane. In the layer beside `NodeHandles`, for the same reason — the
+  positions are a layout's answer and `Item` is memoised — and never in `?snapshot=1`, an export or
+  the read-only view. Placed by measuring the drawn labels and tip commits through `toBoard` after
+  every render, which is `Rename`'s argument: a commit just written reaches the DOM several renders
+  later, with nothing about the chrome having changed.
+- **The writers read the whole history**, so they live beside the parser in
+  `src/dsl/graph/gitgraph.ts`, the way `redate` lives beside the timeline's. The parser publishes
+  what they need in `GitMeta`: each branch's tip, where HEAD ends, where HEAD is after every line,
+  and which lines tagged which commit. `gitCommit` and `gitMerge` **append**, because the end of the
+  body is the one place a statement cannot change what another commit descends from, and write a
+  `checkout` only when HEAD is elsewhere. `gitBranch` off a picked commit writes straight after it
+  (and its tag), the one point at which HEAD's tip *is* that commit, then a `checkout` back so the
+  statements below land where they did — left out when the next statement chooses a branch itself.
+- **A branch is renamed everywhere it is named.** `branch`, every `checkout`/`switch` to it and
+  every `merge` of it — so a lane's rename does not go through `setTitle`, which would write line 1
+  (the parser gives every lane that line). `commitRename` routes a gitgraph lane to
+  `gitRenameBranch`, which refuses `main` (no statement declares it), a taken name and anything that
+  is not one word; the chip on `main` is disabled for the first reason.
+- **A new commit or branch opens the rename on itself**, as a card's `+` does: the commit's message,
+  or the branch's name, since `feature2` is a name nobody chose.
+- **A picked commit's panel is its own, `GitProps`.** A gitgraph line has no `key=value` grammar, so
+  a hue, a status, an icon or a flag written onto it is a word the parser reads past, and a second
+  string is not a meta: `PickProps` would offer a dozen controls that write nothing. What a commit
+  has is a message (the first string, the parser's own rule), a tag — a statement of its own, which
+  `gitSetTag` writes straight after the commit and rewrites or removes in place — and an order.
+  **Earlier** and **Later** are disabled, not missing, where `gitMove` refuses the swap.
+- **Reorder only where the history allows.** Two commits swap only when they follow each other
+  directly on one branch, both are plain commits and the earlier has no other child — no branch
+  started from it, no merge took it. Anywhere else the swap would change what some other commit
+  descends from, which is a different history rather than the same one reordered. What is swapped
+  is the two statements' text, which in a gitgraph is the whole of a commit; the ids are positional
+  and the count does not change, so the tags are moved by id afterwards.
 
 ### What the panel opens on, and what it opens with
 

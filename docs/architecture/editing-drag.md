@@ -22,7 +22,7 @@ where the pointer let go, which is the same honesty `resizeOf`'s `aspect` alread
 | `chart` | a series or slice across its neighbour → its line moves, which is the order of the bars, the wedges and the legend | `moveStatement` |
 | `timeline` | sideways → a new start date, snapped to a day, the range keeping its length | `redate` |
 | `sketch`, any `layout=fixed` fence | anywhere → `x=`/`y=`, snapped to `metric.grid` | `setGeometry` |
-| `gitgraph` | nothing — refused | — |
+| `gitgraph` | a branch's tip onto another lane → that branch merged into the lane's · a commit onto its neighbour on its own lane → the two swapped, where the history allows it | `gitMerge` · `gitMove` |
 
 Ten things are load-bearing.
 
@@ -76,12 +76,17 @@ Ten things are load-bearing.
   frozen `route-quality` totals over the reference boards stand as evidence that this changed
   nothing about how anything is drawn.
 
-Two refusals with reasons. A **`gitgraph` commit** cannot be dragged: a column is a commit and a
-lane is a branch, both ordinal and both the file's, so there is no drop that means anything and
-inventing one would be a gesture that silently rewrote history. The cursor says `not-allowed` and
-the panel carries the line. And a **sequence message** cannot be dragged either, by construction
-rather than by a rule: only a participant header carries `data-dag-node`, so a message can never be
-picked in the first place.
+A **`gitgraph` commit** is dragged only where the history can say what the drop meant. A column is
+a commit and a lane is a branch, both ordinal and both the file's, so a coordinate means nothing —
+but two drops do. The **tip** of a branch let go on another lane (the band, or a commit drawn in
+it) is that branch merged into the lane's: `gitMerge` appends the `checkout` and the `merge`. A
+commit let go on the commit just before or after it on its *own* lane is the two swapped, and
+`gitMove` refuses that unless nothing else descends from the earlier one. Everything else — a
+commit from the middle of a branch over another lane, a drop on the paper — writes nothing. Both
+writers read the whole history, which is why they are in `src/dsl/graph/gitgraph.ts` beside the
+parser rather than in `restate.ts`; see *A git graph's lanes* in `editing.md`. A **sequence
+message** cannot be dragged at all, by construction rather than by a rule: only a participant
+header carries `data-dag-node`, so a message can never be picked in the first place.
 
 `AxisScale` on `Placed.axis` is the timeline's half of this — the three numbers that invert
 `x = ((t − min) / span) · px`, published because a drag along the page is asking for a *value* and

@@ -39,6 +39,7 @@ import { renameItemId, renameNodeLinks } from "@/board/rename";
 import { repairFrontmatter, retypeFence } from "@/board/repair";
 import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
+import { gitBranch, gitCommit, gitRenameBranch } from "@/dsl/graph/gitgraph";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import {
   outdentTopic,
@@ -512,6 +513,15 @@ export interface Editor {
   renaming: Renaming | null;
   commitRename(text: string): void;
   cancelRename(): void;
+  /**
+   * A git graph's lane controls — see `GitLanes`. A commit at the tip of `branch` (the `+` at the
+   * end of its lane), a new branch off `from` or off the current tip, and the inline rename opened
+   * on a branch's name. The first two pick the commit they made and open the rename on it, as the
+   * `+` on a card does.
+   */
+  gitCommit(item: string, branch: string): void;
+  gitBranch(item: string, from: string | null): void;
+  renameBranch(item: string, branch: string): void;
   /**
    * Rename an item everywhere on the board — its own fence line and every `edges` reference.
    *
@@ -1103,6 +1113,14 @@ export function useEditor({
       const it = r && bodyOf(r.item);
       if (!r || !it) return;
       const trimmed = text.trim();
+      /* A git branch is not declared on one line: it is named by its `branch`, every `checkout` to
+         it and every `merge` of it, and the parser gives every lane line 1. So its rename is the
+         one that rewrites them all, and a name it refuses writes nothing. */
+      if (it.type === "gitgraph" && r.what === "lane") {
+        const next = trimmed === "" ? null : gitRenameBranch(it.body, r.id, trimmed);
+        if (next !== null) writeBody(it, next);
+        return;
+      }
       const line = declaredAt(it.type, it.body, r.id, it.dir);
       if (line === null) return;
       /* A sequence writes its own: a message's label keeps its colon, a branch is found by its
@@ -1135,6 +1153,45 @@ export function useEditor({
       writeBody(it, replaceLine(it.body, line, next));
     },
     [bodyOf, renaming, writeBody],
+  );
+
+  /* ---- a git graph's lanes ---- */
+
+  /**
+   * The lane controls write through the same `body:<id>` key as everything else, so each is one
+   * undo. The commit a write made is picked and its message opened for typing — what the `+` on a
+   * card does, and for the same reason: the next thing a person does with a new commit is name it.
+   */
+  const gitAct = useCallback(
+    (item: string, made: (body: string) => { body: string; id: string; branch?: string } | null) => {
+      if (lockedRef.current) return refuseLocked();
+      const it = bodyOf(item);
+      if (!it || it.type !== "gitgraph") return;
+      const done = made(it.body);
+      if (!done) return;
+      pickNode(item, done.id);
+      /* A new branch is named first: its commit says "New commit" and is fine for now, while
+         `feature2` is a name nobody chose. */
+      setRenaming(
+        done.branch
+          ? { item, id: done.branch, what: "lane", seg: 0, text: done.branch }
+          : { item, id: done.id, what: "node", seg: 0, text: "New commit" },
+      );
+      writeBody(it, done.body);
+    },
+    [bodyOf, pickNode, writeBody],
+  );
+
+  const gitCommitOn = useCallback((item: string, branch: string) => gitAct(item, (b) => gitCommit(b, branch)), [gitAct]);
+  const gitBranchFrom = useCallback((item: string, from: string | null) => gitAct(item, (b) => gitBranch(b, from)), [gitAct]);
+  const renameBranch = useCallback(
+    (item: string, branch: string) => {
+      if (lockedRef.current) return refuseLocked();
+      /* `main` is where the parser starts and no line declares it, so there is nothing to rename. */
+      if (branch === "main" || !selected.has(item)) return;
+      setRenaming({ item, id: branch, what: "lane", seg: 0, text: branch });
+    },
+    [selected],
   );
 
   /* A rename belongs to one thing inside one item; anything that lets go of the pick lets go of it
@@ -1698,7 +1755,7 @@ export function useEditor({
         if (!moved) {
           if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < DRAG_SLOP) return;
           moved = true;
-          document.documentElement.dataset.dagNodeDrag = mode === "none" ? "refused" : "on";
+          document.documentElement.dataset.dagNodeDrag = "on";
           card.style.pointerEvents = "none";
           card.style.opacity = "0.5";
           card.style.zIndex = "3";
@@ -1709,7 +1766,6 @@ export function useEditor({
         by = { x: (ev.clientX - sx) / zoom, y: flat ? 0 : (ev.clientY - sy) / zoom };
         card.style.transform = `translate(${by.x}px, ${by.y}px)`;
         if (tools) tools.style.translate = `${by.x}px ${by.y}px`;
-        if (mode === "none") return;
 
         const under = document.elementFromPoint(ev.clientX, ev.clientY);
         const item = under?.closest<HTMLElement>("[data-dag-item]");
@@ -4329,6 +4385,9 @@ export function useEditor({
     renaming,
     commitRename,
     cancelRename,
+    gitCommit: gitCommitOn,
+    gitBranch: gitBranchFrom,
+    renameBranch,
     renameItem,
     renameNode,
     detach: detachItem,

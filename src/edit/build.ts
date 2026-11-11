@@ -370,8 +370,12 @@ export const detachable = (type: ItemType): boolean =>
  *
  * The item's own connect handles are untouched: a board-level link into a series or a participant
  * is an `edges` fence one layer up, and that grammar owns both ends.
+ *
+ * `gitgraph` is a graph and has no edge statement either: a parent link is the order of the
+ * commands, never a line of its own, so `c1 --> c2` there is an unknown command. Its history grows
+ * from the lanes instead — the `+` at a branch's tip, **+ New branch** — which is `GitLanes`.
  */
-export const growable = (type: string): boolean => hasGraph(type);
+export const growable = (type: string): boolean => hasGraph(type) && type !== "gitgraph";
 
 /**
  * A `sketch` item that is one shape and nothing else — what the library drops for "a circle".
