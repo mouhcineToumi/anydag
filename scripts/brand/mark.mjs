@@ -21,15 +21,15 @@
  *   src/ui/markPaths.ts                      the path data `Logo.tsx` draws in currentColor
  *   public/favicon.svg, site/assets/favicon.svg
  *   {docs,site}/assets/logo-{light,dark}.svg, {docs,site}/assets/wordmark-{light,dark}.svg
- * and, when `rsvg-convert` (librsvg) is on the PATH:
+ * and, rendered with resvg (`@resvg/resvg-js`, a dev dependency):
  *   desktop/icon.png (512), public/apple-touch-icon.png and site/assets/apple-touch-icon.png (180)
  *
  * The output is deterministic, so a run with no change to this file changes nothing.
  */
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Resvg } from "@resvg/resvg-js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -266,23 +266,12 @@ for (const dir of ["docs/assets", "site/assets"]) {
   write(`${dir}/wordmark-dark.svg`, wordmark(INK_DARK, ACCENT_DARK));
 }
 
-let rsvg = true;
-try {
-  execFileSync("rsvg-convert", ["--version"], { stdio: "ignore" });
-} catch {
-  rsvg = false;
-}
-if (!rsvg) {
-  console.log("rsvg-convert not found: the PNG icons were left as they are");
-} else {
-  for (const [rel, size] of [
-    ["desktop/icon.png", 512],
-    ["public/apple-touch-icon.png", 180],
-    ["site/assets/apple-touch-icon.png", 180],
-  ]) {
-    execFileSync("rsvg-convert", ["-w", String(size), "-h", String(size), "-o", path.join(ROOT, rel)], {
-      input: appIcon,
-    });
-    console.log(`  ${rel}`);
-  }
+for (const [rel, size] of [
+  ["desktop/icon.png", 512],
+  ["public/apple-touch-icon.png", 180],
+  ["site/assets/apple-touch-icon.png", 180],
+]) {
+  const png = new Resvg(appIcon, { fitTo: { mode: "width", value: size } }).render().asPng();
+  fs.writeFileSync(path.join(ROOT, rel), png);
+  console.log(`  ${rel}`);
 }

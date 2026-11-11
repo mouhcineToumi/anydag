@@ -128,6 +128,7 @@
     "@iconify-json/logos": "^1.2.19",
     "@iconify-json/simple-icons": "^1.2.101",
     "@playwright/test": "1.65.0",
+    "@resvg/resvg-js": "2.6.2",
     "@types/mdast": "^4.0.4",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",

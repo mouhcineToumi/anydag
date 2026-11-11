@@ -87,8 +87,8 @@ with `.dev-home/` as the app's home. See *The local server* and *The desktop app
 **The mark is drawn once, by `scripts/brand/mark.mjs`, and written everywhere it appears:**
 `src/ui/markPaths.ts` (which `src/ui/Logo.tsx` fills with `currentColor` and
 `var(--dag-color-accent)`, because no colour may appear in `src/`), the favicons in `public/` and
-`site/assets/`, the logos and wordmarks in `docs/assets/` and `site/assets/`, and, through
-`rsvg-convert`, `desktop/icon.png` and the two `apple-touch-icon.png`. Change the script and re-run
+`site/assets/`, the logos and wordmarks in `docs/assets/` and `site/assets/`, and, rendered with
+`@resvg/resvg-js`, `desktop/icon.png` and the two `apple-touch-icon.png`. Change the script and re-run
 it; never hand-edit one copy. The mark is a brush-pen drawing, so every line in it is a filled
 outline rather than a stroke: the line lands light, swells through the loop and lifts off to a point
 short of the dot, and the frame tapers where it starts and ends at the opening. It thins toward the
