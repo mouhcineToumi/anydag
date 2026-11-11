@@ -19,7 +19,7 @@
  *   one this whole feature was built around avoiding — it reads every wrapped line as a hard break.
  *   So `text/plain` is converted by `mdToBlocks` and inserted as BlockNote's own HTML; HTML from
  *   another app, and BlockNote's own clipboard, go through the default handler with its Markdown
- *   sniffing off.
+ *   sniffing off. The handler is `markdownPaste` in `./paste.ts`, shared with a quiz's fields.
  * - **The colours are the theme's.** `className="dag-blocks"` lands on the editor *and* on every
  *   menu BlockNote portals out of it, and `src/styles/blocks.css` maps each `--bn-*` onto a
  *   `--dag-*` there. The scheme follows the theme's, so `paper-dark` gets the dark editor.
@@ -56,14 +56,15 @@ import {
 import { LayoutDashboard, Sigma, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
-import { applySteps, mdToBlocks, type NoteBlock, type Step } from "@/note/markdown";
+import { applySteps, type NoteBlock, type Step } from "@/note/markdown";
 import { noteSchema } from "@/note/schema";
 import { readIndex } from "@/refs/useIndex";
 
 import { codeBlock } from "./code";
 import { EquationButton, equationBlock, insertEquation, mathInline, mathKeys } from "./math";
 import { syntaxColours } from "./syntax";
-import { OWN_SLASH, REF_TRIGGERS, SLASH_KEYS, pasteKind } from "./menus";
+import { OWN_SLASH, REF_TRIGGERS, SLASH_KEYS } from "./menus";
+import { markdownPaste } from "./paste";
 import { EMBED_TRIGGER, embedBlock, embedFor, refFor, refInline, refItems } from "./refs";
 
 /**
@@ -133,17 +134,7 @@ function useNoteEditor(props: BlockEditorProps) {
       initialContent: (initial.length ? initial : undefined) as never,
       uploadFile: upload,
       resolveFileUrl: async (url: string) => resolve(url),
-      pasteHandler: ({ event, editor, defaultPasteHandler }) => {
-        const data = event.clipboardData;
-        if (!data) return defaultPasteHandler();
-        if (pasteKind(Array.from(data.types), data.getData("text/html")) === "markdown") {
-          const text = data.getData("text/plain");
-          if (!text) return false;
-          editor.pasteHTML(editor.blocksToHTMLLossy(mdToBlocks(text) as never));
-          return true;
-        }
-        return defaultPasteHandler({ prioritizeMarkdownOverHTML: false, plainTextAsMarkdown: false });
-      },
+      pasteHandler: markdownPaste,
     },
     [],
   );

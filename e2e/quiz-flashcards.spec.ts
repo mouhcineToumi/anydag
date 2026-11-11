@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Locator, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
 
@@ -68,20 +68,27 @@ function recording(page: Page): { quiz: string; question: string; correct: boole
 
 const CHOICE = "## Which fields decide visibility? {#qvis}\n\n* [x] `xmin`\n* [x]   `xmax`\n* [ ] `ctid`\n";
 
+/** Open a rich field: a click, and the editor in its place with the caret in it. */
+async function open(field: Locator): Promise<void> {
+  await field.click();
+  await expect(field.locator('[contenteditable="true"]')).toBeFocused();
+}
+
 test("a flashcard added in the form is written with `card`, and no other byte moves", { tag: "@smoke" }, async ({ page }) => {
   const name = write("made", `---\ntitle: Cards\n---\n\n${CHOICE}`);
   await page.goto(`/?quiz=${name}`);
   await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(1);
   await page.locator("[data-dag-quiz-add-flashcard]").click();
   const added = page.locator("[data-dag-quiz-question]").last();
-  await expect(added.locator("[data-dag-quiz-flashcard]")).toHaveText("Flashcard");
+  await expect(added).toHaveAttribute("data-dag-quiz-kind", "card");
+  await expect(added.locator("[data-dag-quiz-kind-select]")).toHaveValue("card");
   /* A card has a front and a back, and nothing to choose between. */
   await expect(added.locator("[data-dag-quiz-option-text]")).toHaveCount(0);
   await expect(added.locator("[data-dag-quiz-add-option]")).toHaveCount(0);
-  await expect(added.locator("[data-dag-quiz-flashcard-toggle]")).toBeChecked();
-  await expect(added.locator("[data-dag-quiz-prompt]")).toBeFocused();
+  await expect(added.locator('[data-dag-quiz-prompt] [contenteditable="true"]')).toBeFocused();
   await page.keyboard.type("What is MVCC?");
-  await added.locator("[data-dag-quiz-why]").fill("Multi-version concurrency control.");
+  await open(added.locator("[data-dag-quiz-why]"));
+  await page.keyboard.type("Multi-version concurrency control.");
   await expect
     .poll(() => read("made"))
     .toMatch(/\n## What is MVCC\? \{#q[0-9a-z]{6} card\}\n\n> Multi-version concurrency control\.\n$/);
@@ -89,10 +96,27 @@ test("a flashcard added in the form is written with `card`, and no other byte mo
   expect(read("made")).toContain(CHOICE);
   await expect(added.locator("[data-dag-quiz-problem]")).toHaveCount(0);
 
-  /* Unticked, it is an open question: the same quote, `card` gone from the heading. */
-  await added.locator("[data-dag-quiz-flashcard-toggle]").uncheck();
+  /* Answered in words, it is an open question: the same quote, `card` gone from the heading. */
+  await added.locator("[data-dag-quiz-kind-select]").selectOption("written");
   await expect.poll(() => read("made")).toMatch(/\n## What is MVCC\? \{#q[0-9a-z]{6}\}\n\n> Multi-version/);
-  await expect(added.locator("[data-dag-quiz-flashcard]")).toHaveCount(0);
+  await expect(added).toHaveAttribute("data-dag-quiz-kind", "written");
+  /* And a flashcard again, with nothing asked: there were no answers to drop. */
+  await added.locator("[data-dag-quiz-kind-select]").selectOption("card");
+  await expect.poll(() => read("made")).toMatch(/\n## What is MVCC\? \{#q[0-9a-z]{6} card\}\n\n> Multi-version/);
+});
+
+test("turning a question with answers into a flashcard asks before it drops them", async ({ page }) => {
+  const name = write("turn", `---\ntitle: Cards\n---\n\n${CHOICE}`);
+  await page.goto(`/?quiz=${name}`);
+  const card = page.locator('[data-dag-quiz-question="qvis"]');
+  await card.locator("[data-dag-quiz-kind-select]").selectOption("card");
+  await expect(card.locator("[data-dag-quiz-drop-answers]")).toContainText("A flashcard");
+  expect(read("turn")).toContain(CHOICE);
+  await card.locator("[data-dag-quiz-drop-answers-yes]").click();
+  await expect.poll(() => read("turn")).toMatch(/## Which fields decide visibility\? \{#qvis card\}\n$/);
+  await expect(card).toHaveAttribute("data-dag-quiz-kind", "card");
+  /* A card with no back says so in words, and its fix is the Back field. */
+  await expect(card.locator('[data-dag-quiz-problem="EQ_NO_OPTIONS"]')).toContainText("back of this flashcard");
 });
 
 test("a run shows a card's front with nothing to type, Space shows the back, and a miss goes into Mistakes", async ({ page }) => {

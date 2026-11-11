@@ -15,6 +15,7 @@ import {
   RotateCcw,
   SendToBack,
   Sparkles,
+  SquareDashed,
   Trash2,
   Ungroup,
   X,
@@ -27,8 +28,11 @@ import { fileStem, saveFile } from "@/export/save";
 import { readSettings } from "@/settings/store";
 import { useSettings } from "@/settings/useSettings";
 
+import type { FragmentKind } from "@/dsl/sequence";
+
 import { chordFor } from "./bindings";
 import type { Draft, DraftDiagnostic } from "./generate";
+import { wrappable } from "./message";
 import type { Editor } from "./useEditor";
 
 /** Lucide at one size and weight, stated once, as the dock does. */
@@ -112,7 +116,7 @@ interface Props {
 export function SelectionBar({ editor, items, boardName, run, locked = false, onAsk, onAccept, onDiscard }: Props) {
   const bar = useRef<HTMLDivElement>(null);
   /* One menu at a time: Export, or the ⋯ that holds what is used least. */
-  const [menu, setMenu] = useState<null | "export" | "more">(null);
+  const [menu, setMenu] = useState<null | "export" | "more" | "wrap">(null);
   const exporting = menu === "export";
   const scale = useSettings().export.scale;
 
@@ -122,7 +126,18 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
   const busy = run.phase !== "idle";
   const anchor = busy && "id" in run && run.id ? [run.id] : items.map((it) => it.id);
   /* Delete and Duplicate do what their keys do, and the keys act on a pick before the selection. */
-  const inside = editor.pickedNode ? "card" : editor.pickedEdge ? "line" : null;
+  const seq = one?.type === "sequence";
+  const inside = editor.pickedNode
+    ? "card"
+    : editor.pickedEdge
+      ? seq
+        ? editor.pickedEdge.to
+          ? "messages"
+          : "message"
+        : "line"
+      : null;
+  /* A picked message, or a run of them, in one list of a sequence: what a fragment can be wrapped round. */
+  const wrap = seq && editor.pickedEdge?.item === one.id && wrappable(one.body, editor.pickedEdge);
 
   /* What `place` measures around, as of the last render — read through a ref so the listeners below
      are set up once rather than after every render. */
@@ -304,6 +319,41 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
 
           {locked ? null : (
             <>
+              {wrap ? (
+                <div className="dag-selbar__export">
+                  <button
+                    type="button"
+                    className={menu === "wrap" ? "dag-icon dag-icon--on dag-selbar__worded" : "dag-icon dag-selbar__worded"}
+                    data-dag-selbar-wrap=""
+                    aria-haspopup="menu"
+                    aria-expanded={menu === "wrap"}
+                    aria-label="Wrap in a fragment"
+                    title="Wrap the picked messages in a fragment: alt, opt, loop or par"
+                    onClick={() => setMenu((m) => (m === "wrap" ? null : "wrap"))}
+                  >
+                    <SquareDashed {...ICON} aria-hidden="true" />
+                    <span>Wrap in</span>
+                    <ChevronDown {...SMALL} aria-hidden="true" />
+                  </button>
+                  {menu === "wrap" ? (
+                    <div className="dag-more__menu dag-selbar__menu" role="menu">
+                      {WRAPS.map(([kind, what]) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          role="menuitem"
+                          className="dag-more__item"
+                          data-dag-wrap={kind}
+                          onClick={() => (setMenu(null), editor.wrapMessages(kind))}
+                        >
+                          <code>{kind}</code>
+                          <span>{what}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {many ? (
                 <Tool hook="group" label="Group: select and move these as one" keys="Ctrl+G" onClick={editor.group}>
                   <Group {...ICON} aria-hidden="true" />
@@ -444,6 +494,14 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
     </div>
   );
 }
+
+/** The four fragments, and what each one says about the messages inside it. */
+const WRAPS: [FragmentKind, string][] = [
+  ["alt", "one branch or another"],
+  ["opt", "only sometimes"],
+  ["loop", "over and over"],
+  ["par", "at the same time"],
+];
 
 /** The margin the toolbar keeps from the selection's furniture and from the canvas edges. */
 const GAP = 8;

@@ -29,8 +29,10 @@ interface Props {
    * draws all of them (`BoardEdges`); a diagram's edges belong to a memoised `Item`, so which one
    * is picked reaches them as a painted `data-dag-picked` instead — see `paint()` in `useEditor`.
    * Left `undefined` on both sides of a diff, React writes nothing here, so the paint stands.
+   *
+   * `extend` is shift held on the press, which a sequence reads as "and every message up to here".
    */
-  onPick?(id: string): void;
+  onPick?(id: string, extend: boolean): void;
   picked?: string | null;
   /**
    * Bend the picked line through a point: a handle at its middle, pulled.
@@ -129,7 +131,7 @@ export function Edges({ edges, width, height, theme, onPick, picked, onBend, onS
                 fill="none"
                 onPointerDown={(ev) => {
                   ev.stopPropagation();
-                  onPick(e.id);
+                  onPick(e.id, ev.shiftKey);
                 }}
               />
             ) : null}

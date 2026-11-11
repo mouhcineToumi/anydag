@@ -116,3 +116,29 @@ export function chordFor(command: Command): string | undefined {
   const b = BINDINGS.find((x) => x.command === command);
   return b && `${LEADER_LABEL} ${b.key.toUpperCase()}`;
 }
+
+/**
+ * The outliner keys: what a key does while a **mindmap topic** is picked.
+ *
+ * Not leader chords, and not in `BINDINGS`: a chord names a thing to make and waits for a letter,
+ * while these are pressed in runs — Tab, type, Enter, type — the way every outliner is. They are
+ * also *scoped*, which is the other reason they are apart: they mean something only with a topic
+ * picked, and with anything else picked or selected every one of these keys still does what it did
+ * (Enter opens the panel, Alt+arrows nudge, Tab leaves the canvas).
+ *
+ * That scope is also how the one clash is settled. Enter opens the panel for any other pick, and
+ * a topic wants it for "new sibling". On a topic the panel is one click away and a new topic is
+ * not, so the topic keeps the outliner's Enter; double-click renames, as it does everywhere.
+ *
+ * A pure function of the key, so the table is testable without a browser and `useEditor` stays a
+ * place where keys are turned into ops.
+ */
+export type TopicKey = "child" | "sibling" | "outdent" | "up" | "down";
+
+export function topicKeyFor(e: { key: string; shiftKey: boolean; altKey: boolean }): TopicKey | null {
+  if (e.key === "Tab" && !e.altKey) return e.shiftKey ? "outdent" : "child";
+  if (e.key === "Enter" && !e.altKey && !e.shiftKey) return "sibling";
+  if (e.altKey && !e.shiftKey && e.key === "ArrowUp") return "up";
+  if (e.altKey && !e.shiftKey && e.key === "ArrowDown") return "down";
+  return null;
+}

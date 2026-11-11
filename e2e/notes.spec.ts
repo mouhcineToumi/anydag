@@ -117,6 +117,21 @@ test("a save the server could not answer goes again on its own", async ({ page }
   problems = problems.filter((p) => !/status of 503/.test(p));
 });
 
+test("a note whose first read got no answer says so and reads again, rather than staying blank", async ({ page }) => {
+  /* #123: the read that opens a note waited behind the desktop's six held connections, and a page
+     whose read failed drew nothing at all — no text, no title, no word of why — for good. */
+  let refused = 0;
+  await page.route(`**/__board/get?name=${name}&kind=note*`, (route) =>
+    refused < 2 ? (refused++, route.fulfill({ status: 502, body: "anydag: the server is not answering" })) : route.fallback(),
+  );
+  await page.goto(`/?note=${name}`);
+  await expect(page.locator("[data-dag-note-unread]")).toBeVisible();
+  await expect(block(page, "The last paragraph.")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-dag-note-unread]")).toHaveCount(0);
+  expect(refused).toBe(2);
+  problems = problems.filter((p) => !/status of 502/.test(p));
+});
+
 test("a save the server refused waits for the next change", async ({ page }) => {
   /* A 4xx is an answer about the request, and the same request gets the same answer. */
   let puts = 0;

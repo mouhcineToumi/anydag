@@ -21,6 +21,7 @@ import { autoUpdater } from "electron-updater";
 /* The one module the shell borrows from the server: where `~/.anydag/` is, so the keys, the
    `server.json` readback and the shim live where the server writes them. */
 import { homeDir } from "../server/home";
+import { forward } from "./forward";
 import { serverHasStarted } from "./launch";
 
 /* -- what the app ships, and where it finds it --------------------------------------------- */
@@ -556,17 +557,13 @@ async function handleProtocol(request: Request): Promise<Response> {
   const url = new URL(request.url);
   if (isApiPath(url.pathname) && !trusted(request)) return new Response("not from the page", { status: 403 });
   if (serverPort > 0 && isApiPath(url.pathname)) {
-    const body = request.body;
-    const init: RequestInit & { duplex?: "half" } =
-      body === null
-        ? { method: request.method, headers: forwardHeaders(request.headers) }
-        : { method: request.method, headers: forwardHeaders(request.headers), body, duplex: "half" };
     try {
-      const res = await net.fetch(`http://127.0.0.1:${serverPort}${url.pathname}${url.search}`, init);
+      /* Not `net.fetch`: Chromium's six connections to a host, and a stream the page closed that was
+         never let go, are what blanked a note and froze the sidebar (#123) — see `forward.ts`. */
+      const res = await forward(request, serverPort, forwardHeaders(request.headers));
       /* The token never rode back and no cookie is needed — the server's gate was answered here. */
-      const headers = new Headers(res.headers);
-      headers.delete("set-cookie");
-      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+      res.headers.delete("set-cookie");
+      return res;
     } catch (e) {
       return new Response(`anydag: the server is not answering: ${(e as Error).message}`, { status: 502 });
     }

@@ -60,12 +60,12 @@ is the arithmetic that replaced the literal.
 Six things are load-bearing:
 
 - **`?snapshot=1` reads no preference at all** — not `dag:settings`, and not
-  `dag:theme` either. `scripts/snapshot.mjs`, `scripts/tidy.mjs` and every Playwright check open a
+  `dag:theme` or `dag:own-theme` either. `scripts/snapshot.mjs`, `scripts/tidy.mjs` and every Playwright check open a
   board that way, and a picture of a board must be a fact about the board rather than about whoever
   last opened it on this machine. The guarantee held **by accident** at first, because a fresh
   browser context has empty storage; a person pointing the snapshot script at a persistent profile
   got their own theme in the picture and nothing said so. `readSettings()` and `useTheme`'s third
-  argument are the mechanism. The query is read *per call*, never cached at module load: `App`
+  argument (and `readPref`, under the switch) are the mechanism. The query is read *per call*, never cached at module load: `App`
   rewrites it with `replaceState` as boards and pages are opened.
 - **A setting is read at the moment of the gesture, never threaded through `Item`.** `readSettings()`
   is a plain function called inside `onPaste`, `importFiles`, `exportAs` and the toolbar's per-item PNG.
@@ -88,9 +88,17 @@ Six things are load-bearing:
   every frame but the first. **And only a paste is**: an image imported or dropped from the computer
   is an attachment, kept exactly as it was uploaded, and the placement rule decides only its `w=`.
 - **The theme `<select>` became the gear** — net zero in a row that was thinned deliberately. The
-  theme keeps its own `dag:theme` key and its three sources in the same order (`?theme=` beats the stored
-  choice beats the board's `theme:` beats the default): it is the one preference with a third source
-  and its own test, and folding it into the object would be a migration for a key that is not wrong.
+  theme keeps its own `dag:theme` key, and its sources are ordered by `pickTheme` (`src/theme/pick.ts`,
+  a pure function with `test/theme-pick.test.ts`): `?theme=` beats the reader's own theme *if they
+  turned on* **Use my theme on every board** (`dag:own-theme`, Preferences → Appearance, **off** by
+  default) beats the board's `theme:` beats the reader's stored choice beats the default. So a board
+  that names a look is drawn in it unless the reader asked for their own everywhere; it used to be
+  the reader's theme first, which made a `theme:` written in a file — by *Board settings* or by an
+  agent — invisible to anyone who had ever opened this select (#142). `dag:own-theme` is in
+  `PREF_KEYS` and in the vault's half beside `dag:theme`, and like it is not read under `?snapshot=1`.
+  The select shows the reader's own pick (`useTheme`'s `own`), not what is drawn, so choosing on a
+  board with its own look does not snap back. The theme is the one preference with a third source and
+  its own test, and folding it into the object would be a migration for a key that is not wrong.
   Choosing a theme while a `?theme=` is present clears the query key, because choosing now is choosing.
 - **The modal takes focus and owns its own Escape.** `typing()` in `useEditor` counts a focused
   `BUTTON`, `SELECT` or `INPUT` as somebody typing and leaves the keys alone — correctly — so the
@@ -127,7 +135,7 @@ Names claimed, grepped first as this file has learned to: `dag-settings`, `dag-s
 — and for the modal `dag-settings-modal*`, `data-dag-settings-tab`, `data-dag-settings-tab-button`,
 `data-dag-settings-pane`, `data-dag-settings-group`, `data-dag-settings-view`, `data-dag-settings-back`,
 `data-dag-settings-close`, `data-dag-vault-settings`, and the
-storage key `dag:settings-tab`. `dag-settings__*` is also the vocabulary of other cards (the rewrite
+storage key `dag:settings-tab`, `data-dag-setting-own-theme`. `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
 the translucent elevation colour every dialog and floating card draws with — because a shadow is a

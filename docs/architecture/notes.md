@@ -52,7 +52,9 @@ Seven things are load-bearing:
   the caret stays — outside the undo history, so ctrl+Z never takes back the other writer's edit. A
   save that meets a moved text is merged with `merge3` against the text both started from, which
   succeeds whenever the two edited different lines; otherwise the page asks, *Keep mine* or *Use
-  theirs*, and writes nothing until it is answered.
+  theirs*, and writes nothing until it is answered. **The read that opens a note is never left
+  blank**: a 5xx or no answer at all is not "there is no such note", so the page says it could not
+  read it (`data-dag-note-unread`) and reads again on the save's own backoff (#123).
 - **One namespace, a `kind` beside the name.** A vault is a folder, so a name is one file:
   `server/names.ts` classifies a path by its suffix (`.board.md`, `.quiz.md`, `.table.md`, `.md` or
   `.note.md` for a note) and refuses a second file that would give a name two kinds. The
@@ -64,7 +66,9 @@ Seven things are load-bearing:
 - **The editor is a lazy chunk.** `src/blocks/index.ts` is `React.lazy`, so a board never loads
   BlockNote, TipTap, ProseMirror or Mantine, and `?snapshot=1` of a note draws it through
   `react-markdown` read-only — a picture of a note is a fact about the file. The 45 visual baselines
-  are therefore untouched by construction. Mantine is **8**, not 9: 9 wants React 19.
+  are therefore untouched by construction. Mantine is **8**, not 9: 9 wants React 19. Beside it,
+  lazy the same way, is `FieldEditor`, the one-field editor a quiz's form mounts (see *Quizzes*): the note's
+  bridge, paste (`src/blocks/paste.ts`), references and equations, on a schema cut to `FIELD_BLOCKS`.
 - **The colours are the theme's.** `className="dag-blocks"` lands on the editor and on every menu
   BlockNote portals out of it, and `src/styles/blocks.css` sets each `--bn-*` from a `--dag-*` there,
   two classes and an attribute deep so it wins whichever stylesheet loads last. It is chrome in
@@ -104,7 +108,7 @@ The read-only note — `?view=1`, `?snapshot=1` — draws the title as the page'
 
 Names claimed, grepped first: `dag-note-view*`, `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
 (a list row), `data-dag-note-view`, `data-dag-note-editor`, `data-dag-note-conflict`,
-`data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`,
+`data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`, `data-dag-note-unread`,
 `data-dag-new-note`, `data-dag-new-note-here`, `data-dag-welcome-note`, `dag-note-title`,
 `data-dag-note-title`, `data-dag-note-title-read`, and the SSE event
 `dag:note`. `data-dag-note` is one letter from `data-dag-dock`; they are different attributes, and

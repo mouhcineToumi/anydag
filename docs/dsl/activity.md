@@ -16,6 +16,9 @@
     html & pdf --> j1
     j1 --> ready --> [*]
 
+`start <id>` and `end <id>` declare the filled dot and the ringed one with an id, the way `fork f1`
+declares a bar — `[*]` inside an edge still draws the same two, one per mention. They take no text.
+
 `fork` and `join` are solid ink bars that stretch to span their branches — the one place ink is a
 fill rather than a text colour.
 

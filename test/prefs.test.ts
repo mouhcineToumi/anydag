@@ -9,7 +9,6 @@ import {
   FILE_LIST,
   PREF_KEYS,
   QUIZ_ABOUT,
-  QUIZ_MODE,
   SETTINGS_TAB,
   SIDEBAR_FOLDERS,
   STAMP,
@@ -134,7 +133,6 @@ describe("the preference list", () => {
       SYNC,
       SIDEBAR_FOLDERS,
       TASKS_VIEW,
-      QUIZ_MODE,
       QUIZ_ABOUT,
       SETTINGS_TAB,
       CALENDAR_VIEW,
@@ -158,8 +156,6 @@ describe("the preference list", () => {
     expect(PREF_KEYS as readonly string[]).not.toContain(SIDEBAR_FOLDERS);
     /* Nor is whether the Tasks page is a list or a board. */
     expect(PREF_KEYS as readonly string[]).not.toContain(TASKS_VIEW);
-    /* Nor which half of a quiz's form this browser last used. */
-    expect(PREF_KEYS as readonly string[]).not.toContain(QUIZ_MODE);
     /* Nor whether a run's About panel is folded away. */
     expect(PREF_KEYS as readonly string[]).not.toContain(QUIZ_ABOUT);
     /* Nor which tab of the Settings modal was open last. */
@@ -183,7 +179,13 @@ describe("the preference list", () => {
     expect(ACCOUNT_PREF_KEYS.filter((k) => (VAULT_PREF_KEYS as readonly string[]).includes(k))).toEqual([]);
     /* The settings card and the favourites switch with the vault, and how
        the window is laid out does not. */
-    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:theme", "dag:update-links"]);
+    expect([...VAULT_PREF_KEYS].sort()).toEqual([
+      "dag:attachments",
+      "dag:favourites",
+      "dag:own-theme",
+      "dag:theme",
+      "dag:update-links",
+    ]);
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {

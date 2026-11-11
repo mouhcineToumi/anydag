@@ -71,6 +71,10 @@ Seven things are load-bearing:
   or label reaches past the top or the left by whole grid steps, routes again, and sizes the frame
   to the lines and labels too — `layoutGraph`'s `labelReach` rule, with `routeReach` beside it.
   The move comes off `origin`, so a box plus `origin` is still the file's number.
+- **A shape, a group and a frame each take a width and a height from the panel.** The eight handles on
+  a sketch scale the whole drawing, so one shape's own `w=`/`h=` — or a frame's — had only the source;
+  the properties view's Width and Height write them on that one statement (`setExtent`), in a `sketch`
+  and in any fence opened `layout=fixed`.
 - **`resizeOf("sketch")` is `box`.** `aspect` would be a lie, since nothing folds, and `none` would
   leave the one type whose whole premise is hand-placed geometry with no handle at all.
 
