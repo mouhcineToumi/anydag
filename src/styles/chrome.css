@@ -2170,6 +2170,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 .dag-props__add:hover,
 .dag-props__convert button:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+/* A topic move the grammar refuses (the root has no siblings) stays on the panel, dimmed, so the
+   row does not change shape from one topic to the next. */
+.dag-props__add:disabled { opacity: 0.45; cursor: default; }
+.dag-props__add:disabled:hover { color: var(--dag-color-slate); border-color: var(--dag-color-outline); }
 .dag-props__convert { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .dag-icon--tiny { width: 24px; height: 24px; flex: none; }
 .dag-input--mono { font-family: var(--dag-font-mono); font-size: 12px; }

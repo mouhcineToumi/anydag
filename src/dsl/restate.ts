@@ -1361,6 +1361,240 @@ export function takeBodyDir(body: string): { body: string; dir: "LR" | "TB" } | 
   return { body: lines.join("\n"), dir: last.dir };
 }
 
+/* ------------------------------------------------------------ growing and restructuring a mindmap */
+
+/**
+ * One topic line as the parser reads it: where it is, how deep, and which topic it hangs from.
+ *
+ * The parent is found the way `parseMindmap` finds it — pop everything at least as deep, take what
+ * is left — so a file that mixes tabs and spaces, or indents by three, gives the answer the page
+ * draws rather than the one a fixed two-space grid would. Lines are 1-based, which is what every
+ * other writer here takes.
+ */
+interface TopicRow {
+  line: number;
+  depth: number;
+  parent: number | null;
+}
+
+function topicRows(lines: string[]): TopicRow[] {
+  const rows: TopicRow[] = [];
+  const stack: TopicRow[] = [];
+  lines.forEach((text, i) => {
+    if (!topicLine(text)) return;
+    const depth = depthOf(text);
+    while (stack.length && stack[stack.length - 1]!.depth >= depth) stack.pop();
+    const row: TopicRow = { line: i + 1, depth, parent: stack[stack.length - 1]?.line ?? null };
+    rows.push(row);
+    stack.push(row);
+  });
+  return rows;
+}
+
+/** One level of indent, in whatever the author used: a tab if their tree has one, else two spaces. */
+const unitOf = (lines: string[]): string => (lines.some((l) => topicLine(l) && indentOf(l).includes("\t")) ? "\t" : "  ");
+
+/** The topic's parent line, or `null` for the top of the tree — and for a line that is not a topic. */
+export function topicParent(body: string, line: number): number | null {
+  return topicRows(splitLines(body)).find((r) => r.line === line)?.parent ?? null;
+}
+
+/** What a topic can be asked to do, so a control can be offered only where it would act. */
+export interface TopicMoves {
+  /** A child is always possible: the tree has no limit on how wide a topic grows. */
+  child: boolean;
+  /** The top of the tree has no siblings — a second line at depth 0 would be a second root. */
+  sibling: boolean;
+  /** Under the sibling just above it, which is the only thing "indent" can mean in a tree. */
+  indent: boolean;
+  /** Out to the parent's level. Not from directly under the root, which would make a second one. */
+  outdent: boolean;
+  up: boolean;
+  down: boolean;
+  /** Everything but the top, which already is one. */
+  root: boolean;
+}
+
+export function topicMoves(body: string, line: number): TopicMoves {
+  const rows = topicRows(splitLines(body));
+  const at = rows.find((r) => r.line === line);
+  if (!at) return { child: false, sibling: false, indent: false, outdent: false, up: false, down: false, root: false };
+  const sibs = rows.filter((r) => r.parent === at.parent);
+  const i = sibs.indexOf(at);
+  const parent = rows.find((r) => r.line === at.parent);
+  return {
+    child: true,
+    sibling: at.parent !== null,
+    indent: at.parent !== null && i > 0,
+    outdent: parent !== undefined && parent.parent !== null,
+    up: at.parent !== null && i > 0,
+    down: at.parent !== null && i < sibs.length - 1,
+    root: at.parent !== null,
+  };
+}
+
+/**
+ * A new topic: the last child of the one on `line`, or the sibling right after it and its subtree.
+ *
+ * It goes **after** everything the topic holds, so a sibling lands where an outliner puts one — below
+ * the whole branch, not between a parent and its first child — and a child joins the end of the
+ * family. The indent is the one the neighbours already use (the first child's, or one level past the
+ * parent), so a file written with tabs or with four spaces stays that way.
+ *
+ * Returns the new line's number alongside the body, because a topic has no id to hand back: the
+ * parser numbers them as it reads, so the caller finds the new one by parsing and asking for that
+ * line. `null` for a sibling of the top of the tree (that would be a second root) or a line that is
+ * not a topic.
+ */
+export function addTopic(body: string, line: number, as: "child" | "sibling", text = "New topic"): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at) return null;
+  if (as === "sibling" && at.parent === null) return null;
+
+  const own = indentOf(lines[line - 1]!);
+  const first = rows.find((r) => r.parent === line);
+  const indent = as === "sibling" ? own : first ? indentOf(lines[first.line - 1]!) : own + unitOf(lines);
+  const end = topicSpan(body, line).to;
+  return { body: [...lines.slice(0, end), `${indent}${text}`, ...lines.slice(end)].join("\n"), line: end + 1 };
+}
+
+/** A topic edit's answer: the new body, and the line the topic that was acted on now sits on. */
+export interface TopicEdit {
+  body: string;
+  line: number;
+}
+
+/**
+ * Lines `s` moved to sit before the original line index `at`, re-indented so the topic starts at
+ * `indent`. `at` is an index into the lines as they are *now*; the cut shifts what follows it, and
+ * that arithmetic is done here once rather than by every caller.
+ */
+function relocate(lines: string[], s: { from: number; to: number }, at: number, indent: string): TopicEdit {
+  const delta = indent.replace(/\t/g, "  ").length - depthOf(lines[s.from - 1] ?? "");
+  const moved = lines
+    .slice(s.from - 1, s.to)
+    .map((l) =>
+      l.trim() === "" || delta === 0 ? l : delta > 0 ? " ".repeat(delta) + l : l.slice(Math.min(-delta, indentOf(l).length)),
+    );
+  const rest = [...lines.slice(0, s.from - 1), ...lines.slice(s.to)];
+  const to = at >= s.to ? at - moved.length : at;
+  rest.splice(to, 0, ...moved);
+  return { body: rest.join("\n"), line: to + 1 };
+}
+
+/**
+ * Outdent: the topic and its subtree leave their parent and sit right after it, one level out.
+ *
+ * Siblings that were below it stay where they were, under the old parent — the plain reading of
+ * "move this one out", and the one a person can predict. `null` for the top of the tree and for a
+ * child of the top, because the level above that is depth 0 and a mindmap has one root.
+ */
+export function outdentTopic(body: string, line: number): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  const parent = rows.find((r) => r.line === at?.parent);
+  if (!at || !parent || parent.parent === null) return null;
+  return relocate(lines, topicSpan(body, line), topicSpan(body, parent.line).to, indentOf(lines[parent.line - 1]!));
+}
+
+/** Indent: the topic and its subtree become the last children of the sibling just above them. */
+export function indentTopic(body: string, line: number): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at || at.parent === null) return null;
+  const sibs = rows.filter((r) => r.parent === at.parent);
+  const prev = sibs[sibs.indexOf(at) - 1];
+  if (!prev) return null;
+  const first = rows.find((r) => r.parent === prev.line);
+  const indent = first ? indentOf(lines[first.line - 1]!) : indentOf(lines[prev.line - 1]!) + unitOf(lines);
+  return relocate(lines, topicSpan(body, line), topicSpan(body, prev.line).to, indent);
+}
+
+/** Swap a topic, with its subtree, past the sibling above (`-1`) or below (`1`). */
+export function shiftTopic(body: string, line: number, by: -1 | 1): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at || at.parent === null) return null;
+  const sibs = rows.filter((r) => r.parent === at.parent);
+  const next = sibs[sibs.indexOf(at) + by];
+  if (!next) return null;
+  const indent = indentOf(lines[next.line - 1]!);
+  const to = by < 0 ? next.line - 1 : topicSpan(body, next.line).to;
+  return relocate(lines, topicSpan(body, line), to, indent);
+}
+
+/**
+ * Make a topic the root: the tree is turned over so the topic is the top and everything that was
+ * above it hangs below it.
+ *
+ * What "root" means in a tree written as indentation is *the line at depth 0*, so choosing a new one
+ * is re-hanging the tree from it. The topic keeps its own children, and its old parent becomes one
+ * more of them — with its other children under it, and its old parent after those, and so on up to
+ * the old top. Nothing is lost and no topic changes its text; the `root` word moves from the old top
+ * to the new one, because it names the topic the drawing hangs from.
+ *
+ * The whole tree is written out again at one indent unit, which is the one place a writer here
+ * touches lines it was not pointed at: depth *is* the indent, and a branch that changed parent has a
+ * new depth whatever the author typed. A comment or blank line travels with the topic that follows
+ * it. Lines outside the tree (above its top, or after its last topic) are not touched.
+ */
+export function makeRoot(body: string, line: number): TopicEdit | null {
+  const lines = splitLines(body);
+  const rows = topicRows(lines);
+  const at = rows.find((r) => r.line === line);
+  if (!at || at.parent === null) return null;
+
+  const chain: TopicRow[] = [];
+  for (let r: TopicRow | undefined = at; r; r = rows.find((x) => x.line === r!.parent)) chain.push(r);
+  const top = chain[chain.length - 1]!;
+  const range = topicSpan(body, top.line);
+
+  /* A comment or blank is the lead of the topic that follows it, so it stays attached to it when
+     the topics are reordered. Whatever precedes the top, or trails the last topic, is outside the
+     range and is never read. */
+  const lead = new Map<number, string[]>();
+  let carry: string[] = [];
+  for (let n = top.line; n <= range.to; n++) {
+    if (topicLine(lines[n - 1])) {
+      lead.set(n, carry);
+      carry = [];
+    } else carry.push(lines[n - 1]!);
+  }
+
+  const kids = new Map<number, number[]>();
+  for (const r of rows) if (r.parent !== null) kids.set(r.parent, [...(kids.get(r.parent) ?? []), r.line]);
+  const next = (n: number): number[] => {
+    const i = chain.findIndex((c) => c.line === n);
+    if (i === -1) return kids.get(n) ?? [];
+    const was = chain[i - 1]?.line;
+    const up = chain[i + 1]?.line;
+    return [...(kids.get(n) ?? []).filter((k) => k !== was), ...(up === undefined ? [] : [up])];
+  };
+
+  const unit = unitOf(lines);
+  const out: string[] = [];
+  const emit = (n: number, depth: number): void => {
+    out.push(...(lead.get(n) ?? []));
+    const text = lines[n - 1]!.trim();
+    /* Only the two lines that change role touch the word: a deeper topic that merely starts with
+       "root" (a root-cause analysis) is the author's text and stays exactly as written. */
+    const bare = n === line || n === top.line ? text.replace(/^root\b\s*/, "") || text : text;
+    out.push(unit.repeat(depth) + (n === line ? `root ${bare}` : bare));
+    for (const k of next(n)) emit(k, depth + 1);
+  };
+  emit(line, 0);
+
+  return {
+    body: [...lines.slice(0, top.line - 1), ...out, ...lines.slice(range.to)].join("\n"),
+    line: top.line + (lead.get(line)?.length ?? 0),
+  };
+}
+
 /* ------------------------------------------------------------------------------ the chart */
 
 /**

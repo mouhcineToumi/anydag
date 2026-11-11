@@ -71,6 +71,9 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | the properties view's Shape, on a picked group in `usecase` or `c4` | the line's first word, `group` or `system` |
 | the properties view's Add start · Add end, on a picked card in `state` or `activity` | `start <id>` (or `end <id>`) after the picked statement, in its block, plus `<id> --> picked` (or `picked --> <id>`) — one commit |
 | the library's Start · End (`state`, `activity`) · its Group (`erd`, `class`, `state`) | a `start <id>` / `end <id>` statement, or a `group` holding one card, appended to the diagram |
+| the `+` on a picked mindmap topic · Tab · Enter | a new line, `New topic`, as the last child (the outer `+`, Tab) or right after the branch at the same indent (the lower `+`, Enter) — one commit, rename open on it |
+| Shift+Tab · Alt+↑/↓ on a picked mindmap topic, and the panel's Indent · Outdent · Move up · Move down | the topic and its subtree re-indented or swapped past a sibling — the same lines in a different order, nothing re-typed |
+| the panel's Make root on a mindmap topic | the whole tree re-hung from that topic, which takes the `root` word; every topic keeps its text |
 | a round handle on a picked card, dropped on another card in the same diagram | `a --> b` appended to that diagram's body, never to `edges` |
 | the same drop on a card's row, or on a group's boundary | `a --> card.row` · `a --> group` in the diagram's body; across two items it names the whole card, which is all an `edges` fence can say |
 | the same drop with shift held · with alt held | folded into a statement that is there — `a --> c` and a drop from `b` onto `c` is `a & b --> c`; `f --> a` and a drop from `f` onto `b` is `f --> a & b` · carried on, `a --> b` from `b` onto `c` is `a --> b --> c`; with nothing to join, the plain edge |
@@ -393,6 +396,48 @@ and flag controls on one. `grow(…, { pseudo })` writes one off a picked card �
 it, an end state pointed at, whichever handle asked — and a `+` from a start or end state grows a real
 card, never a second dot. A legacy `[*]` is still not pickable as its own statement (its "declaration"
 is the edge line), so it has no Wrap and no Delete of its own; removing one is deleting its edge.
+
+**A mindmap grows by indentation, so its `+` writes a line and no edge.** `grow()` returns `null` for
+one — there is no kind word to copy and `a --> b` in a mindmap body is a topic with that for its
+name — and `growTopic()` is what the topic's `+` calls instead: `addTopic` in `restate.ts`, the
+mindmap's writer, puts `New topic` after everything the picked topic holds (a child as the last
+child, at the indent the first child already has; a sibling right after the branch, so it lands
+where an outliner puts one and never between a parent and its first child). The id is the parser's
+counter, which no writer can hand back, so `growTopic` parses the body it just wrote and asks which
+topic sits on the new line. A picked topic therefore wears **two `+` and no round handles**
+(`topicHandles` in `pick.ts`, drawn by `NodeHandles`): the child's on the side *away from the
+root* — read from the layout's boxes, because a radial map puts a topic wherever ELK chose and the
+file says nothing about it — and the sibling's below, or to the right for a topic that grows up or
+down the page. The root has no sibling `+`: a second line at depth 0 is a second root. Both are a
+tap, not a pull — a topic's place is its indentation, so there is nothing for a pull to say.
+
+**The outliner keys are scoped to a picked topic**, and that scope is how their clashes are settled
+(`topicKeyFor` in `bindings.ts`; it is not a leader chord, because these are pressed in runs). Tab
+a new child, Enter a new sibling (a child on the root, which has none), Shift+Tab out one level,
+Alt+↑/↓ past a sibling. With anything else picked every one of them still means what it did: Enter
+opens the panel, Alt+arrows nudge. The one real clash is Enter, which opened the panel for every
+pick; on a topic the panel is one click away (the toolbar's Edit) and a new topic is not, so the
+topic keeps the outliner's Enter. A key with no move to make — Shift+Tab from directly under the
+root — is still taken, because letting Tab through would walk the focus off the canvas mid-run.
+Moving a topic gives the *same topic* a different id (the counter restarts at every line), so
+`moveTopicPick` re-aims the pick at the line the topic moved to; the panel's buttons do the same
+through `pickFromLine`.
+
+**The restructuring writers all go through `topicRows`**, which finds a parent the way
+`parseMindmap` does — pop everything at least as deep, take what is left — so a file mixing tabs
+and spaces, or indenting by three, is read as the page draws it. Outdent stops at a child of the
+root and `topicMoves()` says so, which is also what disables the panel's buttons: a dimmed button
+is the grammar answering, not a click that quietly does nothing. **Make root turns the tree over**:
+the topic keeps its own children and its old parent becomes one more of them, with that parent's other
+children under it, and so on up to the old top — depth *is* the indent, so a branch that changed
+parent has a new depth whatever was typed. It is the one writer here that rewrites lines it was not
+pointed at (the tree, at one indent unit), and a comment or blank line travels with the topic that
+follows it.
+
+**A mindmap line is bare text, so the panel offers it no hue, status, icon or flags** — `hue=coral`
+or `done` written onto a topic is part of its name (`Topic hue=coral`), because `parseMindmap` reads
+no modifier. Its colour is its branch's, from depth. A chart is left out of the same controls for the
+same reason, one dialect over.
 
 **In a fixed fence the coordinate is the placement, so the edge is a separate claim only a drag
 makes.** Everywhere else the edge *is* the placement — ELK has no reason to put an unconnected card

@@ -33,7 +33,7 @@ import type { Tool, ViewportHandle } from "@/canvas/Viewport";
 import { boardToSvg, itemToSvg } from "@/export/svg";
 import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
-import { bindingFor, CHORD_MS, LEADER_CODE, WHICHKEY_MS, type Command } from "@/edit/bindings";
+import { bindingFor, CHORD_MS, LEADER_CODE, topicKeyFor, WHICHKEY_MS, type Command } from "@/edit/bindings";
 
 import { renameItemId, renameNodeLinks } from "@/board/rename";
 import { repairFrontmatter, retypeFence } from "@/board/repair";
@@ -41,12 +41,14 @@ import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
 import {
+  outdentTopic,
   removeEdge,
   removeNode,
   replaceLine,
   setEdgeLabel,
   setLinkVia,
   setTitle,
+  shiftTopic,
   stripCoords,
   wrapStatement,
   type WrapOpts,
@@ -81,6 +83,7 @@ import {
   freshNodeId,
   grow,
   growable,
+  growTopic,
   hasPseudo,
   loneShape,
   pinUnplaced,
@@ -322,6 +325,12 @@ export interface EditorCtl {
   ): void;
   /** A press on a `+` handle: grow a second card out of the picked one, on that side. */
   grow(id: string, e: ReactPointerEvent, el: HTMLElement, side: ConnectSide): void;
+  /**
+   * A press on a mindmap topic's `+`: a new topic under the picked one (`child`) or beside it
+   * (`sibling`). A tap and nothing else — a topic's place is its indentation, so there is nothing
+   * for a pull to say — and the rename opens on the new topic, as it does for any other `+`.
+   */
+  growTopic(e: ReactPointerEvent, as: "child" | "sibling"): void;
   /**
    * A press on the bend handle at a picked link's middle: pull the line through a point.
    *
@@ -1782,6 +1791,53 @@ export function useEditor({
   }, [bodyOf, laidOutIn, writeShifted]);
 
   /**
+   * A new mindmap topic under the picked one, or beside it, with the rename already open on it.
+   *
+   * The pick moves to the new topic so the next key acts on it, which is what makes Tab, type,
+   * Enter, type a way to write a whole outline. One commit, so one undo takes the topic back.
+   * `false` when there was nothing to do — the top of the tree has no sibling — so a caller can
+   * fall back to the thing that does make sense there.
+   */
+  const growTopicFrom = useCallback(
+    (as: "child" | "sibling"): boolean => {
+      const p = pickedNodeRef.current;
+      const it = p && bodyOf(p.item);
+      if (!p || !it || it.type !== "mindmap") return false;
+      const made = growTopic(it.body, p.node, as);
+      if (!made) return false;
+      setPickedNode({ item: it.id, node: made.id });
+      setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
+      writeBody(it, made.body);
+      return true;
+    },
+    [bodyOf, writeBody],
+  );
+
+  /**
+   * Outdent the picked topic, or move it past the sibling above or below.
+   *
+   * A topic's id is the parser's counter, so a move gives the *same topic* a different id; the pick
+   * is re-aimed at the line it moved to, or the next key would act on whichever topic now holds the
+   * old number.
+   */
+  const moveTopicPick = useCallback(
+    (op: "outdent" | "up" | "down"): boolean => {
+      const p = pickedNodeRef.current;
+      const it = p && bodyOf(p.item);
+      if (!p || !it || it.type !== "mindmap") return false;
+      const line = declaredAt(it.type, it.body, p.node, it.dir);
+      if (line === null) return false;
+      const made = op === "outdent" ? outdentTopic(it.body, line) : shiftTopic(it.body, line, op === "up" ? -1 : 1);
+      if (!made) return false;
+      const at = declaredOn(it.type, made.body, made.line, it.dir);
+      if (at) setPickedNode({ item: it.id, node: at.id });
+      writeBody(it, made.body);
+      return true;
+    },
+    [bodyOf, writeBody],
+  );
+
+  /**
    * Detach: the diagram keeps exactly the drawing it has, and the coordinates become the author's.
    *
    * Both halves in one op. `layout=fixed` on its own would be a *different diagram* — see `detach`
@@ -2886,6 +2942,20 @@ export function useEditor({
       addEventListener("pointercancel", onUp);
     };
 
+    /** The `+` on a mindmap topic: a press, and the topic is made when the button is let go. */
+    const growTopicHandle: EditorCtl["growTopic"] = (e, as) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const onUp = () => {
+        removeEventListener("pointerup", onUp);
+        /* Eat the click that ends the gesture, or the release selects whatever is under it. */
+        addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
+        growTopicFrom(as);
+      };
+      addEventListener("pointerup", onUp);
+    };
+
     const rename: EditorCtl["rename"] = (id, el) => {
       const at = nameableUnder(el);
       return at ? startRename(id, at) : false;
@@ -2907,6 +2977,7 @@ export function useEditor({
       bendLink: held(bendLink, undefined),
       straightenLink: held(straightenLink, undefined),
       grow: held(growHandle, undefined),
+      growTopic: held(growTopicHandle, undefined),
       rename: held(rename, true),
       open: held(open, undefined),
       remove: held(remove, undefined),
@@ -2937,6 +3008,7 @@ export function useEditor({
     pickEdge,
     clearPick,
     growFrom,
+    growTopicFrom,
     startRename,
     nodeDrag,
     writePrompt,
@@ -3748,6 +3820,20 @@ export function useEditor({
       if (mod && e.key === ",") return (take(), onSettingsRef.current?.());
       if (mod) return;
 
+      /* The outliner keys, ahead of the switch because Enter and the arrows mean something else for
+         every other pick — and only here, with a topic picked, do they mean this. A key that has no
+         move to make (outdent from directly under the root) is still taken: letting Tab through
+         would walk the focus off the canvas in the middle of a run of them. */
+      const topicKey = pn && bodyOf(pn.item)?.type === "mindmap" ? topicKeyFor(e) : null;
+      if (topicKey) {
+        take();
+        if (lockedRef.current) return void refuseLocked();
+        if (topicKey === "child") growTopicFrom("child");
+        else if (topicKey === "sibling") growTopicFrom("sibling") || growTopicFrom("child");
+        else moveTopicPick(topicKey);
+        return;
+      }
+
       switch (e.key) {
         case "Escape":
           /* A card over the board first: it sits over everything, and its Escape must not also
@@ -3943,6 +4029,7 @@ export function useEditor({
   }, [
     enabled,
     add,
+    bodyOf,
     bringToFront,
     clear,
     clearPick,
@@ -3951,11 +4038,13 @@ export function useEditor({
     duplicatePickedNode,
     flushNudge,
     group,
+    growTopicFrom,
     history,
     importFiles,
     insert,
     links,
     move,
+    moveTopicPick,
     open,
     paintMove,
     redo,
