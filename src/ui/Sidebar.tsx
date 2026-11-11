@@ -487,8 +487,13 @@ export function Sidebar({
   const locked = useLocked();
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
-  /* The New row's menu, and where on the glass it hangs: beside the row, or under it on a sheet. */
-  const [making, setMaking] = useState<{ x: number; y: number; below: number; left: number } | null>(null);
+  /*
+   * The New row's menu, and where on the glass it hangs: beside the row (under it on a sheet), or
+   * — right-clicked on the tree's own empty space — at the pointer. `here` is the folder the menu's
+   * head names and makes into: the open file's folder from the `+`, the top level from the tree,
+   * which has no row to be in and around which there is nothing else.
+   */
+  const [making, setMaking] = useState<{ x: number; y: number; below: number; left: number; here: string } | null>(null);
   /* Whether the gesture that is ending was a drag, so the click after it does not also open the
      file somebody was only filing away. Cleared when a press starts, never in `onClick`: a drop on
      another row ends on a different element and dispatches no click at all, and a flag waiting for
@@ -1362,7 +1367,17 @@ export function Sidebar({
           onClick={(e) => {
             if (locked) return void refuseLocked();
             const r = e.currentTarget.getBoundingClientRect();
-            setMaking(making ? null : { x: r.left, y: r.bottom + 4, below: r.bottom + 4, left: r.left });
+            setMaking(
+              making
+                ? null
+                : {
+                    x: r.left,
+                    y: r.bottom + 4,
+                    below: r.bottom + 4,
+                    left: r.left,
+                    here: currentName ? parentOf(currentName) : "",
+                  },
+            );
           }}
         >
           <Plus {...SMALL} aria-hidden="true" />
@@ -1399,6 +1414,16 @@ export function Sidebar({
           for (const el of overMarks(listRef.current)) delete el.dataset.dagSidebarOver;
           const over = (e.target as Element).closest<HTMLElement>("[data-dag-sidebar-drop]");
           sendFiles(list, over?.dataset.dagSidebarDrop ?? "");
+        }}
+        /* The browser's own menu is kept off the column, as a row's is: the tree answers right-clicks.
+           A row — and whatever hangs off it, its `⋯` and its folder's *Empty* line — is that row's
+           menu's; the tree's own space, below the rows and around the nothing-here line, is the
+           **top level's**: the `+` menu, at the pointer, making into the folder the tree says is
+           nothing — where there is no row to be in. */
+        onContextMenu={(e) => {
+          if ((e.target as Element).closest(".dag-sidebar__line")) return;
+          e.preventDefault();
+          setMaking({ x: e.clientX, y: e.clientY, below: e.clientY, left: e.clientX, here: "" });
         }}
       >
         {lines.length === 0 && loading ? (
@@ -1731,7 +1756,8 @@ export function Sidebar({
       {making ? (
         <NewMenu
           at={sheet ? { x: making.left, y: making.below } : making}
-          here={currentName ? parentOf(currentName) : ""}
+          here={making.here}
+          locked={locked}
           onClose={() => setMaking(null)}
           onPick={(what, folder) => {
             setMaking(null);
@@ -1904,7 +1930,13 @@ function useAttachmentsFolder(): string {
  *
  * **In the open file's folder**, said at the top with the top level one press away: a file made from inside a folder used to land at the top
  * level, far from the work, and nothing said so. With nothing open, or a file at the top level,
- * there is nowhere else to offer and the header says where it goes.
+ * there is nowhere else to offer and the header says where it goes. From the tree's empty space,
+ * `here` is already `""` — there is no file to be in, and the head says *New at the top level*.
+ *
+ * **The lock keeps the press, and the entries carry its style.** The `+` refuses before its menu
+ * opens, but a right-click — like the row menus, which open and offer less — opens with its entries
+ * `aria-disabled` and in the chrome's blocked style (`lockedAffordance`), and a press on one is
+ * answered with the lock's notice. So the menu the pointer asked for is the one it gets.
  *
  * The six kinds keep the hooks the six rows they replace had (`data-dag-sidebar-new-board` and the
  * rest), so a check that pressed a row presses the same element one menu deeper.
@@ -1912,12 +1944,15 @@ function useAttachmentsFolder(): string {
 function NewMenu({
   at,
   here,
+  locked = false,
   onPick,
   onClose,
 }: {
   at: { x: number; y: number };
   /** The open file's folder, or `""`. */
   here: string;
+  /** Read only: every entry is offered and answers a press with the lock's notice, and makes nothing. */
+  locked?: boolean;
   onPick(what: Making, folder: string): void;
   onClose(): void;
 }) {
@@ -2005,7 +2040,11 @@ function NewMenu({
           className="dag-more__item"
           data-dag-sidebar-new-kind={what}
           {...(hook ? { [hook]: "" } : {})}
-          onClick={() => onPick(what, folder)}
+          {...lockedAffordance(locked)}
+          onClick={() => {
+            if (locked) return void refuseLocked();
+            onPick(what, folder);
+          }}
         >
           <Icon {...ICON} aria-hidden="true" />
           <span>{label}</span>
@@ -2017,7 +2056,11 @@ function NewMenu({
         role="menuitem"
         className="dag-more__item"
         data-dag-sidebar-new-kind="folder"
-        onClick={() => onPick("folder", folder)}
+        {...lockedAffordance(locked)}
+        onClick={() => {
+          if (locked) return void refuseLocked();
+          onPick("folder", folder);
+        }}
       >
         <FolderPlus {...ICON} aria-hidden="true" />
         <span>Folder</span>
@@ -2029,12 +2072,21 @@ function NewMenu({
         className="dag-more__item"
         data-dag-sidebar-new-kind="upload"
         data-dag-sidebar-upload=""
-        title="Upload files: PDFs, pictures, documents, sheets, slides, audio, video"
-        onClick={() => onPick("upload", folder)}
+        title={locked ? LOCK_HINT : "Upload files: PDFs, pictures, documents, sheets, slides, audio, video"}
+        {...lockedAffordance(locked)}
+        onClick={() => {
+          if (locked) return void refuseLocked();
+          onPick("upload", folder);
+        }}
       >
         <Upload {...ICON} aria-hidden="true" />
         <span>Upload files…</span>
       </button>
+      {locked ? (
+        <p className="dag-sidebar__menu-locked" data-dag-sidebar-menu-locked="">
+          Read only: unlock to make anything.
+        </p>
+      ) : null}
     </div>
   );
 }
