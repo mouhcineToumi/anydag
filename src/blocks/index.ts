@@ -14,3 +14,8 @@ export type { NoteEditor } from "./BlockEditor";
 export const preloadEditor = () => import("./BlockEditor");
 
 export const BlockEditor = lazy(preloadEditor);
+
+/** A form's rich field — a quiz's prompt, option or explanation — on the same terms: asked for when a quiz's form opens. */
+export const preloadFieldEditor = () => import("./FieldEditor");
+
+export const FieldEditor = lazy(preloadFieldEditor);

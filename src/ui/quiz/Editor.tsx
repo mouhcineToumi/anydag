@@ -1,169 +1,336 @@
-import { ArrowDown, ArrowUp, Pin, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, Copy, GripVertical, Pin, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
+import { preloadFieldEditor } from "@/blocks";
+import { assertNever } from "@/board/useBoard";
 import type { QuizDiagnostic } from "@/quiz/codes";
 import { parseQuiz, pinned, type Question } from "@/quiz/parse";
 import {
   addQuestion,
+  cleanHeading,
+  closeFence,
   inputOf,
   mintQuestionId,
   moveQuestion,
+  reidQuestion,
   removeQuestion,
   replaceQuestion,
+  resolveStray,
   setDescription,
   setShuffle,
   stampIds,
   type QuestionInput,
 } from "@/quiz/write";
-import { QUIZ_MODE, readPref, writeLocal } from "@/settings/prefs";
+import { ownAssets } from "@/render/assets";
+import { startDrag } from "@/ui/pointerDrag";
+
+import { said, fixLabel, type Fix, type Said } from "./problems";
+import { FieldHostContext, focusField, RichField, type FieldHost } from "./RichField";
+import { QuizMarkdown } from "./QuizMarkdown";
 
 /**
- * A quiz's form (decision 7): a card per question, and the file behind them.
+ * A quiz's form: a quiz builder. A card per question, and no Markdown anywhere on it.
  *
- * **Every field is Markdown source in a plain field**, drawn by the runner. A quiz's text is a line
- * here and a paragraph there, and a second rich-text surface is exactly what this is not building.
+ * **The file is never shown.** A question has a type — one right answer, several, or answered in
+ * words — and its prompt, details, answers and explanation are rich-text fields (`RichField`, the
+ * note's block editor cut to what a question can hold). What they write is the same `.quiz.md` an
+ * agent writes: the editor never parses or writes Markdown itself, `src/note/markdown.ts` does, and
+ * `src/quiz/write.ts` splices one question.
  *
  * **Every write goes through `src/quiz/write.ts`**, so an edit rewrites the question it is about and
- * no other byte of the file. And every write first gives an id to any question that has none
- * (`stampIds`): that is the moment decision 3 names — "whenever the editor writes the file for
- * another reason" — and it is what lets a card be addressed by its id rather than by a position that
- * the other writer can move.
+ * no other byte of the file, and a field opened and left writes nothing (`sameQuestion`). And every
+ * write first gives an id to any question that has none (`stampIds`): the moment decision 3 names —
+ * "whenever the editor writes the file for another reason" — and what lets a card be addressed by
+ * its id rather than by a position the other writer can move.
  *
- * **A field keeps what is being typed while it has the caret.** The form redraws from the file on
- * every keystroke, and the file's form of a prompt is trimmed — so a field that showed the file's
- * answer would eat a space the moment it was typed, before the next word. `Field` holds its own
- * draft while focused and takes the file's again when it lets go.
+ * **A problem is said in words on the question it is about, with what fixes it** (`problems.ts`).
+ * There is no source to send anybody to, so each of the parser's codes has a repair here.
+ *
+ * **A write that would change what the file's questions are is refused.** A field's blocks are cut
+ * to what cannot read back as another part of a question, and the writers escape what would; this is
+ * the net under both — a write that would split a question or swallow the next one is not made, and
+ * the card says so.
  */
 
-type Mode = "questions" | "source";
+type Kind = "one" | "several" | "written";
 
-function readMode(): Mode {
-  return readPref(QUIZ_MODE) === "source" ? "source" : "questions";
-}
+const kindOf = (q: Question): Kind => (q.options.length === 0 ? "written" : q.multi ? "several" : "one");
 
-interface FieldProps {
-  value: string;
-  onCommit(next: string): void;
-  multiline?: boolean;
-  /** The fewest rows a multi-line field shows: an option starts as one line and grows. */
-  minRows?: number;
-  placeholder?: string;
-  label: string;
-  readOnly?: boolean;
-  autoFocus?: boolean;
-  className?: string;
-  attrs?: Record<string, string>;
-}
+const KINDS: { kind: Kind; label: string }[] = [
+  { kind: "one", label: "One right answer" },
+  { kind: "several", label: "Several right answers" },
+  { kind: "written", label: "Answered in words" },
+];
 
-function Field({
-  value,
-  onCommit,
-  multiline = false,
-  minRows = 2,
-  placeholder,
-  label,
-  readOnly,
-  autoFocus,
-  className,
-  attrs,
-}: FieldProps) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (!focused.current) setDraft(value);
-  }, [value]);
-  useEffect(() => {
-    if (autoFocus) ref.current?.focus();
-  }, [autoFocus]);
-  const common = {
-    ref,
-    value: draft,
-    placeholder,
-    "aria-label": label,
-    readOnly,
-    className: `dag-quiz__field${className ? ` ${className}` : ""}`,
-    onFocus: () => {
-      focused.current = true;
-    },
-    onBlur: () => {
-      focused.current = false;
-      setDraft(value);
-    },
-    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setDraft(e.target.value);
-      onCommit(e.target.value);
-    },
-    ...attrs,
-  };
-  return multiline ? (
-    <textarea rows={Math.min(12, Math.max(minRows, draft.split("\n").length))} {...common} />
-  ) : (
-    <input type="text" {...common} />
-  );
-}
-
-/**
- * The problems on the lines of one question: from its heading to the line before the next one.
- *
- * Not `WQ_NO_ID`: that one is about the file — the id the form writes the first time the
- * question is edited or answered — and on a card it read as something the person had got wrong. It
- * stays in Source, with the file.
- */
+/** The problems on the lines of one question: from its heading to the line before the next one. */
 function problemsOf(diagnostics: QuizDiagnostic[], questions: Question[], i: number): QuizDiagnostic[] {
   const from = questions[i]!.line;
   const to = i + 1 < questions.length ? questions[i + 1]!.line : Infinity;
-  return diagnostics.filter((d) => d.line >= from && d.line < to && d.code !== "WQ_NO_ID");
+  return diagnostics.filter((d) => d.line >= from && d.line < to);
 }
 
-function Problems({ list, lines = false }: { list: QuizDiagnostic[]; lines?: boolean }) {
+/**
+ * Drag one of a list's rows to another place: a mark where it would land while it moves, and
+ * `onDrop(to)` — the index it ends at, `splice`'s — on release. Pointer events, `startDrag`'s shape.
+ */
+function dragRow(e: ReactPointerEvent, row: HTMLElement | null, rows: () => HTMLElement[], onDrop: (to: number) => void): void {
+  if (!row) return;
+  e.preventDefault();
+  let slot = -1;
+  const clear = () => {
+    for (const r of rows()) delete r.dataset.dagQuizDrop;
+    delete row.dataset.dagQuizDragging;
+  };
+  startDrag(e, {
+    onMove(ev) {
+      const all = rows();
+      row.dataset.dagQuizDragging = "";
+      slot = all.findIndex((r) => {
+        const b = r.getBoundingClientRect();
+        return ev.clientY < b.top + b.height / 2;
+      });
+      if (slot < 0) slot = all.length;
+      for (const [k, r] of all.entries()) {
+        if (k === slot) r.dataset.dagQuizDrop = "before";
+        else if (k === all.length - 1 && slot === all.length) r.dataset.dagQuizDrop = "after";
+        else delete r.dataset.dagQuizDrop;
+      }
+    },
+    onDrop() {
+      const from = rows().indexOf(row);
+      if (from < 0 || slot < 0) return;
+      const to = slot > from ? slot - 1 : slot;
+      if (to !== from) onDrop(to);
+    },
+    onEnd: clear,
+  });
+}
+
+type StrayTo = "why" | "body" | "drop";
+
+const STRAY_TO: { to: StrayTo; label: string }[] = [
+  { to: "why", label: "Add it to the explanation" },
+  { to: "body", label: "Move it above the answers" },
+  { to: "drop", label: "Delete it" },
+];
+
+function ProblemList({
+  list,
+  onFix,
+  onStray,
+  stray,
+  name,
+}: {
+  list: Said[];
+  onFix(fix: Fix): void;
+  /** Where a stray goes, chosen. */
+  onStray?(to: StrayTo): void;
+  /** A stray's text, shown under its problem. */
+  stray?: string;
+  name: string;
+}) {
   if (list.length === 0) return null;
   return (
     <ul className="dag-quiz__problems" data-dag-quiz-problems="">
-      {list.map((d, i) => (
-        <li key={i} className="dag-quiz__problem" data-dag-quiz-problem={d.code} data-severity={d.severity}>
-          {lines ? <span className="dag-quiz__problem-line">line {d.line}</span> : null}
-          <span>{d.message}</span>
-        </li>
-      ))}
+      {list.map((p, i) => {
+        const label = fixLabel(p.fix);
+        return (
+          <li key={i} className="dag-quiz__problem" data-dag-quiz-problem={p.code} data-severity={p.severity}>
+            <span className="dag-quiz__problem-words">{p.words}</span>
+            {label ? (
+              <button type="button" className="dag-quiz__fix" data-dag-quiz-fix={p.fix.kind} onClick={() => onFix(p.fix)}>
+                {label}
+              </button>
+            ) : null}
+            {p.fix.kind === "stray" ? (
+              <div className="dag-quiz__stray" data-dag-quiz-stray="">
+                {stray ? (
+                  <div className="dag-quiz__stray-text">
+                    <QuizMarkdown name={name} md={stray} />
+                  </div>
+                ) : null}
+                <div className="dag-quiz__stray-fixes">
+                  {STRAY_TO.map(({ to, label }) => (
+                    <button
+                      key={to}
+                      type="button"
+                      className="dag-quiz__fix"
+                      data-dag-quiz-stray-to={to}
+                      onClick={() => onStray?.(to)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
+/** What a card asks of the form. `fix` is a repair addressed to this question. */
 interface CardProps {
   q: Question;
   index: number;
   count: number;
+  name: string;
   problems: QuizDiagnostic[];
   focus: boolean;
   /** The quiz shuffles its options: each option offers to keep its place. */
   shuffle: boolean;
+  /** Why the last edit was not written, until the next one. */
+  refused: string | null;
   onEdit(input: QuestionInput): void;
   onMove(to: number): void;
   onRemove(): void;
+  onDuplicate(): void;
+  onRepair(
+    how: { kind: "reid" } | { kind: "clean" } | { kind: "stray"; to: StrayTo } | { kind: "close-fence"; line: number },
+  ): void;
+  onDragStart(e: ReactPointerEvent): void;
+  onNext(): void;
 }
 
-function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMove, onRemove }: CardProps) {
+function QuestionCard({
+  q,
+  index,
+  count,
+  name,
+  problems,
+  focus,
+  shuffle,
+  refused,
+  onEdit,
+  onMove,
+  onRemove,
+  onDuplicate,
+  onRepair,
+  onDragStart,
+  onNext,
+}: CardProps) {
   const input = inputOf(q);
+  const card = useRef<HTMLElement>(null);
+  const optionList = useRef<HTMLDivElement>(null);
   const [asking, setAsking] = useState(false);
-  const correct = q.options.filter((o) => o.correct).length;
-  /* No options: answered in words, its explanation the model answer. */
-  const open = q.options.length === 0;
-  /* Something after the options the form has no field for: rewriting the card would drop it, so the
-     card says where to edit it instead. */
-  const stray = problems.some((p) => p.code === "EQ_STRAY");
+  /* Turning a question with answers into one answered in words drops them: asked first. */
+  const [dropping, setDropping] = useState(false);
+  const [details, setDetails] = useState(false);
+  /* An answer just added: it opens as it is drawn, in the same render as the press, so a letter
+     typed straight after is never the page's. Let go once it has. */
+  const [fresh, setFresh] = useState<number | null>(null);
+  useEffect(() => {
+    if (fresh !== null) setFresh(null);
+  }, [fresh]);
+  const addOption = () => {
+    onEdit({ ...input, options: [...input.options, { text: "", correct: false }] });
+    setFresh(input.options.length);
+  };
+  const kind = kindOf(q);
+  const shown = problems.flatMap((d) => {
+    const s = said(d, q);
+    return s ? [s] : [];
+  });
+  /* Something the form has no field for, or an identity two questions share: rewriting the card
+     would drop the one or write the other question, so the card is read-only until it is fixed. */
+  const held = shown.some((p) => p.fix.kind === "stray" || p.fix.kind === "reid");
+  const needsAnswer = shown.some((p) => p.code === "EQ_NO_ANSWER");
+
   const setOption = (i: number, patch: Partial<{ text: string; correct: boolean; pin: boolean }>) =>
     onEdit({ ...input, options: input.options.map((o, k) => (k === i ? { ...o, ...patch } : o)) });
+  /* One right answer: ticking one is choosing it, and the others let go. */
+  const choose = (i: number, on: boolean) =>
+    kind === "one"
+      ? onEdit({ ...input, options: input.options.map((o, k) => ({ ...o, correct: k === i })) })
+      : setOption(i, { correct: on });
   const moveOption = (i: number, to: number) => {
     const options = [...input.options];
     options.splice(to, 0, ...options.splice(i, 1));
     onEdit({ ...input, options });
   };
 
+  const setKind = (next: Kind) => {
+    if (next === kind) return;
+    if (next === "written") {
+      if (input.options.some((o) => o.text.trim())) return setDropping(true);
+      return onEdit({ ...input, options: [], multi: false });
+    }
+    if (kind === "written")
+      return onEdit({
+        ...input,
+        multi: next === "several",
+        options: [
+          { text: "", correct: true },
+          { text: "", correct: false },
+        ],
+      });
+    if (next === "several") return onEdit({ ...input, multi: true });
+    /* One right answer: the first ticked keeps its tick. */
+    const first = input.options.findIndex((o) => o.correct);
+    return onEdit({ ...input, multi: false, options: input.options.map((o, k) => ({ ...o, correct: k === first })) });
+  };
+
+  const fix = (f: Fix) => {
+    const at = (sel: string) => card.current?.querySelector(sel);
+    switch (f.kind) {
+      case "focus":
+        if (f.field === "prompt") focusField(at("[data-dag-quiz-prompt]"));
+        else if (f.field === "why") focusField(at("[data-dag-quiz-why]"));
+        else focusField(card.current?.querySelectorAll("[data-dag-quiz-option-text]")[f.option ?? 0]);
+        return;
+      case "add-option":
+        return addOption();
+      case "reid":
+      case "clean":
+      case "close-fence":
+        return onRepair(f);
+      case "stray":
+      case "none":
+        return;
+      default:
+        return assertNever(f);
+    }
+  };
+
+  const showDetails = details || !!q.body.trim();
+
   return (
-    <section className="dag-quiz__card" data-dag-quiz-question={q.id ?? `L${q.line}`} aria-label={`Question ${index + 1}`}>
+    <section
+      ref={card}
+      className="dag-quiz__card"
+      data-dag-quiz-question={q.id ?? `L${q.line}`}
+      data-dag-quiz-kind={kind}
+      data-dag-quiz-needs-answer={needsAnswer ? "" : undefined}
+      aria-label={`Question ${index + 1}`}
+    >
       <header className="dag-quiz__card-head">
+        <button
+          type="button"
+          className="dag-icon dag-quiz__grip"
+          title="Drag to move"
+          aria-label={`Drag question ${index + 1} to move it`}
+          data-dag-quiz-grip=""
+          onPointerDown={onDragStart}
+        >
+          <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
+        </button>
         <span className="dag-quiz__card-number">Question {index + 1}</span>
+        <select
+          className="dag-select dag-quiz__kind"
+          aria-label="Kind of question"
+          data-dag-quiz-kind-select=""
+          value={kind}
+          disabled={held}
+          onChange={(e) => setKind(e.target.value as Kind)}
+        >
+          {KINDS.map((k) => (
+            <option key={k.kind} value={k.kind}>
+              {k.label}
+            </option>
+          ))}
+        </select>
         <span className="dag-quiz__card-tools">
           <button
             type="button"
@@ -184,6 +351,17 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
             onClick={() => onMove(index + 1)}
           >
             <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="dag-icon"
+            title="Duplicate question"
+            aria-label="Duplicate question"
+            data-dag-quiz-duplicate=""
+            disabled={held}
+            onClick={onDuplicate}
+          >
+            <Copy size={14} strokeWidth={2} aria-hidden="true" />
           </button>
           {asking ? (
             <span className="dag-quiz__confirm" data-dag-quiz-confirm="">
@@ -209,156 +387,189 @@ function QuestionCard({ q, index, count, problems, focus, shuffle, onEdit, onMov
           )}
         </span>
       </header>
-      {stray ? <p className="dag-quiz__note">This question has text the form cannot show. Edit it in Source.</p> : null}
-      <Field
+      {dropping ? (
+        <p className="dag-quiz__confirm dag-quiz__confirm--line" data-dag-quiz-drop-answers="">
+          <span>Answered in words, this question has no answers to choose from. Remove them?</span>
+          <button
+            type="button"
+            className="dag-quiz__danger"
+            data-dag-quiz-drop-answers-yes=""
+            onClick={() => {
+              setDropping(false);
+              onEdit({ ...input, options: [], multi: false });
+            }}
+          >
+            Remove them
+          </button>
+          <button type="button" onClick={() => setDropping(false)}>
+            Cancel
+          </button>
+        </p>
+      ) : null}
+      <ProblemList list={shown} onFix={fix} onStray={(to) => onRepair({ kind: "stray", to })} stray={q.stray} name={name} />
+      {refused ? (
+        <p className="dag-quiz__note" role="alert" data-dag-quiz-refused="">
+          {refused}
+        </p>
+      ) : null}
+      <RichField
+        variant="line"
         label="Question"
         placeholder="What do you want to ask?"
-        value={q.prompt}
-        readOnly={stray}
+        md={q.prompt}
+        readOnly={held}
         autoFocus={focus}
         className="dag-quiz__prompt"
         attrs={{ "data-dag-quiz-prompt": "" }}
         onCommit={(prompt) => onEdit({ ...input, prompt })}
+        onEnter={onNext}
       />
-      <Field
-        label="More to the question"
-        placeholder="More to the question, a code sample, a picture (optional)"
-        multiline
-        value={q.body}
-        readOnly={stray}
-        attrs={{ "data-dag-quiz-body": "" }}
-        onCommit={(body) => onEdit({ ...input, body })}
-      />
-      {open ? (
-        <p className="dag-quiz__note" data-dag-quiz-open="">
-          Answered in words: the person writes an answer, sees the model answer below, and says whether they had it. Add an option
-          to make it multiple choice.
-        </p>
-      ) : null}
-      <div className="dag-quiz__options" role="list" aria-label="Options">
-        {q.options.map((o, i) => (
-          <div
-            key={i}
-            className="dag-quiz__option"
-            role="listitem"
-            data-dag-quiz-option={i}
-            data-dag-quiz-correct={o.correct ? "" : undefined}
-          >
-            <input
-              type="checkbox"
-              className="dag-check"
-              checked={o.correct}
-              disabled={stray}
-              aria-label={`Option ${i + 1} is correct`}
-              title="Correct"
-              data-dag-quiz-correct-toggle=""
-              onChange={(e) => setOption(i, { correct: e.target.checked })}
-            />
-            {/* A text area of one row that grows: an option may be a code block. */}
-            <Field
-              label={`Option ${i + 1}`}
-              placeholder={o.correct ? "A correct answer" : "A wrong answer"}
-              multiline
-              minRows={1}
-              value={o.text}
-              readOnly={stray}
-              className="dag-quiz__option-text"
-              attrs={{ "data-dag-quiz-option-text": "" }}
-              onCommit={(text) => setOption(i, { text })}
-            />
-            {shuffle ? (
-              <button
-                type="button"
-                className="dag-icon dag-quiz__pin"
-                aria-pressed={pinned(o)}
-                disabled={stray || (!o.pin && pinned(o))}
-                title={
-                  o.pin
-                    ? "Keeps its place when the options shuffle — click to let it move"
-                    : pinned(o)
-                      ? "Keeps its place: it speaks about the options around it"
-                      : "Keep its place when the options shuffle"
-                }
-                aria-label={`Keep option ${i + 1} in its place`}
-                data-dag-quiz-pin={o.pin ? "" : pinned(o) ? "words" : undefined}
-                onClick={() => setOption(i, { pin: !o.pin })}
-              >
-                <Pin size={14} strokeWidth={2} aria-hidden="true" />
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="dag-icon"
-              title="Move up"
-              aria-label={`Move option ${i + 1} up`}
-              disabled={stray || i === 0}
-              onClick={() => moveOption(i, i - 1)}
-            >
-              <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="dag-icon"
-              title="Remove option"
-              aria-label={`Remove option ${i + 1}`}
-              data-dag-quiz-remove-option=""
-              disabled={stray}
-              onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
-            >
-              <X size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </div>
-        ))}
+      {showDetails ? (
+        <RichField
+          variant="block"
+          label="Details"
+          placeholder="More to the question: a code sample, a picture, an equation"
+          md={q.body}
+          readOnly={held}
+          autoFocus={details && !q.body.trim()}
+          attrs={{ "data-dag-quiz-body": "" }}
+          onCommit={(body) => onEdit({ ...input, body })}
+        />
+      ) : (
         <button
           type="button"
-          className="dag-quiz__add-option"
-          data-dag-quiz-add-option=""
-          disabled={stray}
-          onClick={() => onEdit({ ...input, options: [...input.options, { text: "", correct: false }] })}
+          className="dag-quiz__more"
+          data-dag-quiz-add-details=""
+          disabled={held}
+          onClick={() => setDetails(true)}
         >
           <Plus size={14} strokeWidth={2} aria-hidden="true" />
-          Add an option
+          Add details
         </button>
-      </div>
-      {open ? null : (
-        <label className="dag-quiz__check">
-          <input
-            type="checkbox"
-            className="dag-check"
-            checked={q.multi}
-            disabled={stray || correct > 1}
-            data-dag-quiz-multi=""
-            onChange={(e) => onEdit({ ...input, multi: e.target.checked })}
-          />
-          Ask for every correct answer
-          {correct > 1 ? <span className="dag-quiz__hint"> (it does: more than one is correct)</span> : null}
-        </label>
       )}
-      <Field
-        label={open ? "Model answer" : "Explanation"}
+      {kind === "written" ? null : (
+        <div className="dag-quiz__options" role="list" aria-label="Answers" ref={optionList}>
+          {q.options.map((o, i) => (
+            <div
+              key={i}
+              className="dag-quiz__option"
+              role="listitem"
+              data-dag-quiz-option={i}
+              data-dag-quiz-correct={o.correct ? "" : undefined}
+            >
+              <button
+                type="button"
+                className="dag-icon dag-quiz__grip"
+                title="Drag to move"
+                aria-label={`Drag answer ${i + 1} to move it`}
+                disabled={held}
+                onPointerDown={(e) =>
+                  dragRow(
+                    e,
+                    e.currentTarget.closest<HTMLElement>(".dag-quiz__option"),
+                    () => Array.from(optionList.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__option") ?? []),
+                    (to) => moveOption(i, to),
+                  )
+                }
+              >
+                <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+              <input
+                type={kind === "one" ? "radio" : "checkbox"}
+                className={kind === "one" ? "dag-check dag-check--round" : "dag-check"}
+                name={kind === "one" ? `correct-${q.id ?? q.line}` : undefined}
+                checked={o.correct}
+                disabled={held}
+                aria-label={`Answer ${i + 1} is right`}
+                title="The right answer"
+                data-dag-quiz-correct-toggle=""
+                onChange={(e) => choose(i, e.target.checked)}
+              />
+              <RichField
+                variant="block"
+                label={`Answer ${i + 1}`}
+                placeholder={o.correct ? "A right answer" : "A wrong answer"}
+                md={o.text}
+                readOnly={held}
+                autoFocus={fresh === i}
+                className="dag-quiz__option-text"
+                attrs={{ "data-dag-quiz-option-text": "" }}
+                onCommit={(text) => setOption(i, { text })}
+              />
+              {shuffle ? (
+                <button
+                  type="button"
+                  className="dag-icon dag-quiz__pin"
+                  aria-pressed={pinned(o)}
+                  disabled={held || (!o.pin && pinned(o))}
+                  title={
+                    o.pin
+                      ? "Keeps its place when the answers shuffle — click to let it move"
+                      : pinned(o)
+                        ? "Keeps its place: it speaks about the answers around it"
+                        : "Keep its place when the answers shuffle"
+                  }
+                  aria-label={`Keep answer ${i + 1} in its place`}
+                  data-dag-quiz-pin={o.pin ? "" : pinned(o) ? "words" : undefined}
+                  onClick={() => setOption(i, { pin: !o.pin })}
+                >
+                  <Pin size={14} strokeWidth={2} aria-hidden="true" />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="dag-icon"
+                title="Remove answer"
+                aria-label={`Remove answer ${i + 1}`}
+                data-dag-quiz-remove-option=""
+                disabled={held}
+                onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
+              >
+                <X size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <button type="button" className="dag-quiz__add-option" data-dag-quiz-add-option="" disabled={held} onClick={addOption}>
+            <Plus size={14} strokeWidth={2} aria-hidden="true" />
+            Add an answer
+          </button>
+        </div>
+      )}
+      <RichField
+        variant="block"
+        label={kind === "written" ? "Model answer" : "Explanation"}
         placeholder={
-          open
-            ? "The answer, shown once they have written theirs — a code block if it is code"
+          kind === "written"
+            ? "The answer, shown once they have written theirs"
             : "Why the answer is right, shown after answering (optional)"
         }
-        multiline
-        value={q.why}
-        readOnly={stray}
+        md={q.why}
+        readOnly={held}
         attrs={{ "data-dag-quiz-why": "" }}
         onCommit={(why) => onEdit({ ...input, why })}
       />
-      <Problems list={problems} />
     </section>
   );
 }
 
+/** The questions a text holds, by id and in order, and nothing else: what a write may not change. */
+const shapeOf = (text: string): string =>
+  parseQuiz(text)
+    .questions.map((q) => q.id ?? "")
+    .join(",");
+
 export function QuizEditor({
+  name,
+  scheme,
   text,
   onChange,
   target = null,
   onTargetShown,
   children,
 }: {
+  /** The quiz's name: where its pictures are stored and found. */
+  name: string;
+  scheme: "light" | "dark";
   text: string;
   onChange(next: string): void;
   /**
@@ -371,35 +582,95 @@ export function QuizEditor({
   children?: ReactNode;
 }) {
   const quiz = useMemo(() => parseQuiz(text), [text]);
-  const [mode, setMode] = useState<Mode>(readMode);
   const [focus, setFocus] = useState<string | null>(null);
+  const [refused, setRefused] = useState<{ key: string; why: string } | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  /*
+   * A card's React key is the question's id — and a question with none is given one by the first
+   * write, which would make its card a new one: the field somebody is typing into would close under
+   * them. So an id minted for a card keeps the key the card already had.
+   */
+  const aliases = useRef(new Map<string, string>());
+  const keyOf = (q: Question) => (q.id !== undefined ? (aliases.current.get(q.id) ?? q.id) : `line-${q.line}`);
+
+  useEffect(() => {
+    void preloadFieldEditor();
+  }, []);
 
   useEffect(() => {
     if (!target || quiz.questions.length === 0) return;
     const card = root.current?.querySelector<HTMLElement>(`[data-dag-quiz-question="${CSS.escape(target)}"]`);
     if (!card) return;
-    if (mode !== "questions") setMode("questions");
     card.scrollIntoView({ block: "center" });
-    card.querySelector<HTMLInputElement>("[data-dag-quiz-prompt]")?.focus({ preventScroll: true });
+    focusField(card.querySelector("[data-dag-quiz-prompt]"));
     onTargetShown?.();
-  }, [target, quiz, mode, onTargetShown]);
+  }, [target, quiz, onTargetShown]);
 
-  const chooseMode = (next: Mode) => {
-    setMode(next);
-    writeLocal(QUIZ_MODE, next);
+  const host = useMemo<FieldHost>(
+    () => ({
+      name,
+      scheme,
+      resolve: (src) => ownAssets(name, src),
+      upload: async (file) => {
+        const dataUrl = await new Promise<string>((ok, fail) => {
+          const reader = new FileReader();
+          reader.onload = () => ok(String(reader.result));
+          reader.onerror = () => fail(reader.error);
+          reader.readAsDataURL(file);
+        });
+        const r = await fetch(`/__board/upload?name=${encodeURIComponent(name)}&kind=quiz`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dataUrl }),
+        });
+        if (!r.ok) throw new Error(`the picture was refused (${r.status})`);
+        return ((await r.json()) as { src: string }).src;
+      },
+    }),
+    [name, scheme],
+  );
+
+  /**
+   * Stamp what has no id, then write — decision 3's moment. A write whose questions are not the ones
+   * it was meant to leave (`expect`, the ids in order) is not made: `key` is the card told why.
+   */
+  const write = (
+    key: string | null,
+    fn: (stamped: string, questions: Question[]) => string,
+    expect?: (before: string[]) => string[],
+  ) => {
+    const before = parseQuiz(text).questions;
+    const { text: stamped, minted } = stampIds(text);
+    if (minted.length) {
+      const unnamed = before.filter((q) => q.id === undefined);
+      minted.forEach((id, k) => {
+        const q = unnamed[k];
+        if (q) aliases.current.set(id, `line-${q.line}`);
+      });
+    }
+    const questions = parseQuiz(stamped).questions;
+    const next = fn(stamped, questions);
+    if (next === text) return;
+    const ids = questions.map((q) => q.id ?? "");
+    const wanted = (expect ? expect(ids) : ids).join(",");
+    if (key !== null && shapeOf(next) !== wanted) {
+      setRefused({
+        key,
+        why: "That can't be written into this question: it would change the questions around it. Nothing was saved.",
+      });
+      return;
+    }
+    setRefused(null);
+    onChange(next);
   };
 
-  /** Stamp what has no id, then write — decision 3's moment. */
-  const write = (fn: (stamped: string, questions: Question[]) => string) => {
-    const stamped = stampIds(text).text;
-    onChange(fn(stamped, parseQuiz(stamped).questions));
-  };
+  const idAt = (qs: Question[], i: number) => qs[i]!.id!;
 
-  /** A question at the end: two options to fill in, or none — an open question. */
+  /** A question at the end: two answers to fill in, or none — answered in words. */
   const add = (open = false) => {
     const id = mintQuestionId(new Set(quiz.questions.flatMap((q) => (q.id ? [q.id] : []))));
-    write((t) =>
+    write(null, (t) =>
       addQuestion(t, {
         id,
         prompt: "",
@@ -414,94 +685,112 @@ export function QuizEditor({
     setFocus(id);
   };
 
-  const top = quiz.diagnostics.filter((d) => quiz.questions.length === 0 || d.line < quiz.questions[0]!.line);
+  const description = quiz.questions.length ? quiz.diagnostics.filter((d) => d.line < quiz.questions[0]!.line) : quiz.diagnostics;
+  const top = description.flatMap((d) => {
+    const s = said(d);
+    return s ? [s] : [];
+  });
+  const cards = () => Array.from(list.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__card") ?? []);
 
   return (
-    <div className="dag-quiz" data-dag-quiz-editor={mode} ref={root}>
-      <div className="dag-quiz__bar">
-        <div className="dag-quiz__mode" role="radiogroup" aria-label="Edit as">
-          {(["questions", "source"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              data-dag-quiz-mode={m}
-              onClick={() => chooseMode(m)}
-            >
-              {m === "questions" ? "Questions" : "Source"}
-            </button>
-          ))}
+    <FieldHostContext.Provider value={host}>
+      <div className="dag-quiz" data-dag-quiz-editor="" ref={root}>
+        <div className="dag-quiz__bar">{children}</div>
+        <RichField
+          variant="block"
+          label="Description"
+          placeholder="What this quiz is about (optional)"
+          md={quiz.description}
+          className="dag-quiz__description"
+          attrs={{ "data-dag-quiz-description": "" }}
+          onCommit={(md) => onChange(setDescription(text, md))}
+        />
+        <label className="dag-quiz__check dag-quiz__shuffle">
+          <input
+            type="checkbox"
+            className="dag-check"
+            checked={quiz.shuffle}
+            data-dag-quiz-shuffle=""
+            onChange={(e) => onChange(setShuffle(text, e.target.checked))}
+          />
+          Shuffle the answers in each run
+          <span className="dag-quiz__hint"> — a pinned answer, and one that begins “All of the above”, keeps its place</span>
+        </label>
+        {/* Before the first question only a code block left open can be wrong: what it swallowed. */}
+        <ProblemList
+          list={top}
+          name={name}
+          onFix={(f) => {
+            if (f.kind === "close-fence") onChange(closeFence(text, f.line));
+          }}
+        />
+        {quiz.questions.length === 0 ? <p className="dag-quiz__empty">No questions yet.</p> : null}
+        <div className="dag-quiz__list" ref={list}>
+          {quiz.questions.map((q, i) => {
+            const key = keyOf(q);
+            return (
+              <QuestionCard
+                key={key}
+                q={q}
+                index={i}
+                count={quiz.questions.length}
+                name={name}
+                problems={problemsOf(quiz.diagnostics, quiz.questions, i)}
+                focus={q.id !== undefined && q.id === focus}
+                shuffle={quiz.shuffle}
+                refused={refused?.key === key ? refused.why : null}
+                onEdit={(input) => write(key, (t, qs) => replaceQuestion(t, idAt(qs, i), { ...input, id: idAt(qs, i) }))}
+                onMove={(to) => write(null, (t, qs) => moveQuestion(t, idAt(qs, i), to))}
+                onRemove={() => write(null, (t, qs) => removeQuestion(t, idAt(qs, i)))}
+                onDuplicate={() => {
+                  const id = mintQuestionId(new Set(quiz.questions.flatMap((x) => (x.id ? [x.id] : []))));
+                  write(null, (t, qs) => addQuestion(t, { ...inputOf(qs[i]!), id }, i + 1));
+                  setFocus(id);
+                }}
+                onRepair={(how) => {
+                  switch (how.kind) {
+                    case "reid":
+                      return onChange(reidQuestion(text, i));
+                    case "close-fence":
+                      return onChange(closeFence(text, how.line));
+                    case "clean":
+                      return write(null, (t, qs) => cleanHeading(t, idAt(qs, i)));
+                    case "stray":
+                      return write(null, (t, qs) => resolveStray(t, idAt(qs, i), how.to));
+                    default:
+                      return assertNever(how);
+                  }
+                }}
+                onDragStart={(e) =>
+                  dragRow(e, e.currentTarget.closest<HTMLElement>(".dag-quiz__card"), cards, (to) =>
+                    write(null, (t, qs) => moveQuestion(t, idAt(qs, i), to)),
+                  )
+                }
+                onNext={() => {
+                  const card = cards()[i];
+                  focusField(card?.querySelector("[data-dag-quiz-option-text], [data-dag-quiz-body], [data-dag-quiz-why]"));
+                }}
+              />
+            );
+          })}
         </div>
-        {children}
+        <div className="dag-quiz__adds">
+          <button type="button" className="dag-quiz__add" data-dag-quiz-add="" onClick={() => add()}>
+            <Plus size={16} strokeWidth={2} aria-hidden="true" />
+            {quiz.questions.length === 0 ? "Add the first question" : "Add a question"}
+          </button>
+          <button
+            type="button"
+            className="dag-quiz__add"
+            data-dag-quiz-add-open=""
+            title="A question answered in words, compared with a model answer"
+            onClick={() => add(true)}
+          >
+            <Plus size={16} strokeWidth={2} aria-hidden="true" />
+            Add a question answered in words
+          </button>
+        </div>
       </div>
-      {mode === "source" ? (
-        <div className="dag-quiz__source">
-          <Field
-            label="Source"
-            multiline
-            value={text}
-            className="dag-quiz__source-text"
-            attrs={{ "data-dag-quiz-source": "" }}
-            onCommit={onChange}
-          />
-          <Problems list={quiz.diagnostics} lines />
-        </div>
-      ) : (
-        <>
-          <Field
-            label="Description"
-            placeholder="What this quiz is about (optional)"
-            multiline
-            value={quiz.description}
-            attrs={{ "data-dag-quiz-description": "" }}
-            onCommit={(md) => onChange(setDescription(text, md))}
-          />
-          <label className="dag-quiz__check dag-quiz__shuffle">
-            <input
-              type="checkbox"
-              className="dag-check"
-              checked={quiz.shuffle}
-              data-dag-quiz-shuffle=""
-              onChange={(e) => onChange(setShuffle(text, e.target.checked))}
-            />
-            Shuffle the options in each run
-            <span className="dag-quiz__hint"> — a pinned option, and one that begins “All of the above”, keeps its place</span>
-          </label>
-          <Problems list={top.filter((d) => d.code !== "WQ_EMPTY")} />
-          {quiz.questions.length === 0 ? <p className="dag-quiz__empty">No questions yet.</p> : null}
-          {quiz.questions.map((q, i) => (
-            <QuestionCard
-              key={q.id ?? `line-${q.line}`}
-              q={q}
-              index={i}
-              count={quiz.questions.length}
-              problems={problemsOf(quiz.diagnostics, quiz.questions, i)}
-              focus={q.id !== undefined && q.id === focus}
-              shuffle={quiz.shuffle}
-              onEdit={(input) => write((t, qs) => replaceQuestion(t, qs[i]!.id!, { ...input, id: qs[i]!.id }))}
-              onMove={(to) => write((t, qs) => moveQuestion(t, qs[i]!.id!, to))}
-              onRemove={() => write((t, qs) => removeQuestion(t, qs[i]!.id!))}
-            />
-          ))}
-          <div className="dag-quiz__adds">
-            <button type="button" className="dag-quiz__add" data-dag-quiz-add="" onClick={() => add()}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {quiz.questions.length === 0 ? "Add the first question" : "Add a question"}
-            </button>
-            <button
-              type="button"
-              className="dag-quiz__add"
-              data-dag-quiz-add-open=""
-              title="A question answered in words, compared with a model answer"
-              onClick={() => add(true)}
-            >
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              Add an open question
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+    </FieldHostContext.Provider>
   );
 }

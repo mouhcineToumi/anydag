@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
 import { clickOnHover } from "./hover";
@@ -148,17 +148,30 @@ test("a quiz written as a file is a card on the Quizzes page, and its questions 
   await card.locator(".dag-quizzes__open").click();
   await expect(page).toHaveURL(new RegExp(`quiz=${encodeURIComponent(name).replace(/%2F/g, "(%2F|/)")}`));
   await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(3);
-  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-prompt]')).toHaveValue("What does VACUUM reclaim?");
-  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-multi]')).toBeChecked();
+  /* Drawn as what it says — the backticks are code, never characters on the screen. */
+  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-prompt]')).toHaveText("What does VACUUM reclaim?");
+  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-option-text]').first()).toHaveText("xmin");
+  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-kind-select]')).toHaveValue("several");
+  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-kind-select]')).toHaveValue("one");
+  /* No source anywhere on the page. */
+  await expect(page.locator("textarea")).toHaveCount(0);
   /* Opening it wrote nothing: the question with no id keeps having none until something writes. */
   expect(read("pg")).toBe(QUIZ);
 });
+
+/** Open a rich field: a click, and the editor in its place with the caret in it. */
+async function open(field: Locator): Promise<void> {
+  await field.click();
+  await expect(field.locator('[contenteditable="true"]')).toBeFocused();
+}
 
 test("an edit in the form rewrites the question it touched and leaves every other byte", async ({ page }) => {
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
   const prompt = page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-prompt]');
-  await prompt.fill("Which two fields decide a row's visibility?");
+  await open(prompt);
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.type("Which two fields decide a row's visibility?");
   await expect.poll(() => read("pg")).toContain("## Which two fields decide a row's visibility? {#qvis}");
   const after = read("pg");
   /* The first question, in its author's own bullets and spacing, is byte for byte what it was. */
@@ -166,34 +179,188 @@ test("an edit in the form rewrites the question it touched and leaves every othe
   expect(after).toContain(first);
   /* And the write gave the question that had no id one — minted where it is first needed. */
   expect(after).toMatch(/## Which isolation level is the default\? \{#q[0-9a-z]{6}\}/);
+
+  /* A field opened and left writes nothing, whatever its author's wrapping. */
+  await open(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-why]'));
+  await page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-prompt]').click();
+  await page.locator("[data-dag-quiz-description]").click();
+  await page.waitForTimeout(400);
+  expect(read("pg")).toBe(after);
 });
 
-test("a question added in the form is written, and asks for every answer once two are ticked", async ({ page }) => {
+test("a question built in the form is written as the file's Markdown, none of it typed", async ({ page }) => {
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
   await page.locator("[data-dag-quiz-add]").click();
   const added = page.locator("[data-dag-quiz-question]").last();
   /* The new card takes the caret, so a person can type straight into it. */
-  await expect(added.locator("[data-dag-quiz-prompt]")).toBeFocused();
+  await expect(added.locator('[data-dag-quiz-prompt] [contenteditable="true"]')).toBeFocused();
   await page.keyboard.type("Which of these are MVCC?");
-  await added.locator("[data-dag-quiz-option-text]").nth(0).fill("Snapshots");
-  await added.locator("[data-dag-quiz-option-text]").nth(1).fill("Row versions");
+  /* Enter is the next field — the first answer — never a second line of the question. */
+  await page.keyboard.press("Enter");
+  await expect(added.locator('[data-dag-quiz-option-text] [contenteditable="true"]').first()).toBeFocused();
+  await page.keyboard.type("Snapshots");
+  await open(added.locator("[data-dag-quiz-option-text]").nth(1));
+  await page.keyboard.type("Row versions");
+  await expect.poll(() => read("pg")).toMatch(/- \[ \] Row versions\n$/);
+
+  /* One right answer: ticking the second takes the tick off the first. */
   await added.locator("[data-dag-quiz-correct-toggle]").nth(1).check();
+  await expect.poll(() => read("pg")).toMatch(/- \[ \] Snapshots\n- \[x\] Row versions\n$/);
+  /* Several: both can be ticked, and the ticks say it, so the heading needs no `multi`. */
+  await added.locator("[data-dag-quiz-kind-select]").selectOption("several");
+  await added.locator("[data-dag-quiz-correct-toggle]").nth(0).check();
   await expect
     .poll(() => read("pg"))
     .toMatch(/## Which of these are MVCC\? \{#q[0-9a-z]{6}\}\n\n- \[x\] Snapshots\n- \[x\] Row versions\n$/);
-  await expect(added.locator("[data-dag-quiz-multi]")).toBeChecked();
-  await expect(added.locator("[data-dag-quiz-multi]")).toBeDisabled();
+
+  /* Formatting with the keyboard and the slash menu, never with a Markdown character. */
+  await open(added.locator("[data-dag-quiz-why]"));
+  await page.keyboard.press("ControlOrMeta+B");
+  await page.keyboard.type("Both");
+  await page.keyboard.press("ControlOrMeta+B");
+  await page.keyboard.type(" keep ");
+  await page.keyboard.press("ControlOrMeta+E");
+  await page.keyboard.type("xmin");
+  await page.keyboard.press("ControlOrMeta+E");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/code");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("select xmin from t;");
+  await expect.poll(() => read("pg")).toContain("> select xmin from t;");
+  const text = read("pg");
+  expect(text).toContain("> **Both** keep `xmin`");
+  expect(text).toMatch(/> ```\w*\n> select xmin from t;\n> ```/);
+  /* The other questions are what they were. */
+  expect(text).toContain(QUIZ.slice(QUIZ.indexOf("## What does"), QUIZ.indexOf("## Which fields")));
+
+  /* Typed the instant an answer is added, before its editor is there: not one letter lost. */
+  for (const words of ["Table locks", "Hint bits"]) {
+    await added.locator("[data-dag-quiz-add-option]").click();
+    await page.keyboard.type(words, { delay: 10 });
+    await expect.poll(() => read("pg")).toContain(`- [ ] ${words}\n`);
+  }
+  /* Escape closes the field and leaves it closed; a letter on it opens it again, and is kept. */
+  await page.keyboard.press("Escape");
+  await expect(added.locator("[data-dag-quiz-open-field]")).toHaveCount(0);
+  await page.keyboard.type("!");
+  await expect.poll(() => read("pg")).toContain("- [ ] Hint bits!\n");
 });
 
-test("a question the runner cannot ask says so, and Source shows the whole file with its problems", async ({ page }) => {
-  const name = write("broken", "---\ntitle: Broken\n---\n\n## Nothing is right {#qa}\n- [ ] one\n- [ ] two\n");
+test("a question becomes answered in words, after asking, and back", async ({ page }) => {
+  const name = write("pg");
   await page.goto(`/?quiz=${name}`);
-  await expect(page.locator('[data-dag-quiz-question="qa"] [data-dag-quiz-problem="EQ_NO_ANSWER"]')).toBeVisible();
-  await expect(page.locator("[data-dag-quiz-practice]")).toBeDisabled();
-  await page.locator('[data-dag-quiz-mode="source"]').click();
-  await expect(page.locator("[data-dag-quiz-source]")).toHaveValue(read("broken"));
-  await expect(page.locator('[data-dag-quiz-problem="EQ_NO_ANSWER"]')).toContainText("line 6");
+  const card = page.locator('[data-dag-quiz-question="qvac"]');
+  await card.locator("[data-dag-quiz-kind-select]").selectOption("written");
+  /* It has answers with words in them: asked first, and nothing written until it is answered. */
+  await expect(card.locator("[data-dag-quiz-drop-answers]")).toBeVisible();
+  expect(read("pg")).toBe(QUIZ);
+  await card.locator("[data-dag-quiz-drop-answers-yes]").click();
+  await expect
+    .poll(() => read("pg"))
+    .toMatch(/## What does VACUUM reclaim\? \{#qvac\}\n\n> Dead tuples stay until VACUUM\n> marks their space reusable\.\n/);
+  await expect(card.locator("[data-dag-quiz-option-text]")).toHaveCount(0);
+  await expect(card.locator("[data-dag-quiz-why]")).toHaveAttribute("data-dag-quiz-why", "");
+  await card.locator("[data-dag-quiz-kind-select]").selectOption("one");
+  await expect.poll(() => read("pg")).toMatch(/## What does VACUUM reclaim\? \{#qvac\}\n\n- \[x\]\n- \[ \]\n\n> Dead tuples/);
+});
+
+test("a broken quiz says what is wrong in words, on its question, and the form fixes each", async ({ page }) => {
+  const name = write(
+    "broken",
+    [
+      "---",
+      "title: Broken",
+      "---",
+      "",
+      "## Nothing is right {#qa}",
+      "- [ ] one",
+      "- [ ] two",
+      "",
+      "## Something is after {#qb}",
+      "- [x] one",
+      "- [ ] two",
+      "",
+      "> Why.",
+      "",
+      "A stray paragraph.",
+      "",
+      "## A setting nobody knows {#qc wide}",
+      "- [x] one",
+      "- [ ] two",
+      "",
+      "## A block left open {#qd}",
+      "- [ ] two",
+      "- [x] one",
+      "  ```sql",
+      "  select 1;",
+      "",
+      "## Swallowed {#qe}",
+      "- [x] one",
+      "- [ ] two",
+      "",
+    ].join("\n"),
+  );
+  await page.goto(`/?quiz=${name}`);
+  const status = page.locator(".dag-quiz__status");
+  await expect(status).toContainText("cannot be practiced until fixed");
+  const problems = page.locator("[data-dag-quiz-problem]");
+  await expect(problems).toHaveCount(4);
+  /* Words, never the file: no line numbers and no syntax. */
+  for (const words of await problems.allTextContents()) expect(words).not.toMatch(/line \d|[`#>{}]|\[x\]/);
+
+  /* No answer marked: the ticks are the fix. */
+  const qa = page.locator('[data-dag-quiz-question="qa"]');
+  await expect(qa.locator('[data-dag-quiz-problem="EQ_NO_ANSWER"]')).toBeVisible();
+  await qa.locator("[data-dag-quiz-correct-toggle]").nth(1).check();
+  await expect(qa.locator("[data-dag-quiz-problem]")).toHaveCount(0);
+
+  /* Text the form has no field for: shown, and the card is read-only until it has a place. */
+  const qb = page.locator('[data-dag-quiz-question="qb"]');
+  await expect(qb.locator("[data-dag-quiz-stray]")).toContainText("A stray paragraph.");
+  await expect(qb.locator('[data-dag-quiz-prompt] [role="textbox"]')).toHaveAttribute("aria-readonly", "true");
+  await qb.locator('[data-dag-quiz-stray-to="why"]').click();
+  await expect.poll(() => read("broken")).toContain("> Why.\n>\n> A stray paragraph.\n");
+  await expect(qb.locator("[data-dag-quiz-problem]")).toHaveCount(0);
+
+  const qc = page.locator('[data-dag-quiz-question="qc"]');
+  await qc.locator('[data-dag-quiz-fix="clean"]').click();
+  await expect.poll(() => read("broken")).toContain("## A setting nobody knows {#qc}\n");
+
+  /* The open block swallowed a question; ending it brings the question back. */
+  await expect(page.locator('[data-dag-quiz-question="qe"]')).toHaveCount(0);
+  await page.locator('[data-dag-quiz-fix="close-fence"]').click();
+  await expect(page.locator('[data-dag-quiz-question="qe"]')).toBeVisible();
+  await expect(page.locator("[data-dag-quiz-problem]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(5);
+  await expect(status).toHaveText("");
+});
+
+test("an answer and a question are moved by dragging their handles", async ({ page }) => {
+  const name = write("pg");
+  await page.goto(`/?quiz=${name}`);
+  const card = page.locator('[data-dag-quiz-question="qvis"]');
+  const drag = async (from: Locator, to: Locator, below: boolean) => {
+    const a = (await from.boundingBox())!;
+    const b = (await to.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + 8, { steps: 4 });
+    await page.mouse.move(b.x + b.width / 2, below ? b.y + b.height - 2 : b.y + 2, { steps: 8 });
+    await page.mouse.up();
+  };
+  /* The first answer to the end. */
+  const grips = card.locator(".dag-quiz__option .dag-quiz__grip");
+  await drag(grips.nth(0), card.locator(".dag-quiz__option").nth(2), true);
+  await expect.poll(() => read("pg")).toContain("- [x] `xmax`\n- [ ] `ctid`\n- [x] `xmin`\n");
+  /* The last question to the top. */
+  await drag(
+    page.locator("[data-dag-quiz-question]").last().locator("[data-dag-quiz-grip]"),
+    page.locator("[data-dag-quiz-question]").first(),
+    false,
+  );
+  await expect.poll(() => read("pg")).toMatch(/A short drill\.\n\n## Which isolation level is the default\?/);
 });
 
 test("a run records a miss into Mistakes, and two right in a row in the Mistakes run take it out", { tag: "@smoke" }, async ({
