@@ -43,14 +43,12 @@ export function subscribeChat(key: string, on: (e: ChatEvent) => void, onOpen?: 
         for (const l of made.listeners) l(e);
       });
     }
-    /* Not the first open: a hook has just read the chat itself. A later one is a reconnect, and
-       whatever was said in the gap is gone from the stream and in the file. */
-    let first = true;
+    /* Every open, the first included. A hook reads the chat as it subscribes, while the stream is
+       still connecting, and that read can answer before the server is listening: whatever was said
+       in between — the `end` of a first message, the `chat` that adds a row to the history — was in
+       neither. The server listens before it writes the first byte, so a read after `open` covers the
+       gap. A later open is a reconnect, and the gap it covers is the time it was away. */
     source.addEventListener("open", () => {
-      if (first) {
-        first = false;
-        return;
-      }
       for (const f of made.opens) f();
     });
     channels.set(key, ch);

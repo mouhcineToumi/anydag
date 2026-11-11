@@ -108,7 +108,7 @@ const PAGES: { what: string; url: () => string; here: (page: Page) => Promise<vo
   {
     what: "the assistant",
     url: () => "/?chat=new",
-    here: (page) => expect(page.locator("[data-dag-chat-empty]")).toBeVisible(),
+    here: (page) => expect(page.locator("[data-dag-chat-welcome]")).toBeVisible(),
   },
 ];
 
