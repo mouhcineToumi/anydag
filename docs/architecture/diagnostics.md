@@ -13,7 +13,8 @@ card, which may parse clean and still be wrong (`EG_WRONG_TYPE`), or to a reques
 canvas — see *Problems* for where a person reads them. `GET /__board/diagnostics?name=` is the same
 parse, server-side, through the same `diagnoseBoard` the page's dock calls, and `anydag snapshot`
 prints it. The
-three `EB_LINK_*` codes ride in `board.errors` and reach that endpoint with no change to it, and the
+three `EB_LINK_*` codes ride in `board.errors` and reach that endpoint with no change to it — an
+unresolved end with a `target` naming the link it left hanging (#173) — and the
 five `*_CHART_*` codes are the only family named for a dialect — everything else `parseChart` raises
 is one of the shared ones, which is what says the statement shape really was inherited.
 
@@ -93,7 +94,8 @@ What counts as one a person can act on (`shown()` in `problemList.ts`):
 - **About one thing that was drawn**, with a control in its panel that answers it:
   `W_UNKNOWN_ICON` (the icon picker), `W_UNKNOWN_HUE` (the swatches), `W_RETIRED_FLAG` (Update it),
   `E_UNKNOWN_ID` (a link to a card that is not there — Delete link, in the row), `W_MISSING_ROW`
-  (the link's ends) and `W_CHART_LENGTH` (the values). "Show" picks it. The same code about a
+  (the link's ends), `W_CHART_LENGTH` (the values), and `EB_LINK_UNKNOWN_ITEM` and
+  `EB_LINK_UNKNOWN_NODE` (a board link to nothing, hanging — Delete link, in the row). "Show" picks it. The same code about a
   statement that was *not* drawn — an edge out of a card that could not be read — has nothing to
   pick, and is left out.
 - **About the whole diagram:** a Mermaid paste (`E_MERMAID_SYNTAX` when the header says the block is
@@ -145,6 +147,15 @@ the edge, whose panel has Delete. The diagnostic is unchanged — it still names
 out of `edgeTargets`, `nodeIdsOf` and `declaredOn`, so no menu offers it and no problem targets it.
 An edge with both ends missing, or out of a card that could not be read (`ctx.broken`), gets none;
 there is nothing on the paper to hang it from. Names claimed: `dag-loose`, `data-dag-loose`.
+
+**A board link to nothing hangs the same way** (#173). `resolveLinks` keeps a link with one end
+that resolves, marks the missing end (`loose`), and sets the diagnostic's `target` to
+`{ what: "link", id }` — a board diagnostic's first target, and the reason `DiagnosticTarget.what`
+has a fifth value. The problem's item is the `edges` fence its line is in (`itemAt`), so "Show"
+calls `openOn(fence, target)`, which opens the fence and picks the link, and the panel's row Delete
+goes to `editor.removeLink`. The stub is drawn by `Edges` in the link overlay rather than by a node,
+dragged by `ctl.looseLink`, and written by `reattachLink`; the paragraph on it in
+`links.md` has the rest. `data-dag-loose-link` is claimed beside the two names above.
 
 The frame mark is painted, not rendered (`data-dag-problem-count`, set by `App` the way
 `data-dag-proposed` is): `Item` is memoised and a per-item prop would re-render every diagram

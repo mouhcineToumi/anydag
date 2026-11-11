@@ -50,9 +50,15 @@ Five things about the links are load-bearing:
   whose own id contains a dot wins. That is `makeRef`/`resolveRefs` one layer up. Resolution runs
   *after* the pages are settled: an item on a page nobody declared is moved onto the first one and
   drawn there, and resolving before would report `EB_LINK_UNKNOWN_ITEM` for a card in plain view.
-- **An endpoint that does not resolve takes its link with it**, so nothing downstream carries a
-  case for an end that is not anywhere. One wrong id costs one diagnostic however many times the
-  statement names it — a chain says its middle twice, a bus says its target once per source.
+- **An endpoint that does not resolve leaves its link hanging** (#173), when the other end does.
+  The link stays in `board.links` with `loose: "from" | "to"` naming the missing end, kept as it was
+  typed, and its diagnostic carries `target: { what: "link", id }`. **Every reader of `from`/`to`
+  that means a thing on the board checks `loose` first** — `routeLinks`, `referencedInto` in
+  `survive.ts` — because that end is a name and not an item. With both ends missing there is nothing
+  to hang it from and the link is dropped, as #168 drops a diagram's edge between two undeclared
+  names. One wrong id costs one diagnostic however many times the statement names it — a chain says
+  its middle twice, a bus says its target once per source — and it points at the first link it left
+  hanging. The paragraph on it below has the drawing, the drag and the delete.
 - **A link into a diagram lands on the card, and the frame becomes scenery.** Anchoring on the
   frame level with the node is the mechanism a port row uses and it is defensible on paper. On
   screen a frame is `paper` on `paper` with no border, so the arrow stopped at an edge nobody can
@@ -112,6 +118,32 @@ on a fence nobody touched. It is `applyPatch`'s, not the gesture's, so the CLI a
 every link naming the removed item — or a card inside it, `arch1.db` for `arch1` unless an item has
 that literal id — goes by `removeNode`'s rules, a bus losing a source and a chain split rather than
 joined. Only links *this* patch broke: one that already named nothing is somebody's typing.
+
+**A board link to nothing hangs from a loose end** (#173) — #168's loose end one level up. Four
+things about it:
+
+- **The stub is the router's, not a node's.** A diagram's loose end is a `loose` node laid out with
+  its cards; a board link has no layout to join, so `routeLinks` places the stub itself: beside the
+  item the known end is in — after it for a missing target, before it for a missing source — level
+  with the card it leaves, `edge.reach.min` out from the frame, several on one side stacked a
+  `node.gap` apart. It is a circle node in the route (`outline: "circle"`), so the line meets its
+  ring, and it counts towards the overlay's extent for the bend's reason. `Edges` draws it with
+  #168's look and names (`dag-loose`, `data-dag-loose` = the name as typed, plus
+  `data-dag-loose-link` = the link's id), inside the overlay's own SVG, so an export carries it.
+- **Dragging it is `ctl.looseLink`**, `connect`'s gesture from the stub: `targetAt` reads the drop
+  out of the DOM, `wholeCard` takes off a row or a boundary an `edges` fence cannot name, and
+  `reattachLink` in `connect.ts` rewrites that one end through `retargetRef` — the label, the
+  arrow, `via=` and the other ends stay as written, and a chain through the name is mended at every
+  hop. `reattachable` refuses the thing it hangs from, and a card in the same diagram, which would
+  be a link between two cards of one diagram (see `addLink`). A press that does not travel picks
+  the link.
+- **Deleting it takes the name, not the line.** `removeLink` hands a hanging link to
+  `removeLooseLink`, which runs `removeRefs` over its own line for the missing name — `removeNode`'s
+  rules, as `dropLinks` uses them: a bus keeps its other sources, a chain the hops that did not run
+  through it. A plain link still takes its whole statement.
+- **Opening a board writes nothing.** The parse keeps the link and the page draws it; the file
+  changes only when somebody drags, deletes or edits it — the rule `dropLinks` already follows for a
+  link that named nothing before a patch.
 
 **Renaming follows the link.** `renameItemId` rewrites every `edges` line that names a renamed
 item, and `renameNodeLinks` (`src/board/rename.ts`) does the same one level down: renaming a node

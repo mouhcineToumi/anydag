@@ -141,6 +141,65 @@ test("a click on a loose end picks its link, and Delete takes it out", async ({ 
   expect(fs.readFileSync(file, "utf8")).toContain("api --> db");
 });
 
+/** A board link to something not on the board (#173): hanging from a card in `stack`. */
+const HANGING = `${GOOD}
+\`\`\`edges {#links}
+stack.api --> other
+stack.api --> ghost "reads"
+\`\`\`
+`;
+
+const read = () => fs.readFileSync(file, "utf8");
+
+test("a board link to nothing hangs from a loose end, and dropped on a card is mended", async ({ page }) => {
+  await open(page, HANGING);
+  const stub = page.locator('.dag-board-edges [data-dag-loose="ghost"]');
+  await expect(stub).toBeVisible();
+  await expect(page.locator(".dag-board-edges [data-dag-edge]")).toHaveCount(2);
+  await expect(pill(page)).toHaveText(/1 error/);
+  /* Drawing it wrote nothing: the link stays as typed until somebody acts on it. */
+  expect(read()).toBe(HANGING);
+
+  const from = (await stub.boundingBox())!;
+  const to = (await page.locator('[data-dag-item="other"] [data-dag-node="cache"]').boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+  await expect(page.locator(".dag-connect")).toHaveCount(1);
+  await page.mouse.up();
+
+  await expect.poll(read).toContain('stack.api --> other.cache "reads"');
+  expect(read()).not.toContain("ghost");
+  await expect(stub).toHaveCount(0);
+  await expect(pill(page)).toHaveCount(0);
+});
+
+test("a click on a board link's loose end picks it, and Delete takes it out", async ({ page }) => {
+  await open(page, HANGING);
+  await page.locator('.dag-board-edges [data-dag-loose="ghost"]').click();
+  await expect(page.locator('.dag-board-edges [data-dag-edge="links-2"][data-dag-picked]')).toHaveCount(1);
+  await page.keyboard.press("Delete");
+  await expect.poll(read).not.toContain("ghost");
+  expect(read()).toContain("stack.api --> other\n");
+  await expect(pill(page)).toHaveCount(0);
+});
+
+test("Show picks a hanging board link, and its panel row deletes it", async ({ page }) => {
+  await open(page, HANGING);
+  await page.locator("[data-dag-problems-show]").click();
+  await expect(page.locator("[data-dag-inspector]")).toHaveCount(1);
+  await expect(page.locator('.dag-board-edges [data-dag-edge="links-2"][data-dag-picked]')).toHaveCount(1);
+  /* The link's own controls are what shows, under the problem, in words. */
+  await expect(page.locator("[data-dag-props] [data-dag-prop-line]")).toHaveCount(1);
+  const block = page.locator("[data-dag-inspector-problems]");
+  await expect(block).toContainText("loose end");
+  await expect(block).not.toContainText("EB_LINK");
+  await block.locator("[data-dag-problem-delete]").click();
+  await expect.poll(read).not.toContain("ghost");
+  expect(read()).toContain("stack.api --> other\n");
+  await expect(pill(page)).toHaveCount(0);
+});
+
 test("the count opens the list, and a row opens the panel", async ({ page }) => {
   await open(page, GHOST);
   await pill(page).click();

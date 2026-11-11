@@ -131,15 +131,24 @@ test("K opens the links fence, and makes one where there is none", async ({ page
   await expect.poll(read).toContain("```edges");
 });
 
-test("a link naming nothing is skipped, and the good links still draw", async ({ page }) => {
+test("a link naming nothing hangs from a loose end, and the good links still draw", async ({ page }) => {
   await open(page);
   fs.writeFileSync(file, read().replace('who --> stack.db "reads"', 'who --> stack.db "reads"\nwho --> ghost'));
-  await expect(page.locator(".dag-board-edges [data-dag-edge]")).toHaveCount(1);
-  /* Not a problem a person is told about: there is nothing drawn to act on, and an agent reads
-     `EB_LINK_UNKNOWN_ITEM` from the diagnostics (see `problems.spec.ts`). Never a card either. */
-  await page.waitForTimeout(1500);
-  await expect(page.locator("[data-dag-problems-pill]")).toHaveCount(0);
+  /* Drawn from the end it has to a loose stub (#173), so the problem the dock counts is one a
+     person can see and act on — see `problems.spec.ts`. Never a card on the canvas. */
+  await expect(page.locator(".dag-board-edges [data-dag-edge]")).toHaveCount(2);
+  await expect(page.locator('.dag-board-edges [data-dag-loose="ghost"]')).toBeVisible();
+  await expect(page.locator("[data-dag-problems-pill]")).toHaveText(/1 error/);
   await expect(page.locator(".dag-viewport .dag-error")).toHaveCount(0);
+});
+
+test("a link naming nothing at either end is not drawn, and nothing is said", async ({ page }) => {
+  await open(page);
+  fs.writeFileSync(file, read().replace('who --> stack.db "reads"', 'who --> stack.db "reads"\nghost --> nobody'));
+  await page.waitForTimeout(1500);
+  await expect(page.locator(".dag-board-edges [data-dag-edge]")).toHaveCount(1);
+  await expect(page.locator(".dag-board-edges [data-dag-loose]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-problems-pill]")).toHaveCount(0);
 });
 
 /* ---- the gesture ---- */

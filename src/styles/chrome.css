@@ -1911,6 +1911,14 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 [data-dag-bending] .dag-edge-hit { pointer-events: none; }
 [data-dag-bending] .dag-bend-handle { cursor: grabbing; }
 
+/* A hanging board link's loose stub (#173): a handle, so it takes the pointer `.dag-edges` does
+   not, and gives it up while a drag is reading what is under the pointer — its own included. */
+.dag-loose--live {
+  pointer-events: auto;
+  cursor: grab;
+}
+[data-dag-connecting] .dag-loose--live { pointer-events: none; }
+
 .dag-edges [data-dag-picked] .dag-edge-line {
   stroke: var(--dag-color-accent);
   stroke-width: 3px;

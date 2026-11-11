@@ -84,8 +84,10 @@ warning and the line is drawn straight.
 | `EB_LINK_UNKNOWN_NODE` | the item is a diagram, and it declares no such node |
 | `WB_BAD_VIA` | `via=` was not one `x,y` pair; the bend is dropped and the line drawn straight |
 
-A link with an end that does not resolve is dropped rather than drawn half-way. The diagnostic is
-the report, and it names the fence's line.
+A link with one end that does not resolve is drawn hanging: from the end it has to a small dashed
+circle, which a person drags onto something to point the link there, or clicks to pick and delete.
+The diagnostic still names the fence's line, and nothing is written until somebody acts. A link with
+**both** ends unresolved has nothing to hang from and is not drawn; the diagnostic is the report.
 
 Deleting an item takes every link that named it, or a card inside it, in the same write — from the
 canvas, a `remove` op over MCP (`board_patch`) — so an `EB_LINK_UNKNOWN_ITEM` means a link was written to

@@ -64,6 +64,17 @@ const ON_A_PICK: Partial<Record<Code, { words: string; fix?: Problem["fix"] }>> 
     fix: "delete-edge",
   },
   [CODES.W_MISSING_ROW]: { words: "A link ends on a row the card does not have. Point it at another end." },
+  /* A board link with one end that names nothing hangs from a loose end (#173), and the diagnostic
+     carries the link — so these are a pick like the rest. With both ends missing nothing is drawn,
+     there is no target, and nothing is shown. */
+  [CODES.EB_LINK_UNKNOWN_ITEM]: {
+    words: "A link ends on something that is not on this page. Drag its loose end onto a card, or delete it.",
+    fix: "delete-edge",
+  },
+  [CODES.EB_LINK_UNKNOWN_NODE]: {
+    words: "A link ends on a card that is not there. Drag its loose end onto a card, or delete it.",
+    fix: "delete-edge",
+  },
   [CODES.W_CHART_LENGTH]: { words: "A series has a different number of values than the chart has categories." },
 };
 

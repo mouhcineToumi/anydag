@@ -341,7 +341,8 @@ export interface Diagnostic {
 
 /** The thing a diagnostic concerns, as a pick names it. */
 export interface DiagnosticTarget {
-  what: "node" | "group" | "lane" | "edge";
+  /** `link` is a board link in an `edges` fence (#173), by its id in `board.links`; the rest are inside a diagram. */
+  what: "node" | "group" | "lane" | "edge" | "link";
   id: string;
 }
 

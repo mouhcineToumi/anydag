@@ -1,6 +1,6 @@
 import { endText } from "@/board/links";
-import type { LinkEnd } from "@/board/types";
-import { addEdgeEnd, appendHop, edgeSpan, type EdgeSpan } from "@/dsl/restate";
+import type { BoardLink, LinkEnd } from "@/board/types";
+import { addEdgeEnd, appendHop, edgeSpan, removeRefs, retargetRef, type EdgeSpan } from "@/dsl/restate";
 import type { Box } from "./snap";
 
 /**
@@ -127,6 +127,46 @@ export function removeLinkLine(body: string, line: number): string {
   lines.splice(line - 1, 1);
   /* A body that is now nothing but blank lines is nothing: the fence stays, empty, rather than
      accumulating the whitespace of every link that was ever deleted from it. */
+  return lines.join("\n").trim() === "" ? "" : lines.join("\n");
+}
+
+/**
+ * Whether a hanging link's loose stub may be dropped on `to` (#173): anything a link can name,
+ * except the thing it already hangs from — or a card in the same diagram, which would be a link
+ * between two cards of one diagram, and that belongs in the diagram's own body (see `addLink`).
+ */
+export function reattachable(link: BoardLink, to: Target): boolean {
+  if (!link.loose) return false;
+  const has = link.loose === "to" ? link.from : link.to;
+  return wholeCard(to).item !== has.item;
+}
+
+/**
+ * A hanging link's statement with its loose end dropped on `to` (#173): the name that is nowhere
+ * becomes `to`'s, wherever the line says it, and nothing else on the line changes — the label, the
+ * arrow, `via=` and the other ends stay as written. A chain through the missing name is mended at
+ * every hop that named it, as #168's `retargetRef` mends a diagram's. `null` when there is nothing
+ * to write.
+ */
+export function reattachLink(src: string, link: BoardLink, to: Target): string | null {
+  if (!link.loose || !reattachable(link, to)) return null;
+  const next = retargetRef(src, endText(link[link.loose]), endText(wholeCard(to)));
+  return next === src ? null : next;
+}
+
+/**
+ * A fence body with a hanging link taken out (#173): the missing name off its statement by
+ * `removeNode`'s rules, which is what `dropLinks` does for a deleted item — a bus loses that
+ * source, a chain is split rather than joined, and a statement with nothing left goes. Only this
+ * one line; the same name somewhere else is a link nobody picked.
+ */
+export function removeLooseLink(body: string, line: number, ref: string): string {
+  const lines = body.split("\n");
+  const src = lines[line - 1];
+  if (src === undefined) return body;
+  const next = removeRefs(src, (word) => word === ref);
+  if (next === src) return removeLinkLine(body, line);
+  lines.splice(line - 1, 1, ...(next.trim() === "" ? [] : next.split("\n")));
   return lines.join("\n").trim() === "" ? "" : lines.join("\n");
 }
 

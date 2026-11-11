@@ -2506,6 +2506,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               picked={editor.pickedLink}
               onBend={snapshot || locked || !ctl ? undefined : ctl.bendLink}
               onStraighten={snapshot || locked || !ctl ? undefined : ctl.straightenLink}
+              onLoose={snapshot || locked || !ctl ? undefined : ctl.looseLink}
             />
           ) : null}
         </Viewport>

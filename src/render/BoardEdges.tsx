@@ -58,6 +58,7 @@ export function BoardEdges({
   picked,
   onBend,
   onStraighten,
+  onLoose,
 }: {
   links: BoardLink[];
   boxes: Map<string, Box>;
@@ -80,6 +81,8 @@ export function BoardEdges({
   /** Bend the picked line through a point, and straighten it again. Absent under `?snapshot=1`. */
   onBend?(id: string, e: ReactPointerEvent<SVGCircleElement>): void;
   onStraighten?(id: string): void;
+  /** Pull a hanging link's loose stub onto something (#173). Absent where nothing may be written. */
+  onLoose?(link: string, e: ReactPointerEvent<SVGGElement>): void;
 }) {
   const [moves, setMoves] = useState<LinkPreview["moves"]>(null);
   const [bend, setBend] = useState<BendPreview | null>(null);
@@ -173,6 +176,8 @@ export function BoardEdges({
         picked={picked}
         onBend={onBend}
         onStraighten={onStraighten}
+        loose={routed.loose}
+        onLoose={onLoose}
       />
     </div>
   );
