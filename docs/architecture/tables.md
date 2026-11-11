@@ -25,13 +25,13 @@ and a link cell holds a URL or a `dag:` reference.
 | Where | What it does with one |
 |---|---|
 | the sidebar | **New** → *Table* makes `untitled` with one tab, two text columns and three rows, and names it in the top bar; a table's row wears a grid; a folder's `+` makes one in the folder |
-| its page, `?table=` | the grid of one tab; the tab's bar — Sort, Filter, how many rows show of how many, undo and redo, Source; the tabs along the bottom; Import CSV and Export in the top bar |
+| its page, `?table=` | the grid of one tab; the tab's bar — Sort, Filter, how many rows show of how many, how many problems the file has, undo and redo; the tabs along the bottom; Import CSV and Export in the top bar. **No Source**: the file's problems are said where they apply (below) |
 | a board, or a note, embedding one | a card: its mark, title, tab and row count, then the tab's first rows as the tab shows them — ten on a board, twenty in a note; `#<tab>` picks the tab; Open, or a double-click, opens the table on it |
 | `?view=1` | the grid read-only, the tabs in the strip |
 | a snapshot | every tab, one after another, each under its name |
 | the search | a row is a result, `part` `<tab>/<row>`; it opens the table on that tab with the row marked |
 
-Nine things are load-bearing:
+Ten things are load-bearing:
 
 - **A tab is a `##` heading and everything to the next one; its grid is the first GFM table under
   it.** The heading's words are the tab's name and its `{…}` says `#id`, `sort=` and `filter=`; a
@@ -73,6 +73,26 @@ Nine things are load-bearing:
   `src/view/tableText.ts` is one fetch per table and one `dag:table` listener while anything shows it,
   so ten cards of one table are one request and a change re-renders its cards and nothing else on the
   canvas. A card stops its double-click at itself, so the board does not also open the editor panel.
+- **A problem is said in words on what it concerns, with the button that mends it — the page has no
+  Source.** `src/ui/table/problems.ts` (and `ProblemList.tsx`, which draws them) is a `switch` over `TableCode` ending in `assertNever`, so a
+  code added to `codes.ts` fails the typecheck until it is said there. It turns each diagnostic into
+  a `Problem`: a sentence with no Markdown in it, a `Where` (the file, a tab, a column, a row, a cell —
+  indexes into the parse, because a shared id names neither of two things) and its `Fix`es. The page
+  draws them where they are: a **tab's** (a sort or filter that does not read, text under it, an
+  unknown heading word, a shared tab id, an open code block) and the **file's** (a table above the first
+  tab) in a list above the grid; a **column's** (a shared id, a word that is not a type) on a mark in
+  its header; a **row's** (a shared id, too many cells) and its **cells'** (`WT_CELL`, also the cell's
+  `title`) on a mark in its gutter. The bar's status says how many in the whole file and its button goes
+  to the first, switching tab. `WT_NO_ID` and `WT_EMPTY` are not shown: an id is the file's business
+  and the empty state has its own button. A row has no `WT_UNKNOWN_ATTR` — its braces are attributes
+  only when they hold nothing but an id and a height. Each fix is one `repair` in `problems.ts` over
+  one writer in `write.ts`, addressed **by position** and written like any change, so it is one undo:
+  `reidTab` / `reidColumn` / `reidRow`, `dropUnknownAttrs`, `setCell` / `setColumn` (clear the cell, make
+  the column text, add the value to a select's choices), `trimRow` or `widenToRow` for a row with too
+  many cells, `removeStray` (the list shows the text first), `setTab` with only the sort keys and filter
+  rules that read, `closeFence`, `wrapLooseTable`. Each looks again at what it was asked to mend and
+  returns the text it was given when that is no longer wrong. A write that goes by id while two things
+  share one is refused with a word that says so (`only` in `TablePage.tsx`).
 - **CSV is a conversion, never a format.** `src/table/csv.ts` reads RFC 4180 with the delimiter
   sniffed among `,`, `;` and a tab, and a column's type inferred from its values; a tab goes out as
   every row in its sort order, unfiltered — a filter hides rows from a person, not from a file they

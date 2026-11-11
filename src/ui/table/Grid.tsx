@@ -1,4 +1,13 @@
-import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, ArrowUpNarrowWide, GripVertical, Plus, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownWideNarrow,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpNarrowWide,
+  GripVertical,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -32,6 +41,9 @@ import {
 import { startDrag } from "@/ui/pointerDrag";
 import { COLUMN_ICON, COLUMN_LABEL, CellView, colStyle, keysOf, optionHue } from "@/view/TableRead";
 import { hueVars } from "@/render/hue";
+
+import { ProblemList } from "./ProblemList";
+import type { Fix, Problem } from "./problems";
 
 /**
  * A tab's grid, editable.
@@ -74,6 +86,21 @@ interface Pos {
 
 type Menu = { kind: "col"; c: number; x: number; y: number } | { kind: "row"; r: number; x: number; y: number };
 
+/** The file's problems for this tab, as the grid draws them: marks on columns and rows, a title on a cell. */
+export interface GridProblems {
+  list: readonly Problem[];
+  /** The tab's place in the file, which a problem's `where` names. */
+  tab: number;
+  onFix(p: Problem, f: Fix): void;
+}
+
+/** A card of problems opened from a mark. */
+interface Flagged {
+  x: number;
+  y: number;
+  problems: Problem[];
+}
+
 /** The narrowest a column is dragged to, which is what `setColumn` floors a width at too. */
 const MIN_W = 40;
 const MIN_H = 24;
@@ -84,11 +111,13 @@ export function Grid({
   mark = null,
   readOnly = false,
   onRefused,
+  problems,
 }: {
   tab: Tab;
   edit: Edit;
   mark?: number | null;
   readOnly?: boolean;
+  problems?: GridProblems;
   /** A key or a press that would have edited a read-only grid — the lock's notice. */
   onRefused?(): void;
 }) {
@@ -100,6 +129,43 @@ export function Grid({
   const [active, setActive] = useState<Pos | null>(null);
   const [editing, setEditing] = useState<(Pos & { draft: string }) | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [flagged, setFlagged] = useState<Flagged | null>(null);
+  /* Who has a problem, by place: a column's by its index, a row's — and its cells' — by its stored one. */
+  const flags = useMemo(() => {
+    const columns = new Map<number, Problem[]>();
+    const rows = new Map<number, Problem[]>();
+    const cells = new Map<string, Problem>();
+    const add = <K,>(m: Map<K, Problem[]>, k: K, p: Problem) => m.set(k, [...(m.get(k) ?? []), p]);
+    for (const p of problems?.list ?? []) {
+      const w = p.where;
+      if (w.kind === "file" || w.tab !== problems?.tab) continue;
+      if (w.kind === "column") add(columns, w.column, p);
+      else if (w.kind === "row") add(rows, w.row, p);
+      else if (w.kind === "cell") {
+        add(rows, w.row, p);
+        cells.set(`${w.row}:${w.column}`, p);
+      }
+    }
+    return { columns, rows, cells };
+  }, [problems]);
+  const flag = (list: Problem[], name: string) => (
+    <button
+      type="button"
+      className="dag-grid__flag"
+      data-dag-grid-flag={name}
+      data-severity={list.some((p) => p.severity === "error") ? "error" : "warning"}
+      aria-label={`${list.length} ${list.length === 1 ? "problem" : "problems"}: ${list[0]!.words}`}
+      title={list.map((p) => p.words).join("\n")}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        const box = e.currentTarget.getBoundingClientRect();
+        setFlagged((f) => (f ? null : { x: box.left, y: box.bottom, problems: list }));
+      }}
+    >
+      <AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />
+    </button>
+  );
   /* A row just added, by its stored place, to be selected once it is drawn. */
   const [pending, setPending] = useState<number | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -506,6 +572,7 @@ export function Grid({
                   <span className="dag-grid__head-in">
                     <Icon size={12} strokeWidth={2} aria-hidden="true" />
                     <span className="dag-grid__name">{c.name || " "}</span>
+                    {flags.columns.has(i) ? flag(flags.columns.get(i)!, "column") : null}
                     {by ? (
                       by.desc ? (
                         <ArrowDownWideNarrow
@@ -572,6 +639,7 @@ export function Grid({
                 onPointerDown={dragRow(r)}
               >
                 <span className="dag-grid__num">{index + 1}</span>
+                {flags.rows.has(index) ? flag(flags.rows.get(index)!, "row") : null}
                 {readOnly ? null : <GripVertical size={12} strokeWidth={2} className="dag-grid__grip" aria-hidden="true" />}
                 {readOnly ? null : (
                   <span
@@ -590,6 +658,7 @@ export function Grid({
                     key={colKeys[i]}
                     className={`dag-grid__cell dag-grid__cell--${c.type}`}
                     data-dag-grid-at={`${r}:${i}`}
+                    title={flags.cells.get(`${index}:${i}`)?.words}
                     data-dag-grid-active={on ? "" : undefined}
                     data-dag-grid-editing={isEditing ? "" : undefined}
                     aria-selected={on}
@@ -637,6 +706,18 @@ export function Grid({
           <Plus {...ICON} aria-hidden="true" /> New row
         </button>
       )}
+      {flagged ? (
+        <Pop at={flagged} onClose={() => setFlagged(null)} label="Problems">
+          <ProblemList
+            problems={flagged.problems}
+            disabled={readOnly}
+            onFix={(p, f) => {
+              setFlagged(null);
+              problems?.onFix(p, f);
+            }}
+          />
+        </Pop>
+      ) : null}
       {menu?.kind === "col" && tab.columns[menu.c] ? (
         <ColumnMenu
           key={`col-${menu.c}-${tab.columns[menu.c]!.id}`}
