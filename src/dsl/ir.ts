@@ -288,6 +288,9 @@ export interface LegendEntry {
   text: string;
 }
 
+/** The glyph words `Legend` draws, which is the whole of what `legend <glyph> "…"` can say. */
+export const LEGEND_GLYPHS = ["solid", "dashed", "quiet", "external", "done", "wait", "stop", "port"] as const;
+
 /**
  * Assignment order for anything that did not ask for a hue: groups, lanes, mindmap branches,
  * timeline sections, git branches.

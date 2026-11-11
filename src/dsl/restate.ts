@@ -1,4 +1,4 @@
-import { FORMS, type ChartForm } from "./chart";
+import { FORMS, parseChart, type ChartForm } from "./chart";
 import { declaredAt } from "./declared";
 import { STATUSES, type Status } from "./ir";
 import { renameIds } from "./rebind";
@@ -1494,7 +1494,9 @@ export function setChartOption(
   key: "legend" | "unit" | "min" | "max" | "values",
   value: string | number | boolean | null,
 ): string {
-  const line = headLine(body, new Set([key]));
+  /* `legend` is two statements that share a head word, and this writes the placement one: a key row
+     (`legend solid "…"`) written earlier in the body must not be what a change of placement finds. */
+  const line = key === "legend" ? (legendLines(body).find((l) => !l.glyph)?.line ?? 0) : headLine(body, new Set([key]));
 
   if (value === null || value === false) {
     if (line === 0) return body;
@@ -1554,3 +1556,170 @@ export function setCategories(body: string, labels: readonly string[]): string {
 
 /** The tokenizer's own word shape: a label matching it round-trips bare, and nothing else does. */
 const BARE_LABEL = /^[A-Za-z0-9_*+\-][A-Za-z0-9_.\-/+]*$/;
+
+/* ------------------------------------------------------------------ the centre, the key, the data */
+
+/**
+ * Every `legend` statement of a body, and which of its two meanings each is.
+ *
+ * `legend bottom` places the key and `legend solid "in sync"` adds a row to it; the grammar tells
+ * them apart by whether a string follows the second word, and so does this, off the tokens rather
+ * than a regular expression.
+ */
+function legendLines(body: string): { line: number; glyph: boolean }[] {
+  const by = tokensByLine(body);
+  const out: { line: number; glyph: boolean }[] = [];
+  for (const line of [...by.keys()].sort((a, b) => a - b)) {
+    const t = by.get(line)!;
+    if (t[0]?.kind !== "word" || t[0].value !== "legend") continue;
+    out.push({ line, glyph: t[1]?.kind === "word" && t[2]?.kind === "string" });
+  }
+  return out;
+}
+
+/** A line to put a new chart-level statement on: straight after the form line, else last. */
+function insertAfterForm(body: string, text: string): string {
+  const form = headLine(body, FORM_WORDS);
+  if (form === 0) return body.trim() === "" ? `${text}\n` : `${body.replace(/\n*$/, "")}\n${text}\n`;
+  const lines = splitLines(body);
+  return [...lines.slice(0, form), text, ...lines.slice(form)].join("\n");
+}
+
+/**
+ * A donut's hero — the number in its hole and the word under it — or `null` to take it away.
+ *
+ * It lives on the form line, as strings beside the flags, so the writer swaps only the strings and
+ * leaves the form word, a `%%` comment and any flag exactly where they stood. With no form line the
+ * body is a `bar`, which has no hole, so there is nothing to write and the body comes back as it
+ * was. A caption without a figure is not a thing the grammar has: an empty figure takes both.
+ */
+export function setChartHero(body: string, hero: { value: string; label?: string } | null): string {
+  const line = headLine(body, FORM_WORDS);
+  if (line === 0) return body;
+  const text = splitLines(body)[line - 1]!;
+  const tokens = lineTokens(text);
+  const strings = tokens.filter((t) => t.kind === "string");
+  const value = hero?.value.trim() ?? "";
+  const label = hero?.label?.trim() ?? "";
+  const written = value === "" ? "" : [value, ...(label === "" ? [] : [label])].map((v) => JSON.stringify(v)).join(" ");
+
+  let next = text;
+  /* From the end, so the spans of the strings still to come stay where the tokenizer put them. */
+  for (let i = strings.length - 1; i >= 0; i--) {
+    next = i === 0 && written !== "" ? replaceSpan(next, span(strings[0]!), written) : cut(next, span(strings[i]!));
+  }
+  if (strings.length === 0 && written !== "") next = splice(next, insertAt(next, lineTokens(next)), written);
+  return replaceLine(body, line, next);
+}
+
+/** The key rows of a chart — its `legend <glyph> "text"` statements — in the order they were written. */
+export function chartKeyRows(body: string): { glyph: string; text: string }[] {
+  const by = tokensByLine(body);
+  return legendLines(body)
+    .filter((l) => l.glyph)
+    .map((l) => ({ glyph: by.get(l.line)![1]!.value, text: by.get(l.line)![2]!.value }));
+}
+
+/**
+ * The chart's key rows, replaced by `rows`.
+ *
+ * Rewritten in place and in order: the first row takes the first `legend <glyph> "…"` line, so a
+ * trailing comment on it survives; surplus lines go, and rows past the existing ones are written
+ * after the last of them (after the form line when there is none). A row whose glyph is not one
+ * word, or whose text is empty, is not a statement the grammar can read back, so it is dropped.
+ */
+export function setChartKeyRows(body: string, rows: readonly { glyph: string; text: string }[]): string {
+  const wanted = rows.filter((r) => /^[A-Za-z][A-Za-z0-9_-]*$/.test(r.glyph) && r.text.trim() !== "");
+  const row = (r: { glyph: string; text: string }) => `${r.glyph} ${JSON.stringify(r.text.trim())}`;
+  const had = legendLines(body).filter((l) => l.glyph);
+  let out = body;
+
+  /* Last first, so removing a line never moves one still to be rewritten. */
+  for (let i = had.length - 1; i >= 0; i--) {
+    const line = had[i]!.line;
+    if (i >= wanted.length) {
+      out = dropRange(splitLines(out), line - 1, line - 1).join("\n");
+      continue;
+    }
+    const text = splitLines(out)[line - 1]!;
+    const tokens = lineTokens(text);
+    out = replaceLine(out, line, replaceSpan(text, [span(tokens[1]!)[0], span(tokens[2]!)[1]], row(wanted[i]!)));
+  }
+
+  for (let i = had.length; i < wanted.length; i++) {
+    const last = legendLines(out)
+      .filter((l) => l.glyph)
+      .at(-1);
+    if (!last) {
+      out = insertAfterForm(out, `legend ${row(wanted[i]!)}`);
+      continue;
+    }
+    const lines = splitLines(out);
+    out = [...lines.slice(0, last.line), `legend ${row(wanted[i]!)}`, ...lines.slice(last.line)].join("\n");
+  }
+  return out;
+}
+
+/** Every series and slice id a chart body declares, in declaration order. */
+function chartIds(body: string): string[] {
+  const model = parseChart(body);
+  return [...model.series, ...model.slices].sort((a, b) => a.line - b.line).map((d) => d.id);
+}
+
+/**
+ * A new `series` or a new `slice`, written after the last one the chart has, and the id it was given.
+ *
+ * The id is the kind word with the next free number (`series2`, `slice3`) and the label says the
+ * same in words, because both have to exist before a person can retype either. A series gets one `1`
+ * per category — a bar, a point, a wedge that is there to be seen and picked, where a zero draws
+ * nothing — and a slice its one. No `hue=`: the next unused colour in the theme's list is the
+ * default, and writing one would pin it.
+ */
+export function addChartData(body: string, kind: "series" | "slice"): { body: string; id: string } {
+  const model = parseChart(body);
+  const taken = new Set(chartIds(body));
+  let n = 1;
+  while (taken.has(`${kind}${n}`) && n < 1000) n++;
+  const id = `${kind}${n}`;
+  const count = Math.max(model.categories.length, ...model.series.map((s) => s.values.length), 1);
+  const values = kind === "slice" ? "1" : Array.from({ length: count }, () => "1").join(" ");
+  const text = `${kind} ${id} "${kind === "series" ? "Series" : "Slice"} ${n}" ${values}`;
+
+  const last = [...model.series, ...model.slices].reduce((m, d) => Math.max(m, d.line), 0);
+  if (last === 0) return { body: insertAfterForm(body, text), id };
+  /* After the whole statement: a series line is one line, but the line may be followed by a block. */
+  const to = statementSpan(body, last).to;
+  const lines = splitLines(body);
+  return { body: [...lines.slice(0, to), text, ...lines.slice(to)].join("\n"), id };
+}
+
+/** Why `to` cannot be the id of the series or slice `from`, or `null` when it can. */
+export function chartIdProblem(body: string, from: string, to: string): string | null {
+  if (to === from) return null;
+  if (to === "") return "an id cannot be empty";
+  /* No dot: `chart.web` is an item and the series on it, so the id is the part after the last one. */
+  if (!/^[A-Za-z0-9_-]+$/.test(to)) return "an id is letters, digits, `-` and `_`";
+  if (chartIds(body).includes(to)) return `\`${to}\` is already a series or a slice on this chart`;
+  return null;
+}
+
+/**
+ * Change one series' or slice's id.
+ *
+ * Only the declaration is written, deliberately not `renameId`: that renames every *word* equal to
+ * the id, and in a chart a word is also a category — `x web mobile` beside `series web "Web"` would
+ * lose a column header. A chart's body names an id nowhere but where it declares it, so the one
+ * token is the whole of "every reference in the fence". Anything refused (see `chartIdProblem`)
+ * hands the body back untouched.
+ */
+export function renameChartId(body: string, from: string, to: string): string {
+  if (to === from || chartIdProblem(body, from, to) !== null) return body;
+  const model = parseChart(body);
+  const at = [...model.series, ...model.slices].find((d) => d.id === from);
+  if (!at) return body;
+  const text = splitLines(body)[at.line - 1]!;
+  const tokens = lineTokens(text);
+  const id = idIndex(tokens);
+  if (id === -1 || tokens[id]!.value !== from) return body;
+  return replaceLine(body, at.line, replaceSpan(text, span(tokens[id]!), to));
+}
