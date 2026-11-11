@@ -822,3 +822,16 @@
   prove a push where it lands, on the server, and before asserting that nothing ran, wait for the
   watcher to catch up (`heardAll()`) and then past the debounce. Reproduce both with `taskset -c 2,3` plus five busy loops per core,
   which starves a run far harder than the same loops spread over every core.
+- **Electron's `net.fetch` is Chromium's network stack, six connections to a host and all.** The
+  desktop shell forwarded every page request through it, so the page's three streams that never end
+  (the change feed, the Assistant's history, the open chat) were half the budget — and a stream the
+  page closed was never let go, because the handler handed the upstream body on and nothing
+  cancelled it. Each reload or switch of chat kept one more for the rest of the launch, and with six
+  held every request waited for ever while nothing failed: a note the Assistant rewrote went blank,
+  the sidebar never listed the board it made, and the chat's link to it said *Nothing has this id
+  any more* (#123). Only the desktop app had it — a browser's own six never saw those streams — so
+  no e2e spec could. `desktop/forward.ts` forwards over `node:http` and lets go on
+  `request.signal`. **And a page's copy of a list must ask again on its own after a failure**: the
+  file list and the reference index used to wait for the feed's next change, which after an agent's
+  last write never comes (`src/board/refresher.ts`). To see the first half again, open six
+  `EventSource`s through a `protocol.handle` that forwards with `net.fetch` and try a seventh request.

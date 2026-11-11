@@ -5,13 +5,16 @@
  */
 import type { ReactNode } from "react";
 
-import { hrefFor, titleOf, useIndex } from "./useIndex";
+import { hrefFor, titleOf, useIndex, useSeek } from "./useIndex";
 import { resolveWiki } from "./wikilinks";
 
 /** A link to a note or a board, wearing the target's title as it is now. */
 export function RefLink({ id, part, fallback }: { id: string; part?: string; fallback: ReactNode }) {
   const index = useIndex();
   const doc = index.byId.get(id);
+  /* A link to something made a moment ago — the Assistant's answer naming the board it just made —
+     asks for the index once more before it says the target is missing. */
+  useSeek(id, !!doc, index.loaded);
   /* Before the index has answered, the brackets' own words; after, a target that is not there is
      said to be missing rather than drawn as a link to nowhere. */
   const missing = index.loaded && !doc;

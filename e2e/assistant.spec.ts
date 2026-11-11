@@ -370,6 +370,53 @@ test("the panel keeps the chat it opens onto the page", async ({ page }) => {
   await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toHaveAttribute("aria-current", "page");
 });
 
+test("a board the Assistant makes and embeds in the open note is drawn there, listed, and linked, with no reload", async ({
+  page,
+}) => {
+  /* #123: the note went blank, the sidebar stopped hearing of new files and the chat's link to the
+     new board said "Nothing has this id any more". The panel on the note, as the report had it. */
+  const note = stem("host");
+  const board = stem("flow");
+  fs.writeFileSync(noteFile(note), "---\ntitle: Merge queues\n---\n# Merge queues\n\n## How it works\n\nSome words.\n");
+  await page.goto(`/?note=${note}`);
+  await expect(page.locator(`[data-dag-note-view="${note}"][data-dag-ready]`)).toBeVisible();
+  await openSidebar(page);
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+  await panel.locator("[data-dag-assistant-panel-new]").click();
+  /* The first list and the first index asked for after the message get no answer — in the desktop
+     app they waited for ever behind six held connections — and the page has to ask again itself. */
+  const dropped = { list: 0, index: 0 };
+  await page.route("**/__board/list*", (route) => (dropped.list++ === 0 ? route.abort() : route.continue()));
+  await page.route("**/__board/index*", (route) => (dropped.index++ === 0 ? route.abort() : route.continue()));
+  await say(page, `block Add a diagram\nboard ${board} a --> b\nembed ${note} ${board}`);
+  const turn = panel.locator("[data-dag-chat-turn]");
+  await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  /* The panel's chat is named on its surface rather than in the address. */
+  await expect(panel.locator("[data-dag-chat]")).not.toHaveAttribute("data-dag-chat", "new");
+  chats.push((await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!);
+
+  /* The note took the write in place: still drawn, with the board in it. */
+  const view = page.locator(`[data-dag-note-view="${note}"]`);
+  await expect(view.locator("[data-dag-note-title]")).toBeVisible();
+  await expect(view).toContainText("Some words.");
+  const embed = view.locator('[data-dag-embed][data-dag-embed-kind="board"]');
+  await expect(embed).toHaveAttribute("data-dag-embed-ready", "");
+  const id = await embed.getAttribute("data-dag-embed");
+  expect(fs.readFileSync(noteFile(note), "utf8")).toContain(`](dag:${id})`);
+  /* The sidebar lists the new board beside the note. */
+  await expect(page.locator(`[data-dag-sidebar-row][data-dag-sidebar-key="board:${board}"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-sidebar-row][data-dag-sidebar-key="note:${note}"]`)).toBeVisible();
+  /* And the chat's links to it resolve: neither says the board is missing. */
+  const links = turn.locator(`[data-dag-chat-said] [data-dag-ref="${id}"]`);
+  await expect(links).toHaveCount(2);
+  await expect(turn.locator(`[data-dag-chat-said] [data-dag-ref="${id}"].dag-ref--missing`)).toHaveCount(0);
+  expect(dropped.list).toBeGreaterThan(1);
+  expect(dropped.index).toBeGreaterThan(1);
+  /* The two requests this check refused are on the console; nothing else may be. */
+  problems = problems.filter((p) => !/Failed to load resource: net::ERR_FAILED/.test(p));
+});
+
 test("the composer's controls sit on one row, name the model, and the box can be made taller", async ({ page }) => {
   await page.goto("/?tasks=1");
   await page.locator("[data-dag-assistant-toggle]").click();
