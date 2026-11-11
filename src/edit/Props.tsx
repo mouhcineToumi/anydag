@@ -18,7 +18,7 @@ import {
 import { isDiagramType, isLinkType, resizeOf, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
 import { gitBranchName, gitMetaOf, gitMove, gitSetTag, parseGitgraph } from "@/dsl/graph/gitgraph";
-import { moveEntry, parseTimeline, readWhen, sectionOfLine, sectionsOf, setWhen, whenOf } from "@/dsl/graph/timeline";
+import { labelOf, moveEntry, parseTimeline, readWhen, sectionOfLine, sectionsOf, setWhen, whenOf } from "@/dsl/graph/timeline";
 import { HUE_ORDER, LEGEND_GLYPHS, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
 import { containersOf, descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
 import {
@@ -1067,7 +1067,9 @@ function PickProps({
           <Field
             label={isChart ? "Label" : "Title"}
             hook="data-dag-prop-title"
-            value={type === "mindmap" ? src.replace(/^[ \t]*(root\s+)?/, "") : slot(0)}
+            value={
+              type === "mindmap" ? src.replace(/^[ \t]*(root\s+)?/, "") : type === "timeline" ? (labelOf(src) ?? "") : slot(0)
+            }
             placeholder={id}
             onSet={(v) => {
               /* A mindmap line *is* its title — indentation is the grammar and there is no id to

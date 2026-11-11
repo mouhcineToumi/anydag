@@ -455,7 +455,10 @@ same reason, one dialect over.
 **The same answer holds for a timeline entry, a gitgraph commit and a sequence participant, and
 `pickControls` in `Props.tsx` is the gate the statement controls read.** A timeline entry's tail is
 read for `done` and `wait` only, so its panel is the date, the section and a three-option status —
-no hue, icon, flags or meta; a section keeps its hue, because `parseTimeline` reads that one. A
+no hue, icon, flags or meta; a section keeps its hue, because `parseTimeline` reads that one. Its
+title is read and written by `labelOf` / `setLabel` (`timeline.ts`, through `setTitle(…, "timeline")`)
+rather than the tokenizer's string slots: the tokenizer reads a range's `..` as an arrow, so to it a
+ranged entry had no title, and the label is required, so clearing it writes `""`. A
 gitgraph commit is a command whose first quoted string is its whole message, so `Props` sends it to
 its own `GitProps` panel — message, tag, order, branch — and offers no statement word. A bare word
 after a sequence participant's two strings is read as the next statement, so

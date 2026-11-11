@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CODES } from "@/dsl/codes";
 import { parseGitgraph } from "@/dsl/graph/gitgraph";
-import { parseTimeline } from "@/dsl/graph/timeline";
+import { labelOf, parseTimeline } from "@/dsl/graph/timeline";
 import { HUE_ORDER, type Diagnostic } from "@/dsl/ir";
 import { replaceLine, setFlag, setMeta, setModifier, setStatus, setTitle } from "@/dsl/restate";
 import { parseSequence } from "@/dsl/sequence";
@@ -81,6 +81,27 @@ describe("a timeline entry", () => {
   it("keeps hue on a section, the one timeline line parseTimeline reads it on", () => {
     expect(pickControls("timeline", "group").hue).toBe(true);
     expect(parseTimeline('section "2026" hue=coral\n  2026 "Build"').groups[0]?.hue).toBe("coral");
+  });
+
+  it("reads and writes the title of a ranged entry, whose `..` the tokenizer reads as an arrow", () => {
+    const RANGE = '2026-03 .. 2026-06 "Build" done';
+    expect(labelOf(RANGE)).toBe("Build");
+    const next = setTitle(RANGE, "Ship", "timeline");
+    expect(next).toBe('2026-03 .. 2026-06 "Ship" done');
+    expect(entry(next)).toMatchObject({ title: "Ship", meta: "2026-03 → 2026-06", status: "done" });
+  });
+
+  it("never writes a title the parser rejects: cleared is an empty label, a quote is not an escape", () => {
+    for (const line of [BODY, '2026-03 .. 2026-06 "Build"', '  2026-09 "Build" wait']) {
+      const cleared = setTitle(line, null, "timeline");
+      expect(errors(parseTimeline(cleared).diagnostics)).toEqual([]);
+      expect(entry(cleared).title).toBe("");
+      const quoted = setTitle(line, 'the "big" one', "timeline");
+      expect(errors(parseTimeline(quoted).diagnostics)).toEqual([]);
+      expect(entry(quoted).title).toBe("the 'big' one");
+    }
+    const section = setTitle('section "2026" hue=coral', null, "timeline");
+    expect(parseTimeline(section).groups[0]).toMatchObject({ label: "", hue: "coral" });
   });
 });
 

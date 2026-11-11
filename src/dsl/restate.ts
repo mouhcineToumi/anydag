@@ -1,5 +1,6 @@
 import { FORMS, parseChart, type ChartForm } from "./chart";
 import { declaredAt } from "./declared";
+import { setLabel } from "./graph/timeline";
 import { STATUSES, type Status } from "./ir";
 import { renameIds } from "./rebind";
 import { tokenize, type Token } from "./tokenizer";
@@ -357,9 +358,14 @@ function setTopic(line: string, text: string): string {
   return `${m[1] ?? ""}${m[2] ?? ""}${text}`;
 }
 
-/** The node's name. `type` only matters for `mindmap`, whose line carries nothing else. */
+/**
+ * The node's name. `type` matters for `mindmap`, whose line carries nothing else, and `timeline`,
+ * whose label sits after a date the tokenizer does not read (`..` is an arrow to it) and cannot be
+ * taken off — see `setLabel`.
+ */
 export function setTitle(line: string, text: string | null, type?: string): string {
   if (type === "mindmap") return setTopic(line, text ?? "");
+  if (type === "timeline") return setLabel(line, text ?? "") ?? line;
   return setString(line, 0, text);
 }
 
