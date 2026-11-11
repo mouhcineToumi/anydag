@@ -25,6 +25,7 @@ import { BoardEdges } from "@/render/BoardEdges";
 import { growable } from "@/edit/build";
 import { Inspector } from "@/edit/Inspector";
 import { Library } from "@/edit/Library";
+import { GitLanes } from "@/edit/GitLanes";
 import { NodeHandles } from "@/edit/NodeHandles";
 import { topicHandles } from "@/edit/pick";
 import { Rename } from "@/edit/Rename";
@@ -2419,6 +2420,16 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
               node={pickedNode.node}
               box={pickedBox}
               topic={pickedTopic}
+            />
+          ) : null}
+          {/* A selected git graph's lanes as controls — a chip on each name, a `+` past each tip,
+              + New branch under the last. Before the rename box, which opens over a chip. */}
+          {!snapshot && !locked && selectedItems.length === 1 && selectedItems[0]!.type === "gitgraph" ? (
+            <GitLanes
+              editor={editor}
+              item={selectedItems[0]!.id}
+              body={selectedItems[0]!.body}
+              picked={pickedNode?.item === selectedItems[0]!.id ? pickedNode.node : null}
             />
           ) : null}
           {!snapshot && editor.renaming ? (

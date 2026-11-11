@@ -55,6 +55,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 
 | Section | File |
 |---|---|
+| A git graph's lanes | [`editing.md`](editing.md) |
 | AnyDag | [`overview.md`](overview.md) |
 | Attachments | [`attachments.md`](attachments.md) |
 | Charts | [`charts.md`](charts.md) |

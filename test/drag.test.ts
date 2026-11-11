@@ -52,7 +52,7 @@ describe("dragMode", () => {
   it("gives the four own-layout dialects their own reading", () => {
     expect(dragMode("timeline")).toBe("date");
     expect(dragMode("sequence")).toBe("order");
-    expect(dragMode("gitgraph")).toBe("none");
+    expect(dragMode("gitgraph")).toBe("history");
     expect(dragMode("flow")).toBe("structure");
   });
 
@@ -468,9 +468,31 @@ describe("a fixed drop", () => {
 });
 
 describe("gitgraph", () => {
-  it("refuses every drop — a column is a commit and a lane is a branch", () => {
-    const body = `commit "one"\nbranch feature\ncommit "two"`;
-    expect(drop({ what: "node", id: "c1" }, { type: "gitgraph", body, node: "c0" })).toBeNull();
-    expect(drop({ what: "frame", id: "x" }, { type: "gitgraph", body, node: "c0" })).toBeNull();
+  const body = ['commit "one"', "branch feature", 'commit "two"', "checkout main", 'commit "three"', 'commit "four"'].join("\n");
+  const git = (over: Over, node: string) => drop(over, { type: "gitgraph", body, node });
+
+  it("merges a branch's tip into the lane it is let go on", () => {
+    const merged = `${body}\nmerge feature`;
+    expect(git({ what: "lane", id: "main" }, "c1")).toBe(merged);
+    /* A commit drawn in that lane names the lane too. */
+    expect(git({ what: "node", id: "c3" }, "c1")).toBe(merged);
+    clean("gitgraph", merged);
+    /* And the other way, with the checkout it needs. */
+    expect(git({ what: "lane", id: "feature" }, "c5")).toBe(`${body}\ncheckout feature\nmerge main`);
+  });
+
+  it("swaps a commit with its neighbour along its own lane", () => {
+    expect(git({ what: "node", id: "c5" }, "c3")).toBe(
+      body.replace('"three"', "@").replace('"four"', '"three"').replace("@", '"four"'),
+    );
+  });
+
+  it("writes nothing where the history does not allow it", () => {
+    /* Not a tip: the middle of a branch has nothing to say to another lane. */
+    expect(git({ what: "lane", id: "feature" }, "c0")).toBeNull();
+    /* `one` has two children, so `three` cannot go before it. */
+    expect(git({ what: "node", id: "c0" }, "c3")).toBeNull();
+    expect(git({ what: "frame", id: "x" }, "c1")).toBeNull();
+    expect(git({ what: "lane", id: "feature" }, "c1")).toBeNull();
   });
 });

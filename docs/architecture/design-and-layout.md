@@ -115,9 +115,10 @@ Each of these was *refused* rather than deferred:
   `removeNode` documents and `restate.test.ts` freezes. Re-parenting one level up is what *ungroup*
   means, and it wants a `dissolveGroup` writer and a button of its own — see the end of *Controls on
   the canvas*.
-- **Dragging a `gitgraph` commit, or a `sequence` message.** A commit's column and a branch's lane
-  are both ordinal and both the file's, so no drop means anything; a message is not draggable by
-  construction, since only a participant header carries `data-dag-node`. See *Dragging a card*.
+- **A coordinate for a `gitgraph` commit, or dragging a `sequence` message.** A commit's column and
+  a branch's lane are both ordinal and both the file's, so a drag there is a merge or a swap, never
+  a position; a message is not draggable by construction, since only a participant header carries
+  `data-dag-node`. See *Dragging a card*.
 - **A custom colour.** Ten hues, and `check-literals.mjs` is why: a hex typed into a board is a
   colour the theme does not own, and the swatches are `HUE_ORDER`. A chart is where that costs the
   most and it still holds: `color.chartHues` is seven *names*, and past the seventh a series draws

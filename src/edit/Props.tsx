@@ -16,6 +16,7 @@ import {
 
 import { isDiagramType, isLinkType, resizeOf, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
+import { gitBranchName, gitMetaOf, gitMove, gitSetTag, parseGitgraph } from "@/dsl/graph/gitgraph";
 import { moveEntry, parseTimeline, readWhen, sectionOfLine, sectionsOf, setWhen, whenOf } from "@/dsl/graph/timeline";
 import { HUE_ORDER, LEGEND_GLYPHS, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
 import { containersOf, descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
@@ -95,7 +96,7 @@ import { ARROWS, tokenize } from "@/dsl/tokenizer";
 import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
 
 import { detachable, freshNodeId, hasPseudo, loneNode, wrapPlan, type Pseudo } from "./build";
-import { REFUSAL, layered } from "./drag";
+import { layered } from "./drag";
 import { EdgeEnds } from "./EdgeEnds";
 import { IconPicker } from "./IconPicker";
 import type { Editor } from "./useEditor";
@@ -204,6 +205,9 @@ export function Props({
         : [],
     [item.type, item.dir, item.aspect, item.layout, body],
   );
+  if (subject && item.type === "gitgraph") {
+    return <GitProps item={item.id} editor={editor} body={body} subject={subject} onBody={onBody} />;
+  }
   if (subject) {
     /* Asked of the *draft*, which is what the person is looking at; `wrapPicked` asks again of the
        file at the moment of the click, so a draft that is a quarter of a second ahead is refused
@@ -268,6 +272,115 @@ function Head({ what, id, line, onOut }: { what: string; id: string; line: numbe
       <span className="dag-props__id" title={`line ${line}`}>
         {id}
       </span>
+    </div>
+  );
+}
+
+/**
+ * A picked commit in a git graph: its message, its tag, its place along the branch, and a branch
+ * off it.
+ *
+ * Its own view rather than `PickProps` with things hidden, because almost nothing in that one is
+ * true here. A gitgraph line is a command with no `key=value` grammar, so a hue, a status, an icon
+ * or a flag written onto it is a word the parser reads past and draws nothing for; a second string
+ * is not a meta. What a commit does have — a tag, which is a statement of its own on the next line,
+ * and an order that only some swaps keep — needs writers that read the whole history, and those are
+ * in `src/dsl/graph/gitgraph.ts`.
+ */
+function GitProps({
+  item,
+  editor,
+  body,
+  subject,
+  onBody,
+}: {
+  item: string;
+  editor: Editor;
+  body: string;
+  subject: Subject;
+  onBody(next: string): void;
+}) {
+  const { id, line } = subject;
+  const onOut = () => editor.pickNode(item, null);
+  const graph = parseGitgraph(body);
+  const node = graph.nodes.find((n) => n.id === id);
+  const src = body.split("\n")[line - 1] ?? "";
+  /* A parent link is the order of the commands, not a statement, so a picked line has nothing of
+     its own to edit; it says where its controls are instead of offering ones that write nothing. */
+  if (!node) {
+    return (
+      <div className="dag-props" data-dag-props={id}>
+        <Head what={subject.what} id={id} line={line} onOut={onOut} />
+        <p className="dag-field__hint">A git graph draws its lines from the history. Pick a commit to change it.</p>
+      </div>
+    );
+  }
+
+  /* The first quoted string, which is the rule the parser reads a message by — not `textSlots`,
+     whose idea of an id would put `merge feature "v2"`'s label in the second slot. */
+  const message = /"([^"]*)"/.exec(src)?.[1] ?? "";
+  const branch = gitBranchName(graph, id);
+  const tip = gitMetaOf(graph).tips[branch] === id;
+  const earlier = gitMove(body, id, -1);
+  const later = gitMove(body, id, 1);
+  const move = (made: { body: string; id: string } | null) => {
+    if (!made) return;
+    onBody(made.body);
+    editor.pickNode(item, made.id);
+  };
+
+  return (
+    <div className="dag-props" data-dag-props={id}>
+      <Head what="commit" id={id} line={line} onOut={onOut} />
+      <div className="dag-props__fields">
+        <Field
+          label="Message"
+          hook="data-dag-prop-title"
+          value={message}
+          placeholder={node.title || id}
+          onSet={(v) => onBody(replaceLine(body, line, setTitle(src, v.trim() || null)))}
+        />
+        <Field
+          label="Tag"
+          hook="data-dag-prop-tag"
+          value={node.meta ?? ""}
+          placeholder="v1.0"
+          onSet={(v) => onBody(gitSetTag(body, id, v) ?? body)}
+        />
+      </div>
+      <p className="dag-field__hint" data-dag-git-on={branch}>
+        On <strong>{branch}</strong>
+        {tip ? " — its tip: drag it onto another lane to merge it there." : "."}
+      </p>
+      <div className="dag-props__row" role="group" aria-label="Order">
+        {/* Disabled rather than missing where the history does not allow the swap, so the
+            control is where a person looks for it and says no by being unpressable. */}
+        <button
+          type="button"
+          className="dag-props__add"
+          data-dag-git-move="earlier"
+          disabled={!earlier}
+          title={earlier ? "Swap with the commit before it" : "Another commit depends on the one before it"}
+          onClick={() => move(earlier)}
+        >
+          ← Earlier
+        </button>
+        <button
+          type="button"
+          className="dag-props__add"
+          data-dag-git-move="later"
+          disabled={!later}
+          title={later ? "Swap with the commit after it" : "Another commit depends on this one"}
+          onClick={() => move(later)}
+        >
+          Later →
+        </button>
+      </div>
+      <div className="dag-props__row">
+        <button type="button" className="dag-props__add" data-dag-git-branch-here="" onClick={() => editor.gitBranch(item, id)}>
+          <Plus {...ICON} aria-hidden="true" /> New branch from here
+        </button>
+      </div>
     </div>
   );
 }
@@ -998,10 +1111,6 @@ function PickProps({
       {isMind && isNode ? <TopicTools body={body} line={line} onTopic={onTopic} /> : null}
 
       {isNode && layered(type, layout) ? <Column written={writtenCol} current={column} onSet={(v) => mod("col", v)} /> : null}
-
-      {/* The one dialect with no reading for a drag at all, saying so where a person will look for
-          it after the cursor has already said no. */}
-      {REFUSAL[type] ? <p className="dag-field__hint">{REFUSAL[type]}</p> : null}
 
       {isNode && hasRows(type) ? <Rows type={type} body={body} line={line} onBody={onBody} /> : null}
 
