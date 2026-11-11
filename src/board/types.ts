@@ -212,6 +212,8 @@ export interface BoardLink {
   head: Marker;
   tail: Marker;
   label?: string;
+  /** The second string — C4's technology chip, drawn under the label as it is on a diagram's edge. */
+  label2?: string;
   /** Its own `hue=`, never either endpoint's: an item has no hue to inherit. */
   hue?: string;
   quiet?: boolean;

@@ -19,6 +19,13 @@ import {
   setEdgeHue,
   setLinkVia,
   setEdgeLabel,
+  setEdgeLabel2,
+  setEdgeEnd,
+  addEdgeEnd,
+  removeEdgeEnd,
+  edgeEnds,
+  appendHop,
+  dropHop,
   setFlag,
   setKind,
   setMeta,
@@ -380,6 +387,35 @@ describe("edge writers", () => {
     expect(setEdgeLabel('a --> b "one" --> c', "first", 0)).toBe('a --> b "first" --> c');
   });
 
+  it("writes the second string behind the label", () => {
+    expect(setEdgeLabel2('u --> api "Uses"', "HTTPS")).toBe('u --> api "Uses" "HTTPS"');
+    expect(setEdgeLabel2('u --> api "Uses" "HTTP"', "HTTPS")).toBe('u --> api "Uses" "HTTPS"');
+    expect(setEdgeLabel2('u --> api "Uses" "HTTPS"', null)).toBe('u --> api "Uses"');
+  });
+
+  it("keeps the second string before the modifiers, and after a Mermaid colon", () => {
+    expect(setEdgeLabel2('u --> api "Uses" quiet', "HTTPS")).toBe('u --> api "Uses" "HTTPS" quiet');
+    expect(setEdgeLabel2('u --> api: "Uses" hue=teal', "HTTPS")).toBe('u --> api: "Uses" "HTTPS" hue=teal');
+  });
+
+  it("holds the label's place with an empty string, and takes it off again with the second", () => {
+    expect(setEdgeLabel2("u --> api", "HTTPS")).toBe('u --> api "" "HTTPS"');
+    expect(setEdgeLabel2('u --> api "" "HTTPS"', null)).toBe("u --> api");
+    /* A label somebody wrote stays when only the second one goes. */
+    expect(setEdgeLabel2('u --> api "Uses" "HTTPS"', null)).toBe('u --> api "Uses"');
+  });
+
+  it("writes the second string of one segment of a chain", () => {
+    expect(setEdgeLabel2('a --> b --> c "x"', "tech", 1)).toBe('a --> b --> c "x" "tech"');
+    expect(setEdgeLabel2('a --> b "x" --> c', "tech", 0)).toBe('a --> b "x" "tech" --> c');
+  });
+
+  it("round-trips the second string through the parser", () => {
+    const line = setEdgeLabel2('u --> api "Uses"', "HTTPS");
+    const graph = parseDiagram("c4", `person u "U"\nsystem api "Api"\n${line}`);
+    expect(graph?.edges[0]).toMatchObject({ label: "Uses", label2: "HTTPS" });
+  });
+
   it("swaps an arrow for another the tokenizer knows", () => {
     expect(setEdgeArrow("a --> b", "-.->")).toBe("a -.-> b");
     expect(setEdgeArrow("impl --|> base", "..|>")).toBe("impl ..|> base");
@@ -700,5 +736,74 @@ describe("declaredAt / declaredOn", () => {
        sense, and a caller that guesses at them from the line order guesses wrong. */
     expect(declaredAt("mindmap", map, "m1")).toBe(2);
     expect(declaredOn("mindmap", map, 3)).toEqual({ id: "m3", what: "node" });
+  });
+});
+
+describe("the ends of an edge", () => {
+  it("reads one end's ids in the order written", () => {
+    expect(edgeEnds("a & b --> c", 0, "from")).toEqual(["a", "b"]);
+    expect(edgeEnds("a & b --> c", 0, "to")).toEqual(["c"]);
+    expect(edgeEnds("a --> b & c --> d", 1, "from")).toEqual(["b", "c"]);
+    expect(edgeEnds("not an edge", 0, "from")).toEqual([]);
+  });
+
+  it("swaps an id for a group or a row, and refuses what is not one word", () => {
+    expect(setEdgeEnd("a --> b", 0, "to", 0, "intake")).toBe("a --> intake");
+    expect(setEdgeEnd("api --> store", 0, "from", 0, "api.content")).toBe("api.content --> store");
+    expect(setEdgeEnd("a & b --> c", 0, "from", 1, "z")).toBe("a & z --> c");
+    expect(setEdgeEnd("a --> b", 0, "to", 0, "two words")).toBe("a --> b");
+    expect(setEdgeEnd("a --> b", 0, "to", 3, "x")).toBe("a --> b");
+  });
+
+  it("grows a bus into one statement", () => {
+    expect(addEdgeEnd('a --> c "reject"', 0, "from", "b")).toBe('a & b --> c "reject"');
+    expect(addEdgeEnd("a & b --> c", 0, "from", "d")).toBe("a & b & d --> c");
+  });
+
+  it("grows a fan into one statement", () => {
+    expect(addEdgeEnd("f --> a hue=teal", 0, "to", "b")).toBe("f --> a & b hue=teal");
+  });
+
+  it("does not add an id twice, or to an end that is not there", () => {
+    expect(addEdgeEnd("a & b --> c", 0, "from", "b")).toBe("a & b --> c");
+    expect(addEdgeEnd("a --> b", 4, "to", "z")).toBe("a --> b");
+    expect(addEdgeEnd("a --> b", 0, "to", "not ok")).toBe("a --> b");
+  });
+
+  it("takes an id off a list, with the & that joined it", () => {
+    expect(removeEdgeEnd("a & b & c --> d", 0, "from", 0)).toBe("b & c --> d");
+    expect(removeEdgeEnd("a & b & c --> d", 0, "from", 1)).toBe("a & c --> d");
+    expect(removeEdgeEnd("a & b & c --> d", 0, "from", 2)).toBe("a & b --> d");
+  });
+
+  it("keeps the last id on an end", () => {
+    expect(removeEdgeEnd("a --> b", 0, "to", 0)).toBe("a --> b");
+  });
+
+  it("writes the shared list of a chain once", () => {
+    expect(addEdgeEnd("a --> b --> c", 0, "to", "x")).toBe("a --> b & x --> c");
+    expect(edgeEnds("a --> b & x --> c", 1, "from")).toEqual(["b", "x"]);
+  });
+
+  it("carries a chain one hop on, wearing the chain's arrow, after the last hop's label", () => {
+    expect(appendHop("a --> b", "c")).toBe("a --> b --> c");
+    expect(appendHop('a -.-> b "x" quiet', "c")).toBe('a -.-> b "x" quiet -.-> c');
+    expect(appendHop("a --> b // note", "c")).toBe("a --> b --> c // note");
+    expect(appendHop("a --> b", "c", "-.->")).toBe("a --> b -.-> c");
+    expect(appendHop("a --> b", "two words")).toBe("a --> b");
+  });
+
+  it("takes the last hop of a chain off, and nothing from a single arrow", () => {
+    expect(dropHop("a --> b --> c")).toBe("a --> b");
+    expect(dropHop('a --> b "x" --> c "y" // note')).toBe('a --> b "x" // note');
+    expect(dropHop("a --> b")).toBe("a --> b");
+  });
+
+  it("only writes statements the parser still reads as the same shape", () => {
+    const body = (line: string) => `service a "A"\nservice b "B"\nservice c "C"\n${line}`;
+    const edges = (line: string) => parseDiagram("arch", body(line))?.edges ?? [];
+    expect(edges(addEdgeEnd("a --> c", 0, "from", "b"))).toHaveLength(2);
+    expect(new Set(edges(addEdgeEnd("a --> c", 0, "from", "b")).map((e) => e.bus)).size).toBe(1);
+    expect(edges(appendHop("a --> b", "c"))).toHaveLength(2);
   });
 });

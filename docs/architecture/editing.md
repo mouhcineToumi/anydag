@@ -59,12 +59,16 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | the properties view's Direction on a picked group | `dir=LR` / `dir=TB` on the group's line, or off it to follow the diagram |
 | the properties view's Kind on a card carrying `kind=`, and on a sequence participant | the first word, with the `kind=` taken off · `kind=` on the participant (off when it says what `participant` / `actor` already did) |
 | "Update it", on a card or an item that wears a retired flag, and on a body that sets `dir=` | the flag off the line (a `legend` for a retired mark gone) · the body's `dir=` statement moved to the fence's `dir=` — one commit |
-| the properties view on a picked edge or link | the label, the arrow, `quiet` and `hue=` on that segment of the statement |
+| the properties view on a picked edge or link | the label, its second string (Technology), the arrow, `quiet` and `hue=` on that segment of the statement |
+| the From and To lists on a picked edge: a select per id, a cross, and `+ source` / `+ target` | one end of that segment: an id swapped (a card, a group, or a row — `api.content`), added with ` & id` (a bus, a fan), or taken off with its `&` |
+| Then `→ continue to…` and Last hop on a picked edge | ` --> id` at the end of the statement, wearing the chain's own arrow · the last arrow and its id off again |
 | the properties view on a picked `series` or `slice` | its label, its hue, and the run of numbers on that one line — no kind, meta, status or flags, which a chart reads as data |
 | the item view's Form, Stacked, Horizontal, Legend, Value labels, Unit, Min, Max, Categories | one statement of the chart's own body, written where there is none and taken away when it is emptied |
 | a double-click on a card, a group, a band, an edge label, or a chart's legend row or wedge share | that one name, through `setTitle` or `setEdgeLabel` — Enter commits, Escape reverts |
 | the `+` on a picked card | `<kind> <fresh> "New <kind>"` after the picked statement, in its block, plus the edge — one commit |
 | a round handle on a picked card, dropped on another card in the same diagram | `a --> b` appended to that diagram's body, never to `edges` |
+| the same drop on a card's row, or on a group's boundary | `a --> card.row` · `a --> group` in the diagram's body; across two items it names the whole card, which is all an `edges` fence can say |
+| the same drop with shift held · with alt held | folded into a statement that is there — `a --> c` and a drop from `b` onto `c` is `a & b --> c`; `f --> a` and a drop from `f` onto `b` is `f --> a & b` · carried on, `a --> b` from `b` onto `c` is `a --> b --> c`; with nothing to join, the plain edge |
 | a drag on a picked card, onto a boundary, a band, a sibling or the frame | that statement moved — between brace blocks, into a `lane { }`, past its neighbour, out to the top level |
 | the same drag on a `mindmap` topic · a `timeline` entry · a fixed fence | the topic re-indented under the one it landed on · the entry's date · `x=`/`y=` on that line |
 | a drag on a picked `series` or `slice` | its statement past its neighbour — which is the order of the bars, the wedges and the legend |
@@ -366,6 +370,39 @@ markers and the routing the dialect gives its own edges, and it survives being c
 component or dropped onto another board of that type. A board-level line drawn over the top of the
 diagram it was drawn inside is a different picture. `connectable()` already allowed it: two
 different cards under one item pass, and only `from.node === undefined` refused.
+
+**Every form of edge has a control, because the Source tab is going.** The grammar says four things
+about an edge a drop cannot say alone, and each has one control, over a writer in `restate.ts`:
+
+- *A second string* — C4's technology chip, `a --> b "Uses" "HTTPS"`: the Technology field under the
+  label (`setEdgeLabel2`). It is positional behind the label and the router draws a second line
+  only under a label, so the field is disabled until there is one rather than writing a string
+  nothing would show; clearing it takes away the `""` that only held the label's place. A board
+  link takes the same field: `parseLinks` reads the second string and `routeLinks` hands it on.
+- *A bus and a fan* — `a & b --> c`, `f --> a & b`: `EdgeEnds` lists each end's ids as selects and
+  adds one with `addEdgeEnd`. It is one statement on purpose: state draws a bus as one trunk with
+  one label, which a line per pair (what the handle writes) cannot say. On the canvas it is shift
+  on the drop, `joinEdge` in `connect.ts`, which folds the drop into the first statement whose end
+  is *exactly* the card dropped on (or dragged from) and writes the plain edge when there is none
+  — never a guess about which of two statements was meant. A middle list of a chain belongs to two
+  arrows, so a bus only ever grows a statement's first list or its last.
+- *A chain* — `a --> b --> c`: "continue to…" (`appendHop`) and Last hop (`dropHop`), both on the
+  end of the *statement* whichever segment is picked, because the person who has just carried a
+  chain on is still looking at its first hop; alt on the drop does the same from where a statement
+  ends. A hop is appended after everything the last one wrote, since a label and the modifiers
+  belong to the hop *before* the arrow that follows them.
+- *A group or a row* — `workspace --> intake`, `api.content --> store`: every select offers the
+  diagram's cards, groups and rows (`edgeTargets`, off the parse — a list kept beside the text
+  would drift), and `targetAt` now answers a row (`data-dag-row` inside the card) and a group's
+  boundary (a `data-dag-group` that is *not* the item's own), marking the one the drop will name.
+  A row wins over its card and the header is still the card, so the highlight says which. Only a
+  diagram's own body can name either — an `edges` fence splits on the last dot, so `d.api.content`
+  would be a node `content` of an item `d.api` — so `wholeCard` folds a row to its card and a
+  boundary to its diagram when a link crosses items.
+
+A board link has the second string and the plain edge; its ends are items on the page, which the
+panel does not list, so it has no bus or chain control. The grammar reads both in an `edges` fence
+all the same, and shift and alt on a drop between items write them there.
 
 **The handles are in the layer, not in the item**, and that is what keeps `Item`'s memo honest.
 They are also the dialect's to have: `growable()` beside `detachable()` in `build.ts` is

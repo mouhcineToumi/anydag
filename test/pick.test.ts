@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseChart } from "@/dsl/chart";
 import { parseDiagram } from "@/dsl/parse";
-import { duplicateStatement, edgeAt, edgeLabelOf } from "@/edit/pick";
+import { duplicateStatement, edgeAt, edgeLabelOf, edgeTargets } from "@/edit/pick";
 
 /**
  * The three questions a pick asks that `restate.ts` does not answer.
@@ -122,5 +122,28 @@ describe("duplicateStatement", () => {
     expect(made.body.split("\n")[3]).toBe('series web2 "Web" 12 30 hue=coral');
     expect(parseChart(made.body).diagnostics.filter((d) => d.severity === "error")).toEqual([]);
     expect(parseChart(made.body).series.map((x) => x.id)).toEqual(["web", "web2", "mob"]);
+  });
+});
+
+describe("edgeTargets", () => {
+  it("lists the cards, the groups and the rows an arrow may name", () => {
+    const body = [
+      'service api "API" {',
+      '  content "Content"',
+      "}",
+      'store fs "Files"',
+      'group workspace "Workspace" {',
+      '  service intake "Intake"',
+      "}",
+    ].join("\n");
+    expect(edgeTargets("arch", body)).toEqual({
+      nodes: ["api", "fs", "intake"],
+      groups: ["workspace"],
+      rows: ["api.content"],
+    });
+  });
+
+  it("says nothing for a dialect with no graph", () => {
+    expect(edgeTargets("chart", "bar a 1 2")).toEqual({ nodes: [], groups: [], rows: [] });
   });
 });
