@@ -455,8 +455,14 @@ describe("rowLines", () => {
     ]);
   });
 
-  it("is empty for a node with no block, and for a one-line one", () => {
+  it("is empty for a node with no block", () => {
     expect(rowLines('entity order "Order"', 1)).toEqual([]);
-    expect(rowLines('entity order "Order" { id uuid pk; slug text }', 1)).toEqual([]);
+  });
+
+  it("lists the rows of a one-line block by their place on the line", () => {
+    expect(rowLines('entity order "Order" { id uuid pk; slug text }', 1)).toEqual([
+      { line: 1, text: "id uuid pk", nth: 0 },
+      { line: 1, text: "slug text", nth: 1 },
+    ]);
   });
 });

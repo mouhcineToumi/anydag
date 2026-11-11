@@ -4,9 +4,12 @@ import { ChevronDown, CornerUpLeft, Plus, Trash2 } from "lucide-react";
 import { isDiagramType, isLinkType, resizeOfItem, type BoardItem, type BoardPage } from "@/board/types";
 import { FORMS, parseChart, type ChartForm } from "@/dsl/chart";
 import { HUE_ORDER, STATUSES, type Hue, type Node, type Status } from "@/dsl/ir";
-import { hasRows, kindsOf } from "@/dsl/parse";
+import { descriptionSlot, hasRows, kindsOf } from "@/dsl/parse";
+import { PARTICIPANT_KINDS } from "@/dsl/sequence";
 import {
   edgeSpan,
+  participantKind,
+  readModifier,
   removeRow,
   replaceLine,
   rowLines,
@@ -19,19 +22,25 @@ import {
   setEdgeFlag,
   setEdgeHue,
   setEdgeLabel,
+  setExtent,
   setFlag,
+  setGroupDir,
   setKind,
   setMeta,
   setModifier,
+  setParticipantKind,
   setRow,
   setStatus,
   setTitle,
   setValues,
+  takeBodyDir,
+  updateRetired,
   valuesText,
   addRow as writeRow,
   type Flag,
   type ModifierKey,
 } from "@/dsl/restate";
+import { retiredLines } from "@/dsl/diagnose";
 import { ARROWS, tokenize } from "@/dsl/tokenizer";
 
 import { ASPECT_START, aspectAttr, aspectChoice } from "@/board/settings";
@@ -89,8 +98,20 @@ const ROW_HINT: Record<string, string> = {
   class: "+method()",
 };
 
-/** The kinds that draw C4's wrapping sentence — the only third string anything renders. */
-const describes = (type: string, kind: string): boolean => type === "c4" || kind === "extsystem" || kind === "person";
+/**
+ * The kind a statement is drawn as: its `kind=` when that names one of the dialect's words, else
+ * the word it is declared with. The parser reads the override after the word, so a control that read
+ * only the word would show a card as the kind it is not.
+ */
+function kindOf(src: string, kinds: readonly string[]): string {
+  const written = readModifier(src, "kind");
+  if (written !== null && kinds.includes(written)) return written;
+  return /^\s*([A-Za-z0-9_-]+)\s/.exec(src)?.[1] ?? "";
+}
+
+/** The retired flags a line wears, by name, for the one sentence that says what is out of date. */
+const retiredOn = (src: string): string[] =>
+  ["focus", "current"].filter((w) => new RegExp(`(?:^|\\s)${w}(?:\\s|$)`).test(src.replace(/"[^"]*"/g, '""')));
 
 /** Which flags a node may wear. `quiet` is an edge's; these two are a node's, in every dialect. */
 const NODE_FLAGS: { flag: Flag; label: string }[] = [
@@ -117,6 +138,16 @@ export function Props({
   showItem: boolean;
   onBody(next: string): void;
 }) {
+  /* What the parser called out as out of date, read off the *draft* like every other control here.
+     Memoised on what a parse reads, so a keystroke in a field that changes nothing about it does
+     not parse twice. */
+  const retired = useMemo(
+    () =>
+      isDiagramType(item.type)
+        ? retiredLines({ type: item.type, body, dir: item.dir, aspect: item.aspect, layout: item.layout })
+        : [],
+    [item.type, item.dir, item.aspect, item.layout, body],
+  );
   if (subject) {
     /* `pickNode(item, null)` is how a pick is let go: it clears the node, the edge and the board
        link in one, which is what Escape does one layer up. */
@@ -130,12 +161,13 @@ export function Props({
            there is no signal from inside a memoised, asynchronously laid out subtree to depend on.
            One `querySelector` is cheaper than inventing one — the argument `paint()` already makes. */
         column={subject.what === "node" ? editor.columnOf(item.id, subject.id) : null}
+        retired={retired}
         onBody={onBody}
         onOut={() => editor.pickNode(item.id, null)}
       />
     );
   }
-  return showItem ? <ItemProps item={item} editor={editor} pages={pages} body={body} onBody={onBody} /> : null;
+  return showItem ? <ItemProps item={item} editor={editor} pages={pages} body={body} retired={retired} onBody={onBody} /> : null;
 }
 
 /* ------------------------------------------------------------------ the thing inside a diagram */
@@ -204,11 +236,14 @@ function NumberField({
   label,
   hook,
   value,
+  min,
   onSet,
 }: {
   label: string;
   hook: string;
   value: string;
+  /** The smallest number that means anything here: a width of 0 is not a width, so the box refuses it. */
+  min?: number;
   onSet(next: number | null): void;
 }) {
   return (
@@ -229,7 +264,7 @@ function NumberField({
             return;
           }
           const n = Number(text);
-          if (Number.isFinite(n)) onSet(n);
+          if (Number.isFinite(n) && (min === undefined || n >= min)) onSet(n);
           else e.target.value = value;
         }}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
@@ -410,9 +445,9 @@ function NodeStyle({ type, body, node, onBody }: { type: string; body: string; n
   const write = (next: string) => onBody(replaceLine(body, node.line, next));
   const mod = (key: ModifierKey, value: string | null) => write(setModifier(src, key, value));
   const hue = /(?:^|\s)hue=([A-Za-z0-9_-]+)/.exec(src)?.[1] ?? "";
-  const kind = /^\s*([A-Za-z0-9_-]+)\s/.exec(src)?.[1] ?? "";
-  const icon = /(?:^|\s)icon=([A-Za-z0-9_:.-]+)/.exec(src)?.[1] ?? "";
   const kinds = kindsOf(type);
+  const kind = kindOf(src, kinds);
+  const icon = /(?:^|\s)icon=([A-Za-z0-9_:.-]+)/.exec(src)?.[1] ?? "";
 
   return (
     <div className="dag-props__fields" data-dag-item-style={node.id}>
@@ -450,6 +485,7 @@ function PickProps({
   body,
   subject,
   column,
+  retired,
   onBody,
   onOut,
 }: {
@@ -459,6 +495,8 @@ function PickProps({
   subject: Subject;
   /** The layer the layout put this card in, if it is the kind of diagram that has layers. */
   column: number | null;
+  /** The body lines the parser read a retired flag on, so the picked line can offer to drop its own. */
+  retired: readonly number[];
   onBody(next: string): void;
   onOut(): void;
 }) {
@@ -530,8 +568,18 @@ function PickProps({
   }
 
   const kinds = kindsOf(type);
-  const kind = /^\s*([A-Za-z0-9_-]+)\s/.exec(src)?.[1] ?? "";
+  const kind = kindOf(src, kinds);
   const isNode = what === "node";
+  /* A sequence participant has no kind word to choose — `kind=` is how it is told apart — so it
+     gets a menu of its own, written the way the parser reads it. `null` for any other statement. */
+  const participant = type === "sequence" && isNode ? participantKind(src, PARTICIPANT_KINDS) : null;
+  /* Where the pixels are the author's — a sketch, or any fence opened `layout=fixed` — a shape,
+     a group and a frame each have a box of their own to size. Elsewhere only a card's width is
+     the author's to give: ELK decides everything else, and a height or a group's box written there
+     is read and then ignored. A stroke's box is its points' bounds and is written only by a resize. */
+  const placed = type === "sketch" || layout === "fixed";
+  const sizable = kinds.length > 0 && kind !== "ink" && (isNode || (what === "group" && placed));
+  const retiredHere = retired.includes(line) ? retiredOn(src) : [];
   /*
    * A chart statement is `<kind> <id> "Label" <values…>`, so every writer above already fits it —
    * but most of the *controls* do not. A meta is a second string the chart parser reads and never
@@ -551,6 +599,10 @@ function PickProps({
   const strings: string[] = [];
   for (let i = idAt + 1; i >= 1 && i < toks.length && toks[i]!.kind === "string"; i++) strings.push(toks[i]!.value);
   const slot = (n: number) => strings[n] ?? "";
+  /* The string the card draws as its description, if it draws one. For a C4 person or external
+     system that is the *second* string — the one this panel called "Meta" — until a third is
+     written, so the field has to know which slot it is. */
+  const descAt = isNode && !isChart ? descriptionSlot(type, kind, strings.length) : null;
   const status = STATUSES.find((s) => new RegExp(`(?:^|\\s)${s}(?:\\s|$)`).test(src.replace(/"[^"]*"/g, '""'))) ?? "";
   const icon = /(?:^|\s)icon=([A-Za-z0-9_:.-]+)/.exec(src)?.[1] ?? "";
   const writtenCol = /(?:^|\s)col=(\d+)/.exec(src)?.[1] ?? "";
@@ -563,6 +615,23 @@ function PickProps({
       <Head what={isChart && kind ? kind : what} id={id} line={line} onOut={onOut} />
 
       <div className="dag-props__fields">
+        {participant !== null ? (
+          <label className="dag-field dag-field--row">
+            <span>Kind</span>
+            <select
+              className="dag-select"
+              data-dag-prop-kind=""
+              value={participant}
+              onChange={(e) => write(setParticipantKind(src, e.target.value))}
+            >
+              {PARTICIPANT_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {isNode && kinds.length > 0 && kinds.includes(kind) ? (
           <label className="dag-field dag-field--row">
             <span>Kind</span>
@@ -602,7 +671,7 @@ function PickProps({
         <Hues hue={hue} onSet={(h) => mod("hue", h)} />
         {isNode && !isChart && kindsOf(type).length > 0 ? <Em src={src} onSet={(f, on) => write(setFlag(src, f, on))} /> : null}
 
-        {type === "mindmap" || isChart ? null : (
+        {type === "mindmap" || isChart || descAt === 1 ? null : (
           <Field
             label={what === "group" ? "Sublabel" : "Meta"}
             hook="data-dag-prop-meta"
@@ -619,12 +688,12 @@ function PickProps({
             onSet={(values) => write(setValues(src, values))}
           />
         ) : null}
-        {isNode && describes(type, kind) ? (
+        {descAt !== null ? (
           <Field
             label="Description"
             hook="data-dag-prop-desc"
-            value={slot(2)}
-            onSet={(v) => write(setDesc(src, v.trim() || null))}
+            value={slot(descAt)}
+            onSet={(v) => write(descAt === 1 ? setMeta(src, v.trim() || null) : setDesc(src, v.trim() || null))}
           />
         ) : null}
       </div>
@@ -681,6 +750,56 @@ function PickProps({
         </div>
       ) : null}
 
+      {/* The box, in pixels. A card's width is the one size an automatic layout still takes from the
+          author; a placed shape, group or frame takes both. Empty is "auto" — the size it would have
+          had — and clearing a box takes the `w=`/`h=` off the line. */}
+      {sizable ? (
+        <div className="dag-props__row" role="group" aria-label="Size">
+          <NumberField
+            label="Width"
+            hook="data-dag-prop-w"
+            value={readModifier(src, "w") ?? ""}
+            min={1}
+            onSet={(n) => write(setExtent(src, "w", n))}
+          />
+          {placed ? (
+            <NumberField
+              label="Height"
+              hook="data-dag-prop-h"
+              value={readModifier(src, "h") ?? ""}
+              min={1}
+              onSet={(n) => write(setExtent(src, "h", n))}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* A group's own direction: `dir=` on its line, which sets the way *its* members run and
+          nothing about the diagram's. Meaningless where the author places everything. */}
+      {what === "group" && kinds.length > 0 && !placed ? (
+        <label className="dag-field dag-field--row">
+          <span>Direction</span>
+          <select
+            className="dag-select"
+            data-dag-prop-group-dir=""
+            value={readModifier(src, "dir") ?? ""}
+            onChange={(e) => write(setGroupDir(src, (e.target.value || null) as "LR" | "TB" | null))}
+          >
+            <option value="">follow the diagram</option>
+            <option value="LR">left to right</option>
+            <option value="TB">top to bottom</option>
+          </select>
+        </label>
+      ) : null}
+
+      {retiredHere.length > 0 ? (
+        <Update
+          hook="retired"
+          text={`${retiredHere.map((w) => `\`${w}\``).join(" and ")} no longer mark${retiredHere.length === 1 ? "s" : ""} anything: hovering a card rings it now.`}
+          onGo={() => onBody(updateRetired(body, [line]))}
+        />
+      ) : null}
+
       {isNode && layered(type, layout) ? <Column written={writtenCol} current={column} onSet={(v) => mod("col", v)} /> : null}
 
       {/* The one dialect with no reading for a drag at all, saying so where a person will look for
@@ -730,6 +849,22 @@ function Column({ written, current, onSet }: { written: string; current: number 
 }
 
 /**
+ * A statement the grammar still reads and no longer means, with the one click that brings it up to
+ * date. The sentence says what is out of date and the button is the whole fix: nothing here asks
+ * anybody to open the source and find the word.
+ */
+function Update({ hook, text, onGo }: { hook: string; text: string; onGo(): void }) {
+  return (
+    <div className="dag-props__convert" data-dag-update={hook}>
+      <p className="dag-field__hint">{text}</p>
+      <button type="button" className="dag-props__add" data-dag-update-go={hook} onClick={onGo}>
+        Update it
+      </button>
+    </div>
+  );
+}
+
+/**
  * The rows under a card, as the lines they are.
  *
  * Addressed by line, which is what `setRow` and `removeRow` take and what `addRow` produces: a new
@@ -741,28 +876,33 @@ function Rows({ type, body, line, onBody }: { type: string; body: string; line: 
   const hint = ROW_HINT[type] ?? "a row";
   return (
     <div className="dag-props__rows" data-dag-prop-rows="">
-      {rows.map((row) => (
-        <div className="dag-props__rowline" key={`${row.line}:${row.text}`}>
-          <input
-            className="dag-input dag-input--mono"
-            data-dag-prop-row={row.line}
-            aria-label={`Row ${row.text}`}
-            defaultValue={row.text}
-            onBlur={(e) => e.target.value.trim() !== row.text && onBody(setRow(body, row.line, e.target.value.trim()))}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          />
-          <button
-            type="button"
-            className="dag-icon dag-icon--tiny"
-            data-dag-prop-row-remove={row.line}
-            aria-label={`Remove ${row.text}`}
-            title="Remove this row"
-            onClick={() => onBody(removeRow(body, row.line))}
-          >
-            <Trash2 {...ICON} aria-hidden="true" />
-          </button>
-        </div>
-      ))}
+      {rows.map((row) => {
+        /* A row on a line of its own is told apart by the line; one of several on a line, by its
+           place on it too. */
+        const at = row.nth === undefined ? `${row.line}` : `${row.line}.${row.nth}`;
+        return (
+          <div className="dag-props__rowline" key={`${at}:${row.text}`}>
+            <input
+              className="dag-input dag-input--mono"
+              data-dag-prop-row={at}
+              aria-label={`Row ${row.text}`}
+              defaultValue={row.text}
+              onBlur={(e) => e.target.value.trim() !== row.text && onBody(setRow(body, row.line, e.target.value.trim(), row.nth))}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            />
+            <button
+              type="button"
+              className="dag-icon dag-icon--tiny"
+              data-dag-prop-row-remove={at}
+              aria-label={`Remove ${row.text}`}
+              title="Remove this row"
+              onClick={() => onBody(removeRow(body, row.line, row.nth))}
+            >
+              <Trash2 {...ICON} aria-hidden="true" />
+            </button>
+          </div>
+        );
+      })}
       <button
         type="button"
         className="dag-props__add"
@@ -968,6 +1108,7 @@ function ItemProps({
   editor,
   pages,
   body,
+  retired,
   onBody,
 }: {
   item: BoardItem;
@@ -975,6 +1116,8 @@ function ItemProps({
   pages: BoardPage[];
   /** The draft, for the one type whose *item* fields are statements in its body rather than attrs. */
   body: string;
+  /** The body lines the parser read a retired flag on. */
+  retired: readonly number[];
   onBody(next: string): void;
 }) {
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -994,6 +1137,15 @@ function ItemProps({
    * along in the deps, because they are read even though the body is what usually moves.
    */
   const lone = useMemo(() => loneNode({ ...item, body }), [item.id, item.type, item.dir, item.aspect, item.layout, body]);
+
+  /* A `dir=LR` statement in the body is the parser's own and wins over the fence's `dir=`, so the
+     Direction control below would answer a change with no change. Offered as a move, not a
+     deletion: the statement's value becomes the fence's, and the diagram draws as it did. Only the
+     dialects whose statements go through the shared parser read one. */
+  const movedDir = useMemo(
+    () => (diagram && kindsOf(item.type).length > 0 ? takeBodyDir(body) : null),
+    [diagram, item.type, body],
+  );
 
   /* The disclosure belongs to the thing being looked at, so it closes when that thing changes.
      Plain state, and deliberately not in `localStorage`: a preference about a panel belongs in
@@ -1069,6 +1221,24 @@ function ItemProps({
       ) : links ? null : (
         <Field label="Source" hook="data-dag-item-src" value={item.src ?? ""} onSet={(v) => attr("src", v)} />
       )}
+
+      {/* What the grammar still reads and no longer means. Outside the disclosure on purpose: it is
+          a thing to fix, not a setting, and a person who was told about it is looking at the top
+          of the panel. Each is one button; none needs the source. */}
+      {diagram && retired.length > 0 ? (
+        <Update
+          hook="retired"
+          text={`${retired.length} ${retired.length === 1 ? "line wears" : "lines wear"} a retired flag (focus, current): it no longer marks anything, because hovering a card rings it now.`}
+          onGo={() => onBody(updateRetired(body, retired))}
+        />
+      ) : null}
+      {movedDir ? (
+        <Update
+          hook="dir"
+          text={`The body sets the direction (dir=${movedDir.dir}) and it overrides the Direction below. Move it there.`}
+          onGo={() => editor.replace(item.id, { body: movedDir.body, attrs: { dir: movedDir.dir } })}
+        />
+      ) : null}
 
       {/*
        * The structural half, behind a disclosure collapsed by default.

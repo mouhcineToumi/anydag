@@ -14,7 +14,9 @@ an accent ring the author set, and it is gone — the accent now marks the card 
 nothing else. It was the one status that said something about the author rather than about the
 system, it meant "the subject" in eight dialects and "where a record sits" in `state`, and one mark
 cannot carry two meanings. `focus` and `current` still parse, warn `W_RETIRED_FLAG`, and are
-ignored, so an old board draws.
+ignored, so an old board draws. The properties view offers "Update it" for them — on the card that
+wears one, and for the whole diagram in the item view — which takes the flag off (*Controls on the canvas*,
+`editing.md`).
 
 ## Layout, per diagram type
 
