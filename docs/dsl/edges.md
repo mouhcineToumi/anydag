@@ -40,6 +40,7 @@ The split is on the last `.`, and an item whose id contains a dot wins over it.
     a --> b --> c      a chain: two links
     a & b --> c        two sources, one target: two links
     a --> b "label"    a label
+    a --> b "label" "HTTPS"   and a second string under it, as C4's technology chip is
     a --> b: "label"   Mermaid's spelling of the same
     a --> b hue=teal   its own hue, never an endpoint's — an item has none to inherit
     a --> b quiet      a lighter line
@@ -47,6 +48,9 @@ The split is on the last `.`, and an item whose id contains a dot wins over it.
 
 Arrows are the shared vocabulary: `-->` `->` `-.->` `..>` `<->` `-.-` `---` `--` `..`, and the UML
 and sequence heads besides. Each carries its own dash, head and tail.
+
+The second string follows the label, so it is only drawn under one: with no label to hold its
+place, write `""`. A person sets it in the panel on a picked link; both strings are the hop's own.
 
 A label and the modifiers belong to the **hop** just written, not to the statement, so each arrow
 of a chain takes its own: `a --> b via="10,20" --> c via="30,40"`.

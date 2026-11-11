@@ -5,6 +5,7 @@ import { freshId, itemsToText, textToItems } from "@/board/clipboard";
 import { importKind, openId, sealId } from "@/board/envelope";
 import { rebind } from "@/dsl/rebind";
 import type { Placement } from "@/board/flow";
+import { endText } from "@/board/links";
 import { appendPart, fileCard, isFragment, NOTE_CARD, noteCard, render, type Component } from "@/board/library";
 import { uploadFile } from "@/files/upload";
 import { saveWithFiles } from "@/files/exportBundle";
@@ -12,7 +13,7 @@ import { csvTab } from "@/table/csv";
 import { tableFromCsv } from "@/table/write";
 import { componentFrontmatter } from "@/board/library/saved";
 import { reorderPages } from "@/board/pages";
-import type { MetaOp, NewItem, PatchOp, SetOp } from "@/board/patch";
+import { applyPatch, type MetaOp, type NewItem, type PatchOp, type SetOp } from "@/board/patch";
 import { TEMPLATES } from "@/board/templates";
 import { tidy as tidyBoxes, type TidyBox } from "@/board/tidy";
 import {
@@ -32,23 +33,53 @@ import type { Tool, ViewportHandle } from "@/canvas/Viewport";
 import { boardToSvg, itemToSvg } from "@/export/svg";
 import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
-import { bindingFor, CHORD_MS, LEADER_CODE, WHICHKEY_MS, type Command } from "@/edit/bindings";
+import { bindingFor, CHORD_MS, LEADER_CODE, topicKeyFor, WHICHKEY_MS, type Command } from "@/edit/bindings";
 
-import { renameItemId } from "@/board/rename";
+import { renameItemId, renameNodeLinks } from "@/board/rename";
+import { repairFrontmatter, retypeFence } from "@/board/repair";
 import { parseChart } from "@/dsl/chart";
 import { declaredAt, declaredOn } from "@/dsl/declared";
+import { gitBranch, gitCommit, gitRenameBranch } from "@/dsl/graph/gitgraph";
+import type { DiagnosticTarget } from "@/dsl/ir";
 import { hasGraph, parseDiagram } from "@/dsl/parse";
-import { removeEdge, removeNode, replaceLine, setEdgeLabel, setLinkVia, setTitle, stripCoords } from "@/dsl/restate";
+import {
+  outdentTopic,
+  removeEdge,
+  removeNode,
+  replaceLine,
+  setEdgeLabel,
+  setLinkVia,
+  setTitle,
+  shiftTopic,
+  stripCoords,
+  wrapStatement,
+  type WrapOpts,
+} from "@/dsl/restate";
+import { seqIdOf, type FragmentKind } from "@/dsl/sequence";
+import {
+  branchesOf,
+  noteParts,
+  removeFragment,
+  removeMessage,
+  setBranchLabel,
+  setMessageText,
+  setNoteText,
+} from "@/dsl/sequence-write";
 
 import { History } from "./history";
+import type { Fix } from "./repair";
 import {
   appendLink,
+  bodyText,
   connectSvg,
   connectable,
   handleAt,
+  joinEdge,
   linkStatement,
   removeLinkLine,
   targetAt,
+  wholeCard,
+  type Join,
   type Side as ConnectSide,
   type Target,
 } from "./connect";
@@ -64,15 +95,21 @@ import {
   freshNodeId,
   grow,
   growable,
+  growTopic,
+  hasPseudo,
   loneShape,
   pinUnplaced,
   resizeShape,
   scaleFixed,
   soleCard,
+  wrapGeometry,
+  wrapPlan,
   type LaidOut,
+  type Pseudo,
 } from "./build";
 import { columnOf, dragMode, dropEdit, type Over } from "./drag";
 import { duplicateStatement, edgeAt, edgeLabelOf, type PickedEdge, type PickedNode } from "./pick";
+import { columnAt as lifelineAt, drawMessage, runOf, slotAt, wrapRun } from "./message";
 import { guidesToSvg, snapBox, union, type Box } from "./snap";
 import { framesOf, groupOf, memberOf, memberOps, minimum, paintOf, place as placeMember, type Member } from "./resize";
 import { inkStatement } from "./ink";
@@ -243,11 +280,15 @@ export interface Renaming {
  * own share has to sit over the wedge beside it — so a legend row and a wedge's label are outside
  * the `<g>` that carries the id, and nesting cannot answer for them.
  */
-function nameableUnder(el: Element | null): { id: string; what: Renaming["what"] } | null {
-  const hit = el?.closest<HTMLElement>("[data-dag-node],[data-dag-group],[data-dag-lane],[data-dag-edge],[data-dag-title-of]");
+function nameableUnder(el: Element | null): { id: string; what: Renaming["what"]; seg?: number } | null {
+  const hit = el?.closest<HTMLElement>(
+    "[data-dag-node],[data-dag-group],[data-dag-lane],[data-dag-edge],[data-dag-title-of],[data-dag-frag]",
+  );
   if (!hit) return null;
   const d = hit.dataset;
   if (d.dagTitleOf) return { id: d.dagTitleOf, what: "node" };
+  /* A sequence fragment's tab, or a note's: a container to rename, and which of its branches. */
+  if (d.dagFrag) return { id: d.dagFrag, what: "group", seg: Number(d.dagBranch ?? 0) };
   if (d.dagNode) return { id: d.dagNode, what: "node" };
   if (d.dagGroup) return { id: d.dagGroup, what: "group" };
   if (d.dagLane) return { id: d.dagLane, what: "lane" };
@@ -272,8 +313,11 @@ export interface EditorCtl {
    * of what a diagram looks like.
    */
   press(id: string, e: ReactPointerEvent, el: HTMLDivElement, node?: string): boolean;
-  /** Pick one of this item's own edges, by the id the parser gave it. */
-  pickEdge(item: string, id: string | null): void;
+  /**
+   * Pick one of this item's own edges, by the id the parser gave it. `extend` is shift held, which
+   * in a sequence picks every message from the one already picked to this one.
+   */
+  pickEdge(item: string, id: string | null, extend?: boolean): void;
   /** A press on the resize handle. */
   resize(id: string, e: ReactPointerEvent, el: HTMLDivElement, dir: Dir): void;
   /**
@@ -301,6 +345,12 @@ export interface EditorCtl {
   ): void;
   /** A press on a `+` handle: grow a second card out of the picked one, on that side. */
   grow(id: string, e: ReactPointerEvent, el: HTMLElement, side: ConnectSide): void;
+  /**
+   * A press on a mindmap topic's `+`: a new topic under the picked one (`child`) or beside it
+   * (`sibling`). A tap and nothing else — a topic's place is its indentation, so there is nothing
+   * for a pull to say — and the rename opens on the new topic, as it does for any other `+`.
+   */
+  growTopic(e: ReactPointerEvent, as: "child" | "sibling"): void;
   /**
    * A press on the bend handle at a picked link's middle: pull the line through a point.
    *
@@ -360,7 +410,6 @@ export interface EditorCtl {
 interface Reveal {
   id: string;
   node?: string;
-  line?: number;
   n: number;
 }
 
@@ -371,7 +420,7 @@ export interface Editor {
   selected: ReadonlySet<string>;
   /** The item open in the editor panel, if any. */
   editing: string | null;
-  /** A pending "show me this node's line", or this line, for the open item — see `open`/`openAt`. */
+  /** A pending "show me this node's line" for the open item — see `open`. */
   reveal: Reveal | null;
   tool: Tool;
   setTool(tool: Tool): void;
@@ -391,13 +440,16 @@ export interface Editor {
    */
   links(): void;
   /**
-   * Open the panel on an item's source with the caret on one line of its body — the problems
-   * dock's "show me", where the thing to look at is a line rather than a card.
+   * Open the panel on an item with one thing in it picked — the problems' "Show", where what to
+   * look at is the card, group or link a problem concerns, and the panel then holds the control
+   * that fixes it. With no target the item's own fields are what show.
    */
-  openAt(id: string, line: number): void;
+  openOn(id: string, target?: DiagnosticTarget): void;
   /** The link picked on the canvas, if any. Delete removes it; a click anywhere else clears it. */
   pickedLink: string | null;
   pickLink(id: string | null): void;
+  /** Take one board link out of its `edges` fence: its statement's line goes. */
+  removeLink(id: string): void;
   /**
    * The card, group or lane picked *inside* a diagram, and the edge segment beside it.
    *
@@ -408,7 +460,12 @@ export interface Editor {
   pickedNode: PickedNode | null;
   pickedEdge: PickedEdge | null;
   pickNode(item: string, node: string | null): void;
-  pickEdge(item: string, id: string | null): void;
+  pickEdge(item: string, id: string | null, extend?: boolean): void;
+  /**
+   * The picked message, or run of messages, wrapped in a new fragment — the selection bar's Wrap in.
+   * The fragment is picked once it is written, so its panel is the next thing a person sees.
+   */
+  wrapMessages(kind: FragmentKind): void;
   /**
    * What Delete and ctrl+D do, as a button: the pick first, then the selection.
    *
@@ -419,6 +476,17 @@ export interface Editor {
    */
   removeSelection(): void;
   duplicateSelection(): void;
+  /**
+   * Put the picked card, group or lane inside a new container — a `group`, or a `lane` in `flow` and
+   * `activity` — and open the rename on it. One commit, so one ctrl+Z takes the container off.
+   * Does nothing where `wrapPlan` says no, which the panel reads to leave the button out.
+   */
+  wrapPicked(): void;
+  /**
+   * Grow a start or an end state off the picked card, with its edge: the `+` for the one thing a
+   * `+` cannot say, which is that the new card is not another copy of this one.
+   */
+  growPseudo(kind: Pseudo): void;
   /**
    * Which layer the layout put a card in, counted off the drawing — the number `col=` would pin.
    *
@@ -449,6 +517,15 @@ export interface Editor {
   commitRename(text: string): void;
   cancelRename(): void;
   /**
+   * A git graph's lane controls — see `GitLanes`. A commit at the tip of `branch` (the `+` at the
+   * end of its lane), a new branch off `from` or off the current tip, and the inline rename opened
+   * on a branch's name. The first two pick the commit they made and open the rename on it, as the
+   * `+` on a card does.
+   */
+  gitCommit(item: string, branch: string): void;
+  gitBranch(item: string, from: string | null): void;
+  renameBranch(item: string, branch: string): void;
+  /**
    * Rename an item everywhere on the board — its own fence line and every `edges` reference.
    *
    * Not a patch op: `renameItemId` rewrites spans all over the file, so it goes through `put`, the
@@ -456,6 +533,13 @@ export interface Editor {
    * be done — a name somebody else has, a file that moved underneath — and to `null` when it was.
    */
   renameItem(id: string, to: string): Promise<string | null>;
+  /**
+   * Write `body` as item `id`'s new body — in which a node was renamed `from` → `to` — and rewrite
+   * every `edges` line that named `<id>.<from>` to `<id>.<to>`, **in one write**: one version of
+   * the file, so one undo. The dialect's own rename (`renameChartId`) is the caller's; this only
+   * carries the board half (`renameNodeLinks`). Resolves to a message when it could not be done.
+   */
+  renameNode(id: string, from: string, to: string, body: string): Promise<string | null>;
   /**
    * The two declared conversions between an automatic layout and the author's own coordinates.
    *
@@ -541,6 +625,21 @@ export interface Editor {
    */
   replace(id: string, next: { type?: ItemType; body?: string; attrs?: Record<string, AttrValue | null> }): void;
   setAttrs(id: string, attrs: Record<string, AttrValue | null>): void;
+  /**
+   * Set keys in the board's frontmatter, `null` removing one — `theme:` and `flow:`, which the board
+   * settings card writes, beside the `pages:` the page tabs do. One patch, so one undo entry.
+   * Resolves to whether it was written.
+   */
+  setMeta(meta: Record<string, unknown>): Promise<boolean>;
+  /**
+   * Carry out a repair the problems dock offered — the settings block that cannot be read, a fence
+   * of a kind nobody knows, an attribute that is not a value. Resolves to a sentence when it
+   * could not be done and to `null` when it was.
+   *
+   * The first two go through `put`, like `renameItem`: no item id addresses them. The last is an
+   * ordinary attribute patch.
+   */
+  repair(fix: Fix): Promise<string | null>;
   onMarquee(rect: Rect, additive: boolean): void;
   onPaperClick(): void;
   onPaperDoubleClick(at: Point): void;
@@ -763,12 +862,15 @@ export function useEditor({
    * effect below re-applies it regardless, which is what makes a pick nobody painted work: the
    * caret feeder, and the copy ctrl+D has not laid out yet.
    */
-  const painted = useRef<Element | null>(null);
-  const paint = useCallback((el: Element | null) => {
-    if (painted.current === el) return;
-    painted.current?.removeAttribute("data-dag-picked");
-    painted.current = el;
-    el?.setAttribute("data-dag-picked", "");
+  const painted = useRef<Element[]>([]);
+  /* A list, because a sequence's messages are picked as a run: every one of them wears the ring. */
+  const paint = useCallback((el: Element | readonly (Element | null)[] | null) => {
+    const next = (Array.isArray(el) ? el : [el]).filter((x): x is Element => x !== null);
+    const was = painted.current;
+    if (was.length === next.length && was.every((x, i) => x === next[i])) return;
+    for (const x of was) if (!next.includes(x)) x.removeAttribute("data-dag-picked");
+    for (const x of next) x.setAttribute("data-dag-picked", "");
+    painted.current = next;
   }, []);
 
   /*
@@ -789,8 +891,11 @@ export function useEditor({
     const q = CSS.escape(pickedNode ? pickedNode.node : pickedEdge!.id);
     paint(
       pickedNode
-        ? (find(`[data-dag-node="${q}"]`) ?? find(`[data-dag-group="${q}"]`) ?? find(`[data-dag-lane="${q}"]`))
-        : find(`[data-dag-edge="${q}"]`),
+        ? (find(`[data-dag-node="${q}"]`) ??
+            find(`[data-dag-group="${q}"]`) ??
+            find(`[data-dag-lane="${q}"]`) ??
+            find(`[data-dag-frag="${q}"]`))
+        : runOf(pickedEdge!).map((id) => find(`[data-dag-edge="${CSS.escape(id)}"]`)),
     );
   });
 
@@ -817,18 +922,28 @@ export function useEditor({
     setSelected((prev) => (prev.size === 1 && prev.has(item) ? prev : new Set([item])));
   }, []);
 
-  const pickEdge = useCallback((item: string, id: string | null, body?: string) => {
+  const pickEdgeIn = useCallback((item: string, id: string | null, body?: string, extend = false) => {
     setPickedNode(null);
     setPickedLink(null);
     if (id === null) return setPickedEdge(null);
     const it = boardRef.current?.items.find((x) => x.id === item);
     const at = it && edgeAt(it.type, body ?? it.body, it.dir, id);
     if (!it || !at) return setPickedEdge(null);
-    setPickedEdge((prev) => (prev && prev.item === item && prev.id === id ? prev : { item, id, ...at }));
+    /* Shift on a second message of the same sequence stretches the pick into a run, which is what
+       Wrap in wraps; the first message stays the pick, so the panel keeps showing it. */
+    const prev = pickedEdgeRef.current;
+    if (extend && it.type === "sequence" && prev && prev.item === item && prev.id !== id && seqIdOf(prev.id)?.what === "msg") {
+      setPickedEdge({ ...prev, to: id });
+    } else setPickedEdge((p) => (p && p.item === item && p.id === id && !p.to ? p : { item, id, ...at }));
     /* The hit stroke stops the press reaching `Item`, so nothing else would select the diagram —
        and an unselected item's pick is cleared by the rule above the moment it is set. */
     setSelected((prev) => (prev.size === 1 && prev.has(item) ? prev : new Set([item])));
   }, []);
+
+  const pickEdge = useCallback(
+    (item: string, id: string | null, extend?: boolean) => pickEdgeIn(item, id, undefined, extend),
+    [pickEdgeIn],
+  );
 
   const pickFromLine = useCallback(
     (item: string, line: number, body?: string) => {
@@ -836,10 +951,10 @@ export function useEditor({
       if (!it) return;
       const at = declaredOn(it.type, body ?? it.body, line, it.dir);
       if (!at) return clearPick();
-      if (at.what === "edge") pickEdge(item, at.id, body);
+      if (at.what === "edge") pickEdgeIn(item, at.id, body);
       else pickNode(item, at.id);
     },
-    [clearPick, pickEdge, pickNode],
+    [clearPick, pickEdgeIn, pickNode],
   );
 
   const setMode = useCallback((next: InspectorMode) => {
@@ -888,6 +1003,13 @@ export function useEditor({
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
     setPickedNode(null);
+    /* A sequence's fragment goes with everything in it, as a group does; a note is its one line. */
+    const seq = it.type === "sequence" ? seqIdOf(p.node) : null;
+    const line = seq ? declaredAt(it.type, it.body, p.node) : null;
+    if (seq && line !== null) {
+      writeBody(it, seq.what === "frag" ? removeFragment(it.body, line) : removeEdge(it.body, line));
+      return;
+    }
     writeBody(it, removeNode(it.body, p.node, { type: it.type, dir: it.dir }));
   }, [bodyOf, writeBody]);
 
@@ -896,9 +1018,23 @@ export function useEditor({
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
     setPickedEdge(null);
+    /* A sequence's message takes its `deactivate` line with it, the one that ends its sender's bar. */
+    const remove = it.type === "sequence" ? removeMessage : removeEdge;
+    /* A run of messages goes together, from the bottom up so the lines above stay where they are. */
+    if (p.to) {
+      const lines = runOf(p)
+        .map((id) => declaredAt(it.type, it.body, id, it.dir))
+        .filter((l): l is number => l !== null)
+        .sort((a, b) => b - a);
+      writeBody(
+        it,
+        lines.reduce((body, l) => remove(body, l), it.body),
+      );
+      return;
+    }
     /* The id is what the pick actually holds, so it is asked first; the line it was picked at is
        the fallback for the case `declaredAt` cannot answer — a node happening to be called `e3`. */
-    writeBody(it, removeEdge(it.body, declaredAt(it.type, it.body, p.id, it.dir) ?? p.line));
+    writeBody(it, remove(it.body, declaredAt(it.type, it.body, p.id, it.dir) ?? p.line));
   }, [bodyOf, writeBody]);
 
   /* ---- renaming in place ---- */
@@ -912,9 +1048,23 @@ export function useEditor({
    * box and then write it back as the title.
    */
   const startRename = useCallback(
-    (item: string, at: { id: string; what: Renaming["what"] }): boolean => {
+    (item: string, at: { id: string; what: Renaming["what"]; seg?: number }): boolean => {
       const it = bodyOf(item);
       if (!it || !isDiagramType(it.type)) return false;
+      /* A sequence's fragment and note: a branch's condition, a note's words — read off the line. */
+      const seq = it.type === "sequence" && at.what === "group" ? seqIdOf(at.id) : null;
+      if (seq) {
+        const line = declaredAt(it.type, it.body, at.id);
+        if (line === null) return false;
+        const seg = at.seg ?? 0;
+        const text =
+          seq.what === "note"
+            ? (noteParts(it.body.split("\n")[line - 1] ?? "")?.text ?? "")
+            : (branchesOf(it.body, line)?.branches[seg]?.label ?? "");
+        pickNode(item, at.id);
+        setRenaming({ item, id: at.id, what: "group", seg, text });
+        return true;
+      }
       if (at.what === "edge") {
         const where = edgeAt(it.type, it.body, it.dir, at.id);
         if (!where) return false;
@@ -966,8 +1116,33 @@ export function useEditor({
       const it = r && bodyOf(r.item);
       if (!r || !it) return;
       const trimmed = text.trim();
+      /* A git branch is not declared on one line: it is named by its `branch`, every `checkout` to
+         it and every `merge` of it, and the parser gives every lane line 1. So its rename is the
+         one that rewrites them all, and a name it refuses writes nothing. */
+      if (it.type === "gitgraph" && r.what === "lane") {
+        const next = trimmed === "" ? null : gitRenameBranch(it.body, r.id, trimmed);
+        if (next !== null) writeBody(it, next);
+        return;
+      }
       const line = declaredAt(it.type, it.body, r.id, it.dir);
       if (line === null) return;
+      /* A sequence writes its own: a message's label keeps its colon, a branch is found by its
+         index, and a note always has words — an empty box on one writes nothing. */
+      const seq = it.type === "sequence" ? seqIdOf(r.id) : null;
+      if (seq) {
+        const at = seq.what === "frag" ? (branchesOf(it.body, line)?.branches[r.seg]?.line ?? line) : line;
+        const own = it.body.split("\n")[at - 1] ?? "";
+        const next =
+          seq.what === "msg"
+            ? setMessageText(own, trimmed || null)
+            : seq.what === "frag"
+              ? setBranchLabel(own, trimmed || null)
+              : trimmed
+                ? setNoteText(own, trimmed)
+                : own;
+        writeBody(it, replaceLine(it.body, at, next));
+        return;
+      }
       const src = it.body.split("\n")[line - 1] ?? "";
       /* An empty box on a *label* means "take the label off", which the grammar can say. An empty
          box on a card does not: a nameless card would draw as nothing, and a mindmap topic *is*
@@ -983,6 +1158,45 @@ export function useEditor({
     [bodyOf, renaming, writeBody],
   );
 
+  /* ---- a git graph's lanes ---- */
+
+  /**
+   * The lane controls write through the same `body:<id>` key as everything else, so each is one
+   * undo. The commit a write made is picked and its message opened for typing — what the `+` on a
+   * card does, and for the same reason: the next thing a person does with a new commit is name it.
+   */
+  const gitAct = useCallback(
+    (item: string, made: (body: string) => { body: string; id: string; branch?: string } | null) => {
+      if (lockedRef.current) return refuseLocked();
+      const it = bodyOf(item);
+      if (!it || it.type !== "gitgraph") return;
+      const done = made(it.body);
+      if (!done) return;
+      pickNode(item, done.id);
+      /* A new branch is named first: its commit says "New commit" and is fine for now, while
+         `feature2` is a name nobody chose. */
+      setRenaming(
+        done.branch
+          ? { item, id: done.branch, what: "lane", seg: 0, text: done.branch }
+          : { item, id: done.id, what: "node", seg: 0, text: "New commit" },
+      );
+      writeBody(it, done.body);
+    },
+    [bodyOf, pickNode, writeBody],
+  );
+
+  const gitCommitOn = useCallback((item: string, branch: string) => gitAct(item, (b) => gitCommit(b, branch)), [gitAct]);
+  const gitBranchFrom = useCallback((item: string, from: string | null) => gitAct(item, (b) => gitBranch(b, from)), [gitAct]);
+  const renameBranch = useCallback(
+    (item: string, branch: string) => {
+      if (lockedRef.current) return refuseLocked();
+      /* `main` is where the parser starts and no line declares it, so there is nothing to rename. */
+      if (branch === "main" || !selected.has(item)) return;
+      setRenaming({ item, id: branch, what: "lane", seg: 0, text: branch });
+    },
+    [selected],
+  );
+
   /* A rename belongs to one thing inside one item; anything that lets go of the pick lets go of it
      too, which is the same one rule that already covers the paper, a marquee, a page and a board. */
   useEffect(() => {
@@ -993,6 +1207,8 @@ export function useEditor({
     const p = pickedNodeRef.current;
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
+    /* A fragment or a note is counted, not named: there is no id to copy it under. */
+    if (it.type === "sequence" && seqIdOf(p.node)) return;
     const made = duplicateStatement(it.type, it.body, p.node, it.dir);
     if (!made) return;
     setPickedNode({ item: it.id, node: made.id });
@@ -1339,18 +1555,20 @@ export function useEditor({
   );
 
   /*
-   * The other way into the panel: a line rather than a card. A diagnostic names a line, and on a
-   * broken body there may be no card to pick at all — the whole point is that the text does not
-   * parse. The source is what shows, because a line is a fact about the text.
+   * The other way into the panel: a problem rather than a click. A diagnostic's target is the thing
+   * its line declares (`diagnoseBoard`), so "Show" picks it the way a click on the canvas would, and
+   * the Properties half is what shows — that is where the control that fixes it is.
    */
-  const openAt = useCallback(
-    (id: string, line: number) => {
+  const openOn = useCallback(
+    (id: string, target?: DiagnosticTarget) => {
       setSelected(new Set([id]));
       setEditing(id);
-      setMode("source");
-      setReveal((prev) => ({ id, line, n: (prev?.n ?? 0) + 1 }));
+      setMode("props");
+      if (!target) return pickNode(id, null);
+      if (target.what === "edge") pickEdgeIn(id, target.id);
+      else pickNode(id, target.id);
     },
-    [setMode],
+    [setMode, pickNode, pickEdgeIn],
   );
 
   const add = useCallback(
@@ -1405,16 +1623,27 @@ export function useEditor({
    * was drawn inside, which is a different picture.
    */
   const addLink = useCallback(
-    (from: Target, to: Target) => {
+    (from: Target, to: Target, join?: Join) => {
       const b = boardRef.current;
       if (!b) return;
       if (from.item === to.item && from.node && to.node) {
         const it = b.items.find((x) => x.id === from.item);
-        if (it && isDiagramType(it.type)) return writeBody(it, appendEdge(it.body, `${from.node} --> ${to.node}`));
+        if (!it || !isDiagramType(it.type)) return;
+        const [a, z] = [bodyText(from), bodyText(to)];
+        /* Shift or alt on the drop folds it into a statement that is already there — a bus, a chain —
+           and a drop with nothing to fold into is the plain edge it always was. */
+        const joined = join ? joinEdge(it.body, a, z, join) : null;
+        return writeBody(it, joined ?? appendEdge(it.body, `${a} --> ${z}`));
+      }
+      /* Across items a row or a boundary cannot be named by an `edges` fence: see `wholeCard`. */
+      const [a, z] = [wholeCard(from), wholeCard(to)];
+      const fence = b.items.find((it) => isLinkType(it.type) && it.page === pageRef.current);
+      const joined = fence && join ? joinEdge(fence.body, endText(a), endText(z), join) : null;
+      if (fence && joined !== null) {
+        if (joined !== fence.body) void commit([{ id: fence.id, body: joined }]);
         return;
       }
-      const statement = linkStatement(from, to);
-      const fence = b.items.find((it) => isLinkType(it.type) && it.page === pageRef.current);
+      const statement = linkStatement(a, z);
       if (fence) void commit([{ id: fence.id, body: appendLink(fence.body, statement) }]);
       else void insert([{ type: "edges", attrs: {}, body: statement }]);
     },
@@ -1531,7 +1760,7 @@ export function useEditor({
         if (!moved) {
           if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < DRAG_SLOP) return;
           moved = true;
-          document.documentElement.dataset.dagNodeDrag = mode === "none" ? "refused" : "on";
+          document.documentElement.dataset.dagNodeDrag = "on";
           card.style.pointerEvents = "none";
           card.style.opacity = "0.5";
           card.style.zIndex = "3";
@@ -1542,7 +1771,6 @@ export function useEditor({
         by = { x: (ev.clientX - sx) / zoom, y: flat ? 0 : (ev.clientY - sy) / zoom };
         card.style.transform = `translate(${by.x}px, ${by.y}px)`;
         if (tools) tools.style.translate = `${by.x}px ${by.y}px`;
-        if (mode === "none") return;
 
         const under = document.elementFromPoint(ev.clientX, ev.clientY);
         const item = under?.closest<HTMLElement>("[data-dag-item]");
@@ -1620,6 +1848,132 @@ export function useEditor({
   );
 
   /**
+   * Drawing a message: a drag from one lifeline to another, in a sequence that is already selected.
+   *
+   * The drop says three things and all three are read off what the layout published, never off the
+   * pixel: the lifeline it started on is the sender, the one nearest where it let go is the receiver
+   * (its own is a message to itself), and the **height** is which statement it goes after — the
+   * rows the layout drew, because in this dialect the drawing order is the file's order. What
+   * lands is one statement, `a ->> b : "message"`, picked and with its label open for typing, the
+   * way the `+` hands over a new card.
+   *
+   * Painted while it runs, like every gesture here: a dashed line in the diagram's own coordinates
+   * from the sender's lifeline to the receiver's, at the pointer's height, and the receiver's card
+   * marked as a drop target. Nothing reaches React until the release. The diagram's own size is the
+   * scale — `offsetWidth` is the layout's width and the client rect is that times the zoom — so no
+   * `data-zoom` arithmetic is needed to turn the pointer into the layout's numbers.
+   */
+  const lifelineDrag = useCallback(
+    (id: string, from: string, e: ReactPointerEvent, el: HTMLElement): boolean => {
+      const it = bodyOf(id);
+      const diagram = el.querySelector<HTMLElement>(".dag-diagram");
+      const laid = laidOutIn(id);
+      if (!it || it.type !== "sequence" || !diagram || !laid?.nodes[from]) return false;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      const centre = (who: string) => {
+        const b = laid.nodes[who]!;
+        return b.x + b.w / 2;
+      };
+      const local = (ev: PointerEvent) => {
+        const r = diagram.getBoundingClientRect();
+        return {
+          x: ((ev.clientX - r.left) / (r.width || 1)) * diagram.offsetWidth,
+          y: ((ev.clientY - r.top) / (r.height || 1)) * diagram.offsetHeight,
+        };
+      };
+
+      let moved = false;
+      let cancelled = false;
+      let at = { x: 0, y: 0 };
+      let to: string | null = null;
+      let ghost: SVGSVGElement | null = null;
+      let marked: HTMLElement | null = null;
+      const mark = (next: HTMLElement | null) => {
+        if (marked === next) return;
+        if (marked) delete marked.dataset.dagDrop;
+        marked = next;
+        if (marked) marked.dataset.dagDrop = "";
+      };
+
+      const onMove = (ev: PointerEvent) => {
+        if (!moved) {
+          if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < DRAG_SLOP) return;
+          moved = true;
+          const ns = "http://www.w3.org/2000/svg";
+          ghost = document.createElementNS(ns, "svg");
+          ghost.setAttribute("class", "dag-msg-ghost");
+          ghost.setAttribute("width", String(diagram.offsetWidth));
+          ghost.setAttribute("height", String(diagram.offsetHeight));
+          ghost.appendChild(document.createElementNS(ns, "path"));
+          diagram.appendChild(ghost);
+          document.documentElement.dataset.dagDrawing = "";
+        }
+        at = local(ev);
+        to = lifelineAt(laid.nodes, at.x);
+        const x0 = centre(from);
+        const x1 = to ? centre(to) : at.x;
+        /* A message to itself loops out to the right and back, as the layout draws one. */
+        const d =
+          to === from
+            ? `M${x0},${at.y} c${laid.nodes[from]!.w / 2},0 ${laid.nodes[from]!.w / 2},${laid.nodes[from]!.h / 2} 0,${laid.nodes[from]!.h / 2}`
+            : `M${x0},${at.y} L${x1},${at.y}`;
+        ghost?.firstElementChild?.setAttribute("d", d);
+        mark(to ? diagram.querySelector<HTMLElement>(`[data-dag-node="${CSS.escape(to)}"]`) : null);
+      };
+
+      const onUp = () => {
+        removeEventListener("pointermove", onMove);
+        removeEventListener("pointerup", onUp);
+        removeEventListener("pointercancel", onUp);
+        removeEventListener("keydown", onKey, true);
+        mark(null);
+        ghost?.remove();
+        delete document.documentElement.dataset.dagDrawing;
+        if (!moved || cancelled || !to) return;
+        addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
+        /* The board is one round trip stale after a write, so the body is read again here. */
+        const cur = bodyOf(id);
+        const made = cur && drawMessage(cur.body, from, to, slotAt(laid.rows ?? [], at.y));
+        if (!cur || !made) return;
+        writeBody(cur, made.body);
+        setPickedNode(null);
+        setPickedEdge({ item: id, id: made.id, line: made.line, seg: 0 });
+        setRenaming({ item: id, id: made.id, what: "edge", seg: 0, text: "message" });
+      };
+
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key !== "Escape") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        cancelled = true;
+        onUp();
+      };
+
+      addEventListener("pointermove", onMove);
+      addEventListener("pointerup", onUp);
+      addEventListener("pointercancel", onUp);
+      addEventListener("keydown", onKey, true);
+      return true;
+    },
+    [bodyOf, laidOutIn, writeBody],
+  );
+
+  const wrapMessages = useCallback(
+    (kind: FragmentKind) => {
+      const p = pickedEdgeRef.current;
+      const it = p && bodyOf(p.item);
+      if (!p || !it || it.type !== "sequence") return;
+      const out = wrapRun(it.body, p, kind);
+      if (!out) return;
+      writeBody(it, out.body);
+      setPickedEdge(null);
+      setPickedNode({ item: it.id, node: out.id });
+    },
+    [bodyOf, writeBody],
+  );
+
+  /**
    * A second card beside the picked one, with an edge to it, and the rename already open on it.
    *
    * draw.io's hover arrow, and the single biggest way of *building* a diagram without typing. The
@@ -1627,10 +1981,11 @@ export function useEditor({
    * commits would make "undo" mean "leave a card nothing points at".
    */
   const growFrom = useCallback(
-    (side: ConnectSide, dragged: boolean) => {
+    (side: ConnectSide, dragged: boolean, pseudo?: Pseudo) => {
       const p = pickedNodeRef.current;
       const it = p && bodyOf(p.item);
       if (!p || !it || !isDiagramType(it.type)) return;
+      if (pseudo && !hasPseudo(it.type)) return;
       /* The handles are not drawn where a dialect has no edge to write (`growable`), so this is the
          belt to that brace: a `+` on a chart would append `web --> mob`, which is `E_UNKNOWN_KIND`
          in a chart body — a gesture that breaks the thing it was pressed on. */
@@ -1660,13 +2015,106 @@ export function useEditor({
         }
       }
 
-      const made = grow(it.type, body, it.dir, p.node, { side, edge: !fixed || dragged, at });
+      const made = grow(it.type, body, it.dir, p.node, { side, edge: !fixed || dragged || pseudo !== undefined, at, pseudo });
       if (!made) return;
       setPickedNode({ item: it.id, node: made.id });
-      setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
+      /* A start or an end state draws no text, so there is nothing to name. */
+      if (!pseudo) setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
       writeShifted(it, made.body, shift);
     },
     [bodyOf, laidOutIn, writeShifted],
+  );
+
+  /** A start state goes in front of the picked card and an end state behind it; see `GrowOpts.pseudo`. */
+  const growPseudo = useCallback((kind: Pseudo) => growFrom(kind === "start" ? "w" : "e", false, kind), [growFrom]);
+
+  /**
+   * Wrap the picked thing in a new container.
+   *
+   * The statement is rewritten by `wrapStatement` and nothing else in the body moves. A fixed fence
+   * is the one place that needs more than the word, because there the container carries its own
+   * box: it is read off the layout (`wrapGeometry`), the unplaced cards are pinned first so that
+   * giving one of them a coordinate does not send the rest below it, and the item moves by whatever
+   * the new box took from the frame's corner — the three things `+` does in the same fence, for the
+   * same reasons.
+   */
+  const wrapPicked = useCallback(() => {
+    const p = pickedNodeRef.current;
+    const it = p && bodyOf(p.item);
+    if (!p || !it || !isDiagramType(it.type)) return;
+    const plan = wrapPlan(it, p.node);
+    if (!plan) return;
+
+    const id = freshNodeId(it.body, plan.word);
+    const opts: WrapOpts = {
+      word: plan.word,
+      id,
+      label: plan.word === "lane" ? "Lane" : plan.word === "system" ? "System" : "Group",
+    };
+    let body = it.body;
+    let shift = { x: 0, y: 0 };
+    if (it.type === "sketch" || it.layout === "fixed") {
+      const laid = laidOutIn(p.item);
+      const graph = laid ? parseDiagram(it.type, it.body, it.dir, it.aspect, it.layout) : null;
+      const geo = laid && graph ? wrapGeometry(laid, p.node, plan.parent, gridRef.current * 2) : null;
+      if (!laid || !graph || !geo) return;
+      body = pinUnplaced(graph, laid, it.body);
+      opts.box = geo.box;
+      opts.at = geo.at;
+      const was = cornerOf(laid);
+      shift = frameShift(was, { x: Math.min(was.x, geo.corner.x), y: Math.min(was.y, geo.corner.y) });
+    }
+
+    setPickedNode({ item: it.id, node: id });
+    setRenaming({ item: it.id, id, what: plan.word === "lane" ? "lane" : "group", seg: 0, text: "" });
+    writeShifted(it, wrapStatement(body, plan.line, opts), shift);
+  }, [bodyOf, laidOutIn, writeShifted]);
+
+  /**
+   * A new mindmap topic under the picked one, or beside it, with the rename already open on it.
+   *
+   * The pick moves to the new topic so the next key acts on it, which is what makes Tab, type,
+   * Enter, type a way to write a whole outline. One commit, so one undo takes the topic back.
+   * `false` when there was nothing to do — the top of the tree has no sibling — so a caller can
+   * fall back to the thing that does make sense there.
+   */
+  const growTopicFrom = useCallback(
+    (as: "child" | "sibling"): boolean => {
+      const p = pickedNodeRef.current;
+      const it = p && bodyOf(p.item);
+      if (!p || !it || it.type !== "mindmap") return false;
+      const made = growTopic(it.body, p.node, as);
+      if (!made) return false;
+      setPickedNode({ item: it.id, node: made.id });
+      setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
+      writeBody(it, made.body);
+      return true;
+    },
+    [bodyOf, writeBody],
+  );
+
+  /**
+   * Outdent the picked topic, or move it past the sibling above or below.
+   *
+   * A topic's id is the parser's counter, so a move gives the *same topic* a different id; the pick
+   * is re-aimed at the line it moved to, or the next key would act on whichever topic now holds the
+   * old number.
+   */
+  const moveTopicPick = useCallback(
+    (op: "outdent" | "up" | "down"): boolean => {
+      const p = pickedNodeRef.current;
+      const it = p && bodyOf(p.item);
+      if (!p || !it || it.type !== "mindmap") return false;
+      const line = declaredAt(it.type, it.body, p.node, it.dir);
+      if (line === null) return false;
+      const made = op === "outdent" ? outdentTopic(it.body, line) : shiftTopic(it.body, line, op === "up" ? -1 : 1);
+      if (!made) return false;
+      const at = declaredOn(it.type, made.body, made.line, it.dir);
+      if (at) setPickedNode({ item: it.id, node: at.id });
+      writeBody(it, made.body);
+      return true;
+    },
+    [bodyOf, writeBody],
   );
 
   /**
@@ -1722,6 +2170,32 @@ export function useEditor({
       setTick((t) => t + 1);
       setSelected(new Set([want]));
       setEditing((prev) => (prev === id ? want : prev));
+      return null;
+    },
+    [history],
+  );
+
+  /**
+   * A node inside an item renamed, and the board's links to it following.
+   *
+   * Through `put` for the reason `renameItem` is: the body op and the `edges` rewrites are spans in
+   * different fences, and the patch route addresses one item at a time. The body goes in first,
+   * through `applyPatch` like any panel write, then `renameNodeLinks` runs over the result; the
+   * one string is written once, with no history key, so the rename is its own undo step.
+   */
+  const renameNode = useCallback(
+    async (id: string, from: string, to: string, body: string): Promise<string | null> => {
+      if (lockedRef.current) return (refuseLocked(), "read only: unlock to rename it");
+      const cur = handleRef.current.current();
+      if (!cur) return "the board has not loaded yet";
+      const patched = applyPatch(cur.text, [{ id, body }]);
+      if (!patched.ok) return patched.error;
+      const done = renameNodeLinks(patched.text, id, from, to);
+      if (!done.ok) return done.error;
+      const w = await handleRef.current.put(done.text);
+      if (!w) return "the file changed underneath. Try again";
+      history.push(w.before, w.after);
+      setTick((t) => t + 1);
       return null;
     },
     [history],
@@ -1997,6 +2471,13 @@ export function useEditor({
       setPickedLink(null);
 
       const was = selectedRef.current;
+
+      /* A sequence that is already the selection: a press on a lifeline draws a message from it.
+         Unselected, the same press selects and moves the diagram, as a press anywhere on it does. */
+      const life = (e.target as Element | null)?.closest<HTMLElement>("[data-dag-lifeline]")?.dataset.dagLifeline;
+      if (life !== undefined && !e.shiftKey && !e.altKey && !lockedRef.current && was.size === 1 && was.has(id)) {
+        if (lifelineDrag(id, life, e, el)) return true;
+      }
 
       /*
        * The second click picks the card out of the diagram.
@@ -2588,15 +3069,20 @@ export function useEditor({
         const under = document.elementFromPoint(ev.clientX, ev.clientY);
         const hit = targetAt(under);
         over = hit && connectable(source, hit) ? hit : null;
+        /* The mark is on what the drop will name: the row, the boundary, the card, or the item. */
         mark(
           over
-            ? (under?.closest<HTMLElement>("[data-dag-node]") ?? under?.closest<HTMLElement>("[data-dag-item]") ?? null)
+            ? ((over.row !== undefined ? under?.closest<HTMLElement>("[data-dag-row]") : null) ??
+                (over.boundary ? under?.closest<HTMLElement>("[data-dag-group]") : null) ??
+                under?.closest<HTMLElement>("[data-dag-node]") ??
+                under?.closest<HTMLElement>("[data-dag-item]") ??
+                null)
             : null,
         );
         if (overlay) overlay.innerHTML = connectSvg(from, at, side, over !== null, dotR);
       };
 
-      const onUp = () => {
+      const onUp = (ev?: PointerEvent) => {
         removeEventListener("pointermove", onMove);
         removeEventListener("pointerup", onUp);
         removeEventListener("pointercancel", onUp);
@@ -2606,7 +3092,10 @@ export function useEditor({
         if (overlay) overlay.innerHTML = "";
         /* Eat the click that ends the gesture, or the release over an item selects it. */
         addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
-        if (over) addLink(source, over);
+        /* Read at release, where the person's hand is, rather than at the press: shift to join a bus,
+           alt to carry a chain on. Neither is written anywhere until then. */
+        if (over)
+          addLink(source, over, ev?.type === "pointerup" ? (ev.shiftKey ? "bus" : ev.altKey ? "chain" : undefined) : undefined);
       };
 
       /* Escape abandons it. Captured, because the board's own key handler would take the key first
@@ -2740,6 +3229,20 @@ export function useEditor({
       addEventListener("pointercancel", onUp);
     };
 
+    /** The `+` on a mindmap topic: a press, and the topic is made when the button is let go. */
+    const growTopicHandle: EditorCtl["growTopic"] = (e, as) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const onUp = () => {
+        removeEventListener("pointerup", onUp);
+        /* Eat the click that ends the gesture, or the release selects whatever is under it. */
+        addEventListener("click", (c) => c.stopPropagation(), { capture: true, once: true });
+        growTopicFrom(as);
+      };
+      addEventListener("pointerup", onUp);
+    };
+
     const rename: EditorCtl["rename"] = (id, el) => {
       const at = nameableUnder(el);
       return at ? startRename(id, at) : false;
@@ -2761,6 +3264,7 @@ export function useEditor({
       bendLink: held(bendLink, undefined),
       straightenLink: held(straightenLink, undefined),
       grow: held(growHandle, undefined),
+      growTopic: held(growTopicHandle, undefined),
       rename: held(rename, true),
       open: held(open, undefined),
       remove: held(remove, undefined),
@@ -2791,8 +3295,10 @@ export function useEditor({
     pickEdge,
     clearPick,
     growFrom,
+    growTopicFrom,
     startRename,
     nodeDrag,
+    lifelineDrag,
     writePrompt,
     generateFor,
     acceptDraft,
@@ -3343,6 +3849,35 @@ export function useEditor({
     [commit],
   );
 
+  const setMeta = useCallback((meta: Record<string, unknown>) => commit([{ meta }]), [commit]);
+
+  /**
+   * A repair, written as the version of the file it would be — see `Editor.repair`.
+   *
+   * The text is read **now**, not when the dock drew the button: a fix is offered against one
+   * reading of the board, and `retypeFence` refuses one whose line no longer says what it was
+   * offered for, which is how a repair clicked after Claude rewrote the file does nothing instead
+   * of something to the wrong line.
+   */
+  const repair = useCallback(
+    async (fix: Fix): Promise<string | null> => {
+      if (lockedRef.current) return (refuseLocked(), "read only: unlock to repair it");
+      if (fix.kind === "attr") {
+        return (await commit([{ id: fix.item, attrs: { [fix.key]: null } }])) ? null : "the file changed underneath. Try again";
+      }
+      const cur = handleRef.current.current();
+      if (!cur) return "the board has not loaded yet";
+      const done = fix.kind === "frontmatter" ? repairFrontmatter(cur.text) : retypeFence(cur.text, fix.line, fix.from, fix.to);
+      if (!done.ok) return done.error;
+      const w = await handleRef.current.put(done.text);
+      if (!w) return "the file changed underneath. Try again";
+      history.push(w.before, w.after);
+      setTick((t) => t + 1);
+      return null;
+    },
+    [commit, history],
+  );
+
   /* ---- keys and the clipboard ---- */
 
   /* Where the pointer last was, so a paste lands under it rather than in a corner. */
@@ -3573,6 +4108,20 @@ export function useEditor({
       if (mod && e.key === ",") return (take(), onSettingsRef.current?.());
       if (mod) return;
 
+      /* The outliner keys, ahead of the switch because Enter and the arrows mean something else for
+         every other pick — and only here, with a topic picked, do they mean this. A key that has no
+         move to make (outdent from directly under the root) is still taken: letting Tab through
+         would walk the focus off the canvas in the middle of a run of them. */
+      const topicKey = pn && bodyOf(pn.item)?.type === "mindmap" ? topicKeyFor(e) : null;
+      if (topicKey) {
+        take();
+        if (lockedRef.current) return void refuseLocked();
+        if (topicKey === "child") growTopicFrom("child");
+        else if (topicKey === "sibling") growTopicFrom("sibling") || growTopicFrom("child");
+        else moveTopicPick(topicKey);
+        return;
+      }
+
       switch (e.key) {
         case "Escape":
           /* A card over the board first: it sits over everything, and its Escape must not also
@@ -3768,6 +4317,7 @@ export function useEditor({
   }, [
     enabled,
     add,
+    bodyOf,
     bringToFront,
     clear,
     clearPick,
@@ -3776,11 +4326,13 @@ export function useEditor({
     duplicatePickedNode,
     flushNudge,
     group,
+    growTopicFrom,
     history,
     importFiles,
     insert,
     links,
     move,
+    moveTopicPick,
     open,
     paintMove,
     redo,
@@ -3819,15 +4371,19 @@ export function useEditor({
     redo,
     add,
     links,
-    openAt,
+    openOn,
     pickedLink,
     pickLink,
+    removeLink,
     pickedNode,
     pickedEdge,
     pickNode,
     pickEdge,
+    wrapMessages,
     removeSelection,
     duplicateSelection,
+    wrapPicked,
+    growPseudo,
     columnOf: columnAt,
     pickFromLine,
     mode,
@@ -3835,7 +4391,11 @@ export function useEditor({
     renaming,
     commitRename,
     cancelRename,
+    gitCommit: gitCommitOn,
+    gitBranch: gitBranchFrom,
+    renameBranch,
     renameItem,
+    renameNode,
     detach: detachItem,
     relayout: relayoutItem,
     place,
@@ -3854,6 +4414,8 @@ export function useEditor({
     close,
     setBody,
     setAttrs,
+    setMeta,
+    repair,
     replace,
     onMarquee,
     onPaperClick,

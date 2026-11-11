@@ -12,6 +12,7 @@
  * | a column renamed, retyped, its options, its width | the header cell, and the delimiter's for a type |
  * | a column added, removed, moved | the header, the delimiter and every row of that tab |
  * | a tab added, renamed, sorted, filtered, removed, moved | its heading line, or its whole span |
+ * | a problem repaired (*Repairs*, below) | the heading, header cell or row line it is on; a tab's stray text; a grid, to keep a row's extra cells |
  *
  * **Never padded.** A row a writer touches comes back as `| a | b |`, and every other row keeps the
  * bytes an author or an agent gave it — their alignment included. Re-padding a column would rewrite
@@ -27,8 +28,10 @@
 import { serializeAttrs, type Attrs } from "../board/attrs";
 import {
   cellSource,
+  cellText,
   parseTable,
   readSort,
+  splitRow,
   writeFilter,
   writeSort,
   type Column,
@@ -214,6 +217,18 @@ const rowInput = (r: Row): RowInput => ({
   cells: r.cells,
   extra: r.extra,
 });
+
+/** A row's first cell as written: its words, then its `{#id h=…}`. Every other cell of a row is its words alone. */
+const firstCell = (r: Row, id: string | undefined): string =>
+  `${cellSource(r.cells[0] ?? "")}${braces(
+    attrs(
+      [
+        ["id", id],
+        ["h", r.h],
+      ],
+      r.extra,
+    ),
+  )}`.trim();
 
 /** Replace a tab's whole grid, or write one under a tab that has none. */
 function replaceGrid(text: string, tab: Tab, columns: readonly ColumnInput[], rows: readonly RowInput[]): string {
@@ -613,6 +628,187 @@ export function moveTab(text: string, tabId: string, before: string | null): str
   return trimmed + eol + eol + block;
 }
 
+// -- repairs ------------------------------------------------------------------------------------
+
+/*
+ * What the page offers to mend a problem the file has. Each is addressed by **position** — the
+ * tab's, the column's, the row's place in the file — because a problem is often an id that is missing
+ * or shared, and an id that names two things names neither. Each looks again at what it was asked
+ * to mend and returns the text it was given when that is no longer wrong, so a repair meant for a
+ * file the other writer has since mended is not a write.
+ */
+
+const tabAt = (table: Table, index: number): Tab => {
+  const tab = table.tabs[index];
+  if (!tab) throw new TableError("that tab is not here any more");
+  return tab;
+};
+
+const rowAt = (tab: Tab, index: number): Row => {
+  const row = tab.rows[index];
+  if (!row) throw new TableError("that row is not here any more");
+  return row;
+};
+
+/** A row's line as written, without its newline. */
+const lineOfRow = (text: string, row: Row): string => text.slice(row.span.start, row.span.end).replace(/\r?\n$/, "");
+
+/** A tab's heading rewritten from what it holds, the line's own bytes replaced and its newline kept. */
+function rewriteHeading(text: string, tab: Tab, change: { id?: string; extra?: Attrs }): string {
+  const id = change.id ?? tab.id;
+  const line = headingLine({
+    ...(id !== undefined ? { id } : {}),
+    name: tab.name,
+    ...(tab.sortText ? { sort: tab.sortText } : {}),
+    ...(tab.filterText ? { filter: tab.filterText } : {}),
+    extra: change.extra ?? tab.extra,
+  });
+  const was = text.slice(tab.heading.start, tab.heading.end).replace(/\r?\n$/, "");
+  return line === was ? text : splice(text, tab.heading.start, tab.heading.start + was.length, line);
+}
+
+/** The tab at `tabIndex` given an id of its own, when it shares one (`ET_DUPLICATE_ID`). */
+export function reidTab(text: string, tabIndex: number): string {
+  const table = parseTable(text);
+  const tab = tabAt(table, tabIndex);
+  if (tab.id === undefined || table.tabs.filter((t) => t.id === tab.id).length < 2) return text;
+  const taken = new Set(table.tabs.flatMap((t) => (t.id ? [t.id] : [])));
+  return rewriteHeading(text, tab, { id: freeId(slug(tab.name, "tab"), taken) });
+}
+
+/** The column at `columnIndex` of a tab given an id of its own, when it shares one. */
+export function reidColumn(text: string, tabIndex: number, columnIndex: number): string {
+  const tab = tabAt(parseTable(text), tabIndex);
+  const column = tab.columns[columnIndex];
+  if (!column) throw new TableError("that column is not here any more");
+  if (column.id === undefined || tab.columns.filter((c) => c.id === column.id).length < 2) return text;
+  const taken = new Set(tab.columns.flatMap((c) => (c.id ? [c.id] : [])));
+  const id = freeId(slug(column.name), taken);
+  return splice(text, column.span.start, column.span.end, ` ${headerCell({ ...columnInput(column), id })} `);
+}
+
+/** The row at `rowIndex` of a tab given an id of its own, when it shares one. */
+export function reidRow(text: string, tabIndex: number, rowIndex: number): string {
+  const tab = tabAt(parseTable(text), tabIndex);
+  const row = rowAt(tab, rowIndex);
+  const seg = row.segments[0];
+  if (row.id === undefined || !seg || tab.rows.filter((r) => r.id === row.id).length < 2) return text;
+  const id = mintRowId(new Set(tab.rows.flatMap((r) => (r.id ? [r.id] : []))));
+  return splice(text, seg.start, seg.end, ` ${firstCell(row, id)} `);
+}
+
+/**
+ * A tab, or one of its columns, with the `{…}` words it does not know taken off (`WT_UNKNOWN_ATTR`)
+ * — only that heading or header cell is rewritten, and what it does know (its id, type, options,
+ * width, sort and filter) stays. A row has none to drop: its braces are attributes only when they
+ * hold nothing but an id and a height.
+ */
+export function dropUnknownAttrs(text: string, tabIndex: number, columnIndex?: number): string {
+  const tab = tabAt(parseTable(text), tabIndex);
+  if (columnIndex !== undefined) {
+    const column = tab.columns[columnIndex];
+    if (!column) throw new TableError("that column is not here any more");
+    if (column.extra.order.length === 0) return text;
+    return splice(text, column.span.start, column.span.end, ` ${headerCell({ ...columnInput(column), extra: NO_ATTRS })} `);
+  }
+  if (tab.extra.order.length === 0) return text;
+  return rewriteHeading(text, tab, { extra: NO_ATTRS });
+}
+
+/** A row with more cells than the tab has columns, written again with the cells past the last column gone (`WT_ROW_WIDTH`). */
+export function trimRow(text: string, tabIndex: number, rowIndex: number): string {
+  const tab = tabAt(parseTable(text), tabIndex);
+  const row = rowAt(tab, rowIndex);
+  const line = lineOfRow(text, row);
+  if (splitRow(line).length <= tab.columns.length) return text;
+  return splice(text, row.span.start, row.span.start + line.length, rowLine(rowInput(row), tab.columns.length));
+}
+
+/**
+ * The tab given the columns a row's extra cells need, named `Column 3` and so on, and each row's own
+ * cells past the old last column carried into them — the other way to mend `WT_ROW_WIDTH`, which keeps
+ * what was written instead of dropping it. Every row of the tab is written again, as any column add is.
+ */
+export function widenToRow(text: string, tabIndex: number, rowIndex: number): string {
+  const tab = tabAt(parseTable(text), tabIndex);
+  const row = rowAt(tab, rowIndex);
+  const width = tab.columns.length;
+  const need = splitRow(lineOfRow(text, row)).length;
+  if (need <= width) return text;
+  const taken = new Set(tab.columns.flatMap((c) => (c.id ? [c.id] : [])));
+  const columns = tab.columns.map(columnInput);
+  for (let n = width; n < need; n++) {
+    const name = `Column ${n + 1}`;
+    const id = freeId(slug(name), taken);
+    taken.add(id);
+    columns.push({ id, name });
+  }
+  const rows = tab.rows.map((r) => {
+    const segs = splitRow(lineOfRow(text, r));
+    const cells = [...r.cells];
+    for (let n = width; n < need; n++) cells.push(cellText(segs[n]?.raw ?? ""));
+    return { ...rowInput(r), cells };
+  });
+  return replaceGrid(text, tab, columns, rows);
+}
+
+/** What a tab holds that is not its table: from the table's end (or the heading's) to its last line (`WT_STRAY`). */
+export function strayOf(text: string, tab: Tab): string {
+  const from = tab.grid ? tab.grid.end : tab.heading.end;
+  return from < tab.span.end
+    ? text
+        .slice(from, tab.span.end)
+        .replace(/^(?:\r?\n)+/, "")
+        .replace(/\s+$/, "")
+    : "";
+}
+
+/** A tab with everything under it that is not its table taken away. */
+export function removeStray(text: string, tabIndex: number): string {
+  const tab = tabAt(parseTable(text), tabIndex);
+  const from = tab.grid ? tab.grid.end : tab.heading.end;
+  if (from >= tab.span.end) return text;
+  return splice(text, from, tab.span.end, "");
+}
+
+/**
+ * The text with the code block opened on `line` (1-based, the file's) closed (`WT_OPEN_FENCE`):
+ * before the next `##` heading, so the tabs it swallowed come back, or at the end when there is none.
+ */
+export function closeFence(text: string, line: number): string {
+  const eol = eolOf(text);
+  const lines = text.split("\n");
+  const open = /^ {0,3}(`{3,}|~{3,})/.exec(lines[line - 1] ?? "");
+  if (!open) return text;
+  const fence = `${lines[line - 1]!.match(/^ */)![0]}${open[1]}`;
+  let at = lines.findIndex((l, i) => i >= line && /^ {0,3}##(?=[ \t]|$)/.test(l));
+  if (at < 0) return `${text.replace(/\s+$/, "")}${eol}${fence}${eol}`;
+  while (at > line && !lines[at - 1]!.trim()) at--;
+  lines.splice(at, 0, eol === "\r\n" ? `${fence}\r` : fence);
+  return lines.join("\n");
+}
+
+/**
+ * A table above the first tab given a tab to be in (`WT_LOOSE_TABLE`): a `## Tab n` heading over the
+ * line it starts on, with a blank line between if the description ran right up to it.
+ */
+export function wrapLooseTable(text: string, line: number): string {
+  const table = parseTable(text);
+  const first = table.tabs[0];
+  const at = text
+    .split(/(?<=\n)/)
+    .slice(0, line - 1)
+    .join("").length;
+  if (first && at >= first.heading.start) return text;
+  const names = new Set(table.tabs.map((t) => t.name));
+  let n = table.tabs.length + 1;
+  while (names.has(`Tab ${n}`)) n++;
+  const eol = eolOf(text);
+  const before = text.slice(0, at);
+  const lead = before === "" || /(?:\r?\n){2}$/.test(before) ? "" : eol;
+  return splice(text, at, at, `${lead}## Tab ${n}${eol}${eol}`);
+}
+
 // -- ids ----------------------------------------------------------------------------------------
 
 /**
@@ -644,16 +840,7 @@ export function stampTable(text: string): string {
           const id = mintRowId(rows);
           rows.add(id);
           const seg = r.segments[0];
-          const content = `${cellSource(r.cells[0] ?? "")}${braces(
-            attrs(
-              [
-                ["id", id],
-                ["h", r.h],
-              ],
-              r.extra,
-            ),
-          )}`.trim();
-          if (seg) edits.push({ start: seg.start, end: seg.end, by: ` ${content} ` });
+          if (seg) edits.push({ start: seg.start, end: seg.end, by: ` ${firstCell(r, id)} ` });
         }
       }
       if (tab.id === undefined) {

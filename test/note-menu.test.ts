@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import { getDefaultSlashMenuItems } from "@blocknote/core/extensions";
 import { ServerBlockNoteEditor } from "@blocknote/server-util";
 
-import { OWN_SLASH, SLASH, SLASH_KEYS, pasteKind } from "@/blocks/menus";
+import { FIELD_BLOCKS, FIELD_SLASH_KEYS, OWN_SLASH, SLASH, SLASH_KEYS, pasteKind } from "@/blocks/menus";
 import { NOTE_BLOCKS, NOTE_STYLES, blocksToMd, mdToBlocks, type NoteBlock } from "@/note/markdown";
 import { noteSchema } from "@/note/schema";
+import { parseQuiz } from "@/quiz/parse";
+import { renderQuestion } from "@/quiz/write";
 
 /**
  * The menus are a closed set, and the file is what closes it: anything the editor offers must be
@@ -77,6 +79,49 @@ describe("the slash menu", () => {
       expect(back.map((b) => b.type)).toEqual([type]);
     });
   }
+
+  /*
+   * A quiz's rich field holds a note's blocks less the four that are a quiz's own syntax. Every one
+   * it holds, written into any field of a question, has to come back as that question's and no other's:
+   * the field schema is what keeps a person from typing a second question into the first.
+   */
+  describe("a quiz field", () => {
+    it("holds only blocks a note holds, and none of the quiz's own syntax", () => {
+      for (const type of FIELD_BLOCKS) expect(NOTE_BLOCKS).toContain(type);
+      for (const type of ["heading", "checkListItem", "quote", "divider"]) expect(FIELD_BLOCKS).not.toContain(type);
+      for (const key of FIELD_SLASH_KEYS) {
+        expect(SLASH_KEYS).toContain(key);
+        expect(FIELD_BLOCKS).toContain(SLASH[key]);
+      }
+    });
+
+    for (const type of FIELD_BLOCKS) {
+      it(`a ${type} in a prompt's details, an answer or an explanation stays in its question`, () => {
+        const md = blocksToMd([samples[type]]);
+        for (const where of ["body", "why", "option"] as const) {
+          const text = `${renderQuestion({
+            id: "qa",
+            prompt: "Q",
+            body: where === "body" ? md : "",
+            why: where === "why" ? md : "",
+            options: [
+              { text: where === "option" ? md : "a", correct: true },
+              { text: "b", correct: false },
+            ],
+          })}\n## Next {#qb}\n- [x] c\n- [ ] d\n`;
+          const quiz = parseQuiz(text);
+          expect(
+            quiz.questions.map((q) => q.id),
+            `${type} in ${where}`,
+          ).toEqual(["qa", "qb"]);
+          expect(quiz.diagnostics, `${type} in ${where}`).toEqual([]);
+          const q = quiz.questions[0]!;
+          const back = where === "body" ? q.body : where === "why" ? q.why : q.options[0]!.text;
+          expect(back, `${type} in ${where}`).toBe(md);
+        }
+      });
+    }
+  });
 });
 
 describe("a paste", () => {

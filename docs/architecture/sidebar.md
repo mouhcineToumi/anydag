@@ -5,7 +5,8 @@
 ## The sidebar
 
 `src/ui/Shell.tsx` and `src/ui/Sidebar.tsx`. A column the full height
-of the window: the lockup beside the toggle, the vault switcher, then Search, Tasks, Calendar, Quizzes and
+of the window: the lockup beside the toggle — which goes home, one press from any page back to the
+welcome card, as it does in the toolbar while the column is away — the vault switcher, then Search, Tasks, Calendar, Quizzes and
 one **New** row whose menu makes every kind, then Favourites, then the files as a tree,
 then Settings at the foot. The sidebar is "in Notion
 style", the place people "find their way to most of what the app has to offer"; Notion is the
@@ -49,7 +50,14 @@ Fourteen things are load-bearing:
   folders are open is `dag:sidebar-open`, this browser's and deliberately not synced — view state,
   like a scroll position — written with `writeLocal`, which does not wake the preference sync.
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
-  one menu; a folder's `+` makes things in it. The search dialog carried the same four operations on
+  one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
+  down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
+  Files and the only way a top-level file was made before #121. That menu's `here` is carried in the
+  state that opens it: the `+` says the open file's folder, the tree's space says the top level, and
+  where there is no file to be in the head says *New at the top level* and offers no toggle. The menu
+  opens when the vault is locked — as a row's does — with every entry `aria-disabled` and in the
+  chrome's blocked style, a press answered by the lock's notice; the `+` still refuses before its menu
+  opens. The search dialog carried the same four operations on
   hover icons, and a control in two places is two places to keep in step, so it lost them.
   `Delete` is deliberately not a key: undo is a version of a board's *text* and never reaches the
   file.
@@ -125,7 +133,7 @@ Fourteen things are load-bearing:
   back to the open board*), and the glide's own check passed under load only after it.
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
-`dag-toolbar__crumb*`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
+`dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
 `data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, the storage key `dag:file-list` and the event

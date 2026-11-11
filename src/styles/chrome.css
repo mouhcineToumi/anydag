@@ -355,6 +355,24 @@
   cursor: pointer;
 }
 .dag-tab__close:hover { color: var(--dag-color-danger); }
+/* A page with problems: its name truncates, its count does not. */
+.dag-tab--flagged { display: inline-flex; align-items: center; gap: 6px; }
+.dag-tab__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dag-tab__flag {
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 999px;
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border: 1px solid var(--dag-color-warning);
+}
 .dag-tab__add {
   display: inline-flex;
   align-items: center;
@@ -473,7 +491,24 @@
   height: 48px;
   padding: 0 8px 0 calc(16px + var(--window-inset));
 }
-.dag-sidebar__logo { display: flex; align-items: center; color: var(--dag-color-ink); }
+/* The logo is a button that goes home: nothing open, the welcome card, as a new history entry.
+   `font: inherit` — a button's own font would otherwise redraw the wordmark. The 4px of air is the
+   same on the toolbar's, so the mark sits exactly where the toolbar draws it when the column goes
+   (`e2e/sidebar.spec.ts` holds the two level), and the hover is the column's own. */
+.dag-sidebar__logo {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 4px;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-sidebar__logo:hover { background: var(--dag-color-paper200); }
+.dag-sidebar__logo:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 
 /*
  * The sidebar's one toggle. `Shell` draws it once, over the top-left corner of the
@@ -1625,15 +1660,29 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 
 /* The dot on a diagram showing its last good drawing. Inside the item's box, top right: `.dag-item`
    clips anything painted outside it. */
-.dag-stale {
+/* A diagram with a problem a person can act on (#145): its frame in the problem colour and a count
+   by its title. Painted by App onto the item, never in a snapshot; an outline and a pseudo-element,
+   so the box `size.ts` measured is the box drawn. `::before`, because `::after` is the selection's. */
+.dag-item[data-dag-problem-count] {
+  outline: 1.5px solid var(--dag-color-dangerBorder);
+  outline-offset: 2px;
+  content-visibility: visible;
+}
+.dag-item[data-dag-problem-count]::before {
+  content: attr(data-dag-problem-count);
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  top: -10px;
+  left: -10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
   background: var(--dag-color-danger);
-  box-shadow: 0 0 0 1.5px var(--dag-color-paper);
+  color: var(--dag-color-paper);
+  font: 600 11px/18px var(--dag-font-sans);
+  text-align: center;
+  pointer-events: none;
   z-index: 3;
 }
 
@@ -1711,6 +1760,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-viewport[data-tool="pen"] .dag-item,
 .dag-viewport[data-tool="pen"] .dag-nodetools,
 .dag-viewport[data-tool="pen"] .dag-nodetools > *,
+.dag-viewport[data-tool="pen"] .dag-gitlanes *,
 .dag-viewport[data-tool="pen"] .dag-edge-hit { pointer-events: none; }
 
 .dag-marquee {
@@ -1807,6 +1857,38 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 [data-dag-connecting] .dag-edge-hit { pointer-events: none; }
 
 /*
+ * A sequence: the lifeline a message is drawn from, the message being drawn, and the tab a
+ * fragment is picked by.
+ *
+ * The lifeline's stroke is `.dag-edge-hit`'s answer to a hairline nobody can hit, and only drawn
+ * with a pointer to use it (`SequenceView`'s `live`). It answers the pointer on a diagram that is
+ * not selected too, because a press there is how the diagram gets selected and moved; the crosshair
+ * only says "draw from here" once a press there would.
+ */
+.dag-lifeline-hit {
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+}
+[data-dag-selected] .dag-lifeline-hit { cursor: crosshair; }
+[data-dag-drawing] .dag-lifeline-hit,
+[data-dag-drawing] .dag-edge-hit { pointer-events: none; }
+.dag-msg-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.dag-msg-ghost path {
+  fill: none;
+  stroke: var(--dag-color-accent);
+  stroke-width: 2px;
+  stroke-dasharray: 6 4;
+}
+[data-dag-selected] .dag-frag-tab[data-dag-frag] { cursor: pointer; }
+
+/*
  * The bend handle at a picked link's middle: pull it, and the line goes through the point.
  *
  * Drawn only for the one line that is picked, and only on the board layer — a fixed point between
@@ -1846,7 +1928,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  */
 [data-dag-node][data-dag-picked],
 [data-dag-group][data-dag-picked],
-[data-dag-lane][data-dag-picked] {
+[data-dag-lane][data-dag-picked],
+[data-dag-frag][data-dag-picked] {
   outline: 2px solid var(--dag-color-accent);
   outline-offset: 2px;
   z-index: 2;
@@ -2108,6 +2191,14 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-props__label { flex: 1; min-width: 80px; }
 .dag-props__arrow { flex: none; font-family: var(--dag-font-mono); }
 
+/* A picked edge's ends: a list per side, an id in it per select, and one more select to add to it. */
+.dag-props__edgeends { display: flex; flex-direction: column; gap: 6px; }
+.dag-props__ends { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dag-props__tag { flex: none; min-width: 34px; font-size: 11px; font-weight: 600; color: var(--dag-color-muted); }
+.dag-props__end { display: inline-flex; align-items: center; gap: 2px; }
+.dag-props__id { max-width: 140px; font-family: var(--dag-font-mono); }
+.dag-props__id--add { color: var(--dag-color-muted); }
+
 /* The properties view proper: the kind, the strings, the flags and the rows. */
 .dag-props__fields { display: flex; flex-direction: column; gap: 8px; }
 .dag-props__out {
@@ -2144,6 +2235,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 .dag-props__add:hover,
 .dag-props__convert button:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+/* A topic move the grammar refuses (the root has no siblings) stays on the panel, dimmed, so the
+   row does not change shape from one topic to the next. */
+.dag-props__add:disabled { opacity: 0.45; cursor: default; }
+.dag-props__add:disabled:hover { color: var(--dag-color-slate); border-color: var(--dag-color-outline); }
 .dag-props__convert { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .dag-icon--tiny { width: 24px; height: 24px; flex: none; }
 .dag-input--mono { font-family: var(--dag-font-mono); font-size: 12px; }
@@ -2311,6 +2406,24 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-props__em:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
 .dag-props__em--on { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
 
+/* The status picker on a timeline entry: three options, each an icon and a word, one on. */
+.dag-props__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-small);
+  cursor: pointer;
+}
+.dag-props__choice:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+.dag-props__choice--on { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+
 /*
  * The handles on a picked card: four to link from, four to grow from.
  *
@@ -2349,6 +2462,39 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-plus[data-dag-plus="s"] { bottom: -10px; left: 50%; margin-left: -8px; }
 .dag-plus[data-dag-plus="e"] { right: -10px; top: 50%; margin-top: -8px; }
 .dag-plus[data-dag-plus="w"] { left: -10px; top: 50%; margin-top: -8px; }
+
+/*
+ * A selected git graph's lanes as controls: a chip over each branch name, a `+` past each tip and
+ * **+ New branch** under the last lane. Like `.dag-nodetools`, the container takes no pointer and
+ * sits over the diagram it belongs to.
+ */
+.dag-gitlanes { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 4; }
+.dag-gitlanes button { position: absolute; top: 0; left: 0; pointer-events: auto; }
+/* The chip is the drawn label, made pressable: no fill of its own, so the name and its hue still
+   read through, and an outline that says it can be renamed. */
+.dag-git-chip {
+  padding: 0;
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: var(--dag-metric-radius-small);
+  cursor: text;
+}
+.dag-git-chip:not(:disabled):hover,
+.dag-git-chip:focus-visible { border-color: var(--dag-color-accent); }
+.dag-git-chip:disabled { cursor: default; }
+.dag-git-plus { border: 0; padding: 0; }
+.dag-git-newbranch {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--dag-color-accent);
+  background: var(--dag-color-card);
+  border: 1px dashed var(--dag-color-accent);
+  border-radius: var(--dag-metric-radius-small);
+  cursor: pointer;
+}
+.dag-git-newbranch:hover { background: var(--dag-color-paper); }
 
 /*
  * The inline rename box.
@@ -2394,38 +2540,47 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 
 /* The open item's problems, under its source: where somebody editing it is already looking. */
+/* The panel's Problems block (#145): at the top, words and the act that answers them. */
+/* An `edges` fence with no link picked: what to do instead of reading its statements (#145). */
+.dag-inspector__hint { margin: 10px 14px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+
 .dag-inspector__problems {
   flex: none;
-  max-height: 140px;
+  max-height: 180px;
   overflow-y: auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-inspector__problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  padding: 4px 8px;
+  padding: 0;
   list-style: none;
-  border-top: 1px solid var(--dag-color-outlineSoft);
 }
 .dag-inspector__problem {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  width: 100%;
+  gap: 4px;
   padding: 4px 8px;
-  font: inherit;
   font-size: 12px;
-  text-align: left;
-  color: var(--dag-color-ink);
-  background: transparent;
-  border: none;
   border-left: 2px solid var(--dag-color-warning);
-  border-radius: var(--dag-metric-radius-small);
-  cursor: pointer;
 }
 .dag-inspector__problem--error { border-left-color: var(--dag-color-danger); }
-.dag-inspector__problem:hover { background: var(--dag-color-paper100); }
-.dag-inspector__problem-where {
-  font-family: var(--dag-font-mono);
-  font-size: 10.5px;
-  color: var(--dag-color-muted);
+.dag-inspector__problem-acts { display: flex; gap: 6px; }
+.dag-inspector__problem-acts:empty { display: none; }
+.dag-inspector__problem-act {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--dag-color-ink);
+  background: none;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 4px;
+  cursor: pointer;
 }
+.dag-inspector__problem-act:hover { background: var(--dag-color-paper100); }
 
 [data-snapshot="1"] .dag-inspector { display: none; }
 
@@ -2638,9 +2793,6 @@ html[data-dag-dragging], html[data-dag-dragging] * { cursor: grabbing !important
    the board's own links stop answering `elementFromPoint` before the card under them does — the
    same two things a connect needs, for the same two reasons. */
 html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !important; user-select: none; }
-/* Except where the dialect has no reading for a drag: a gitgraph's columns and lanes are both the
-   file's order, so the gesture says no rather than writing something else. */
-html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { cursor: not-allowed !important; }
 [data-dag-node-drag] .dag-edge-hit { pointer-events: none; }
 
 [data-snapshot="1"] .dag-library { display: none; }
@@ -2832,6 +2984,14 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
 .dag-rewrite-dialog__foot { align-items: center; justify-content: space-between; margin-top: 12px; }
 .dag-rewrite-dialog__hint { font-size: 11.5px; color: var(--dag-color-muted); }
 .dag-rewrite-dialog .dag-feedback__text:focus { outline: 2px solid var(--dag-color-accentSoft); border-color: var(--dag-color-accent); }
+
+/* The board's own settings: the settings card's shell, with the inspector's field rows inside it. */
+.dag-board-settings { width: 420px; }
+.dag-board-settings__body { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.dag-board-settings__flow { display: flex; gap: 12px; }
+.dag-board-settings__flow .dag-field { flex: 1; }
+.dag-board-settings .dag-field__hint { margin: 0; line-height: 1.5; }
+.dag-board-settings__foot { justify-content: flex-end; margin-top: 12px; }
 
 /* The shortcut sheet: a card over the board, `?` to open, Escape or a click outside to close. */
 .dag-shortcuts__scrim {
@@ -3418,6 +3578,11 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   cursor: pointer;
 }
 .dag-problems__row--error { border-left-color: var(--dag-color-danger); }
+/* A repair, in words, under the row it answers — indented to sit under the message, not the code. */
+.dag-problems__fix { display: flex; flex-direction: column; gap: 6px; padding: 2px 8px 8px 12px; }
+.dag-problems__fix-words { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-problems__fix-words--bad { color: var(--dag-color-dangerText); }
+.dag-problems__fix-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dag-problems__row:hover:not(:disabled) { background: var(--dag-color-paper100); }
 .dag-problems__row:disabled { cursor: default; }
 .dag-problems__row .dag-problems__msg { font-size: 12.5px; color: var(--dag-color-ink); }
@@ -3614,8 +3779,18 @@ html[data-dag-node-drag="refused"], html[data-dag-node-drag="refused"] * { curso
   align-items: center;
   flex: none;
   margin-right: 2px;
+  padding: 4px;
+  font: inherit;
   color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
 }
+/* The logo goes home from here too — the column is away, which is when this bar carries it. The
+   hover is the bar's own (`dag-toolbar__board`'s), not the column's. */
+.dag-toolbar__logo:hover { background: var(--dag-color-paper100); }
+.dag-toolbar__logo:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 
 /*
  * The mark and the name as one thing.
@@ -4865,45 +5040,49 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-quiz > * { max-width: 760px; margin-inline: auto; }
 /* A field's and a problem list's own `margin` shorthand would undo the centring above. */
-.dag-quiz > .dag-quiz__field,
+.dag-quiz > .dag-quiz__rich,
 .dag-quiz > .dag-quiz__shuffle,
 .dag-quiz > .dag-quiz__problems { margin-inline: auto; }
 .dag-quiz__bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.dag-quiz__mode { display: inline-flex; padding: 2px; background: var(--dag-color-paper100); border: 1px solid var(--dag-color-outlineSoft); border-radius: var(--dag-metric-radius-chip); }
-.dag-quiz__mode > button {
-  padding: 4px 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-quiz__mode > button[aria-checked="true"] { color: var(--dag-color-ink); background: var(--dag-color-card); }
-.dag-quiz__mode > button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-quiz__bar:empty { display: none; }
 .dag-quiz__status { margin-left: auto; font-size: 12px; color: var(--dag-color-muted); }
-.dag-quiz__field {
-  display: block;
+
+/*
+ * A rich field: drawn as what it says until it is opened, then the block editor in the same box. The
+ * box is the field's, so the two look like one control; BlockNote's own gutter and padding are taken
+ * off inside it (`.dag-blocks--field`).
+ */
+.dag-quiz__rich {
   box-sizing: border-box;
-  width: 100%;
   margin: 0 0 10px;
-  padding: 7px 10px;
-  font: inherit;
   font-size: 14px;
   line-height: 1.45;
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
   border-radius: var(--dag-metric-radius-small);
-  resize: vertical;
+  cursor: text;
 }
-.dag-quiz__field::placeholder { color: var(--dag-color-muted); }
-.dag-quiz__field:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -1px; border-color: transparent; }
-.dag-quiz__field[readonly] { color: var(--dag-color-slate); background: var(--dag-color-paper100); }
+.dag-quiz__rich[data-dag-quiz-open-field],
+.dag-quiz__rich:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 1px var(--dag-color-accent); }
+.dag-quiz__rich-view { min-height: 20px; padding: 7px 10px; outline: none; overflow-wrap: anywhere; }
+.dag-quiz__rich-view > :first-child { margin-top: 0; }
+.dag-quiz__rich-view > :last-child { margin-bottom: 0; }
+.dag-quiz__rich-view[aria-readonly="true"] { color: var(--dag-color-slate); background: var(--dag-color-paper100); cursor: default; }
+.dag-quiz__rich--line .dag-quiz__rich-view { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dag-quiz__placeholder { color: var(--dag-color-muted); }
 .dag-quiz__prompt { font-size: 16px; font-weight: 600; }
-.dag-quiz__source-text { min-height: 60vh; font-family: var(--dag-font-mono); font-size: 13px; }
+.dag-quiz__description { margin-bottom: 12px; }
+/* The editor in the field's box, at the field's size: no gutter, no background of its own. */
+.dag-rich-field .dag-blocks--field .bn-editor { padding: 4px 10px; font-size: 14px; line-height: 1.45; background: transparent; }
+.dag-rich-field .dag-blocks--field.bn-root[data-color-scheme] { --bn-colors-editor-background: transparent; }
+.dag-quiz__prompt .dag-rich-field .dag-blocks--field .bn-editor { font-size: 16px; font-weight: 600; }
+/* No empty block after the last to click into, so a field opens at its drawing's height: a field
+   that grew as it opened moved everything under it, and a press on the button below it — *Add an
+   answer*, a tick — was let go over something else and missed. A code block is left with Enter
+   three times or shift+Enter, BlockNote's own keys. */
+.dag-rich-field .dag-blocks--field .bn-trailing-block { display: none; }
+
 .dag-quiz__card {
   margin-bottom: 16px;
   padding: 14px 16px 6px;
@@ -4911,8 +5090,31 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   border: 1px solid var(--dag-color-outlineSoft);
   border-radius: var(--dag-metric-radius-card);
 }
-.dag-quiz__card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dag-quiz__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dag-quiz__card-number { font-size: 13px; font-weight: 600; color: var(--dag-color-slate); }
+.dag-select.dag-quiz__kind { width: auto; min-width: 0; font-size: 12px; }
+/* A handle to drag by: the row moves, the handle says so. */
+.dag-quiz__grip { cursor: grab; touch-action: none; color: var(--dag-color-muted); }
+.dag-quiz__grip:hover:not(:disabled) { color: var(--dag-color-ink); }
+[data-dag-dragging] .dag-quiz__grip { cursor: grabbing; }
+[data-dag-quiz-dragging] { opacity: 0.5; }
+[data-dag-quiz-drop="before"] { box-shadow: 0 -2px 0 var(--dag-color-accent); }
+[data-dag-quiz-drop="after"] { box-shadow: 0 2px 0 var(--dag-color-accent); }
+.dag-quiz__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: -4px 0 10px;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.dag-quiz__more:hover:not(:disabled) { color: var(--dag-color-ink); }
+.dag-quiz__more:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 .dag-quiz__card-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
 .dag-quiz__confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-quiz__confirm > button {
@@ -4926,19 +5128,23 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-quiz__confirm > .dag-quiz__danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); background: var(--dag-color-dangerSoft); }
+.dag-quiz__confirm--line { display: flex; flex-wrap: wrap; margin: 0 0 10px; }
 .dag-quiz__options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 /* At the top of the row, which an option holding a code block makes tall. */
 .dag-quiz__option { display: flex; align-items: flex-start; gap: 6px; }
-.dag-quiz__option > .dag-quiz__field { margin: 0; flex: 1; min-width: 0; }
+.dag-quiz__option > .dag-quiz__rich { margin: 0; flex: 1; min-width: 0; }
 .dag-quiz__option > .dag-check { margin: 11px 4px 0 2px; }
+/* One right answer is a choice of one: a circle, as a radio is everywhere else. */
+.dag-check--round { border-radius: 50%; }
 /* A right answer is ticked in the success colour: it is the key, not a setting. */
 .dag-quiz__option > .dag-check:checked { background: var(--dag-color-success); border-color: var(--dag-color-success); }
+/* No answer is marked: the ticks are where to look. */
+.dag-quiz__card[data-dag-quiz-needs-answer] .dag-quiz__option > .dag-check { border-color: var(--dag-color-dangerBorder); box-shadow: 0 0 0 3px var(--dag-color-dangerSoft); }
 .dag-quiz__option > .dag-icon { margin-top: 2px; }
-.dag-quiz__option-text { resize: none; }
 /* Pressed, a pin wears the accent: the option keeps its place when a run shuffles. */
 .dag-quiz__pin[aria-pressed="true"] { color: var(--dag-color-accent); }
 .dag-quiz__pin[aria-pressed="true"]:disabled { opacity: 0.6; }
-.dag-quiz__option[data-dag-quiz-correct] > .dag-quiz__field { border-color: var(--dag-color-successBorder); }
+.dag-quiz__option[data-dag-quiz-correct] > .dag-quiz__rich { border-color: var(--dag-color-successBorder); }
 .dag-quiz__add-option,
 .dag-quiz__add {
   display: inline-flex;
@@ -4966,9 +5172,34 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-quiz__adds { display: flex; flex-wrap: wrap; gap: 8px; }
 .dag-quiz__empty { margin: 24px auto 12px; font-size: 14px; color: var(--dag-color-muted); }
 .dag-quiz__problems { margin: 0 0 10px; padding: 0; list-style: none; }
-.dag-quiz__problem { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; color: var(--dag-color-warningText); }
+.dag-quiz__problem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 0; font-size: 12px; color: var(--dag-color-warningText); }
 .dag-quiz__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
-.dag-quiz__problem-line { flex: none; font-family: var(--dag-font-mono); color: var(--dag-color-muted); }
+.dag-quiz__fix {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-quiz__fix:hover { border-color: var(--dag-color-slate); }
+.dag-quiz__fix:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+/* The text the form has no field for, shown as it reads, and where it can go. */
+.dag-quiz__stray { flex-basis: 100%; }
+.dag-quiz__stray-text {
+  margin: 4px 0 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border-left: 3px solid var(--dag-color-warningText);
+  border-radius: var(--dag-metric-radius-small);
+}
+.dag-quiz__stray-text > :first-child { margin-top: 0; }
+.dag-quiz__stray-text > :last-child { margin-bottom: 0; }
+.dag-quiz__stray-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
 .dag-quiz__conflict {
   display: flex;
   flex-wrap: wrap;
@@ -5788,8 +6019,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-bottom: 1px solid var(--dag-color-outlineSoft);
   background: var(--dag-color-paper);
 }
-.dag-tablepage__pop,
-.dag-tablepage__mode {
+.dag-tablepage__pop {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -5803,13 +6033,10 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-tablepage__pop:hover,
-.dag-tablepage__mode:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-tablepage__pop:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
 .dag-tablepage__pop[data-on] { color: var(--dag-color-accent); background: var(--dag-color-accentSoft); }
 .dag-tablepage__pop[aria-expanded="true"] { border-color: var(--dag-color-outline); }
-.dag-tablepage__mode[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
-.dag-tablepage__pop:focus-visible,
-.dag-tablepage__mode:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-tablepage__pop:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 .dag-tablepage__count { padding: 0 6px; font-size: 12px; color: var(--dag-color-muted); white-space: nowrap; }
 .dag-tablepage__status { min-width: 0; overflow: hidden; font-size: 12px; color: var(--dag-color-warningText); white-space: nowrap; text-overflow: ellipsis; }
 .dag-tablepage__spacer { flex: 1; }
@@ -5842,29 +6069,62 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   cursor: pointer;
 }
 
-/* Source: the file in a text field, its problems under it — the quiz's other half. */
-.dag-tablepage__source { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 16px; }
-.dag-tablepage__text {
-  flex: 1;
-  min-height: 240px;
-  padding: 10px 12px;
+/* The status line's count of problems is a button: it takes you to the first. */
+.dag-tablepage__show {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.dag-tablepage__show:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+
+/* A file's problems in words: above the grid for a tab's, in the card a mark opens for a column's or a row's. */
+.dag-tablepage__issues {
+  flex: none;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px 16px;
+  background: var(--dag-color-warningSoft);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-tablepage__problems { margin: 0; padding: 0; list-style: none; }
+.dag-tablepage__problem { display: flex; gap: 8px; padding: 6px 0; font-size: 13px; color: var(--dag-color-warningText); }
+.dag-tablepage__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
+.dag-tablepage__problem-mark { flex: none; margin-top: 2px; }
+.dag-tablepage__problem-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.dag-tablepage__problem-words { margin: 0; color: var(--dag-color-ink); }
+.dag-tablepage__problem-detail {
+  max-height: 72px;
+  margin: 0;
+  overflow: auto;
+  padding: 4px 8px;
   font-family: var(--dag-font-mono);
+  font-size: 11px;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-chip);
+  white-space: pre-wrap;
+}
+.dag-tablepage__problem-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
+.dag-tablepage__problem-fix {
+  padding: 3px 10px;
+  font: inherit;
   font-size: 12px;
-  line-height: 1.55;
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  resize: none;
-  white-space: pre;
-  tab-size: 2;
+  cursor: pointer;
 }
-.dag-tablepage__text:focus { outline: none; border-color: var(--dag-color-accent); }
-.dag-tablepage__problems { flex: none; max-height: 160px; overflow: auto; margin: 0; padding: 0; list-style: none; }
-.dag-tablepage__problem { display: flex; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--dag-color-warningText); }
-.dag-tablepage__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
-.dag-tablepage__problem-line { flex: none; font-family: var(--dag-font-mono); color: var(--dag-color-muted); }
-.dag-tablepage__clean { flex: none; margin: 0; font-size: 12px; color: var(--dag-color-muted); }
+.dag-tablepage__problem-fix:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-tablepage__problem-fix:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-tablepage__problem-fix:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-grid__menu > .dag-tablepage__problems { width: 320px; padding: 2px 8px; }
 
 /* Sort and Filter: a line per key or rule, in the grid's card. */
 .dag-tablepage__rules { display: flex; flex-direction: column; gap: 6px; min-width: 300px; padding: 4px; }
@@ -5994,6 +6254,24 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   user-select: none;
 }
 .dag-grid__num { display: inline-block; }
+/* A problem's mark: on a header beside the name, in the gutter at its left, where a row's number never goes. */
+.dag-grid .dag-grid__flag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-grid .dag-grid__flag[data-severity="error"] { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
+.dag-grid .dag-grid__flag:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-grid .dag-grid__gutter > .dag-grid__flag { position: absolute; top: 50%; left: 3px; transform: translateY(-50%); }
 .dag-grid__grip { display: none; vertical-align: middle; color: var(--dag-color-slate); }
 .dag-grid tr:hover > .dag-grid__gutter .dag-grid__num { display: none; }
 .dag-grid tr:hover > .dag-grid__gutter .dag-grid__grip { display: inline-block; }
@@ -6612,12 +6890,21 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer { position: relative; flex: none; display: flex; flex-direction: column; gap: 6px; margin: 0 20px 16px; padding: 8px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); }
 .dag-chat-composer:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
 .dag-chat-composer__input { width: 100%; box-sizing: border-box; min-height: 24px; max-height: 200px; padding: 4px 4px; resize: none; font: inherit; font-size: 14px; line-height: 1.5; color: var(--dag-color-ink); background: transparent; border: none; outline: none; }
+/* Expanded by its toggle: most of the column, and it goes back on sending (the component clears the state). */
+.dag-chat-composer__input--tall { min-height: 320px; max-height: 60vh; }
 .dag-chat-composer__input::placeholder { color: var(--dag-color-muted); }
 .dag-chat-composer__why { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
-.dag-chat-composer__row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.dag-chat-composer__space { flex: 1; }
+/* One row: scope, then model, effort, expand and Send pushed to the right. Each control can shrink and
+   ellipsize rather than wrap, so a long vault or model name reads shorter instead of pushing Send onto
+   a second line. `field-sizing` sizes a select to what it shows rather than its widest option, where
+   the browser has it; without it the box is that widest option's, which still fits the row. */
+.dag-chat-composer__row { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; }
+.dag-chat-modelpick { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: 220px; flex: 0 1 auto; margin-left: auto; }
+.dag-chat-modelpick .dag-glyph { position: absolute; left: 9px; top: 0; bottom: 0; display: flex; align-items: center; pointer-events: none; }
+.dag-chat-modelpick .dag-chat-picker { min-width: 0; width: 100%; max-width: none; flex: 1 1 auto; padding-left: 29px; }
 .dag-chat-picker { max-width: 220px; height: 28px; font-size: 12px; }
-.dag-chat-picker--effort { max-width: 130px; }
+.dag-chat-picker--effort { max-width: 96px; field-sizing: content; padding-right: 24px; }
+.dag-chat-composer__expand { flex: none; width: 24px; height: 24px; }
 .dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-paper); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }
 .dag-chat-send:disabled { opacity: 0.35; cursor: default; }
 .dag-chat-send:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }

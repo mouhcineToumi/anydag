@@ -20,7 +20,7 @@
 | `src/quiz/` | the `.quiz.md` format: the parser, its `EQ_`/`WQ_` codes, and the writers that rewrite one question and no other byte | the browser, React: the server and the CLI import it verbatim |
 | `src/files/` | an attachment on the page: its sort and icon, the upload and its refusal, its own page and every preview (`PdfViewer` a lazy chunk with pdf.js behind it), and the page's half of a zip export | what a file *is* — the server decides that off the extension (`server/uploads.ts`), and this only ever mirrors it |
 | `src/table/` | the `.table.md` format: the parser, its `ET_`/`WT_` codes, what a cell of each type reads as, sort and filter, the writers that rewrite one cell, line or heading, the ops the api applies, and CSV | the browser, React: the server and the CLI import it verbatim |
-| `src/ui/table/` | a table's page: the grid, its menus and editors, the tab bar, Sort and Filter, Source, undo | the format: every change is a writer from `src/table/write.ts`, addressed by id |
+| `src/ui/table/` | a table's page: the grid, its menus and editors, the tab bar, Sort and Filter, the file's problems in words with their fixes, undo | the format: every change is a writer from `src/table/write.ts`, addressed by id |
 | `src/blocks/` | BlockNote configured once — its menus, paste, upload and theme bridge — and loaded lazily | which file it writes: it takes blocks in and hands a `NoteEditor` back |
 | `src/view/` | drawing a board or a note read-only — `?view=1`, a snapshot, and what an embed draws with — and what drawing shares with the canvas (`drawing.ts`) | `src/edit/`, BlockNote: a viewer must never fetch either, and `test/view-graph.test.ts` walks the import graph to hold it |
 | `src/refs/` | what a reference *is* (`extract.ts`, browser-free), the page's copy of the index, and how a reference, an embed and the backlinks are drawn | a name: every reference is an id, resolved when it is followed |
@@ -45,6 +45,7 @@
 | `build.ts` | what the `+` appends and what Detach rewrites, as text over text | the DOM: the boxes reach it through `data-dag-layout` |
 | `drag.ts` | what a drop inside a diagram *means* — a statement moving, a topic re-indenting, a date | the pointer; it is handed a target and a fraction |
 | `Props.tsx` | one control per thing a statement can say, for a node, an edge, a link or the item | which line it writes — `declaredAt` answers that |
+| `repair.ts` | what a problem about the file itself can be put right with, in words — the plan and the fix as data | the pointer, React; it never writes: `Editor.repair` does, through `src/board/repair.ts` |
 | `Rename.tsx` | the input over the drawing, and where the drawing put the text | how a card was sized (`size.ts` sizes a card, never the text in it) |
 | `NodeHandles.tsx` | the four link handles and the four `+` handles on a picked card | `Item`: it is placed by `App` in board coordinates |
 | `connect.ts`, `snap.ts`, `history.ts` | what may join what · where a dragged box wants to land · undo as versions of the file | all three: the pointer |

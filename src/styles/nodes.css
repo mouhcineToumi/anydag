@@ -25,6 +25,23 @@
   border-radius: 0;
 }
 
+/*
+ * A diagram that has a `hue=`: its frame is drawn with a hairline in the hue and the title band behind
+ * the header in the hue's tint. `--frame-h` and `--frame-t` are bound on the section by `frameHueVars()`
+ * and read only here — `--dag-h` is not, because every card inside inherits that one. Insets and no
+ * border, so the box measured by `size.ts` is the box drawn; the header's three-sided hairline is the
+ * frame's own, put back over the band that would otherwise cover it.
+ */
+.dag-frame--hued { box-shadow: inset 0 0 0 var(--dag-metric-line-hair) var(--frame-h); }
+.dag-frame--bare.dag-frame--hued { border-radius: var(--dag-metric-radius-group); }
+.dag-frame__head--hued {
+  background: var(--frame-t);
+  border-radius: var(--dag-metric-radius-group) var(--dag-metric-radius-group) 0 0;
+  box-shadow:
+    inset var(--dag-metric-line-hair) 0 0 0 var(--frame-h),
+    inset calc(-1 * var(--dag-metric-line-hair)) 0 0 0 var(--frame-h),
+    inset 0 var(--dag-metric-line-hair) 0 0 var(--frame-h);
+}
 .dag-frame__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--dag-metric-frame-headGap); }
 .dag-frame__title {
   margin: 0;

@@ -25,6 +25,12 @@ import { scopedKey } from "@/vault/current";
 
 /** Where the reader's own choice of theme lives. */
 export const THEME = "dag:theme";
+/**
+ * Whether the reader's own theme is drawn on every board, over a board's own `theme:` — *Use my
+ * theme on every board*. `"1"` for on; absent or `"0"`, **off**: a board that names a theme is drawn
+ * in it. The theme's own half (`VAULT_PREF_KEYS`) — it is a statement about the theme above it.
+ */
+export const OWN_THEME = "dag:own-theme";
 /** Where the library remembers whether it was open. */
 export const LIBRARY = "dag:library";
 /**
@@ -70,11 +76,6 @@ export const FILE_LIST = "dag:file-list";
  */
 export const TASKS_VIEW = "dag:tasks-view";
 
-/**
- * Which half of a quiz's form this browser last used — its questions or its source. The
- * Tasks page's layout's reason: view state, this browser's, not in `PREF_KEYS`.
- */
-export const QUIZ_MODE = "dag:quiz-mode";
 /**
  * Whether a run's *About this quiz* panel is folded away, `"0"` when it is. The Tasks
  * page's layout's reason: view state, this browser's, not in `PREF_KEYS`.
@@ -143,6 +144,7 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
  */
 export const PREF_KEYS = [
   THEME,
+  OWN_THEME,
   LIBRARY,
   INSPECTOR_MODE,
   INSPECTOR_WIDTH,
@@ -163,7 +165,7 @@ export const PREF_KEYS = [
  * settings object in the vault's bundle. Everything else in `PREF_KEYS` is how the window is laid
  * out, and stays the person's: a sidebar docked in one vault is docked in the next.
  */
-export const VAULT_PREF_KEYS = [THEME, FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
+export const VAULT_PREF_KEYS = [THEME, OWN_THEME, FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
 export const ACCOUNT_PREF_KEYS = PREF_KEYS.filter((k) => !(VAULT_PREF_KEYS as readonly string[]).includes(k));
 
 /**

@@ -3842,6 +3842,7 @@ export const ICON_NAMES: ReadonlySet<string> = new Set([
   "omega",
   "openai",
   "openapi",
+  "opencode",
   "opensearch",
   "opentelemetry",
   "opentofu",

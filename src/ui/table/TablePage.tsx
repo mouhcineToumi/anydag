@@ -1,4 +1,4 @@
-import { ArrowDownWideNarrow, Code2, Filter, Plus, Redo2, Table2, Trash2, Undo2, Upload, X } from "lucide-react";
+import { ArrowDownWideNarrow, Filter, Plus, Redo2, Trash2, Undo2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { sealId } from "@/board/envelope";
@@ -11,7 +11,7 @@ import { Backlinks } from "@/refs/Backlinks";
 import { clearTarget, useTarget } from "@/refs/target";
 import { csvTab, tabCsv } from "@/table/csv";
 import { FILTER_OPS, parseTable, type FilterOp, type FilterRule, type SortKey, type Tab, type Table } from "@/table/parse";
-import { tableDiagnostics, viewRows } from "@/table/values";
+import { viewRows } from "@/table/values";
 import { TableError, addTab, moveTab, removeTab, setTab, stampTable } from "@/table/write";
 import { ExportButton, TABLE_EXPORTS, exportRows } from "@/ui/Export";
 import { PageBar } from "@/ui/PageBar";
@@ -22,13 +22,19 @@ import { leaf } from "@/ui/tree";
 import { TableFrame, keysOf, rowCount, tablePart } from "@/view/TableRead";
 
 import { Grid, Pop, type At, type Edit } from "./Grid";
+import { ProblemList } from "./ProblemList";
+import { aboveGrid, countByTab, problemsOf, repair, tabOfProblem, type Fix, type Problem } from "./problems";
 
 /**
  * A table's own page — `?table=<name>&tab=<id>`.
  *
  * The toolbar has the title, the backlinks, Import CSV and Export. Under it, the tab's own
- * bar — Sort, Filter, how many rows show of how many, undo and redo, and Source — then the grid, and
- * the tabs along the bottom in the board's own strip.
+ * bar — Sort, Filter, how many rows show of how many, how many problems the file has, undo and redo —
+ * then the grid, and the tabs along the bottom in the board's own strip.
+ *
+ * **There is no Source here.** The file's problems are said in words where they apply (`problems.ts`):
+ * a tab's above its grid, a column's on its header, a row's — and its cells' — on its number, each with
+ * the button that mends it, and the bar says how many and takes you to the first.
  *
  * **Every change is a writer over the text**, applied to what the page holds after `stampTable` has
  * given everything without an id one: so the grid can address a row by its place on screen and the
@@ -55,8 +61,6 @@ const OP_LABEL: Readonly<Record<FilterOp, string>> = {
   "<=": "≤",
 };
 
-type Mode = "grid" | "source";
-
 /** A tab's id once `stampTable` has run, from its key in the strip — `#2` is the second tab. */
 function tabIdIn(table: Table, key: string): string | undefined {
   const at = /^#(\d+)$/.exec(key);
@@ -76,7 +80,7 @@ function tabFor(table: Table, key: string | null): Tab | undefined {
 function only(id: string | undefined, all: readonly { id?: string }[], what: string): string {
   if (!id) throw new TableError(`that ${what} is not here any more`);
   if (all.filter((x) => x.id === id).length > 1)
-    throw new TableError(`two ${what}s share the id \`${id}\`: give one another in Source`);
+    throw new TableError(`two ${what}s share the id \`${id}\`: give one its own first, from the problem marked on it`);
   return id;
 }
 
@@ -109,9 +113,9 @@ export function TablePage({
   lockedRef.current = locked;
   const table = useMemo(() => parseTable(file.text), [file.text]);
   const ready = file.state.status === "ready" || file.state.status === "conflict";
+  const problems = useMemo(() => (ready ? problemsOf(file.text, table) : []), [ready, file.text, table]);
   const title = list.titles[name] ?? splitNote(file.text).title ?? leaf(name);
   const id = list.ids[name];
-  const [mode, setMode] = useState<Mode>("grid");
   const [problem, setProblem] = useState<string | null>(null);
   const history = useRef(new History());
   /* What the page holds now — ahead of `file.text` between a write and the render it causes, so two
@@ -124,6 +128,11 @@ export function TablePage({
   }
 
   const tabKeys = useMemo(() => keysOf(table.tabs), [table]);
+  /* The count on each tab in the strip, so a problem on a tab nobody is looking at shows. */
+  const flags = useMemo(() => {
+    const counts = countByTab(problems, table.tabs.length);
+    return Object.fromEntries(tabKeys.map((k, i) => [k, counts[i]!]));
+  }, [problems, table, tabKeys]);
   const current = ready ? tabFor(table, tabParam) : undefined;
   const currentKey = current ? tabKeys[table.tabs.indexOf(current)]! : null;
 
@@ -189,6 +198,34 @@ export function TablePage({
     },
     [currentKey, write],
   );
+
+  /** One repair a problem offers, written like any other change — so it is one undo. */
+  const fix = useCallback(
+    (p: Problem, f: Fix) => {
+      /* A refusal that sent the person to this button is answered by pressing it. */
+      setProblem(null);
+      write((text) => repair(text, p, f));
+    },
+    [write],
+  );
+
+  /* The bar's "show": the tab the first problem is on, then its mark brought into view. */
+  const [revealing, setRevealing] = useState(false);
+  const showProblems = () => {
+    const here = current ? table.tabs.indexOf(current) : -1;
+    const first = problems.find((p) => tabOfProblem(p) === here) ?? problems[0];
+    if (!first) return;
+    const t = tabOfProblem(first);
+    if (t !== null && t !== here) onTab(tabKeys[t]!);
+    setRevealing(true);
+  };
+  useEffect(() => {
+    if (!revealing) return;
+    setRevealing(false);
+    const mark = document.querySelector<HTMLElement>("[data-dag-grid-flag]");
+    mark?.scrollIntoView({ block: "center", inline: "center" });
+    mark?.focus();
+  }, [revealing, currentKey]);
 
   const restore = useCallback(
     (which: "undo" | "redo") => {
@@ -321,8 +358,8 @@ export function TablePage({
     return <TableFrame name={name} text={file.state.status === "missing" ? null : file.text} bar={null} />;
   }
 
-  const diagnostics = ready ? tableDiagnostics(table) : [];
-  const errors = diagnostics.filter((d) => d.severity === "error").length;
+  const here = current ? table.tabs.indexOf(current) : -1;
+  const above = aboveGrid(problems, here);
   const shown = current ? viewRows(current).length : 0;
 
   let body: ReactNode;
@@ -334,38 +371,6 @@ export function TablePage({
         <button type="button" className="dag-grid__add" onClick={onOpenTables}>
           Search for another
         </button>
-      </div>
-    );
-  else if (mode === "source")
-    body = (
-      <div className="dag-tablepage__source">
-        <textarea
-          className="dag-tablepage__text"
-          data-dag-tablepage-source=""
-          aria-label="Source"
-          spellCheck={false}
-          value={file.text}
-          readOnly={locked}
-          onChange={(e) => {
-            const next = e.target.value;
-            history.current.push({ text: latest.current, base: latest.current }, { text: next, base: next }, "source");
-            latest.current = next;
-            file.change(next);
-          }}
-          onBlur={() => history.current.seal()}
-        />
-        {diagnostics.length ? (
-          <ul className="dag-tablepage__problems" data-dag-tablepage-problems="">
-            {diagnostics.map((d, i) => (
-              <li key={i} className="dag-tablepage__problem" data-dag-tablepage-problem={d.code} data-severity={d.severity}>
-                <span className="dag-tablepage__problem-line">line {d.line}</span>
-                <code>{d.code}</code> {d.message}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="dag-tablepage__clean">No problems.</p>
-        )}
       </div>
     );
   else if (!current)
@@ -389,6 +394,7 @@ export function TablePage({
           readOnly={locked}
           onRefused={refuseLocked}
           mark={mark && mark.tab === currentKey ? mark.index : null}
+          problems={{ list: problems, tab: here, onFix: fix }}
         />
       </div>
     );
@@ -434,7 +440,7 @@ export function TablePage({
       ) : null}
       {ready ? (
         <div className="dag-tablepage__bar" data-dag-tablepage-bar="">
-          {current && mode === "grid" ? (
+          {current ? (
             <>
               <SortButton tab={current} write={edit} />
               <FilterButton tab={current} write={edit} />
@@ -445,11 +451,15 @@ export function TablePage({
           ) : null}
           <span className="dag-tablepage__status" role="status" data-dag-tablepage-status="">
             {problem ??
-              (file.state.status === "ready" && file.state.failed
-                ? "Not saved yet. Trying again."
-                : errors && mode === "grid"
-                  ? `${errors} ${errors === 1 ? "problem" : "problems"} in the file — see Source`
-                  : "")}
+              (file.state.status === "ready" && file.state.failed ? (
+                "Not saved yet. Trying again."
+              ) : problems.length ? (
+                <button type="button" className="dag-tablepage__show" data-dag-tablepage-show="" onClick={showProblems}>
+                  {`${problems.length} ${problems.length === 1 ? "problem" : "problems"} in the file — show`}
+                </button>
+              ) : (
+                ""
+              ))}
           </span>
           <span className="dag-tablepage__spacer" />
           <button
@@ -474,27 +484,22 @@ export function TablePage({
           >
             <Redo2 {...ICON} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="dag-tablepage__mode"
-            data-dag-tablepage-mode={mode}
-            aria-pressed={mode === "source"}
-            title={mode === "source" ? "Back to the grid" : "The file as text, with its problems"}
-            onClick={() => setMode((m) => (m === "source" ? "grid" : "source"))}
-          >
-            {mode === "source" ? <Table2 {...ICON} aria-hidden="true" /> : <Code2 {...ICON} aria-hidden="true" />}
-            <span>{mode === "source" ? "Grid" : "Source"}</span>
-          </button>
         </div>
       ) : null}
-      {table.description && mode === "grid" ? <p className="dag-tablepage__description">{table.description}</p> : null}
+      {above.length ? (
+        <div className="dag-tablepage__issues" data-dag-tablepage-issues="">
+          <ProblemList problems={above} disabled={locked} onFix={fix} />
+        </div>
+      ) : null}
+      {table.description ? <p className="dag-tablepage__description">{table.description}</p> : null}
       {body}
-      {ready && mode === "grid" && table.tabs.length > 0 && currentKey ? (
+      {ready && table.tabs.length > 0 && currentKey ? (
         <PageBar
           pages={table.tabs.map((t, i) => ({ id: tabKeys[i]!, name: t.name }))}
           page={currentKey}
           onPage={onTab}
           edit={locked ? undefined : tabEdit}
+          flags={flags}
           noun="tab"
         />
       ) : null}

@@ -5,12 +5,14 @@ import { BOARDS } from "./boards";
 import { vaultKey } from "./vault";
 
 /**
- * Problems live at the bottom of the board, not on it.
+ * Problems a person can act on, and nothing else (#145).
  *
- * The board that started this had a stray `y` at the top of its `edges` fence, and a 620px red card
- * hung over the canvas until somebody found and fixed it — with no way to put it away. Everything
- * here is about what a person sees instead: nothing on the canvas but the drawing, a notification
- * that goes away, a count that stays, and a way from either to the line that is wrong.
+ * The board that started the dock had a stray `y` at the top of its `edges` fence, and a 620px red
+ * card hung over the canvas until somebody found and fixed it. Then the dock took the card's place
+ * and pointed at lines — in a text a person no longer sees. What is here now: a statement that
+ * cannot be read is skipped and the rest drawn, with nothing said; a problem with an answer — a
+ * link to a card that is not there — is a quiet mark on the diagram, a notification that goes away,
+ * a count that stays, and from any of them the panel, with the link picked and a way to fix it.
  */
 
 const DIR = BOARDS;
@@ -26,7 +28,10 @@ store cache "Redis" icon=database
 \`\`\`
 `;
 
-/** The shape of today's board: one stray word at the top of the links fence. */
+/** A link to a card that is not there: something a person can see and do something about. */
+const GHOST = GOOD.replace("api --> db", "api --> db\napi --> ghost");
+
+/** The shape of the board that started this: one stray word at the top of the links fence. */
 const STRAY = `${GOOD}
 \`\`\`edges {#links}
 y
@@ -34,7 +39,7 @@ stack.api --> other
 \`\`\`
 `;
 
-/** A diagram whose own body does not parse: a word that is not a kind. */
+/** A diagram with a statement that cannot be read: a word that is not a kind. */
 const BROKEN = GOOD.replace("api --> db", 'api --> db\ndatabase cache2 "Redis"');
 
 let name = "";
@@ -55,10 +60,13 @@ async function open(page: Page, text: string) {
 const toast = (page: Page) => page.locator("[data-dag-problems-toast]");
 const pill = (page: Page) => page.locator("[data-dag-problems-pill]");
 
-test("a board error is a notification, never a card on the canvas", { tag: "@smoke" }, async ({ page }) => {
-  await open(page, STRAY);
-  await expect(page.locator(".dag-viewport .dag-error, .dag-viewport [data-dag-error]")).toHaveCount(0);
-  await expect(toast(page)).toHaveAttribute("data-dag-problems-toast", "EB_LINK_SYNTAX");
+test("a link to nothing is a notification, never a card on the canvas", { tag: "@smoke" }, async ({ page }) => {
+  await open(page, GHOST);
+  await expect(page.locator(".dag-viewport .dag-error")).toHaveCount(0);
+  await expect(toast(page)).toHaveAttribute("data-dag-problems-toast", "E_UNKNOWN_ID");
+  /* In words: no code, no line, no grammar. */
+  await expect(toast(page)).not.toContainText("E_UNKNOWN_ID");
+  await expect(toast(page)).not.toContainText("line");
   await expect(pill(page)).toHaveText(/1 error/);
 
   /* Put away, and the count stays so the problem is not lost. */
@@ -68,64 +76,73 @@ test("a board error is a notification, never a card on the canvas", { tag: "@smo
 });
 
 test("the notification goes away on its own", async ({ page }) => {
-  await open(page, STRAY);
+  await open(page, GHOST);
   await expect(toast(page)).toBeVisible();
   await expect(toast(page)).toHaveCount(0, { timeout: 12_000 });
   await expect(pill(page)).toBeVisible();
 });
 
-test("Show opens the fence with the caret on the line that is wrong", async ({ page }) => {
-  await open(page, STRAY);
-  await page.locator("[data-dag-problems-show]").click();
-  const area = page.locator("[data-dag-body]");
-  await expect(area).toBeFocused();
-  await expect
-    .poll(() => area.evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd)))
-    .toBe("y");
-  /* And the panel lists it, under the text it is about. */
-  await expect(page.locator("[data-dag-inspector-problems]")).toContainText("EB_LINK_SYNTAX");
+test("the diagram wears a count by its title, and loses it when fixed", async ({ page }) => {
+  await open(page, GHOST);
+  const item = page.locator('[data-dag-item="stack"]');
+  await expect(item).toHaveAttribute("data-dag-problem-count", "1");
+  await expect(page.locator('[data-dag-item="other"]')).not.toHaveAttribute("data-dag-problem-count", /.*/);
+  fs.writeFileSync(file, GOOD);
+  await expect(item).not.toHaveAttribute("data-dag-problem-count", /.*/);
+  await expect(pill(page)).toHaveCount(0);
 });
 
-test("the count opens the list, and a row goes to the line", async ({ page }) => {
-  await open(page, STRAY);
+test("Show opens the panel on the link, with the problem at the top", async ({ page }) => {
+  await open(page, GHOST);
+  await page.locator("[data-dag-problems-show]").click();
+  await expect(page.locator("[data-dag-inspector]")).toHaveCount(1);
+  const block = page.locator("[data-dag-inspector-problems]");
+  await expect(block).toContainText("not there");
+  await expect(block).not.toContainText("E_UNKNOWN_ID");
+  /* The link is what is picked, so its controls are the panel's. It is not drawn yet — a link with
+     no card at one end has nowhere to go until it is drawn hanging (the next part of #145). */
+  await expect(page.locator("[data-dag-props] [data-dag-prop-arrow]")).toHaveCount(1);
+});
+
+test("the count opens the list, and a row opens the panel", async ({ page }) => {
+  await open(page, GHOST);
   await pill(page).click();
-  const row = page.locator('[data-dag-problems-row="EB_LINK_SYNTAX"]');
+  const row = page.locator('[data-dag-problems-row="E_UNKNOWN_ID"]');
   await expect(row).toBeVisible();
   await row.click();
   await expect(page.locator("[data-dag-inspector]")).toHaveCount(1);
   await expect(page.locator("[data-dag-problems-tray]")).toHaveCount(0);
 });
 
-test("fixing it clears the count", async ({ page }) => {
-  await open(page, STRAY);
-  await expect(pill(page)).toBeVisible();
-  fs.writeFileSync(file, STRAY.replace("\ny\n", "\n"));
+test("the panel deletes a link to nothing from its row", async ({ page }) => {
+  await open(page, GHOST);
+  await page.locator("[data-dag-problems-show]").click();
+  await page.locator("[data-dag-problem-delete]").click();
+  await expect.poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 }).not.toContain("ghost");
+  expect(fs.readFileSync(file, "utf8")).toContain("api --> db");
   await expect(pill(page)).toHaveCount(0);
+  await expect(page.locator("[data-dag-inspector-problems]")).toHaveCount(0);
 });
 
-test("a diagram that breaks keeps its last drawing, marked", async ({ page }) => {
-  await open(page, GOOD);
-  await expect(page.locator('[data-dag-item="stack"] [data-dag-node="api"]')).toBeVisible();
-
-  fs.writeFileSync(file, BROKEN);
-  await expect(page.locator('[data-dag-item="stack"] [data-dag-stale]')).toHaveCount(1);
-  /* The cards are the old drawing's, still there. */
-  await expect(page.locator('[data-dag-item="stack"] [data-dag-node="api"]')).toBeVisible();
-  await expect(page.locator("[data-dag-error]")).toHaveCount(0);
-  await expect(toast(page)).toHaveAttribute("data-dag-problems-toast", "E_UNKNOWN_KIND");
-
-  fs.writeFileSync(file, GOOD);
-  await expect(page.locator("[data-dag-stale]")).toHaveCount(0);
-  await expect(pill(page)).toHaveCount(0);
-});
-
-test("opened broken, a diagram is a small placeholder", async ({ page }) => {
+test("a statement that cannot be read is skipped, the rest drawn, and nothing said", async ({ page }) => {
   await open(page, BROKEN);
-  const stub = page.locator('[data-dag-item="stack"] [data-dag-error]');
-  await expect(stub).toHaveCount(1);
-  await expect(stub).toContainText("can't be drawn");
-  /* A stand-in, not the old card: it does not list the messages. */
-  await expect(page.locator(".dag-error")).toHaveCount(0);
+  await expect(page.locator('[data-dag-item="stack"] [data-dag-node="api"]')).toBeVisible();
+  await expect(page.locator('[data-dag-item="stack"] [data-dag-node="cache2"]')).toHaveCount(0);
+  /* A tool reading the page still learns it: the marker is there, and hidden. */
+  await expect(page.locator('[data-dag-item="stack"] [data-dag-error]')).toHaveCount(1);
+  await expect(page.locator('[data-dag-item="stack"] [data-dag-error]')).toBeHidden();
+  await page.waitForTimeout(1500);
+  await expect(toast(page)).toHaveCount(0);
+  await expect(pill(page)).toHaveCount(0);
+  await expect(page.locator('[data-dag-item="stack"]')).not.toHaveAttribute("data-dag-problem-count", /.*/);
+});
+
+test("a stray word in the links is skipped, and the links still drawn", async ({ page }) => {
+  await open(page, STRAY);
+  await expect(page.locator(".dag-board-edges .dag-edge-hit")).toHaveCount(1);
+  await page.waitForTimeout(1500);
+  await expect(toast(page)).toHaveCount(0);
+  await expect(pill(page)).toHaveCount(0);
 });
 
 test("a warning is counted but never pops up", async ({ page }) => {
@@ -140,7 +157,7 @@ test("the setting can turn it all off", async ({ page }) => {
   await page.goto("/");
   const settings = await vaultKey(page, "dag:settings");
   await page.evaluate((k) => localStorage.setItem(k, JSON.stringify({ problems: { show: "off" } })), settings);
-  await open(page, STRAY);
+  await open(page, GHOST);
   await page.waitForTimeout(1500);
   await expect(page.locator("[data-dag-problems]")).toHaveCount(0);
   await page.evaluate((k) => localStorage.removeItem(k), settings);
