@@ -104,15 +104,18 @@ async function props(page: Page, selector: string) {
 /**
  * Pick a group and open the panel on it.
  *
- * A group is reached the way a person reaches one — a double-click on its name, which picks it and
- * opens the rename — and the rename is let go of with Escape, which leaves the pick standing.
+ * A group is reached the way a card is (#145): the first click takes the diagram, the second, on
+ * the group's name, picks the group. It used to take a double-click, which opens the rename, and an
+ * Escape to put the rename away.
  */
 async function propsOfGroup(page: Page, item: string, group: string) {
   const ring = `[data-dag-item="${item}"] [data-dag-group="${group}"]`;
-  await page.locator(`${ring} [data-dag-title]`).dblclick();
-  await expect(page.locator("[data-dag-rename-box]")).toBeVisible();
-  await page.locator("[data-dag-rename-box]").press("Escape");
+  const label = page.locator(`${ring} [data-dag-title]`);
+  await label.click();
+  await page.waitForTimeout(400);
+  await label.click();
   await expect(page.locator(`${ring}[data-dag-picked]`)).toHaveCount(1);
+  await expect(page.locator("[data-dag-rename-box]")).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(page.locator("[data-dag-props]")).toHaveCount(1);
 }
@@ -250,6 +253,36 @@ test("a group in a dialect with no system word is offered no shape", async ({ pa
   await propsOfGroup(page, "infra", "gcp");
   await expect(page.locator("[data-dag-prop-shape]")).toHaveCount(0);
   await expect(page.locator("[data-dag-prop-group-dir]")).toHaveCount(1);
+});
+
+test("a group and a lane are picked with one click, as a card is, and the card inside is still its own", async ({ page }) => {
+  fs.writeFileSync(
+    file,
+    `${BOARD}\n\`\`\`flow {#lanes x=1280 y=0}\nlane ops "Ops" {\n  step c "Check"\n}\nlane dev "Dev" {\n  step d "Deploy"\n}\nc --> d\n\`\`\`\n`,
+  );
+  await open(page);
+  const ring = '[data-dag-item="uses"] [data-dag-group="sys"]';
+  /* The first click takes the diagram; the second, on the group's name, picks the group. */
+  await page.locator(`${ring} [data-dag-title]`).click();
+  await page.waitForTimeout(400);
+  await page.locator(`${ring} [data-dag-title]`).click();
+  await expect(page.locator(`${ring}[data-dag-picked]`)).toHaveCount(1);
+  await expect(page.locator("[data-dag-rename-box]")).toHaveCount(0);
+  /* A card inside it is still the card. */
+  await page.waitForTimeout(400);
+  await page.locator('[data-dag-item="uses"] [data-dag-node="pay"]').click();
+  await expect(page.locator('[data-dag-item="uses"] [data-dag-node="pay"][data-dag-picked]')).toHaveCount(1);
+  await expect(page.locator(`${ring}[data-dag-picked]`)).toHaveCount(0);
+
+  /* A swimlane's band, by its label. */
+  const label = page.locator('[data-dag-item="lanes"] [data-dag-lane-label="dev"]');
+  await label.scrollIntoViewIfNeeded();
+  await label.click();
+  await page.waitForTimeout(400);
+  await label.click();
+  await expect(page.locator('[data-dag-item="lanes"] [data-dag-lane="dev"][data-dag-picked]')).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "dev");
 });
 
 test("a group's direction is dir=TB or dir=LR, and 'follow the diagram' takes it off", async ({ page }) => {

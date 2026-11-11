@@ -1932,6 +1932,11 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 [data-dag-frag][data-dag-picked] {
   outline: 2px solid var(--dag-color-accent);
   outline-offset: 2px;
+}
+/* A card comes forward; a container does not. A group or a lane raised over its own cards took
+   every click meant for them, so a picked group's cards could not be picked out of it (#145). */
+[data-dag-node][data-dag-picked],
+[data-dag-frag][data-dag-picked] {
   z-index: 2;
 }
 /* A geometric shape is picked on its outline: a rectangle round a circle says "this box", and the
