@@ -416,6 +416,71 @@ export function setParticipantKind(line: string, word: string): string {
   return writeModifier(line, "kind", word === (first.value === "actor" ? "person" : "service") ? null : word);
 }
 
+/** The two words that open a container with a brace in the dialects that have both. */
+export type ContainerWord = "group" | "system";
+
+/**
+ * Turn a `group` into a `system`, or back.
+ *
+ * Two spellings of one statement — `usecase` and `c4` take `system` for the boundary of the thing
+ * under discussion, and the rest of the line (id, strings, hue, box) is read the same either way —
+ * so this is the kind swap `setKind` makes, for the only declarations whose first word is not in
+ * `dialect.kinds`. A line that opens with anything else is handed back: `frame` in a sketch is the
+ * same statement as `group` and is not offered, and a node's kind is `setKind`'s to change.
+ */
+export function setContainer(line: string, word: ContainerWord): string {
+  const tokens = lineTokens(line);
+  const first = tokens[0];
+  if (first?.kind !== "word" || (first.value !== "group" && first.value !== "system")) return line;
+  if (tokens[1]?.kind !== "word") return line;
+  return replaceSpan(line, span(first), word);
+}
+
+/** What `wrapStatement` writes round a statement. */
+export interface WrapOpts {
+  /** `group`, `system` or `lane` — the dialect's word for the container; the caller knows which. */
+  word: string;
+  id: string;
+  label: string;
+  /**
+   * The container's own box, for a fence whose coordinates are the author's. Everywhere else the
+   * layout places a container round what is in it and writing one would pin it.
+   */
+  box?: Geometry;
+  /** Where the wrapped statement sits *inside* the new container, for the same fences. */
+  at?: { x: number; y: number };
+}
+
+/**
+ * Put one statement — with the `{ }` block it opens — inside a new container.
+ *
+ * The lines keep every byte they had and gain two spaces of indent, so a card that was at the top
+ * level comes out one level in, and a group that is wrapped carries its children with it at the
+ * same relative depth. Edges are untouched on purpose: they name ids, ids did not change, and an
+ * edge to a card inside a container is exactly as legal as one to a card outside it.
+ *
+ * The container's line is written the way `+` writes a card — `<word> <id> "<label>"` and nothing
+ * the author did not choose — with the brace after any geometry, which is where every dialect's
+ * parser expects it.
+ *
+ * Total, like everything here: a line number that is outside the body, or a line that is blank or
+ * a closing brace, hands the body back, because there is nothing there to wrap.
+ */
+export function wrapStatement(body: string, line: number, opts: WrapOpts): string {
+  const lines = splitLines(body);
+  const first = lines[line - 1];
+  if (first === undefined || first.trim() === "" || /^\s*}/.test(first)) return body;
+  const s = statementSpan(body, line);
+  const pad = indentOf(first);
+
+  const head = `${pad}${opts.word} ${opts.id} ${JSON.stringify(opts.label)}`;
+  const open = `${opts.box ? setGeometry(head, opts.box) : head} {`;
+  const inner = lines.slice(s.from - 1, s.to).map((l) => (l.trim() === "" ? l : `  ${l}`));
+  if (opts.at) inner[0] = setGeometry(inner[0]!, opts.at);
+
+  return [...lines.slice(0, s.from - 1), open, ...inner, `${pad}}`, ...lines.slice(s.to)].join("\n");
+}
+
 /* ---------------------------------------------------------------------------- across a body */
 
 const splitLines = (body: string): string[] => body.split("\n");

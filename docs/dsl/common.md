@@ -109,6 +109,8 @@ distinct official mark any more — use a concept glyph for those.
     lane  <id> "<label>" [hue=ochre] { ... }                           -- flow / activity only
 
 `system` also opens a group in `usecase` and `c4`. A file uses groups or lanes, not both.
+`dir=TB` or `dir=LR` on a group sets which way the cards inside it run; leave it off and they follow
+the diagram.
 
 ## Edges
 
@@ -129,7 +131,8 @@ distinct official mark any more — use a concept glyph for those.
 | `..>` | dashed, open arrow (depends on) |
 | `\|\|--o{` etc. | ER cardinalities: `\|` one, `o{` many, `..` dashed |
 
-`[*]` is the start pseudostate as a source and the end as a target.
+`[*]` is the start pseudostate as a source and the end as a target. In `state` and `activity`
+`start <id>` and `end <id>` declare the same two with an id of their own.
 
 ## Legend
 
