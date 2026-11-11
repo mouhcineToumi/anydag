@@ -117,12 +117,10 @@ that list, closed where closing it was honest.
   with no handle. What comes back after an ELK relayout is not to the pixel where the pointer let
   go, and that is the honest answer.
 - **A card knows its line.** `declaredAt()` in `src/dsl/declared.ts` maps a node id to the line that
-  declares it, and the panel selects that line in the source — the browser's own selection, because
-  a `<textarea>` cannot be styled per line without a second element tracking its wrapping.
-  `declaredOn()` is the inverse. **The pick decides; the caret feeds it.** The strip followed
-  the *caret* once, and it follows the *pick* now, with the caret feeding it through `declaredOn`.
-  Still one source of truth, and arrowing down the source still walks the cards — see *Picking a
-  node*.
+  declares it, which is the line every control writes; `declaredOn()` is the inverse, and what turns
+  a diagnostic's line into the thing it is about. **The pick decides.** The strip followed the
+  *caret* in the source box once; it follows the *pick*, and the box is gone (#145) — see *Picking
+  a node*.
 - **The properties strip writes one line.** `src/dsl/restate.ts` sets `hue=`, `icon=` and the status
   flag on a single statement, through the tokenizer — `stop` inside `"we stop here"` is a `string`
   and cannot be mistaken for the flag, and `state done "Done"` keeps its id. Reserialising the IR

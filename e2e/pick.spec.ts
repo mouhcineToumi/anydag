@@ -186,43 +186,22 @@ test("ctrl+D copies the picked statement under a free id, and picks the copy", a
   expect(await selectedIds(page)).toEqual(["infra"]);
 });
 
-test("the caret still moves the strip, once the source is showing", async ({ page }) => {
+test("a diagram's panel is its controls, with no Source tab and no text (#145)", async ({ page }) => {
   await open(page);
   await tap(page, '[data-dag-node="api"]');
   await tap(page, '[data-dag-node="api"]');
   await page.keyboard.press("Enter");
-
-  await page.locator('[data-dag-mode="source"]').click();
-  /* Switching in with a pick standing selects that card's line — the reveal, which is all that is
-     left of it now that the pick rather than the caret is the source of truth. */
-  const picked = await page.locator("[data-dag-body]").evaluate((el) => {
-    const t = el as HTMLTextAreaElement;
-    return t.value.slice(t.selectionStart, t.selectionEnd);
-  });
-  expect(picked).toBe('service api "The API" icon=server');
   await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "api");
-
-  /* And arrowing down walks the cards, which is what the caret is for now. */
-  await page.locator("[data-dag-body]").press("ArrowDown");
-  await expect(page.locator("[data-dag-props]")).toHaveAttribute("data-dag-props", "db");
-  /* The ring on the canvas follows it: one pick, two ways to move it. */
-  expect(await pickedNodes(page)).toEqual(["db"]);
-});
-
-test("which half of the panel is showing outlives a reload", async ({ page }) => {
-  await open(page);
-  /* Opened with Enter rather than a double-click: a double-click on a *card* is a request for the
-     controls and forces Properties, which is the thing that would hide the preference. */
-  await tap(page, '[data-dag-item="infra"]');
-  await page.keyboard.press("Enter");
-  await page.locator('[data-dag-mode="source"]').click();
-  await expect(page.locator("[data-dag-body]")).toBeVisible();
-
+  await expect(page.locator("[data-dag-mode]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
+  /* A preference left behind by the tab that is gone brings nothing back. */
+  await page.evaluate(() => localStorage.setItem("dag:inspector-mode", "source"));
   await open(page);
   await tap(page, '[data-dag-item="infra"]');
   await page.keyboard.press("Enter");
-  await expect(page.locator('[data-dag-mode="source"]')).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator("[data-dag-body]")).toBeVisible();
+  await expect(page.locator("[data-dag-inspector]")).toBeVisible();
+  await expect(page.locator("[data-dag-mode]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-body]")).toHaveCount(0);
 });
 
 test("a note has no halves, and its text is written on the card", async ({ page }) => {

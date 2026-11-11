@@ -35,8 +35,6 @@ const bodyOf = () => {
 async function open(page: Page) {
   await page.goto(`/?board=${name}`);
   await page.evaluate(() => localStorage.setItem("dag:library", "0"));
-  /* The panel opens on whichever half was used last; these checks are about the controls. */
-  await page.evaluate(() => localStorage.setItem("dag:inspector-mode", "props"));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 

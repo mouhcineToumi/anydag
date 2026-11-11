@@ -119,7 +119,6 @@ import { type RewriteOutcome, requestRewrite, rewriteContext, rewriteOps } from 
 import { toggleAssistant } from "@/assistant/panelState";
 import { lost } from "@/board/survive";
 import { refuseLocked } from "@/settings/lock";
-import { INSPECTOR_MODE, readPref, writePref } from "@/settings/prefs";
 import { readSettings } from "@/settings/store";
 import { track } from "@/telemetry/client";
 
@@ -251,9 +250,6 @@ type Override = Partial<Pick<Placement, "x" | "y" | "w" | "h">>;
 /** Which handle a resize started on: a compass point, `n` for the top edge, `se` for a corner. */
 export type Dir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
-/** Which half of the editor panel is showing: the controls, or the text behind them. */
-type InspectorMode = "props" | "source";
-
 /**
  * What a double-click landed on inside a diagram, and therefore what the inline input renames.
  *
@@ -294,13 +290,6 @@ function nameableUnder(el: Element | null): { id: string; what: Renaming["what"]
   if (d.dagLane) return { id: d.dagLane, what: "lane" };
   if (d.dagEdge) return { id: d.dagEdge, what: "edge" };
   return null;
-}
-
-/* Which half of the panel is showing. A preference, so it lives with the other four in
-   `settings/prefs.ts` — and since accounts, follows the person rather than the machine. */
-
-function storedMode(): InspectorMode {
-  return readPref(INSPECTOR_MODE) === "source" ? "source" : "props";
 }
 
 /** The methods `Item` calls. One object, never recreated. */
@@ -402,17 +391,6 @@ export interface EditorCtl {
   applyRewrite(id: string, draft: Draft): Promise<boolean>;
 }
 
-/**
- * A request to put the panel's caret somewhere: on the line declaring a card (`node`), or on a line
- * of the body (`line`, 1-based, relative to the body as `declaredAt` counts). `n` makes it a request
- * rather than a fact — asking for the same place twice has to move the caret back.
- */
-interface Reveal {
-  id: string;
-  node?: string;
-  n: number;
-}
-
 export interface Editor {
   enabled: boolean;
   /** Whether a leader chord has been open long enough to be worth naming — the which-key overlay. */
@@ -426,8 +404,6 @@ export interface Editor {
   write(id: string): void;
   /** The card's text is finished with: Escape, or a press outside it. Its last write is already made. */
   stopWriting(): void;
-  /** A pending "show me this node's line" for the open item — see `open`. */
-  reveal: Reveal | null;
   tool: Tool;
   setTool(tool: Tool): void;
   ctl: EditorCtl;
@@ -508,9 +484,6 @@ export interface Editor {
    * have been written to the file yet — this is the one caller that knows more than the board.
    */
   pickFromLine(item: string, line: number, body?: string): void;
-  /** Which half of the editor panel is showing. Remembered across sessions, not in the URL. */
-  mode: InspectorMode;
-  setMode(mode: InspectorMode): void;
   /**
    * The inline rename standing over a card, a container, a band or an edge label.
    *
@@ -711,14 +684,6 @@ export function useEditor({
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
-  /*
-   * A request to put the caret on one node's line, once.
-   *
-   * `n` is what makes it a request rather than a fact: double-clicking the same card twice must
-   * move the caret back, and a value equal to the last one would be indistinguishable from no
-   * request at all. The panel acts on it and nothing else reads it.
-   */
-  const [reveal, setReveal] = useState<Reveal | null>(null);
   /* The link picked on the canvas. Not part of `selected`: a link is not an item — it cannot be
      moved, resized, grouped or copied — and widening the selection to hold two kinds of thing
      would put a `typeof` in every place that reads it. */
@@ -739,7 +704,6 @@ export function useEditor({
   const pickedEdgeRef = useRef<PickedEdge | null>(null);
   pickedEdgeRef.current = pickedEdge;
   const [renaming, setRenaming] = useState<Renaming | null>(null);
-  const [mode, setModeState] = useState<InspectorMode>(storedMode);
   const [tool, setTool] = useState<Tool>("select");
 
   /*
@@ -963,11 +927,6 @@ export function useEditor({
     },
     [clearPick, pickEdgeIn, pickNode],
   );
-
-  const setMode = useCallback((next: InspectorMode) => {
-    setModeState(next);
-    writePref(INSPECTOR_MODE, next);
-  }, []);
 
   /* ---- writing ---- */
 
@@ -1544,9 +1503,8 @@ export function useEditor({
    * Open the panel on an item, and — when the gesture landed on a card — on that card.
    *
    * A double-click used to mean "show me this line of the source", and it meant it literally: the
-   * panel opened on the text with the declaring line selected. It now opens on the *controls* for
-   * the thing that was clicked, and the caret placement is what `reveal` still carries, for the
-   * moment somebody switches to the source with a pick standing.
+   * panel opened on the text with the declaring line selected. It opens on the *controls* for the
+   * thing that was clicked, and there is no text to open on (#145).
    *
    * A double-click on a bare card is an inline rename on the card itself, in place.
    */
@@ -1554,12 +1512,9 @@ export function useEditor({
     (id: string, node?: string) => {
       setSelected(new Set([id]));
       setEditing(id);
-      if (!node) return;
-      pickNode(id, node);
-      setMode("props");
-      setReveal((prev) => ({ id, node, n: (prev?.n ?? 0) + 1 }));
+      if (node) pickNode(id, node);
     },
-    [pickNode, setMode],
+    [pickNode],
   );
 
   /**
@@ -1589,19 +1544,18 @@ export function useEditor({
 
   /*
    * The other way into the panel: a problem rather than a click. A diagnostic's target is the thing
-   * its line declares (`diagnoseBoard`), so "Show" picks it the way a click on the canvas would, and
-   * the Properties half is what shows — that is where the control that fixes it is.
+   * its line declares (`diagnoseBoard`), so "Show" picks it the way a click on the canvas would —
+   * and the panel's controls for it are where the one that fixes it is.
    */
   const openOn = useCallback(
     (id: string, target?: DiagnosticTarget) => {
       setSelected(new Set([id]));
       setEditing(id);
-      setMode("props");
       if (!target) return pickNode(id, null);
       if (target.what === "edge") pickEdgeIn(id, target.id);
       else pickNode(id, target.id);
     },
-    [setMode, pickNode, pickEdgeIn],
+    [pickNode, pickEdgeIn],
   );
 
   const add = useCallback(
@@ -4274,11 +4228,7 @@ export function useEditor({
           if (pickedLinkRef.current) return (take(), removeLink(pickedLinkRef.current));
           return;
         case "Enter":
-          if (pn || pe) {
-            take();
-            setMode("props");
-            return open((pn ?? pe)!.item);
-          }
+          if (pn || pe) return (take(), open((pn ?? pe)!.item));
           /* A board link's statement lives in an `edges` fence, and the fence is an item — so its
              controls are reached by opening that item, which is the only thing on a board with no
              place on the paper to click. Enter rather than the pick itself: a panel that flew open
@@ -4287,7 +4237,6 @@ export function useEditor({
             const link = boardRef.current?.links.find((l) => l.id === pickedLinkRef.current);
             if (link) {
               take();
-              setMode("props");
               return open(link.fence);
             }
           }
@@ -4469,7 +4418,6 @@ export function useEditor({
     saveAsComponent,
     selectAll,
     sendToBack,
-    setMode,
     tidyUp,
     toggleHidden,
     undo,
@@ -4490,7 +4438,6 @@ export function useEditor({
     writing,
     write,
     stopWriting,
-    reveal,
     tool,
     setTool,
     ctl,
@@ -4516,8 +4463,6 @@ export function useEditor({
     growPseudo,
     columnOf: columnAt,
     pickFromLine,
-    mode,
-    setMode,
     renaming,
     commitRename,
     cancelRename,

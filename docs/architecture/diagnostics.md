@@ -160,4 +160,5 @@ the same answer from the endpoint. `problems.show` in `src/settings/` is `notify
 
 **Out, and why:** the stray `y` that started this almost certainly came in through the panel — K
 and Enter open a fence with the source focused and its caret at offset zero, so the next letter
-typed as a shortcut lands on the body's first line. That is a separate defect and is not fixed here.
+typed as a shortcut lands on the body's first line. That was a separate defect; the box is gone
+for a diagram and a link fence now (#145), so there is no source for a letter to land in.

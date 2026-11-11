@@ -2047,30 +2047,6 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   text-overflow: ellipsis;
 }
 .dag-inspector__name::before { content: "·"; margin-right: 8px; color: var(--dag-color-muted); }
-/* The two halves of the panel: the controls, and the text they write. `dag-inspector__mode` rather
-   than `dag-tab` — the page tabs own that name, and `nodes.css` loads after this file. */
-.dag-inspector__modes {
-  display: flex;
-  gap: 2px;
-  flex: none;
-  padding: 6px 8px 0;
-  border-bottom: 1px solid var(--dag-color-outlineSoft);
-}
-.dag-inspector__mode {
-  font: inherit;
-  font-size: 12px;
-  color: var(--dag-color-muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-.dag-inspector__mode:hover { color: var(--dag-color-ink); }
-.dag-inspector__mode--on { color: var(--dag-color-ink); border-bottom-color: var(--dag-color-accent); }
-.dag-inspector__mode:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
-
 .dag-inspector__fields {
   display: flex;
   flex-direction: column;

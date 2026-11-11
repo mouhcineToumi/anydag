@@ -243,24 +243,19 @@ an edge says had to be typed into a fence. A **pick** is that missing thing: `pi
   been parsed and ELK has answered, several renders later with nothing about the pick changing — and
   a dep list would have to name a signal from inside a memoised, asynchronously laid out subtree.
   There is none; one `querySelector` per render is cheaper than inventing one.
-- **The strip is driven by the pick, with the caret as a feeder.** The caret was the truth once,
-  and a double-click moved it; the pick is now, and `onSelect` on the textarea
-  calls `pickFromLine`. One source of truth, three ways to move it, and none of them can disagree.
-  Two consequences. The panel hands its **draft** to `pickFromLine` and to `declaredAt`, because
-  what a person is looking at may be a quarter of a second ahead of the file. And the reveal effect
-  that puts the caret on the pick's line **must check that the textarea has focus** before deciding
-  the caret is already there: without that half of the guard it also swallowed the *first*
-  placement, since a textarea nobody has touched reports a caret at offset zero, which is inside
-  line 1.
-- **The panel is Properties and Source, and only for a diagram.** A diagram's body is a language —
-  everything it says has a control, so the text behind them is genuinely optional, which is the
-  point. A note's body *is* the note, an image's is its caption, and an `edges` fence
-  has no attributes at all: putting any of those behind a tab would hide the item's content from the
-  person who opened the panel to see it. Which half is showing lives in `localStorage`
-  (`dag:inspector-mode`), the same argument as the panel's width — a fact about this window, not part
-  of what a `?board=…` link means. Double-clicking a card opens the **inline rename**, not
-  Properties; Enter and the toolbar's Edit are what open the panel, and
-  `reveal` survives only to place the caret when somebody switches to Source with a pick standing.
+- **The strip is driven by the pick.** The caret in the source box was the truth once, and a
+  double-click moved it; the pick is now, and with the box gone (#145) nothing else feeds it. A
+  control that makes a statement hands its line to `pickFromLine`, with the panel's **draft**,
+  because what a person is looking at may be a quarter of a second ahead of the file.
+- **The panel is controls, with no Source tab** (#145, decided on #132: removed, not hidden behind
+  a setting). It was Properties and Source for a diagram, with the half showing kept as a
+  preference, `dag:inspector-mode`; the tab, the preference, the `mode` and `reveal` the editor kept
+  for it, and the CLI's `inspector.mode` are gone, and a value left in a browser is read by nothing.
+  A diagram's body is a language and everything it says has a control; an agent writes the DSL and
+  a person never has to read it. The panel's text box is left only for what is not a language: an
+  image's caption and a prompt card's request. An `md` card's text is written on the card (*An md
+  card's text, in place*) and an `edges` fence's statements are its links on the canvas.
+  Double-clicking a card opens the **inline rename**; Enter and the toolbar's Edit open the panel.
 - **A picked edge's swatch recolours the line instead of claiming to.** `setEdgeHue` once wrote an
   attribute `parseEdge` did not read; `parseEdge` reads the hue now — three lines — and `finalize()`
   still derives an edge's hue from its source's wherever the author wrote none. See *Controls on
@@ -284,9 +279,7 @@ arithmetic behind the `+` and behind Detach.
 
 **One subject at a time.** A pick *replaces* the item's fields rather than stacking under them: a
 diagram's six fields plus a card's twelve plus a rows list is a panel nobody can read, and the thing
-a person is working on is the innermost one they touched. The pick's half shows in both views —
-it is what they are working on in either — and the item's only in Properties, which is what keeps
-`pick.spec.ts`'s "the caret still moves the strip, once the source is showing" true.
+a person is working on is the innermost one they touched.
 
 - **The kind menu is `kindsOf(type)`, which is `Object.keys(dialect.kinds)`** — the same list
   `E_UNKNOWN_KIND` suggests from. Two lists would be two chances to offer a word the parser rejects.
