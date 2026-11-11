@@ -91,10 +91,28 @@ test("a message is picked, and its panel writes its text, its ends, its arrow an
   await page.locator("[data-dag-prop-activate]").check();
   await expect.poll(read, { timeout: 5_000 }).toContain('a -) +c : "good morning"');
 
-  /* Down one row: past Bob's reply, so it is the second message now and the panel follows it. */
+  /* Both boxes: Mermaid cannot say `+` and `-` on one message, so the second is a line of its own. */
+  await page.locator("[data-dag-prop-deactivate]").check();
+  await expect
+    .poll(() => body().slice(3, 6), { timeout: 5_000 })
+    .toEqual(['a -) +c : "good morning"', "deactivate a", 'b -->> a : "hi"']);
+  await expect(page.locator("[data-dag-prop-activate]")).toBeChecked();
+  await expect(page.locator("[data-dag-prop-deactivate]")).toBeChecked();
+
+  /* Down one row: past Bob's reply, so it is the second message now and the panel follows it, and the
+     `deactivate` line goes with it. */
   await page.locator('[data-dag-prop-move="down"]').click();
-  await expect.poll(() => body().slice(3, 5), { timeout: 5_000 }).toEqual(['b -->> a : "hi"', 'a -) +c : "good morning"']);
+  await expect
+    .poll(() => body().slice(3, 6), { timeout: 5_000 })
+    .toEqual(['b -->> a : "hi"', 'a -) +c : "good morning"', "deactivate a"]);
   await expect(page.locator('[data-dag-props="msg:1"]')).toHaveCount(1);
+  await expect(page.locator("[data-dag-prop-deactivate]")).toBeChecked();
+
+  /* Unticking one box takes off exactly its part. */
+  await page.locator("[data-dag-prop-deactivate]").uncheck();
+  await expect
+    .poll(() => body().slice(3, 6), { timeout: 5_000 })
+    .toEqual(['b -->> a : "hi"', 'a -) +c : "good morning"', 'alt "yes"']);
 });
 
 test("Delete on a picked message takes its line and nothing else", async ({ page }) => {

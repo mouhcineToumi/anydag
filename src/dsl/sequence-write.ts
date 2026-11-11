@@ -85,6 +85,20 @@ function readMessage(line: string): MessageLine | null {
   return { from, arrow, to, plus, minus, marks, colon, label };
 }
 
+/**
+ * Whether the line right after a message is the `deactivate <sender>` that ends the sender's
+ * activation — the second line of a hand-off. Mermaid cannot say `+` and `-` on one message, so a
+ * message that does both is written as two lines, and the second belongs to the first: it is read
+ * as that message's `-`, and moved, deleted and wrapped with it. A message that already carries a
+ * `-` of its own has nothing for the line to be the other half of, so the line stays its own.
+ */
+function pairedDeactivate(lines: readonly string[], line: number): boolean {
+  const m = readMessage(lines[line - 1] ?? "");
+  if (!m || m.minus) return false;
+  const next = lineTokens(lines[line] ?? "");
+  return next.length === 2 && next[0]!.kind === "word" && next[0]!.value === "deactivate" && next[1]!.value === m.from.value;
+}
+
 /** What the panel shows for a picked message. */
 export interface MessageParts {
   from: string;
@@ -93,12 +107,14 @@ export interface MessageParts {
   text: string;
   /** `+`: the message starts the target's activation. */
   activates: boolean;
-  /** `-`: the message ends the sender's. */
+  /** `-`, or a `deactivate <sender>` line right after it: the message ends the sender's. */
   deactivates: boolean;
 }
 
-export function messageParts(line: string): MessageParts | null {
-  const m = readMessage(line);
+/** The message on this line of the body, or `null` when the line is not one. */
+export function messageParts(body: string, line: number): MessageParts | null {
+  const lines = body.split("\n");
+  const m = readMessage(lines[line - 1] ?? "");
   if (!m) return null;
   return {
     from: m.from.value,
@@ -106,7 +122,7 @@ export function messageParts(line: string): MessageParts | null {
     arrow: m.arrow.value,
     text: m.label?.value ?? "",
     activates: m.plus,
-    deactivates: m.minus,
+    deactivates: m.minus || pairedDeactivate(lines, line),
   };
 }
 
@@ -143,11 +159,19 @@ export function setMessageText(line: string, text: string | null): string {
   return `${line.slice(0, at)}${m.colon ? " " : " : "}${JSON.stringify(text)}${tail}`;
 }
 
-/** Who sends it, or who receives it. An id with nothing in it is refused rather than written. */
-export function setMessageEnd(line: string, end: "from" | "to", id: string): string {
-  const m = readMessage(line);
-  if (!m || !/^[A-Za-z0-9_][A-Za-z0-9_.\-/]*$/.test(id)) return line;
-  return swap(line, end === "from" ? span(m.from) : m.to.span, id);
+/**
+ * Who sends it, or who receives it. An id with nothing in it is refused rather than written. A new
+ * sender takes the `deactivate` line that ends its activation with it, so the pair stays a pair.
+ */
+export function setMessageEnd(body: string, line: number, end: "from" | "to", id: string): string {
+  const lines = body.split("\n");
+  const src = lines[line - 1] ?? "";
+  const m = readMessage(src);
+  if (!m || !/^[A-Za-z0-9_][A-Za-z0-9_.\-/]*$/.test(id)) return body;
+  const pair = end === "from" && pairedDeactivate(lines, line);
+  lines[line - 1] = swap(src, end === "from" ? span(m.from) : m.to.span, id);
+  if (pair) lines[line] = `${indentOf(lines[line]!)}deactivate ${id}`;
+  return lines.join("\n");
 }
 
 /** Which arrow. Only the four the sheet lists — anything else would not be a message. */
@@ -157,21 +181,10 @@ export function setMessageArrow(line: string, arrow: string): string {
   return swap(line, span(m.arrow), arrow);
 }
 
-/**
- * The `+` or the `-` on a message — the busy bar starting at the target, or ending at the sender.
- *
- * Written the way Mermaid writes it, onto the front of the target: `a ->> +b`. Both at once is a
- * hand-off the grammar can say, and the second one goes after the target as its own word, the form
- * the parser has always read: `a ->> +b - : "x"`. Every mark already on the line is taken off and
- * the wanted ones put back, so the line converges on one spelling whatever it started from.
- */
-export function setMessageMark(line: string, which: "+" | "-", on: boolean): string {
+/** The line with every `+`/`-` taken off, and the wanted one written onto the front of the target. */
+function markedAs(line: string, head: "+" | "-" | ""): string {
   const m = readMessage(line);
   if (!m) return line;
-  const plus = which === "+" ? on : m.plus;
-  const minus = which === "-" ? on : m.minus;
-  if (plus === m.plus && minus === m.minus) return line;
-
   /* Right to left, so the earlier spans stay where they were. A word mark takes the space before it;
      a prefix is one character of the target's word and takes nothing else. */
   let out = line;
@@ -185,9 +198,57 @@ export function setMessageMark(line: string, which: "+" | "-", on: boolean): str
   const again = readMessage(out);
   if (!again) return line;
   const [a, b] = again.to.span;
-  const head = plus ? "+" : minus ? "-" : "";
-  const trail = plus && minus ? " -" : "";
-  return `${out.slice(0, a)}${head}${again.to.value}${trail}${out.slice(b)}`;
+  return `${out.slice(0, a)}${head}${again.to.value}${out.slice(b)}`;
+}
+
+/**
+ * The busy bar on a message: `+` starts the target's, `-` ends the sender's.
+ *
+ * Written the way Mermaid writes it, onto the front of the target — `a ->> +b`, `b -->> -a` — and
+ * **never both on one line**, which Mermaid cannot read. A message that starts the receiver's bar
+ * *and* ends the sender's is two lines:
+ *
+ *     web ->> +api : "hand off"
+ *     deactivate web
+ *
+ * Each box removes exactly its own part: `+` the plus, `-` the `deactivate` line (or the inline
+ * `-` of a message written that way). A hand-off in the old one-line spelling (`a ->> +b - : "x"`)
+ * is still read, and is rewritten as two lines the moment either box is touched.
+ */
+export function setMessageMark(body: string, line: number, which: "+" | "-", on: boolean): string {
+  const lines = body.split("\n");
+  const src = lines[line - 1] ?? "";
+  const m = readMessage(src);
+  if (!m) return body;
+  const paired = pairedDeactivate(lines, line);
+  const deactivate = () => `${indentOf(src)}deactivate ${m.from.value}`;
+
+  if (which === "+") {
+    if (on === m.plus) return body;
+    if (!on) lines[line - 1] = markedAs(src, m.minus ? "-" : "");
+    else if (m.minus) {
+      lines[line - 1] = markedAs(src, "+");
+      lines.splice(line, 0, deactivate());
+    } else lines[line - 1] = markedAs(src, "+");
+  } else {
+    if (on === (m.minus || paired)) return body;
+    if (on) {
+      if (m.plus) lines.splice(line, 0, deactivate());
+      else lines[line - 1] = markedAs(src, "-");
+    } else {
+      if (m.minus) lines[line - 1] = markedAs(src, m.plus ? "+" : "");
+      if (paired) lines.splice(line, 1);
+    }
+  }
+  return lines.join("\n");
+}
+
+/** A message taken out, and the `deactivate` line that is the other half of it with it. */
+export function removeMessage(body: string, line: number): string {
+  const lines = body.split("\n");
+  if (!readMessage(lines[line - 1] ?? "")) return body;
+  lines.splice(line - 1, pairedDeactivate(lines, line) ? 2 : 1);
+  return lines.join("\n");
 }
 
 /* ------------------------------------------------------------------- where a statement goes */
@@ -242,7 +303,8 @@ function placeIn(lines: string[], rows: SeqRow[], slot: Slot): { at: number; ind
     return { at, indent: "" };
   }
   const own = lines[slot.line - 1] ?? "";
-  if (!slot.inside) return { at: slot.line, indent: indentOf(own) };
+  /* After a message that ends its sender's activation on a second line, after that line too. */
+  if (!slot.inside) return { at: slot.line + (pairedDeactivate(lines, slot.line) ? 1 : 0), indent: indentOf(own) };
   /* Into a block: as deep as what is already in it, or one level deeper than its head. */
   const next = lines[slot.line];
   const deeper = next !== undefined && next.trim() !== "" && indentOf(next).length > indentOf(own).length;
@@ -277,11 +339,16 @@ export function moveRow(body: string, line: number, dir: -1 | 1): { body: string
   /* A fragment's `end` is a row but not a statement: it stays, and only a message or a note moves. */
   if (fragmentAt(body, line)) return null;
   const lines = body.split("\n");
-  const text = lines[line - 1]!;
-  lines.splice(line - 1, 1);
+  /* A message that ends its sender's activation on a second line takes that line with it. */
+  const count = pairedDeactivate(lines, line) ? 2 : 1;
+  const [text, tail] = lines.splice(line - 1, count) as [string, string?];
   const without = lines.join("\n");
-  const shift = (r: SeqRow): SeqRow => (r.line > line ? { ...r, line: r.line - 1 } : r);
-  return insertStatement(without, target === null ? null : shift(target), text);
+  const shift = (r: SeqRow): SeqRow => (r.line > line ? { ...r, line: r.line - count } : r);
+  const out = insertStatement(without, target === null ? null : shift(target), text);
+  if (tail === undefined) return out;
+  const moved = out.body.split("\n");
+  moved.splice(out.line, 0, indentOf(moved[out.line - 1]!) + tail.trim());
+  return { body: moved.join("\n"), line: out.line };
 }
 
 /* ------------------------------------------------------------------------------- fragments */
@@ -319,8 +386,12 @@ function listOf(events: readonly SeqEvent[], line: number): readonly SeqEvent[] 
   return null;
 }
 
-/** The last line an event takes: its `end` for a fragment, its own line otherwise. */
-const lastLine = (e: SeqEvent, body: string): number => (e.t === "fragment" ? (e.end ?? body.split("\n").length) : e.line);
+/** The last line an event takes: its `end` for a fragment, its `deactivate` line for a hand-off, its own otherwise. */
+const lastLine = (e: SeqEvent, body: string): number => {
+  const lines = body.split("\n");
+  if (e.t === "fragment") return e.end ?? lines.length;
+  return pairedDeactivate(lines, e.line) ? e.line + 1 : e.line;
+};
 
 /**
  * Whether the statements from one line to another can be wrapped in a fragment — the two are in

@@ -54,7 +54,15 @@ import {
   type WrapOpts,
 } from "@/dsl/restate";
 import { seqIdOf, type FragmentKind } from "@/dsl/sequence";
-import { branchesOf, noteParts, removeFragment, setBranchLabel, setMessageText, setNoteText } from "@/dsl/sequence-write";
+import {
+  branchesOf,
+  noteParts,
+  removeFragment,
+  removeMessage,
+  setBranchLabel,
+  setMessageText,
+  setNoteText,
+} from "@/dsl/sequence-write";
 
 import { History } from "./history";
 import type { Fix } from "./repair";
@@ -997,6 +1005,8 @@ export function useEditor({
     const it = p && bodyOf(p.item);
     if (!p || !it) return;
     setPickedEdge(null);
+    /* A sequence's message takes its `deactivate` line with it, the one that ends its sender's bar. */
+    const remove = it.type === "sequence" ? removeMessage : removeEdge;
     /* A run of messages goes together, from the bottom up so the lines above stay where they are. */
     if (p.to) {
       const lines = runOf(p)
@@ -1005,13 +1015,13 @@ export function useEditor({
         .sort((a, b) => b - a);
       writeBody(
         it,
-        lines.reduce((body, l) => removeEdge(body, l), it.body),
+        lines.reduce((body, l) => remove(body, l), it.body),
       );
       return;
     }
     /* The id is what the pick actually holds, so it is asked first; the line it was picked at is
        the fallback for the case `declaredAt` cannot answer — a node happening to be called `e3`. */
-    writeBody(it, removeEdge(it.body, declaredAt(it.type, it.body, p.id, it.dir) ?? p.line));
+    writeBody(it, remove(it.body, declaredAt(it.type, it.body, p.id, it.dir) ?? p.line));
   }, [bodyOf, writeBody]);
 
   /* ---- renaming in place ---- */

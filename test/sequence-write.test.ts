@@ -15,6 +15,7 @@ import {
   noteStatement,
   removeBranch,
   removeFragment,
+  removeMessage,
   seqRows,
   setBranchLabel,
   setMessageArrow,
@@ -107,9 +108,16 @@ describe("a message's writers", () => {
   const line = '  a ->> b : "hello" %% why';
 
   it("reads every part", () => {
-    expect(messageParts(line)).toEqual({ from: "a", to: "b", arrow: "->>", text: "hello", activates: false, deactivates: false });
-    expect(messageParts('a ->> +b : "x"')?.activates).toBe(true);
-    expect(messageParts("participant a")).toBeNull();
+    expect(messageParts(line, 1)).toEqual({
+      from: "a",
+      to: "b",
+      arrow: "->>",
+      text: "hello",
+      activates: false,
+      deactivates: false,
+    });
+    expect(messageParts('a ->> +b : "x"', 1)?.activates).toBe(true);
+    expect(messageParts("participant a", 1)).toBeNull();
   });
 
   it("retypes the label, adds one where there was none, and takes it off", () => {
@@ -120,9 +128,9 @@ describe("a message's writers", () => {
   });
 
   it("changes who sends and who receives, keeping a + on the target", () => {
-    expect(setMessageEnd(line, "from", "c")).toBe('  c ->> b : "hello" %% why');
-    expect(setMessageEnd('a ->> +b : "x"', "to", "c")).toBe('a ->> +c : "x"');
-    expect(setMessageEnd(line, "to", "not ok")).toBe(line);
+    expect(setMessageEnd(line, 1, "from", "c")).toBe('  c ->> b : "hello" %% why');
+    expect(setMessageEnd('a ->> +b : "x"', 1, "to", "c")).toBe('a ->> +c : "x"');
+    expect(setMessageEnd(line, 1, "to", "not ok")).toBe(line);
   });
 
   it("changes the arrow to one of the four, and nothing else", () => {
@@ -132,14 +140,91 @@ describe("a message's writers", () => {
   });
 
   it("writes the activation marks as Mermaid does, and converges on one spelling", () => {
-    expect(setMessageMark('a ->> b : "x"', "+", true)).toBe('a ->> +b : "x"');
-    expect(setMessageMark('a ->>+ b : "x"', "+", false)).toBe('a ->> b : "x"');
-    expect(setMessageMark('a ->> b + : "x"', "+", false)).toBe('a ->> b : "x"');
-    expect(setMessageMark('b -->> a : "y"', "-", true)).toBe('b -->> -a : "y"');
-    const both = setMessageMark('a ->> +b : "x"', "-", true);
-    expect(both).toBe('a ->> +b - : "x"');
-    expect(parseSequence(both).events.map((e) => e.t)).toEqual(["activate", "msg", "deactivate"]);
-    expect(setMessageMark(both, "+", false)).toBe('a ->> -b : "x"');
+    expect(setMessageMark('a ->> b : "x"', 1, "+", true)).toBe('a ->> +b : "x"');
+    expect(setMessageMark('a ->>+ b : "x"', 1, "+", false)).toBe('a ->> b : "x"');
+    expect(setMessageMark('a ->> b + : "x"', 1, "+", false)).toBe('a ->> b : "x"');
+    /* Only "Ends" is valid Mermaid on one line: `-` on the target ends the sender's bar. */
+    expect(setMessageMark('b -->> a : "y"', 1, "-", true)).toBe('b -->> -a : "y"');
+    expect(setMessageMark('b -->> -a : "y"', 1, "-", false)).toBe('b -->> a : "y"');
+  });
+});
+
+describe("a message that starts one bar and ends another is two lines, both valid Mermaid", () => {
+  const ONE = 'a ->> b : "x"';
+  const TWO = 'a ->> +b : "x"\ndeactivate a';
+  const tags = (b: string) =>
+    parseSequence(b).events.map((e) => (e.t === "deactivate" || e.t === "activate" ? `${e.t} ${e.who}` : e.t));
+
+  it("writes both boxes as the `+` and a `deactivate` line, whichever is ticked first", () => {
+    expect(setMessageMark(setMessageMark(ONE, 1, "+", true), 1, "-", true)).toBe(TWO);
+    expect(setMessageMark(setMessageMark(ONE, 1, "-", true), 1, "+", true)).toBe(TWO);
+    expect(tags(TWO)).toEqual(["activate b", "msg", "deactivate a"]);
+    expect(errors(TWO)).toEqual([]);
+  });
+
+  it("indents the second line like the first", () => {
+    const body = 'alt "ok"\n  a ->> b : "x"\nend';
+    expect(setMessageMark(setMessageMark(body, 2, "+", true), 2, "-", true)).toBe(
+      'alt "ok"\n  a ->> +b : "x"\n  deactivate a\nend',
+    );
+  });
+
+  it("reads the pair as one message with both boxes ticked", () => {
+    expect(messageParts(TWO, 1)).toMatchObject({ from: "a", to: "b", activates: true, deactivates: true });
+    expect(messageParts('a ->> b : "x"\ndeactivate b', 1)?.deactivates).toBe(false);
+    expect(messageParts('a ->> b : "x"\ndeactivate a', 1)?.deactivates).toBe(true);
+  });
+
+  it("removes exactly its own part when a box is unticked", () => {
+    expect(setMessageMark(TWO, 1, "-", false)).toBe('a ->> +b : "x"');
+    expect(setMessageMark(TWO, 1, "+", false)).toBe('a ->> b : "x"\ndeactivate a');
+    expect(messageParts(setMessageMark(TWO, 1, "+", false), 1)).toMatchObject({ activates: false, deactivates: true });
+  });
+
+  it("still reads the old one-line form, and rewrites it as two lines when a box is touched", () => {
+    const old = 'a ->> +b - : "x"';
+    expect(tags(old)).toEqual(["activate b", "msg", "deactivate a"]);
+    expect(messageParts(old, 1)).toMatchObject({ activates: true, deactivates: true });
+    expect(setMessageMark(old, 1, "+", false)).toBe('a ->> -b : "x"');
+    expect(setMessageMark(old, 1, "-", false)).toBe('a ->> +b : "x"');
+    expect(setMessageMark('a ->> -b : "x"', 1, "+", true)).toBe(TWO);
+  });
+
+  it("keeps the pair together when the sender changes", () => {
+    expect(setMessageEnd(TWO, 1, "from", "c")).toBe('c ->> +b : "x"\ndeactivate c');
+    expect(setMessageEnd(TWO, 1, "to", "c")).toBe('a ->> +c : "x"\ndeactivate a');
+  });
+
+  it("deletes the message and its deactivate line together, and only a paired one", () => {
+    const body = `participant a\nparticipant b\n${TWO}\nb -->> a : "y"`;
+    expect(removeMessage(body, 3)).toBe('participant a\nparticipant b\nb -->> a : "y"');
+    expect(removeMessage('a ->> b : "x"\ndeactivate b\nb -->> a : "y"', 1)).toBe('deactivate b\nb -->> a : "y"');
+  });
+
+  it("moves with its deactivate line, up and down, and nothing lands between them", () => {
+    const body = `participant a\nparticipant b\nb -->> a : "one"\n${TWO}\nb -->> a : "three"`;
+    const up = moveRow(body, 4, -1)!;
+    expect(up.body).toBe(`participant a\nparticipant b\n${TWO}\nb -->> a : "one"\nb -->> a : "three"`);
+    expect(up.line).toBe(3);
+    const down = moveRow(body, 4, 1)!;
+    expect(down.body).toBe(`participant a\nparticipant b\nb -->> a : "one"\nb -->> a : "three"\n${TWO}`);
+    expect(down.line).toBe(5);
+    /* Stepping past a message that has a pair of its own never splits that pair. */
+    const past = moveRow(`participant a\nparticipant b\n${TWO}\nb -->> a : "three"`, 5, -1)!;
+    expect(past.body).toBe(`participant a\nparticipant b\nb -->> a : "three"\n${TWO}`);
+    expect(errors(past.body)).toEqual([]);
+  });
+
+  it("a statement dropped under the message goes under its deactivate line", () => {
+    const body = `participant a\nparticipant b\n${TWO}`;
+    expect(insertStatement(body, { line: 3, inside: false }, 'b -->> a : "y"').body).toBe(`${body}\nb -->> a : "y"`);
+  });
+
+  it("wraps with its deactivate line inside the fragment", () => {
+    const body = `participant a\nparticipant b\n${TWO}\nb -->> a : "y"`;
+    expect(wrapIn(body, 3, 3, "opt")!.body).toBe(
+      `participant a\nparticipant b\nopt "condition"\n  a ->> +b : "x"\n  deactivate a\nend\nb -->> a : "y"`,
+    );
   });
 });
 

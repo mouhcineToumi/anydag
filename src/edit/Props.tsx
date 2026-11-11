@@ -1333,7 +1333,7 @@ function MessageProps({
   const src = body.split("\n")[line - 1] ?? "";
   const write = (next: string) => onBody(replaceLine(body, line, next));
   const people = useParticipants(body);
-  const m = messageParts(src);
+  const m = messageParts(body, line);
   if (!m) return null;
   const named = (who: string) => people.find((p) => p.id === who)?.title ?? who;
   /* What is on the line goes first, so a spelling the four do not name (`--)`) is still shown. */
@@ -1361,7 +1361,7 @@ function MessageProps({
         className="dag-select"
         {...{ [hook]: "" }}
         value={m[end]}
-        onChange={(e) => write(setMessageEnd(src, end, e.target.value))}
+        onChange={(e) => onBody(setMessageEnd(body, line, end, e.target.value))}
       >
         {people.map((p) => (
           <option key={p.id} value={p.id}>
@@ -1408,7 +1408,7 @@ function MessageProps({
             className="dag-check"
             data-dag-prop-activate=""
             checked={m.activates}
-            onChange={(e) => write(setMessageMark(src, "+", e.target.checked))}
+            onChange={(e) => onBody(setMessageMark(body, line, "+", e.target.checked))}
           />
           <span>Activates {named(m.to)}</span>
         </label>
@@ -1418,7 +1418,7 @@ function MessageProps({
             className="dag-check"
             data-dag-prop-deactivate=""
             checked={m.deactivates}
-            onChange={(e) => write(setMessageMark(src, "-", e.target.checked))}
+            onChange={(e) => onBody(setMessageMark(body, line, "-", e.target.checked))}
           />
           <span>Ends {named(m.from)}'s activation</span>
         </label>

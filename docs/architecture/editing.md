@@ -712,6 +712,17 @@ and a sequence can be built from an empty body without the Source tab. The write
   Mermaid spelling was an error, so that was fixed with it. Explicit `activate`/`deactivate` lines
   still parse and draw; the panel offers the mark on the message, which is one control rather than
   two lines to keep in step.
+- **A hand-off is two lines, because Mermaid cannot say `+` and `-` on one** (#135). A message that
+  starts the receiver's bar *and* ends the sender's is written `web ->> +api : "x"` followed by
+  `deactivate web`, both valid Mermaid; the old one-line `a ->> +b - : "x"` is still read. The panel
+  shows the pair as one message with both boxes ticked. The rule is `pairedDeactivate`: a
+  `deactivate <sender>` directly after a message that has no `-` of its own *is* that message's
+  `-`. So `messageParts` reads it, unticking either box removes exactly its part (the `+`, or the
+  line — touching the old one-line form rewrites it as two), changing the sender renames the line,
+  and everything that moves or cuts by line carries it: `moveRow`, `removeMessage` (what Delete
+  calls), `wrapIn`, and `placeIn` (a statement dropped "after" the message goes after the pair, never
+  between). `Ends` alone stays one line, `b -->> -a`, which is valid Mermaid. These writers are
+  body-level (`setMessageMark(body, line, …)`, `setMessageEnd(body, line, …)`) for that reason.
 - **A participant has no status and no flags.** Its line is two strings, `icon=`, `hue=` and
   `kind=`, and a bare word after them starts the next statement — so those controls would break the
   diagram they were used on. It has the Kind menu its grammar has instead: `actor` is a head word,
