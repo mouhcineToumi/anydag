@@ -24,11 +24,14 @@ interface Glyph {
   height?: number;
 }
 
+/* Anthropic's and OpenAI's marks are one colour, and their colour-set art is that colour — black —
+   so on a dark theme they vanished. The mono art draws in `currentColor`, the ink of the text beside
+   it, in every theme. Gemini's mark is its gradient, which reads on light and dark alike. */
 const MARKS: Readonly<Record<string, { set: "color" | "mono"; name: string }>> = {
-  claude: { set: "color", name: "anthropic" },
+  claude: { set: "mono", name: "anthropic" },
   gemini: { set: "color", name: "google-gemini" },
   opencode: { set: "mono", name: "opencode" },
-  custom: { set: "color", name: "openai" },
+  custom: { set: "mono", name: "openai" },
 };
 
 function glyphOf(provider: string): Glyph | null {

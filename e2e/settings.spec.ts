@@ -572,6 +572,45 @@ test("its elevation is a soft shadow on paper and a dark one on paper-dark", asy
   }
 });
 
+test("the AI tab wears the prompt card's look in every theme", async ({ page }) => {
+  /* Both lists are fixed so the picture is the tab's look and not this machine's sign-ins: Claude
+     Code ready for the diagrams, and the Assistant on the same. */
+  const llm = providerList();
+  llm.providers[0] = { ...llm.providers[0], ready: true, error: undefined, reason: undefined } as (typeof llm.providers)[0];
+  await page.route("**/__board/llm*", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(llm) }));
+  await page.route("**/__board/chat/models*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        providers: [
+          {
+            provider: "claude",
+            label: "Claude Code",
+            available: true,
+            default: "claude-sonnet-5-5",
+            models: [{ id: "claude-sonnet-5-5", label: "Sonnet 5.5" }],
+            efforts: ["", "low", "medium", "high", "max"],
+          },
+        ],
+      }),
+    }),
+  );
+  for (const theme of ["neutral", "paper", "paper-dark"]) {
+    await open(page, `&theme=${theme}`);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await openSettings(page, "vault-ai");
+    const pane = page.locator('[data-dag-settings-pane="vault-ai"]');
+    await expect(pane.locator(".dag-settings__group--prompt")).toHaveCount(2);
+    await expect(pane.locator("[data-dag-setting-assistant-hint]")).toBeVisible();
+    /* Off any control and its focus ring, as the elevation picture does. */
+    const box = (await pane.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + 4);
+    await expect(pane).toHaveScreenshot(`settings-ai-${theme}.png`);
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toHaveCount(0);
+  }
+});
+
 /** A `/__board/llm` answer with one provider in each state the pill knows. */
 function providerList(over: { zaiReady?: boolean } = {}) {
   const row = (id: string, label: string, kind: "cli" | "http", keyEnv: string[], ready: boolean, code?: string) => ({

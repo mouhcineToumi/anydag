@@ -99,7 +99,7 @@ export function AiPane() {
 
   return (
     <>
-      <Group>
+      <Group prompt>
         <FeatureRow
           feature="diagrams"
           provider={diagrams?.provider ?? null}
@@ -209,6 +209,7 @@ function DiagramsGroup({ llm, refresh }: { llm: Providers | null; refresh(): voi
   };
   return (
     <Group
+      prompt
       title="Diagrams and flashcards"
       footer={
         <>
@@ -297,6 +298,7 @@ function AssistantGroup({ models }: { models: ProviderModels[] | null }) {
   const note = chosen && !chosen.available ? `${chosen.label} is not available: ${chosen.why ?? "it did not answer"}.` : null;
   return (
     <Group
+      prompt
       title="Assistant"
       footer={
         <Hint data-dag-setting-assistant-hint="">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Check, TextField } from "@/ui/controls";
 import { copyText } from "@/ui/clipboard";
 import { SyncError, syncDevices, syncLink, syncNow, syncPair, syncRemotes, syncRevoke, syncUnlink } from "@/sync/api";
-import { hrefForPath, passphraseProblem, plural, sameRecovery, statusWords } from "@/sync/status";
+import { hrefForPath, passphraseProblem, plural, sameRecovery, statusTone, statusWords } from "@/sync/status";
 import type { SyncDevices, SyncRemote, SyncStatus } from "@/sync/types";
 import { adoptSyncStatus, useSyncStatus } from "@/sync/useSyncStatus";
 import { withVault } from "@/vault/current";
@@ -448,6 +448,11 @@ function Recovery({ code, onDone }: { code: string; onDone(): void }) {
 
 // -- linked --------------------------------------------------------------------------------------
 
+/** The State row's dot: the sidebar mark's three looks, and a grey one when nothing is linked. */
+function syncTone(s: SyncStatus): "ok" | "busy" | "warn" | "off" {
+  return s.linked ? statusTone(s) : "off";
+}
+
 function when(iso: string | null): string {
   if (!iso) return "never";
   const d = new Date(iso);
@@ -481,7 +486,11 @@ function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {
     <>
       <Facts title="Status">
         <Fact label="State">
-          <span className="dag-settings__value" data-dag-sync-state={status.state}>
+          <span
+            className="dag-settings__value dag-settings__state"
+            data-dag-sync-state={status.state}
+            data-dag-sync-tone={syncTone(status)}
+          >
             {statusWords(status)}
           </span>
         </Fact>
