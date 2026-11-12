@@ -327,11 +327,12 @@ only signal that this was an accident rather than a choice was not recognising i
 `pointer-events: none` and the card turns it back on, so the paper behind it still pans and zooms —
 an invitation, not a gate.
 
-**It is three parts, and no more.** First the ways to start, as tiles that carry the key that does
-the same thing: **Board** (`B`), **Note** (`N`), **Task** (`T`), **More…** (`M`, which opens Event,
-Quiz and Table under them) and **Search** (the board dialog's `space O`). Those bare letters are
-live only while Home is showing, where there is no board, no text box and no dialog to want them;
-the card leaves the keys alone once any of those is up.
+**It is three parts, and no more.** First the ways to start, as tiles: **Board**, **Note**, **Task**,
+**More…** (which opens Event, Quiz and Table under them) and **Search**, which shows the board
+dialog's `space O`. The tiles have **no bare-letter keys** of their own: the app moved every command
+off bare letters after a typed letter landed in a board file (*The leader key*, `editing.md`), and a
+single-key shortcut that cannot be turned off is WCAG 2.1.4's failure. They are buttons, and Tab
+reaches them.
 
 Then **Recent**, the last five files this browser opened in this vault, newest first, each a row
 that opens it again. It is not the index and it is not a preference: `src/ui/recents.ts` keeps

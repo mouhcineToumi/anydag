@@ -15,7 +15,7 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { everyFile, type BoardTree, type FileKind, type TextKind } from "@/board/useBoard";
 import { chordFor } from "@/edit/bindings";
@@ -51,12 +51,12 @@ const KIND_ICON: Readonly<Record<FileKind, LucideIcon>> = {
 };
 
 /** The ways to start, in the order a person reaches for them. `lead` is the one the card points at. */
-type StartTile = { kind: StartKind; label: string; icon: LucideIcon; key?: string; lead?: boolean };
+type StartTile = { kind: StartKind; label: string; icon: LucideIcon; lead?: boolean };
 
 const STARTS: StartTile[] = [
-  { kind: "board", label: "Board", key: "B", icon: Workflow, lead: true },
-  { kind: "note", label: "Note", key: "N", icon: FileText },
-  { kind: "task", label: "Task", key: "T", icon: SquareCheckBig },
+  { kind: "board", label: "Board", icon: Workflow, lead: true },
+  { kind: "note", label: "Note", icon: FileText },
+  { kind: "task", label: "Task", icon: SquareCheckBig },
 ];
 
 /** The kinds behind *More…* — the ones a first card does not put in front of somebody. */
@@ -71,13 +71,6 @@ function weekFrom(day: string): string {
   const at = new Date(`${day}T12:00:00Z`);
   at.setUTCDate(at.getUTCDate() + 7);
   return at.toISOString().slice(0, 10);
-}
-
-/** Whether a key press landed in something somebody types into, where Home's letters are text. */
-function typingHere(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  if (!el?.tagName) return false;
-  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
 /**
@@ -100,9 +93,7 @@ function typingHere(target: EventTarget | null): boolean {
  * second set of instructions a few pixels away. Here the title says the vault is empty, every kind
  * is a tile, and Search is not offered because it can find nothing.
  *
- * **The tiles carry the keys that do the same thing**, and this card is the only place those bare
- * letters are live: no board, no text box, no dialog. A press elsewhere is text, and an open dialog
- * — Settings, the search, the shortcut sheet — keeps its keys.
+ * **The tiles have no bare-letter keys.** Search shows its real chord; the others are buttons.
  *
  * The canvas underneath stays live — `pointer-events` is off on the layer and back on for the card
  * — so the paper can still be panned and zoomed behind it. It is an invitation, not a gate.
@@ -156,28 +147,9 @@ export function Welcome({
 
   const start = (kind: StartKind) => (locked ? refuseLocked() : onStart(kind));
 
-  /* The keys the tiles name. Registered once for as long as Home is on screen; a dialog owns its
-     own keys while it is open, and a box somebody types into is text. */
-  const acts = useRef({ start, onOpen, setMore, empty, more });
-  acts.current = { start, onOpen, setMore, empty, more };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-      if (typingHere(e.target) || document.querySelector('[role="dialog"]')) return;
-      const key = e.key.toLowerCase();
-      if (key === "m" && !acts.current.empty) {
-        e.preventDefault();
-        acts.current.setMore((was) => !was);
-        return;
-      }
-      const kind = key === "b" ? "board" : key === "n" ? "note" : key === "t" ? "task" : null;
-      if (!kind) return;
-      e.preventDefault();
-      acts.current.start(kind);
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, []);
+  /* No bare letters here: the app moved every command off them after a typed letter landed in a
+     board file (*The leader key*, `editing.md`), and a single-key shortcut is WCAG 2.1.4's failure.
+     The tiles are buttons, reached by Tab. */
 
   return (
     <div className="dag-welcome__layer" data-dag-welcome="">
@@ -211,29 +183,24 @@ export function Welcome({
         ) : null}
 
         <div className="dag-welcome__acts dag-welcome__acts--home">
-          {(empty ? [...STARTS, ...MORE_STARTS.map((other) => ({ ...other, key: "" }))] : STARTS).map(
-            ({ kind, label, key, icon: Icon, lead }) => (
-              <button
-                key={kind}
-                type="button"
-                className={
-                  lead
-                    ? "dag-welcome__act dag-welcome__act--tile dag-welcome__act--go"
-                    : "dag-welcome__act dag-welcome__act--tile"
-                }
-                data-dag-welcome-new={kind === "board" ? "" : undefined}
-                data-dag-welcome-note={kind === "note" ? "" : undefined}
-                data-dag-welcome-task={kind === "task" ? "" : undefined}
-                data-dag-welcome-start={kind}
-                {...blocked}
-                onClick={() => start(kind)}
-              >
-                <Icon {...ICON} aria-hidden="true" />
-                <span>{label}</span>
-                {key ? <kbd>{key}</kbd> : null}
-              </button>
-            ),
-          )}
+          {(empty ? [...STARTS, ...MORE_STARTS] : STARTS).map(({ kind, label, icon: Icon, lead }) => (
+            <button
+              key={kind}
+              type="button"
+              className={
+                lead ? "dag-welcome__act dag-welcome__act--tile dag-welcome__act--go" : "dag-welcome__act dag-welcome__act--tile"
+              }
+              data-dag-welcome-new={kind === "board" ? "" : undefined}
+              data-dag-welcome-note={kind === "note" ? "" : undefined}
+              data-dag-welcome-task={kind === "task" ? "" : undefined}
+              data-dag-welcome-start={kind}
+              {...blocked}
+              onClick={() => start(kind)}
+            >
+              <Icon {...ICON} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
           {!empty ? (
             <button
               type="button"
@@ -245,7 +212,6 @@ export function Welcome({
             >
               <MoreHorizontal {...ICON} aria-hidden="true" />
               <span>More…</span>
-              <kbd>M</kbd>
             </button>
           ) : null}
           {more && !empty
