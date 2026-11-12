@@ -235,7 +235,7 @@ test("a width written in Layout survives a reload, and ctrl+Z on the board takes
 
   await openLayout(page);
   await expect(width).toHaveValue("2400");
-  await expect(read()).toContain("flow:\n  width: 2400");
+  expect(read()).toContain("flow:\n  width: 2400");
 
   /* A second write, then one undo: it is a version of the file, so the value read back after the
      reload is the one it puts back. */
