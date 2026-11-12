@@ -8,12 +8,14 @@ import type { LlmReason } from "./llmReason";
  * one fails, and by their model chips. `enabled` lets a card ask only once it has a failure to
  * explain.
  */
-interface ProviderInfo {
+export interface ProviderInfo {
   id: string;
   label: string;
   /** What the name no longer explains, shown as the provider row's hint in Settings. */
   description: string;
   kind: "http" | "cli";
+  /** The environment variables its key is read from. Names only. */
+  keyEnv?: string[];
   defaultModel: string;
   models: string[];
   ready: boolean;
@@ -33,17 +35,21 @@ export interface Providers {
    surface hears the new answer — a chip on a card must not go on naming the provider from before
    a sign-in. */
 let last: Providers | null = null;
+/** When `last` came back, for Settings' "Checked N seconds ago". */
+let lastAt: number | null = null;
 let pending: Promise<Providers | null> | null = null;
 const listeners = new Set<(d: Providers) => void>();
 
 function load(force: boolean): Promise<Providers | null> {
   if (!force && last) return Promise.resolve(last);
   if (!pending) {
-    pending = fetch("/__board/llm")
+    /* A refresh asks the server to check again too, not to repeat the minute-old answer it keeps. */
+    pending = fetch(force ? "/__board/llm?fresh=1" : "/__board/llm")
       .then((r) => (r.ok ? (r.json() as Promise<Providers>) : null))
       .then((d) => {
         if (d) {
           last = d;
+          lastAt = Date.now();
           for (const hear of listeners) hear(d);
         }
         return d;
@@ -55,6 +61,11 @@ function load(force: boolean): Promise<Providers | null> {
       });
   }
   return pending;
+}
+
+/** When the list on screen was checked, in milliseconds; `null` before the first answer. */
+export function providersCheckedAt(): number | null {
+  return lastAt;
 }
 
 export function useProviders(enabled = true): [Providers | null, () => void] {

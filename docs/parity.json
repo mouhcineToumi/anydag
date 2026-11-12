@@ -933,6 +933,14 @@
       "mcp": ["llm"]
     },
     {
+      "id": "models.test",
+      "area": "Models",
+      "what": "Make one short call to a provider, to see that it really answers",
+      "rest": ["POST /__board/llm/test"],
+      "cli": {"admin": false},
+      "mcp": ["llm"]
+    },
+    {
       "id": "models.generate",
       "area": "Models",
       "what": "Ask a model to draw a diagram",

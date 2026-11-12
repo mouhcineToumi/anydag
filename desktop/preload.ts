@@ -25,6 +25,14 @@ export interface AnyDagDesktopKeys {
   names(): Promise<string[]>;
 }
 
+/** What a provider needs besides its key and is not secret: the OpenAI-compatible address and
+ *  model. Unlike a key, the page may read these back. Setting one restarts the server. */
+export interface AnyDagDesktopProviderEnv {
+  get(): Promise<Record<string, string>>;
+  /** Store a value, or `""` to remove it. `false` for a name the shell does not keep or an address that is not http(s). */
+  set(name: string, value: string): Promise<boolean>;
+}
+
 export interface AnyDagDesktop {
   /** What the page puts on a write so the shell knows the page sent it (`desktop/main.ts`,
    *  `trusted`). Absent in a subframe and on any document that is not the page. */
@@ -34,6 +42,7 @@ export interface AnyDagDesktop {
   pickFolder(): Promise<string | null>;
   revealInFolder(target: string): Promise<void>;
   keys: AnyDagDesktopKeys;
+  providerEnv: AnyDagDesktopProviderEnv;
   readonly version: string;
   readonly platform: string;
   /** Whether the window is in full screen now. */
@@ -56,6 +65,14 @@ const api: AnyDagDesktop = {
   },
   revealInFolder(target: string): Promise<void> {
     return ipcRenderer.invoke("folders:reveal", target);
+  },
+  providerEnv: {
+    get(): Promise<Record<string, string>> {
+      return ipcRenderer.invoke("providerEnv:get");
+    },
+    set(name: string, value: string): Promise<boolean> {
+      return ipcRenderer.invoke("providerEnv:set", name, value);
+    },
   },
   keys: {
     set(name: string, value: string): Promise<boolean> {
