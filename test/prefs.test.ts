@@ -91,6 +91,8 @@ const EVENTS = new Set([
   "dag:link-bend",
   "dag:settings",
   "dag:prefs",
+  /* A setting's write landed, and the row that owns it says Saved: `settings/saved.ts`. */
+  "dag:settings-saved",
   /* The sidebar asking the page for a card it renders — search, settings or feedback.
      Not `dag:settings`, which is the settings-changed event above: one name meaning two things is
      the namespace hazard this list exists to keep visible. */

@@ -26,6 +26,7 @@ import { AgentsPane } from "./panes/Agents";
 import { CalendarPane } from "./panes/Calendar";
 import { ICON } from "./panes/common";
 import { ExportPane } from "./panes/Export";
+import { SettingsFeedback } from "./feedback";
 import { PreferencesPane } from "./panes/Preferences";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
@@ -96,7 +97,10 @@ export function useSettingsOpen() {
  *   in a field that is holding a change takes the change back first; the next one closes.
  * - **There is no Save**, on any tab. Every control writes as it changes, which is what the rest of
  *   this app does with a file and the only behaviour that cannot leave a preference in a state
- *   nobody asked for. The vault's name, the one field that is text, saves when it is left.
+ *   nobody asked for. The row that changed says `✓ Saved` once the write has landed — a text field
+ *   after a pause, or when it is left — and the modal's one polite live region announces it. Each
+ *   tab's Reset names its scope in its own text and offers Undo for six seconds. The vault's name,
+ *   the one field that is text, saves when it is left.
  * - **The tab is remembered in this browser** (`dag:settings-tab`), and a request that names one
  *   opens on that one instead. On a narrow window a generic opening shows the list, as a phone's
  *   settings do, and a request for a tab goes straight to it.
@@ -229,117 +233,119 @@ export function Settings({
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={onKey}
       >
-        <nav className="dag-settings-modal__nav" aria-label="Settings">
-          <h2 className="dag-settings-modal__title">Settings</h2>
-          {groups.map((g) => {
-            const heading = `${id}-group-${g.group}`;
-            return (
-              <div key={g.group} className="dag-settings-modal__group">
-                <p
-                  id={heading}
-                  className="dag-settings-modal__heading"
-                  data-dag-settings-group={g.group}
-                  /* Which vault the second group's tabs are kept with: its name is the heading. */
-                  {...(g.group === "vault" ? { "data-dag-settings-vault": vault.id } : {})}
-                >
-                  {g.group === "account" ? "App" : vault.name}
-                </p>
-                <div role="tablist" aria-orientation="vertical" aria-labelledby={heading}>
-                  {g.tabs.map((t) => {
-                    const TabIcon = TAB_ICON[t];
-                    const on = t === tab;
-                    return (
-                      <button
-                        key={t}
-                        id={tabId(t)}
-                        type="button"
-                        role="tab"
-                        aria-selected={on}
-                        aria-controls={paneId}
-                        tabIndex={on ? 0 : -1}
-                        className="dag-settings-modal__tab"
-                        data-dag-settings-tab-button={t}
-                        onClick={() => {
-                          setTab(t);
-                          setView("pane");
-                          /* On a narrow window the list goes away under the click, and the focus with it. */
-                          if (narrow())
-                            requestAnimationFrame(() =>
-                              card.current?.querySelector<HTMLElement>("[data-dag-settings-back]")?.focus(),
-                            );
-                        }}
-                        onKeyDown={onTabKey}
-                      >
-                        <TabIcon {...ICON} aria-hidden="true" />
-                        <span>{TAB_LABEL[t]}</span>
-                      </button>
-                    );
-                  })}
+        <SettingsFeedback>
+          <nav className="dag-settings-modal__nav" aria-label="Settings">
+            <h2 className="dag-settings-modal__title">Settings</h2>
+            {groups.map((g) => {
+              const heading = `${id}-group-${g.group}`;
+              return (
+                <div key={g.group} className="dag-settings-modal__group">
+                  <p
+                    id={heading}
+                    className="dag-settings-modal__heading"
+                    data-dag-settings-group={g.group}
+                    /* Which vault the second group's tabs are kept with: its name is the heading. */
+                    {...(g.group === "vault" ? { "data-dag-settings-vault": vault.id } : {})}
+                  >
+                    {g.group === "account" ? "App" : vault.name}
+                  </p>
+                  <div role="tablist" aria-orientation="vertical" aria-labelledby={heading}>
+                    {g.tabs.map((t) => {
+                      const TabIcon = TAB_ICON[t];
+                      const on = t === tab;
+                      return (
+                        <button
+                          key={t}
+                          id={tabId(t)}
+                          type="button"
+                          role="tab"
+                          aria-selected={on}
+                          aria-controls={paneId}
+                          tabIndex={on ? 0 : -1}
+                          className="dag-settings-modal__tab"
+                          data-dag-settings-tab-button={t}
+                          onClick={() => {
+                            setTab(t);
+                            setView("pane");
+                            /* On a narrow window the list goes away under the click, and the focus with it. */
+                            if (narrow())
+                              requestAnimationFrame(() =>
+                                card.current?.querySelector<HTMLElement>("[data-dag-settings-back]")?.focus(),
+                              );
+                          }}
+                          onKeyDown={onTabKey}
+                        >
+                          <TabIcon {...ICON} aria-hidden="true" />
+                          <span>{TAB_LABEL[t]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </nav>
+              );
+            })}
+          </nav>
 
-        <div
-          id={paneId}
-          role="tabpanel"
-          aria-labelledby={tabId(tab)}
-          className="dag-settings-modal__pane"
-          data-dag-settings-pane={tab}
-        >
-          <div className="dag-settings-modal__head">
-            <button
-              type="button"
-              className="dag-icon dag-settings-modal__back"
-              aria-label="All settings"
-              data-dag-settings-back=""
-              onClick={() => {
-                setView("list");
-                focusTab(tab);
-              }}
-            >
-              <ArrowLeft {...ICON} aria-hidden="true" />
-            </button>
-            <h3>{TAB_LABEL[tab]}</h3>
-          </div>
-          <div className="dag-settings-modal__body">
-            {tab === "calendar" ? (
-              <CalendarPane />
-            ) : tab === "shortcuts" ? (
-              <ShortcutList />
-            ) : tab === "privacy" && cloud ? (
-              <PrivacyPane />
-            ) : tab === "about" ? (
-              <AboutPane
-                onShortcuts={() => {
-                  setTab("shortcuts");
-                  focusTab("shortcuts");
+          <div
+            id={paneId}
+            role="tabpanel"
+            aria-labelledby={tabId(tab)}
+            className="dag-settings-modal__pane"
+            data-dag-settings-pane={tab}
+          >
+            <div className="dag-settings-modal__head">
+              <button
+                type="button"
+                className="dag-icon dag-settings-modal__back"
+                aria-label="All settings"
+                data-dag-settings-back=""
+                onClick={() => {
+                  setView("list");
+                  focusTab(tab);
                 }}
-              />
-            ) : tab === "preferences" ? (
-              <PreferencesPane themes={themes} themeName={themeName} onTheme={onTheme} />
-            ) : tab === "vault" ? (
-              <VaultPane boardName={boardName} />
-            ) : tab === "sync" && cloud ? (
-              <SyncPane />
-            ) : tab === "agents" ? (
-              <AgentsPane />
-            ) : (
-              <ExportPane />
-            )}
+              >
+                <ArrowLeft {...ICON} aria-hidden="true" />
+              </button>
+              <h3>{TAB_LABEL[tab]}</h3>
+            </div>
+            <div className="dag-settings-modal__body">
+              {tab === "calendar" ? (
+                <CalendarPane />
+              ) : tab === "shortcuts" ? (
+                <ShortcutList />
+              ) : tab === "privacy" && cloud ? (
+                <PrivacyPane />
+              ) : tab === "about" ? (
+                <AboutPane
+                  onShortcuts={() => {
+                    setTab("shortcuts");
+                    focusTab("shortcuts");
+                  }}
+                />
+              ) : tab === "preferences" ? (
+                <PreferencesPane themes={themes} themeName={themeName} onTheme={onTheme} />
+              ) : tab === "vault" ? (
+                <VaultPane boardName={boardName} />
+              ) : tab === "sync" && cloud ? (
+                <SyncPane />
+              ) : tab === "agents" ? (
+                <AgentsPane />
+              ) : (
+                <ExportPane />
+              )}
+            </div>
           </div>
-        </div>
 
-        <button
-          type="button"
-          className="dag-icon dag-settings-modal__close"
-          aria-label="Close settings"
-          data-dag-settings-close=""
-          onClick={onClose}
-        >
-          <X {...ICON} aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            className="dag-icon dag-settings-modal__close"
+            aria-label="Close settings"
+            data-dag-settings-close=""
+            onClick={onClose}
+          >
+            <X {...ICON} aria-hidden="true" />
+          </button>
+        </SettingsFeedback>
       </section>
     </div>,
     document.body,

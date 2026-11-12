@@ -3,6 +3,7 @@ import { useState } from "react";
 import { setConsent, useTelemetry } from "@/telemetry/client";
 import { NEVER, SENT } from "@/telemetry/what";
 import { Switch } from "@/ui/controls";
+import { markSaved } from "../saved";
 
 import { Field, Group, Hint } from "./common";
 
@@ -26,6 +27,7 @@ export function PrivacyPane() {
               ? "That did not save. Try again in a moment."
               : "Errors, which features are used, and how fast pages draw. Nothing you write, and nothing that names you."
           }
+          save="telemetry.consent"
         >
           <Switch
             data-dag-setting-telemetry=""
@@ -33,7 +35,7 @@ export function PrivacyPane() {
             disabled={status === null}
             onChange={(e) => {
               setFailed(false);
-              void setConsent(e.target.checked).then((ok) => !ok && setFailed(true));
+              void setConsent(e.target.checked).then((ok) => (ok ? markSaved("telemetry.consent") : setFailed(true)));
             }}
           />
         </Field>

@@ -195,6 +195,32 @@ test("a tab's reset puts back what that tab shows, and nothing on another tab", 
   await expect(page.locator("[data-dag-setting-export-scale]")).toHaveValue("2");
 });
 
+test("a change says Saved, and a reset's Undo puts the value back after a reload", async ({ page }) => {
+  await open(page);
+  await openSettings(page, "export");
+  const scale = page.locator("[data-dag-setting-export-scale]");
+
+  await scale.selectOption("4");
+  /* The row that changed says so, and the tick goes away on its own. */
+  const saved = page.locator('[data-dag-settings-pane="export"] [data-dag-setting-saved]');
+  await expect(saved).toContainText("Saved");
+  await expect(saved).toHaveCount(0, { timeout: 5_000 });
+
+  await page.locator("[data-dag-setting-reset]").click();
+  const toast = page.locator("[data-dag-setting-reset-toast]");
+  await expect(toast).toContainText("Import and export reset");
+  await expect(scale).toHaveValue("2");
+
+  await toast.locator("[data-dag-setting-reset-undo]").click();
+  await expect(scale).toHaveValue("4");
+  await expect(toast).toHaveCount(0);
+
+  /* Undo wrote through the same setter as the control, so the value is a preference like any other. */
+  await open(page);
+  await openSettings(page, "export");
+  await expect(page.locator("[data-dag-setting-export-scale]")).toHaveValue("4");
+});
+
 test("a board's theme: changes nothing; the reader's choice and the snapshot default do", async ({ page }) => {
   /* The fixture carries `theme: paper-dark`; the app's default is paper. */
   await open(page);

@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import {
   Children,
   Fragment,
@@ -10,6 +10,9 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+
+import { useResetToast, useSaved } from "../feedback";
+import { quietly } from "../saved";
 
 /** Lucide at one size and weight, stated once. */
 export const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -53,6 +56,10 @@ function named(node: ReactNode, labelId: string, hintId?: string): ReactNode {
  * a `<label>` when the control is something to click, so pressing the words toggles a switch or
  * focuses a select; a read-only value is a plain row. `stack` puts the control under the words, for
  * one that needs the width — a command to copy, a path.
+ *
+ * `save` is the key this row's writes announce (`paste.width`, `dag:week-start`); the tick beside
+ * the control appears when one lands. A text field passes `settle` so the tick waits for a pause in
+ * the typing rather than blinking under the caret, and leaving the field shows it at once.
  */
 export function Field({
   label,
@@ -60,6 +67,8 @@ export function Field({
   children,
   plain,
   stack,
+  save,
+  settle = 0,
   ...rest
 }: {
   label: ReactNode;
@@ -68,11 +77,16 @@ export function Field({
   /** Not a `<label>`: the row holds buttons, or nothing to click at all. */
   plain?: boolean;
   stack?: boolean;
+  /** The `markSaved` key this row's control writes, when it writes one. */
+  save?: string;
+  /** Milliseconds of quiet before a text field's tick shows; zero for a control that writes once. */
+  settle?: number;
 } & Record<`data-${string}`, string>) {
   const id = useId();
   const labelId = `${id}-name`;
   const hintId = `${id}-hint`;
   const Row = plain ? "div" : "label";
+  const saved = useSaved(save, settle);
   return (
     <Row className={`dag-settings__row${stack ? " dag-settings__row--stack" : ""}`} {...rest}>
       <span className="dag-settings__label">
@@ -86,7 +100,15 @@ export function Field({
         ) : null}
       </span>
       {children !== undefined ? (
-        <span className="dag-settings__control">{named(children, labelId, hint ? hintId : undefined)}</span>
+        <span className="dag-settings__control" onBlurCapture={saved.flush}>
+          {saved.shown ? (
+            <span className="dag-settings__saved" data-dag-setting-saved="" aria-hidden="true">
+              <Check size={12} strokeWidth={2} />
+              <span>Saved</span>
+            </span>
+          ) : null}
+          {named(children, labelId, hint ? hintId : undefined)}
+        </span>
       ) : null}
     </Row>
   );
@@ -103,21 +125,28 @@ export function Hint({ children, ...rest }: { children: ReactNode } & Record<`da
 
 /**
  * Back to the defaults, for what this tab shows and nothing else. Quiet, at the foot of the
- * tab, because it is the one control nobody should press by accident; the title names what it
- * resets, because "Reset" on its own is a question a person should not have to press to answer.
+ * tab, because it is the one control nobody should press by accident. The button names its scope in
+ * its own text — "Reset Diagrams to defaults" — and the action hands back Undo, which the modal
+ * offers for six seconds. The writes the reset itself makes are quiet: the toast is its answer.
  */
-export function Reset({ what, onReset }: { what: string; onReset(): void }) {
+export function Reset({ what, onReset }: { what: string; onReset(): () => void }) {
+  const showReset = useResetToast();
   return (
     <footer className="dag-settings__foot">
       <button
         type="button"
         className="dag-settings__reset"
         data-dag-setting-reset=""
-        onClick={onReset}
-        title={`Put ${what} back as they were`}
+        onClick={() => {
+          let undo: () => void = () => undefined;
+          quietly(() => {
+            undo = onReset();
+          });
+          showReset(what, undo);
+        }}
       >
         <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
-        <span>Reset to defaults</span>
+        <span>Reset {what} to defaults</span>
       </button>
     </footer>
   );

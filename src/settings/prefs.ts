@@ -23,6 +23,8 @@
 
 import { scopedKey } from "@/vault/current";
 
+import { markSaved } from "./saved";
+
 /** Where the reader's own choice of theme lives. */
 export const THEME = "dag:theme";
 /** Where the library remembers whether it was open. */
@@ -245,8 +247,13 @@ export function readFlag(key: string, fallback: boolean): boolean {
   return raw === null ? fallback : raw !== "0";
 }
 
-/** Write one, and tell the window — which is how it reaches the sync. */
-export function writePref(key: string, value: string | null): void {
+/**
+ * Write one, and tell the window — which is how it reaches the sync.
+ *
+ * `savedAs` names the row a tick belongs to when several rows share one storage key — the calendar's
+ * kinds are one comma list but three switches; without it, toggling one would tick all three.
+ */
+export function writePref(key: string, value: string | null, savedAs: string = key): void {
   if (snapshot()) return;
   try {
     if (value === null) localStorage.removeItem(storageKey(key));
@@ -255,10 +262,41 @@ export function writePref(key: string, value: string | null): void {
     /* Remembering is the nicety; honouring it for this session is the point. */
   }
   announce(PER_VAULT.has(key) ? "vault" : "account");
+  markSaved(savedAs);
 }
 
-export function writeFlag(key: string, value: boolean): void {
-  writePref(key, value ? "1" : "0");
+export function writeFlag(key: string, value: boolean, savedAs?: string): void {
+  writePref(key, value ? "1" : "0", savedAs);
+}
+
+/** The values of `keys` that exist now — what a reset will change, and what its Undo puts back. */
+function snapshotPrefs(keys: readonly string[]): Record<string, string | null> {
+  const snapshot: Record<string, string | null> = {};
+  for (const key of keys) {
+    const value = readPref(key);
+    if (value !== null) snapshot[key] = value;
+  }
+  return snapshot;
+}
+
+/** Put a snapshot back through {@link writePref}, so each one announces and reaches the sync. */
+function restorePrefs(snapshot: Record<string, string | null>): void {
+  for (const [key, value] of Object.entries(snapshot)) writePref(key, value);
+}
+
+/**
+ * Remove every key that is set, which is the default for these preferences — the calendar's zone,
+ * its week start and its hidden kinds are all absent until somebody chooses — and hand back the
+ * Undo.
+ *
+ * The snapshot is taken before the reset and holds only the keys that exist, so Undo puts back every
+ * value the reset changed and touches nothing chosen afterwards. Undo writes it through the same
+ * accessor the controls use, so a value that was there comes back exactly as it was.
+ */
+export function resetPrefs(keys: readonly string[]): () => void {
+  const before = snapshotPrefs(keys);
+  for (const key of keys) if (readPref(key) !== null) writePref(key, null);
+  return () => restorePrefs(before);
 }
 
 /**
