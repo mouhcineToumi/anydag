@@ -29,9 +29,12 @@ export interface Providers {
 }
 
 /* One answer for every surface: a board with ten prompt cards would otherwise ask ten times. A
-   refresh (the Settings tab, a failure's Check again) asks the server again. */
+   refresh (the Settings tab, a failure's Check again) asks the server again, and every mounted
+   surface hears the new answer — a chip on a card must not go on naming the provider from before
+   a sign-in. */
 let last: Providers | null = null;
 let pending: Promise<Providers | null> | null = null;
+const listeners = new Set<(d: Providers) => void>();
 
 function load(force: boolean): Promise<Providers | null> {
   if (!force && last) return Promise.resolve(last);
@@ -39,7 +42,10 @@ function load(force: boolean): Promise<Providers | null> {
     pending = fetch("/__board/llm")
       .then((r) => (r.ok ? (r.json() as Promise<Providers>) : null))
       .then((d) => {
-        if (d) last = d;
+        if (d) {
+          last = d;
+          for (const hear of listeners) hear(d);
+        }
         return d;
       })
       /* No server: the select offers the server default and nothing else, which is true. */
@@ -57,11 +63,14 @@ export function useProviders(enabled = true): [Providers | null, () => void] {
   useEffect(() => {
     if (!enabled) return;
     let live = true;
+    const hear = (d: Providers) => live && setList(d);
+    listeners.add(hear);
     void load(asked > 0).then((d) => {
       if (live && d) setList(d);
     });
     return () => {
       live = false;
+      listeners.delete(hear);
     };
   }, [asked, enabled]);
   return [list, () => ask((n) => n + 1)];
