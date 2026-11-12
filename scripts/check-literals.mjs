@@ -108,4 +108,73 @@ if (findings.length) {
   process.exit(1);
 }
 
+/* 5. Text in the app chrome never uses `muted`. It is 2.46:1 on Paper's page and 2.29:1 on its
+      sidebar, so a rule that colours words with it is text a person cannot read. `slate` is the
+      second text tone the themes already carry. What may keep `muted` is listed, selector by
+      selector and with its reason, in `chrome-muted-allowlist.json`: disabled controls,
+      separators and decorative glyphs, none of which is text. */
+const CHROME = "src/styles/chrome.css";
+const CHROME_ALLOWLIST = "scripts/chrome-muted-allowlist.json";
+
+/** The selector and declarations of every rule in a stylesheet, at-rules included. */
+function cssRules(text) {
+  const clean = strip(text, ".css");
+  const rules = [];
+  const stack = [];
+  const lineAt = (index) => clean.slice(0, index).split("\n").length;
+  let start = 0;
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
+    if (ch === "{") {
+      const raw = clean.slice(start, i);
+      const lead = raw.search(/\S/);
+      const selector = raw.trim().replace(/\s+/g, " ");
+      if (stack.length) stack[stack.length - 1].decls += clean.slice(stack[stack.length - 1].declStart, i);
+      stack.push({ selector, line: lineAt(lead < 0 ? start : start + lead), declStart: i + 1, decls: "" });
+      start = i + 1;
+    } else if (ch === "}") {
+      const block = stack.pop();
+      if (!block) continue;
+      block.decls += clean.slice(block.declStart, i);
+      rules.push(block);
+      if (stack.length) stack[stack.length - 1].declStart = i + 1;
+      start = i + 1;
+    } else if (ch === ";" && stack.length === 0) {
+      start = i + 1;
+    }
+  }
+  return rules;
+}
+
+const mutedAllow = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(root, CHROME_ALLOWLIST), "utf8"))));
+const muted = /color\s*:\s*var\(--dag-color-muted\)/;
+const chromeAllowed = new Set();
+const chromeFindings = [];
+
+for (const rule of cssRules(fs.readFileSync(path.join(root, CHROME), "utf8"))) {
+  if (rule.selector.startsWith("@") || !muted.test(rule.decls)) continue;
+  if (mutedAllow.has(rule.selector)) chromeAllowed.add(rule.selector);
+  else chromeFindings.push({ file: CHROME, line: rule.line, what: "muted text", text: rule.selector });
+}
+
+for (const [selector, reason] of mutedAllow) {
+  if (typeof reason !== "string" || !reason.trim()) {
+    chromeFindings.push({ file: CHROME_ALLOWLIST, line: 0, what: "no reason", text: selector });
+  } else if (!chromeAllowed.has(selector)) {
+    chromeFindings.push({ file: CHROME_ALLOWLIST, line: 0, what: "stale entry", text: selector });
+  }
+}
+
+if (chromeFindings.length) {
+  console.error(`${chromeFindings.length} muted text finding(s) in the chrome:\n`);
+  let last = "";
+  for (const f of chromeFindings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
+    if (f.file !== last) console.error(`  ${f.file}`), (last = f.file);
+    console.error(`    ${String(f.line).padStart(4)}  ${f.what.padEnd(18)} ${f.text}`);
+  }
+  console.error("\nReadable text is `slate`; `muted` is only for disabled controls, separators and decorative glyphs.");
+  process.exit(1);
+}
+
 console.log("ok: no hardcoded colours, lengths or svg style values on the diagram surface");
+console.log("ok: no muted text in the chrome outside the allowlist");

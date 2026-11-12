@@ -60,4 +60,7 @@ through an unchecked cast). `check-literals.mjs` is the other half, and it exist
 file once claimed `check-theme.mjs` did its job, and 99 px literals had accumulated behind the
 claim. The app chrome is exempt and lives in `src/styles/chrome.css`: no theme has an opinion about
 the height of a zoom button, and inventing keys nobody would set is how a design system stops
-meaning anything.
+meaning anything. Its fifth section does hold the chrome's text tone: a `color: var(--dag-color-muted)`
+there is refused unless its selector is listed, with a reason, in
+`scripts/chrome-muted-allowlist.json` — and only a disabled control, a separator or a decorative
+glyph belongs there. Readable text is `slate`; `muted` is not a text colour.
