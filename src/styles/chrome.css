@@ -296,6 +296,14 @@
 }
 .dag-modelpicker__customInput:focus { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
 .dag-modelpicker__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+/* The picker is opened from Settings, so at phone width its list is a finger's too. */
+@media (max-width: 719px) {
+  .dag-modelpicker__searchInput { height: 44px; }
+  .dag-modelpicker__option { min-height: 44px; }
+  .dag-modelpicker__back { min-height: 44px; }
+  .dag-modelpicker__customInput { height: 44px; }
+  .dag-modelpicker__popover .dag-button { height: 44px; }
+}
 
 /* Settings' provider list: one row per provider, its state as a pill, its setup under it. The pill's
    colours are the theme's status families, so a theme decides what Ready and Needs a key look like. */
@@ -3681,6 +3689,46 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings-modal__copy--block { align-items: flex-start; padding: 8px 4px 8px 12px; }
 .dag-settings-modal__copy--block > code { white-space: pre-wrap; line-height: 1.5; }
+/* The AI tab on a phone: one row per feature, opening onto that feature's controls. The row is the
+   whole target, so a thumb does not have to find a chevron. Names grepped first:
+   `dag-settings__feature*` and `data-dag-setting-ai-*` were nobody's. */
+.dag-settings__feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.dag-settings__feature:hover { background: var(--dag-color-paper100); }
+.dag-settings__feature:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; border-radius: var(--dag-metric-radius-tile); }
+.dag-settings__featureMark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--dag-color-ink); }
+.dag-settings__featureText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dag-settings__featureChevron { flex: none; color: var(--dag-color-slate); }
+.dag-settings__featureBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin: -4px 0 8px -8px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--dag-color-slate);
+  background: none;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-settings__featureBack:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-settings__featureBack:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 /* A phone, or a window as narrow as one: the whole window, the list of tabs, then one tab with a way
    back — the shape a phone's own settings have. `719px` is the breakpoint the Tasks and quiz pages
    already fold at. */
@@ -3698,12 +3746,95 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-settings-modal[data-dag-settings-view="pane"] .dag-settings-modal__nav { display: none; }
   .dag-settings-modal__nav { padding: 16px 12px; border-right: none; }
   .dag-settings-modal__title { font-size: 16px; }
-  .dag-settings-modal__tab { height: 40px; font-size: 14px; }
+  .dag-settings-modal__tab { height: 44px; font-size: 14px; }
   .dag-settings-modal__back { display: inline-flex; }
   .dag-settings-modal__pane { padding: 12px 16px 24px; }
+  .dag-settings-modal__head { padding-right: 52px; }
   .dag-settings-modal .dag-settings__row { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
   .dag-settings-modal .dag-settings__control { max-width: none; justify-content: flex-start; }
   .dag-settings-modal .dag-settings__control > .dag-select, .dag-settings-modal .dag-textfield, .dag-settings-modal .dag-modelpicker, .dag-settings-modal .dag-effort { width: 100%; }
+  .dag-settings-modal .dag-settings__actions { flex-wrap: wrap; }
+
+  /* Every target is a finger's: 44 by 44 on the element itself, never on a hit area borrowed from a
+     pseudo-element. A switch and a check keep the size they are drawn at and get the box around
+     them; a field's input is the box, not the wrapper that draws its border. */
+  .dag-settings-modal .dag-icon { width: 44px; height: 44px; }
+  .dag-settings-modal .dag-button { min-width: 44px; height: 44px; }
+  .dag-settings-modal .dag-select { height: 44px; }
+  .dag-settings-modal .dag-textfield { height: auto; min-height: 44px; }
+  .dag-settings-modal .dag-textfield > input { height: 44px; }
+  .dag-settings-modal .dag-modelpicker__button { height: 44px; }
+  .dag-settings-modal .dag-settings__reset { min-height: 44px; padding: 0 10px; }
+  .dag-settings-modal .dag-settings__client { min-height: 44px; }
+  .dag-settings-modal .dag-settings__more > summary { min-height: 44px; }
+  .dag-settings-modal .dag-settings__toast-act { min-height: 44px; }
+  .dag-settings-modal .dag-settings__link { min-height: 44px; }
+  .dag-settings-modal .dag-providers__check { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; padding: 0 4px; vertical-align: middle; }
+  [data-dag-settings] a[href] { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
+
+  /* The switch is 32×18 drawn, in a 44×44 checkbox: the track moves to `::before` and the knob to
+     `::after`, so the thumb's box is the switch and the picture inside it does not grow. */
+  .dag-settings-modal .dag-switch { position: relative; width: 44px; height: 44px; background: transparent; }
+  .dag-settings-modal .dag-switch::before {
+    content: "";
+    position: absolute;
+    top: 13px;
+    left: 6px;
+    width: 32px;
+    height: 18px;
+    background: var(--dag-color-outline);
+    border-radius: 9999px;
+    box-shadow: none;
+    transition: background-color 0.15s ease;
+  }
+  .dag-settings-modal .dag-switch::after {
+    content: "";
+    position: absolute;
+    top: 15px;
+    left: 8px;
+    width: 14px;
+    height: 14px;
+    background: var(--dag-color-card);
+    border-radius: 50%;
+    box-shadow: 0 1px 2px var(--dag-color-shadow);
+    transition: transform 0.15s ease;
+  }
+  .dag-settings-modal .dag-switch:checked { background: transparent; }
+  .dag-settings-modal .dag-switch:checked::before { background: var(--dag-color-accent); transform: none; }
+  .dag-settings-modal .dag-switch:checked::after { transform: translateX(14px); }
+
+  /* The tick box has the same shape: a 16×16 square drawn in a 44×44 checkbox. */
+  .dag-settings-modal .dag-check { position: relative; width: 44px; height: 44px; background: transparent; border: none; }
+  .dag-settings-modal .dag-check::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    background: var(--dag-color-card);
+    border: 1.5px solid var(--dag-color-mutedBorder);
+    border-radius: 4px;
+    box-sizing: border-box;
+    transform: none;
+    opacity: 1;
+  }
+  .dag-settings-modal .dag-check::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 18px;
+    width: 8px;
+    height: 4px;
+    border-left: 2px solid var(--dag-color-card);
+    border-bottom: 2px solid var(--dag-color-card);
+    transform: rotate(-45deg);
+    opacity: 0;
+  }
+  .dag-settings-modal .dag-check:checked { background: transparent; border-color: transparent; }
+  .dag-settings-modal .dag-check:checked::before { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+  .dag-settings-modal .dag-check:checked::after { opacity: 1; }
 }
 
 /* ---- the model chip ----

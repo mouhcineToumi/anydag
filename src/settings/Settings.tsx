@@ -38,6 +38,7 @@ import { GeneralPane } from "./panes/General";
 import { ProvidersPane } from "./panes/Providers";
 import { QuizzesPane } from "./panes/Quizzes";
 import { SettingsFeedback } from "./feedback";
+import { narrow } from "./narrow";
 import { needsAttention } from "./providerStatus";
 import { useProviders } from "./useProviders";
 import { useSettings } from "./useSettings";
@@ -72,17 +73,6 @@ const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   privacy: ShieldCheck,
   shortcuts: Keyboard,
   about: Info,
-};
-
-/** Below this the modal is the whole window: a list of tabs, and one tab at a time. */
-const NARROW = "(max-width: 719px)";
-
-const narrow = (): boolean => {
-  try {
-    return matchMedia(NARROW).matches;
-  } catch {
-    return false;
-  }
 };
 
 /** Whether Settings is up, and on which tab it was asked to open — the state each page keeps. */
