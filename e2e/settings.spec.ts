@@ -440,8 +440,10 @@ test("the model picker searches OpenCode's ids, writes provider and model togeth
   });
   expect(saved.llm).toMatchObject({ provider: "opencode", model: "opencode-go/glm-5.3-flash" });
 
-  /* The popover is fixed to the viewport, so a phone-width window still holds the whole of it. */
+  /* The popover is fixed to the viewport, so a phone-width window still holds the whole of it.
+     At phone width the AI tab is one row per feature, so the picker is behind the diagrams row. */
   await page.setViewportSize({ width: 390, height: 800 });
+  await page.locator('[data-dag-setting-ai-feature="diagrams"]').click();
   await picker.click();
   const box = await page.locator("[data-dag-model-popover]").boundingBox();
   expect(box).not.toBeNull();

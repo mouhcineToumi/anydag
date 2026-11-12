@@ -94,6 +94,21 @@ Four things about the modal are load-bearing:
   opens the first one too, like any id this page cannot show. Under 720px the modal is the window:
   the tab list, then one tab with a back arrow.
 
+**Under 720px every control is a finger's.** Each tab is one page with a back arrow to the list, and
+every interactive element inside `[data-dag-settings]` is at least 44 × 44 CSS px: the back and
+close buttons, the tab buttons, selects, switches, text fields, copy buttons, the model picker's
+trigger, the providers' buttons and Reset. A switch and a check keep the 32 × 18 and 16 × 16 picture
+they are drawn at, inside a 44 × 44 input, so the target is the element's own box rather than a hit
+area borrowed from a pseudo-element. `e2e/settings-phone.spec.ts` measures every tab at 390 × 844 —
+the AI tab's feature pages included — and holds every tab to no horizontal scroll, the providers'
+key rows and Agent access's command among them.
+
+**The AI tab is two rows on a phone.** *Diagrams and flashcards* and *Assistant* each read as one
+summary row — the provider's mark, the feature's name, and `Claude Code · sonnet · Low` from
+`modelChoiceText` plus the chosen effort — and a tap opens that feature's controls in the same pane,
+with *All AI settings* as the way back. The modal's own back still leaves the tab for the list. Above
+720px the tab is the two groups it was; the summary rows are not drawn.
+
 **The words name the control.** Every `Field` row gives its name and hint ids and puts them on the
 control as `aria-labelledby`/`aria-describedby`, because a `plain` row is a `<div>` and the visible
 words named nothing (#189). The modal's head is a `<div>`, not a second `<header>`: the page already
@@ -209,6 +224,8 @@ access `dag-settings__client*` (`data-dag-agent-client`, `data-dag-agent-clients
 `dag-settings__defaults` and `data-dag-board-flow-*`; its two numbers are `--board-flow-width` and
 `--board-flow-gap`, which are not theme tokens — no theme has an opinion about a board's flow — the
 same argument `--inspector-w` makes.
+The phone layout added `dag-settings__feature*` (`data-dag-setting-ai-feature`,
+`data-dag-setting-ai-summary`, `data-dag-setting-ai-back`) and `dag-settings__featureBack`.
 `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
