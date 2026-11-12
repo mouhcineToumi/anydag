@@ -43,7 +43,7 @@ export function ProvidersPane() {
   return (
     <>
       <p className="dag-providers__scope" data-dag-providers-scope="">
-        Sign-ins and keys stay on this computer. Which model each feature uses is saved with the vault.
+        Sign-ins and keys stay on this computer. Which model each feature uses is yours, in every vault.
       </p>
       <Group
         footer={

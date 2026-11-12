@@ -89,10 +89,12 @@ describe("what this browser keeps per vault", () => {
     expect(scopedKey("dag:theme", "")).toBe("dag:theme");
   });
 
-  it("scopes the settings, the theme, the favourites, the attachments folder and the open folders — not the window's layout", () => {
+  it("scopes the settings, the favourites, the attachments folder and the open folders — not the window's layout, the theme or the AI choices", () => {
     pinVault("v1");
     expect(storageKey("dag:settings")).toBe("dag:settings@v1");
-    expect(storageKey("dag:theme")).toBe("dag:theme@v1");
+    /* The person's, in every vault (#191). */
+    expect(storageKey("dag:theme")).toBe("dag:theme");
+    expect(storageKey("dag:ai")).toBe("dag:ai");
     expect(storageKey("dag:favourites")).toBe("dag:favourites@v1");
     expect(storageKey("dag:attachments")).toBe("dag:attachments@v1");
     expect(storageKey("dag:sidebar-open")).toBe("dag:sidebar-open@v1");
@@ -100,7 +102,7 @@ describe("what this browser keeps per vault", () => {
     expect(storageKey("dag:sidebar")).toBe("dag:sidebar");
     expect(storageKey("dag:prefs-at")).toBe("dag:prefs-at");
     pinVault("");
-    expect(storageKey("dag:theme")).toBe("dag:theme");
+    expect(storageKey("dag:settings")).toBe("dag:settings");
   });
 });
 

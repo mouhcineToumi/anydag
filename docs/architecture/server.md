@@ -136,9 +136,10 @@ Eight things are load-bearing:
   `src/vault/current.ts` and carried on every request by a `fetch` wrapper, the `EventSource` and
   `<img src>`; a bare `/` resumes the vault opened last. **Switching is a page load**, so no
   subscription, cache or preference is left behind, and it happens once per page.
-- **A vault's own preferences are `<vault>/.anydag/settings.json`** — the theme, the favourites, the
-  attachments folder — so a vault opened on another machine looks the same; the person's own are the
-  app's home's. `WORKSPACE_PREF_KEYS` is still the name of the split in `src/settings/`.
+- **A vault's own preferences are `<vault>/.anydag/settings.json`** — the favourites, the
+  attachments folder, the links switch and the settings card's vault half — so a vault opened on
+  another machine works the same; the person's own are the app's home's, the theme and the AI choices
+  among them since #191 (`settings.md`). `WORKSPACE_PREF_KEYS` is still the name of the split in `src/settings/`.
 - **A file keeps its id across a transfer**, and a reference from a file left behind stops resolving
   there: an id resolves within its vault.
 

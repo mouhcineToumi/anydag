@@ -278,23 +278,23 @@ const theme = (page: Page) => page.locator("[data-dag-setting-theme]");
 
 test("a theme picked in settings survives a reload", async ({ page }) => {
   await open(page);
-  await openSettings(page, "vault-general");
+  await openSettings(page, "appearance");
   await theme(page).selectOption("neutral");
   await expect(theme(page)).toHaveValue("neutral");
 
   await open(page);
-  await openSettings(page, "vault-general");
+  await openSettings(page, "appearance");
   await expect(theme(page)).toHaveValue("neutral");
 
   /* An explicit `?theme=` still outranks it — `snapshot.mjs --theme` and every check here are that. */
   await open(page, "&theme=paper");
-  await openSettings(page, "vault-general");
+  await openSettings(page, "appearance");
   await expect(theme(page)).toHaveValue("paper");
 });
 
 test("a snapshot reads no stored preference at all", async ({ page }) => {
   await open(page);
-  await openSettings(page, "vault-general");
+  await openSettings(page, "appearance");
   await theme(page).selectOption("neutral");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 

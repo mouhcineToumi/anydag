@@ -153,7 +153,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   const act = (a: LlmAction) => {
     switch (a.kind) {
       case "settings":
-        askPage("settings", "vault-ai");
+        askPage("settings", "ai");
         return;
       case "provider":
         if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });

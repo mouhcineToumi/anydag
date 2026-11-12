@@ -1418,6 +1418,22 @@ const fileTools: Tool[] = [
   }),
 ];
 
+/**
+ * Which model a generation asks when the call names none: the person's choice (`dag:ai` in the app's
+ * settings, #191), and — for a person whose app has not carried it over yet — the vault's old `llm`.
+ */
+async function llmChoice(kit: Kit, vault: string | undefined): Promise<Record<string, any>> {
+  const app = ((await kit.api("GET", "/api/settings")).settings ?? {}) as Record<string, unknown>;
+  try {
+    const ai = typeof app["dag:ai"] === "string" ? JSON.parse(app["dag:ai"]) : null;
+    if (ai?.llm && typeof ai.llm === "object") return ai.llm;
+  } catch {
+    /* A hand-edited value that is not JSON: as if there were none. */
+  }
+  const mine = (await kit.api("GET", "/api/vault/settings", { vault })).settings?.settings ?? {};
+  return mine.llm && typeof mine.llm === "object" ? mine.llm : {};
+}
+
 /** A bundle with `change` merged in: a key set to null goes, and `settings` — the card's object — is merged a group at a time. */
 function merged(held: Record<string, any> | null, change: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = { ...(held ?? {}) };
@@ -1504,8 +1520,7 @@ const grammarTools: Tool[] = [
       vault,
     },
     run: async ({ prompt, kind, count, as_type, source, from_type, provider, model, reasoning, vault: v }, kit) => {
-      const mine = (await kit.api("GET", "/api/vault/settings", { vault: v })).settings?.settings ?? {};
-      const chosen = mine.llm && typeof mine.llm === "object" ? mine.llm : {};
+      const chosen = await llmChoice(kit, v);
       const body: Record<string, unknown> = { prompt };
       for (const [k, val] of Object.entries({
         kind,
@@ -1555,7 +1570,7 @@ const appTools: Tool[] = [
     name: "settings",
     description:
       "The person's preferences — or, with `set`, a change to them. **Only when they asked.**\n\n" +
-      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`, `llm` — which model a prompt card asks), `dag:theme` and `dag:favourites`; travels with the vault's folder. `app` level: this machine's — how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
+      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`) and `dag:favourites`; travels with the vault's folder. `app` level: the person's, the same in every vault — `dag:theme`, `dag:ai` (a JSON string: `{llm: {provider, model, reasoning}, assistant: {provider, model}}` — which model a prompt card and a new Assistant chat use), how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
       NOTE_VAULT,
     // Only a `set` writes; reading is allowed under --read-only.
     write: false,

@@ -48,11 +48,12 @@ async function open(page: Page) {
 
 /** Every tab, including the two a cloud build draws (the suite's server is one). */
 const TABS: SettingsTab[] = [
+  "appearance",
+  "ai",
   "calendar",
   "quizzes",
   "providers",
   "vault-general",
-  "vault-ai",
   "vault-files",
   "export",
   "sync",

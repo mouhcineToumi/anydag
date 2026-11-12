@@ -64,13 +64,12 @@ describe("the tab list", () => {
 
   it("groups the settings by where they are kept", () => {
     expect(GROUPS.map((g) => g.group)).toEqual(["you", "computer", "vault", "board"]);
-    /* The person's, in every vault. */
-    expect(scopeOf("calendar")).toBe("you");
-    expect(scopeOf("quizzes")).toBe("you");
+    /* The person's, in every vault: the theme and the AI choices since #191. */
+    for (const tab of ["appearance", "ai", "calendar", "quizzes"] as const) expect(scopeOf(tab), tab).toBe("you");
     /* This machine's. */
     expect(scopeOf("providers")).toBe("computer");
     /* Stored with the vault. */
-    for (const tab of ["vault-general", "vault-ai", "vault-files", "export", "sync", "agent-access"] as const)
+    for (const tab of ["vault-general", "vault-files", "export", "sync", "agent-access"] as const)
       expect(scopeOf(tab), tab).toBe("vault");
     /* Stored in the board's own file, and drawn only while one is open. */
     expect(scopeOf("board-layout")).toBe("board");
@@ -120,7 +119,7 @@ describe("the tab list", () => {
     /* The foot is still there, without Privacy. */
     expect(off.find((s) => s.group === "foot")?.tabs).toEqual(["shortcuts", "about"]);
     expect(off.map((s) => s.group)).toEqual(["you", "computer", "vault", "board", "foot"]);
-    expect(drawn).toContain("vault-ai");
+    expect(drawn).toContain("ai");
     expect(withoutCloudTabs(SECTIONS, true)).toEqual(SECTIONS);
   });
 });
@@ -142,10 +141,10 @@ describe("the arrow keys", () => {
   });
 
   it("go to either end on Home and End, and leave every other key alone", () => {
-    expect(stepTab("vault-ai", "Home")).toBe(TABS[0]);
-    expect(stepTab("vault-ai", "End")).toBe(TABS[TABS.length - 1]);
-    expect(stepTab("vault-ai", "ArrowLeft")).toBeNull();
-    expect(stepTab("vault-ai", "a")).toBeNull();
+    expect(stepTab("ai", "Home")).toBe(TABS[0]);
+    expect(stepTab("ai", "End")).toBe(TABS[TABS.length - 1]);
+    expect(stepTab("ai", "ArrowLeft")).toBeNull();
+    expect(stepTab("ai", "a")).toBeNull();
   });
 });
 
@@ -156,9 +155,9 @@ describe("the tab it opens on", () => {
 
   it("is the last one opened, in this browser", () => {
     const store = stub();
-    rememberTab("vault-ai");
-    expect(store[SETTINGS_TAB]).toBe("vault-ai");
-    expect(lastTab()).toBe("vault-ai");
+    rememberTab("ai");
+    expect(store[SETTINGS_TAB]).toBe("ai");
+    expect(lastTab()).toBe("ai");
   });
 
   it("opens the tab that took an old id's place", () => {
@@ -167,7 +166,10 @@ describe("the tab it opens on", () => {
     stub({ [SETTINGS_TAB]: "vault" });
     expect(lastTab()).toBe("vault-general");
     stub({ [SETTINGS_TAB]: "agents" });
-    expect(lastTab()).toBe("vault-ai");
+    expect(lastTab()).toBe("ai");
+    /* The AI tab was the vault's until its choices became the person's (#191). */
+    stub({ [SETTINGS_TAB]: "vault-ai" });
+    expect(lastTab()).toBe("ai");
     /* The ids that did not move stay theirs. */
     expect(isTab("export")).toBe(true);
     expect(isTab("sync")).toBe(true);
@@ -189,8 +191,8 @@ describe("the tab it opens on", () => {
     expect(lastTab()).toBe(TABS[0]);
     /* With one, the remembered tab is drawn and comes back. */
     expect(lastTab(true)).toBe("board-layout");
-    stub({ [SETTINGS_TAB]: "vault-ai" });
-    expect(lastTab(true)).toBe("vault-ai");
+    stub({ [SETTINGS_TAB]: "ai" });
+    expect(lastTab(true)).toBe("ai");
   });
 
   it("is not read or written under a snapshot", () => {

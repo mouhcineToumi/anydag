@@ -32,7 +32,7 @@ export function ModelChip({
       onClick={(e) => {
         e.stopPropagation();
         if (onOpen) onOpen();
-        else askPage("settings", "vault-ai");
+        else askPage("settings", "ai");
       }}
     >
       {text}

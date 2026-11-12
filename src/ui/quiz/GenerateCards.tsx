@@ -172,7 +172,7 @@ export function GenerateCards({
       case "settings":
         /* The dialog and Settings share a layer; the dialog goes first so the tab is the one on top. */
         close();
-        askPage("settings", "vault-ai");
+        askPage("settings", "ai");
         return;
       case "provider":
         if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });
@@ -227,7 +227,7 @@ export function GenerateCards({
             onOpen={() => {
               /* The dialog and Settings share a layer; the dialog goes first so the tab is the one on top. */
               close();
-              askPage("settings", "vault-ai");
+              askPage("settings", "ai");
             }}
           />
           <span className="dag-toolbar__spacer" />

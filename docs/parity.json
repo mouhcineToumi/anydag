@@ -103,7 +103,7 @@
     {
       "id": "vault.settings",
       "area": "Vaults",
-      "what": "A vault's preferences — the settings card, the theme, the favourites",
+      "what": "A vault's preferences — the settings card's vault half, the favourites, the attachments folder",
       "rest": ["GET /api/vault/settings", "PUT /api/vault/settings"],
       "cli": ["settings"],
       "mcp": ["settings"]

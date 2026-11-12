@@ -102,8 +102,9 @@ const READY: Record<SettingsTab, string> = {
   calendar: "[data-dag-setting-time-zone]",
   quizzes: "[data-dag-setting-graduate]",
   providers: "[data-dag-providers]",
-  "vault-general": "[data-dag-setting-theme]",
-  "vault-ai": '[data-dag-setting-ai-feature="diagrams"]',
+  appearance: "[data-dag-setting-theme]",
+  "vault-general": "[data-dag-setting-problems]",
+  ai: '[data-dag-setting-ai-feature="diagrams"]',
   "vault-files": "[data-dag-setting-attachments]",
   export: "[data-dag-setting-export-scale]",
   sync: "[data-dag-sync-intro], [data-dag-sync-server-input], [data-dag-sync-state]",
@@ -276,10 +277,10 @@ test("every target in Settings is at least 44 by 44 at phone width", async ({ pa
     await expectTargets(page, tab);
     /* The AI tab's two feature pages are reached from its summary rows, and each has its own
        controls. The next check walks them and measures while they are open. */
-    if (tab === "vault-ai") {
+    if (tab === "ai") {
       for (const feature of ["diagrams", "assistant"] as const) {
         await page.locator(`[data-dag-setting-ai-feature="${feature}"]`).click();
-        await expectTargets(page, `vault-ai · ${feature}`);
+        await expectTargets(page, `ai · ${feature}`);
         await page.locator("[data-dag-setting-ai-back]").click();
       }
     }
@@ -315,12 +316,12 @@ test("no tab scrolls sideways at phone width", async ({ page }) => {
     expect(got.pane[0], `${tab}: its pane`).toBeLessThanOrEqual(got.pane[1]!);
     /* The two feature pages are part of the AI tab, and the model picker there is wider than the
        summary rows. */
-    if (tab === "vault-ai") {
+    if (tab === "ai") {
       for (const feature of ["diagrams", "assistant"] as const) {
         await page.locator(`[data-dag-setting-ai-feature="${feature}"]`).click();
         const pageGot = await widths();
-        expect(pageGot.document[0], `vault-ai · ${feature}: the page`).toBeLessThanOrEqual(pageGot.document[1]!);
-        expect(pageGot.pane[0], `vault-ai · ${feature}: its pane`).toBeLessThanOrEqual(pageGot.pane[1]!);
+        expect(pageGot.document[0], `ai · ${feature}: the page`).toBeLessThanOrEqual(pageGot.document[1]!);
+        expect(pageGot.pane[0], `ai · ${feature}: its pane`).toBeLessThanOrEqual(pageGot.pane[1]!);
         await page.locator("[data-dag-setting-ai-back]").click();
       }
     }
@@ -332,7 +333,7 @@ test("the AI tab is two summary rows that open their own page", async ({ page })
   await page.setViewportSize(PHONE);
   await open(page);
   await openSheet(page);
-  await openTab(page, "vault-ai");
+  await openTab(page, "ai");
 
   const diagrams = page.locator('[data-dag-setting-ai-feature="diagrams"]');
   const assistant = page.locator('[data-dag-setting-ai-feature="assistant"]');
@@ -380,7 +381,7 @@ test("the AI tab is two summary rows that open their own page", async ({ page })
 test("above 720px the AI tab is still the two groups", async ({ page }) => {
   await open(page);
   await openSheet(page);
-  await settingsTab(page, "vault-ai");
+  await settingsTab(page, "ai");
 
   await expect(page.locator("[data-dag-setting-llm-provider]")).toBeVisible();
   await expect(page.locator("[data-dag-setting-ai-feature]")).toHaveCount(0);

@@ -33,7 +33,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Stop serving a vault, or forget it — never its folder | `POST /api/vaults/close` | `vault close` | `vault_close` |
 | Run the MCP server over stdio for a vault — what Claude Code and Claude Desktop connect to | ✗ [4] | `mcp` | ✗ [5] |
 | Serve a vault and the page to a browser on this machine, behind a token printed once | ✗ [6] | `serve` | ✗ [7] |
-| A vault's preferences — the settings card, the theme, the favourites | `GET /api/vault/settings` `PUT /api/vault/settings` | `settings` | `settings` |
+| A vault's preferences — the settings card's vault half, the favourites, the attachments folder | `GET /api/vault/settings` `PUT /api/vault/settings` | `settings` | `settings` |
 | Move a file, or a folder whole, to another open vault | `POST /__board/transfer` | `vault transfer` | `board_transfer` |
 
 ## Files

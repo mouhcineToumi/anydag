@@ -184,9 +184,11 @@ describe("the preference list", () => {
   it("splits into the account's half and the vault's, with nothing in both or neither", () => {
     expect([...ACCOUNT_PREF_KEYS, ...VAULT_PREF_KEYS].sort()).toEqual([...PREF_KEYS].sort());
     expect(ACCOUNT_PREF_KEYS.filter((k) => (VAULT_PREF_KEYS as readonly string[]).includes(k))).toEqual([]);
-    /* The settings card and the favourites switch with the vault, and how
-       the window is laid out does not. */
-    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:theme", "dag:update-links"]);
+    /* The favourites, the attachments folder and the links switch go with the vault; how the window
+       is laid out, the theme and the AI choices are the person's (#191). */
+    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:update-links"]);
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:theme");
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:ai");
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {

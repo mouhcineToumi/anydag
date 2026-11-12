@@ -26,13 +26,13 @@ import { useSettings } from "../useSettings";
 import { Field, Group, Hint, ICON, Reset } from "./common";
 
 /**
- * Which model draws this vault's diagrams and flashcards, and what a new Assistant chat starts on.
+ * Which model draws diagrams and flashcards, and what a new Assistant chat starts on.
  *
  * The model half is the old card's *Prompt cards* section, now named after everything it drives —
  * prompt cards, Rewrite and Generate flashcards share it. The Assistant half is the chat's own
- * default, and each message can pick another. Both are stored with the vault today (`dag:settings`
- * is one of the vault's keys), which is why the tab is under *This vault*; moving them to the person
- * is issue #191, not this tab's.
+ * default, and each message can pick another. Both are **the person's, the same in every vault**
+ * (#191): `store.ts` keeps them under `dag:ai`, beside the keys and sign-ins that were always this
+ * computer's, which is why the tab is under *You*.
  *
  * **On a phone the two features are two rows**, each naming the provider, model and effort it
  * would use, and a row opens onto that feature's controls inside the same pane. The wide window

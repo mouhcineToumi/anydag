@@ -148,8 +148,11 @@ export async function saveVaultSettings(settings: Record<string, unknown>): Prom
 
 // -- what this browser keeps per vault -----------------------------------------
 
-/** The keys a new vault starts with a copy of: its look and its settings, never its favourites. */
-const SEEDED = ["dag:settings", "dag:theme"];
+/**
+ * The keys a new vault starts with a copy of: its settings, never its favourites. The theme is not
+ * one: it is the person's in every vault (#191), so there is nothing to copy.
+ */
+const SEEDED = ["dag:settings"];
 
 /** A new vault starts with the look of the one it was made from; written into this browser's cache. */
 function seed(from: string, to: string): void {

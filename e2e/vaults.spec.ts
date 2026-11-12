@@ -236,22 +236,45 @@ test("a board moves to another vault from its row, keeping its id", async ({ pag
   expect((await ids(other.id))[`moving-${id}`]).toBe(ident);
 });
 
-test("a theme chosen in one vault is that vault's", async ({ page }) => {
+test("a theme chosen in one vault is the person's, the same in every vault", async ({ page }) => {
+  /* It was the vault's until #191: opening another vault changed how the app looked. */
   const other = await vault(page);
   const home = await homeId(page);
   const scheme = () => page.evaluate(() => document.documentElement.style.colorScheme);
 
   await page.goto(`/?vault=${other.id}`);
-  await openSettings(page, "vault-general");
+  await openSettings(page, "appearance");
+  await expect(page.locator("[data-dag-settings-scope]")).toHaveText("You");
   await page.locator("[data-dag-setting-theme]").selectOption("paper-dark");
   await expect.poll(scheme).toBe("dark");
-  await expect(page.locator("[data-dag-settings-vault]")).toContainText(`vault-${id}`);
 
   await page.goto(`/?vault=${home}&tasks=1`);
-  await expect.poll(scheme).toBe("light");
-
-  await page.goto(`/?vault=${other.id}&tasks=1`);
   await expect.poll(scheme).toBe("dark");
+
+  /* Back to the default, so the next check in this worker starts light. */
+  await openSettings(page, "appearance");
+  await page.locator("[data-dag-setting-theme]").selectOption("paper");
+  await expect.poll(scheme).toBe("light");
+});
+
+test("a vault's old theme is carried over to the person once", async ({ page }) => {
+  /* Before #191 the theme was kept per vault, as `dag:theme@<vault>` in this browser. */
+  const other = await vault(page);
+  const scheme = () => page.evaluate(() => document.documentElement.style.colorScheme);
+  await page.goto(`/?vault=${other.id}&tasks=1`);
+  await page.evaluate((v) => {
+    localStorage.removeItem("dag:theme");
+    localStorage.setItem(`dag:theme@${v}`, "paper-dark");
+  }, other.id);
+  await page.reload();
+  await expect.poll(scheme).toBe("dark");
+  expect(await page.evaluate(() => localStorage.getItem("dag:theme"))).toBe("paper-dark");
+  /* Once: the vault's copy is left as it was, and a later change is the person's alone. */
+  await openSettings(page, "appearance");
+  await page.locator("[data-dag-setting-theme]").selectOption("paper");
+  await page.reload();
+  await expect.poll(scheme).toBe("light");
+  await page.evaluate((v) => localStorage.removeItem(`dag:theme@${v}`), other.id);
 });
 
 test("closing one from its Settings tab leaves its folder, keeps it on the list, and the tab goes to another vault", async ({

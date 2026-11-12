@@ -19,16 +19,17 @@ machine's alone. *This vault* is stored with the vault and switches when it does
 the open board's own file, stored in its frontmatter, and its group is drawn **only while a board is
 open and editable** — not under `?snapshot=1`, and not when the vault is locked. The three
 reference pages are tabs too — so the arrow keys walk them — but they are drawn as quieter links at
-the foot, outside the groups. **Nothing about where a setting is stored changed with the grouping**;
-moving the theme or the model choices to another scope is issue #191.
+the foot, outside the groups. The grouping itself moved nothing; #191 then moved two things to *You*,
+below.
 
 | Group | Tab | Holds |
 |---|---|---|
-| You | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
+| You | Appearance | the theme — the person's, in every vault (#191) |
+| | AI | one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on — the person's, in every vault (#191) |
+| | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
 | This computer | AI providers | every provider in its own row, with its logo, a status pill (Ready, Needs a key, Not signed in, Not installed, Needs an address…) and what it takes to set it up: in the desktop app a key field, and for OpenAI-compatible its address and model too; in a browser, the variable the server reads. *Save and test* stores, waits for the server, then makes one short call. *Check again* asks afresh. The tab carries a dot when a provider in use cannot answer |
-| This vault | General | the vault's name, location and facts, the theme, "When a board has an error", the trash's retention, and Close vault — never deleting the folder |
-| | AI | one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on |
+| This vault | General | the vault's name, location and facts, "When a board has an error", the trash's retention, and Close vault — never deleting the folder |
 | | Files and images | the attachments folder, whether a rename updates the `[[wikilinks]]` to it, how a pasted image lands, and the open board's unused images |
 | | Export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 | | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on |
@@ -37,6 +38,25 @@ moving the theme or the model choices to another scope is issue #191.
 | *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) |
 | | Keyboard shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
 | | About | the build's `VERSION` and the server's |
+
+**The theme and the AI choices are the person's (#191).** Both used to be the vault's, so opening a
+second vault changed how the app looked, and the Assistant could start on another provider. Now:
+
+- **The theme** is `dag:theme` in the person's half of `PREF_KEYS`, not in `VAULT_PREF_KEYS`. It is
+  stored bare, never as `dag:theme@<vault>`, and a new vault no longer copies one (`SEEDED`).
+- **The AI choices** are the settings object's `llm` and `assistant`, kept under `dag:ai` (one JSON
+  string in the person's bundle). `store.ts` still hands every reader one `Settings` and takes every
+  write through `writeSettings`; only where a section is stored moved. `PERSON_SECTIONS` are read
+  from and written to `dag:ai`, and the rest go to the vault's `dag:settings`. A write to one never
+  rewrites the other. The vault's bundle carries `vaultPart` only.
+- **The carry-over** is `migrate.ts`, run by `pull()` before the app mounts, with sync on or off. When
+  the person has no theme or no `dag:ai` yet, the open vault's old value is taken once: from its
+  bundle as the server holds it, else from this browser's `key@<vault>` copy. A value the person
+  already has is never written over. The vault's own copy is left in place for an older app version,
+  so nothing is lost. The first vault opened after the change is the one whose choice carries over.
+- **The MCP `generate` tool** reads `dag:ai` from the app's settings, and the vault's old `llm` only
+  when that is absent. The `settings` tool lists `dag:theme` and `dag:ai` at the `app` level.
+- The old tab id `vault-ai` opens *AI* (`LEGACY_TABS`).
 
 The headings and the words on the tabs are the scopes: *You*, *This computer*, *This vault* and
 *This board*. Each heading is ink, with one short line under it in slate saying what it means — under
@@ -78,7 +98,7 @@ Four things about the modal are load-bearing:
   modal announces each save once, so a screen reader hears one word rather than one per row. Each
   tab's Reset names its scope in its own text ("Reset Export to defaults") and resets what that tab
   shows and nothing else. A tab that now holds part of an old section splits the reset with it:
-  General's covers the settings object's `problems` and the vault's `THEME` preference, Files and
+  General's covers the settings object's `problems`, Appearance's the person's `THEME`, Files and
   images' covers `paste`, `ATTACHMENTS` and `UPDATE_LINKS`, and Quizzes' writes the practice
   threshold back to its default through `setGraduate`. Before it resets it snapshots the values it
   will change, then raises the modal's toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes

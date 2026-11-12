@@ -22,8 +22,9 @@
 
 import { fetchVaultSettings, saveVaultSettings } from "@/vault/api";
 
+import { migrateToPerson } from "./migrate";
 import { CHANGED, type Half, adoptAll, readAll, stamp, storageKey, syncs, touch } from "./prefs";
-import { EVENT, STORE, normalise, readSettings } from "./store";
+import { EVENT, STORE, normalise, readSettings, vaultPart } from "./store";
 
 /** The app's preferences, or `null` when none were ever saved. */
 async function fetchSettings(): Promise<Record<string, unknown> | null> {
@@ -45,7 +46,7 @@ const DEBOUNCE = 800;
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let stop: (() => void) | null = null;
-/** Which halves changed since the last push, so a theme picked writes the vault's bundle alone. */
+/** Which halves changed since the last push, so a favourite added writes the vault's bundle alone. */
 const dirty = new Set<Half>();
 
 /**
@@ -53,15 +54,16 @@ const dirty = new Set<Half>();
  * last-write-wins rather than server-always-wins — sent rather than taken from the server's clock
  * because the comparison it has to win is against *this* browser's own later change.
  *
- * The app's is how the window is laid out; the vault's is the validated settings object
- * plus the preferences that switch with the vault, the theme and the favourites.
+ * The person's is how the window is laid out, the theme and the AI choices (`dag:ai`); the vault's
+ * is the vault's sections of the settings object plus the preferences that switch with the vault,
+ * the favourites among them. The vault's carries no `llm` or `assistant` any more (#191).
  */
 function accountBundle(): Record<string, unknown> {
   return { at: stamp("account"), ...readAll("account") };
 }
 
 function vaultBundle(): Record<string, unknown> {
-  return { settings: readSettings(), at: stamp("vault"), ...readAll("vault") };
+  return { settings: vaultPart(readSettings()), at: stamp("vault"), ...readAll("vault") };
 }
 
 const atOf = (b: Record<string, unknown>): number => (typeof b.at === "number" ? b.at : Number.POSITIVE_INFINITY);
@@ -93,7 +95,11 @@ function adoptVault(b: Record<string, unknown>): void {
  * this mechanism existed, and it is authoritative then: there is nothing to compare it against.
  */
 export async function pull(): Promise<void> {
-  if (!syncs()) return;
+  /* With no sync, the vault's old theme and AI choices are carried over from this browser's copy. */
+  if (!syncs()) {
+    migrateToPerson();
+    return;
+  }
   let account: Record<string, unknown> | null;
   let space: Record<string, unknown> | null;
   try {
@@ -101,6 +107,7 @@ export async function pull(): Promise<void> {
   } catch {
     /* Offline, or a server that is not answering. The cache is a perfectly good answer and the
        app must still open: a preference is not worth a blank screen. */
+    migrateToPerson();
     return;
   }
 
@@ -111,6 +118,11 @@ export async function pull(): Promise<void> {
     push("vault");
   } else if (atOf(space) < stamp("vault")) push("vault");
   else adoptVault(space);
+
+  /* After both are adopted, so the person's bundle is the one a carried-over value is checked
+     against, and before the app mounts, so nothing has drawn the old one. Nothing listens for the
+     write yet, so the push is asked for here. */
+  if (migrateToPerson(space)) push("account");
 
   try {
     dispatchEvent(new Event(EVENT));
@@ -148,7 +160,10 @@ function push(half?: Half): void {
  */
 export function watch(): () => void {
   if (stop) return stop;
-  const onSettings = () => {
+  const onSettings = (e: Event) => {
+    /* The AI choices are the person's: `store.ts` wrote them through `prefs.ts`, which announced
+       the person's half already, and the vault's bundle has nothing new. */
+    if ((e as CustomEvent<unknown>).detail === "account") return;
     /* Stamped here rather than in `store.ts`, which knows nothing about the sync. */
     touch("vault");
     push("vault");

@@ -1,14 +1,12 @@
 import { FolderOpen, Power } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { DEFAULT_THEME } from "@/theme/useTheme";
 import { closeVault, currentOf, loadVaults, vaultsNow } from "@/vault/api";
 import { switchVault } from "@/vault/current";
 import { desktop } from "@/vault/desktop";
 import { useVaults } from "@/vault/useVaults";
 import { readTrash } from "@/ui/trashApi";
 
-import { THEME, resetPrefs } from "../prefs";
 import { resetSettingsWithUndo, writeSettings, type ProblemsShow } from "../store";
 import { useSettings } from "../useSettings";
 
@@ -24,13 +22,9 @@ const PROBLEMS: { value: ProblemsShow; label: string; hint: string }[] = [
   { value: "off", label: "Hide", hint: "Nothing on the board. The editor panel still lists the open item's problems." },
 ];
 
-/** What a theme is called for a person; its folder name is what a link and a board say. */
-const THEME_LABEL: Record<string, string> = { paper: "Light", "paper-dark": "Dark", neutral: "Neutral" };
-const themeLabel = (t: string): string => THEME_LABEL[t] ?? t.replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase());
-
 /**
- * The vault itself: where it is and what it is, how it looks (the theme is stored with the vault),
- * how loudly a board's problems speak, and closing it. **There is nothing here that removes the
+ * The vault itself: where it is and what it is, how loudly a board's problems speak, and closing
+ * it. The theme was here until it became the person's (#191); it is *You → Appearance* now. **There is nothing here that removes the
  * folder**, and nothing that renames it — it is a folder the person already owns, and the file
  * manager is the place for that.
  *
@@ -38,15 +32,7 @@ const themeLabel = (t: string): string => THEME_LABEL[t] ?? t.replace(/[-_]+/g, 
  * list rather than rows with a control: there is nothing to press. The one action about the
  * location, *Show in folder*, stays a button.
  */
-export function GeneralPane({
-  themes,
-  themeName,
-  onTheme,
-}: {
-  themes: string[];
-  themeName: string;
-  onTheme(name: string): void;
-}) {
+export function GeneralPane() {
   const s = useSettings();
   const here = currentOf(useVaults());
   useEffect(() => void loadVaults(), []);
@@ -79,28 +65,6 @@ export function GeneralPane({
           </span>
         </Fact>
       </Facts>
-
-      <Group title="Appearance">
-        <Field
-          label="Theme"
-          hint="A theme in the page's address still wins, so a shared link shows what it was meant to."
-          save={THEME}
-        >
-          <select
-            className="dag-select"
-            data-dag-setting-theme=""
-            aria-label="Theme"
-            value={themeName}
-            onChange={(e) => onTheme(e.target.value)}
-          >
-            {themes.map((t) => (
-              <option key={t} value={t}>
-                {themeLabel(t)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </Group>
 
       <Group title="Problems">
         <Field
@@ -140,21 +104,7 @@ export function GeneralPane({
         </Field>
       </Group>
 
-      <Reset
-        what="General"
-        onReset={() => {
-          /* Problems are the settings object's; the theme is the vault's own preference. Both are
-             drawn here, so one Reset covers both and touches nothing on another tab. */
-          const beforeTheme = themeName;
-          const undoProblems = resetSettingsWithUndo(["problems"]);
-          resetPrefs([THEME]);
-          onTheme(DEFAULT_THEME);
-          return () => {
-            undoProblems();
-            onTheme(beforeTheme);
-          };
-        }}
-      />
+      <Reset what="General" onReset={() => resetSettingsWithUndo(["problems"])} />
     </>
   );
 }
