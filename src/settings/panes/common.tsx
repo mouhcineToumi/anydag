@@ -1,5 +1,15 @@
 import { RotateCcw } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  Children,
+  Fragment,
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 /** Lucide at one size and weight, stated once. */
 export const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -17,6 +27,25 @@ export function Group({ title, children, footer }: { title?: string; children: R
       {footer ? <div className="dag-settings__after">{footer}</div> : null}
     </section>
   );
+}
+
+/**
+ * Put the row's name and hint on the control itself.
+ *
+ * A row drawn as a `<label>` names one control implicitly, but a `plain` row — the Sync fields, a
+ * key field beside its Save — is a `<div>`, and there the visible words named nothing. A control
+ * that can carry a name gets `aria-labelledby`/`aria-describedby`; a wrapper keeps its own
+ * `aria-label` (the API key fields do), and a fragment is walked.
+ */
+function named(node: ReactNode, labelId: string, hintId?: string): ReactNode {
+  return Children.map(node, (child) => {
+    if (!isValidElement(child)) return child;
+    if (child.type === Fragment) return named((child.props as { children?: ReactNode }).children, labelId, hintId);
+    if (typeof child.type === "string" && !["input", "select", "textarea"].includes(child.type)) return child;
+    const props: Record<string, string> = { "aria-labelledby": labelId };
+    if (hintId) props["aria-describedby"] = hintId;
+    return cloneElement(child as ReactElement<Record<string, string>>, props);
+  });
 }
 
 /**
@@ -40,14 +69,25 @@ export function Field({
   plain?: boolean;
   stack?: boolean;
 } & Record<`data-${string}`, string>) {
+  const id = useId();
+  const labelId = `${id}-name`;
+  const hintId = `${id}-hint`;
   const Row = plain ? "div" : "label";
   return (
     <Row className={`dag-settings__row${stack ? " dag-settings__row--stack" : ""}`} {...rest}>
       <span className="dag-settings__label">
-        <span className="dag-settings__name">{label}</span>
-        {hint ? <span className="dag-settings__desc">{hint}</span> : null}
+        <span className="dag-settings__name" id={labelId}>
+          {label}
+        </span>
+        {hint ? (
+          <span className="dag-settings__desc" id={hintId}>
+            {hint}
+          </span>
+        ) : null}
       </span>
-      {children !== undefined ? <span className="dag-settings__control">{children}</span> : null}
+      {children !== undefined ? (
+        <span className="dag-settings__control">{named(children, labelId, hint ? hintId : undefined)}</span>
+      ) : null}
     </Row>
   );
 }

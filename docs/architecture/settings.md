@@ -57,6 +57,12 @@ Four things about the modal are load-bearing:
   request that names one wins. `dag:chrome` carries `{ what, tab? }` (`src/ui/chrome.ts`). Under
   720px the modal is the window: the tab list, then one tab with a back arrow.
 
+**The words name the control.** Every `Field` row gives its name and hint ids and puts them on the
+control as `aria-labelledby`/`aria-describedby`, because a `plain` row is a `<div>` and the visible
+words named nothing (#189). The modal's head is a `<div>`, not a second `<header>`: the page already
+has a banner. The MCP command wraps in full rather than scrolling sideways where a keyboard cannot
+reach it.
+
 Everything below is from the card's first version, and still holds of the tabs that carry it.
 
 **It exists because of a defect with no setting behind it.** A pasted screenshot looked soft, and the

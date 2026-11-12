@@ -3443,14 +3443,14 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings-modal__copy > code {
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
   font-family: var(--dag-font-mono);
   font-size: 11.5px;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--dag-color-ink);
 }
 .dag-settings-modal__copy--block { align-items: flex-start; padding: 8px 4px 8px 12px; }
-.dag-settings-modal__copy--block > code { white-space: pre; line-height: 1.5; }
+.dag-settings-modal__copy--block > code { white-space: pre-wrap; line-height: 1.5; }
 /* A phone, or a window as narrow as one: the whole window, the list of tabs, then one tab with a way
    back — the shape a phone's own settings have. `719px` is the breakpoint the Tasks and quiz pages
    already fold at. */
