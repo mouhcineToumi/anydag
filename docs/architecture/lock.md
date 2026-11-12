@@ -4,41 +4,43 @@
 
 ## The lock
 
-Read only, so nothing changes by accident: `ctrl+shift+L`, or the switch at
-the end of every page's top bar, and the notice under it says when it switched and when it refused
-something.
+Read only, so nothing changes by accident: `ctrl+shift+L`, or the switch in the top bar's `⋯`, and
+locked, **one** *Read only* pill in the bar with **Unlock** beside it. It is the only place the
+lock is shown; a refusal shakes that pill rather than opening a second notice.
 
 | Where | Holds |
 |---|---|
-| `src/settings/lock.ts` | `dag:locked` (`writeLocal`, never `PREF_KEYS`), `isLocked`, `setLocked`, `toggleLock`, `useLocked`, `refuseLocked`, `mayEdit`, `LOCK_HINT`, `lockedAffordance`, `lockNoticeText`, and the events `dag:lock` and `dag:lock-refused` |
-| `src/ui/Lock.tsx` | `LockButton` (in `Toolbar`), `LockNotice`, `useLockKey` and `useLockedRoot` (in `Shell`), which paints `html[data-dag-locked]` |
+| `src/settings/lock.ts` | `dag:locked` (`writeLocal`, never `PREF_KEYS`), `isLocked`, `setLocked`, `toggleLock`, `useLocked`, `refuseLocked`, `mayEdit`, `LOCK_HINT`, `lockedAffordance`, and the events `dag:lock` and `dag:lock-refused` |
+| `src/ui/Lock.tsx` | `LockButton` (the pill and its Unlock, in `Toolbar`), `useLockKey` and `useLockedRoot` (in `Shell`), which paints `html[data-dag-locked]` |
+| `src/ui/Dock.tsx` | the *Locked* chip and the writing controls it greys while locked |
 
-Seven things are load-bearing:
+The things that are load-bearing:
 
-- **Two layers, and both are needed.** Each page draws its read-only half — no dock, no handles, an
-  editor not `editable`, a grid `readOnly`, a quiz drawn as its sheet, the sidebar's menus without the
-  rows that write, a Trash page with nothing to restore or delete — and each write asks `isLocked()` again where it happens: `useEditor`'s `commit`,
+- **Two layers, and both are needed.** Each page draws its read-only half — a dock whose writing
+  controls are greyed, no handles, an editor not `editable`, a grid `readOnly`, a quiz drawn as its
+  sheet, the sidebar's menus without the rows that write, a Trash page with nothing to restore or
+  delete — and each write asks `isLocked()` again where it happens: `useEditor`'s `commit`,
   `put`, every `/create` and the paste's `/asset`, the methods on `ctl` (wrapped by `held`), the
   note's title and bars, the table's `write` and `restore`, the Shell's `files` (wrapped the same
   way, `trash` among them), the sidebar's bulk moves, the Vault pane's delete and sweep, and the
-  trash's restore, delete for good and empty (`post` in `src/ui/trashApi.ts`, which the notice's Undo goes
-  through too). The drawing is what a
+  trash's restore, delete for good and empty (`post` in `src/ui/trashApi.ts`, which the trash
+  notice's Undo goes through too). The drawing is what a
   person sees; the floor is what holds when a key, a menu or a test reaches a write anyway.
-- **A refusal is said, never silent — and said where it can be seen.** `refuseLocked()` is the call,
-  and it returns `false` so a write that answers with whether it landed can return it. `LockNotice`
-  turns it into a banner under the top bar with **Unlock** on it, and **a refusal stays until it is
-  dismissed or the app is unlocked**: it used to flash for 2.6 s at the top right, which the person
-  who pressed a button elsewhere did not see, and read as a broken page. Its `×`
-  (`data-dag-readonly-dismiss`) puts it away so the controls under it can be reached, and a new
-  refusal brings it back. The *locked* and *unlocked* lines are announcements and leave on the 2.6 s
-  timer — keeping *locked* up for ever covered the Calendar's month toolbar — and every timer holds
-  while the pointer or the focus is on the notice, so its buttons cannot vanish under a click. The
-  notice's own `Unlock` and the `Nothing open` card's are the same `setLocked(false)`: nothing
-  reloads, and every control comes back because each page draws from `useLocked()`.
+- **The lock is shown once, and a refusal draws attention to it.** `refuseLocked()` is the call, and
+  it returns `false` so a write that answers with whether it landed can return it. It shakes the
+  top bar's *Read only* pill for 0.32 s — no motion under `prefers-reduced-motion`, where the
+  hidden `role="status"` line beside it is the whole answer — rather than opening a banner under the
+  bar that repeats the pill's words. The pill cannot be missed by the person who pressed something
+  elsewhere: it is the one lock display, in the top bar of every page, and its **Unlock** is beside
+  it. The dock's *Locked* chip and the `Nothing open` card's Unlock are the same `setLocked(false)`:
+  nothing reloads, and every control comes back because each page draws from `useLocked()`.
 - **A control that writes looks read-only before it is pressed.** `lockedAffordance(locked)` gives it
   `aria-disabled`, the `data-dag-readonly-blocked` hook that `chrome.css` dims, and the one hover
-  sentence `LOCK_HINT` — *Read only — unlock (Ctrl+Shift+L)*. It keeps its click, because the notice
-  answers it; the point is that it no longer *looks* like a button that will work. `Welcome` and
+  sentence `LOCK_HINT` — *Read only — unlock (Ctrl+Shift+L)*. It keeps its click, because the pill
+  shakes to answer it; the point is that it no longer *looks* like a button that will work. A locked
+  board keeps its dock, so its tools do not vanish without a reason: the pen and the make and
+  history controls wear that state, the select and hand tools still read, and the *Locked* chip
+  unlocks in place. `Welcome` and
   `EmptyBoard` take `locked` as a prop, say the app is read-only, keep New board/New note/A note/the
   library/describe visibly unavailable, and offer Unlock in place; the empty-board card is no longer
   hidden when locked, which used to leave an empty page with no explanation at all. The Tasks
@@ -65,8 +67,9 @@ Seven things are load-bearing:
   binds it; Obsidian's own ctrl+E is the note editor's inline code.
 
 Names claimed, grepped first: `dag-readonly*` (not `dag-lock*`: the logo owns `dag-lockup`),
-`data-dag-readonly`, `data-dag-readonly-notice`, `data-dag-readonly-unlock`,
-`data-dag-readonly-dismiss`, `data-dag-readonly-blocked`, `data-dag-locked`, `data-dag-welcome-locked`,
+`data-dag-readonly`, `data-dag-readonly-pill`, `data-dag-readonly-shake`,
+`data-dag-readonly-unlock`, `data-dag-readonly-blocked`, `dag-dock__locked`, `data-dag-dock-locked`,
+`data-dag-locked`, `data-dag-welcome-locked`,
 `data-dag-welcome-unlock`, `data-dag-empty-board-unlock`, `data-dag-calendar-new-locked`,
 `data-dag-calendar-new-unlock`, `data-dag-trash-unlock`, `dag-sidebar__menu-locked`,
 `data-dag-sidebar-menu-locked`, `data-dag-quiz-locked`, `data-dag-trash-locked`, the storage key

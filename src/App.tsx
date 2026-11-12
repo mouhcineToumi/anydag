@@ -2549,10 +2549,11 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             page tabs underneath it are cleared without either of them knowing PageBar exists. */}
         {!snapshot && (
           <Dock
+            locked={locked}
             edit={
-              /* Every tool on it makes or changes something, so a locked board has no dock; the
-                 select and hand tools are still `space V` and `space H`, and the zoom is its own bar. */
-              board && !locked
+              /* Locked, the dock stays and its writing controls are greyed; the select and hand
+                 tools still read, and its Locked chip unlocks in place. */
+              board
                 ? {
                     tool: editor.tool,
                     onTool,

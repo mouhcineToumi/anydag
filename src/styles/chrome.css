@@ -1384,11 +1384,22 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-toolbar__board { height: 44px; padding: 0 6px; font-size: 15px; }
   .dag-toolbar__name { height: 36px; font-size: 15px; }
   .dag-backlinks__word,
-  .dag-export__word,
-  .dag-readonly__word { display: none; }
-  .dag-readonly--on { justify-content: center; min-width: 40px; height: 36px; margin: 0 2px; padding: 0 8px; }
-  .dag-readonly.dag-icon { width: 44px; height: 44px; }
-  .dag-readonly-notice { top: 58px; right: 8px; }
+  .dag-export__word { display: none; }
+  /* The pill drops its word to keep the bar's width for the title, but a reader still needs the
+     word: the `Unlock` beside it would otherwise be the whole of what the lock says. */
+  .dag-readonly__word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .dag-readonly__pill { justify-content: center; min-width: 40px; height: 36px; padding: 0 8px; }
+  .dag-readonly__unlock { height: 36px; }
   .dag-toolbar .dag-backlinks__toggle,
   .dag-pagemore__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
   .dag-pagemore--narrow { display: flex; }
@@ -4009,6 +4020,26 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 
 .dag-dock__group { display: flex; align-items: center; gap: 2px; }
 .dag-dock__rule { width: 1px; height: 20px; margin: 0 4px; background: var(--dag-color-outlineSoft); }
+/* The dock's own way out of a locked board: the same switch as the top bar's Unlock, where a hand
+   already on the tools will look for it. */
+.dag-dock__locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-dock__locked:hover { background: var(--dag-color-paper200); }
+.dag-dock__locked:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-dock__locked > svg { flex: none; color: var(--dag-color-slate); }
 
 /* The one promoted thing, which is what both references do with exactly one control. */
 .dag-icon--accent { color: var(--dag-color-accent); }
@@ -4046,6 +4077,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-dock { left: calc(var(--canvas-x, 0px) + 12px); transform: none; }
   .dag-dock .dag-icon,
   .dag-zoombar .dag-icon { width: 44px; height: 44px; }
+  .dag-dock__locked { height: 44px; }
   .dag-zoombar__pct { height: 44px; }
 }
 @media (pointer: coarse) {
@@ -4501,80 +4533,66 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-backlinks__path { grid-column: 2; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /*
- * The lock. Unlocked, one glyph beside the `⋯`; locked, a pill that says *Read only* in the
- * accent, Share's "Shared" treatment, because a page that refuses edits has to say so before anybody
- * tries one. `dag-readonly`, not `dag-lock`: the logo owns `dag-lockup`. Names grepped first.
+ * The lock. Locked, one *Read only* pill in ink on paper with **Unlock** beside it — the one place
+ * the lock is shown, so a refused write shakes the pill for a moment rather than opening a second
+ * notice under the bar. `dag-readonly`, not `dag-lock`: the logo owns `dag-lockup`. Names grepped
+ * first.
  */
-.dag-readonly { flex: none; }
-.dag-readonly--on {
+.dag-readonly { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.dag-readonly__pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 30px;
   padding: 0 10px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: var(--dag-color-accentSoft);
-  border: 1px solid color-mix(in srgb, var(--dag-color-accent) 45%, transparent);
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-readonly--on:hover { border-color: var(--dag-color-accent); }
-.dag-readonly:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
-/* Under the bar's right end, where the switch is: told, never asked, so it takes no focus and stays
-   clear of the page's own cards (Share's and Export's are 40, the Settings modal 50). */
-.dag-readonly-notice {
-  position: fixed;
-  top: 54px;
-  right: 12px;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100vw - 24px);
-  padding: 7px 8px 7px 12px;
-  font-size: 12.5px;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-  pointer-events: auto;
-}
-.dag-readonly-notice > svg { flex: none; color: var(--dag-color-accent); }
-.dag-readonly-notice__unlock {
-  flex: none;
-  height: 26px;
-  padding: 0 10px;
-  font: inherit;
   font-size: 12px;
   font-weight: 600;
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
+  white-space: nowrap;
 }
-.dag-readonly-notice__unlock:hover { background: var(--dag-color-paper200); }
-.dag-readonly-notice__dismiss {
+.dag-readonly__pill > svg { flex: none; color: var(--dag-color-slate); }
+.dag-readonly__pill--shake { animation: dag-readonly-shake 0.32s ease; }
+@keyframes dag-readonly-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dag-readonly__pill--shake { animation: none; }
+}
+.dag-readonly__unlock {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--dag-color-muted);
-  background: transparent;
-  border: 1px solid transparent;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-readonly-notice__dismiss:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-readonly-notice__dismiss:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
-/* A control that writes while the app is locked. It keeps its press — which the notice answers, so
+.dag-readonly__unlock:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-accent); }
+.dag-readonly__unlock:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+/* The refusal, said to a reader; the shake is its visual half. */
+.dag-readonly__said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* A control that writes while the app is locked. It keeps its press — which shakes the pill, so
    the page is never silently dead — but reads as unavailable before one, and its `title` names the
    word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control
    that moves under the pointer is one more thing that looks broken. */
