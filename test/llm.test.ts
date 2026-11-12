@@ -501,12 +501,12 @@ describe("parseClaudeResult", () => {
 
 describe("effortFor", () => {
   it("maps the one scale onto each provider's own words", () => {
-    /* Claude Code's --effort has no none and no max: none is its lowest and max its highest. */
+    /* Claude Code's --effort has max but no none: none is its lowest. */
     expect(effortFor("claude", { reasoning: "none" })).toBe("low");
     expect(effortFor("claude", { reasoning: "low" })).toBe("low");
     expect(effortFor("claude", { reasoning: "medium" })).toBe("medium");
     expect(effortFor("claude", { reasoning: "high" })).toBe("high");
-    expect(effortFor("claude", { reasoning: "max" })).toBe("high");
+    expect(effortFor("claude", { reasoning: "max" })).toBe("max");
 
     /* OpenCode's variants have max, and its middle asks for the model's own default. */
     expect(effortFor("opencode", { reasoning: "none" })).toBe("low");

@@ -404,8 +404,8 @@ export function claudeComplete(o: ClaudeOptions): Complete {
 /**
  * What a provider's own vocabulary calls each level of the one effort scale.
  *
- * Claude Code's `--effort` has low, medium and high and no Max: Max asks for its highest, high. It
- * has no "none" either, so None — a value stored before the scale changed — is its lowest, low.
+ * Claude Code's `--effort` takes low, medium, high, xhigh and max, so the scale passes through. It
+ * has no "none", so None — a value stored before the scale changed — is its lowest, low.
  */
 function claudeEffort(level: string): string | undefined {
   switch (level) {
@@ -415,8 +415,9 @@ function claudeEffort(level: string): string | undefined {
     case "medium":
       return "medium";
     case "high":
-    case "max":
       return "high";
+    case "max":
+      return "max";
     default:
       return undefined;
   }

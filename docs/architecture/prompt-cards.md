@@ -57,8 +57,8 @@ Nine things are load-bearing:
   `.env.local` and a restart. It outranks `ANYDAG_LLM_REASONING`, because the environment is how this
   machine is set up and the select is somebody choosing now; `default` is a choice too, and means the
   model's own. **One mapping decides what each provider calls the level** (`effortFor` in `llm.ts`):
-  Claude Code's `--effort` takes low, medium and high, so Max is High and `none`, read from an older
-  preference, is Low; OpenCode's `#variant` has `low`, `high` and `max`, so none and low map to `low`
+  Claude Code's `--effort` takes low through max, so the scale passes through and `none`, read from an
+  older preference, is Low; OpenCode's `#variant` has `low`, `high` and `max`, so none and low map to `low`
   and the middle is "say nothing"; an HTTP provider's `reasoning_effort` takes none through high, so
   Max is High there too. The server checks only the shape, because an unknown level ends up in a
   request body and a model that refuses it says so in its own words on the card.
