@@ -26,6 +26,39 @@ import path from "node:path";
 
 export type ProviderKind = "http" | "cli";
 
+/** Why a provider cannot answer, in words a machine can act on. The plain `error` stays beside it. */
+export type LlmReasonCode =
+  | "no-key"
+  | "needs-model"
+  | "needs-base-url"
+  | "not-installed"
+  | "not-signed-in"
+  | "too-old"
+  | "unknown-provider"
+  | "busy"
+  | "timeout"
+  | "provider-error";
+
+export interface LlmReason {
+  code: LlmReasonCode;
+  provider?: string;
+  /** For `no-key`: the environment variables the server reads, in the order it reads them. */
+  keyEnv?: string[];
+}
+
+/** A refusal a route can send as `{ error, reason }`: the sentence MCP reads, and the code the page reads. */
+export interface Failure {
+  ok: false;
+  error: string;
+  reason: LlmReason;
+}
+
+const refusal = (error: string, code: LlmReasonCode, provider?: string, keyEnv?: string[]): Failure => ({
+  ok: false,
+  error,
+  reason: { code, ...(provider ? { provider } : {}), ...(keyEnv ? { keyEnv } : {}) },
+});
+
 const OPENCODE_DEFAULT_MODEL = "opencode-go/glm-5.3-flash";
 
 export interface ProviderSpec {
@@ -182,7 +215,7 @@ function remembered<T>(key: string, ask: () => T, good: (v: T) => boolean): T {
 /* ---- Claude Code ---- */
 
 /** Where Claude Code is, or why it cannot be used. */
-export function findClaude(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
+export function findClaude(env: Env): { ok: true; bin: string } | Failure {
   const r = findCli(
     "claude",
     env.ANYDAG_CLAUDE_BIN,
@@ -190,9 +223,12 @@ export function findClaude(env: Env): { ok: true; bin: string } | { ok: false; e
     (home, exe) => [path.join(home, ".local", "bin", exe), path.join(home, ".claude", "local", exe)],
     env,
   );
-  return r.ok || r.error
-    ? r
-    : { ok: false, error: "Claude Code is not installed — install it and sign in, or set ANYDAG_CLAUDE_BIN" };
+  if (r.ok) return r;
+  return refusal(
+    r.error || "Claude Code is not installed — install it and sign in, or set ANYDAG_CLAUDE_BIN",
+    "not-installed",
+    "claude",
+  );
 }
 
 /**
@@ -238,18 +274,22 @@ export function claudeSignedIn(bin: string, env: Env): boolean {
 }
 
 /** Claude Code found and signed in, or why not. */
-export function claudeReady(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
+export function claudeReady(env: Env): { ok: true; bin: string } | Failure {
   const found = findClaude(env);
   if (!found.ok) return found;
   if (!claudeSignedIn(found.bin, env))
-    return { ok: false, error: "Claude Code is not signed in — run `claude` once and sign in with your Claude account" };
+    return refusal(
+      "Claude Code is not signed in — run `claude` once and sign in with your Claude account",
+      "not-signed-in",
+      "claude",
+    );
   return found;
 }
 
 /* ---- OpenCode ---- */
 
 /** Where OpenCode is, or why it cannot be used. `~/.opencode/bin` is where its install script puts it. */
-export function findOpencode(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
+export function findOpencode(env: Env): { ok: true; bin: string } | Failure {
   const r = findCli(
     "opencode",
     env.ANYDAG_OPENCODE_BIN,
@@ -257,9 +297,12 @@ export function findOpencode(env: Env): { ok: true; bin: string } | { ok: false;
     (home, exe) => [path.join(home, ".opencode", "bin", exe)],
     env,
   );
-  return r.ok || r.error
-    ? r
-    : { ok: false, error: "OpenCode is not installed — install it and sign in, or set ANYDAG_OPENCODE_BIN" };
+  if (r.ok) return r;
+  return refusal(
+    r.error || "OpenCode is not installed — install it and sign in, or set ANYDAG_OPENCODE_BIN",
+    "not-installed",
+    "opencode",
+  );
 }
 
 /**
@@ -314,19 +357,20 @@ export function opencodeLogins(bin: string, env: Env): Set<string> | undefined {
  * is `--standalone`, and an agent's tools are a `permission` rather than a `tools` map. One shape is
  * supported, and a 1.x is told to upgrade rather than half-working.
  */
-export function opencodeReady(env: Env, model?: string): { ok: true; bin: string } | { ok: false; error: string } {
+export function opencodeReady(env: Env, model?: string): { ok: true; bin: string } | Failure {
   const found = findOpencode(env);
   if (!found.ok) return found;
   const major = opencodeMajor(found.bin, env);
   if (major !== undefined && major < 2)
-    return { ok: false, error: `OpenCode ${major}.x is too old — run \`opencode upgrade\` (2 or later is needed)` };
+    return refusal(`OpenCode ${major}.x is too old — run \`opencode upgrade\` (2 or later is needed)`, "too-old", "opencode");
   const logins = opencodeLogins(found.bin, env);
   const provider = model?.split("/")[0];
   if (logins && (logins.size === 0 || (provider && !logins.has(provider))))
-    return {
-      ok: false,
-      error: `OpenCode is not signed in${provider ? ` to ${provider}` : ""} — run \`opencode auth login\``,
-    };
+    return refusal(
+      `OpenCode is not signed in${provider ? ` to ${provider}` : ""} — run \`opencode auth login\``,
+      "not-signed-in",
+      "opencode",
+    );
   return found;
 }
 
@@ -364,17 +408,19 @@ export function defaultProvider(env: Env): string {
 export function resolveProvider(
   env: Env,
   want?: { provider?: string | null; model?: string | null },
-): { ok: true; value: Resolved } | { ok: false; error: string } {
+): { ok: true; value: Resolved } | Failure {
   const id = want?.provider?.trim() || defaultProvider(env);
   const spec = PROVIDERS.find((p) => p.id === id);
-  if (!spec) return { ok: false, error: `no provider \`${id}\` — expected one of ${PROVIDERS.map((p) => p.id).join(", ")}` };
+  if (!spec)
+    return refusal(`no provider \`${id}\` — expected one of ${PROVIDERS.map((p) => p.id).join(", ")}`, "unknown-provider", id);
 
   /* Read against the provider the environment named (or Gemini), never the desktop's implicit
      Claude: a model set for Gemini in `.env.local` is not a model name Claude Code knows. */
   const envModel = id === (env.ANYDAG_LLM_PROVIDER?.trim() || "gemini") ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
   const model =
     want?.model?.trim() || envModel || (spec.id === "custom" ? env.ANYDAG_LLM_MODEL?.trim() : "") || spec.defaultModel;
-  if (!model) return { ok: false, error: `provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings` };
+  if (!model)
+    return refusal(`provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings`, "needs-model", id);
 
   if (spec.id === "claude") {
     const ready = claudeReady(env);
@@ -388,14 +434,11 @@ export function resolveProvider(
   }
 
   const baseURL = (spec.id === "custom" ? env.ANYDAG_LLM_BASE_URL?.trim() : spec.baseURL)?.replace(/\/+$/, "");
-  if (!baseURL) return { ok: false, error: "provider `custom` needs ANYDAG_LLM_BASE_URL" };
+  if (!baseURL) return refusal("provider `custom` needs ANYDAG_LLM_BASE_URL", "needs-base-url", "custom");
   const key = keyOf(spec, env);
   /* A local endpoint (Ollama, vLLM) may take no key at all; every hosted one here needs one. */
   if (!key && spec.id !== "custom")
-    return {
-      ok: false,
-      error: `provider \`${id}\` has no key — set ${spec.keyEnv.join(" or ")} in .env.local`,
-    };
+    return refusal(`provider \`${id}\` has no key — set ${spec.keyEnv.join(" or ")} in .env.local`, "no-key", id, spec.keyEnv);
   return { ok: true, value: { spec, model, baseURL, key } };
 }
 
@@ -407,8 +450,10 @@ export interface PublicProvider {
   defaultModel: string;
   models: string[];
   ready: boolean;
-  /** Why it is not ready, for the settings card to say. */
-  reason?: string;
+  /** Why it is not ready, in the server's own words. */
+  error?: string;
+  /** The same answer, for the page to turn into a sentence and a next step. */
+  reason?: LlmReason;
 }
 
 export function describeProviders(env: Env): { default: string; providers: PublicProvider[] } {
@@ -423,7 +468,8 @@ export function describeProviders(env: Env): { default: string; providers: Publi
         defaultModel: r.ok ? r.value.model : spec.defaultModel,
         models: spec.models,
         ready: r.ok,
-        reason: r.ok ? undefined : r.error,
+        error: r.ok ? undefined : r.error,
+        reason: r.ok ? undefined : r.reason,
       };
     }),
   };

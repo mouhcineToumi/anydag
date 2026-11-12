@@ -1,5 +1,6 @@
 import { splitNote } from "@/note/format";
 import { applyQuizOps } from "@/quiz/ops";
+import { LlmRequestError, reasonOf } from "@/settings/llmReason";
 
 /**
  * Flashcards from a model (#140), the half with no dialog in it: asking `/generate` for them, and
@@ -63,8 +64,8 @@ export async function requestCards(req: CardsRequest, signal?: AbortSignal): Pro
     body: JSON.stringify({ kind: "flashcards", ...req }),
     signal,
   });
-  const body = (await res.json().catch(() => ({}))) as Partial<GeneratedCards> & { error?: string };
-  if (!res.ok) throw new Error(body.error ?? `the server answered ${res.status}`);
+  const body = (await res.json().catch(() => ({}))) as Partial<GeneratedCards> & { error?: string; reason?: unknown };
+  if (!res.ok) throw new LlmRequestError(body.error ?? `the server answered ${res.status}`, reasonOf(body.reason));
   return { ok: false, cards: [], problems: [], attempts: 0, ...body };
 }
 

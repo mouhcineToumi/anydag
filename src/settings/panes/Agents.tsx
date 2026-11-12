@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 
 import { loadModels } from "@/assistant/api";
 import type { ProviderModels } from "@/assistant/types";
+import { assertNever } from "@/board/useBoard";
+import { explainLlmReason, type LlmAction } from "@/settings/llmReason";
+import { useProviders, type Providers } from "@/settings/useProviders";
 import { currentOf } from "@/vault/api";
 import { desktop } from "@/vault/desktop";
 import { useVaults } from "@/vault/useVaults";
@@ -10,31 +13,9 @@ import { useVaults } from "@/vault/useVaults";
 import { REASONING, resetSettings, writeSettings } from "../store";
 import { useSettings } from "../useSettings";
 import { TextField } from "@/ui/controls";
+import { LlmSentence } from "@/ui/LlmSentence";
 
 import { Field, Group, Hint, ICON, Reset, copyText } from "./common";
-
-/** What `GET /__board/llm` says: which providers exist and which could answer now. No keys, ever. */
-interface Providers {
-  default: string;
-  providers: { id: string; label: string; defaultModel: string; models: string[]; ready: boolean; reason?: string }[];
-}
-
-function useProviders(): [Providers | null, () => void] {
-  const [list, setList] = useState<Providers | null>(null);
-  const [asked, ask] = useState(0);
-  useEffect(() => {
-    let live = true;
-    fetch("/__board/llm")
-      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : null))
-      .then((d) => live && d && setList(d))
-      /* No server: the select offers the server default and nothing else, which is true. */
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [asked]);
-  return [list, () => ask((n) => n + 1)];
-}
 
 /**
  * Which model draws this workspace's prompt cards, and how an agent reaches it.
@@ -50,7 +31,15 @@ export function AgentsPane() {
   const s = useSettings();
   const [llm, refresh] = useProviders();
   const chosen = llm?.providers.find((p) => p.id === (s.llm.provider ?? llm.default));
-  const problem = chosen && !chosen.ready ? `${chosen.label} is not set up: ${chosen.reason}.` : null;
+  const keys = desktop()?.keys;
+  const explanation =
+    chosen && !chosen.ready && chosen.reason
+      ? explainLlmReason(chosen.reason, { host: keys ? "desktop" : "browser", providers: llm?.providers })
+      : null;
+  const problem =
+    chosen && !chosen.ready
+      ? (explanation?.sentence ?? `${chosen.label} is not set up: ${chosen.error ?? "it could not answer"}.`)
+      : null;
   /* In the app a key is typed below; anywhere else it is the server's environment, which is worth one line. */
   const note =
     problem ??
@@ -58,12 +47,58 @@ export function AgentsPane() {
       ? "Uses your own Claude subscription, through the Claude Code signed in on this computer. No key, and it counts against that plan's usage."
       : chosen?.id === "opencode"
         ? "Uses the OpenCode signed in on this computer, with whatever it is signed in to (OpenCode Go, or a provider you connected). No key here, and it counts against that account."
-        : desktop()?.keys
+        : keys
           ? null
           : "Keys come from the server's environment. This only picks which provider to ask.");
+  const act = (a: LlmAction) => {
+    switch (a.kind) {
+      case "settings": {
+        /* This pane is the settings; Add a key means the field below, and otherwise ask the server again. */
+        const name = chosen?.reason?.keyEnv?.[0];
+        if (name) document.querySelector<HTMLInputElement>(`[data-dag-setting-key="${name}"] input`)?.focus();
+        else refresh();
+        return;
+      }
+      case "provider":
+        if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });
+        refresh();
+        return;
+      case "retry":
+        refresh();
+        return;
+      default:
+        return assertNever(a.kind);
+    }
+  };
   return (
     <>
-      <Group title="Prompt cards" footer={note ? <Hint data-dag-setting-llm-hint="">{note}</Hint> : undefined}>
+      <Group
+        title="Prompt cards"
+        footer={
+          note ? (
+            <>
+              <Hint data-dag-setting-llm-hint="">
+                <LlmSentence text={note} />
+              </Hint>
+              {explanation ? (
+                <div className="dag-settings__actions">
+                  {explanation.actions.map((a) => (
+                    <button
+                      key={`${a.kind}:${a.label}`}
+                      type="button"
+                      className="dag-button"
+                      data-dag-setting-llm-act={a.kind}
+                      onClick={() => act(a)}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : undefined
+        }
+      >
         <Field label="Provider" hint="A prompt card describes a diagram and this model draws it.">
           <select
             className="dag-select dag-select--wide"
