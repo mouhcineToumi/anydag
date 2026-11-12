@@ -185,7 +185,10 @@ Nine things are load-bearing:
   writes.
 - **A timed event of a day or more goes in the all-day row**, as every calendar draws a trip; shorter,
   it is in the hour grid, cut at midnight into each day it touches. A month caps a week at four lanes
-  and says how many more a day holds, which opens that day on its own.
+  and says how many more a day holds, which opens that day on its own. **A day's number is a 24px
+  button in its 30px header, and an all-day bar is 24px tall**; a timed block in the hour grid keeps
+  its event's own height, because that height is the duration — the one deliberate exception to the
+  24px floor `e2e/touch-targets.spec.ts` holds.
 - **A drag on empty time makes an event, and a drag on an event or a task moves it**. A
   press anywhere but on an item starts a range, snapped to a quarter of an hour in the grid and to days
   in the all-day row and a month, and a small card asks for the title; the file is named after it, in

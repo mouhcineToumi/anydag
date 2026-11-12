@@ -132,6 +132,13 @@ Fourteen things are load-bearing:
   it has shown. `e2e/folders.spec.ts` holds it (*a file somebody else makes does not bring the list
   back to the open board*), and the glide's own check passed under load only after it.
 
+**A phone's shell is finger-sized.** Under 720px the sheet's acts, its rows, the Settings row and each
+row's `⋯` are 44×44; the `⋯` keeps its 14px glyph inside a 44px box, because a phone has no
+right-click and that button is the only way to rename, move or delete. The page tabs' close and the
+search card's field and rows follow the same floor. At every width nothing in the shell, the search,
+a quiz's answer ticks or a table's strip is under 24×24 — `e2e/touch-targets.spec.ts` holds both
+floors, at 390×844 and 1440×900.
+
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
