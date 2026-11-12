@@ -8,7 +8,7 @@ import { SETTLE } from "../feedback";
 import { useSettings } from "../useSettings";
 import { ScaledNumber, Switch } from "@/ui/controls";
 
-import { Field, Group, Reset } from "./common";
+import { Fact, Facts, Field, Group, Reset } from "./common";
 
 /** The board grid an export margin is counted in: `metric.grid` in every theme. */
 const GRID = 8;
@@ -69,11 +69,9 @@ export function ExportPane() {
         </p>
       </Group>
 
-      <Group title="Attachments">
-        <UploadLimits />
-      </Group>
+      <UploadLimits />
 
-      <Reset what="Import and export" onReset={() => resetSettingsWithUndo(["export"])} />
+      <Reset what="Export" onReset={() => resetSettingsWithUndo(["export"])} />
     </>
   );
 }
@@ -92,22 +90,23 @@ function UploadLimits() {
     };
   }, []);
   return (
-    <>
-      <Field label="Largest file" plain>
+    <Facts title="Attachments">
+      <Fact label="Largest file">
         <span className="dag-settings__value" data-dag-setting-upload-max={limits?.maxBytes ?? ""}>
           {limits ? megabytes(limits.maxBytes) : "…"}
         </span>
-      </Field>
-      <details className="dag-settings__more">
-        <summary>
-          <span className="dag-settings__name">File types</span>
-          <span className="dag-settings__value">{limits ? `${limits.types.length} kinds` : "…"}</span>
-          <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
-        </summary>
-        <p className="dag-settings__types" data-dag-setting-upload-types="">
-          {limits ? limits.types.map((t) => `.${t}`).join("  ") : ""}
-        </p>
-      </details>
-    </>
+      </Fact>
+      <Fact label="File types" stack>
+        <details className="dag-settings__more">
+          <summary>
+            <span className="dag-settings__value">{limits ? `${limits.types.length} kinds` : "…"}</span>
+            <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
+          </summary>
+          <p className="dag-settings__types" data-dag-setting-upload-types="">
+            {limits ? limits.types.map((t) => `.${t}`).join("  ") : ""}
+          </p>
+        </details>
+      </Fact>
+    </Facts>
   );
 }

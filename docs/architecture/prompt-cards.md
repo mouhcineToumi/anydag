@@ -51,7 +51,7 @@ Nine things are load-bearing:
   `subtitle`, `dir`, `aspect` and `frame`, plus `w`/`h` on a `chart` or `sketch`, whose size is a
   choice; anything else a model writes — `x=`, `#id`, `page=`, `hidden` — is dropped before the
   check, not after it.
-- **How hard the model thinks is the person's, not the machine's.** Settings → AI and agents offers
+- **How hard the model thinks is the person's, not the machine's.** Settings → AI offers
   the same scale everywhere — Automatic · Low · Medium · High · Max — beside the provider, and the
   level rides with the request: trying `High` on a dense description is a select, not an edit to
   `.env.local` and a restart. It outranks `ANYDAG_LLM_REASONING`, because the environment is how this
@@ -73,7 +73,7 @@ Nine things are load-bearing:
   (`{ code, provider?, keyEnv? }`) beside it on `/__board/generate` and per provider on
   `/__board/llm`. `src/settings/llmReason.ts` is the one place the page turns a code into plain
   words and at most two actions; the prompt card, Rewrite, Generate flashcards and Settings → AI
-  and agents all use it. It knows whether this is the desktop app (a key in the keyring) or a
+  all use it. It knows whether this is the desktop app (a key in the keyring) or a
   browser (the server's environment), and offers **Use Claude Code** or **Use OpenCode** only when
   that other provider is ready. A missing or unknown reason falls back to the server's `error`, so
   a newer server never leaves the page with nothing to say.
@@ -107,7 +107,7 @@ description read-only.
 **A model chip says who would answer, on all three surfaces that ask.** The prompt card, the Rewrite
 bar and the Generate flashcards dialog each draw `<provider name> · <model>` — the provider from
 `readSettings().llm` or `GET /__board/llm`'s default, the model from the setting or that provider's
-`defaultModel` — and the chip opens Settings → AI and agents. It is text only for now; the
+`defaultModel` — and the chip opens Settings → AI. It is text only for now; the
 provider's mark arrives with #182.
 
 **`scripts/generate.mjs`** is the card without the card — the same route, the answer printed with

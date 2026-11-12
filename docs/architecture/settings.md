@@ -11,22 +11,40 @@ window that no board should carry. `src/settings/store.ts` owns the keys, `Setti
 `feedback.tsx` turns it into the tick beside a row, the modal's single polite live region, and the
 toast a reset raises. The gear at the
 sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and the vault switcher's
-*Vault settings…* on Vault.
+*Vault settings…* on *This vault → General*.
+
+**The tabs are grouped by where each setting is kept**, which is the line the group headings draw.
+*You* is the person's, the same in every vault, kept in the app's home. *This computer* is this
+machine's alone. *This vault* is stored with the vault and switches when it does. The three
+reference pages are tabs too — so the arrow keys walk them — but they are drawn as quieter links at
+the foot, outside the groups. **Nothing about where a setting is stored changed with the grouping**;
+moving the theme or the model choices to another scope is issue #191.
 
 | Group | Tab | Holds |
 |---|---|---|
-| Account | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
-| | Shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
-| | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) — logs are all it holds, so a build without them has no tab |
+| You | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
+| | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
+| This computer | AI providers | the desktop app's provider keys, kept in the system keyring — outside the desktop app, one line saying the keys are the server's environment |
+| This vault | General | the vault's name, location and facts, the theme, "When a board has an error", the trash's retention, and Close vault — never deleting the folder |
+| | AI | one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on |
+| | Files and images | the attachments folder, whether a rename updates the `[[wikilinks]]` to it, how a pasted image lands, and the open board's unused images |
+| | Export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
+| | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on |
+| | Agent access | the command that connects Claude Code, Claude Desktop or another MCP client to this vault, with a **Read only** switch that adds the server's own `--read-only` |
+| *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) |
+| | Keyboard shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
 | | About | the build's `VERSION` and the server's |
-| *the vault's name* | Preferences | the theme, problems, pasted images, and the quiz threshold (the person's, and says so) |
-| | Vault | where it is, where its attachments go, whether a rename updates the `[[wikilinks]]` to it, the open board's unused images, and Close vault — never deleting the folder |
-| | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on, like Privacy |
-| | AI and agents | one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards and the Assistant's new chats; how to reach this vault from the CLI and MCP |
-| | Import and export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 
-The *Account* group keeps its name for what it now means: the person's, in every vault, kept in the
-app's home. There is no account to sign into.
+The headings and the words on the tabs are the scopes: *You*, *This computer* and *This vault*.
+Each heading is ink, with one short line under it in slate saying what it means — under the third,
+"Saved with <vault name>. Another vault has its own." Every pane repeats its scope in a small pill
+beside its title, so a tab read on its own (a narrow window shows one at a time) still says where it
+belongs.
+
+**Facts are not settings.** A row that only shows a value — the vault's name and location, a version,
+the trash's "30 days", a path, a server's upload limit — is a quiet label and value list with no
+control and no card around it (`Facts`/`Fact` in `panes/common.tsx`). An action about a fact, such as
+*Show in folder*, stays a button.
 
 **A model is chosen with one picker, and effort with one scale.** The *Diagrams and flashcards* row
 and the Assistant's *Model* row both use `src/ui/ModelPicker.tsx`: a button opening a listbox with a
@@ -56,21 +74,28 @@ Four things about the modal are load-bearing:
   small slate `✓ Saved` for about a second and a half — a select at once, a text field after roughly
   600 ms of no typing or when it is left. The tick itself is silent; one polite live region in the
   modal announces each save once, so a screen reader hears one word rather than one per row. Each
-  tab's Reset names its scope in its own text ("Reset Import and export to defaults") and resets what
-  that tab shows and nothing else (`resetSettings(only)`; the Calendar's is `resetPrefs` over its
-  three keys). Before it resets it snapshots the values it will change, then raises the modal's
-  toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes the snapshot back through the same
-  setters. The attachments folder, the one text field that saves on Enter rather than as it is typed,
-  keeps doing that; Escape with a change in it takes the change back, and the next closes.
+  tab's Reset names its scope in its own text ("Reset Export to defaults") and resets what that tab
+  shows and nothing else. A tab that now holds part of an old section splits the reset with it:
+  General's covers the settings object's `problems` and the vault's `THEME` preference, Files and
+  images' covers `paste`, `ATTACHMENTS` and `UPDATE_LINKS`, and Quizzes' writes the practice
+  threshold back to its default through `setGraduate`. Before it resets it snapshots the values it
+  will change, then raises the modal's toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes
+  the snapshot back through the same setters. The attachments folder, the one text field that saves
+  on Enter rather than as it is typed, keeps doing that; Escape with a change in it takes the change
+  back, and the next closes.
 - **The tab is this browser's** (`dag:settings-tab`, written with `writeLocal`, never synced) and a
-  request that names one wins. `dag:chrome` carries `{ what, tab? }` (`src/ui/chrome.ts`). Under
-  720px the modal is the window: the tab list, then one tab with a back arrow.
+  request that names one wins. `dag:chrome` carries `{ what, tab? }` (`src/ui/chrome.ts`), and a
+  request made while the modal is open moves it — the AI tab's *Add a key* opens AI providers.
+  `lastTab` maps the ids a version before the scopes used: `preferences` and `vault` open General,
+  `agents` opens AI, and anything else that is not a tab opens the first one. Under 720px the modal
+  is the window: the tab list, then one tab with a back arrow.
 
 **The words name the control.** Every `Field` row gives its name and hint ids and puts them on the
 control as `aria-labelledby`/`aria-describedby`, because a `plain` row is a `<div>` and the visible
 words named nothing (#189). The modal's head is a `<div>`, not a second `<header>`: the page already
-has a banner. The MCP command wraps in full rather than scrolling sideways where a keyboard cannot
-reach it.
+has a banner. The Agent access command wraps in full rather than scrolling sideways where a keyboard
+cannot reach it, and is plain selectable text; the Read only switch is the server's `--read-only`,
+never a flag invented for the page.
 
 Everything below is from the card's first version, and still holds of the tabs that carry it.
 
@@ -133,7 +158,7 @@ Six things are load-bearing:
   key from the start; the window handler's `[data-dag-settings]` branch is what closes it when the
   focus has somehow left.
 
-**Storage — on the Vault tab — is the one thing in Settings that is not a preference, and it is scoped to a board.**
+**Storage — the unused-images row on Files and images — is the one thing in Settings that is not a preference, and it is scoped to a board.**
 Deleting an image item removed its fence and left `paste-<sha1>.png` on disk; nothing swept, and only
 deleting a whole board took its `.assets/` with it. `unused` in `server/routes/files.ts` is the rule —
 `GET /__board/assets/unused?name=` counts, `POST /__board/assets/sweep?name=` removes — over the
@@ -145,7 +170,7 @@ touches), and three things about it are load-bearing:
   fence goes would break both. A sweep somebody asks for, twice, is the only safe shape.
 - **Scoped to the open board, never the vault** — the same refusal `/rmdir` makes by not being
   recursive. A vault-wide button is one click that reaches into thirty boards, and the first
-  version of the e2e check for it caught exactly that: run from a preferences dialog it would have
+  version of the e2e check for it caught exactly that: run from a Settings tab it would have
   deleted files out of every board in `boards/`, this repository's own included.
 - **A file is kept if its *basename* appears in any board's text**, which is deliberately blunter
   than reading `src=` off a fence. A `src` is relative to the board's *directory*, so one board may
@@ -163,6 +188,10 @@ Names claimed, grepped first as this file has learned to: `dag-settings`, `dag-s
 storage key `dag:settings-tab`. The save tick added `dag-settings__saved` (`data-dag-setting-saved`),
 the toast `dag-settings__toast*` (`data-dag-setting-reset-toast`, `data-dag-setting-reset-undo`), the
 live region `dag-settings__said` (`data-dag-setting-said`), and the event `dag:settings-saved`.
+The scopes added `dag-settings-modal__note` and `dag-settings-modal__scope`
+(`data-dag-settings-scope`), the quiet facts `dag-settings__fact*` (`dag-settings__facts`), and Agent
+access `dag-settings__client*` (`data-dag-agent-client`, `data-dag-agent-clients`,
+`data-dag-setting-agent-readonly`).
 `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
@@ -175,10 +204,13 @@ dialog and the welcome card all read it.
 **Contrast is a token choice, not a theme edit.** `muted` is 2.6:1 on Neutral's white card and 2.4:1
 on its panel, so text a person must read inside `[data-dag-settings]` and the board settings card —
 headings, hints, descriptions, placeholders and unit suffixes — takes `slate`, which every theme
-carries. Hints there are at least 12.5px, and prose is capped at 68ch with `text-wrap: pretty`.
+carries. The group headings are the exception in the other direction: they are `ink`, because they
+are the scopes the list is built on, and the one line under each is `slate`. Hints there are at
+least 12.5px, and prose is capped at 68ch with `text-wrap: pretty`.
 `muted` remains for disabled controls and dividers, and the sidebar's keycaps and folder names are a
-separate audit. `e2e/settings-contrast.spec.ts` measures every tab and the card in all three themes
-against WCAG, `::placeholder` included; no colour in `themes/*/theme.json` changed.
+separate audit. `e2e/settings-contrast.spec.ts` measures every tab, the group headers and the card
+in all three themes against WCAG, `::placeholder` included; no colour in `themes/*/theme.json`
+changed.
 
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);
 a config file the server reads (it would put a person's preference into every visual baseline, and

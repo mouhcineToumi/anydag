@@ -40,7 +40,7 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | a prompt card's Insert anyway | the same, with a draft that still has errors, to be fixed where it lands |
 | an image pasted or imported | `w=` from the placement rule — its size on screen by default, not a fixed width — and `page=`, the page it was pasted on |
 | the Settings modal (the gear at the sidebar's foot, or `ctrl+,`) | nothing in the board: a preference is not part of what a `?board=…` link means |
-| Settings → Vault's Unused images, then its confirm | the files in *this* board's legacy `.assets/` that no board's text names — never another board's, and never the directory |
+| Settings → This vault → Files and images' Unused images, then its confirm | the files in *this* board's legacy `.assets/` that no board's text names — never another board's, and never the directory |
 | a diagram's two side handles | `aspect=` — the shape ELK folds to — and `w=` removed |
 | the item view's Advanced → Wrapping, on a laid-out diagram | `aspect=` set to a ratio, to `0` (never wrap), or taken off (the theme's shape) — the one way to take it back off |
 | the item view's Frame colour, on a diagram | `hue=` on the fence line — the tint of the frame's hairline and its title band |

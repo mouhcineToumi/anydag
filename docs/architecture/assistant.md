@@ -121,8 +121,7 @@ Ten things are load-bearing:
 Nothing here draws under `?snapshot=1`, and the canvas never learns a chat exists: a turn's writes
 reach an open board through the change feed like any other writer's. Deleting a chat emits a `gone`
 event on the chat stream, so every open history drops the row at once and a page on that chat goes to
-New chat; the panel's open state is not remembered across a reload, and Settings → AI and agents
-holds the default engine and model.
+New chat; the panel's open state is not remembered across a reload, and Settings → AI holds the default engine and model.
 
 Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`,
 the setting `assistant`, the leader binding `space A`, and the query key `chat`.

@@ -24,7 +24,7 @@ export const THEMES: Record<string, Theme> = Object.fromEntries(
 
 export const THEME_NAMES = Object.keys(THEMES).sort();
 
-const DEFAULT = THEMES.paper ? "paper" : (THEME_NAMES[0] ?? "");
+export const DEFAULT_THEME = THEMES.paper ? "paper" : (THEME_NAMES[0] ?? "");
 
 /**
  * The theme a page of paper is printed in: the one on screen when it is light, and the default
@@ -34,7 +34,7 @@ const DEFAULT = THEMES.paper ? "paper" : (THEME_NAMES[0] ?? "");
  */
 export function paperTheme(current: Theme): Theme {
   if (current.color.scheme !== "dark") return current;
-  const fallback = THEMES[DEFAULT];
+  const fallback = THEMES[DEFAULT_THEME];
   if (fallback && fallback.color.scheme !== "dark") return fallback;
   return Object.values(THEMES).find((t) => t.color.scheme !== "dark") ?? current;
 }
@@ -79,8 +79,8 @@ function stored(): string | null {
 export function useTheme(explicit?: string, snapshot = false): { theme: Theme; name: string; setName(n: string): void } {
   const [chosen, setChosen] = useState<string | null>(() => (snapshot ? null : stored()));
 
-  const name = known(explicit) ?? chosen ?? DEFAULT;
-  const theme = THEMES[name] ?? THEMES[DEFAULT]!;
+  const name = known(explicit) ?? chosen ?? DEFAULT_THEME;
+  const theme = THEMES[name] ?? THEMES[DEFAULT_THEME]!;
 
   useEffect(() => {
     applyTheme(theme);

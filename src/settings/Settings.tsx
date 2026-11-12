@@ -1,48 +1,71 @@
 import {
   ArrowLeft,
-  Bot,
   Briefcase,
   CalendarDays,
-  Keyboard,
+  GraduationCap,
+  Images,
   Info,
+  KeyRound,
+  Keyboard,
   PackageOpen,
+  Plug,
   RefreshCw,
   ShieldCheck,
-  SlidersHorizontal,
+  Sparkles,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
-import type { BoardTree } from "@/board/useBoard";
+import { assertNever, type BoardTree } from "@/board/useBoard";
 import { useFeatures } from "@/features";
 import { ShortcutList } from "@/edit/Shortcuts";
 import { currentOf } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
 
 import { AboutPane } from "./panes/About";
-import { AgentsPane } from "./panes/Agents";
+import { AgentAccessPane } from "./panes/AgentAccess";
+import { AiPane } from "./panes/Ai";
 import { CalendarPane } from "./panes/Calendar";
 import { ICON } from "./panes/common";
 import { ExportPane } from "./panes/Export";
+import { FilesPane } from "./panes/Files";
+import { GeneralPane } from "./panes/General";
+import { ProvidersPane } from "./panes/Providers";
+import { QuizzesPane } from "./panes/Quizzes";
 import { SettingsFeedback } from "./feedback";
-import { PreferencesPane } from "./panes/Preferences";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
-import { VaultPane } from "./panes/Vault";
-import { GROUPS, CLOUD_TABS, TABS, TAB_LABEL, lastTab, rememberTab, stepTab, withoutCloudTabs, type SettingsTab } from "./tabs";
+import {
+  CLOUD_TABS,
+  SCOPE_LABEL,
+  SECTIONS,
+  TABS,
+  TAB_LABEL,
+  lastTab,
+  rememberTab,
+  scopeOf,
+  stepTab,
+  withoutCloudTabs,
+  type SettingsGroup,
+  type SettingsTab,
+  type TabGroup,
+} from "./tabs";
 
 const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   calendar: CalendarDays,
-  shortcuts: Keyboard,
-  privacy: ShieldCheck,
-  about: Info,
-  preferences: SlidersHorizontal,
-  vault: Briefcase,
-  sync: RefreshCw,
-  agents: Bot,
+  quizzes: GraduationCap,
+  providers: KeyRound,
+  "vault-general": Briefcase,
+  "vault-ai": Sparkles,
+  "vault-files": Images,
   export: PackageOpen,
+  sync: RefreshCw,
+  "agent-access": Plug,
+  privacy: ShieldCheck,
+  shortcuts: Keyboard,
+  about: Info,
 };
 
 /** Below this the modal is the whole window: a list of tabs, and one tab at a time. */
@@ -76,14 +99,15 @@ export function useSettingsOpen() {
 }
 
 /**
- * What the *app* does, as opposed to what a board says — a modal with a tab for each topic, Notion's
- *.
+ * What the *app* does, as opposed to what a board says — a modal whose tabs are grouped by **where
+ * each setting is kept**: the person's (*You*), this machine's (*This computer*), and the vault's
+ * (*This vault*). The reference pages sit at the foot as quieter links, outside the groups.
  *
  * It replaced a single card that had grown a section per milestone until the theme, the export
- * scale, the model a prompt card asks and the quiz threshold were one scroll apart, with one line at
- * the top trying to say which of them were the account's and which the vault's. Now the split is
- * the tab list itself: *Account* for what is the person's, and the vault's own name for what
- * switches with it (`tabs.ts`). Every setting there was is in exactly one tab.
+ * scale, the model a prompt card asks and the quiz threshold were one scroll apart. The split is
+ * the tab list now (`tabs.ts`), and every setting there was is in exactly one tab under the group
+ * that matches where it is stored today. Moving a setting to another scope is a storage change,
+ * and its own issue.
  *
  * Four things are load-bearing:
  *
@@ -99,11 +123,11 @@ export function useSettingsOpen() {
  *   this app does with a file and the only behaviour that cannot leave a preference in a state
  *   nobody asked for. The row that changed says `✓ Saved` once the write has landed — a text field
  *   after a pause, or when it is left — and the modal's one polite live region announces it. Each
- *   tab's Reset names its scope in its own text and offers Undo for six seconds. The vault's name,
- *   the one field that is text, saves when it is left.
+ *   tab's Reset names its scope in its own text and offers Undo for six seconds.
  * - **The tab is remembered in this browser** (`dag:settings-tab`), and a request that names one
- *   opens on that one instead. On a narrow window a generic opening shows the list, as a phone's
- *   settings do, and a request for a tab goes straight to it.
+ *   opens on that one instead. A remembered id from before the scopes opens the tab that took its
+ *   place (`lastTab`). On a narrow window a generic opening shows the list, as a phone's settings
+ *   do, and a request for a tab goes straight to it.
  */
 export function Settings({
   themes,
@@ -116,9 +140,9 @@ export function Settings({
   themes: string[];
   themeName: string;
   onTheme(name: string): void;
-  /** Whose unused images the Vault tab offers to remove — never the whole vault's. */
+  /** Whose unused images the Files and images tab offers to remove — never the whole vault's. */
   boardName: string | null;
-  /** The listing the sidebar draws; the Vault tab no longer reads it. */
+  /** The listing the sidebar draws; the Files and images tab no longer reads it. */
   list?: BoardTree;
   /** The tab a request named; otherwise the last one opened. */
   tab?: SettingsTab;
@@ -130,8 +154,10 @@ export function Settings({
      while the answer is on its way, which is why the unknown hides them too. */
   const features = useFeatures();
   const cloud = features?.cloud === true;
-  const groups = useMemo(() => withoutCloudTabs(GROUPS, cloud), [cloud]);
-  const walked = useMemo(() => groups.flatMap((g) => g.tabs), [groups]);
+  const sections = useMemo(() => withoutCloudTabs(SECTIONS, cloud), [cloud]);
+  const groups = useMemo(() => sections.filter((s): s is TabGroup<SettingsGroup> => s.group !== "foot"), [sections]);
+  const foot = useMemo(() => sections.find((s) => s.group === "foot")?.tabs ?? [], [sections]);
+  const walked = useMemo(() => sections.flatMap((s) => s.tabs), [sections]);
   /* The tab as of the last key, not the last render: focus follows a step a frame later, so a
      second arrow pressed inside that frame still lands on the old button, and must step from the
      new tab rather than from the button it landed on. */
@@ -156,6 +182,12 @@ export function Settings({
 
   /* Whichever way a tab came to be open — asked for, clicked, arrowed to — it is the one to come back to. */
   useEffect(() => rememberTab(tab), [tab]);
+
+  /* A request that names a tab while the modal is already up switches to it: the AI tab's *Add a
+     key* asks for the AI providers tab, which is a different pane now. */
+  useEffect(() => {
+    if (asked) setTab(asked);
+  }, [asked, setTab]);
 
   /* The focus starts on the tab that is open, which is also where the arrow keys start from — or,
      on a narrow window showing one tab, on the way back to the list. */
@@ -219,6 +251,88 @@ export function Settings({
     }
   };
 
+  /** One short line under a group's heading, in slate: what the heading means. */
+  const noteFor = (group: SettingsGroup): string => {
+    switch (group) {
+      case "you":
+        return "Yours, in every vault.";
+      case "computer":
+        return "Only on this machine.";
+      case "vault":
+        return `Saved with ${vault.name}. Another vault has its own.`;
+      default:
+        return assertNever(group);
+    }
+  };
+
+  const tabButton = (t: SettingsTab, atFoot = false) => {
+    const TabIcon = TAB_ICON[t];
+    const on = t === tab;
+    return (
+      <button
+        key={t}
+        id={tabId(t)}
+        type="button"
+        role="tab"
+        aria-selected={on}
+        aria-controls={paneId}
+        tabIndex={on ? 0 : -1}
+        className={`dag-settings-modal__tab${atFoot ? " dag-settings-modal__tab--foot" : ""}`}
+        data-dag-settings-tab-button={t}
+        onClick={() => {
+          setTab(t);
+          setView("pane");
+          /* On a narrow window the list goes away under the click, and the focus with it. */
+          if (narrow())
+            requestAnimationFrame(() => card.current?.querySelector<HTMLElement>("[data-dag-settings-back]")?.focus());
+        }}
+        onKeyDown={onTabKey}
+      >
+        <TabIcon {...ICON} aria-hidden="true" />
+        <span>{TAB_LABEL[t]}</span>
+      </button>
+    );
+  };
+
+  /** The open tab's pane. A switch, so a tab added to `SettingsTab` fails to compile until it has one. */
+  const pane = () => {
+    switch (tab) {
+      case "calendar":
+        return <CalendarPane />;
+      case "quizzes":
+        return <QuizzesPane />;
+      case "providers":
+        return <ProvidersPane />;
+      case "vault-general":
+        return <GeneralPane themes={themes} themeName={themeName} onTheme={onTheme} />;
+      case "vault-ai":
+        return <AiPane />;
+      case "vault-files":
+        return <FilesPane boardName={boardName} />;
+      case "export":
+        return <ExportPane />;
+      case "sync":
+        return <SyncPane />;
+      case "agent-access":
+        return <AgentAccessPane />;
+      case "privacy":
+        return <PrivacyPane />;
+      case "shortcuts":
+        return <ShortcutList />;
+      case "about":
+        return (
+          <AboutPane
+            onShortcuts={() => {
+              setTab("shortcuts");
+              focusTab("shortcuts");
+            }}
+          />
+        );
+      default:
+        return assertNever(tab);
+    }
+  };
+
   return createPortal(
     <div className="dag-settings-modal__scrim" data-dag-settings="" onPointerDown={onClose}>
       <section
@@ -237,53 +351,33 @@ export function Settings({
           <nav className="dag-settings-modal__nav" aria-label="Settings">
             <h2 className="dag-settings-modal__title">Settings</h2>
             {groups.map((g) => {
-              const heading = `${id}-group-${g.group}`;
+              const group = g.group;
+              const heading = `${id}-group-${group}`;
               return (
-                <div key={g.group} className="dag-settings-modal__group">
-                  <p
-                    id={heading}
-                    className="dag-settings-modal__heading"
-                    data-dag-settings-group={g.group}
-                    /* Which vault the second group's tabs are kept with: its name is the heading. */
-                    {...(g.group === "vault" ? { "data-dag-settings-vault": vault.id } : {})}
-                  >
-                    {g.group === "account" ? "App" : vault.name}
+                <section
+                  key={group}
+                  className="dag-settings-modal__group"
+                  data-dag-settings-group={group}
+                  /* Which vault the third group's tabs are kept with: its name is in the line below. */
+                  {...(group === "vault" ? { "data-dag-settings-vault": vault.id } : {})}
+                >
+                  <p id={heading} className="dag-settings-modal__heading">
+                    {SCOPE_LABEL[group]}
                   </p>
+                  <p className="dag-settings-modal__note">{noteFor(group)}</p>
                   <div role="tablist" aria-orientation="vertical" aria-labelledby={heading}>
-                    {g.tabs.map((t) => {
-                      const TabIcon = TAB_ICON[t];
-                      const on = t === tab;
-                      return (
-                        <button
-                          key={t}
-                          id={tabId(t)}
-                          type="button"
-                          role="tab"
-                          aria-selected={on}
-                          aria-controls={paneId}
-                          tabIndex={on ? 0 : -1}
-                          className="dag-settings-modal__tab"
-                          data-dag-settings-tab-button={t}
-                          onClick={() => {
-                            setTab(t);
-                            setView("pane");
-                            /* On a narrow window the list goes away under the click, and the focus with it. */
-                            if (narrow())
-                              requestAnimationFrame(() =>
-                                card.current?.querySelector<HTMLElement>("[data-dag-settings-back]")?.focus(),
-                              );
-                          }}
-                          onKeyDown={onTabKey}
-                        >
-                          <TabIcon {...ICON} aria-hidden="true" />
-                          <span>{TAB_LABEL[t]}</span>
-                        </button>
-                      );
-                    })}
+                    {g.tabs.map((t) => tabButton(t))}
                   </div>
-                </div>
+                </section>
               );
             })}
+            {foot.length > 0 ? (
+              <div className="dag-settings-modal__group dag-settings-modal__foot" data-dag-settings-group="foot">
+                <div role="tablist" aria-orientation="vertical" aria-label="More settings">
+                  {foot.map((t) => tabButton(t, true))}
+                </div>
+              </div>
+            ) : null}
           </nav>
 
           <div
@@ -307,33 +401,11 @@ export function Settings({
                 <ArrowLeft {...ICON} aria-hidden="true" />
               </button>
               <h3>{TAB_LABEL[tab]}</h3>
+              <span className="dag-settings-modal__scope" data-dag-settings-scope={scopeOf(tab)}>
+                {SCOPE_LABEL[scopeOf(tab)]}
+              </span>
             </div>
-            <div className="dag-settings-modal__body">
-              {tab === "calendar" ? (
-                <CalendarPane />
-              ) : tab === "shortcuts" ? (
-                <ShortcutList />
-              ) : tab === "privacy" && cloud ? (
-                <PrivacyPane />
-              ) : tab === "about" ? (
-                <AboutPane
-                  onShortcuts={() => {
-                    setTab("shortcuts");
-                    focusTab("shortcuts");
-                  }}
-                />
-              ) : tab === "preferences" ? (
-                <PreferencesPane themes={themes} themeName={themeName} onTheme={onTheme} />
-              ) : tab === "vault" ? (
-                <VaultPane boardName={boardName} />
-              ) : tab === "sync" && cloud ? (
-                <SyncPane />
-              ) : tab === "agents" ? (
-                <AgentsPane />
-              ) : (
-                <ExportPane />
-              )}
-            </div>
+            <div className="dag-settings-modal__body">{pane()}</div>
           </div>
 
           <button

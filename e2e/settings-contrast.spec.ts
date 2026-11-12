@@ -122,48 +122,50 @@ function audit(page: Page, selector: string): Promise<Audit> {
     };
     const disabled = (el: Element): boolean => !!el.closest(":disabled, [aria-disabled='true']");
 
-    const root = document.querySelector(rootSelector);
-    if (!root) return { text: 0, placeholders: 0, failures: [`nothing matched ${rootSelector}`] };
+    const roots = document.querySelectorAll(rootSelector);
+    if (!roots.length) return { text: 0, placeholders: 0, failures: [`nothing matched ${rootSelector}`] };
 
     const failures: string[] = [];
     let text = 0;
     let placeholders = 0;
 
-    for (const el of root.querySelectorAll<HTMLElement>("*")) {
-      if (!(el instanceof HTMLElement) || disabled(el) || !visible(el)) continue;
-      const own = Array.from(el.childNodes)
-        .filter((node) => node.nodeType === Node.TEXT_NODE)
-        .map((node) => node.textContent ?? "")
-        .join("")
-        .trim();
-      if (!own) continue;
-      const style = getComputedStyle(el);
-      const color = parse(style.color);
-      if (!color) continue;
-      text++;
-      const failure = report(el, color, background(el), parseFloat(style.fontSize), weightOf(style.fontWeight));
-      if (failure) failures.push(`${failure} — "${own.replace(/\s+/g, " ").slice(0, 48)}"`);
-    }
+    for (const root of roots) {
+      for (const el of [root as HTMLElement, ...root.querySelectorAll<HTMLElement>("*")]) {
+        if (!(el instanceof HTMLElement) || disabled(el) || !visible(el)) continue;
+        const own = Array.from(el.childNodes)
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? "")
+          .join("")
+          .trim();
+        if (!own) continue;
+        const style = getComputedStyle(el);
+        const color = parse(style.color);
+        if (!color) continue;
+        text++;
+        const failure = report(el, color, background(el), parseFloat(style.fontSize), weightOf(style.fontWeight));
+        if (failure) failures.push(`${failure} — "${own.replace(/\s+/g, " ").slice(0, 48)}"`);
+      }
 
-    for (const el of root.querySelectorAll<HTMLElement>("input[placeholder], textarea[placeholder]")) {
-      if (!(el instanceof HTMLElement) || disabled(el) || !visible(el)) continue;
-      const style = getComputedStyle(el);
-      const pseudo = getComputedStyle(el, "::placeholder");
-      const color = parse(pseudo.color);
-      if (!color) continue;
-      placeholders++;
-      const bg = background(el);
-      const ratio = contrast(over(color, bg), bg);
-      const need = large(
-        parseFloat(pseudo.fontSize) || parseFloat(style.fontSize),
-        weightOf(pseudo.fontWeight || style.fontWeight),
-      )
-        ? 3
-        : 4.5;
-      if (ratio < need) {
-        failures.push(
-          `${where(el)}::placeholder: ${ratio.toFixed(2)}:1, needs ${need}:1 (${pseudo.color} on rgb(${bg.r}, ${bg.g}, ${bg.b})) — "${el.getAttribute("placeholder")}"`,
-        );
+      for (const el of root.querySelectorAll<HTMLElement>("input[placeholder], textarea[placeholder]")) {
+        if (!(el instanceof HTMLElement) || disabled(el) || !visible(el)) continue;
+        const style = getComputedStyle(el);
+        const pseudo = getComputedStyle(el, "::placeholder");
+        const color = parse(pseudo.color);
+        if (!color) continue;
+        placeholders++;
+        const bg = background(el);
+        const ratio = contrast(over(color, bg), bg);
+        const need = large(
+          parseFloat(pseudo.fontSize) || parseFloat(style.fontSize),
+          weightOf(pseudo.fontWeight || style.fontWeight),
+        )
+          ? 3
+          : 4.5;
+        if (ratio < need) {
+          failures.push(
+            `${where(el)}::placeholder: ${ratio.toFixed(2)}:1, needs ${need}:1 (${pseudo.color} on rgb(${bg.r}, ${bg.g}, ${bg.b})) — "${el.getAttribute("placeholder")}"`,
+          );
+        }
       }
     }
 
@@ -184,8 +186,14 @@ test("text in Settings and the board settings card meets contrast in every theme
       .locator("[data-dag-settings-tab-button]")
       .evaluateAll((els) => els.map((el) => el.getAttribute("data-dag-settings-tab-button") as SettingsTab));
     /* The cloud switch is on in the suite, so Privacy and Sync are drawn; both are checked. */
-    expect(tabs).toContain("preferences");
+    expect(tabs).toContain("vault-general");
     expect(tabs).toContain("export");
+
+    /* The group headers are ink now, and the line under each is slate: both must clear 4.5:1 on the
+       panel behind them, in every theme. */
+    const headings = await audit(page, ".dag-settings-modal__heading, .dag-settings-modal__note");
+    expect(headings.text, `${theme}: group headers and notes found`).toBeGreaterThanOrEqual(6);
+    expect(headings.failures, `${theme}: group headers`).toEqual([]);
 
     for (const tab of tabs) {
       await settingsTab(page, tab);

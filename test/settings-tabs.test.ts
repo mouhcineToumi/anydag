@@ -1,12 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SETTINGS_TAB } from "@/settings/prefs";
-import { GROUPS, TABS, TAB_LABEL, groupOf, isTab, lastTab, rememberTab, stepTab } from "@/settings/tabs";
+import {
+  CLOUD_TABS,
+  FOOT_TABS,
+  GROUPS,
+  SECTIONS,
+  TABS,
+  TAB_LABEL,
+  isTab,
+  lastTab,
+  rememberTab,
+  scopeOf,
+  stepTab,
+  withoutCloudTabs,
+} from "@/settings/tabs";
 
 /**
- * The Settings modal's tabs: the list, the order the arrow keys walk, and the tab it opens
- * on. `localStorage` and `location` are stubbed the way `settings.test.ts` stubs them — the suite runs
- * in Node, and both being absent is a case the module has to survive anyway.
+ * The Settings modal's tabs: the list, the groups they are drawn in, the order the arrow keys walk,
+ * and the tab it opens on. `localStorage` and `location` are stubbed the way `settings.test.ts`
+ * stubs them — the suite runs in Node, and both being absent is a case the module has to survive
+ * anyway.
  */
 function stub(store: Record<string, string> = {}) {
   Object.defineProperty(globalThis, "localStorage", {
@@ -35,22 +49,52 @@ afterEach(() => {
 });
 
 describe("the tab list", () => {
-  it("puts every tab in exactly one group, in the order the groups draw them", () => {
+  it("puts every tab in exactly one section, in the order the sections draw them", () => {
     expect(new Set(TABS).size).toBe(TABS.length);
-    expect(TABS).toEqual(GROUPS.flatMap((g) => g.tabs));
-    for (const t of TABS) expect(GROUPS.filter((g) => g.tabs.includes(t))).toHaveLength(1);
+    expect(TABS).toEqual(SECTIONS.flatMap((s) => s.tabs));
+    for (const t of TABS) expect(SECTIONS.filter((s) => s.tabs.includes(t))).toHaveLength(1);
   });
 
   it("names every tab", () => {
     expect(Object.keys(TAB_LABEL).sort()).toEqual([...TABS].sort());
   });
 
-  it("keeps the account's tabs apart from the vault's", () => {
-    expect(GROUPS.map((g) => g.group)).toEqual(["account", "vault"]);
-    expect(groupOf("calendar")).toBe("account");
-    expect(groupOf("shortcuts")).toBe("account");
-    expect(groupOf("preferences")).toBe("vault");
-    expect(groupOf("agents")).toBe("vault");
+  it("groups the settings by where they are kept", () => {
+    expect(GROUPS.map((g) => g.group)).toEqual(["you", "computer", "vault"]);
+    /* The person's, in every vault. */
+    expect(scopeOf("calendar")).toBe("you");
+    expect(scopeOf("quizzes")).toBe("you");
+    /* This machine's. */
+    expect(scopeOf("providers")).toBe("computer");
+    /* Stored with the vault. */
+    for (const tab of ["vault-general", "vault-ai", "vault-files", "export", "sync", "agent-access"] as const)
+      expect(scopeOf(tab), tab).toBe("vault");
+  });
+
+  it("draws the reference pages at the foot, outside the groups and after every group", () => {
+    expect(FOOT_TABS).toEqual(["privacy", "shortcuts", "about"]);
+    expect(TABS.slice(-FOOT_TABS.length)).toEqual(FOOT_TABS);
+    for (const tab of FOOT_TABS)
+      expect(
+        GROUPS.some((g) => g.tabs.includes(tab)),
+        tab,
+      ).toBe(false);
+    /* They still say what they belong to. */
+    expect(scopeOf("privacy")).toBe("computer");
+    expect(scopeOf("shortcuts")).toBe("you");
+    expect(scopeOf("about")).toBe("computer");
+  });
+
+  it("hides every sync and privacy tab when the cloud switch is off", () => {
+    expect(CLOUD_TABS).toEqual(["privacy", "sync"]);
+    const off = withoutCloudTabs(SECTIONS, false);
+    const drawn = off.flatMap((s) => s.tabs);
+    for (const tab of CLOUD_TABS) expect(drawn, tab).not.toContain(tab);
+    /* The foot is still there, without Privacy. */
+    expect(off.find((s) => s.group === "foot")?.tabs).toEqual(["shortcuts", "about"]);
+    expect(off.map((s) => s.group)).toEqual(["you", "computer", "vault", "foot"]);
+    expect(drawn).toContain("vault-ai");
+    expect(withoutCloudTabs(SECTIONS, true)).toEqual(SECTIONS);
   });
 });
 
@@ -62,15 +106,18 @@ describe("the arrow keys", () => {
   });
 
   it("cross from one group into the next as though the heading were not there", () => {
-    const lastOfAccount = GROUPS[0]!.tabs[GROUPS[0]!.tabs.length - 1]!;
-    expect(stepTab(lastOfAccount, "ArrowDown")).toBe(GROUPS[1]!.tabs[0]);
+    const lastOfYou = GROUPS[0]!.tabs[GROUPS[0]!.tabs.length - 1]!;
+    expect(stepTab(lastOfYou, "ArrowDown")).toBe(GROUPS[1]!.tabs[0]);
+    /* And out of the last group into the foot links. */
+    const lastOfVault = GROUPS[2]!.tabs[GROUPS[2]!.tabs.length - 1]!;
+    expect(stepTab(lastOfVault, "ArrowDown")).toBe(FOOT_TABS[0]);
   });
 
   it("go to either end on Home and End, and leave every other key alone", () => {
-    expect(stepTab("agents", "Home")).toBe(TABS[0]);
-    expect(stepTab("agents", "End")).toBe(TABS[TABS.length - 1]);
-    expect(stepTab("agents", "ArrowLeft")).toBeNull();
-    expect(stepTab("agents", "a")).toBeNull();
+    expect(stepTab("vault-ai", "Home")).toBe(TABS[0]);
+    expect(stepTab("vault-ai", "End")).toBe(TABS[TABS.length - 1]);
+    expect(stepTab("vault-ai", "ArrowLeft")).toBeNull();
+    expect(stepTab("vault-ai", "a")).toBeNull();
   });
 });
 
@@ -81,14 +128,29 @@ describe("the tab it opens on", () => {
 
   it("is the last one opened, in this browser", () => {
     const store = stub();
-    rememberTab("agents");
-    expect(store[SETTINGS_TAB]).toBe("agents");
-    expect(lastTab()).toBe("agents");
+    rememberTab("vault-ai");
+    expect(store[SETTINGS_TAB]).toBe("vault-ai");
+    expect(lastTab()).toBe("vault-ai");
+  });
+
+  it("opens the tab that took an old id's place", () => {
+    stub({ [SETTINGS_TAB]: "preferences" });
+    expect(lastTab()).toBe("vault-general");
+    stub({ [SETTINGS_TAB]: "vault" });
+    expect(lastTab()).toBe("vault-general");
+    stub({ [SETTINGS_TAB]: "agents" });
+    expect(lastTab()).toBe("vault-ai");
+    /* The ids that did not move stay theirs. */
+    expect(isTab("export")).toBe(true);
+    expect(isTab("sync")).toBe(true);
   });
 
   it("falls back to the first for a stored value that is not a tab", () => {
     stub({ [SETTINGS_TAB]: "language" });
     expect(isTab("language")).toBe(false);
+    expect(lastTab()).toBe(TABS[0]);
+    /* A name on the object's prototype is not a tab from an older version. */
+    stub({ [SETTINGS_TAB]: "toString" });
     expect(lastTab()).toBe(TABS[0]);
   });
 

@@ -4,7 +4,7 @@ AnyDag works without AI. When you want it, it uses **your own** AI: the Claude C
 are already signed in to on this computer, or an API key you provide. AnyDag has no AI service of its
 own and sends nothing anywhere unless you ask it to.
 
-Choose the provider and model in **Settings → AI and agents**.
+Choose the provider and model in **Settings → This vault → AI**.
 
 ## The Assistant
 
@@ -34,7 +34,7 @@ quizzes in your vault, and the app shows each change as it happens.
 
 For a richer connection, AnyDag includes an **MCP server**, so an agent such as Claude Code can use
 every feature of the app: search, notes, boards, tables, quizzes, tasks, the trash. On first launch
-the desktop app installs an `anydag` command (Settings → AI and agents shows where). Then, for
+the desktop app installs an `anydag` command (Settings → This vault → Agent access shows where). Then, for
 Claude Code:
 
 ```bash

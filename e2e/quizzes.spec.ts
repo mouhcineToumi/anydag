@@ -482,7 +482,7 @@ test("raising the threshold in Settings puts a question back into Mistakes", asy
   expect(await poolOf(page, id)).toEqual([]);
   try {
     await page.goto(`/?quiz=${name}`);
-    await openSettings(page, "preferences");
+    await openSettings(page, "quizzes");
     const select = page.locator("[data-dag-setting-graduate]");
     await expect(select).toHaveValue("2");
     await select.selectOption("3");

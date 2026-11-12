@@ -64,8 +64,19 @@ test("hides every server-backed feature, and asks for none of them", { tag: "@sm
   await openSettings(page);
   await expect(page.locator('[data-dag-settings-tab-button="sync"]')).toHaveCount(0);
   await expect(page.locator('[data-dag-settings-tab-button="privacy"]')).toHaveCount(0);
-  await expect(page.locator('[data-dag-settings-tab-button="preferences"]')).toBeVisible();
-  for (const still of ["calendar", "shortcuts", "about", "vault", "agents", "export"])
+  await expect(page.locator('[data-dag-settings-tab-button="vault-general"]')).toBeVisible();
+  for (const still of [
+    "calendar",
+    "quizzes",
+    "providers",
+    "vault-general",
+    "vault-ai",
+    "vault-files",
+    "export",
+    "agent-access",
+    "shortcuts",
+    "about",
+  ])
     await expect(page.locator(`[data-dag-settings-tab-button="${still}"]`)).toBeVisible();
 
   /* Nothing went looking for what this build does not have — the logs answer the page would have

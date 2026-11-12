@@ -3226,6 +3226,16 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   border-radius: var(--dag-metric-radius-tile);
 }
 .dag-settings__card > * + * { border-top: 1px solid var(--dag-color-outlineSoft); }
+/* A fact is a label and a value, not a setting: no card, no box, no control-sized edge. */
+.dag-settings__facts { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 2px; }
+.dag-settings__fact { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; min-width: 0; }
+.dag-settings__fact--stack { flex-direction: column; align-items: stretch; gap: 2px; }
+.dag-settings__factName { flex: none; font-size: 13px; color: var(--dag-color-slate); }
+.dag-settings__factValue { min-width: 0; margin: 0; font-size: 13px; color: var(--dag-color-ink); }
+.dag-settings__fact:not(.dag-settings__fact--stack) > .dag-settings__factValue { text-align: right; }
+.dag-settings__factValue > .dag-settings__path { justify-content: flex-end; }
+.dag-settings__fact--stack > .dag-settings__factValue > .dag-settings__path { justify-content: flex-start; }
+.dag-settings__factValue .dag-settings__more > summary { min-height: 24px; padding: 0; }
 .dag-settings__row {
   display: flex;
   align-items: center;
@@ -3438,6 +3448,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings-modal:focus { outline: none; }
 .dag-settings-modal__nav {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow-y: auto;
   padding: 18px 10px;
@@ -3446,15 +3458,30 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings-modal__title { margin: 0 0 14px; padding: 0 10px; font-size: 15px; font-weight: 600; }
 .dag-settings-modal__group + .dag-settings-modal__group { margin-top: 18px; }
+.dag-settings-modal__group { flex: none; }
 .dag-settings-modal__heading {
-  margin: 0 0 4px;
+  margin: 0;
   padding: 0 10px;
   font-size: 12px;
-  font-weight: 500;
-  color: var(--dag-color-slate);
+  font-weight: 600;
+  color: var(--dag-color-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* One line saying what the heading means. Slate, because it is read, not decoration. */
+.dag-settings-modal__note {
+  margin: 1px 0 6px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--dag-color-slate);
+  text-wrap: pretty;
+}
+.dag-settings-modal__foot {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--dag-color-outlineSoft);
 }
 .dag-settings-modal__tab {
   display: flex;
@@ -3477,6 +3504,9 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings-modal__tab:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-settings-modal__tab[aria-selected="true"] { font-weight: 500; color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-settings-modal__tab:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+/* The reference pages at the foot: quieter than the settings, which is what they are. */
+.dag-settings-modal__tab--foot { height: 30px; font-size: 12.5px; }
+.dag-settings-modal__tab--foot > svg { color: var(--dag-color-slate); }
 /* The shared textfield paints its placeholder and unit muted app-wide, which is 2.6:1 on Neutral's
    card. Inside Settings and the board settings card both carry a value a person has to read — the
    placeholder is where the default model shows — so they take the slate token instead. */
@@ -3487,6 +3517,32 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings-modal__pane { min-height: 0; overflow-y: auto; padding: 22px 32px 32px; }
 .dag-settings-modal__head { display: flex; align-items: center; gap: 8px; min-height: 32px; padding-right: 36px; margin-bottom: 20px; }
 .dag-settings-modal__head h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.dag-settings-modal__scope {
+  flex: none;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper200);
+  border-radius: var(--dag-metric-radius-chip);
+  white-space: nowrap;
+}
+.dag-settings__clients { display: flex; flex-wrap: wrap; gap: 4px; }
+.dag-settings__client {
+  min-height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-settings__client:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-settings__client[aria-selected="true"] { font-weight: 500; color: var(--dag-color-ink); background: var(--dag-color-paper200); border-color: var(--dag-color-outline); }
+.dag-settings__client:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 .dag-settings-modal__mark { flex: none; color: var(--dag-color-slate); }
 /* Only on a narrow window, where one tab is drawn at a time and this is the way back to the list. */
 .dag-settings-modal__back { display: none; }

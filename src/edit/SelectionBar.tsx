@@ -654,7 +654,7 @@ function Run({
     const act = (a: LlmAction) => {
       switch (a.kind) {
         case "settings":
-          askPage("settings", "agents");
+          askPage("settings", "vault-ai");
           return;
         case "provider":
           if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });

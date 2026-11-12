@@ -18,7 +18,7 @@ another app keeps its formatting.
 ## Linking notes together
 
 Type `[[` and the name of another note, board, quiz or table to link to it. Links are kept by an
-id, not by name, so **renaming or moving a file never breaks a link to it**. Settings → Vault decides
+id, not by name, so **renaming or moving a file never breaks a link to it**. Settings → This vault → Files and images decides
 whether a rename also updates the `[[wikilinks]]` that name it.
 
 Each document lists its **backlinks**, the other documents that link to it, in its top bar. Over

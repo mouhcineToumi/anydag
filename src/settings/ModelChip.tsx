@@ -5,8 +5,8 @@ import { useProviders } from "./useProviders";
 import { useSettings } from "./useSettings";
 
 /**
- * Who would answer an AI surface: the provider and model, in a small chip that opens Settings → AI
- * and agents. It reads the same settings and `GET /__board/llm` answer a request does, so a person
+ * Who would answer an AI surface: the provider and model, in a small chip that opens Settings → AI.
+ * It reads the same settings and `GET /__board/llm` answer a request does, so a person
  * can see the choice without opening the settings tab — and change it in one press.
  *
  * Text only for now; the provider's mark arrives with #182.
@@ -32,7 +32,7 @@ export function ModelChip({
       onClick={(e) => {
         e.stopPropagation();
         if (onOpen) onOpen();
-        else askPage("settings", "agents");
+        else askPage("settings", "vault-ai");
       }}
     >
       {text}

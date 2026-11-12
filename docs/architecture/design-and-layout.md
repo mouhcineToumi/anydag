@@ -19,7 +19,7 @@ wears one, and for the whole diagram in the item view — which takes the flag o
 `editing.md`).
 
 **A theme is the reader's, not the board's.** Every board draws in the theme chosen in Settings →
-Preferences → Appearance, or the one a `?theme=` URL names; a `theme:` in a board's frontmatter
+This vault → General (Appearance), or the one a `?theme=` URL names; a `theme:` in a board's frontmatter
 changes nothing on screen. The line is ordinary frontmatter and stays in the file untouched — opening
 a vault never writes a byte — so a board written before this decision keeps its text and simply draws
 in the reader's theme. **It is not a diagnostic either**: a person has no action for a frontmatter

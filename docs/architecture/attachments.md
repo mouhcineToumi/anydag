@@ -18,7 +18,7 @@ opened at `?file=<name>`.
 | a board | a file dropped on the canvas, Import, or a sidebar row let go over it: a picture is an `image` fence with `src="dag:<id>"`, anything else the placed card every document is |
 | `?view=1` | the page read-only; a note or board draws the files it names |
 | Export | a board or a note that names an attachment or a pasted picture saves as `<name>.zip` |
-| Settings → Import and export | the largest file and the types this server takes, read-only |
+| Settings → Export | the largest file and the types this server takes, read-only |
 
 Nine things are load-bearing:
 

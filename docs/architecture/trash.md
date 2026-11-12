@@ -13,7 +13,7 @@ kind, or a folder with everything in it — moves the thing to the vault's trash
 | the sidebar | Delete on a row, a picked row's menu or the selection's bar: to the trash at once, nothing asked; a **Trash** row at the foot opens the page |
 | the notice | *Moved “Plan” to the trash* · **Undo** (every entry the delete made, the open file reopened, a favourite a favourite again) · **View trash**; eight seconds, held while the pointer or the focus is on it |
 | the Trash page, `?trash=1` | newest first: the mark, the title, where it was, what a folder held, *Deleted 3 days ago · 27 days left*; Restore; Delete forever, asked in its row; a filter; Empty trash, asked once |
-| Settings → Vault | how many days, read-only — the server's |
+| Settings → This vault → General | how many days, read-only — the server's |
 | `anydag trash ls\|restore\|rm\|empty` · `trash_list`, `trash_restore`, `trash_delete`, `trash_empty` | the same four, by an entry's id or the name it had; the two that delete for good ask, or want a `confirm` |
 
 | Route | Does |
