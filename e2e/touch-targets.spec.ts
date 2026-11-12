@@ -222,10 +222,12 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
   await page.goto(await vaulted(page, "/?tasks=1"));
   await page.locator("[data-dag-tasks-filter]").fill(stem);
   await expect(page.locator(`[data-dag-task-row="${stem}/task"]`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(`[data-dag-task-row="${stem}/task"] .dag-task-status`)).toBeVisible();
   await measure(page, "Tasks at 1440", [".dag-app--tasks"], 24);
 
   await page.goto(await vaulted(page, "/?calendar=month&date=2035-07-15"));
   await expect(page.locator(`[data-dag-cal-item="${stem}/event"]`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("[data-dag-cal-day-open]").first()).toBeVisible();
   await measure(page, "the calendar at 1440", [".dag-app--calendar"], 24);
   /* The Show card holds a real `<select>`, which is a control too. */
   await page.locator("[data-dag-calendar-show]").click();
@@ -235,6 +237,7 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
 
   await page.goto(await vaulted(page, `/?quiz=${encodeURIComponent(`${stem}/quiz`)}`));
   await expect(page.locator("[data-dag-quiz-question]")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("[data-dag-quiz-correct-toggle]").first()).toBeVisible();
   await measure(page, "a quiz at 1440", [".dag-app--quiz"], 24);
   /* Delete asks on the card before it does anything. */
   await page.locator("[data-dag-quiz-delete]").click();
@@ -246,6 +249,7 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
   await expect(page.locator("[data-dag-grid-wrap]")).toBeVisible({ timeout: 15_000 });
   /* A second tab is what draws the close button this issue is about. */
   await expect(page.locator("[data-dag-page]")).toHaveCount(2);
+  await expect(page.locator("[data-dag-page-remove]")).toBeVisible();
   await measure(page, "a table at 1440", [".dag-app--table"], 24);
   /* Sort and Filter ask in a card of selects and fields. */
   await page.locator("[data-dag-tablepage-sort]").click();
