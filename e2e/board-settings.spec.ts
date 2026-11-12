@@ -175,7 +175,7 @@ test("board layout: the flow is the frontmatter's, and the defaults are not writ
   await openLayout(page);
   await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__heading')).toHaveText("This board");
   await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__note')).toContainText(
-    `Saved in ${name}'s file.`,
+    "Saved in this board's file. Another board has its own.",
   );
   /* A theme is the reader's, never the board's (#162): the tab has no control for one. */
   await expect(page.locator("[data-dag-board-theme]")).toHaveCount(0);

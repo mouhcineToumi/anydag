@@ -40,8 +40,7 @@ moving the theme or the model choices to another scope is issue #191.
 
 The headings and the words on the tabs are the scopes: *You*, *This computer*, *This vault* and
 *This board*. Each heading is ink, with one short line under it in slate saying what it means — under
-the third, "Saved with <vault name>. Another vault has its own."; under the fourth, "Saved in <board
-name>'s file." Every pane repeats its scope in a small pill beside its title, so a tab read on its
+the third, "Saved with <vault name>. Another vault has its own."; under the fourth, "Saved in this board's file. Another board has its own." Every pane repeats its scope in a small pill beside its title, so a tab read on its
 own (a narrow window shows one at a time) still says where it belongs.
 
 **Facts are not settings.** A row that only shows a value — the vault's name and location, a version,

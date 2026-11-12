@@ -280,7 +280,7 @@ export function Settings({
       case "vault":
         return `Saved with ${vault.name}. Another vault has its own.`;
       case "board":
-        return `Saved in ${board?.name ?? "this board"}'s file.`;
+        return "Saved in this board's file. Another board has its own.";
       default:
         return assertNever(group);
     }

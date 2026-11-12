@@ -337,7 +337,7 @@ test("every tab says which scope it belongs to, under a heading that says what i
   );
   await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__heading')).toHaveText("This board");
   await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__note')).toContainText(
-    `Saved in ${name}'s file.`,
+    "Saved in this board's file. Another board has its own.",
   );
 });
 
