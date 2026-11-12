@@ -2,17 +2,20 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SETTINGS_TAB } from "@/settings/prefs";
 import {
+  BOARD_TABS,
   CLOUD_TABS,
   FOOT_TABS,
   GROUPS,
   SECTIONS,
   TABS,
   TAB_LABEL,
+  drawnSections,
   isTab,
   lastTab,
   rememberTab,
   scopeOf,
   stepTab,
+  withoutBoardTab,
   withoutCloudTabs,
 } from "@/settings/tabs";
 
@@ -60,7 +63,7 @@ describe("the tab list", () => {
   });
 
   it("groups the settings by where they are kept", () => {
-    expect(GROUPS.map((g) => g.group)).toEqual(["you", "computer", "vault"]);
+    expect(GROUPS.map((g) => g.group)).toEqual(["you", "computer", "vault", "board"]);
     /* The person's, in every vault. */
     expect(scopeOf("calendar")).toBe("you");
     expect(scopeOf("quizzes")).toBe("you");
@@ -69,6 +72,30 @@ describe("the tab list", () => {
     /* Stored with the vault. */
     for (const tab of ["vault-general", "vault-ai", "vault-files", "export", "sync", "agent-access"] as const)
       expect(scopeOf(tab), tab).toBe("vault");
+    /* Stored in the board's own file, and drawn only while one is open. */
+    expect(scopeOf("board-layout")).toBe("board");
+  });
+
+  it("draws This board after This vault and before the foot, only with a board", () => {
+    expect(BOARD_TABS).toEqual(["board-layout"]);
+    const withBoard = withoutBoardTab(SECTIONS, true);
+    expect(withBoard.map((s) => s.group)).toEqual(["you", "computer", "vault", "board", "foot"]);
+    const without = withoutBoardTab(SECTIONS, false);
+    expect(without.map((s) => s.group)).toEqual(["you", "computer", "vault", "foot"]);
+    expect(without.flatMap((s) => s.tabs)).not.toContain("board-layout");
+    /* The two switches compose in draw order. */
+    expect(drawnSections(SECTIONS, { cloud: false, board: true }).map((s) => s.group)).toEqual([
+      "you",
+      "computer",
+      "vault",
+      "board",
+      "foot",
+    ]);
+    expect(
+      drawnSections(SECTIONS, { cloud: true, board: false })
+        .flatMap((s) => s.tabs)
+        .includes("board-layout"),
+    ).toBe(false);
   });
 
   it("draws the reference pages at the foot, outside the groups and after every group", () => {
@@ -92,7 +119,7 @@ describe("the tab list", () => {
     for (const tab of CLOUD_TABS) expect(drawn, tab).not.toContain(tab);
     /* The foot is still there, without Privacy. */
     expect(off.find((s) => s.group === "foot")?.tabs).toEqual(["shortcuts", "about"]);
-    expect(off.map((s) => s.group)).toEqual(["you", "computer", "vault", "foot"]);
+    expect(off.map((s) => s.group)).toEqual(["you", "computer", "vault", "board", "foot"]);
     expect(drawn).toContain("vault-ai");
     expect(withoutCloudTabs(SECTIONS, true)).toEqual(SECTIONS);
   });
@@ -108,9 +135,10 @@ describe("the arrow keys", () => {
   it("cross from one group into the next as though the heading were not there", () => {
     const lastOfYou = GROUPS[0]!.tabs[GROUPS[0]!.tabs.length - 1]!;
     expect(stepTab(lastOfYou, "ArrowDown")).toBe(GROUPS[1]!.tabs[0]);
-    /* And out of the last group into the foot links. */
+    /* Into This board, and out of it into the foot links. */
     const lastOfVault = GROUPS[2]!.tabs[GROUPS[2]!.tabs.length - 1]!;
-    expect(stepTab(lastOfVault, "ArrowDown")).toBe(FOOT_TABS[0]);
+    expect(stepTab(lastOfVault, "ArrowDown")).toBe("board-layout");
+    expect(stepTab("board-layout", "ArrowDown")).toBe(FOOT_TABS[0]);
   });
 
   it("go to either end on Home and End, and leave every other key alone", () => {
@@ -152,6 +180,17 @@ describe("the tab it opens on", () => {
     /* A name on the object's prototype is not a tab from an older version. */
     stub({ [SETTINGS_TAB]: "toString" });
     expect(lastTab()).toBe(TABS[0]);
+  });
+
+  it("falls back from a remembered board tab when no board is open", () => {
+    stub({ [SETTINGS_TAB]: "board-layout" });
+    /* The id is real, but this page cannot draw it without a board. */
+    expect(isTab("board-layout")).toBe(true);
+    expect(lastTab()).toBe(TABS[0]);
+    /* With one, the remembered tab is drawn and comes back. */
+    expect(lastTab(true)).toBe("board-layout");
+    stub({ [SETTINGS_TAB]: "vault-ai" });
+    expect(lastTab(true)).toBe("vault-ai");
   });
 
   it("is not read or written under a snapshot", () => {

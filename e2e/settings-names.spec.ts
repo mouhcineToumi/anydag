@@ -57,6 +57,7 @@ const TABS: SettingsTab[] = [
   "export",
   "sync",
   "agent-access",
+  "board-layout",
   "privacy",
   "shortcuts",
   "about",
@@ -102,7 +103,7 @@ test("every input, select and button on every tab has a name", async ({ page }) 
   expect(total).toBeGreaterThan(20);
 });
 
-test("neither settings card holds a second banner, and the MCP command wraps in the box", async ({ page }) => {
+test("Settings holds no second banner, and the MCP command wraps in the box", async ({ page }) => {
   await open(page);
   await openSettings(page, "agent-access");
   await expect(page.locator("[data-dag-settings] header")).toHaveCount(0);
@@ -115,7 +116,8 @@ test("neither settings card holds a second banner, and the MCP command wraps in 
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
 
+  /* The board's ⋯ opens the same modal on This board → Layout. */
   await pageMore(page, "data-dag-board-settings-open");
-  await expect(page.locator("[data-dag-board-settings]")).toBeVisible();
-  await expect(page.locator("[data-dag-board-settings] header")).toHaveCount(0);
+  await expect(page.locator('[data-dag-settings-pane="board-layout"]')).toBeVisible();
+  await expect(page.locator("[data-dag-settings] header")).toHaveCount(0);
 });

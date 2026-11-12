@@ -162,51 +162,91 @@ test("a diagram with no header keeps the hairline and has no band to tint", asyn
 
 /* -------------------------------------------------------------------------------- flow: */
 
-test("board settings: the flow is the frontmatter's, and the defaults are not written", async ({ page }) => {
-  await open(page);
+/** The board's ⋯ menu opens Settings on This board → Layout, never the old floating card. */
+async function openLayout(page: Page) {
   await pageMore(page, "data-dag-board-settings-open");
-  const card = page.locator("[data-dag-board-settings]");
-  await expect(card).toBeVisible();
-  /* A theme is the reader's, never the board's (#162): the card has no control for one. */
+  await expect(page.locator("[data-dag-settings]")).toBeVisible();
+  await expect(page.locator('[data-dag-settings-tab="board-layout"]')).toBeVisible();
+  await expect(page.locator('[data-dag-settings-pane="board-layout"]')).toBeVisible();
+}
+
+test("board layout: the flow is the frontmatter's, and the defaults are not written", async ({ page }) => {
+  await open(page);
+  await openLayout(page);
+  await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__heading')).toHaveText("This board");
+  await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__note')).toContainText(
+    `Saved in ${name}'s file.`,
+  );
+  /* A theme is the reader's, never the board's (#162): the tab has no control for one. */
   await expect(page.locator("[data-dag-board-theme]")).toHaveCount(0);
 
   const width = page.locator("[data-dag-board-flow-width]");
+  const gap = page.locator("[data-dag-board-flow-gap]");
+  await expect(width).toHaveValue("4000");
+  await expect(gap).toHaveValue("80");
   await width.fill("2400");
   await width.blur();
   await expect.poll(read, { timeout: 5_000 }).toMatch(/flow:\n {2}width: 2400\n/);
 
-  const gap = page.locator("[data-dag-board-flow-gap]");
   await gap.fill("40");
   await gap.blur();
   await expect.poll(read, { timeout: 5_000 }).toMatch(/flow:\n {2}width: 2400\n {2}gap: 40\n/);
   expect(read()).toContain("title: Settings");
 
-  /* The defaults are not written: put them back and the block is as short as it was. */
-  await width.fill("4000");
-  await width.blur();
-  await gap.fill("80");
-  await gap.blur();
+  /* The defaults are not written: Use defaults leaves the block as short as it was. */
+  await page.locator("[data-dag-board-flow-defaults]").click();
   await expect.poll(read, { timeout: 5_000 }).toBe(BOARD);
+  await expect(width).toHaveValue("4000");
+  await expect(gap).toHaveValue("80");
 });
 
-test("a flow number the control may not write is put back in the box, with the range", async ({ page }) => {
+test("a flow number the control may not write is refused in the row, with the range", async ({ page }) => {
   await open(page);
-  await pageMore(page, "data-dag-board-settings-open");
+  await openLayout(page);
   const width = page.locator("[data-dag-board-flow-width]");
   await width.fill("12");
   await width.blur();
   await expect(page.locator("[data-dag-board-flow-bad]")).toContainText("320");
-  await expect(width).toHaveValue("4000");
+  await expect(width).toHaveValue("12");
   expect(read()).toBe(BOARD);
 });
 
-test("Escape closes the card and leaves the board as it was", async ({ page }) => {
+test("Escape closes Settings and leaves the board as it was", async ({ page }) => {
   await open(page);
-  await pageMore(page, "data-dag-board-settings-open");
-  await expect(page.locator("[data-dag-board-settings]")).toBeVisible();
+  await openLayout(page);
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-dag-board-settings]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
   expect(read()).toBe(BOARD);
+});
+
+test("a width written in Layout survives a reload, and ctrl+Z on the board takes the next one back", async ({ page }) => {
+  await open(page);
+  await openLayout(page);
+  const width = page.locator("[data-dag-board-flow-width]");
+
+  await width.fill("2400");
+  await width.blur();
+  await expect.poll(read, { timeout: 5_000 }).toMatch(/flow:\n {2}width: 2400\n/);
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+
+  await openLayout(page);
+  await expect(width).toHaveValue("2400");
+  await expect(read()).toContain("flow:\n  width: 2400");
+
+  /* A second write, then one undo: it is a version of the file, so the value read back after the
+     reload is the one it puts back. */
+  await width.fill("2600");
+  await width.blur();
+  await expect.poll(read, { timeout: 5_000 }).toMatch(/flow:\n {2}width: 2600\n/);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
+  await page.locator(".dag-viewport").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Control+z");
+  await expect.poll(read, { timeout: 5_000 }).toMatch(/flow:\n {2}width: 2400\n/);
 });
 
 /* -------------------------------------------------------------------------- repairs */

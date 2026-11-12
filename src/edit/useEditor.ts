@@ -613,9 +613,9 @@ export interface Editor {
   replace(id: string, next: { type?: ItemType; body?: string; attrs?: Record<string, AttrValue | null> }): void;
   setAttrs(id: string, attrs: Record<string, AttrValue | null>): void;
   /**
-   * Set keys in the board's frontmatter, `null` removing one — `theme:` and `flow:`, which the board
-   * settings card writes, beside the `pages:` the page tabs do. One patch, so one undo entry.
-   * Resolves to whether it was written.
+   * Set keys in the board's frontmatter, `null` removing one — `theme:` and `flow:`, which the
+   * Settings modal's This board → Layout tab writes, beside the `pages:` the page tabs do. One patch,
+   * so one undo entry. Resolves to whether it was written.
    */
   setMeta(meta: Record<string, unknown>): Promise<boolean>;
   /**

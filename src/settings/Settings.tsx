@@ -7,6 +7,7 @@ import {
   Info,
   KeyRound,
   Keyboard,
+  LayoutDashboard,
   PackageOpen,
   Plug,
   RefreshCw,
@@ -19,6 +20,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type Keyboard
 import { createPortal } from "react-dom";
 
 import { assertNever, type BoardTree } from "@/board/useBoard";
+import type { Board } from "@/board/types";
 import { useFeatures } from "@/features";
 import { ShortcutList } from "@/edit/Shortcuts";
 import { currentOf } from "@/vault/api";
@@ -27,6 +29,7 @@ import { useVaults } from "@/vault/useVaults";
 import { AboutPane } from "./panes/About";
 import { AgentAccessPane } from "./panes/AgentAccess";
 import { AiPane } from "./panes/Ai";
+import { BoardLayoutPane } from "./panes/BoardLayout";
 import { CalendarPane } from "./panes/Calendar";
 import { ICON } from "./panes/common";
 import { ExportPane } from "./panes/Export";
@@ -41,16 +44,15 @@ import { useSettings } from "./useSettings";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
 import {
-  CLOUD_TABS,
   SCOPE_LABEL,
   SECTIONS,
   TABS,
   TAB_LABEL,
+  drawnSections,
   lastTab,
   rememberTab,
   scopeOf,
   stepTab,
-  withoutCloudTabs,
   type SettingsGroup,
   type SettingsTab,
   type TabGroup,
@@ -66,6 +68,7 @@ const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   export: PackageOpen,
   sync: RefreshCw,
   "agent-access": Plug,
+  "board-layout": LayoutDashboard,
   privacy: ShieldCheck,
   shortcuts: Keyboard,
   about: Info,
@@ -103,8 +106,10 @@ export function useSettingsOpen() {
 
 /**
  * What the *app* does, as opposed to what a board says — a modal whose tabs are grouped by **where
- * each setting is kept**: the person's (*You*), this machine's (*This computer*), and the vault's
- * (*This vault*). The reference pages sit at the foot as quieter links, outside the groups.
+ * each setting is kept**: the person's (*You*), this machine's (*This computer*), the vault's
+ * (*This vault*), and the open board's own file (*This board*). The reference pages sit at the foot
+ * as quieter links, outside the groups. The board group is drawn only while a board is open and
+ * editable, so a remembered `board-layout` tab falls back to the first on any other page.
  *
  * It replaced a single card that had grown a section per milestone until the theme, the export
  * scale, the model a prompt card asks and the quiz threshold were one scroll apart. The split is
@@ -137,6 +142,9 @@ export function Settings({
   themeName,
   onTheme,
   boardName,
+  board = null,
+  onMeta,
+  editable = false,
   tab: asked,
   onClose,
 }: {
@@ -145,19 +153,26 @@ export function Settings({
   onTheme(name: string): void;
   /** Whose unused images the Files and images tab offers to remove — never the whole vault's. */
   boardName: string | null;
+  /** The board Settings is over. Its Layout tab is drawn only when this is set and editable. */
+  board?: Pick<Board, "name" | "flow"> | null;
+  /** `Editor.setMeta`: the Layout tab's one write path — one `MetaOp`, one undo entry. */
+  onMeta?(meta: Record<string, unknown>): Promise<boolean>;
+  /** False on a locked vault, where the board may be read but not written. */
+  editable?: boolean;
   /** The listing the sidebar draws; the Files and images tab no longer reads it. */
   list?: BoardTree;
   /** The tab a request named; otherwise the last one opened. */
   tab?: SettingsTab;
   onClose(): void;
 }) {
-  const [tab, setTabState] = useState<SettingsTab>(() => asked ?? lastTab());
+  const boardOpen = board !== null && editable;
+  const [tab, setTabState] = useState<SettingsTab>(() => asked ?? lastTab(boardOpen));
   /* What the server says this build may show (`src/features.ts`): Privacy (only the logs hold it)
      and Sync are its tabs. A person reads no sign a server exists on a build without them — nor,
      while the answer is on its way, which is why the unknown hides them too. */
   const features = useFeatures();
   const cloud = features?.cloud === true;
-  const sections = useMemo(() => withoutCloudTabs(SECTIONS, cloud), [cloud]);
+  const sections = useMemo(() => drawnSections(SECTIONS, { cloud, board: boardOpen }), [cloud, boardOpen]);
   const groups = useMemo(() => sections.filter((s): s is TabGroup<SettingsGroup> => s.group !== "foot"), [sections]);
   const foot = useMemo(() => sections.find((s) => s.group === "foot")?.tabs ?? [], [sections]);
   const walked = useMemo(() => sections.flatMap((s) => s.tabs), [sections]);
@@ -169,12 +184,13 @@ export function Settings({
     current.current = t;
     setTabState(t);
   }, []);
-  /* A stored tab that is one of the gated ones moves to the first still drawn — once the server has
-     said off, not while its answer is on its way, so a Sync tab asked for at boot is not lost. */
+  /* A stored tab this page cannot draw — one of the gated ones with the server's switch off, or the
+     board's with no editable board open — moves to the first tab it does draw, once the answer is
+     known rather than while it is on its way, so a Sync tab asked for at boot is not lost. */
   const known = features !== null;
   useEffect(() => {
-    if (known && !cloud && CLOUD_TABS.includes(tab)) setTab(TABS.find((t) => !CLOUD_TABS.includes(t)) ?? tab);
-  }, [known, cloud, tab, setTab]);
+    if (known && !walked.includes(tab)) setTab(walked[0] ?? TABS[0]);
+  }, [known, walked, tab, setTab]);
   /* On a narrow window, the list or one tab; on a wide one both are drawn and this changes nothing. */
   const [view, setView] = useState<"list" | "pane">(() => (asked || !narrow() ? "pane" : "list"));
   const vault = currentOf(useVaults());
@@ -263,6 +279,8 @@ export function Settings({
         return "Only on this machine.";
       case "vault":
         return `Saved with ${vault.name}. Another vault has its own.`;
+      case "board":
+        return `Saved in ${board?.name ?? "this board"}'s file.`;
       default:
         return assertNever(group);
     }
@@ -330,6 +348,8 @@ export function Settings({
         return <SyncPane />;
       case "agent-access":
         return <AgentAccessPane />;
+      case "board-layout":
+        return board && editable && onMeta ? <BoardLayoutPane board={board} onMeta={onMeta} /> : null;
       case "privacy":
         return <PrivacyPane />;
       case "shortcuts":

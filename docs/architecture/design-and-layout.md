@@ -24,7 +24,8 @@ changes nothing on screen. The line is ordinary frontmatter and stays in the fil
 a vault never writes a byte — so a board written before this decision keeps its text and simply draws
 in the reader's theme. **It is not a diagnostic either**: a person has no action for a frontmatter
 line that changes nothing, and the rule here is that a person only sees problems they can act on —
-a one-click removal needs a board settings card to sit in, and there is none. Snapshots and the
+a one-click removal needs a control to sit in, and the Layout tab holds only the flow's two numbers,
+so there is none. Snapshots and the
 CLI's exports open `?snapshot=1`, which reads no preference, so they use the app's default theme
 unless the URL names one. This is the same refusal as the accent one layer out: a document may not
 decide how its reader sees it, and one vault must look the same board to board.
