@@ -113,8 +113,8 @@ if (findings.length) {
       second text tone the themes already carry. What may keep `muted` is listed, selector by
       selector and with its reason, in `chrome-muted-allowlist.json`: disabled controls,
       separators and decorative glyphs, none of which is text. */
-const CHROME = "src/styles/chrome.css";
-const CHROME_ALLOWLIST = "scripts/chrome-muted-allowlist.json";
+const MUTED_CSS = "src/styles/chrome.css";
+const MUTED_ALLOWLIST = "scripts/chrome-muted-allowlist.json";
 
 /** The selector and declarations of every rule in a stylesheet, at-rules included. */
 function cssRules(text) {
@@ -146,29 +146,29 @@ function cssRules(text) {
   return rules;
 }
 
-const mutedAllow = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(root, CHROME_ALLOWLIST), "utf8"))));
+const mutedAllow = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(root, MUTED_ALLOWLIST), "utf8"))));
 const muted = /color\s*:\s*var\(--dag-color-muted\)/;
-const chromeAllowed = new Set();
-const chromeFindings = [];
+const mutedSeen = new Set();
+const mutedFindings = [];
 
-for (const rule of cssRules(fs.readFileSync(path.join(root, CHROME), "utf8"))) {
+for (const rule of cssRules(fs.readFileSync(path.join(root, MUTED_CSS), "utf8"))) {
   if (rule.selector.startsWith("@") || !muted.test(rule.decls)) continue;
-  if (mutedAllow.has(rule.selector)) chromeAllowed.add(rule.selector);
-  else chromeFindings.push({ file: CHROME, line: rule.line, what: "muted text", text: rule.selector });
+  if (mutedAllow.has(rule.selector)) mutedSeen.add(rule.selector);
+  else mutedFindings.push({ file: MUTED_CSS, line: rule.line, what: "muted text", text: rule.selector });
 }
 
 for (const [selector, reason] of mutedAllow) {
   if (typeof reason !== "string" || !reason.trim()) {
-    chromeFindings.push({ file: CHROME_ALLOWLIST, line: 0, what: "no reason", text: selector });
-  } else if (!chromeAllowed.has(selector)) {
-    chromeFindings.push({ file: CHROME_ALLOWLIST, line: 0, what: "stale entry", text: selector });
+    mutedFindings.push({ file: MUTED_ALLOWLIST, line: 0, what: "no reason", text: selector });
+  } else if (!mutedSeen.has(selector)) {
+    mutedFindings.push({ file: MUTED_ALLOWLIST, line: 0, what: "stale entry", text: selector });
   }
 }
 
-if (chromeFindings.length) {
-  console.error(`${chromeFindings.length} muted text finding(s) in the chrome:\n`);
+if (mutedFindings.length) {
+  console.error(`${mutedFindings.length} muted text finding(s) in the chrome:\n`);
   let last = "";
-  for (const f of chromeFindings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
+  for (const f of mutedFindings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
     if (f.file !== last) console.error(`  ${f.file}`), (last = f.file);
     console.error(`    ${String(f.line).padStart(4)}  ${f.what.padEnd(18)} ${f.text}`);
   }
