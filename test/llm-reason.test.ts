@@ -16,17 +16,15 @@ import {
  */
 
 const providers = (ready: string[]): ProviderStatus[] =>
-  ["claude", "gemini", "opencode", "zai", "custom"].map((id) => ({ id, ready: ready.includes(id) }));
+  ["claude", "opencode", "custom"].map((id) => ({ id, ready: ready.includes(id) }));
 
 const explain = (reason: LlmReason, host: "desktop" | "browser" = "desktop", ready: string[] = []) =>
   explainLlmReason(reason, { host, providers: providers(ready) })!;
 
 describe("explainLlmReason", () => {
   it("says a key is missing, and offers the keyring in the app and another ready provider", () => {
-    const said = explain({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] }, "desktop", [
-      "claude",
-    ]);
-    expect(said.sentence).toBe("Gemini needs an API key.");
+    const said = explain({ code: "no-key", provider: "custom", keyEnv: ["ANYDAG_LLM_API_KEY"] }, "desktop", ["claude"]);
+    expect(said.sentence).toBe("OpenAI-compatible needs an API key.");
     expect(said.actions).toEqual([
       { kind: "settings", label: "Add a key" },
       { kind: "provider", label: "Use Claude Code", provider: "claude" },
@@ -34,20 +32,20 @@ describe("explainLlmReason", () => {
   });
 
   it("names the server's variable in a browser, drawn as code rather than backticks", () => {
-    const said = explain({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] }, "browser");
-    expect(said.sentence).toBe("Gemini needs an API key in the server's environment: GEMINI_API_KEY or GOOGLE_API_KEY.");
+    const said = explain({ code: "no-key", provider: "custom", keyEnv: ["ANYDAG_LLM_API_KEY"] }, "browser");
+    expect(said.sentence).toBe("OpenAI-compatible needs an API key in the server's environment: ANYDAG_LLM_API_KEY.");
     expect(said.sentence).not.toContain("`");
     expect(said.sentence).not.toContain(".env.local");
     expect(said.actions).toEqual([{ kind: "settings", label: "Open AI settings" }]);
-    expect(sentenceParts(said.sentence)).toContainEqual({ code: "GEMINI_API_KEY" });
+    expect(sentenceParts(said.sentence)).toContainEqual({ code: "ANYDAG_LLM_API_KEY" });
   });
 
-  it("names Z.ai and OpenAI-compatible as the provider list does", () => {
-    expect(explain({ code: "not-installed", provider: "zai" }, "browser").sentence).toBe(
-      "Z.ai is not installed. Install it, then check again.",
+  it("names OpenAI-compatible as the provider list does, and falls back for an id it does not know", () => {
+    expect(explain({ code: "too-old", provider: "custom" }, "browser").sentence).toBe(
+      "OpenAI-compatible is too old. Update it, then check again.",
     );
-    expect(explain({ code: "no-key", provider: "custom" }, "browser").sentence).toBe(
-      "OpenAI-compatible needs an API key in the server's environment.",
+    expect(explain({ code: "too-old", provider: "some-new-thing" }, "browser").sentence).toBe(
+      "The model provider is too old. Update it, then check again.",
     );
   });
 
@@ -74,7 +72,7 @@ describe("explainLlmReason", () => {
       "provider-error",
     ];
     for (const code of codes) {
-      const said = explain({ code, provider: "gemini" }, "browser", ["claude", "opencode"]);
+      const said = explain({ code, provider: "custom" }, "browser", ["claude", "opencode"]);
       expect(said.sentence).not.toBe("");
       expect(said.actions.length).toBeGreaterThan(0);
       expect(said.actions.length).toBeLessThanOrEqual(2);
@@ -85,22 +83,22 @@ describe("explainLlmReason", () => {
   });
 
   it("gives a transient failure its sentence and Try again", () => {
-    expect(explain({ code: "busy", provider: "gemini" })).toEqual({
+    expect(explain({ code: "busy", provider: "custom" })).toEqual({
       sentence: "The model is busy with other answers right now. Try again in a moment.",
       actions: [{ kind: "retry", label: "Try again" }],
     });
-    expect(explain({ code: "timeout", provider: "gemini" }).actions).toEqual([{ kind: "retry", label: "Try again" }]);
-    expect(explain({ code: "provider-error", provider: "gemini" }).sentence).toBe("The model could not answer.");
+    expect(explain({ code: "timeout", provider: "custom" }).actions).toEqual([{ kind: "retry", label: "Try again" }]);
+    expect(explain({ code: "provider-error", provider: "custom" }).sentence).toBe("The model could not answer.");
   });
 
   it("falls back to the server's own text for a missing or unknown reason", () => {
     expect(explainLlmReason(undefined, { host: "browser" })).toBeNull();
     expect(explainLlmReason({ code: "something-new" as LlmReasonCode }, { host: "browser" })).toBeNull();
     expect(reasonOf({ code: "something-new" })).toBeUndefined();
-    expect(reasonOf({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY"] })).toEqual({
+    expect(reasonOf({ code: "no-key", provider: "custom", keyEnv: ["ANYDAG_LLM_API_KEY"] })).toEqual({
       code: "no-key",
-      provider: "gemini",
-      keyEnv: ["GEMINI_API_KEY"],
+      provider: "custom",
+      keyEnv: ["ANYDAG_LLM_API_KEY"],
     });
   });
 });

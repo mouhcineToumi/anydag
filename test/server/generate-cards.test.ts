@@ -62,8 +62,8 @@ describe("/__board/generate, kind flashcards", () => {
     /* No PATH and an empty home: a Claude Code on the machine running the suite would otherwise answer. */
     const said = await generate({ prompt: "a web app" }, { PATH: "", HOME: "/nonexistent-home" });
     expect(said.status).toBe(400);
-    expect(said.error).toContain("GEMINI_API_KEY");
-    expect(said.reason).toEqual({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] });
+    expect(said.error).toContain("Claude Code is not installed");
+    expect(said.reason).toEqual({ code: "not-installed", provider: "claude" });
   });
 
   it("names a provider it does not have", async () => {

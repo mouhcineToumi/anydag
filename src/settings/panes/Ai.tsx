@@ -245,7 +245,7 @@ function DiagramsGroup({ llm, refresh }: { llm: Providers | null; refresh(): voi
           data-dag-setting-llm-provider=""
           value={s.llm.provider ?? ""}
           /* A model name belongs to its provider, so choosing another provider clears it back to
-             that provider's own default rather than sending a Gemini name to Z.ai. */
+             that provider's own default rather than sending one provider's model name to another. */
           onChange={(e) => writeSettings({ llm: { provider: e.target.value || null, model: null } })}
         >
           <option value="">{automatic ? `Automatic · ${automatic}` : "Automatic"}</option>

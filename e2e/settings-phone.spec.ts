@@ -52,17 +52,6 @@ const LLM = {
       ready: true,
     },
     {
-      id: "zai",
-      label: "Z.ai",
-      description: "GLM through Z.ai's own API.",
-      kind: "http",
-      keyEnv: ["ZAI_API_KEY"],
-      defaultModel: "glm-5.3",
-      models: ["glm-5.3"],
-      ready: false,
-      reason: { code: "no-key", provider: "zai", keyEnv: ["ZAI_API_KEY"] },
-    },
-    {
       id: "custom",
       label: "OpenAI-compatible",
       description: "Any server that speaks OpenAI's shape.",
@@ -205,9 +194,9 @@ async function openTab(page: Page, tab: SettingsTab): Promise<void> {
   }
   if (tab === "providers") {
     /* The key row's field only appears once the fake shell says whether a key is stored. */
-    await expect(page.locator('[data-dag-settings-pane="providers"] [data-dag-setting-key="ZAI_API_KEY"] input')).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(
+      page.locator('[data-dag-settings-pane="providers"] [data-dag-setting-key="ANYDAG_LLM_API_KEY"] input'),
+    ).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-dag-settings-pane="providers"] input[data-dag-provider-base-url]')).toBeVisible({
       timeout: 10_000,
     });

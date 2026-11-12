@@ -22,11 +22,14 @@ import {
 } from "../plugins/generate/llm";
 import {
   claudeEnv,
+  defaultProvider,
   describeProviders,
   findClaude,
   findOpencode,
+  namedProvider,
   opencodeEnv,
   resolveProvider,
+  RETIRED_PROVIDERS,
 } from "../plugins/generate/providers";
 
 /**
@@ -265,30 +268,55 @@ describe("opencodeComplete", () => {
 });
 
 describe("resolveProvider", () => {
-  it("defaults to Gemini when nothing can answer, and needs its key", () => {
+  it("falls back to Claude Code when nothing can answer, and says why it is not ready", () => {
     /* No PATH and a home with nothing in it: a Claude Code on the machine running the suite must not answer. */
     expect(resolveProvider({ PATH: "", HOME: "/nonexistent-home" })).toMatchObject({
       ok: false,
-      error: expect.stringContaining("GEMINI_API_KEY"),
-      reason: { code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
+      error: expect.stringContaining("Claude Code is not installed"),
+      reason: { code: "not-installed", provider: "claude" },
     });
-    const r = resolveProvider({ GEMINI_API_KEY: KEY });
-    expect(r.ok && r.value).toMatchObject({
-      model: "gemini-3.8-flash",
-      key: KEY,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-    });
+    expect(defaultProvider({ PATH: "", HOME: "/nonexistent-home" })).toBe("claude");
+    expect(defaultProvider({ PATH: "", HOME: "/nonexistent-home", ANYDAG_DESKTOP: "1" })).toBe("claude");
   });
 
   it("lets the environment choose the default provider and its model", () => {
-    const r = resolveProvider({ ANYDAG_LLM_PROVIDER: "zai", ANYDAG_LLM_MODEL: "glm-5.3", ZHIPU_API_KEY: KEY });
-    expect(r.ok && r.value.spec.id).toBe("zai");
+    const r = resolveProvider({
+      ANYDAG_LLM_PROVIDER: "custom",
+      ANYDAG_LLM_MODEL: "glm-5.3",
+      ANYDAG_LLM_BASE_URL: "https://api.z.ai/api/paas/v4",
+      ANYDAG_LLM_API_KEY: KEY,
+    });
+    expect(r.ok && r.value.spec.id).toBe("custom");
     expect(r.ok && r.value.model).toBe("glm-5.3");
   });
 
-  it("does not hand the default provider's model name to a provider somebody picked", () => {
-    const r = resolveProvider({ ANYDAG_LLM_MODEL: "gemini-3.7-flash", ZHIPU_API_KEY: KEY }, { provider: "zai" });
-    expect(r.ok && r.value.model).toBe("glm-5.3-flash");
+  it("reads a retired provider id as if no provider were named", () => {
+    expect(RETIRED_PROVIDERS).toEqual(["gemini", "zai"]);
+    for (const id of RETIRED_PROVIDERS) {
+      expect(namedProvider(id)).toBeUndefined();
+      expect(namedProvider(` ${id} `)).toBeUndefined();
+    }
+    expect(namedProvider("custom")).toBe("custom");
+
+    const custom = {
+      PATH: "",
+      HOME: "/nonexistent-home",
+      ANYDAG_LLM_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/openai",
+      ANYDAG_LLM_MODEL: "gemini-3.8-flash",
+      ANYDAG_LLM_API_KEY: KEY,
+    };
+    /* A request naming one gets the default, not `unknown-provider`. */
+    for (const id of RETIRED_PROVIDERS) {
+      const r = resolveProvider({ ...custom, ANYDAG_LLM_PROVIDER: "custom" }, { provider: id });
+      expect(r.ok && r.value.spec.id).toBe("custom");
+      expect(r.ok && r.value.model).toBe("gemini-3.8-flash");
+    }
+    /* A model named with a retired provider goes with it, rather than reaching the default. */
+    const withModel = resolveProvider({ ...custom, ANYDAG_LLM_PROVIDER: "custom" }, { provider: "zai", model: "glm-5.3" });
+    expect(withModel.ok && withModel.value.model).toBe("gemini-3.8-flash");
+    /* The environment naming one is the same as naming none: the first provider that can answer. */
+    const r = resolveProvider({ ...custom, ANYDAG_LLM_PROVIDER: "gemini" });
+    expect(r.ok && r.value.spec.id).toBe("custom");
   });
 
   it("takes a custom endpoint entirely from the environment, key optional", () => {
@@ -321,11 +349,19 @@ describe("resolveProvider", () => {
 });
 
 describe("describeProviders", () => {
+  const CUSTOM = {
+    ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1",
+    ANYDAG_LLM_MODEL: "qwen3:32b",
+    ANYDAG_LLM_API_KEY: KEY,
+    PATH: "",
+    HOME: "/nonexistent-home",
+  };
+
   it("says which could run, and never carries a key", () => {
-    const d = describeProviders({ GEMINI_API_KEY: KEY, PATH: "", HOME: "/nonexistent-home" });
+    const d = describeProviders(CUSTOM);
     expect(JSON.stringify(d)).not.toContain(KEY);
-    expect(d.default).toBe("gemini");
-    expect(d.providers.find((p) => p.id === "gemini")!.ready).toBe(true);
+    expect(d.default).toBe("custom");
+    expect(d.providers.find((p) => p.id === "custom")!.ready).toBe(true);
     expect(d.providers.find((p) => p.id === "opencode")).toMatchObject({
       ready: false,
       error: expect.stringContaining("not installed"),
@@ -334,12 +370,10 @@ describe("describeProviders", () => {
   });
 
   it("names every provider as the app does, and explains in a description beside the name", () => {
-    const d = describeProviders({ GEMINI_API_KEY: KEY, PATH: "", HOME: "/nonexistent-home" });
+    const d = describeProviders(CUSTOM);
     expect(Object.fromEntries(d.providers.map((p) => [p.id, p.label]))).toEqual({
       claude: "Claude Code",
-      gemini: "Gemini",
       opencode: "OpenCode",
-      zai: "Z.ai",
       custom: "OpenAI-compatible",
     });
     for (const p of d.providers) {
@@ -350,31 +384,36 @@ describe("describeProviders", () => {
 });
 
 describe("extraFor", () => {
-  const gemini = () => {
-    const r = resolveProvider({ GEMINI_API_KEY: KEY });
+  const custom = () => {
+    const r = resolveProvider(
+      { ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1", ANYDAG_LLM_MODEL: "qwen3:32b" },
+      { provider: "custom" },
+    );
     if (!r.ok) throw new Error(r.error);
     return r.value;
   };
 
-  it("asks Gemini to think little, which is most of the wait on a diagram", () => {
-    expect(extraFor(gemini(), {})).toEqual({ reasoning_effort: "low" });
+  it("sends nothing the provider did not ask for", () => {
+    expect(extraFor(custom(), {})).toEqual({});
   });
 
   it("lets the environment choose, or ask for the model's own default", () => {
-    expect(extraFor(gemini(), { ANYDAG_LLM_REASONING: "high", ANYDAG_LLM_TEMPERATURE: "0.3" })).toEqual({
+    expect(extraFor(custom(), { ANYDAG_LLM_REASONING: "high", ANYDAG_LLM_TEMPERATURE: "0.3" })).toEqual({
       reasoning_effort: "high",
       temperature: 0.3,
     });
-    expect(extraFor(gemini(), { ANYDAG_LLM_REASONING: "default" })).toEqual({});
+    expect(extraFor(custom(), { ANYDAG_LLM_REASONING: "default" })).toEqual({});
   });
 
   it("lets the person in the settings card outrank the machine's setting", () => {
-    expect(extraFor(gemini(), { ANYDAG_LLM_REASONING: "high" }, { reasoning: "none" })).toEqual({ reasoning_effort: "none" });
-    expect(extraFor(gemini(), {}, { reasoning: "default" })).toEqual({});
-    /* Nothing chosen is nothing said: the provider's own measured default stands. */
-    expect(extraFor(gemini(), {}, { reasoning: null })).toEqual({ reasoning_effort: "low" });
-    /* Gemini has no Max, so the app's highest maps to the highest it does have. */
-    expect(extraFor(gemini(), {}, { reasoning: "max" })).toEqual({ reasoning_effort: "high" });
+    expect(extraFor(custom(), { ANYDAG_LLM_REASONING: "high" }, { reasoning: "none" })).toEqual({
+      reasoning_effort: "none",
+    });
+    expect(extraFor(custom(), {}, { reasoning: "default" })).toEqual({});
+    /* Nothing chosen is nothing said: an HTTP provider with no measured default gets no field. */
+    expect(extraFor(custom(), {}, { reasoning: null })).toEqual({});
+    /* The HTTP scale has no Max, so the app's highest maps to the highest it does have. */
+    expect(extraFor(custom(), {}, { reasoning: "max" })).toEqual({ reasoning_effort: "high" });
   });
 });
 
@@ -515,18 +554,16 @@ describe("effortFor", () => {
     expect(effortFor("opencode", { reasoning: "high" })).toBe("high");
     expect(effortFor("opencode", { reasoning: "max" })).toBe("max");
 
-    /* HTTP providers carry reasoning_effort; max is their highest accepted level. */
-    for (const provider of ["gemini", "zai", "custom"]) {
-      expect(effortFor(provider, { reasoning: "none" })).toBe("none");
-      expect(effortFor(provider, { reasoning: "low" })).toBe("low");
-      expect(effortFor(provider, { reasoning: "medium" })).toBe("medium");
-      expect(effortFor(provider, { reasoning: "high" })).toBe("high");
-      expect(effortFor(provider, { reasoning: "max" })).toBe("high");
-    }
+    /* The HTTP provider carries reasoning_effort; max is its highest accepted level. */
+    expect(effortFor("custom", { reasoning: "none" })).toBe("none");
+    expect(effortFor("custom", { reasoning: "low" })).toBe("low");
+    expect(effortFor("custom", { reasoning: "medium" })).toBe("medium");
+    expect(effortFor("custom", { reasoning: "high" })).toBe("high");
+    expect(effortFor("custom", { reasoning: "max" })).toBe("high");
   });
 
   it("says nothing for Automatic and for an old `default`", () => {
-    for (const provider of ["claude", "opencode", "gemini"]) {
+    for (const provider of ["claude", "opencode", "custom"]) {
       expect(effortFor(provider, { reasoning: "default" })).toBeUndefined();
       expect(effortFor(provider, {})).toBeUndefined();
       expect(effortFor(provider, { reasoning: null })).toBeUndefined();
@@ -582,19 +619,35 @@ describe.skipIf(process.platform === "win32")("finding Claude Code", () => {
     });
   });
 
-  it("is the default when it can answer, and never takes a Gemini model name from the environment", () => {
+  it("is the default when it can answer, and never takes another provider's model from the environment", () => {
     const h = home(".claude/local/claude");
-    /* A browser with no Gemini key falls to Claude Code rather than failing its first card (#179)… */
+    /* A browser with no keyed provider falls to Claude Code rather than failing its first card (#179). */
     expect(describeProviders({ PATH: "", HOME: h }).default).toBe("claude");
-    /* …but a Gemini key there keeps Gemini, as it always was, and the desktop app still puts the plan first. */
-    expect(describeProviders({ PATH: "", HOME: h, GEMINI_API_KEY: KEY }).default).toBe("gemini");
-    expect(describeProviders({ PATH: "", HOME: h, GEMINI_API_KEY: KEY, ANYDAG_DESKTOP: "1" }).default).toBe("claude");
-    const desk = { PATH: "", HOME: h, ANYDAG_DESKTOP: "1", ANYDAG_LLM_MODEL: "gemini-3.7-flash" };
+    const custom = {
+      PATH: "",
+      HOME: h,
+      ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1",
+      ANYDAG_LLM_MODEL: "qwen3:32b",
+    };
+    expect(describeProviders(custom).default).toBe("claude");
+    expect(describeProviders({ ...custom, ANYDAG_DESKTOP: "1" }).default).toBe("claude");
+    const desk = { PATH: "", HOME: h, ANYDAG_DESKTOP: "1", ANYDAG_LLM_MODEL: "qwen3:32b" };
     expect(describeProviders(desk).default).toBe("claude");
     const r = resolveProvider(desk);
     expect(r.ok && r.value).toMatchObject({ spec: { id: "claude" }, model: "sonnet" });
-    expect(describeProviders({ PATH: "", HOME: home(null), ANYDAG_DESKTOP: "1" }).default).toBe("gemini");
-    expect(describeProviders({ ...desk, ANYDAG_LLM_PROVIDER: "zai" }).default).toBe("zai");
+    expect(describeProviders({ PATH: "", HOME: home(null), ANYDAG_DESKTOP: "1" }).default).toBe("claude");
+    expect(
+      describeProviders({ ...desk, ANYDAG_LLM_PROVIDER: "custom", ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1" }).default,
+    ).toBe("custom");
+
+    /* A model named for another provider is not sent to Claude; named for Claude, it is. */
+    const other = resolveProvider(
+      { ...desk, ANYDAG_LLM_PROVIDER: "custom", ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1" },
+      { provider: "claude" },
+    );
+    expect(other.ok && other.value.model).toBe("sonnet");
+    const mine = resolveProvider({ ...desk, ANYDAG_LLM_PROVIDER: "claude" }, { provider: "claude" });
+    expect(mine.ok && mine.value.model).toBe("qwen3:32b");
   });
 
   it("strips what would make somebody else's account answer", () => {
@@ -673,7 +726,7 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     expect(describeProviders({ PATH: "", HOME: h }).default).toBe("opencode");
     expect(describeProviders({ PATH: "", HOME: h, ANYDAG_DESKTOP: "1" }).default).toBe("opencode");
     expect(describeProviders({ PATH: "", HOME: home(".opencode/bin/opencode", "2.2.5", []), ANYDAG_DESKTOP: "1" }).default).toBe(
-      "gemini",
+      "claude",
     );
     /* With Claude Code there too, Claude goes first. */
     const both = home(".opencode/bin/opencode");
@@ -683,12 +736,19 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     expect(describeProviders({ PATH: "", HOME: both }).default).toBe("claude");
   });
 
-  it("falls to a keyed provider that can answer, then to Gemini when none can", () => {
+  it("falls to a keyed provider that can answer, then to Claude Code when none can", () => {
     const none = home(null);
-    expect(describeProviders({ PATH: "", HOME: none, ANYDAG_DESKTOP: "1", ZAI_API_KEY: KEY }).default).toBe("zai");
-    expect(describeProviders({ PATH: "", HOME: none, ZAI_API_KEY: KEY }).default).toBe("zai");
-    expect(describeProviders({ PATH: "", HOME: none, ANYDAG_DESKTOP: "1" }).default).toBe("gemini");
-    expect(describeProviders({ PATH: "", HOME: none }).default).toBe("gemini");
+    const custom = {
+      PATH: "",
+      HOME: none,
+      ANYDAG_LLM_BASE_URL: "http://localhost:11434/v1",
+      ANYDAG_LLM_MODEL: "qwen3:32b",
+      ANYDAG_LLM_API_KEY: KEY,
+    };
+    expect(describeProviders({ ...custom, ANYDAG_DESKTOP: "1" }).default).toBe("custom");
+    expect(describeProviders(custom).default).toBe("custom");
+    expect(describeProviders({ PATH: "", HOME: none, ANYDAG_DESKTOP: "1" }).default).toBe("claude");
+    expect(describeProviders({ PATH: "", HOME: none }).default).toBe("claude");
   });
 
   it("does not let the server's own config or token reach the run", () => {

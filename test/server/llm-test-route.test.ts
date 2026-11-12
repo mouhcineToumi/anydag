@@ -39,9 +39,9 @@ describe("/__board/llm/test", () => {
   });
 
   it("says why a provider cannot answer, before any call is made", async () => {
-    const said = await call("POST", "/__board/llm/test", { provider: "gemini" });
+    const said = await call("POST", "/__board/llm/test", { provider: "claude" });
     expect(said.status).toBe(400);
-    expect(said.body.reason).toEqual({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] });
+    expect(said.body.reason).toEqual({ code: "not-installed", provider: "claude" });
   });
 
   it("needs an address before OpenAI-compatible can be tried", async () => {
@@ -59,7 +59,8 @@ describe("/__board/llm", () => {
     const said = await call("GET", "/__board/llm?fresh=1");
     expect(said.status).toBe(200);
     const providers = said.body.providers as { id: string; keyEnv: string[] }[];
-    expect(providers.find((p) => p.id === "gemini")?.keyEnv).toEqual(["GEMINI_API_KEY", "GOOGLE_API_KEY"]);
+    expect(providers.map((p) => p.id)).toEqual(["claude", "opencode", "custom"]);
+    expect(providers.find((p) => p.id === "custom")?.keyEnv).toEqual(["ANYDAG_LLM_API_KEY"]);
     expect(providers.find((p) => p.id === "claude")?.keyEnv).toEqual([]);
   });
 });

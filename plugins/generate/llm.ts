@@ -49,9 +49,9 @@ interface HttpOptions {
 /**
  * `POST {base}/chat/completions`, and nothing an SDK would add.
  *
- * Gemini, Z.ai, OpenRouter, Ollama and vLLM all answer this shape, which is the whole reason there
- * is one adapter rather than four. `content` may come back as a string or as an array of parts
- * (some gateways do the latter); both are read.
+ * OpenRouter, Ollama, vLLM and the hosted providers' OpenAI-compatible endpoints all answer this
+ * shape, which is the whole reason there is one adapter rather than one per service. `content` may
+ * come back as a string or as an array of parts (some gateways do the latter); both are read.
  */
 export function httpComplete(o: HttpOptions): Complete {
   const doFetch = o.fetchImpl ?? fetch;
@@ -448,8 +448,8 @@ function opencodeEffort(level: string): string | undefined {
 }
 
 /**
- * The body field an OpenAI-compatible provider reads. Gemini 3.8 Flash takes none, low, medium and
- * high and refuses `minimal`; Max is that highest, high.
+ * The body field an OpenAI-compatible provider reads. It takes none, low, medium and high; the
+ * app's Max is that highest, high.
  */
 function httpEffort(level: string): string | undefined {
   switch (level) {

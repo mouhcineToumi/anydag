@@ -2,14 +2,14 @@
 /**
  * Ask the running dev server for a diagram from the command line — the prompt card without the card.
  *
- *   node scripts/generate.mjs "<description>" [--as arch] [--provider claude|gemini|opencode|zai|custom]
+ *   node scripts/generate.mjs "<description>" [--as arch] [--provider claude|opencode|custom]
  *                            [--model <id>] [--port 3500] [--json]
  *
  * It calls `POST /__board/generate`, the route the card calls, so what it prints is exactly what a
  * card would have been answered: the fence, how many attempts the fix loop took, how long, and every
  * diagnostic left over. That makes it the way to compare models — the same five descriptions through
- * Gemini and through GLM, read side by side — and the way to see a provider's refusal in words when
- * the card only has room for one line. Nothing is written to any board.
+ * two providers, read side by side — and the way to see a provider's refusal in words when the card
+ * only has room for one line. Nothing is written to any board.
  *
  * Exit codes: 0 a clean diagram · 1 a diagram with errors left in it · 2 no diagram at all, or the
  * server refused · 6 the server is not up.

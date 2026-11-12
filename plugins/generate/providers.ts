@@ -10,9 +10,9 @@ import { PROVIDER_NAMES } from "../../src/settings/providerNames";
  *
  * Two kinds, and one interface in front of both (`llm.ts`):
  *
- * - **`http`** — an OpenAI-compatible `chat/completions` endpoint and a key. Gemini is the default
- *   over HTTP; Z.ai is GLM from the people who make it; `custom` is anything else that speaks the
- *   dialect — OpenRouter, Ollama, a local vLLM — named entirely from the environment.
+ * - **`http`** — an OpenAI-compatible `chat/completions` endpoint and a key. `custom` is anything
+ *   that speaks the dialect — OpenRouter, Ollama, a local vLLM, and Gemini or Z.ai through their
+ *   OpenAI-compatible endpoints — named from the environment.
  * - **`cli`** — a coding agent's own command line, which reuses whatever it is logged into.
  *   `claude` is Claude Code in print mode, on the person's own Claude subscription: no key, because
  *   the login is the CLI's. `opencode` is OpenCode 2 the same way, on whatever it is signed into —
@@ -77,10 +77,7 @@ export interface ProviderSpec {
   defaultModel: string;
   /** Suggestions for the settings card, not a whitelist: any model the endpoint knows is accepted. */
   models: string[];
-  /**
-   * Body fields sent unless the environment says otherwise (`ANYDAG_LLM_REASONING`, `ANYDAG_LLM_TEMPERATURE`).
-   * Measured, not guessed — see Gemini's.
-   */
+  /** Body fields sent unless the environment says otherwise (`ANYDAG_LLM_REASONING`, `ANYDAG_LLM_TEMPERATURE`). */
   defaults?: Record<string, unknown>;
 }
 
@@ -96,20 +93,6 @@ export const PROVIDERS: ProviderSpec[] = [
     models: ["sonnet", "opus", "haiku", "fable"],
   },
   {
-    id: "gemini",
-    label: PROVIDER_NAMES.gemini,
-    description: "Google's Gemini, through an API key.",
-    kind: "http",
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-    keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-    defaultModel: "gemini-3.8-flash",
-    models: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview"],
-    /* Gemini 3.x Flash thinks by default, and on a diagram that thinking is nearly all of the wait:
-       one description took 42 s at the model's default, 14 s at `low` and 10 s at `none`, with the
-       same diagram each time. `minimal` is refused by 3.8 Flash. */
-    defaults: { reasoning_effort: "low" },
-  },
-  {
     id: "opencode",
     label: PROVIDER_NAMES.opencode,
     description: "Uses your OpenCode login and whatever it is signed in to. No key here.",
@@ -117,16 +100,6 @@ export const PROVIDERS: ProviderSpec[] = [
     keyEnv: [],
     defaultModel: OPENCODE_DEFAULT_MODEL,
     models: ["opencode-go/glm-5.3-flash", "opencode-go/glm-5.3", "opencode-go/kimi-k3", "opencode-go/deepseek-v4.1-flash"],
-  },
-  {
-    id: "zai",
-    label: PROVIDER_NAMES.zai,
-    description: "GLM, from Z.ai, through an API key.",
-    kind: "http",
-    baseURL: "https://api.z.ai/api/paas/v4",
-    keyEnv: ["ZHIPU_API_KEY", "ZAI_API_KEY"],
-    defaultModel: "glm-5.3-flash",
-    models: ["glm-5.3-flash", "glm-5.3"],
   },
   {
     id: "custom",
@@ -393,48 +366,64 @@ export function opencodeReady(env: Env, model?: string): { ok: true; bin: string
 /**
  * Which providers the default is looked for in, first to last. In the desktop app (`ANYDAG_DESKTOP=1`,
  * set by the shell) the coding agents' CLIs come first, because a plan the person already pays for
- * needs no key. Anywhere else Gemini stays first, so a `.env.local` holding a Gemini key goes on
- * answering exactly as it did; the CLIs follow it, so a browser on a machine where Claude Code is
- * signed in does not fail its first prompt card on a key nobody set (#179).
+ * needs no key. A browser has nothing keyed ahead of them now that Gemini and Z.ai are reached through
+ * OpenAI-compatible, so the order is the same there. When none can answer, the first row is the one
+ * whose refusal the person is told.
  */
 const DEFAULT_ORDER = {
-  desktop: ["claude", "opencode", "gemini", "zai", "custom"],
-  elsewhere: ["gemini", "claude", "opencode", "zai", "custom"],
+  desktop: ["claude", "opencode", "custom"],
+  elsewhere: ["claude", "opencode", "custom"],
 } as const;
+
+/** Ids this build no longer offers. They stay reachable through `custom`'s OpenAI-compatible row. */
+export const RETIRED_PROVIDERS: readonly string[] = ["gemini", "zai"];
+
+/** The provider a request names, or `undefined` when it names none — or one this build retired. */
+export function namedProvider(id: string | null | undefined): string | undefined {
+  const said = id?.trim();
+  if (!said || RETIRED_PROVIDERS.includes(said)) return undefined;
+  return said;
+}
 
 /**
  * The id the server uses when a request names none: `ANYDAG_LLM_PROVIDER`; else the first provider in
- * `DEFAULT_ORDER` that can answer now; else Gemini, whose "no key" is then what the person is told.
- * Every readiness check is remembered (`remembered`), so asking costs nothing after the first time.
+ * `DEFAULT_ORDER` that can answer now; else the first row of that order, whose refusal is then what the
+ * person is told. Every readiness check is remembered (`remembered`), so asking costs nothing after
+ * the first time.
  */
 export function defaultProvider(env: Env): string {
-  const named = env.ANYDAG_LLM_PROVIDER?.trim();
+  const named = namedProvider(env.ANYDAG_LLM_PROVIDER);
   if (named) return named;
   const order = env.ANYDAG_DESKTOP === "1" ? DEFAULT_ORDER.desktop : DEFAULT_ORDER.elsewhere;
-  return order.find((id) => resolveProvider(env, { provider: id }).ok) ?? "gemini";
+  return order.find((id) => resolveProvider(env, { provider: id }).ok) ?? order[0];
 }
 
 /**
  * Turn a request's `provider`/`model` into something callable, or say why not.
  *
- * `ANYDAG_LLM_MODEL` overrides the default model of the *default* provider only: a person who picked a
- * different provider in the settings card and left the model empty wants that provider's default,
- * not a Gemini model name sent to Z.ai.
+ * `ANYDAG_LLM_MODEL` belongs to the provider `ANYDAG_LLM_PROVIDER` names, and to the
+ * OpenAI-compatible row: a person who picked a different provider in the settings card and left the
+ * model empty wants that provider's default, not one provider's model name sent to another. A
+ * `gemini` or `zai` in a request or in the environment is read as if no provider were named, so the
+ * default answers rather than a request failing with `unknown-provider`.
  */
 export function resolveProvider(
   env: Env,
   want?: { provider?: string | null; model?: string | null },
 ): { ok: true; value: Resolved } | Failure {
-  const id = want?.provider?.trim() || defaultProvider(env);
+  const id = namedProvider(want?.provider) ?? defaultProvider(env);
   const spec = PROVIDERS.find((p) => p.id === id);
   if (!spec)
     return refusal(`no provider \`${id}\` — expected one of ${PROVIDERS.map((p) => p.id).join(", ")}`, "unknown-provider", id);
 
-  /* Read against the provider the environment named (or Gemini), never the desktop's implicit
-     Claude: a model set for Gemini in `.env.local` is not a model name Claude Code knows. */
-  const envModel = id === (env.ANYDAG_LLM_PROVIDER?.trim() || "gemini") ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
-  const model =
-    want?.model?.trim() || envModel || (spec.id === "custom" ? env.ANYDAG_LLM_MODEL?.trim() : "") || spec.defaultModel;
+  /* Read against the provider the environment named, and `custom`: a model set for one provider is
+     not a model name Claude Code or OpenCode knows, so it is never sent to them unless one of them
+     is the provider the environment named. */
+  const named = namedProvider(env.ANYDAG_LLM_PROVIDER);
+  const envModel = id === "custom" || (named !== undefined && id === named) ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
+  /* A retired provider's model goes with it: `gemini-3.8-flash` means nothing to the default. */
+  const retired = Boolean(want?.provider?.trim()) && namedProvider(want?.provider) === undefined;
+  const model = (retired ? "" : want?.model?.trim()) || envModel || spec.defaultModel;
   if (!model)
     return refusal(`provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings`, "needs-model", id);
 
