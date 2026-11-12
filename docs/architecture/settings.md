@@ -160,6 +160,14 @@ on a dark edge rather than glowing; in `paper` and `neutral` it is a soft tint o
 `--elevation` rule is where the geometry lives, and the Settings modal, the board browser, the rewrite
 dialog and the welcome card all read it.
 
+**Contrast is a token choice, not a theme edit.** `muted` is 2.6:1 on Neutral's white card and 2.4:1
+on its panel, so text a person must read inside `[data-dag-settings]` and the board settings card —
+headings, hints, descriptions, placeholders and unit suffixes — takes `slate`, which every theme
+carries. Hints there are at least 12.5px, and prose is capped at 68ch with `text-wrap: pretty`.
+`muted` remains for disabled controls and dividers, and the sidebar's keycaps and folder names are a
+separate audit. `e2e/settings-contrast.spec.ts` measures every tab and the card in all three themes
+against WCAG, `::placeholder` included; no colour in `themes/*/theme.json` changed.
+
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);
 a config file the server reads (it would put a person's preference into every visual baseline, and
 `src/board/` could not read one anyway); per-board settings (the file already says what it can, in
