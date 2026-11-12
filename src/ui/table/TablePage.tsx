@@ -14,6 +14,7 @@ import { FILTER_OPS, parseTable, type FilterOp, type FilterRule, type SortKey, t
 import { viewRows } from "@/table/values";
 import { TableError, addTab, moveTab, removeTab, setTab, stampTable } from "@/table/write";
 import { ExportButton, TABLE_EXPORTS, exportRows } from "@/ui/Export";
+import { FileProblem } from "@/ui/FileProblem";
 import { PageBar } from "@/ui/PageBar";
 import { refuseLocked, useLocked } from "@/settings/lock";
 import { Toolbar } from "@/ui/Toolbar";
@@ -90,7 +91,8 @@ export function TablePage({
   tab: tabParam,
   onTab,
   onBrowse,
-  onOpenTables,
+  onTrash,
+  onHome,
   snapshot,
   children,
 }: {
@@ -100,8 +102,8 @@ export function TablePage({
   tab: string | null;
   onTab(tab: string | null): void;
   onBrowse(): void;
-  /** Where to go when the table is not there any more. */
-  onOpenTables(): void;
+  onTrash(): void;
+  onHome(): void;
   snapshot: boolean;
   /** The cards the sidebar asks a page for. */
   children?: ReactNode;
@@ -112,6 +114,7 @@ export function TablePage({
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
   const table = useMemo(() => parseTable(file.text), [file.text]);
+  const loadProblem = file.state.status === "problem" ? file.state.problem : null;
   const ready = file.state.status === "ready" || file.state.status === "conflict";
   const problems = useMemo(() => (ready ? problemsOf(file.text, table) : []), [ready, file.text, table]);
   const title = list.titles[name] ?? splitNote(file.text).title ?? leaf(name);
@@ -355,7 +358,13 @@ export function TablePage({
 
   if (snapshot) {
     if (file.state.status === "loading") return null;
-    return <TableFrame name={name} text={file.state.status === "missing" ? null : file.text} bar={null} />;
+    if (loadProblem)
+      return (
+        <div className="dag-app dag-app--table">
+          <FileProblem kind="table" name={name} problem={loadProblem} />
+        </div>
+      );
+    return <TableFrame name={name} text={file.text} bar={null} />;
   }
 
   const here = current ? table.tabs.indexOf(current) : -1;
@@ -364,14 +373,17 @@ export function TablePage({
 
   let body: ReactNode;
   if (file.state.status === "loading") body = <div className="dag-tablepage dag-tablepage--loading" />;
-  else if (file.state.status === "missing")
+  else if (loadProblem)
     body = (
-      <div className="dag-tablepage" data-dag-tablepage-missing="">
-        <p className="dag-grid__empty">This table is not here any more.</p>
-        <button type="button" className="dag-grid__add" onClick={onOpenTables}>
-          Search for another
-        </button>
-      </div>
+      <FileProblem
+        kind="table"
+        name={name}
+        problem={loadProblem}
+        onSearch={onBrowse}
+        onTrash={onTrash}
+        onHome={onHome}
+        onRetry={loadProblem.reason === "unreachable" ? file.retry : undefined}
+      />
     );
   else if (!current)
     body = (
@@ -402,9 +414,9 @@ export function TablePage({
   return (
     <div className="dag-app dag-app--table" data-dag-tablepage={name}>
       <Toolbar
-        boardName={name}
-        title={title}
-        kind="table"
+        boardName={loadProblem ? null : name}
+        title={loadProblem ? undefined : title}
+        kind={loadProblem ? undefined : "table"}
         onBoards={onBrowse}
         more={[
           /* A tab from a CSV file, beside the exports it is the other half of. */

@@ -125,9 +125,9 @@ test("a note whose first read got no answer says so and reads again, rather than
     refused < 2 ? (refused++, route.fulfill({ status: 502, body: "anydag: the server is not answering" })) : route.fallback(),
   );
   await page.goto(`/?note=${name}`);
-  await expect(page.locator("[data-dag-note-unread]")).toBeVisible();
+  await expect(page.locator('[data-dag-file-problem="unreadable"]')).toBeVisible();
   await expect(block(page, "The last paragraph.")).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator("[data-dag-note-unread]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-file-problem]")).toHaveCount(0);
   expect(refused).toBe(2);
   problems = problems.filter((p) => !/status of 502/.test(p));
 });
