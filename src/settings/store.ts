@@ -114,7 +114,7 @@ const SHOWS: readonly ProblemsShow[] = ["notify", "badge", "off"];
  *
  * Not a contract with any provider: the server maps each level to what that provider accepts —
  * Claude's `--effort`, OpenCode's `#variant`, an HTTP provider's `reasoning_effort` — and a model
- * with no Max takes High instead (`effortFor` in `plugins/generate/llm.ts`).
+ * with no Max (an HTTP provider) takes High instead (`effortFor` in `plugins/generate/llm.ts`).
  */
 export const EFFORTS = ["low", "medium", "high", "max"] as const;
 
