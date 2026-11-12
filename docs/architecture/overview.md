@@ -23,9 +23,9 @@ one of those is a write to the same file — so the board has two writers and ne
 lock. See *Editing on the canvas* below.
 
 And a person can **ask a model for a diagram without Claude in the loop**: a *prompt card* holds a
-description, the local server has Gemini (or GLM, or anything OpenAI-compatible) write the DSL with
-the person's own key, the real parser checks it, and the card is replaced by the diagram in one
-undoable edit. See *Prompt cards*.
+description, the local server has Claude Code, OpenCode or an OpenAI-compatible endpoint write the
+DSL with the person's own plan or key, the real parser checks it, and the card is replaced by the
+diagram in one undoable edit. See *Prompt cards*.
 
 And a person can **write a note**: any `.md` in the vault — `untitled.md` for a new one, and
 `.note.md` still opens as one — listed and foldered beside the boards and opened full-window at

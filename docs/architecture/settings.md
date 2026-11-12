@@ -78,7 +78,7 @@ entry for a list that has gone stale. Choosing a model of another provider write
 it. The *Thinking* row and the Assistant composer's effort control are the same `EffortPicker`,
 whose scale is Automatic · Low · Medium · High · Max; `none` is still read from an older preference
 but is no longer offered, and `src/settings/store.ts` is where the stored values and defaults live.
-The provider's mark is its own logo; Z.ai, which has none in `icons/`, falls back to its name.
+The provider's mark is its own logo; a provider with no mark in `icons/` falls back to its name.
 
 Four things about the modal are load-bearing:
 
@@ -287,7 +287,10 @@ board list's went with the column.)
 `panes/Providers.tsx` draws `GET /__board/llm`, so a row says Ready because the server could reach
 the provider, not because a field holds something. The pill is `providerStatus` in
 `src/settings/providerStatus.ts`, one word per reason code; the sentence under a row that is not
-ready is `explainLlmReason`'s, as on every other AI surface.
+ready is `explainLlmReason`'s, as on every other AI surface. A stored `llm.provider` naming `gemini`
+or `zai` reads as Automatic, and its model is dropped with it; a request or `ANYDAG_LLM_PROVIDER`
+naming either is read as if no provider were named (`plugins/generate/providers.ts`, and the copy of
+the list in `src/settings/providerNames.ts` because `src/` may not import `plugins/`).
 
 - **Check again is `GET /__board/llm?fresh=1`**, which forgets the server's remembered readiness
   (a yes is kept a minute, a no three seconds). Every mounted surface hears the new list through
@@ -302,8 +305,7 @@ ready is `explainLlmReason`'s, as on every other AI surface.
   default when none is chosen) and the Assistant's when one is chosen. A provider nobody uses is
   not a problem, however unready.
 - **The logos** come from `icons/data/providers.json`, generated beside the brand bundle so opening
-  Settings does not fetch 2.5 MB of diagram icons (`src/ui/ProviderMark.tsx`). Z.ai has no mark in
-  either source yet and keeps an empty column. Anthropic's and OpenAI's marks come from the mono set
-  and draw in `currentColor`: their colour art is black, and a dark theme hid it. Only Gemini's
-  gradient is drawn in colour.
+  Settings does not fetch 2.5 MB of diagram icons (`src/ui/ProviderMark.tsx`). A provider with no
+  mark in either source keeps an empty column. Anthropic's, OpenCode's and OpenAI's marks come from
+  the mono set and draw in `currentColor`: their colour art is black, and a dark theme hid it.
 

@@ -50,7 +50,6 @@ const WORDS: Readonly<Record<string, string>> = {
   deepseek: "DeepSeek",
   fable: "Fable",
   flash: "Flash",
-  gemini: "Gemini",
   glm: "GLM",
   gpt: "GPT",
   haiku: "Haiku",

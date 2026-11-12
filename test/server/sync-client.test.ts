@@ -266,7 +266,7 @@ describe("state, bases and keys", () => {
     const other = tmpDir();
     fs.writeFileSync(
       path.join(other, "keys.json"),
-      JSON.stringify({ keys: { GEMINI_API_KEY: { scheme: "base64", value: "eA" } } }),
+      JSON.stringify({ keys: { ANYDAG_LLM_API_KEY: { scheme: "base64", value: "eA" } } }),
     );
     expect(homeSecret(other, {})).toHaveLength(32);
   });

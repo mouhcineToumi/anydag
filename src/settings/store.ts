@@ -22,6 +22,7 @@
  */
 
 import { AI, storageKey, writePref } from "./prefs";
+import { RETIRED_PROVIDER_IDS } from "./providerNames";
 import { markSaved } from "./saved";
 
 /** How wide a pasted or imported image is placed. */
@@ -76,8 +77,7 @@ export type Settings = {
     model: string | null;
     /**
      * How hard the model should think, for the providers that have a word for it: one of
-     * `REASONING`, or `null` for the provider's own setting (Gemini's is `low`, which is what
-     * `plugins/generate/providers.ts` measured as the best of speed and drawing).
+     * `REASONING`, or `null` for the provider's own setting.
      */
     reasoning: string | null;
   };
@@ -169,6 +169,10 @@ export function normalise(raw: unknown): Settings {
   const l = o.llm ?? {};
   const ast = o.assistant ?? {};
   const max = p.maxWidth;
+  /* A provider this build dropped reads as Automatic, and its model goes with it: a Gemini model
+     name means nothing to whichever provider the default now is. */
+  const storedProvider = ident(l.provider);
+  const retired = storedProvider !== null && RETIRED_PROVIDER_IDS.includes(storedProvider);
   return {
     problems: {
       show: SHOWS.includes(q.show as ProblemsShow) ? (q.show as ProblemsShow) : DEFAULTS.problems.show,
@@ -187,8 +191,8 @@ export function normalise(raw: unknown): Settings {
       margin: Math.round(num(e.margin, 0, 40, DEFAULTS.export.margin)),
     },
     llm: {
-      provider: ident(l.provider),
-      model: ident(l.model),
+      provider: retired ? null : storedProvider,
+      model: retired ? null : ident(l.model),
       /* A level the app does not offer is dropped rather than sent: this is a hand-editable file. */
       reasoning: (REASONING as readonly string[]).includes(String(l.reasoning)) ? String(l.reasoning) : null,
     },

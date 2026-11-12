@@ -5,9 +5,10 @@
  * Settings tab all say the same thing.
  *
  * **No provider ids and no backticks reach the screen.** A provider is named the way the app names
- * it ("Claude Code", "Gemini"); a variable name is plain text here and `LlmSentence` draws it as
- * code. The host matters: the desktop app stores a key in its keyring, a browser reads the server's
- * environment, and `.env.local` is never a thing the desktop app's person is told to edit.
+ * it ("Claude Code", "OpenAI-compatible"); a variable name is plain text here and `LlmSentence`
+ * draws it as code. The host matters: the desktop app stores a key in its keyring, a browser reads
+ * the server's environment, and `.env.local` is never a thing the desktop app's person is told to
+ * edit.
  *
  * Pure: no React, no `fetch`, no DOM. The caller passes whether it is the desktop app and which
  * providers are ready; `test/llm-reason.test.ts` holds the sentences and the action limits.
@@ -78,9 +79,9 @@ const SIGN_IN: Readonly<Record<string, string>> = {
 };
 
 /**
- * The other coding agent that could answer now, if one can. Only the two CLIs are offered: a Gemini
- * or Z.ai key is a different arrangement, while Claude Code and OpenCode are logins the person
- * already has, and switching to one is a single press.
+ * The other coding agent that could answer now, if one can. Only the two CLIs are offered: an
+ * OpenAI-compatible key is a different arrangement, while Claude Code and OpenCode are logins the
+ * person already has, and switching to one is a single press.
  */
 function otherReady(reason: LlmReason, providers?: readonly ProviderStatus[]): string | undefined {
   for (const id of ["claude", "opencode"]) {

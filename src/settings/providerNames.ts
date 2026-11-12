@@ -8,11 +8,16 @@
  */
 export const PROVIDER_NAMES = {
   claude: "Claude Code",
-  gemini: "Gemini",
   opencode: "OpenCode",
-  zai: "Z.ai",
   custom: "OpenAI-compatible",
 } as const;
+
+/**
+ * Providers a stored setting may still name from before this build dropped them. They resolve as if
+ * no provider were named; `plugins/generate/providers.ts` owns the same list for requests and
+ * `ANYDAG_LLM_PROVIDER`, and this copy exists because `src/` may not import from `plugins/`.
+ */
+export const RETIRED_PROVIDER_IDS: readonly string[] = ["gemini", "zai"];
 
 /** The name for an id, or `undefined` for one this build does not know. */
 export function providerName(id: string | null | undefined): string | undefined {

@@ -271,8 +271,8 @@ test("Generate puts the diagram exactly where the card was, and one ctrl+Z bring
     draft: DRAFT,
     diagnostics: [],
     attempts: 1,
-    provider: "gemini",
-    model: "gemini-3.8-flash",
+    provider: "custom",
+    model: "qwen3:32b",
     ms: 900,
   });
   await open(page);
@@ -326,10 +326,10 @@ test("a draft that still has errors is shown, and Insert anyway puts it down to 
 });
 
 test("a refusal is said on the card, and the card stays", async ({ page }) => {
-  await answer(page, 400, { error: "provider `gemini` has no key — set GEMINI_API_KEY or GOOGLE_API_KEY in .env.local" });
+  await answer(page, 400, { error: "provider `custom` has no address — set ANYDAG_LLM_BASE_URL in .env.local" });
   await open(page);
   await page.locator("[data-dag-prompt-go]").click();
-  await expect(page.locator("[data-dag-prompt-fail]")).toContainText("GEMINI_API_KEY");
+  await expect(page.locator("[data-dag-prompt-fail]")).toContainText("ANYDAG_LLM_BASE_URL");
   expect(read()).toContain("```prompt {#ask");
   /* A 400 is a console error in Chromium's own words; it is the answer this check is about. */
   problems = problems.filter((p) => !p.includes("400"));
@@ -337,15 +337,15 @@ test("a refusal is said on the card, and the card stays", async ({ page }) => {
 
 test("a no-key refusal says what is missing in plain words, and opens the AI settings", async ({ page }) => {
   await answer(page, 400, {
-    error: "provider `gemini` has no key — set GEMINI_API_KEY or GOOGLE_API_KEY in .env.local",
-    reason: { code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
+    error: "provider `custom` has no key — set ANYDAG_LLM_API_KEY in .env.local",
+    reason: { code: "no-key", provider: "custom", keyEnv: ["ANYDAG_LLM_API_KEY"] },
   });
   await open(page);
   await page.locator("[data-dag-prompt-go]").click();
 
   const fail = page.locator("[data-dag-prompt-fail]");
-  await expect(fail).toContainText("Gemini needs an API key in the server's environment");
-  await expect(fail.locator("code").first()).toContainText("GEMINI_API_KEY");
+  await expect(fail).toContainText("OpenAI-compatible needs an API key in the server's environment");
+  await expect(fail.locator("code").first()).toContainText("ANYDAG_LLM_API_KEY");
   await expect(fail).not.toContainText("`");
   await expect(fail).not.toContainText(".env.local");
 

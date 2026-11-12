@@ -22,18 +22,18 @@ describe("the Settings dot", () => {
     default: "claude",
     providers: [
       { id: "claude", ready: false },
-      { id: "gemini", ready: true },
-      { id: "zai", ready: false },
+      { id: "opencode", ready: true },
+      { id: "custom", ready: false },
     ],
   };
 
   it("shows when a provider somebody uses cannot answer, the default included", () => {
     expect(needsAttention(list, [null])).toBe(true);
-    expect(needsAttention(list, ["gemini", "zai"])).toBe(true);
+    expect(needsAttention(list, ["opencode", "custom"])).toBe(true);
   });
 
   it("stays away for a provider nobody chose, however unready", () => {
-    expect(needsAttention(list, ["gemini"])).toBe(false);
+    expect(needsAttention(list, ["opencode"])).toBe(false);
     expect(needsAttention(null, [null])).toBe(false);
   });
 });

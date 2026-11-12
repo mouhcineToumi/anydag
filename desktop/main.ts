@@ -67,13 +67,7 @@ const cliBundle = (): string => unpackedPath(path.join("cli", "dist", "anydag.mj
 
 /** The key env vars the server's providers read — `plugins/generate/providers.ts`. A key the
  *  person stored is decrypted here and handed to the server as its env var when it spawns. */
-const PROVIDER_KEY_ENVS: readonly string[] = [
-  "GEMINI_API_KEY",
-  "GOOGLE_API_KEY",
-  "ZHIPU_API_KEY",
-  "ZAI_API_KEY",
-  "ANYDAG_LLM_API_KEY",
-];
+const PROVIDER_KEY_ENVS: readonly string[] = ["ANYDAG_LLM_API_KEY"];
 
 /** What the OpenAI-compatible provider needs besides its key, and none of it is a secret: the
  *  address it speaks at and the model it serves. Kept beside the keys in `~/.anydag/`, in plain

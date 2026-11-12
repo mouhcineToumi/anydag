@@ -621,8 +621,8 @@ test("the AI tab wears the prompt card's look in every theme", async ({ page }) 
   }
 });
 
-/** A `/__board/llm` answer with one provider in each state the pill knows. */
-function providerList(over: { zaiReady?: boolean } = {}) {
+/** A `/__board/llm` answer with one provider in each state the pill knows: three rows remain. */
+function providerList(over: { customReady?: boolean } = {}) {
   const row = (id: string, label: string, kind: "cli" | "http", keyEnv: string[], ready: boolean, code?: string) => ({
     id,
     label,
@@ -639,9 +639,7 @@ function providerList(over: { zaiReady?: boolean } = {}) {
     providers: [
       row("claude", "Claude Code", "cli", [], false, "not-signed-in"),
       row("opencode", "OpenCode", "cli", [], false, "not-installed"),
-      row("gemini", "Gemini", "http", ["GEMINI_API_KEY", "GOOGLE_API_KEY"], true),
-      row("zai", "Z.ai", "http", ["ZAI_API_KEY"], over.zaiReady ?? false, "no-key"),
-      row("custom", "OpenAI-compatible", "http", ["ANYDAG_LLM_API_KEY"], false, "needs-base-url"),
+      row("custom", "OpenAI-compatible", "http", ["ANYDAG_LLM_API_KEY"], over.customReady ?? false, "needs-base-url"),
     ],
   };
 }
@@ -657,13 +655,11 @@ test("every provider's state reads as a pill, Check again asks afresh, and the t
   const pill = (id: string) => page.locator(`[data-dag-provider="${id}"] [data-dag-provider-pill]`);
   await expect(pill("claude")).toHaveText("Not signed in");
   await expect(pill("opencode")).toHaveText("Not installed");
-  await expect(pill("gemini")).toHaveText("Ready");
-  await expect(pill("zai")).toHaveText("Needs a key");
   await expect(pill("custom")).toHaveText("Needs an address");
   /* Claude Code is the default and is not signed in, so the tab that can fix it says so. */
   await expect(page.locator('[data-dag-settings-tab-button="providers"] [data-dag-settings-attention]')).toBeVisible();
   /* A browser has no field to type a key in: it names the variable the server reads. */
-  await expect(page.locator('[data-dag-provider="zai"] [data-dag-provider-env]')).toContainText("ZAI_API_KEY");
+  await expect(page.locator('[data-dag-provider="custom"] [data-dag-provider-env]')).toContainText("ANYDAG_LLM_API_KEY");
   await expect(page.locator("[data-dag-provider] input")).toHaveCount(0);
 
   await page.locator("[data-dag-providers-check]").click();
@@ -704,33 +700,33 @@ test("in the app, a key is saved in its own row and tested with one short call",
   await page.route(/\/__board\/llm\/test(\?|$)/, (route) =>
     route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ ok: true, provider: "zai", model: "glm-5.3", ms: 1200 }),
+      body: JSON.stringify({ ok: true, provider: "custom", model: "qwen3:32b", ms: 1200 }),
     }),
   );
   await page.route(/\/__board\/llm(\?|$)/, (route) =>
-    route.fulfill({ contentType: "application/json", body: JSON.stringify(providerList({ zaiReady: saved })) }),
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(providerList({ customReady: saved })) }),
   );
   await open(page);
   await openSettings(page, "providers");
 
-  const zai = page.locator('[data-dag-provider="zai"]');
-  await zai.locator('[data-dag-setting-key="ZAI_API_KEY"] input').fill("sk-test");
-  saved = true;
-  await zai.locator("[data-dag-provider-save]").click();
-  await expect(zai.locator("[data-dag-provider-test]")).toHaveText("glm-5.3 answered in 1.2 s.");
-  await expect(zai.locator("[data-dag-provider-pill]")).toHaveText("Ready");
-  /* The key went to the shell, and the field let go of it: it is never shown again. */
-  expect(await page.evaluate(() => (window as unknown as { desktopCalls: string[] }).desktopCalls)).toContain("key:ZAI_API_KEY");
-  await expect(zai.locator('[data-dag-setting-key="ZAI_API_KEY"] input')).toHaveValue("");
-
-  /* OpenAI-compatible takes an address and a model too, and refuses an address that is not http(s). */
+  /* OpenAI-compatible is the one keyed row left: it takes a key, an address and a model, and
+     refuses an address that is not http(s). */
   const custom = page.locator('[data-dag-provider="custom"]');
+  await custom.locator('[data-dag-setting-key="ANYDAG_LLM_API_KEY"] input').fill("sk-test");
   await custom.locator("input[data-dag-provider-base-url]").fill("ftp://nope");
   await expect(custom.locator("[data-dag-provider-save]")).toBeDisabled();
   await custom.locator("input[data-dag-provider-base-url]").fill("http://localhost:11434/v1");
-  await custom.locator("input[data-dag-provider-model]").fill("qwen3");
+  await custom.locator("input[data-dag-provider-model]").fill("qwen3:32b");
+  saved = true;
   await custom.locator("[data-dag-provider-save]").click();
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { desktopCalls: string[] }).desktopCalls))
-    .toEqual(expect.arrayContaining(["env:ANYDAG_LLM_BASE_URL=http://localhost:11434/v1", "env:ANYDAG_LLM_MODEL=qwen3"]));
+  await expect(custom.locator("[data-dag-provider-test]")).toHaveText("qwen3:32b answered in 1.2 s.");
+  await expect(custom.locator("[data-dag-provider-pill]")).toHaveText("Ready");
+  /* The key went to the shell, and the field let go of it: it is never shown again. */
+  expect(await page.evaluate(() => (window as unknown as { desktopCalls: string[] }).desktopCalls)).toContain(
+    "key:ANYDAG_LLM_API_KEY",
+  );
+  await expect(custom.locator('[data-dag-setting-key="ANYDAG_LLM_API_KEY"] input')).toHaveValue("");
+  expect(await page.evaluate(() => (window as unknown as { desktopCalls: string[] }).desktopCalls)).toEqual(
+    expect.arrayContaining(["env:ANYDAG_LLM_BASE_URL=http://localhost:11434/v1", "env:ANYDAG_LLM_MODEL=qwen3:32b"]),
+  );
 });

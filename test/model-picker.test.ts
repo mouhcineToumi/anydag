@@ -128,7 +128,7 @@ describe("nearestModel", () => {
 describe("model names and the two routes' shapes", () => {
   it("reads a raw id as a name, with a provider prefix off", () => {
     expect(prettyModel("opencode-go/glm-5.3-flash")).toBe("GLM 5.3 Flash");
-    expect(prettyModel("gemini-3.8-flash")).toBe("Gemini 3.8 Flash");
+    expect(prettyModel("deepseek-v4.1-flash")).toBe("DeepSeek V4.1 Flash");
     expect(prettyModel("claude-sonnet-5-5")).toBe("Claude Sonnet 5 5");
   });
 
@@ -136,23 +136,23 @@ describe("model names and the two routes' shapes", () => {
     const list = pickerProvidersFromLlm({
       providers: [
         {
-          id: "gemini",
-          label: "Gemini",
-          defaultModel: "gemini-3.8-flash",
-          models: ["gemini-3.8-flash"],
+          id: "custom",
+          label: "OpenAI-compatible",
+          defaultModel: "deepseek-v4.1-flash",
+          models: ["deepseek-v4.1-flash"],
           ready: false,
-          error: "GEMINI_API_KEY is not set",
+          error: "ANYDAG_LLM_BASE_URL is not set",
         },
       ],
     });
     expect(list).toEqual([
       {
-        id: "gemini",
-        label: "Gemini",
+        id: "custom",
+        label: "OpenAI-compatible",
         ready: false,
-        why: "GEMINI_API_KEY is not set",
-        defaultModel: "gemini-3.8-flash",
-        models: [{ id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" }],
+        why: "ANYDAG_LLM_BASE_URL is not set",
+        defaultModel: "deepseek-v4.1-flash",
+        models: [{ id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash" }],
       },
     ]);
   });

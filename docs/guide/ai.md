@@ -25,7 +25,9 @@ only works through AnyDag itself: it cannot run commands or read other files on 
 On a board, `space P` adds a **prompt card**. Describe the diagram you want ("a timeline of the
 French Revolution", "a flowchart of how a bill becomes law") and run it. The model writes the
 diagram, AnyDag checks it, and it replaces the card. One undo takes it back. Prompt cards work with
-Claude Code, OpenCode, or an API key for a model such as Gemini or any OpenAI-compatible service.
+Claude Code, OpenCode, or any OpenAI-compatible service with an API key. Gemini and Z.ai serve that
+dialect at `https://generativelanguage.googleapis.com/v1beta/openai` and
+`https://api.z.ai/api/paas/v4`.
 
 ## Let an AI agent work in your folder
 

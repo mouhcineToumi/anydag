@@ -240,10 +240,25 @@ describe("the model a prompt card asks", () => {
     expect(normalise({ llm: { reasoning: "max" } }).llm.reasoning).toBe("max");
     /* `none` was a level before Max existed; it is still read rather than becoming Automatic. */
     expect(normalise({ llm: { reasoning: "none" } }).llm.reasoning).toBe("none");
-    /* Gemini refuses `minimal` and the card never offers it: a hand-edited file saying so is
-       dropped rather than sent for the provider to reject. */
+    /* The card never offers `minimal`: a hand-edited file saying so is dropped rather than sent
+       for a provider to reject. */
     expect(normalise({ llm: { reasoning: "minimal" } }).llm.reasoning).toBeNull();
     expect(normalise({ llm: { reasoning: 7 } }).llm.reasoning).toBeNull();
+  });
+
+  it("reads a provider this build dropped as Automatic, and drops its model with it", () => {
+    for (const provider of ["gemini", "zai"]) {
+      expect(normalise({ llm: { provider, model: `${provider}-model`, reasoning: "low" } }).llm).toEqual({
+        provider: null,
+        model: null,
+        reasoning: "low",
+      });
+    }
+    expect(normalise({ llm: { provider: "custom", model: "qwen3:32b" } }).llm).toEqual({
+      provider: "custom",
+      model: "qwen3:32b",
+      reasoning: null,
+    });
   });
 
   it("loads an Assistant default stored with the old mode, and drops the mode", () => {
@@ -262,14 +277,14 @@ describe("the model a prompt card asks", () => {
 
 describe("the model a surface says will answer", () => {
   const list: Providers = {
-    default: "gemini",
+    default: "custom",
     providers: [
       {
-        id: "gemini",
-        label: "Gemini",
-        description: "Google's Gemini, through an API key.",
+        id: "custom",
+        label: "OpenAI-compatible",
+        description: "Any endpoint that speaks the OpenAI chat-completions dialect.",
         kind: "http",
-        defaultModel: "gemini-3.8-flash",
+        defaultModel: "qwen3:32b",
         models: [],
         ready: true,
       },
@@ -287,8 +302,8 @@ describe("the model a surface says will answer", () => {
 
   it("takes the server's default provider and that provider's default model", () => {
     const choice = modelChoice({ provider: null, model: null, reasoning: null }, list);
-    expect(choice).toEqual({ provider: "gemini", name: "Gemini", model: "gemini-3.8-flash" });
-    expect(modelChoiceText(choice)).toBe("Gemini · gemini-3.8-flash");
+    expect(choice).toEqual({ provider: "custom", name: "OpenAI-compatible", model: "qwen3:32b" });
+    expect(modelChoiceText(choice)).toBe("OpenAI-compatible · qwen3:32b");
   });
 
   it("takes the provider and model somebody chose", () => {

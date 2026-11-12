@@ -134,18 +134,18 @@ writeFileSync(out, JSON.stringify(bundle));
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 
 /*
- * The AI providers' marks, on their own: Settings and the Assistant's composer draw four logos,
+ * The AI providers' marks, on their own: Settings and the Assistant's composer draw three logos,
  * and fetching the 2.5 MB bundle for them would cost every person who opens Settings the whole
  * diagram vocabulary (`src/render/art.ts`). `src/ui/ProviderMark.tsx` imports this small file
  * statically. The artwork is the same entries as the bundle's, under the same licences
- * (`icons/NOTICE`). No timestamp, so a rebuild that changes nothing leaves it alone. Z.ai has no
- * mark in either source yet; the composer names it instead.
+ * (`icons/NOTICE`). No timestamp, so a rebuild that changes nothing leaves it alone. A provider
+ * with no mark in either source is named instead.
  */
-/* Colour only where the colour is the mark: Anthropic's and OpenAI's colour art is black, which a
-   dark theme hides, so they are drawn from the mono set in `currentColor` (#186). */
+/* All three marks are drawn from the mono set in `currentColor` (#186): their colour art is black,
+   which a dark theme hides. */
 const PROVIDER_MARKS = {
-  color: ["google-gemini"],
-  mono: ["anthropic", "google-gemini", "opencode", "openai"],
+  color: [],
+  mono: ["anthropic", "opencode", "openai"],
 };
 const pick = (from, names) => Object.fromEntries(names.filter((n) => from[n]).map((n) => [n, from[n]]));
 writeFileSync(
