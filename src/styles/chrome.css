@@ -1130,7 +1130,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-vault__button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 .dag-vault__name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-vault__chev { flex: none; color: var(--dag-color-slate); }
-/* A square where the account's avatar is round: a workspace is a place, the account a person. */
+/* A square where the account's avatar is round: a workspace is a place, the account a person.
+   The tile's two colours are the mark's own custom properties, bound by `Vaults.tsx` from the hue
+   its id hashes to; ink on a tint keeps the letters legible in every theme. */
 .dag-vault__mark {
   flex: none;
   display: inline-flex;
@@ -1139,29 +1141,38 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   width: 22px;
   height: 22px;
   border-radius: var(--dag-metric-radius-chip);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--dag-color-ink);
-  background: var(--dag-color-accentSoft);
+  background: var(--vault-t);
+  box-shadow: inset 0 0 0 1px var(--vault-h);
 }
 .dag-vault__menu { top: calc(100% + 4px); bottom: auto; left: 8px; right: 8px; z-index: 30; max-height: 70vh; overflow-y: auto; }
 /* Two classes deep: a menu item's every `span` is `flex: 1`, and the mark is a span. */
 .dag-vault__item > .dag-vault__mark { flex: none; }
+.dag-vault__item { height: auto; min-height: 38px; padding: 4px 8px; }
 .dag-vault__item[aria-checked="true"] { color: var(--dag-color-ink); font-weight: 600; }
+.dag-vault__item[aria-checked="true"] .dag-vault__title { font-weight: 600; }
 .dag-vault__item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-vault__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dag-vault__item .dag-vault__text > span { flex: none; }
+.dag-vault__title { font-size: 13px; font-weight: 500; color: var(--dag-color-ink); }
 .dag-vault__tick { flex: none; color: var(--dag-color-accent); }
 .dag-vault__rule { margin: 4px 0; border: none; border-top: 1px solid var(--dag-color-outlineSoft); }
 .dag-vault__namebox { padding: 2px 0; }
 .dag-vault__namebox .dag-sidebar__name-input { height: 30px; font-family: var(--dag-font-sans); font-size: 13px; }
-.dag-vault__problem { margin: 4px 8px; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); }
+.dag-vault__problem { margin: 4px 8px; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); overflow-wrap: anywhere; }
+.dag-vault__problem code { font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-ink); }
 .dag-vault__line { display: flex; align-items: center; gap: 2px; }
 .dag-vault__line > .dag-vault__item { flex: 1; min-width: 0; }
 .dag-vault__item:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-vault__item:disabled .dag-vault__title,
+.dag-vault__item:disabled .dag-vault__path { color: var(--dag-color-muted); }
 .dag-vault__note { flex: none; margin-left: auto; font-size: 11.5px; color: var(--dag-color-muted); }
 .dag-vault__forget { flex: none; opacity: 0; }
 .dag-vault__line:hover .dag-vault__forget,
 .dag-vault__line:focus-within .dag-vault__forget { opacity: 1; }
-.dag-vault__path { margin-left: auto; padding-left: 8px; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-muted); }
+.dag-vault__path { font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); }
 /*
  * The two first-run forms. The card centres its prose, but a label is not prose: it starts at its
  * field's left edge and sits directly above the control it names, so the two fields read as a form

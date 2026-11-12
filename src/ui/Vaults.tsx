@@ -1,6 +1,17 @@
 import { Check, ChevronsUpDown, FolderOpen, FolderPlus, Power, Settings2, X } from "lucide-react";
-import { type FormEvent, type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 
+import { HUE_ORDER, type Hue } from "@/dsl/ir";
 import { type Vault, closeVault, createVault, currentOf, loadVaults, openVault, vaultsNow } from "@/vault/api";
 import { switchVault } from "@/vault/current";
 import { desktop } from "@/vault/desktop";
@@ -8,12 +19,127 @@ import { useHome, useVaults } from "@/vault/useVaults";
 
 const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-/** The mark a vault wears: its first letter, which is how Notion and Slack tell theirs apart. */
-function Mark({ name }: { name: string }) {
+/** Two letters, and a path deeper than three parts, are what a narrow menu can show whole. */
+const MARK_LETTERS = 2;
+const PATH_PARTS = 3;
+
+/**
+ * The two letters a vault wears: the first letters of its first two words, or of its only one.
+ * "vault-two" is VT and "Vault (old)" is VO — a name's first letter alone said nothing about which.
+ */
+export function monogram(name: string): string {
+  const words = name
+    .trim()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  if (words.length === 0) return "·";
+  const letters = words.length === 1 ? Array.from(words[0]!) : words.slice(0, MARK_LETTERS).map((word) => Array.from(word)[0]!);
+  return letters.slice(0, MARK_LETTERS).join("").toUpperCase();
+}
+
+/**
+ * A hue for a vault, from its id. Two vaults whose names start alike are still different ids, so
+ * their marks take different hues even when their monograms cannot tell them apart.
+ */
+export function vaultHue(id: string): Hue {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return HUE_ORDER[(hash >>> 0) % HUE_ORDER.length]!;
+}
+
+/**
+ * A path as a person reads it: their home is `~`, and a path deeper than three parts keeps its
+ * first and its last, so the folder's own name is never the part an ellipsis eats.
+ */
+export function shortPath(path: string, home: string): string {
+  const root = home.replace(/[\\/]+$/, "");
+  const under = root && (path === root || path.startsWith(`${root}/`) || path.startsWith(`${root}\\`));
+  const shown = under ? `~${path.slice(root.length)}` : path;
+  const parts = shown.split(/[\\/]/);
+  if (parts.length <= PATH_PARTS) return shown;
+  return `${parts[0]}/…/${parts[parts.length - 1]}`;
+}
+
+/**
+ * The mark a vault wears: two letters on a tint of the hue its id picks out, ringed in that hue.
+ * The two custom properties are the mark's own, like `--inspector-w` — a theme owns the hues, not
+ * the distance from a letter to its tile.
+ */
+export function Mark({ id, name }: Pick<Vault, "id" | "name">) {
+  const hue = vaultHue(id);
   return (
-    <span className="dag-vault__mark" aria-hidden="true">
-      {(name.trim()[0] ?? "·").toUpperCase()}
+    <span
+      className="dag-vault__mark"
+      aria-hidden="true"
+      style={
+        {
+          "--vault-h": `var(--dag-color-hues-${hue})`,
+          "--vault-t": `var(--dag-tint-${hue})`,
+        } as CSSProperties
+      }
+    >
+      {monogram(name)}
     </span>
+  );
+}
+
+/** The server's refusal, with what it put between backticks drawn as code rather than as punctuation. */
+export function VaultProblem({ text, className = "dag-vault__problem" }: { text: string | null; className?: string }) {
+  return (
+    <p className={className} role="alert" data-dag-vault-problem={text ? "" : undefined}>
+      {text ? codeSpans(text) : null}
+    </p>
+  );
+}
+
+function codeSpans(text: string): ReactNode[] {
+  return text.split("`").map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : <Fragment key={i}>{part}</Fragment>));
+}
+
+/**
+ * One vault in a list: its mark, its name on a line and the shortened path under it. The name is
+ * the accessible name and the path its description, so a screen reader says "vault-two" rather than
+ * reading a home directory first.
+ */
+function VaultRow({
+  vault,
+  home,
+  menu,
+  current,
+  onPick,
+}: {
+  vault: Vault;
+  home: string;
+  menu?: boolean;
+  current?: boolean;
+  onPick(): void;
+}) {
+  const pathId = useId();
+  return (
+    <button
+      type="button"
+      role={menu ? "menuitemradio" : undefined}
+      aria-checked={menu ? Boolean(current) : undefined}
+      className="dag-more__item dag-vault__item"
+      data-dag-vault={vault.id}
+      disabled={vault.missing}
+      aria-label={vault.name}
+      aria-describedby={pathId}
+      onClick={onPick}
+    >
+      <Mark id={vault.id} name={vault.name} />
+      <span className="dag-vault__text">
+        <span className="dag-vault__title">{vault.name}</span>
+        <span className="dag-vault__path" id={pathId} title={vault.path}>
+          {shortPath(vault.path, home)}
+        </span>
+      </span>
+      {vault.missing ? <span className="dag-vault__note">not found</span> : null}
+      {menu && current ? <Check {...ICON} aria-hidden="true" className="dag-vault__tick" /> : null}
+    </button>
   );
 }
 
@@ -98,9 +224,7 @@ export function OpenFolderForm({ onCancel }: { onCancel?(): void }) {
         </button>
       </div>
       {/* Always in the flow, so a refusal replaces a line rather than pushing the actions down. */}
-      <p className="dag-vault__form-error" role="alert" data-dag-vault-problem={problem ? "" : undefined}>
-        {problem}
-      </p>
+      <VaultProblem text={problem} className="dag-vault__form-error" />
     </form>
   );
 }
@@ -195,9 +319,7 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
         </button>
       </div>
       {/* Always in the flow, so a refusal replaces a line rather than pushing the actions down. */}
-      <p className="dag-vault__form-error" role="alert" data-dag-vault-problem={problem ? "" : undefined}>
-        {problem}
-      </p>
+      <VaultProblem text={problem} className="dag-vault__form-error" />
     </form>
   );
 }
@@ -214,6 +336,7 @@ function stopKeys(e: ReactKeyboardEvent, cancel?: () => void) {
 /** The recent vaults as rows to go to — used by the picker when no vault is open. */
 export function RecentVaults() {
   const all = useVaults();
+  const home = useHome();
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => void loadVaults(), []);
   const rows = all ?? [];
@@ -222,18 +345,7 @@ export function RecentVaults() {
     <div className="dag-novault__recent" data-dag-vault-recent="">
       {rows.map((v) => (
         <div key={v.id} className="dag-vault__line">
-          <button
-            type="button"
-            className="dag-more__item dag-vault__item"
-            data-dag-vault={v.id}
-            disabled={v.missing}
-            title={v.path}
-            onClick={() => void enterVault(v).catch((e) => setProblem(sayOf(e)))}
-          >
-            <Mark name={v.name} />
-            <span>{v.name}</span>
-            {v.missing ? <span className="dag-vault__note">not found</span> : <span className="dag-vault__path">{v.path}</span>}
-          </button>
+          <VaultRow vault={v} home={home} onPick={() => void enterVault(v).catch((e) => setProblem(sayOf(e)))} />
           {!v.open ? (
             <button
               type="button"
@@ -248,11 +360,7 @@ export function RecentVaults() {
           ) : null}
         </div>
       ))}
-      {problem ? (
-        <p className="dag-vault__problem" role="alert" data-dag-vault-problem="">
-          {problem}
-        </p>
-      ) : null}
+      {problem ? <VaultProblem text={problem} /> : null}
     </div>
   );
 }
@@ -272,6 +380,7 @@ export function RecentVaults() {
  */
 export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
   const all = useVaults();
+  const home = useHome();
   const here = currentOf(all);
   const [open, setOpen] = useState(false);
   const [asking, setAsking] = useState<"open" | "create" | null>(null);
@@ -357,7 +466,7 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
         title={here.path ? `Vault: ${here.name} (${here.path})` : `Vault: ${here.name}`}
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <Mark name={here.name} />
+        <Mark id={here.id} name={here.name} />
         <span className="dag-vault__name" data-dag-vault-current="">
           {here.name}
         </span>
@@ -369,24 +478,16 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
           <p className="dag-sidebar__menu-who">Vaults</p>
           {(all ?? [here]).map((v: Vault) => (
             <div key={v.id} className="dag-vault__line">
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={v.id === here.id}
-                className="dag-more__item dag-vault__item"
-                data-dag-vault={v.id}
-                disabled={v.missing}
-                title={v.path}
-                onClick={() => {
+              <VaultRow
+                vault={v}
+                home={home}
+                menu
+                current={v.id === here.id}
+                onPick={() => {
                   if (v.id === here.id) return close();
                   void enterVault(v).catch((error) => setProblem(sayOf(error)));
                 }}
-              >
-                <Mark name={v.name} />
-                <span>{v.name}</span>
-                {v.missing ? <span className="dag-vault__note">not found</span> : null}
-                {v.id === here.id ? <Check {...ICON} aria-hidden="true" className="dag-vault__tick" /> : null}
-              </button>
+              />
               {!v.open ? (
                 <button
                   type="button"
@@ -439,7 +540,7 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
             onClick={() => void closeThis()}
           >
             <Power {...ICON} aria-hidden="true" />
-            <span>Close vault</span>
+            <span>Close vault “{here.name}”</span>
           </button>
           <button
             type="button"
@@ -454,11 +555,7 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
             <Settings2 {...ICON} aria-hidden="true" />
             <span>Vault settings…</span>
           </button>
-          {problem ? (
-            <p className="dag-vault__problem" role="alert" data-dag-vault-problem="">
-              {problem}
-            </p>
-          ) : null}
+          {problem ? <VaultProblem text={problem} /> : null}
         </div>
       ) : null}
     </div>
