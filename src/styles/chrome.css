@@ -790,7 +790,9 @@
   cursor: pointer;
 }
 .dag-sidebar__tool:hover { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
-.dag-sidebar__tool--danger:hover { color: var(--dag-color-danger); }
+.dag-sidebar__tool--danger { color: var(--dag-color-dangerText); }
+/* The hover keeps `dangerText`: `danger` on `dangerSoft` is under 4.5:1, and this one carries a word. */
+.dag-sidebar__tool--danger:hover { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
 .dag-sidebar__tool:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 
 /* A question asked in the row — a name, a folder to move to, whether to delete — never through a
@@ -852,6 +854,7 @@
 .dag-sidebar__bulk {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-height: 34px;
@@ -864,8 +867,19 @@
 }
 .dag-sidebar__bulk > .dag-sidebar__move { margin-left: -6px; }
 .dag-sidebar__bulk-count { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dag-sidebar__bulk-acts { display: flex; gap: 2px; }
+.dag-sidebar__bulk-acts { display: flex; flex-wrap: wrap; gap: 2px; }
 .dag-sidebar__bulk-head { margin: 2px 8px 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); }
+/* An action says its name beside its mark, so what it does is read rather than hovered for; the
+   bar wraps in a narrow column, which puts them on a line of their own under the count. */
+.dag-sidebar__bulk-act {
+  width: auto;
+  gap: 4px;
+  padding: 0 6px;
+  font-family: var(--dag-font-sans);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.dag-sidebar__bulk-act > span { line-height: 1; }
 
 /*
  * A row lets the list scroll under a finger: a swipe is a scroll, and only a row held
@@ -1280,7 +1294,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
 /* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
 .dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: 15px; }
-.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: 40px; height: 40px; }
+.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: auto; min-width: 40px; height: 40px; padding: 0 8px; }
+.dag-sidebar[data-sheet] .dag-sidebar__bulk-act { font-size: 14px; }
 .dag-sidebar[data-sheet] .dag-sidebar__bulk-count { font-size: 14px; }
 
 /* The folders above the open file, in the toolbar. Each shows its folder in the sidebar. */
