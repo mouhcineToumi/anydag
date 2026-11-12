@@ -96,6 +96,18 @@ test("asks after a file opens, sends nothing before, and a no is the end of it",
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
 
+test("once asked, the question stays until it is answered, wherever the person goes", async ({ page }) => {
+  const server = await fakeServer(page, null);
+  await open(page);
+  const ask = page.locator("[data-dag-telemetry-ask]");
+  await expect(ask).toBeVisible({ timeout: 6_000 });
+  /* Home is not a file, and still the toast does not leave and come back. */
+  await page.locator("[data-dag-sidebar-home]:visible, [data-dag-toolbar-home]:visible").first().click();
+  await expect(page.locator("[data-dag-welcome]")).toBeVisible();
+  await expect(ask).toBeVisible();
+  expect(server.puts).toEqual([]);
+});
+
 test("Escape in the toast is no", async ({ page }) => {
   const server = await fakeServer(page, null);
   await open(page);

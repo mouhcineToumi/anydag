@@ -57,7 +57,9 @@ Eight things are load-bearing:
   in `server/main.ts`); the CLI's in-process one never does.
 - **The question is a toast, not a gate.** It appears once a board, note, quiz or table has been the
   open page for 3 s — never on Home, a listing page, an attachment or an empty vault — and it takes
-  no focus, so the page stays usable behind it. `useEditor`'s capture-phase key handler still skips
+  no focus, so the page stays usable behind it. Once up it stays until it is answered, wherever the
+  person goes next: a question that left with the file and came back three seconds into the next
+  one would be asked twice. `useEditor`'s capture-phase key handler still skips
   targets inside `[data-dag-telemetry-ask]` as it skips `[data-dag-settings]`, so a key aimed at one
   of its buttons does not reach the board; Escape in the toast is *No*.
 - **`/v1/logs` is open, and stands in for a token with limits**: 256 KB a batch, 30 a minute an

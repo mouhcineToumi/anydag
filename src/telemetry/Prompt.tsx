@@ -19,20 +19,21 @@ const ASK_AFTER = 3000;
  */
 export function TelemetryPrompt({ page }: { page: string | null }) {
   const status = useTelemetry();
-  const [shownFor, setShownFor] = useState<string | null>(null);
+  /* Once asked, it stays until it is answered: moving to another file, or Home, does not take it
+     away and bring it back three seconds later. */
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [what, setWhat] = useState(false);
 
   useEffect(() => {
-    setShownFor(null);
-    setWhat(false);
-    if (!page) return;
-    const timer = window.setTimeout(() => setShownFor(page), ASK_AFTER);
+    if (shown || !page) return;
+    /* A new page restarts the wait: the question comes after one file has been open a moment. */
+    const timer = window.setTimeout(() => setShown(true), ASK_AFTER);
     return () => window.clearTimeout(timer);
-  }, [page]);
+  }, [page, shown]);
 
-  const asking = page !== null && shownFor === page && status?.consent === null;
+  const asking = shown && status?.consent === null;
 
   if (!asking) return null;
 
