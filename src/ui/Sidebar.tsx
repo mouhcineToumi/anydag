@@ -1622,10 +1622,12 @@ export function Sidebar({
                   className="dag-sidebar__tool"
                   data-dag-sidebar-star={where}
                   aria-label={`Remove ${where} from favourites`}
-                  title="Remove from favourites"
+                  title="A favourite: click to remove it"
                   onClick={() => files.favourite(line.entry.kind, where, false)}
                 >
-                  <StarOff {...SMALL} aria-hidden="true" />
+                  {/* Filled: it says what the file is, where the favourites list's crossed-out star
+                      says what the click does. */}
+                  <Star {...SMALL} fill="currentColor" aria-hidden="true" />
                 </button>
               ) : null}
               <button
