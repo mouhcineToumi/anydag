@@ -6,8 +6,8 @@ import { BOARDS } from "./boards";
 import { openSettings } from "./sidebar";
 
 /**
- * The logs question: asked once, on the first page, before anything is sent; answered either way,
- * it goes; and Settings → Privacy changes it after.
+ * The logs question: asked once, after a file has been open for a moment, before anything is sent;
+ * answered either way, it goes; and Settings → Privacy changes it after.
  *
  * The answer is the dev server's home, which every worker shares and which `global-setup.ts`
  * answers *no* for the rest of the suite — so each check here stands in its own server with
@@ -53,40 +53,64 @@ async function open(page: Page) {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
-test("asks once when nobody has answered, sends nothing before, and a no is the end of it", { tag: "@smoke" }, async ({
-  page,
-}) => {
+test("shows no question on Home before a file opens", async ({ page }) => {
+  const server = await fakeServer(page, null);
+  await page.goto("/");
+  await expect(page.locator("[data-dag-welcome]")).toBeVisible();
+  /* Longer than the toast's own wait: a file that is merely in the vault is not a file that is open. */
+  await page.waitForTimeout(3500);
+  await expect(page.locator("[data-dag-telemetry-ask]")).toHaveCount(0);
+  expect(server.puts).toEqual([]);
+  expect(server.events).toEqual([]);
+});
+
+test("asks after a file opens, sends nothing before, and a no is the end of it", { tag: "@smoke" }, async ({ page }) => {
   const server = await fakeServer(page, null);
   await open(page);
   const ask = page.locator("[data-dag-telemetry-ask]");
-  await expect(ask).toBeVisible();
-  await expect(ask).toContainText("Never sent");
-  /* The board's keys do not act behind the question: `space N` would add a note to the file. */
-  await expect(page.locator(".dag-telemetry-ask")).toBeFocused();
-  await page.keyboard.press("Space");
-  await page.keyboard.press("n");
+  await expect(ask).toBeVisible({ timeout: 6_000 });
+  await expect(ask).toContainText("Send anonymous logs to help fix crashes? Never your files or names.");
+
+  /* Nothing is sent before the answer — not even on the page going away. */
+  expect(server.puts).toEqual([]);
+  expect(server.events).toEqual([]);
+  await page.evaluate(() => dispatchEvent(new Event("pagehide")));
+  expect(server.events).toEqual([]);
+
+  /* *What's sent* opens the full list the old card held. */
+  await page.locator("[data-dag-telemetry-what]").click();
+  const what = page.locator("#dag-telemetry-ask-what");
+  await expect(what).toBeVisible();
+  await expect(what).toContainText("What is sent");
+  await expect(what).toContainText("Never sent");
+  await expect(what).toContainText("What you write");
+
   await page.locator("[data-dag-telemetry-no]").click();
   await expect(ask).toHaveCount(0);
   expect(server.puts).toEqual([false]);
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1");
+  await page.waitForTimeout(3500);
   await expect(ask).toHaveCount(0);
   expect(server.events).toEqual([]);
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
 
-test("Escape is no", async ({ page }) => {
+test("Escape in the toast is no", async ({ page }) => {
   const server = await fakeServer(page, null);
   await open(page);
-  await expect(page.locator("[data-dag-telemetry-ask]")).toBeVisible();
+  const ask = page.locator("[data-dag-telemetry-ask]");
+  await expect(ask).toBeVisible({ timeout: 6_000 });
+  await page.locator("[data-dag-telemetry-no]").focus();
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-dag-telemetry-ask]")).toHaveCount(0);
+  await expect(ask).toHaveCount(0);
   expect(server.puts).toEqual([false]);
 });
 
 test("a yes sends events that name no document, and Privacy turns it off", async ({ page }) => {
   const server = await fakeServer(page, null);
   await open(page);
+  await expect(page.locator("[data-dag-telemetry-ask]")).toBeVisible({ timeout: 6_000 });
   await page.locator("[data-dag-telemetry-yes]").click();
   await expect(page.locator("[data-dag-telemetry-ask]")).toHaveCount(0);
   expect(server.puts).toEqual([true]);

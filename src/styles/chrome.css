@@ -1063,24 +1063,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-purge .dag-purge__go:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: 0 0 0 2px var(--dag-color-dangerSoft); }
 .dag-purge .dag-purge__go:disabled:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: none; }
 .dag-purge button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
-/* The one question about logs, asked once per install (`src/telemetry/Prompt.tsx`): the
-   Settings card's shape over the whole window, above the Settings modal (50) because it may be up
-   when somebody opens that. Two classes deep for the purge card's reason. Names grepped first:
-   `dag-telemetry*` and `data-dag-telemetry*` were nobody's. */
-.dag-settings__scrim.dag-telemetry-ask__scrim {
-  position: fixed;
-  z-index: 70;
-  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
-}
-.dag-telemetry-ask { width: 480px; }
-.dag-telemetry-ask__mark { flex: none; color: var(--dag-color-accent); }
-.dag-telemetry-ask__lead { margin: 8px 0 12px; font-size: 13px; line-height: 1.5; color: var(--dag-color-ink); }
-.dag-telemetry-ask__label { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
-.dag-telemetry-ask__list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
-.dag-telemetry-ask__hint { margin: 12px 0 0; font-size: 12px; color: var(--dag-color-slate); }
-.dag-telemetry-ask__failed { margin: 8px 0 0; font-size: 12px; color: var(--dag-color-dangerText); }
-.dag-telemetry-ask__foot { gap: 8px; }
-/* The Privacy tab's two lists. */
+/* The Privacy tab's two lists, which the logs toast (`src/telemetry/Prompt.tsx`) says again when
+   *What's sent* is opened. Names grepped first: `dag-telemetry*` and `data-dag-telemetry*` were
+   nobody's. */
 .dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); text-wrap: pretty; }
 .dag-sidebar__menu-who {
   margin: 0;
@@ -3443,7 +3428,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings__toast > svg { flex: none; color: var(--dag-color-slate); }
 .dag-settings__toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-settings__toast-dot { flex: none; color: var(--dag-color-muted); }
-.dag-settings__toast-act {
+.dag-settings__toast-act,
+.dag-telemetry-toast__act {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -3458,8 +3444,10 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-settings__toast-act:hover { background: var(--dag-color-paper100); }
-.dag-settings__toast-act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-settings__toast-act:hover,
+.dag-telemetry-toast__act:hover { background: var(--dag-color-paper100); }
+.dag-settings__toast-act:focus-visible,
+.dag-telemetry-toast__act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 /* One polite live region for every save and reset in the modal; the ticks themselves are silent. */
 .dag-settings__said {
   position: absolute;
@@ -7039,11 +7027,13 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-trash__plain { min-height: 36px; }
 }
 
-/* The notice a delete raises: at the page's bottom-left, and **above the board's dock** rather than
-   beside it — a long title reaches the dock in the middle of the canvas, and at the dock's own height
-   the two overlapped. The sidebar's width is the page's left edge while it is docked.
-   Fixed, because it belongs to the window rather than to whichever page is under it. */
-.dag-trash-notice {
+/* The notice a delete raises, and the logs question (`src/telemetry/Prompt.tsx`): the same toast at
+   the page's bottom-left, and **above the board's dock** rather than beside it — a long title reaches
+   the dock in the middle of the canvas, and at the dock's own height the two overlapped. The
+   sidebar's width is the page's left edge while it is docked. Fixed, because it belongs to the
+   window rather than to whichever page is under it. */
+.dag-trash-notice,
+.dag-telemetry-toast {
   position: fixed;
   left: calc(var(--trash-notice-left, 0px) + 16px);
   bottom: 104px;
@@ -7060,8 +7050,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
-.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
-.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
 .dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
 .dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .dag-trash-notice__act {
@@ -7084,9 +7074,37 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-trash-notice__act:disabled { opacity: 0.5; cursor: default; }
 .dag-trash-notice button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 .dag-trash-notice__close { flex: none; }
+/* The logs question is the same toast with room for the list behind *What's sent*: a column, above
+   the page rather than over it, and never in front of a delete's own notice. */
+.dag-telemetry-toast {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: min(560px, calc(100vw - 32px));
+  padding: 10px 10px 10px 12px;
+  z-index: 44;
+}
+.dag-telemetry-toast__row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dag-telemetry-toast__mark { flex: none; color: var(--dag-color-accent); }
+.dag-telemetry-toast__text { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
+.dag-telemetry-toast__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
+.dag-telemetry-toast__what {
+  padding: 8px 10px;
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-small);
+}
+.dag-telemetry-toast__label { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
+.dag-telemetry-toast__list { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-telemetry-toast__hint { margin: 0; font-size: 12px; color: var(--dag-color-slate); }
+.dag-telemetry-toast__failed { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
 @media (max-width: 719px) {
-  .dag-trash-notice { left: 12px; right: 12px; bottom: 72px; max-width: none; }
+  .dag-trash-notice,
+  .dag-telemetry-toast { left: 12px; right: 12px; bottom: 72px; max-width: none; }
   .dag-trash-notice__act { min-height: 36px; }
+  .dag-telemetry-toast { width: auto; }
+  .dag-telemetry-toast .dag-button,
+  .dag-telemetry-toast__act { min-height: 36px; }
 }
 
 /* Sync: the sidebar's status row and the Settings tab's own bits. Colour from the

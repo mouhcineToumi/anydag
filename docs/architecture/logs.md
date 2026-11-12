@@ -10,14 +10,14 @@ drawn, no route answers, no batch is resolved to a destination, and any address 
 logs is never read. The dev server and the test suites say on.
 
 Anonymous logs from installs whose person said yes, and from no other. Off
-until answered; asked once per install, on the first page anybody opens; changed in Settings →
-Privacy or with `anydag telemetry on|off|ask`.
+until answered; asked once per install, after the first board, note, quiz or table has been the
+open page for a few seconds; changed in Settings → Privacy or with `anydag telemetry on|off|ask`.
 
 | Where | Owns |
 |---|---|
 | `api/protocol/logs.ts` | what a log may hold: `EVENTS`, each prop a count, a duration, a boolean or one word of a list; `scrub`; `cleanEvent` and `cleanBatch`, which every hop runs |
 | `src/telemetry/client.ts` | the page's half: the answer (`useTelemetry`), `track`, `fail`, the error listeners, a post every 30 s and on `pagehide` |
-| `src/telemetry/Prompt.tsx` · `what.ts` | the first-run question, drawn by `Shell` · the two lists it and the Privacy tab both say |
+| `src/telemetry/Prompt.tsx` · `what.ts` | the first-run toast, drawn by `Shell` once a file is open · the two lists it and the Privacy tab both say |
 | `server/telemetry.ts` · `server/routes/telemetry.ts` | the answer in the home's `kv`, the install id, what is held, the route summary, where it goes, the send |
 | `api/server/routes/logs.ts` | `POST /v1/logs` on the api server: open, rate-limited, one JSONL file a day in `<data>/logs/` |
 
@@ -55,18 +55,20 @@ Eight things are load-bearing:
   server of the first vault paired on this machine, else
   nowhere — and nowhere means nothing is kept for later. Only a server that stays up sends (`start`
   in `server/main.ts`); the CLI's in-process one never does.
-- **The question is a modal the board cannot hear behind.** `useEditor`'s capture-phase key handler
-  runs before any card can stop a key, so it skips targets inside `[data-dag-telemetry-ask]` as it
-  skips `[data-dag-settings]`; Escape is *No*.
+- **The question is a toast, not a gate.** It appears once a board, note, quiz or table has been the
+  open page for 3 s — never on Home, a listing page, an attachment or an empty vault — and it takes
+  no focus, so the page stays usable behind it. `useEditor`'s capture-phase key handler still skips
+  targets inside `[data-dag-telemetry-ask]` as it skips `[data-dag-settings]`, so a key aimed at one
+  of its buttons does not reach the board; Escape in the toast is *No*.
 - **`/v1/logs` is open, and stands in for a token with limits**: 256 KB a batch, 30 a minute an
   address, 3000 a minute in all, and what is over is `{accepted: 0}` rather than an error a client
   would retry. Nothing about the request — no address, no header — is written. `ANYDAG_API_LOGS=off`
   makes it a 404; `ANYDAG_API_LOGS_DAYS` (30) is how long a day file stays. The address the rate
   limits count is the proxy's word only when `ANYDAG_API_TRUST_PROXY` names hops (`docs/architecture/api.md`) —
   otherwise the socket's.
-- **The suite answers no.** `e2e/global-setup.ts` answers the dev home's question once, or a card
-  over every page would take every click; `telemetry.spec.ts` stands in its own answer with
-  `page.route`.
+- **The suite answers no.** `e2e/global-setup.ts` answers the dev home's question once, or a toast
+  over every open file would take a click meant for the board; `telemetry.spec.ts` stands in its own
+  answer with `page.route`.
 
 Names claimed, grepped first: `dag-telemetry*`, `data-dag-telemetry*`, `data-dag-setting-telemetry*`,
 the Settings tab `privacy`, and the event `dag:telemetry` (in `test/prefs.test.ts`'s list).
