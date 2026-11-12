@@ -38,31 +38,42 @@ export function ProvidersPane() {
     return () => clearInterval(timer);
   }, []);
   const host = desktop()?.keys ? "desktop" : "browser";
+  /* The pane's title already says AI providers, so the group has none; the line about what is kept
+     where sits above the list, and the note about keys once under it. */
   return (
-    <Group
-      title="AI providers"
-      footer={
-        <Hint data-dag-providers-checked="">
-          Checked {checkedAgo(at, now)} ·{" "}
-          <button type="button" className="dag-providers__check" data-dag-providers-check="" onClick={refresh}>
-            Check again
-          </button>
-        </Hint>
-      }
-    >
+    <>
       <p className="dag-providers__scope" data-dag-providers-scope="">
         Sign-ins and keys stay on this computer. Which model each feature uses is saved with the vault.
       </p>
-      {llm ? (
-        <ul className="dag-providers" data-dag-providers="">
-          {llm.providers.map((p) => (
-            <ProviderRow key={p.id} p={p} all={llm.providers} host={host} onChange={refresh} />
-          ))}
-        </ul>
-      ) : (
-        <p className="dag-providers__scope">Asking the server which providers could answer…</p>
-      )}
-    </Group>
+      <Group
+        footer={
+          <>
+            {host === "desktop" ? (
+              <Hint>
+                Keys are kept on this computer, encrypted where the system allows, and never shown again. Saving restarts the
+                server.
+              </Hint>
+            ) : null}
+            <Hint data-dag-providers-checked="">
+              Checked {checkedAgo(at, now)} ·{" "}
+              <button type="button" className="dag-providers__check" data-dag-providers-check="" onClick={refresh}>
+                Check again
+              </button>
+            </Hint>
+          </>
+        }
+      >
+        {llm ? (
+          <ul className="dag-providers" data-dag-providers="">
+            {llm.providers.map((p) => (
+              <ProviderRow key={p.id} p={p} all={llm.providers} host={host} onChange={refresh} />
+            ))}
+          </ul>
+        ) : (
+          <p className="dag-providers__scope">Asking the server which providers could answer…</p>
+        )}
+      </Group>
+    </>
   );
 }
 
@@ -85,7 +96,10 @@ function ProviderRow({
   return (
     <li className="dag-providers__row" data-dag-provider={p.id} data-dag-provider-status={status}>
       <div className="dag-providers__head">
-        <ProviderMark provider={p.id} size={18} nameFallback={false} />
+        {/* A provider with no mark yet keeps the column, so every name starts in one line. */}
+        <span className="dag-providers__mark">
+          <ProviderMark provider={p.id} size={18} nameFallback={false} />
+        </span>
         <span className="dag-providers__text">
           <span className="dag-providers__name">{p.label}</span>
           <span className="dag-providers__desc">{p.description}</span>
@@ -260,7 +274,7 @@ function KeyedSetup({ p, onChange }: { p: ProviderInfo; onChange(): void }) {
           type="button"
           className="dag-button"
           data-dag-provider-save=""
-          disabled={busy || addressBad || (!changed && !stored && !(custom && saved.address))}
+          disabled={busy || addressBad || (!changed && !stored && !p.ready && !(custom && saved.address))}
           onClick={() => void saveAndTest()}
         >
           {changed ? "Save and test" : "Test"}
@@ -275,9 +289,6 @@ function KeyedSetup({ p, onChange }: { p: ProviderInfo; onChange(): void }) {
         </span>
       </div>
       {addressBad ? <p className="dag-providers__why">The address starts with http:// or https://.</p> : null}
-      <p className="dag-providers__note">
-        Kept on this computer, encrypted where the system allows. Saving restarts the server. A key is never shown again.
-      </p>
     </div>
   );
 }
