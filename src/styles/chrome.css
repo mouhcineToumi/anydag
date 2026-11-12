@@ -1023,7 +1023,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-telemetry-ask__failed { margin: 8px 0 0; font-size: 12px; color: var(--dag-color-dangerText); }
 .dag-telemetry-ask__foot { gap: 8px; }
 /* The Privacy tab's two lists. */
-.dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); }
+.dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); text-wrap: pretty; }
 .dag-sidebar__menu-who {
   margin: 0;
   padding: 6px 8px;
@@ -3099,7 +3099,14 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-board-settings__body { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .dag-board-settings__flow { display: flex; gap: 12px; }
 .dag-board-settings__flow .dag-field { flex: 1; }
-.dag-board-settings .dag-field__hint { margin: 0; line-height: 1.5; }
+.dag-board-settings .dag-field__hint {
+  max-width: 68ch;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.dag-board-settings .dag-field__hint:not(.dag-field__hint--bad) { color: var(--dag-color-slate); }
 .dag-board-settings__foot { justify-content: flex-end; margin-top: 12px; }
 
 /* The shortcut sheet: a card over the board, `?` to open, Escape or a click outside to close. */
@@ -3232,7 +3239,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings__row--stack { flex-direction: column; align-items: stretch; gap: 8px; }
 .dag-settings__label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dag-settings__name { font-weight: 500; color: var(--dag-color-ink); }
-.dag-settings__desc { font-size: 12px; line-height: 1.45; color: var(--dag-color-slate); }
+.dag-settings__desc { max-width: 68ch; font-size: 12.5px; line-height: 1.45; color: var(--dag-color-slate); text-wrap: pretty; }
 .dag-settings__control { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; max-width: 60%; }
 .dag-settings__row--stack > .dag-settings__control { display: block; min-width: 0; max-width: none; }
 .dag-settings__control > .dag-select { width: 200px; }
@@ -3253,7 +3260,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings__after { margin-top: 8px; }
 /* A line of prose under a group, for what no single row says. */
-.dag-settings__hint { margin: 0 2px; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-settings__hint { max-width: 68ch; margin: 0 2px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); text-wrap: pretty; }
 .dag-settings__hint code, .dag-settings__desc code {
   font-family: var(--dag-font-mono);
   font-size: 11.5px;
@@ -3261,7 +3268,15 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   border-radius: 4px;
   padding: 1px 4px;
 }
-.dag-settings__prose { margin: 0; padding: 12px 16px; font-size: 13px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-settings__prose {
+  max-width: 68ch;
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dag-color-slate);
+  text-wrap: pretty;
+}
 /* A row that opens onto more: the file types, the desktop app's config. Closed by default, because
    what is in it is reference, not a decision. */
 .dag-settings__more > summary {
@@ -3364,7 +3379,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 0 10px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--dag-color-muted);
+  color: var(--dag-color-slate);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3390,6 +3405,13 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings-modal__tab:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-settings-modal__tab[aria-selected="true"] { font-weight: 500; color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-settings-modal__tab:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+/* The shared textfield paints its placeholder and unit muted app-wide, which is 2.6:1 on Neutral's
+   card. Inside Settings and the board settings card both carry a value a person has to read — the
+   placeholder is where the default model shows — so they take the slate token instead. */
+[data-dag-settings] .dag-textfield > input::placeholder,
+[data-dag-board-settings] .dag-textfield > input::placeholder { color: var(--dag-color-slate); }
+[data-dag-settings] .dag-textfield__suffix,
+[data-dag-board-settings] .dag-textfield__suffix { color: var(--dag-color-slate); }
 .dag-settings-modal__pane { min-height: 0; overflow-y: auto; padding: 22px 32px 32px; }
 .dag-settings-modal__head { display: flex; align-items: center; gap: 8px; min-height: 32px; padding-right: 36px; margin-bottom: 20px; }
 .dag-settings-modal__head h3 { margin: 0; font-size: 18px; font-weight: 600; }
