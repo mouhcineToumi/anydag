@@ -619,6 +619,9 @@ const newBoardText = (title: string): string =>
  */
 export { UNTITLED };
 
+/** A title as a frontmatter scalar: *Untitled* plain, anything else quoted for YAML. */
+const titleScalar = (title: string): string => (title === UNTITLED ? UNTITLED : JSON.stringify(title));
+
 /**
  * What a board made from the sidebar starts as: **titled `Untitled`, and empty.**
  *
@@ -627,18 +630,22 @@ export { UNTITLED };
  * which the page then drew at 205%, the fit of one small card, and which the first thing anybody did
  * was delete. The page says it now, in a card that is not in the file (`EmptyBoard`); an
  * empty page is ready the moment it is parsed, so nothing waits on an item that is not there.
+ *
+ * A title is passed by the search, which makes what somebody typed: the server files the text
+ * under that title, the way `/create` files every text that carries one.
  */
-export const blankBoardText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
+export const blankBoardText = (title: string = UNTITLED): string => `---\ntitle: ${titleScalar(title)}\n---\n`;
 
 /** What a note made from the sidebar starts as: its title, and an empty page under it. */
-export const blankNoteText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
+export const blankNoteText = (title: string = UNTITLED): string => `---\ntitle: ${titleScalar(title)}\n---\n`;
 
 /**
  * What a task made from the sidebar or the Tasks page starts as: a note, titled *Untitled*
  * like any other, with a status — which is the whole of what makes it a task. A column's own `+`
  * starts it in that column.
  */
-export const blankTaskText = (status: TaskStatus = "todo"): string => `---\ntitle: ${UNTITLED}\nstatus: ${status}\n---\n`;
+export const blankTaskText = (status: TaskStatus = "todo", title: string = UNTITLED): string =>
+  `---\ntitle: ${titleScalar(title)}\nstatus: ${status}\n---\n`;
 
 /**
  * What an event made from the sidebar or the calendar starts as: a note titled as asked —
@@ -647,7 +654,7 @@ export const blankTaskText = (status: TaskStatus = "todo"): string => `---\ntitl
  * is all day.
  */
 export const blankEventText = (start: string, end?: string, title: string = UNTITLED): string =>
-  `---\ntitle: ${title === UNTITLED ? UNTITLED : JSON.stringify(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
+  `---\ntitle: ${titleScalar(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
 
 export const createBoard = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? newBoardText(name) });
@@ -684,7 +691,7 @@ export const createNote = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? newNoteText(name), kind: "note" });
 
 /** What a quiz made from the sidebar or the Quizzes page starts as: a title and no questions yet. */
-export const blankQuizText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
+export const blankQuizText = (title: string = UNTITLED): string => `---\ntitle: ${titleScalar(title)}\n---\n`;
 
 export const createQuiz = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? blankQuizText(), kind: "quiz" });
@@ -694,7 +701,7 @@ export const createQuiz = async (name: string, text?: string): Promise<Made> =>
  * columns and three empty rows — somewhere to click and type. `src/table/write.ts` says so, where
  * every other writer of the format is.
  */
-export const blankTableText = (): string => blankTable(UNTITLED);
+export const blankTableText = (title: string = UNTITLED): string => blankTable(titleScalar(title));
 
 const createTable = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? blankTableText(), kind: "table" });
