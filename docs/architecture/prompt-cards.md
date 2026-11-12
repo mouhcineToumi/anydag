@@ -102,8 +102,12 @@ with an answer, and a real model would make the suite slow, paid for and differe
 **`claude` is the person's own Claude subscription**, through the Claude Code signed in on this
 machine — no key anywhere in AnyDag. `claudeComplete` runs `claude -p`
 in an empty directory with the system prompt as `--system-prompt-file` and the request on stdin, and
-reads `result` out of `--output-format json`. In the desktop app it is the default when it can answer
-(`ANYDAG_DESKTOP=1`, which the shell sets); elsewhere a person picks it. Five things bit:
+reads `result` out of `--output-format json`. **The default is the first provider that can answer
+now** (`defaultProvider`, #179): in the desktop app (`ANYDAG_DESKTOP=1`, which the shell sets) Claude
+Code, OpenCode, then the keyed rows; anywhere else Gemini first, so a `.env.local` with a Gemini key
+answers as it always did, then the same. Only when nothing can answer is it Gemini, whose missing key
+is then what the card says. A browser on a machine where Claude Code is signed in used to fail its
+first card on a Gemini key nobody had set. Five things bit:
 
 - **`--bare` is the wrong flag.** It reads like "answer and nothing else", and it reads only
   `ANTHROPIC_API_KEY` — never the subscription's login — so the one run that should work is the one it
@@ -130,8 +134,8 @@ reads `result` out of `--output-format json`. In the desktop app it is the defau
   seconds at both.
 
 **`opencode` is the person's own OpenCode login** the same way — OpenCode Go, or any provider they
-connected with `opencode auth login` — through `opencodeComplete`, and in the desktop app it is the
-default when Claude Code cannot answer and it can. OpenCode **2 or later**: the run is the five things
+connected with `opencode auth login` — through `opencodeComplete`, and it is the default after Claude
+Code when that cannot answer and it can. OpenCode **2 or later**: the run is the five things
 in *Things that will bite*, and four more are this row's.
 
 - **"Ready" is three questions, each answered by the CLI in well under a second**: found

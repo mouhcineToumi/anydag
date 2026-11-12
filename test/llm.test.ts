@@ -265,8 +265,12 @@ describe("opencodeComplete", () => {
 });
 
 describe("resolveProvider", () => {
-  it("defaults to Gemini, and needs its key", () => {
-    expect(resolveProvider({})).toMatchObject({ ok: false, error: expect.stringContaining("GEMINI_API_KEY") });
+  it("defaults to Gemini when nothing can answer, and needs its key", () => {
+    /* No PATH and a home with nothing in it: a Claude Code on the machine running the suite must not answer. */
+    expect(resolveProvider({ PATH: "", HOME: "/nonexistent-home" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("GEMINI_API_KEY"),
+    });
     const r = resolveProvider({ GEMINI_API_KEY: KEY });
     expect(r.ok && r.value).toMatchObject({
       model: "gemini-3.8-flash",
@@ -515,9 +519,13 @@ describe.skipIf(process.platform === "win32")("finding Claude Code", () => {
     });
   });
 
-  it("is the desktop app's default when it can answer, and never takes a Gemini model name from the environment", () => {
+  it("is the default when it can answer, and never takes a Gemini model name from the environment", () => {
     const h = home(".claude/local/claude");
-    expect(describeProviders({ PATH: "", HOME: h }).default).toBe("gemini");
+    /* A browser with no Gemini key falls to Claude Code rather than failing its first card (#179)… */
+    expect(describeProviders({ PATH: "", HOME: h }).default).toBe("claude");
+    /* …but a Gemini key there keeps Gemini, as it always was, and the desktop app still puts the plan first. */
+    expect(describeProviders({ PATH: "", HOME: h, GEMINI_API_KEY: KEY }).default).toBe("gemini");
+    expect(describeProviders({ PATH: "", HOME: h, GEMINI_API_KEY: KEY, ANYDAG_DESKTOP: "1" }).default).toBe("claude");
     const desk = { PATH: "", HOME: h, ANYDAG_DESKTOP: "1", ANYDAG_LLM_MODEL: "gemini-3.7-flash" };
     expect(describeProviders(desk).default).toBe("claude");
     const r = resolveProvider(desk);
@@ -593,9 +601,9 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     });
   });
 
-  it("is the desktop app's default after Claude Code, and only when it can answer", () => {
+  it("is the default after Claude Code, and only when it can answer", () => {
     const h = home(".opencode/bin/opencode");
-    expect(describeProviders({ PATH: "", HOME: h }).default).toBe("gemini");
+    expect(describeProviders({ PATH: "", HOME: h }).default).toBe("opencode");
     expect(describeProviders({ PATH: "", HOME: h, ANYDAG_DESKTOP: "1" }).default).toBe("opencode");
     expect(describeProviders({ PATH: "", HOME: home(".opencode/bin/opencode", "2.2.5", []), ANYDAG_DESKTOP: "1" }).default).toBe(
       "gemini",
@@ -605,6 +613,15 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     fs.mkdirSync(path.join(both, ".local/bin"), { recursive: true });
     fs.writeFileSync(path.join(both, ".local/bin/claude"), `#!/bin/sh\necho '{"loggedIn": true}'\n`, { mode: 0o755 });
     expect(describeProviders({ PATH: "", HOME: both, ANYDAG_DESKTOP: "1" }).default).toBe("claude");
+    expect(describeProviders({ PATH: "", HOME: both }).default).toBe("claude");
+  });
+
+  it("falls to a keyed provider that can answer, then to Gemini when none can", () => {
+    const none = home(null);
+    expect(describeProviders({ PATH: "", HOME: none, ANYDAG_DESKTOP: "1", ZAI_API_KEY: KEY }).default).toBe("zai");
+    expect(describeProviders({ PATH: "", HOME: none, ZAI_API_KEY: KEY }).default).toBe("zai");
+    expect(describeProviders({ PATH: "", HOME: none, ANYDAG_DESKTOP: "1" }).default).toBe("gemini");
+    expect(describeProviders({ PATH: "", HOME: none }).default).toBe("gemini");
   });
 
   it("does not let the server's own config or token reach the run", () => {

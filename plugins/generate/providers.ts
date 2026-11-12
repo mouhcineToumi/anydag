@@ -331,18 +331,27 @@ export function opencodeReady(env: Env, model?: string): { ok: true; bin: string
 }
 
 /**
- * The id the server uses when a request names none: `ANYDAG_LLM_PROVIDER`; else, in the desktop app
- * (`ANYDAG_DESKTOP=1`, set by the shell), the first coding agent's CLI that is there and signed in —
- * Claude Code, then OpenCode — because a plan the person already pays for needs no key; else Gemini.
+ * Which providers the default is looked for in, first to last. In the desktop app (`ANYDAG_DESKTOP=1`,
+ * set by the shell) the coding agents' CLIs come first, because a plan the person already pays for
+ * needs no key. Anywhere else Gemini stays first, so a `.env.local` holding a Gemini key goes on
+ * answering exactly as it did; the CLIs follow it, so a browser on a machine where Claude Code is
+ * signed in does not fail its first prompt card on a key nobody set (#179).
+ */
+const DEFAULT_ORDER = {
+  desktop: ["claude", "opencode", "gemini", "zai", "custom"],
+  elsewhere: ["gemini", "claude", "opencode", "zai", "custom"],
+} as const;
+
+/**
+ * The id the server uses when a request names none: `ANYDAG_LLM_PROVIDER`; else the first provider in
+ * `DEFAULT_ORDER` that can answer now; else Gemini, whose "no key" is then what the person is told.
+ * Every readiness check is remembered (`remembered`), so asking costs nothing after the first time.
  */
 export function defaultProvider(env: Env): string {
   const named = env.ANYDAG_LLM_PROVIDER?.trim();
   if (named) return named;
-  if (env.ANYDAG_DESKTOP === "1") {
-    if (claudeReady(env).ok) return "claude";
-    if (opencodeReady(env, OPENCODE_DEFAULT_MODEL).ok) return "opencode";
-  }
-  return "gemini";
+  const order = env.ANYDAG_DESKTOP === "1" ? DEFAULT_ORDER.desktop : DEFAULT_ORDER.elsewhere;
+  return order.find((id) => resolveProvider(env, { provider: id }).ok) ?? "gemini";
 }
 
 /**
