@@ -110,13 +110,19 @@ const SIZES: readonly PasteSize[] = ["screen", "pixels", "width"];
 const SHOWS: readonly ProblemsShow[] = ["notify", "badge", "off"];
 
 /**
- * The thinking levels the card offers.
+ * The effort scale every AI surface shows, low to high.
  *
- * Not a contract with any provider: the server passes the word through and a model that has never
- * heard of it refuses in its own words, which the card shows. Gemini 3.8 Flash takes these four and
- * rejects `minimal`; OpenCode maps them onto a variant written `model#variant`.
+ * Not a contract with any provider: the server maps each level to what that provider accepts —
+ * Claude's `--effort`, OpenCode's `#variant`, an HTTP provider's `reasoning_effort` — and a model
+ * with no Max (an HTTP provider) takes High instead (`effortFor` in `plugins/generate/llm.ts`).
  */
-export const REASONING = ["none", "low", "medium", "high"] as const;
+export const EFFORTS = ["low", "medium", "high", "max"] as const;
+
+/**
+ * Every value a stored thinking preference may hold, including `none` from before Max existed.
+ * `normalise` reads all of them; the card offers `EFFORTS`, with `null` as Automatic.
+ */
+export const REASONING = ["none", ...EFFORTS] as const;
 
 /** A short id-like string, or `null`. The server says whether it names anything. */
 const ident = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" && v.length <= 200 ? v.trim() : null);

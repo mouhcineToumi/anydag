@@ -11,11 +11,15 @@ import { currentOf } from "@/vault/api";
 import { desktop } from "@/vault/desktop";
 import { useVaults } from "@/vault/useVaults";
 
-import { PROVIDER_NAMES, providerName } from "../providerNames";
-import { REASONING, resetSettings, writeSettings } from "../store";
-import { useSettings } from "../useSettings";
-import { TextField } from "@/ui/controls";
+import { EffortPicker } from "@/ui/EffortPicker";
 import { LlmSentence } from "@/ui/LlmSentence";
+import { ModelPicker } from "@/ui/ModelPicker";
+import { pickerProvidersFromChat, pickerProvidersFromLlm } from "@/ui/modelList";
+import { TextField } from "@/ui/controls";
+
+import { PROVIDER_NAMES, providerName } from "../providerNames";
+import { resetSettings, writeSettings } from "../store";
+import { useSettings } from "../useSettings";
 
 import { Field, Group, Hint, ICON, Reset, copyText } from "./common";
 
@@ -122,36 +126,23 @@ export function AgentsPane() {
         </Field>
         <Field
           label="Model"
-          hint={s.llm.model ? undefined : `Uses ${chosen?.defaultModel || "the provider's default"} unless you enter another.`}
+          hint={s.llm.model ? undefined : `Uses ${chosen?.defaultModel || "the provider's default"} unless you choose another.`}
         >
-          <TextField
-            wide
+          <ModelPicker
             data-dag-setting-llm-model=""
-            list="dag-llm-models"
-            spellCheck={false}
-            value={s.llm.model ?? ""}
-            onChange={(e) => writeSettings({ llm: { model: e.target.value } })}
+            providers={pickerProvidersFromLlm(llm)}
+            provider={s.llm.provider}
+            model={s.llm.model}
+            defaultProvider={llm?.default ?? null}
+            onChange={(choice) => writeSettings({ llm: { provider: choice.provider, model: choice.model } })}
           />
-          <datalist id="dag-llm-models">
-            {(chosen?.models ?? []).map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
         </Field>
         <Field label="Thinking" hint="More is slower, and rarely a better diagram. Low is usually enough.">
-          <select
-            className="dag-select"
+          <EffortPicker
             data-dag-setting-llm-reasoning=""
-            value={s.llm.reasoning ?? ""}
-            onChange={(e) => writeSettings({ llm: { reasoning: e.target.value || null } })}
-          >
-            <option value="">Default</option>
-            {REASONING.map((level) => (
-              <option key={level} value={level}>
-                {level.charAt(0).toUpperCase() + level.slice(1)}
-              </option>
-            ))}
-          </select>
+            value={s.llm.reasoning}
+            onChange={(level) => writeSettings({ llm: { reasoning: level } })}
+          />
         </Field>
       </Group>
 
@@ -225,20 +216,19 @@ function AssistantGroup() {
         </select>
       </Field>
       <Field label="Model">
-        <select
-          className="dag-select dag-select--wide"
+        <ModelPicker
           data-dag-setting-assistant-model=""
-          disabled={!chosen}
-          value={s.assistant.model ?? ""}
-          onChange={(e) => writeSettings({ assistant: { model: e.target.value || null } })}
-        >
-          <option value="">{chosen ? `Default (${chosen.default})` : "Default"}</option>
-          {(chosen?.models ?? []).map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+          providers={pickerProvidersFromChat(providers)}
+          provider={s.assistant.provider}
+          model={s.assistant.model}
+          defaultProvider={automatic}
+          disabled={!providers}
+          onChange={(choice) =>
+            writeSettings({
+              assistant: { provider: (choice.provider ?? null) as "claude" | "opencode" | null, model: choice.model },
+            })
+          }
+        />
       </Field>
     </Group>
   );

@@ -133,9 +133,67 @@ test("the model chip names who would answer, and opens the AI settings", async (
   /* The default is worded the same way as the Assistant's, and the model's default is in the hint,
      not only in a placeholder that disappears as soon as somebody types. */
   await expect(page.locator("[data-dag-setting-llm-provider] option").first()).toHaveText("Automatic · Claude Code");
-  await expect(page.locator("[data-dag-setting-llm-model]")).toHaveValue("");
-  await expect(page.getByText("Uses sonnet unless you enter another.")).toBeVisible();
+  await expect(page.locator("[data-dag-setting-llm-model]")).toContainText("Automatic");
+  await expect(page.getByText("Uses sonnet unless you choose another.")).toBeVisible();
   await expect(page.getByText("Prompt cards, Rewrite in the panel, and Generate flashcards use this model.")).toBeVisible();
+});
+
+test("the model picker searches the list, picks with the keyboard, and the choice rides with the request", async ({ page }) => {
+  const asked = await answer(page, 200, { ok: true, draft: DRAFT, diagnostics: [], attempts: 1 });
+  await page.route("**/__board/llm*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        default: "claude",
+        providers: [
+          {
+            id: "claude",
+            label: "Claude Code",
+            description: "Uses your Claude plan.",
+            kind: "cli",
+            defaultModel: "sonnet",
+            models: ["sonnet"],
+            ready: true,
+          },
+          {
+            id: "opencode",
+            label: "OpenCode",
+            description: "Uses your OpenCode login.",
+            kind: "cli",
+            defaultModel: "opencode-go/glm-5.3-flash",
+            models: ["opencode-go/glm-5.3-flash", "opencode-go/kimi-k3"],
+            ready: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await open(page);
+  await page.keyboard.press("Control+Comma");
+  await settingsTab(page, "agents");
+  const picker = page.locator("[data-dag-setting-llm-model]");
+  await picker.click();
+  const search = page.locator("[data-dag-model-search]");
+  await expect(search).toBeFocused();
+  await search.fill("glm");
+  await expect(page.getByRole("option", { name: /GLM 5\.3 Flash/ })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(picker).toContainText("GLM 5.3 Flash");
+  await expect(page.locator("[data-dag-setting-llm-provider]")).toHaveValue("opencode");
+  /* Choosing another provider's model wrote the provider with it, and the card uses both. */
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
+  await page.locator("[data-dag-prompt-go]").click();
+  await expect.poll(read).not.toContain("```prompt");
+  expect(asked).toEqual([
+    {
+      prompt: "A browser talking to an API that stores orders in Postgres.",
+      provider: "opencode",
+      model: "opencode-go/glm-5.3-flash",
+      reasoning: null,
+    },
+  ]);
 });
 
 /**

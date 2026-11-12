@@ -202,6 +202,106 @@
 .dag-textfield > input::-webkit-inner-spin-button, .dag-textfield > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .dag-textfield__suffix { flex: none; font-size: 12px; color: var(--dag-color-muted); }
 
+/*
+ * The model picker (`src/ui/ModelPicker.tsx`): one control for the three places a model was chosen.
+ * The button is the closed control; the popover is portalled to the body so a settings pane's
+ * overflow cannot clip it, and kept inside the viewport with a fixed position.
+ */
+.dag-modelpicker { position: relative; display: inline-flex; min-width: 0; max-width: 100%; }
+.dag-modelpicker__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: 13px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-modelpicker__button:hover:not(:disabled) { border-color: var(--dag-color-mutedBorder); }
+.dag-modelpicker__button:focus-visible {
+  outline: none;
+  border-color: var(--dag-color-accent);
+  box-shadow: 0 0 0 3px var(--dag-color-accentSoft);
+}
+.dag-modelpicker__button:disabled { opacity: 0.55; cursor: default; }
+.dag-modelpicker__current { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.dag-modelpicker__chevron { flex: none; color: var(--dag-color-slate); }
+.dag-provider-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--dag-color-slate); }
+.dag-provider-mark--name { width: auto; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.dag-modelpicker__popover {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 6px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-card);
+  box-shadow: var(--elevation);
+}
+.dag-modelpicker__search { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 8px; border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-modelpicker__searchIcon { flex: none; color: var(--dag-color-muted); }
+.dag-modelpicker__searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: 13px;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.dag-modelpicker__searchInput::placeholder { color: var(--dag-color-muted); }
+.dag-modelpicker__list { min-height: 0; overflow-y: auto; padding-top: 4px; }
+.dag-modelpicker__grouphead { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--dag-color-slate); }
+.dag-modelpicker__provider { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-modelpicker__status { flex: none; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--dag-color-slate); }
+.dag-modelpicker__status[data-dag-model-ready="0"] { color: var(--dag-color-dangerText); }
+.dag-modelpicker__option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: var(--dag-metric-radius-chip); cursor: pointer; }
+.dag-modelpicker__option--active { background: var(--dag-color-accentSoft); }
+.dag-modelpicker__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dag-modelpicker__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--dag-color-ink); }
+.dag-modelpicker__id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); }
+.dag-modelpicker__check { flex: none; color: var(--dag-color-accent); }
+.dag-modelpicker__custom { display: flex; flex-direction: column; gap: 8px; padding: 6px; overflow-y: auto; }
+.dag-modelpicker__back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 2px 4px; font: inherit; font-size: 12px; color: var(--dag-color-slate); background: none; border: none; cursor: pointer; }
+.dag-modelpicker__back:hover { color: var(--dag-color-ink); }
+.dag-modelpicker__customLine { margin: 0; font-size: 12px; color: var(--dag-color-slate); }
+.dag-modelpicker__customForm { display: flex; align-items: center; gap: 6px; }
+.dag-modelpicker__customInput {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-family: var(--dag-font-mono);
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  outline: none;
+}
+.dag-modelpicker__customInput:focus { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-modelpicker__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-modelpicker__suggest { padding: 0; font: inherit; font-size: 12px; color: var(--dag-color-accent); background: none; border: none; text-decoration: underline; cursor: pointer; }
+.dag-modelpicker__hint { margin: 0; font-size: 11px; line-height: 1.45; color: var(--dag-color-muted); }
+.dag-effort { max-width: 100%; }
+.dag-settings__control > .dag-modelpicker { width: 260px; }
+.dag-settings__control > .dag-effort { width: 200px; }
+
 .dag-button {
   display: inline-flex;
   align-items: center;
@@ -3373,7 +3473,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-settings-modal__pane { padding: 12px 16px 24px; }
   .dag-settings-modal .dag-settings__row { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
   .dag-settings-modal .dag-settings__control { max-width: none; justify-content: flex-start; }
-  .dag-settings-modal .dag-settings__control > .dag-select, .dag-settings-modal .dag-textfield { width: 100%; }
+  .dag-settings-modal .dag-settings__control > .dag-select, .dag-settings-modal .dag-textfield, .dag-settings-modal .dag-modelpicker, .dag-settings-modal .dag-effort { width: 100%; }
 }
 
 /* ---- the model chip ----
@@ -6955,9 +7055,9 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
    the browser has it; without it the box is that widest option's, which still fits the row. */
 .dag-chat-composer__row { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; }
 .dag-chat-modelpick { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: 220px; flex: 0 1 auto; margin-left: auto; }
-.dag-chat-modelpick .dag-glyph { position: absolute; left: 9px; top: 0; bottom: 0; display: flex; align-items: center; pointer-events: none; }
-.dag-chat-modelpick .dag-chat-picker { min-width: 0; width: 100%; max-width: none; flex: 1 1 auto; padding-left: 29px; }
+.dag-chat-modelpick .dag-modelpicker { min-width: 0; width: 100%; max-width: none; flex: 1 1 auto; }
 .dag-chat-picker { max-width: 220px; height: 28px; font-size: 12px; }
+.dag-chat-picker .dag-modelpicker__button { height: 28px; font-size: 12px; }
 .dag-chat-picker--effort { max-width: 96px; field-sizing: content; padding-right: 24px; }
 .dag-chat-composer__expand { flex: none; width: 24px; height: 24px; }
 .dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-paper); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }

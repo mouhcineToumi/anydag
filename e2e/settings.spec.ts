@@ -308,6 +308,111 @@ test("a key pressed in it never reaches what is selected on the board behind it"
   expect(fs.readFileSync(file, "utf8")).toBe(before);
 });
 
+test("the model picker searches OpenCode's ids, writes provider and model together, and fits 390px", async ({ page }) => {
+  await page.route("**/__board/llm*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        default: "claude",
+        providers: [
+          {
+            id: "claude",
+            label: "Claude Code",
+            description: "Uses your Claude plan.",
+            kind: "cli",
+            defaultModel: "sonnet",
+            models: ["sonnet"],
+            ready: true,
+          },
+          {
+            id: "opencode",
+            label: "OpenCode",
+            description: "Uses your OpenCode login.",
+            kind: "cli",
+            defaultModel: "opencode-go/glm-5.3-flash",
+            models: ["opencode-go/glm-5.3-flash", "opencode-go/kimi-k3"],
+            ready: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await open(page);
+  await openSettings(page, "agents");
+  const picker = page.locator("[data-dag-setting-llm-model]");
+  await expect(picker).toContainText("Automatic");
+  await picker.click();
+  const search = page.locator("[data-dag-model-search]");
+  await expect(search).toBeFocused();
+  await search.fill("glm");
+  await expect(page.getByRole("option", { name: /GLM 5\.3 Flash/ })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(picker).toContainText("GLM 5.3 Flash");
+  await expect(page.locator("[data-dag-setting-llm-provider]")).toHaveValue("opencode");
+
+  const saved = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k === "dag:settings" || k.startsWith("dag:settings@"));
+    return JSON.parse(localStorage.getItem(key!) ?? "{}") as { llm?: { provider?: string; model?: string } };
+  });
+  expect(saved.llm).toMatchObject({ provider: "opencode", model: "opencode-go/glm-5.3-flash" });
+
+  /* The popover is fixed to the viewport, so a phone-width window still holds the whole of it. */
+  await page.setViewportSize({ width: 390, height: 800 });
+  await picker.click();
+  const box = await page.locator("[data-dag-model-popover]").boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  await page.keyboard.press("Escape");
+});
+
+test("the Assistant's model row is the same picker, and choosing another provider's model sets it", async ({ page }) => {
+  await page.route("**/__board/chat/models*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        providers: [
+          {
+            provider: "claude",
+            label: "Claude Code",
+            available: true,
+            default: "claude-sonnet-5-5",
+            models: [{ id: "claude-sonnet-5-5", label: "Sonnet 5.5" }],
+            efforts: ["", "low", "medium", "high", "max"],
+          },
+          {
+            provider: "opencode",
+            label: "OpenCode",
+            available: true,
+            default: "opencode-go/glm-5.3-flash",
+            models: [
+              { id: "opencode-go/glm-5.3-flash", label: "GLM 5.3 Flash" },
+              { id: "opencode-go/kimi-k3", label: "Kimi K3" },
+            ],
+            efforts: ["", "low", "medium", "high", "max"],
+          },
+        ],
+      }),
+    }),
+  );
+  await open(page);
+  await openSettings(page, "agents");
+  const picker = page.locator("[data-dag-setting-assistant-model]");
+  await picker.click();
+  await page.locator("[data-dag-model-search]").fill("glm");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(picker).toContainText("GLM 5.3 Flash");
+  await expect(page.locator("[data-dag-setting-assistant-provider]")).toHaveValue("opencode");
+
+  const saved = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k === "dag:settings" || k.startsWith("dag:settings@"));
+    return JSON.parse(localStorage.getItem(key!) ?? "{}") as { assistant?: { provider?: string; model?: string } };
+  });
+  expect(saved.assistant).toMatchObject({ provider: "opencode", model: "opencode-go/glm-5.3-flash" });
+});
+
 test("on a narrow window it is the list of tabs, then one tab with a way back", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await open(page);

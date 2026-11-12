@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
-import { DEFAULTS, normalise, readSettings, resetSettings, STORE, writeSettings } from "@/settings/store";
+import { DEFAULTS, normalise, REASONING, readSettings, resetSettings, STORE, writeSettings } from "@/settings/store";
 import type { Providers } from "@/settings/useProviders";
 
 /**
@@ -174,7 +174,11 @@ describe("the model a prompt card asks", () => {
   });
 
   it("keeps a thinking level it offers and drops one it does not", () => {
+    expect(REASONING).toEqual(["none", "low", "medium", "high", "max"]);
     expect(normalise({ llm: { reasoning: "high" } }).llm.reasoning).toBe("high");
+    expect(normalise({ llm: { reasoning: "max" } }).llm.reasoning).toBe("max");
+    /* `none` was a level before Max existed; it is still read rather than becoming Automatic. */
+    expect(normalise({ llm: { reasoning: "none" } }).llm.reasoning).toBe("none");
     /* Gemini refuses `minimal` and the card never offers it: a hand-edited file saying so is
        dropped rather than sent for the provider to reject. */
     expect(normalise({ llm: { reasoning: "minimal" } }).llm.reasoning).toBeNull();

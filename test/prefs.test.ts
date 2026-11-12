@@ -20,6 +20,7 @@ import {
 } from "@/settings/prefs";
 import { LOCKED } from "@/settings/lock";
 import { STORE } from "@/settings/store";
+import { RECENT_KEY } from "@/ui/modelList";
 import { LAST } from "@/vault/current";
 
 /**
@@ -140,6 +141,7 @@ describe("the preference list", () => {
       VAULT_STAMP,
       FILE_LIST,
       LOCKED,
+      RECENT_KEY,
     ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);
@@ -172,6 +174,9 @@ describe("the preference list", () => {
     /* Nor whether this browser is locked: a phone stays locked while the
        laptop edits, and a lock that followed the account would lock the laptop too. */
     expect(PREF_KEYS as readonly string[]).not.toContain(LOCKED);
+    /* Nor the five models this browser picked last: a quick choice here need not become a list on
+       every other machine, and the picker works without it. */
+    expect(PREF_KEYS as readonly string[]).not.toContain(RECENT_KEY);
   });
 
   it("splits into the account's half and the vault's, with nothing in both or neither", () => {

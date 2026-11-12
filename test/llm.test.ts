@@ -373,6 +373,8 @@ describe("extraFor", () => {
     expect(extraFor(gemini(), {}, { reasoning: "default" })).toEqual({});
     /* Nothing chosen is nothing said: the provider's own measured default stands. */
     expect(extraFor(gemini(), {}, { reasoning: null })).toEqual({ reasoning_effort: "low" });
+    /* Gemini has no Max, so the app's highest maps to the highest it does have. */
+    expect(extraFor(gemini(), {}, { reasoning: "max" })).toEqual({ reasoning_effort: "high" });
   });
 });
 
@@ -385,6 +387,7 @@ describe("variantFor", () => {
     expect(variantFor({}, { reasoning: "none" })).toBe("low");
     expect(variantFor({}, { reasoning: "low" })).toBe("low");
     expect(variantFor({}, { reasoning: "medium" })).toBeUndefined();
+    expect(variantFor({}, { reasoning: "max" })).toBe("max");
   });
 
   it("falls back to the machine's variant when nothing was chosen", () => {
@@ -497,12 +500,37 @@ describe("parseClaudeResult", () => {
 });
 
 describe("effortFor", () => {
-  it("maps the card's levels onto Claude Code's, which has no none", () => {
-    expect(effortFor({ reasoning: "none" })).toBe("low");
-    expect(effortFor({ reasoning: "medium" })).toBe("medium");
-    expect(effortFor({ reasoning: "high" })).toBe("high");
-    expect(effortFor({ reasoning: "default" })).toBeUndefined();
-    expect(effortFor({})).toBeUndefined();
+  it("maps the one scale onto each provider's own words", () => {
+    /* Claude Code's --effort has max but no none: none is its lowest. */
+    expect(effortFor("claude", { reasoning: "none" })).toBe("low");
+    expect(effortFor("claude", { reasoning: "low" })).toBe("low");
+    expect(effortFor("claude", { reasoning: "medium" })).toBe("medium");
+    expect(effortFor("claude", { reasoning: "high" })).toBe("high");
+    expect(effortFor("claude", { reasoning: "max" })).toBe("max");
+
+    /* OpenCode's variants have max, and its middle asks for the model's own default. */
+    expect(effortFor("opencode", { reasoning: "none" })).toBe("low");
+    expect(effortFor("opencode", { reasoning: "low" })).toBe("low");
+    expect(effortFor("opencode", { reasoning: "medium" })).toBeUndefined();
+    expect(effortFor("opencode", { reasoning: "high" })).toBe("high");
+    expect(effortFor("opencode", { reasoning: "max" })).toBe("max");
+
+    /* HTTP providers carry reasoning_effort; max is their highest accepted level. */
+    for (const provider of ["gemini", "zai", "custom"]) {
+      expect(effortFor(provider, { reasoning: "none" })).toBe("none");
+      expect(effortFor(provider, { reasoning: "low" })).toBe("low");
+      expect(effortFor(provider, { reasoning: "medium" })).toBe("medium");
+      expect(effortFor(provider, { reasoning: "high" })).toBe("high");
+      expect(effortFor(provider, { reasoning: "max" })).toBe("high");
+    }
+  });
+
+  it("says nothing for Automatic and for an old `default`", () => {
+    for (const provider of ["claude", "opencode", "gemini"]) {
+      expect(effortFor(provider, { reasoning: "default" })).toBeUndefined();
+      expect(effortFor(provider, {})).toBeUndefined();
+      expect(effortFor(provider, { reasoning: null })).toBeUndefined();
+    }
   });
 });
 

@@ -32,7 +32,7 @@ const Said = memo(function Said({ text }: { text: string }) {
 const providerLabel = (p: string): string => providerName(p) ?? p;
 
 /** A model's id with the vendor's prefix off, which is how a person says it. */
-export const modelLabel = (id: string): string => id.replace(/^claude-/, "").replace(/^[a-z0-9-]+\//, "");
+const modelLabel = (id: string): string => id.replace(/^claude-/, "").replace(/^[a-z0-9-]+\//, "");
 
 export interface Actions {
   /** The person's answer to an approval or an access card. */
