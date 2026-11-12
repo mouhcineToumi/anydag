@@ -21,7 +21,7 @@
  * one string so `test/settings.test.ts` can hold it in Node.
  */
 
-import { storageKey } from "./prefs";
+import { AI, storageKey, writePref } from "./prefs";
 import { markSaved } from "./saved";
 
 /** How wide a pasted or imported image is placed. */
@@ -111,6 +111,17 @@ export type SettingsPatch = {
 };
 
 const SECTIONS = ["problems", "paste", "export", "llm", "assistant"] as const;
+
+/**
+ * **Two homes for one object** (#191). `problems`, `paste` and `export` are the vault's, kept under
+ * {@link STORE} and carried in the vault's bundle. `llm` and `assistant` — which model each AI feature
+ * uses — are the person's, kept under `AI` (`prefs.ts`) and carried in the person's bundle, the same
+ * in every vault. Every reader still gets one `Settings` from `readSettings`, and every writer still
+ * calls `writeSettings`: only where a section is stored moved.
+ */
+const PERSON_SECTIONS = ["llm", "assistant"] as const;
+type PersonSection = (typeof PERSON_SECTIONS)[number];
+const isPerson = (k: string): k is PersonSection => (PERSON_SECTIONS as readonly string[]).includes(k);
 
 /** Where they live. One key holding one object, so a bad value is one `catch` and a reset is one `removeItem`. */
 export const STORE = "dag:settings";
@@ -204,17 +215,26 @@ export function isSnapshot(): boolean {
   }
 }
 
+/** One stored JSON object, or `null` for none, junk or a blocked accessor. */
+function stored(key: string): Record<string, unknown> | null {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    /* A blocked accessor throws, and so does a half-written string. */
+    return null;
+  }
+}
+
 /** The current settings. `DEFAULTS` for a snapshot, for a browser with site data blocked, and for junk. */
 export function readSettings(): Settings {
   if (isSnapshot()) return DEFAULTS;
-  try {
-    const raw = localStorage.getItem(storageKey(STORE));
-    return normalise(raw ? JSON.parse(raw) : null);
-  } catch {
-    /* A blocked accessor throws, and so does a half-written string. The defaults are still a
-       perfectly good answer and it is not worth taking the page down for. */
-    return DEFAULTS;
-  }
+  /* The vault's sections from the vault's key, the AI choices from the person's — and only from
+     there: a vault's old `llm` is read once, by `migrate.ts`, and never again. */
+  const vault = stored(storageKey(STORE)) ?? {};
+  const person = stored(storageKey(AI)) ?? {};
+  return normalise({ ...vault, llm: person.llm, assistant: person.assistant });
 }
 
 /** Merge a patch into what is stored, section by section, and tell the window. */
@@ -227,9 +247,44 @@ export function writeSettings(patch: SettingsPatch): Settings {
     llm: { ...now.llm, ...patch.llm },
     assistant: { ...now.assistant, ...patch.assistant },
   });
-  save(JSON.stringify(next));
+  write(next, Object.keys(patch));
   announce(now, next, patch);
   return next;
+}
+
+/**
+ * Store `next`, in the home of each section `touched` names: the vault's key when any of the vault's
+ * sections changed, the person's when either AI section did. A write to one never rewrites the other,
+ * so picking a model does not stamp the vault's bundle, nor an export scale the person's.
+ */
+function write(next: Settings, touched: readonly string[]): void {
+  if (touched.some((k) => !isPerson(k))) save(JSON.stringify(vaultPart(next)));
+  if (touched.some(isPerson)) savePerson(next);
+}
+
+/** The vault's sections of a whole settings object: what its key and its bundle carry. */
+export function vaultPart(s: Settings): Omit<Settings, PersonSection> {
+  return { problems: s.problems, paste: s.paste, export: s.export };
+}
+
+/** The person's sections of a whole settings object: what `dag:ai` carries. */
+export function personPart(s: Settings): Pick<Settings, PersonSection> {
+  return { llm: s.llm, assistant: s.assistant };
+}
+
+/**
+ * Write the AI choices to the person's key, through `prefs.ts` so the change is stamped and pushed
+ * in the person's bundle, then tell the window the settings changed — with `account` as the detail,
+ * so `sync.ts` does not push the vault's bundle for a change that is not in it.
+ */
+function savePerson(next: Settings): void {
+  if (isSnapshot()) return;
+  writePref(AI, JSON.stringify(personPart(next)), "ai");
+  try {
+    dispatchEvent(new CustomEvent(EVENT, { detail: "account" }));
+  } catch {
+    /* No `window`. Nothing is listening either. */
+  }
 }
 
 /**
@@ -263,6 +318,7 @@ function announce(before: Settings, after: Settings, patch: SettingsPatch): void
 export function resetSettings(only?: readonly (keyof Settings)[]): Settings {
   if (!only) {
     save(null);
+    if (!isSnapshot()) writePref(AI, null, "ai");
     return DEFAULTS;
   }
   const now = readSettings();
@@ -270,7 +326,7 @@ export function resetSettings(only?: readonly (keyof Settings)[]): Settings {
     ...now,
     ...Object.fromEntries(only.map((k) => [k, DEFAULTS[k]])),
   });
-  save(JSON.stringify(next));
+  write(next, only);
   return next;
 }
 

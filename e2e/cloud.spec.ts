@@ -66,11 +66,12 @@ test("hides every server-backed feature, and asks for none of them", { tag: "@sm
   await expect(page.locator('[data-dag-settings-tab-button="privacy"]')).toHaveCount(0);
   await expect(page.locator('[data-dag-settings-tab-button="vault-general"]')).toBeVisible();
   for (const still of [
+    "appearance",
+    "ai",
     "calendar",
     "quizzes",
     "providers",
     "vault-general",
-    "vault-ai",
     "vault-files",
     "export",
     "agent-access",

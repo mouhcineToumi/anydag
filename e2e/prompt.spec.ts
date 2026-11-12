@@ -129,7 +129,7 @@ test("the model chip names who would answer, and opens the AI settings", async (
   await expect(chip).toHaveText("Claude Code · sonnet");
   await chip.click();
   await expect(page.locator("[data-dag-settings]")).toBeVisible();
-  await expect(page.locator("[data-dag-settings-pane=vault-ai]")).toBeVisible();
+  await expect(page.locator("[data-dag-settings-pane=ai]")).toBeVisible();
   /* The default is worded the same way as the Assistant's, and the model's default is in the hint,
      not only in a placeholder that disappears as soon as somebody types. */
   await expect(page.locator("[data-dag-setting-llm-provider] option").first()).toHaveText("Automatic · Claude Code");
@@ -170,7 +170,7 @@ test("the model picker searches the list, picks with the keyboard, and the choic
   );
   await open(page);
   await page.keyboard.press("Control+Comma");
-  await settingsTab(page, "vault-ai");
+  await settingsTab(page, "ai");
   const picker = page.locator("[data-dag-setting-llm-model]");
   await picker.click();
   const search = page.locator("[data-dag-model-search]");
@@ -353,7 +353,7 @@ test("a no-key refusal says what is missing in plain words, and opens the AI set
   await expect(action).toBeVisible();
   await action.click();
   await expect(page.locator("[data-dag-settings]")).toBeVisible();
-  await expect(page.locator("[data-dag-settings-pane=vault-ai]")).toBeVisible();
+  await expect(page.locator("[data-dag-settings-pane=ai]")).toBeVisible();
   problems = problems.filter((p) => !p.includes("400"));
 });
 
@@ -362,7 +362,7 @@ test("the thinking level picked in Settings rides with the request", async ({ pa
   await open(page);
   /* Chosen the way a person chooses it: the card, not `localStorage`. */
   await page.keyboard.press("Control+Comma");
-  await settingsTab(page, "vault-ai");
+  await settingsTab(page, "ai");
   await page.locator("[data-dag-setting-llm-reasoning]").selectOption("high");
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-settings]")).toHaveCount(0);

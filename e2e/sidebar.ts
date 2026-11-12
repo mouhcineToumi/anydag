@@ -22,11 +22,12 @@ export async function openSidebar(page: Page): Promise<void> {
 
 /** The Settings modal's tabs, by the id `src/settings/tabs.ts` gives each. */
 export type SettingsTab =
+  | "appearance"
+  | "ai"
   | "calendar"
   | "quizzes"
   | "providers"
   | "vault-general"
-  | "vault-ai"
   | "vault-files"
   | "export"
   | "sync"

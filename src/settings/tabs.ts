@@ -4,11 +4,11 @@
  * stored value falls back to are unit tests rather than a browser.
  *
  * **Four groups, and the line between them is where a setting is kept.** *You* is the person's, the
- * same in every vault: the calendar's zone and week start, and the quiz practice threshold, which is
- * kept with the practice records in the app's home. *This computer* is this machine's alone: the API
- * keys the desktop app keeps in the system keyring. *This vault* is stored with the vault and switches
- * when it does: its name and facts, the theme, the settings object (problems, pasted images, export,
- * the diagram and Assistant models) and its sync link. *This board* is the open board's own file:
+ * same in every vault: the theme, which model each AI feature uses (#191), the calendar's zone and
+ * week start, and the quiz practice threshold, which is kept with the practice records in the app's
+ * home. *This computer* is this machine's alone: the API keys the desktop app keeps in the system
+ * keyring. *This vault* is stored with the vault and switches when it does: its name and facts, the
+ * vault's half of the settings object (problems, pasted images, export) and its sync link. *This board* is the open board's own file:
  * its flow, which is drawn only while that board is open and writable.
  *
  * The three reference pages — Privacy, Keyboard shortcuts and About — are tabs too, but drawn as
@@ -22,11 +22,12 @@
 import { SETTINGS_TAB, readPref, writeLocal } from "./prefs";
 
 export type SettingsTab =
+  | "appearance"
+  | "ai"
   | "calendar"
   | "quizzes"
   | "providers"
   | "vault-general"
-  | "vault-ai"
   | "vault-files"
   | "export"
   | "sync"
@@ -52,9 +53,9 @@ export const BOARD_TABS: readonly SettingsTab[] = ["board-layout"];
 
 /** The tabs in the order they are drawn, which is also the order the arrow keys walk. */
 export const GROUPS: readonly TabGroup[] = [
-  { group: "you", tabs: ["calendar", "quizzes"] },
+  { group: "you", tabs: ["appearance", "ai", "calendar", "quizzes"] },
   { group: "computer", tabs: ["providers"] },
-  { group: "vault", tabs: ["vault-general", "vault-ai", "vault-files", "export", "sync", "agent-access"] },
+  { group: "vault", tabs: ["vault-general", "vault-files", "export", "sync", "agent-access"] },
   { group: "board", tabs: BOARD_TABS },
 ];
 
@@ -79,11 +80,12 @@ export const SCOPE_LABEL: Readonly<Record<SettingsGroup, string>> = {
  * shortcuts are the person's, and About is the build's.
  */
 const SCOPE_OF: Readonly<Record<SettingsTab, SettingsGroup>> = {
+  appearance: "you",
+  ai: "you",
   calendar: "you",
   quizzes: "you",
   providers: "computer",
   "vault-general": "vault",
-  "vault-ai": "vault",
   "vault-files": "vault",
   export: "vault",
   sync: "vault",
@@ -134,11 +136,12 @@ export function drawnSections<G extends string>(
 }
 
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
+  appearance: "Appearance",
+  ai: "AI",
   calendar: "Calendar",
   quizzes: "Quizzes",
   providers: "AI providers",
   "vault-general": "General",
-  "vault-ai": "AI",
   "vault-files": "Files and images",
   export: "Export",
   sync: "Sync",
@@ -157,7 +160,9 @@ export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
 const LEGACY_TABS: Readonly<Record<string, SettingsTab>> = {
   preferences: "vault-general",
   vault: "vault-general",
-  agents: "vault-ai",
+  agents: "ai",
+  /* The AI tab was the vault's until its choices became the person's (#191). */
+  "vault-ai": "ai",
 };
 
 export function isTab(value: unknown): value is SettingsTab {

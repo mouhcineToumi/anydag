@@ -175,8 +175,9 @@ test("a tab's reset puts back what that tab shows, and nothing on another tab", 
   await openSettings(page, "export");
   await page.locator("[data-dag-setting-export-scale]").selectOption("4");
 
-  await settingsTab(page, "vault-general");
+  await settingsTab(page, "appearance");
   await page.locator("[data-dag-setting-theme]").selectOption("neutral");
+  await settingsTab(page, "vault-general");
   await page.locator("[data-dag-setting-problems]").selectOption("off");
 
   await settingsTab(page, "vault-files");
@@ -191,15 +192,18 @@ test("a tab's reset puts back what that tab shows, and nothing on another tab", 
   await expect(page.locator("[data-dag-setting-paste-width]")).toHaveCount(0);
 
   await settingsTab(page, "vault-general");
-  await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("neutral");
   await expect(page.locator("[data-dag-setting-problems]")).toHaveValue("off");
 
-  /* The theme is its own key, with its own sources and its own test; a board is not one of them.
-     General's reset covers it and the problems row, and nothing on Export. */
+  /* General's reset covers the problems row, and nothing on Appearance or Export. */
+  await page.locator("[data-dag-setting-reset]").click();
+  await expect(page.locator("[data-dag-setting-problems]")).toHaveValue("notify");
+
+  /* The theme is the person's and has its own tab (#191); its reset puts the default back. */
+  await settingsTab(page, "appearance");
+  await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("neutral");
   await page.locator("[data-dag-setting-reset]").click();
   await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("paper");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
-  await expect(page.locator("[data-dag-setting-problems]")).toHaveValue("notify");
 
   await settingsTab(page, "export");
   await expect(page.locator("[data-dag-setting-export-scale]")).toHaveValue("4");
@@ -241,7 +245,7 @@ test("a board's theme: changes nothing; the reader's choice and the snapshot def
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 
   /* The reader's own choice is what draws the board now. */
-  await openSettings(page, "vault-general");
+  await openSettings(page, "appearance");
   await page.locator("[data-dag-setting-theme]").selectOption("neutral");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 
@@ -262,10 +266,15 @@ test("the arrow keys walk the tabs across every group, and the last tab is where
   await expect(dialog(page)).toBeVisible();
   const selected = page.locator('[data-dag-settings] [role="tab"][aria-selected="true"]');
   /* Nothing remembered in a fresh browser: the first tab, with the focus on it. */
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "calendar");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "appearance");
   await expect(selected).toBeFocused();
+  await expect(page.locator('[data-dag-settings-pane="appearance"] [data-dag-setting-theme]')).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "ai");
+  await page.keyboard.press("ArrowDown");
 
   /* The calendar's tab. */
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "calendar");
   await expect(page.locator('[data-dag-settings-pane="calendar"] [data-dag-setting-week-start]')).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "quizzes");
@@ -277,7 +286,7 @@ test("the arrow keys walk the tabs across every group, and the last tab is where
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-general");
   await expect(selected).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-files");
   /* The vault's remaining tabs, then This board, then the foot: one walk in drawn order. */
   await page.locator('[data-dag-settings-tab-button="agent-access"]').click();
   await page.keyboard.press("ArrowDown");
@@ -288,21 +297,21 @@ test("the arrow keys walk the tabs across every group, and the last tab is where
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "about");
   await expect(page.locator('[data-dag-settings-pane="about"] [data-dag-setting-version]')).toBeVisible();
   await page.keyboard.press("ArrowDown");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "calendar");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "appearance");
   await page.keyboard.press("ArrowUp");
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "about");
 
-  await page.locator('[data-dag-settings-tab-button="vault-ai"]').click();
+  await page.locator('[data-dag-settings-tab-button="ai"]').click();
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
   await page.keyboard.press("Control+Comma");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "ai");
 
   /* And it survives a reload: this browser remembers it. */
   await page.keyboard.press("Escape");
   await open(page);
   await openSettings(page);
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "ai");
 });
 
 test("every tab says which scope it belongs to, under a heading that says what it means", async ({ page }) => {
@@ -310,11 +319,12 @@ test("every tab says which scope it belongs to, under a heading that says what i
   await openSettings(page);
 
   const scopes: [SettingsTab, string][] = [
+    ["appearance", "You"],
+    ["ai", "You"],
     ["calendar", "You"],
     ["quizzes", "You"],
     ["providers", "This computer"],
     ["vault-general", "This vault"],
-    ["vault-ai", "This vault"],
     ["vault-files", "This vault"],
     ["export", "This vault"],
     ["sync", "This vault"],
@@ -354,7 +364,7 @@ test("a press outside it, the close button and ctrl+, close it, and Tab stays in
 
   /* ctrl+, from a control inside it — where the page's own handler cannot hear it. */
   await page.keyboard.press("Control+Comma");
-  await page.locator("[data-dag-setting-theme]").focus();
+  await page.locator("[data-dag-setting-problems]").focus();
   await page.keyboard.press("Control+Comma");
   await expect(dialog(page)).toHaveCount(0);
 
@@ -421,7 +431,7 @@ test("the model picker searches OpenCode's ids, writes provider and model togeth
     }),
   );
   await open(page);
-  await openSettings(page, "vault-ai");
+  await openSettings(page, "ai");
   const picker = page.locator("[data-dag-setting-llm-model]");
   await expect(picker).toContainText("Automatic");
   await picker.click();
@@ -434,10 +444,10 @@ test("the model picker searches OpenCode's ids, writes provider and model togeth
   await expect(picker).toContainText("GLM 5.3 Flash");
   await expect(page.locator("[data-dag-setting-llm-provider]")).toHaveValue("opencode");
 
-  const saved = await page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k === "dag:settings" || k.startsWith("dag:settings@"));
-    return JSON.parse(localStorage.getItem(key!) ?? "{}") as { llm?: { provider?: string; model?: string } };
-  });
+  /* The person's, in every vault (#191): kept under `dag:ai`, not in the vault's settings. */
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("dag:ai") ?? "{}") as { llm?: { provider?: string; model?: string } },
+  );
   expect(saved.llm).toMatchObject({ provider: "opencode", model: "opencode-go/glm-5.3-flash" });
 
   /* The popover is fixed to the viewport, so a phone-width window still holds the whole of it.
@@ -482,7 +492,7 @@ test("the Assistant's model row is the same picker, and choosing another provide
     }),
   );
   await open(page);
-  await openSettings(page, "vault-ai");
+  await openSettings(page, "ai");
   const picker = page.locator("[data-dag-setting-assistant-model]");
   await picker.click();
   await page.locator("[data-dag-model-search]").fill("glm");
@@ -491,10 +501,10 @@ test("the Assistant's model row is the same picker, and choosing another provide
   await expect(picker).toContainText("GLM 5.3 Flash");
   await expect(page.locator("[data-dag-setting-assistant-provider]")).toHaveValue("opencode");
 
-  const saved = await page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k === "dag:settings" || k.startsWith("dag:settings@"));
-    return JSON.parse(localStorage.getItem(key!) ?? "{}") as { assistant?: { provider?: string; model?: string } };
-  });
+  /* The person's, in every vault (#191): kept under `dag:ai`, not in the vault's settings. */
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("dag:ai") ?? "{}") as { assistant?: { provider?: string; model?: string } },
+  );
   expect(saved.assistant).toMatchObject({ provider: "opencode", model: "opencode-go/glm-5.3-flash" });
 });
 
@@ -535,7 +545,7 @@ test("on a narrow window it is the list of tabs, then one tab with a way back", 
   await page.locator('[data-dag-settings-tab-button="vault-general"]').click();
   await expect(pane).toBeVisible();
   await expect(nav).toBeHidden();
-  await expect(page.locator("[data-dag-setting-theme]")).toBeVisible();
+  await expect(page.locator("[data-dag-setting-problems]")).toBeVisible();
   await expect(page.locator("[data-dag-settings-back]")).toBeFocused();
 
   await page.locator("[data-dag-settings-back]").click();
@@ -598,8 +608,8 @@ test("the AI tab wears the prompt card's look in every theme", async ({ page }) 
   for (const theme of ["neutral", "paper", "paper-dark"]) {
     await open(page, `&theme=${theme}`);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    await openSettings(page, "vault-ai");
-    const pane = page.locator('[data-dag-settings-pane="vault-ai"]');
+    await openSettings(page, "ai");
+    const pane = page.locator('[data-dag-settings-pane="ai"]');
     await expect(pane.locator(".dag-settings__group--prompt")).toHaveCount(2);
     await expect(pane.locator("[data-dag-setting-assistant-hint]")).toBeVisible();
     /* Off any control and its focus ring, as the elevation picture does. */

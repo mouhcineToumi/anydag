@@ -12,6 +12,7 @@ import {
   Plug,
   RefreshCw,
   ShieldCheck,
+  Palette,
   Sparkles,
   X,
   type LucideIcon,
@@ -30,6 +31,7 @@ import { AboutPane } from "./panes/About";
 import { AgentAccessPane } from "./panes/AgentAccess";
 import { AiPane } from "./panes/Ai";
 import { BoardLayoutPane } from "./panes/BoardLayout";
+import { AppearancePane } from "./panes/Appearance";
 import { CalendarPane } from "./panes/Calendar";
 import { ICON } from "./panes/common";
 import { ExportPane } from "./panes/Export";
@@ -60,11 +62,12 @@ import {
 } from "./tabs";
 
 const TAB_ICON: Record<SettingsTab, LucideIcon> = {
+  appearance: Palette,
   calendar: CalendarDays,
   quizzes: GraduationCap,
   providers: KeyRound,
   "vault-general": Briefcase,
-  "vault-ai": Sparkles,
+  ai: Sparkles,
   "vault-files": Images,
   export: PackageOpen,
   sync: RefreshCw,
@@ -320,6 +323,10 @@ export function Settings({
   /** The open tab's pane. A switch, so a tab added to `SettingsTab` fails to compile until it has one. */
   const pane = () => {
     switch (tab) {
+      case "appearance":
+        return <AppearancePane themes={themes} themeName={themeName} onTheme={onTheme} />;
+      case "ai":
+        return <AiPane />;
       case "calendar":
         return <CalendarPane />;
       case "quizzes":
@@ -327,9 +334,7 @@ export function Settings({
       case "providers":
         return <ProvidersPane />;
       case "vault-general":
-        return <GeneralPane themes={themes} themeName={themeName} onTheme={onTheme} />;
-      case "vault-ai":
-        return <AiPane />;
+        return <GeneralPane />;
       case "vault-files":
         return <FilesPane boardName={boardName} />;
       case "export":

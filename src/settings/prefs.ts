@@ -25,8 +25,20 @@ import { scopedKey } from "@/vault/current";
 
 import { markSaved } from "./saved";
 
-/** Where the reader's own choice of theme lives. */
+/**
+ * Where the reader's own choice of theme lives. **The person's, in every vault** (#191): it was the
+ * vault's until then, so opening another vault changed how the app looked. A vault's old value is
+ * carried over once by `migrate.ts`.
+ */
 export const THEME = "dag:theme";
+/**
+ * Which model each AI feature uses: the `llm` and `assistant` sections of the settings object, as one
+ * JSON string. **The person's, in every vault** (#191), beside the keys and sign-ins, which were
+ * always this computer's: a second vault no longer starts the Assistant on another provider.
+ * `store.ts` reads and writes it with the rest of the settings object, so nothing that reads a
+ * setting changed; `migrate.ts` carries a vault's old choice over once.
+ */
+export const AI = "dag:ai";
 /** Where the library remembers whether it was open. */
 export const LIBRARY = "dag:library";
 /**
@@ -143,6 +155,7 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
  */
 export const PREF_KEYS = [
   THEME,
+  AI,
   LIBRARY,
   INSPECTOR_WIDTH,
   SIDEBAR,
@@ -157,12 +170,12 @@ export const PREF_KEYS = [
 ] as const;
 
 /**
- * **The half of `PREF_KEYS` that switches with the vault**: the
- * theme and the favourites — which name files, and a vault's files are its own — travel with the
- * settings object in the vault's bundle. Everything else in `PREF_KEYS` is how the window is laid
- * out, and stays the person's: a sidebar docked in one vault is docked in the next.
+ * **The half of `PREF_KEYS` that switches with the vault**: the favourites — which name files, and a
+ * vault's files are its own — the attachments folder and the links switch, which the server reads
+ * out of the vault's bundle. Everything else in `PREF_KEYS` is the person's, the same in every vault:
+ * how the window is laid out, the theme and the AI choices (#191).
  */
-export const VAULT_PREF_KEYS = [THEME, FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
+export const VAULT_PREF_KEYS = [FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
 export const ACCOUNT_PREF_KEYS = PREF_KEYS.filter((k) => !(VAULT_PREF_KEYS as readonly string[]).includes(k));
 
 /**
@@ -174,8 +187,8 @@ export const VAULT_STAMP = "dag:vault-prefs-at";
 /**
  * Every key this browser keeps a copy of **per vault**: the vault's preferences, the settings
  * object (`store.ts`'s `dag:settings`), which folders are open — they are the vault's folders —
- * and the clock that dates them. Under any vault but the default they are stored as `key@slug`,
- * so two tabs in two vaults never read each other's theme (`vault/current.ts`).
+ * and the clock that dates them. They are stored as `key@slug`, so two tabs in two vaults never read
+ * each other's favourites (`vault/current.ts`).
  */
 const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST]);
 
