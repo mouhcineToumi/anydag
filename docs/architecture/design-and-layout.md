@@ -30,6 +30,17 @@ CLI's exports open `?snapshot=1`, which reads no preference, so they use the app
 unless the URL names one. This is the same refusal as the accent one layer out: a document may not
 decide how its reader sees it, and one vault must look the same board to board.
 
+**The chrome has its own scale, apart from the diagram's** (#205). `theme.ui` holds the app's font
+sizes and line heights, two weights, corners, three elevations, five layers, two durations and an
+easing, control heights, the focus ring and spacing; `applyTheme()` writes them as
+`--dag-ui-<group>-<step>`, with the group's unit (`UI_UNITS`), and `check:theme` proves every theme
+has every group. They exist so the chrome stops typing its own numbers and stops borrowing the
+diagram's: before, `--dag-metric-radius-chip` was every button's corner, so a theme could not round
+a chip without rounding the app. `check-literals.mjs` counts the rules in `chrome.css` that still
+type a font size, corner, shadow, layer or duration, against `scripts/chrome-literals.json`, and the
+count may only fall. Every step is the value the chrome already used most, so a rule that moves onto
+a token draws the same.
+
 ## Layout, per diagram type
 
 Three knobs in `theme.metric.elk`, and each exists because a board looked wrong without it:

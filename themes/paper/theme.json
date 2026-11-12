@@ -311,6 +311,22 @@
     },
     "grid": 8
   },
+  "ui": {
+    "text": { "xs": 11, "sm": 12, "md": 13, "lg": 14, "xl": 16, "title": 20, "display": 26 },
+    "leading": { "xs": 16, "sm": 16, "md": 20, "lg": 22, "xl": 24, "title": 28, "display": 32 },
+    "weight": { "regular": 400, "strong": 600 },
+    "radius": { "control": 9, "surface": 12, "dialog": 16, "pill": 999 },
+    "elevation": {
+      "raised": "0 2px 8px var(--dag-color-shadow)",
+      "overlay": "0 4px 16px var(--dag-color-shadow)",
+      "modal": "0 12px 40px var(--dag-color-shadow)"
+    },
+    "layer": { "chrome": 10, "popover": 20, "modal": 30, "toast": 40, "tooltip": 50 },
+    "motion": { "fast": 120, "base": 160, "ease": "cubic-bezier(0.2, 0, 0, 1)" },
+    "control": { "sm": 24, "md": 30, "touch": 44 },
+    "focus": { "width": 2, "offset": 2 },
+    "space": { "1": 4, "2": 8, "3": 12, "4": 16, "5": 24 }
+  },
   "icons": {
     "service": "Server",
     "store": "Database",

@@ -1,22 +1,28 @@
 /*
  * The app around the board: toolbar, pickers, and the two cards that report trouble.
  *
- * Exempt from `scripts/check-literals.mjs`, deliberately. None of this is a diagram: it is never
- * exported, never screenshotted by the skill, and no theme has an opinion about the height of a
- * zoom button. Holding it to the same rule would mean inventing theme keys nobody would ever set,
- * which is how a design system stops meaning anything. Colours still come from the theme, because
- * the chrome has to sit next to the board without arguing with it — and the colour rule admits no
- * exceptions anywhere in `src/`.
+ * Not held to the diagram surface's length rule: none of this is a diagram, it is never exported,
+ * and no theme has an opinion about the height of one zoom button. Colours still come from the
+ * theme, because the chrome has to sit next to the board without arguing with it — and the colour
+ * rule admits no exceptions anywhere in `src/`.
+ *
+ * What it does have is its own scale, the theme's `ui` family (#205): `--dag-ui-text-*`,
+ * `-leading-*`, `-weight-*`, `-radius-*`, `-elevation-*`, `-layer-*`, `-motion-*`, `-control-*`,
+ * `-focus-*` and `-space-*`. A font size, corner, shadow, layer or duration reads one of those,
+ * not a number and not a diagram token (`--dag-metric-radius-chip` is a diagram chip's corner).
+ * `scripts/check-literals.mjs` counts the rules that still type their own against
+ * `scripts/chrome-literals.json`, and the count only goes down. A component's own stacking
+ * (`z-index` 1–9) and an inset ring are structure, not scale, and are not counted.
  */
 
 /*
  * The elevation every full-size overlay shares — the Settings modal, the board browser, the
  * rewrite dialog, the welcome card, the shortcut sheet, the floating sidebar, a calendar card and
  * an equation's field. The theme owns the colour (`color.shadow`): dark and translucent on
- * `paper-dark`, soft and low-contrast on the light themes. The geometry is chrome's, and the same
- * on every one of them so two dialogs never sit at two different heights above the page.
+ * `paper-dark`, soft and low-contrast on the light themes. The geometry is `ui.elevation.modal`,
+ * the same on every theme so two dialogs never sit at two different heights above the page.
  */
-:root { --elevation: 0 12px 40px var(--dag-color-shadow); }
+:root { --elevation: var(--dag-ui-elevation-modal); }
 
 /*
  * The room the macOS window's traffic lights take at its top-left corner, in the desktop app, where
