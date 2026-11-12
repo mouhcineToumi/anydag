@@ -141,8 +141,10 @@ const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
  * (`icons/NOTICE`). No timestamp, so a rebuild that changes nothing leaves it alone. Z.ai has no
  * mark in either source yet; the composer names it instead.
  */
+/* Colour only where the colour is the mark: Anthropic's and OpenAI's colour art is black, which a
+   dark theme hides, so they are drawn from the mono set in `currentColor` (#186). */
 const PROVIDER_MARKS = {
-  color: ["anthropic", "google-gemini", "openai"],
+  color: ["google-gemini"],
   mono: ["anthropic", "google-gemini", "opencode", "openai"],
 };
 const pick = (from, names) => Object.fromEntries(names.filter((n) => from[n]).map((n) => [n, from[n]]));

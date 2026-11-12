@@ -1,4 +1,4 @@
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw, Sparkles } from "lucide-react";
 import {
   Children,
   Fragment,
@@ -22,10 +22,30 @@ export const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLi
  * a rule between them — the shape macOS and Notion share, which reads as a list of decisions
  * rather than a form. A group with no rows (only a line of prose) has no box.
  */
-export function Group({ title, children, footer }: { title?: string; children?: ReactNode; footer?: ReactNode }) {
+export function Group({
+  title,
+  children,
+  footer,
+  prompt = false,
+}: {
+  title?: string;
+  children?: ReactNode;
+  footer?: ReactNode;
+  /**
+   * A group that sets what a prompt card runs on wears the card's look: the heading is its Sparkles
+   * and small accent capitals, and the box is its dashed accent edge. A person who has made a prompt
+   * card recognises where its model comes from.
+   */
+  prompt?: boolean;
+}) {
   return (
-    <section className="dag-settings__group">
-      {title ? <h4 className="dag-settings__section">{title}</h4> : null}
+    <section className={prompt ? "dag-settings__group dag-settings__group--prompt" : "dag-settings__group"}>
+      {title ? (
+        <h4 className="dag-settings__section">
+          {prompt ? <Sparkles {...ICON} size={13} aria-hidden="true" /> : null}
+          {title}
+        </h4>
+      ) : null}
       {children === undefined || children === null ? null : <div className="dag-settings__card">{children}</div>}
       {footer ? <div className="dag-settings__after">{footer}</div> : null}
     </section>

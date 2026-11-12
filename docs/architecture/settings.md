@@ -109,6 +109,14 @@ summary row — the provider's mark, the feature's name, and `Claude Code · son
 with *All AI settings* as the way back. The modal's own back still leaves the tab for the list. Above
 720px the tab is the two groups it was; the summary rows are not drawn.
 
+**Settings look like AnyDag, not like any app (#186).** The AI tab's groups are `Group prompt`:
+the heading is the prompt card's Sparkles in small accent capitals and the box its dashed accent
+edge (`.dag-prompt`), so a person who has made a prompt card sees where its model comes from. Only
+the edge and the heading change; the rows inside are every tab's rows. A status is a dot and a word,
+never the word alone: the providers' pills, the model picker's *Ready* / *Not set up*, and Sync's
+*State* (`data-dag-sync-tone`: the sidebar mark's `ok`, `busy`, `warn`, and `off` when nothing is
+linked). `settings-ai-<theme>.png` holds the look in all three themes.
+
 **The words name the control.** Every `Field` row gives its name and hint ids and puts them on the
 control as `aria-labelledby`/`aria-describedby`, because a `plain` row is a `<div>` and the visible
 words named nothing (#189). The modal's head is a `<div>`, not a second `<header>`: the page already
@@ -275,5 +283,7 @@ ready is `explainLlmReason`'s, as on every other AI surface.
   not a problem, however unready.
 - **The logos** come from `icons/data/providers.json`, generated beside the brand bundle so opening
   Settings does not fetch 2.5 MB of diagram icons (`src/ui/ProviderMark.tsx`). Z.ai has no mark in
-  either source yet and keeps an empty column.
+  either source yet and keeps an empty column. Anthropic's and OpenAI's marks come from the mono set
+  and draw in `currentColor`: their colour art is black, and a dark theme hid it. Only Gemini's
+  gradient is drawn in colour.
 
