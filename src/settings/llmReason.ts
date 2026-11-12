@@ -73,7 +73,7 @@ const NAME: Readonly<Record<string, string>> = {
   gemini: "Gemini",
   opencode: "OpenCode",
   zai: "Z.ai",
-  custom: "The custom provider",
+  custom: "OpenAI-compatible",
 };
 
 const nameOf = (id?: string): string => (id ? (NAME[id] ?? "The model provider") : "The model provider");

@@ -32,10 +32,17 @@ export function AgentsPane() {
   const [llm, refresh] = useProviders();
   const chosen = llm?.providers.find((p) => p.id === (s.llm.provider ?? llm.default));
   const keys = desktop()?.keys;
-  const explanation =
+  const explained =
     chosen && !chosen.ready && chosen.reason
       ? explainLlmReason(chosen.reason, { host: keys ? "desktop" : "browser", providers: llm?.providers })
       : null;
+  /* This pane is the AI settings, so "Open AI settings" would open the page already open. The only
+     settings action worth a button here is the desktop's "Add a key", which goes to its field below. */
+  const keyField = keys ? chosen?.reason?.keyEnv?.[0] : undefined;
+  const explanation = explained && {
+    ...explained,
+    actions: explained.actions.filter((a) => a.kind !== "settings" || keyField !== undefined),
+  };
   const problem =
     chosen && !chosen.ready
       ? (explanation?.sentence ?? `${chosen.label} is not set up: ${chosen.error ?? "it could not answer"}.`)
@@ -52,13 +59,10 @@ export function AgentsPane() {
           : "Keys come from the server's environment. This only picks which provider to ask.");
   const act = (a: LlmAction) => {
     switch (a.kind) {
-      case "settings": {
-        /* This pane is the settings; Add a key means the field below, and otherwise ask the server again. */
-        const name = chosen?.reason?.keyEnv?.[0];
-        if (name) document.querySelector<HTMLInputElement>(`[data-dag-setting-key="${name}"] input`)?.focus();
-        else refresh();
+      case "settings":
+        /* Only the desktop's "Add a key" is left by the filter above: it means the field below. */
+        if (keyField) document.querySelector<HTMLInputElement>(`[data-dag-setting-key="${keyField}"] input`)?.focus();
         return;
-      }
       case "provider":
         if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });
         refresh();
