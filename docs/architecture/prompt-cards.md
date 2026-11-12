@@ -65,8 +65,10 @@ Nine things are load-bearing:
 - **A provider is a row in a table** (`providers.ts`), resolved per request from `.env.local` and
   the process environment, so a key added mid-session counts; in the desktop app the person's own key
   is kept in the OS keychain and never in a file anybody syncs.
-  `GET /__board/llm` reports which could answer and why not, and never a key; the page names a
-  provider by id. `ANYDAG_LLM_MODEL` is the default provider's model only — a Gemini name sent to Z.ai
+  `GET /__board/llm` reports which could answer and why not, each provider's key variables by name
+  (`keyEnv`), and never a key; the page names a provider by id. `?fresh=1` checks every provider
+  again instead of answering from what it remembered, and `POST /__board/llm/test` makes one short
+  call to one provider — Settings' *Save and test*, and the MCP `llm` tool's `test`. `ANYDAG_LLM_MODEL` is the default provider's model only — a Gemini name sent to Z.ai
   because somebody picked Z.ai in the settings card is the bug that rule prevents.
 - **A failure is a sentence and a next step, not a developer's note.** The server keeps its
   plain-text `error` — MCP tools and the CLI read it — and adds a machine-readable `reason`

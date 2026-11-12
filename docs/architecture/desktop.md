@@ -104,6 +104,12 @@ Twelve things are load-bearing:
   `ready`**: its spawn reads the keys and the home secret, `safeStorage` throws before `ready`, and
   that throw read as "no keyring" — every first launch stored the home secret merely encoded. The
   macOS smoke log is what showed it.
+- **OpenAI-compatible's address and model are not keys** and are kept apart from them, in plain
+  text beside them (`provider-env.json`, mode 0600), as `ANYDAG_LLM_BASE_URL` and
+  `ANYDAG_LLM_MODEL` — the names `.env.local` uses, handed to the server the same way at spawn. The
+  page may read them back (`providerEnv.get`), because the field has to show what is set; setting
+  one restarts the server like a key does. An address is `http(s)://` only, because it is where the
+  server will send the key.
 - **On macOS the window has no title bar** (`titleBarStyle: "hiddenInset"`, #78): the traffic
   lights sit in the page's top row, centred on its 48px. The page learns it from the bridge
   (`platform`, `isFullScreen`, `onFullScreen`) and `src/ui/windowInset.ts` puts

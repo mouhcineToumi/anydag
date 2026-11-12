@@ -1473,10 +1473,14 @@ const grammarTools: Tool[] = [
   tool({
     name: "llm",
     description:
-      "Which model providers this machine could ask to draw, their models, and why one cannot — what `generate` may be pointed at. Never a key.",
+      "Which model providers this machine could ask to draw, their models, and why one cannot — what `generate` may be pointed at. Never a key.\n\n" +
+      "`fresh: true` asks every provider again instead of answering from the minute a yes is remembered for — after somebody signed in. `test` names one provider and makes one short call to it, so the answer says whether a model really answered (`ok`, `model`, `ms`) or why it did not; it spends a few tokens of the person's own key, so only when asked.",
     write: false,
-    input: {},
-    run: (_, kit) => kit.api("GET", "/__board/llm"),
+    input: { fresh: z.boolean().optional(), test: z.string().optional() },
+    run: ({ fresh, test }, kit) =>
+      test
+        ? kit.api("POST", "/__board/llm/test", { body: { provider: test } })
+        : kit.api("GET", "/__board/llm", { query: { fresh: fresh ? "1" : undefined } }),
   }),
   tool({
     name: "generate",

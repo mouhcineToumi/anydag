@@ -134,6 +134,25 @@ writeFileSync(out, JSON.stringify(bundle));
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 
 /*
+ * The AI providers' marks, on their own: Settings and the Assistant's composer draw four logos,
+ * and fetching the 2.5 MB bundle for them would cost every person who opens Settings the whole
+ * diagram vocabulary (`src/render/art.ts`). `src/ui/ProviderMark.tsx` imports this small file
+ * statically. The artwork is the same entries as the bundle's, under the same licences
+ * (`icons/NOTICE`). No timestamp, so a rebuild that changes nothing leaves it alone. Z.ai has no
+ * mark in either source yet; the composer names it instead.
+ */
+const PROVIDER_MARKS = {
+  color: ["anthropic", "google-gemini", "openai"],
+  mono: ["anthropic", "google-gemini", "opencode", "openai"],
+};
+const pick = (from, names) => Object.fromEntries(names.filter((n) => from[n]).map((n) => [n, from[n]]));
+writeFileSync(
+  at("icons/data/providers.json"),
+  `${JSON.stringify({ color: pick(color, PROVIDER_MARKS.color), mono: pick(mono, PROVIDER_MARKS.mono) }, null, 2)}\n`,
+);
+console.log(`icons/data/providers.json  ${kb(readFileSync(at("icons/data/providers.json")).byteLength)}`);
+
+/*
  * Every name `icon=` may legally take, as a TypeScript module inside the DSL layer.
  *
  * `finalize()` needs this to report `W_UNKNOWN_ICON`, and the DSL is the one layer that must stay

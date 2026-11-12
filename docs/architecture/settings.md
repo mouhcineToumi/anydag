@@ -24,7 +24,7 @@ moving the theme or the model choices to another scope is issue #191.
 |---|---|---|
 | You | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
-| This computer | AI providers | the desktop app's provider keys, kept in the system keyring — outside the desktop app, one line saying the keys are the server's environment |
+| This computer | AI providers | every provider in its own row, with its logo, a status pill (Ready, Needs a key, Not signed in, Not installed, Needs an address…) and what it takes to set it up: in the desktop app a key field, and for OpenAI-compatible its address and model too; in a browser, the variable the server reads. *Save and test* stores, waits for the server, then makes one short call. *Check again* asks afresh. The tab carries a dot when a provider in use cannot answer |
 | This vault | General | the vault's name, location and facts, the theme, "When a board has an error", the trash's retention, and Close vault — never deleting the folder |
 | | AI | one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on |
 | | Files and images | the attachments folder, whether a rename updates the `[[wikilinks]]` to it, how a pasted image lands, and the open board's unused images |
@@ -220,3 +220,27 @@ un-embedding the fonts from an export (the layout was measured against the
 theme's face, so a file without it is a different diagram); and the window keys — the library and
 the inspector's mode and width — which each have a control where they act. (There were five; the
 board list's went with the column.)
+
+### *The provider list*
+
+`panes/Providers.tsx` draws `GET /__board/llm`, so a row says Ready because the server could reach
+the provider, not because a field holds something. The pill is `providerStatus` in
+`src/settings/providerStatus.ts`, one word per reason code; the sentence under a row that is not
+ready is `explainLlmReason`'s, as on every other AI surface.
+
+- **Check again is `GET /__board/llm?fresh=1`**, which forgets the server's remembered readiness
+  (a yes is kept a minute, a no three seconds). Every mounted surface hears the new list through
+  `useProviders`' listeners, and "Checked N seconds ago" is when the page last got one.
+- **Save and test** stores what changed — the key through `desktop.keys`, OpenAI-compatible's
+  address and model through `desktop.providerEnv` — each of which restarts the server, then calls
+  `POST /__board/llm/test`: one short answer, one attempt, thirty seconds. The row shows the model
+  and how long it took, or the reason it could not, in the same words a prompt card would use.
+- **A key never comes back to the page**; the address and the model do, because neither is a
+  secret and the field has to show what is set.
+- **The dot** on the AI providers tab is `needsAttention`: the diagrams' provider (the server's
+  default when none is chosen) and the Assistant's when one is chosen. A provider nobody uses is
+  not a problem, however unready.
+- **The logos** come from `icons/data/providers.json`, generated beside the brand bundle so opening
+  Settings does not fetch 2.5 MB of diagram icons (`src/ui/ProviderMark.tsx`). Z.ai has no mark in
+  either source yet and keeps an empty column.
+

@@ -13,7 +13,7 @@ import YAML from "yaml";
 import { cardCount, CARDS_MAX, CARDS_MIN, generateCards } from "../../plugins/generate/cards";
 import { generate } from "../../plugins/generate/generate";
 import { completeFor, LlmError } from "../../plugins/generate/llm";
-import { describeProviders, resolveProvider } from "../../plugins/generate/providers";
+import { describeProviders, forgetReadiness, resolveProvider } from "../../plugins/generate/providers";
 import { isDiagramType, type DiagramType } from "../../src/board/types";
 import type { Session } from "../context";
 import { features } from "../features";
@@ -121,7 +121,12 @@ export function metaRoutes(app: Hono, s: Session): void {
 
   /* -- the prompt card's model ------------------------------------------------------------- */
 
-  app.get("/__board/llm", (c) => c.json(describeProviders(s.env)));
+  /* `?fresh=1` is Settings' *Check again*: every provider is asked again rather than answered from
+     the minute a yes is remembered for. */
+  app.get("/__board/llm", (c) => {
+    if (c.req.query("fresh")) forgetReadiness();
+    return c.json(describeProviders(s.env));
+  });
 
   let running = 0;
 
@@ -134,6 +139,7 @@ export function metaRoutes(app: Hono, s: Session): void {
     c: { req: { raw: Request } },
     body: Record<string, unknown>,
     ask: (complete: ReturnType<typeof completeFor>, attempts: number, signal: AbortSignal) => Promise<T>,
+    limits: { attempts?: number; timeout?: number } = {},
   ): Promise<T> => {
     const reasoning = typeof body.reasoning === "string" && body.reasoning ? body.reasoning : undefined;
     const resolved = resolveProvider(s.env, {
@@ -145,8 +151,8 @@ export function metaRoutes(app: Hono, s: Session): void {
       throw err(429, `${RUNNING_MAX} answers are being written already — give it a moment`, {
         reason: { code: "busy", provider: resolved.value.spec.id },
       });
-    const attempts = Number(s.env.ANYDAG_LLM_ATTEMPTS) || 3;
-    const timeout = Number(s.env.ANYDAG_LLM_TIMEOUT) || 120_000;
+    const attempts = limits.attempts ?? (Number(s.env.ANYDAG_LLM_ATTEMPTS) || 3);
+    const timeout = limits.timeout ?? (Number(s.env.ANYDAG_LLM_TIMEOUT) || 120_000);
     const stop = new AbortController();
     const timer = setTimeout(() => stop.abort(new Error("timeout")), timeout * attempts);
     c.req.raw.signal.addEventListener("abort", () => stop.abort(new Error("gone")));
@@ -166,6 +172,34 @@ export function metaRoutes(app: Hono, s: Session): void {
       running--;
     }
   };
+
+  /**
+   * Settings' *Save and test*: one short call to one provider, after its key or address changed,
+   * so the row can say "Ready" because a model answered rather than because a key is present. It
+   * spends a few tokens of the person's own key, once per press, and is held to the same limits as
+   * a prompt card, with one attempt and thirty seconds.
+   */
+  app.post("/__board/llm/test", async (c) => {
+    const body = await bodyOf(c);
+    if (typeof body.provider !== "string" || !body.provider) throw err(400, "`provider` names the provider to test");
+    const started = Date.now();
+    const resolved = resolveProvider(s.env, {
+      provider: body.provider,
+      model: typeof body.model === "string" ? body.model : null,
+    });
+    await spend(
+      c,
+      { provider: body.provider, model: body.model },
+      (complete, _attempts, signal) => complete([{ role: "user", content: "Reply with the single word OK." }], signal),
+      { attempts: 1, timeout: 30_000 },
+    );
+    return c.json({
+      ok: true,
+      provider: body.provider,
+      model: resolved.ok ? resolved.value.model : null,
+      ms: Date.now() - started,
+    });
+  });
 
   app.post("/__board/generate", async (c) => {
     const body = await bodyOf(c);

@@ -214,6 +214,12 @@ function findCli(
 /** Remember a yes for a minute and a no for three seconds, so somebody who has just signed in is
  *  not told otherwise for long. Keyed by whatever the answer depends on. */
 const seen = new Map<string, { at: number; value: unknown }>();
+
+/** Forget every remembered answer: Settings' *Check again*, after somebody signed in or installed
+ *  something and does not want to wait out a remembered no. */
+export function forgetReadiness(): void {
+  seen.clear();
+}
 function remembered<T>(key: string, ask: () => T, good: (v: T) => boolean): T {
   const was = seen.get(key);
   if (was && Date.now() - was.at < (good(was.value as T) ? 60_000 : 3_000)) return was.value as T;
@@ -459,6 +465,8 @@ export interface PublicProvider {
   /** What the name no longer explains, as one line under the provider's row in Settings. */
   description: string;
   kind: ProviderKind;
+  /** The environment variables its key is read from, first one first. Names, never values. */
+  keyEnv: string[];
   defaultModel: string;
   models: string[];
   ready: boolean;
@@ -478,6 +486,7 @@ export function describeProviders(env: Env): { default: string; providers: Publi
         label: spec.label,
         description: spec.description,
         kind: spec.kind,
+        keyEnv: [...spec.keyEnv],
         defaultModel: r.ok ? r.value.model : spec.defaultModel,
         models: spec.models,
         ready: r.ok,

@@ -75,6 +75,12 @@ const PROVIDER_KEY_ENVS: readonly string[] = [
   "ANYDAG_LLM_API_KEY",
 ];
 
+/** What the OpenAI-compatible provider needs besides its key, and none of it is a secret: the
+ *  address it speaks at and the model it serves. Kept beside the keys in `~/.anydag/`, in plain
+ *  text, and handed to the server as its environment the same way — so the server reads it exactly
+ *  as it reads `.env.local`, and the page may read it back to show it. */
+const PROVIDER_ENV_NAMES: readonly string[] = ["ANYDAG_LLM_BASE_URL", "ANYDAG_LLM_MODEL"];
+
 /** What the doc params of a deep link — `anydag://open?vault=<id>&…` — may name. The `view` and
  *  `snapshot` params of the page's own OPENS list are not documents a link opens. */
 const DOC_PARAMS: readonly string[] = ["board", "note", "quiz", "table", "file", "tasks", "quizzes", "calendar", "ref"];
@@ -133,6 +139,7 @@ async function startServer(folder: string | null): Promise<void> {
     const said = decryptKey(name);
     if (typeof said === "string" && said !== "") env[name] = said;
   }
+  for (const [name, value] of Object.entries(readProviderEnv())) env[name] = value;
   const secret = homeSecret();
   if (secret) env.ANYDAG_HOME_SECRET = secret;
   /* The IPC channel is how the server is asked to stop: Windows has no SIGTERM to send — `kill()`
@@ -300,6 +307,37 @@ function homeSecret(): string | null {
   }
   storeKey(HOME_SECRET, secret);
   return secret;
+}
+
+/* -- the provider settings that are not secrets ---------------------------------------------- */
+
+const providerEnvFile = path.join(homeDir(), "provider-env.json");
+
+function readProviderEnv(): Record<string, string> {
+  try {
+    const it = JSON.parse(fs.readFileSync(providerEnvFile, "utf8")) as unknown;
+    if (!it || typeof it !== "object") return {};
+    const out: Record<string, string> = {};
+    for (const name of PROVIDER_ENV_NAMES) {
+      const value = (it as Record<string, unknown>)[name];
+      if (typeof value === "string" && value !== "") out[name] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** An address is `http(s)://` and nothing else: it is where the server will send the key. */
+const providerEnvOk = (name: string, value: string): boolean =>
+  value.length <= 500 && (name !== "ANYDAG_LLM_BASE_URL" || value === "" || /^https?:\/\/[^\s]+$/i.test(value));
+
+function storeProviderEnv(name: string, value: string): void {
+  const all = readProviderEnv();
+  if (value === "") delete all[name];
+  else all[name] = value;
+  fs.mkdirSync(path.dirname(providerEnvFile), { recursive: true });
+  fs.writeFileSync(providerEnvFile, JSON.stringify(all, null, 2), { mode: 0o600 });
 }
 
 /** The page may only ever ask *whether* a key is there, by name. */
@@ -850,6 +888,16 @@ async function whenReady(): Promise<void> {
   ipcMain.handle("keys:delete", async (_event, name: unknown): Promise<boolean> => {
     if (!keyNameOk(name) || !PROVIDER_KEY_ENVS.includes(name)) return false;
     storeKey(name, "");
+    await restartServer();
+    return true;
+  });
+  ipcMain.handle("providerEnv:get", (): Record<string, string> => readProviderEnv());
+  ipcMain.handle("providerEnv:set", async (_event, name: unknown, value: unknown): Promise<boolean> => {
+    if (typeof name !== "string" || !PROVIDER_ENV_NAMES.includes(name) || typeof value !== "string") return false;
+    const said = value.trim();
+    if (!providerEnvOk(name, said)) return false;
+    if ((readProviderEnv()[name] ?? "") === said) return true;
+    storeProviderEnv(name, said);
     await restartServer();
     return true;
   });

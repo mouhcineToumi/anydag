@@ -35,6 +35,9 @@ import { GeneralPane } from "./panes/General";
 import { ProvidersPane } from "./panes/Providers";
 import { QuizzesPane } from "./panes/Quizzes";
 import { SettingsFeedback } from "./feedback";
+import { needsAttention } from "./providerStatus";
+import { useProviders } from "./useProviders";
+import { useSettings } from "./useSettings";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
 import {
@@ -265,6 +268,15 @@ export function Settings({
     }
   };
 
+  /* A dot on AI providers when a provider somebody uses cannot answer: the diagrams' provider (the
+     server's default when none is chosen), and the Assistant's when one is chosen. */
+  const settings = useSettings();
+  const [llm] = useProviders();
+  const attention = needsAttention(llm, [
+    settings.llm.provider,
+    ...(settings.assistant.provider ? [settings.assistant.provider] : []),
+  ]);
+
   const tabButton = (t: SettingsTab, atFoot = false) => {
     const TabIcon = TAB_ICON[t];
     const on = t === tab;
@@ -290,6 +302,9 @@ export function Settings({
       >
         <TabIcon {...ICON} aria-hidden="true" />
         <span>{TAB_LABEL[t]}</span>
+        {t === "providers" && attention ? (
+          <span className="dag-settings-modal__dot" data-dag-settings-attention="" role="img" aria-label="needs attention" />
+        ) : null}
       </button>
     );
   };
