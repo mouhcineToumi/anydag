@@ -7,7 +7,7 @@ import type { SettingsTab } from "@/settings/tabs";
  *
  * `dag:chrome` and not `dag:settings`, which is the settings-changed event: one name meaning two
  * things is the hazard `docs/architecture/things-that-will-bite.md` records. A request for Settings may name the tab to open on
- * — the switcher's *Vault settings…* opens on the vault's own — and one that names
+ * — the switcher's *Vault settings…* opens on *This vault → General* — and one that names
  * none opens where the last one left off.
  */
 export type ChromeRequest = "search" | "settings" | "feedback";

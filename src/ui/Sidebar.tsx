@@ -1201,7 +1201,7 @@ export function Sidebar({
           phone it shares its row with the way out, as the sheet has no page beside it to press. */}
       {sheet ? (
         <div className="dag-sidebar__sheethead">
-          <VaultSwitcher onSettings={() => ask("settings", "vault")} />
+          <VaultSwitcher onSettings={() => ask("settings", "vault-general")} />
           <button
             type="button"
             className="dag-icon dag-sidebar__close"
@@ -1213,7 +1213,7 @@ export function Sidebar({
           </button>
         </div>
       ) : (
-        <VaultSwitcher onSettings={() => ask("settings", "vault")} />
+        <VaultSwitcher onSettings={() => ask("settings", "vault-general")} />
       )}
 
       <div className="dag-sidebar__acts">

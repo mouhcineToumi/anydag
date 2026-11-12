@@ -132,8 +132,8 @@ Twelve things are load-bearing:
   `anydag shim —` the sh one carries, and says `setlocal`, or its `set` would outlive it in the
   shell that ran it. A Mac app running from its disk image or a translocated quarantine path writes
   none: that path is gone next launch. `~/.local/bin` is not on a Mac's PATH and
-  Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → AI
-  and agents writes the MCP lines with that absolute path.
+  Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → This vault → Agent access writes the MCP lines with that absolute
+  path.
 
 **Not yet, and why:** signing certificates, so the builds are unsigned and an unsigned Mac updates
 by hand (the release workflow signs and notarises the moment the secrets exist); Windows on arm64

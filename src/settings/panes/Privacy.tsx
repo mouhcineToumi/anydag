@@ -5,7 +5,7 @@ import { NEVER, SENT } from "@/telemetry/what";
 import { Switch } from "@/ui/controls";
 import { markSaved } from "../saved";
 
-import { Field, Group, Hint } from "./common";
+import { Fact, Facts, Field, Group, Hint } from "./common";
 
 /**
  * Logs: whether this install sends them, what they hold, and where they go. The person's,
@@ -39,12 +39,15 @@ export function PrivacyPane() {
             }}
           />
         </Field>
-        <Field label="Where they go" plain data-dag-setting-telemetry-to="">
+      </Group>
+
+      <Facts>
+        <Fact label="Where they go" stack data-dag-setting-telemetry-to="">
           <span className="dag-settings__value">
             {status === null ? "…" : (status.destination ?? "Nowhere yet: no sync server is paired and none is set")}
           </span>
-        </Field>
-      </Group>
+        </Fact>
+      </Facts>
 
       <Group title="What is sent">
         <ul className="dag-telemetry__list">

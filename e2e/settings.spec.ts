@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { exportAs, openExport } from "./export";
-import { openSettings, settingsTab } from "./sidebar";
+import { openSettings, settingsTab, type SettingsTab } from "./sidebar";
 import { BOARDS, ROOT } from "./boards";
 
 /**
@@ -132,7 +132,7 @@ test("unused images are counted and swept, and what is still drawn is kept", asy
   fs.writeFileSync(file, `${BOARD}\n\`\`\`image {#pic x=0 y=400 w=64 src=${name}.assets/kept.png}\n\`\`\`\n`);
 
   await open(page);
-  await openSettings(page, "vault");
+  await openSettings(page, "vault-files");
 
   /* The count is the server's and covers this board alone — never the workspace, for the reason
      `/rmdir` is not recursive — so it can only settle once the fetch lands. */
@@ -151,7 +151,7 @@ test("unused images are counted and swept, and what is still drawn is kept", asy
 
 test("the vault's links switch is on by default, and is the vault's preference", async ({ page }) => {
   await open(page);
-  await openSettings(page, "vault");
+  await openSettings(page, "vault-files");
   /* Obsidian's default: a rename keeps the [[wikilinks]] to it. The server reads it off the vault's
      `.anydag/settings.json`, which the preference sync writes; this suite runs with the sync off, so
      what is checked is the key the sync carries (`test/server/relink.test.ts` holds the server half). */
@@ -175,20 +175,32 @@ test("a tab's reset puts back what that tab shows, and nothing on another tab", 
   await openSettings(page, "export");
   await page.locator("[data-dag-setting-export-scale]").selectOption("4");
 
-  await settingsTab(page, "preferences");
+  await settingsTab(page, "vault-general");
   await page.locator("[data-dag-setting-theme]").selectOption("neutral");
+  await page.locator("[data-dag-setting-problems]").selectOption("off");
+
+  await settingsTab(page, "vault-files");
   await page.locator("[data-dag-setting-paste-size]").selectOption("width");
   await expect(page.locator("[data-dag-setting-paste-width]")).toBeVisible();
 
+  /* The paste controls and the attachments folder are this tab's; the theme and the problems row
+     are not, even though they used to share one Preferences tab. */
   await page.locator("[data-dag-setting-reset]").click();
   await expect(page.locator("[data-dag-setting-paste-size]")).toHaveValue("screen");
   /* The fixed-width field is only there for the rule that uses it. */
   await expect(page.locator("[data-dag-setting-paste-width]")).toHaveCount(0);
-  /* The theme is its own key, with its own sources and its own test; a board is not one of them. */
-  await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("neutral");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 
-  /* The export tab's own setting was not this tab's to reset. */
+  await settingsTab(page, "vault-general");
+  await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("neutral");
+  await expect(page.locator("[data-dag-setting-problems]")).toHaveValue("off");
+
+  /* The theme is its own key, with its own sources and its own test; a board is not one of them.
+     General's reset covers it and the problems row, and nothing on Export. */
+  await page.locator("[data-dag-setting-reset]").click();
+  await expect(page.locator("[data-dag-setting-theme]")).toHaveValue("paper");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
+  await expect(page.locator("[data-dag-setting-problems]")).toHaveValue("notify");
+
   await settingsTab(page, "export");
   await expect(page.locator("[data-dag-setting-export-scale]")).toHaveValue("4");
   await page.locator("[data-dag-setting-reset]").click();
@@ -208,7 +220,7 @@ test("a change says Saved, and a reset's Undo puts the value back after a reload
 
   await page.locator("[data-dag-setting-reset]").click();
   const toast = page.locator("[data-dag-setting-reset-toast]");
-  await expect(toast).toContainText("Import and export reset");
+  await expect(toast).toContainText("Export reset");
   await expect(scale).toHaveValue("2");
 
   await toast.locator("[data-dag-setting-reset-undo]").click();
@@ -229,7 +241,7 @@ test("a board's theme: changes nothing; the reader's choice and the snapshot def
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 
   /* The reader's own choice is what draws the board now. */
-  await openSettings(page, "preferences");
+  await openSettings(page, "vault-general");
   await page.locator("[data-dag-setting-theme]").selectOption("neutral");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 
@@ -256,37 +268,72 @@ test("the arrow keys walk the tabs across both groups, and the last tab is where
   /* The calendar's tab. */
   await expect(page.locator('[data-dag-settings-pane="calendar"] [data-dag-setting-week-start]')).toBeVisible();
   await page.keyboard.press("ArrowDown");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "shortcuts");
-  await expect(page.locator('[data-dag-settings-pane="shortcuts"] .dag-shortcuts__row').first()).toBeVisible();
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "quizzes");
+  await expect(page.locator('[data-dag-settings-pane="quizzes"] [data-dag-setting-graduate]')).toBeVisible();
   await page.keyboard.press("ArrowDown");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "providers");
   await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  /* Out of the app's group and into the vault's, as though the heading were not there. */
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "preferences");
+  /* Out of This computer and into This vault, as though the heading were not there. */
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-general");
   await expect(selected).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
   await page.keyboard.press("End");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "export");
+  /* The reference pages are tabs too, walked after the last group. */
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "about");
+  await expect(page.locator('[data-dag-settings-pane="about"] [data-dag-setting-version]')).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "calendar");
   await page.keyboard.press("ArrowUp");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "export");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "about");
 
-  await page.locator('[data-dag-settings-tab-button="agents"]').click();
+  await page.locator('[data-dag-settings-tab-button="vault-ai"]').click();
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
   await page.keyboard.press("Control+Comma");
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "agents");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
 
   /* And it survives a reload: this browser remembers it. */
   await page.keyboard.press("Escape");
   await open(page);
   await openSettings(page);
-  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "agents");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
+});
+
+test("every tab says which scope it belongs to, under a heading that says what it means", async ({ page }) => {
+  await open(page);
+  await openSettings(page);
+
+  const scopes: [SettingsTab, string][] = [
+    ["calendar", "You"],
+    ["quizzes", "You"],
+    ["providers", "This computer"],
+    ["vault-general", "This vault"],
+    ["vault-ai", "This vault"],
+    ["vault-files", "This vault"],
+    ["export", "This vault"],
+    ["sync", "This vault"],
+    ["agent-access", "This vault"],
+    ["privacy", "This computer"],
+    ["shortcuts", "You"],
+    ["about", "This computer"],
+  ];
+  for (const [tab, scope] of scopes) {
+    await settingsTab(page, tab);
+    await expect(page.locator("[data-dag-settings-scope]"), tab).toHaveText(scope);
+  }
+
+  await expect(page.locator('[data-dag-settings-group="you"] .dag-settings-modal__heading')).toHaveText("You");
+  await expect(page.locator('[data-dag-settings-group="computer"] .dag-settings-modal__heading')).toHaveText("This computer");
+  await expect(page.locator('[data-dag-settings-group="vault"] .dag-settings-modal__heading')).toHaveText("This vault");
+  await expect(page.locator('[data-dag-settings-group="vault"] .dag-settings-modal__note')).toContainText(
+    "Another vault has its own.",
+  );
 });
 
 test("a press outside it, the close button and ctrl+, close it, and Tab stays inside", async ({ page }) => {
   await open(page);
-  await openSettings(page, "preferences");
+  await openSettings(page, "vault-general");
   /* The corner of the window is the scrim: the modal is over everything, the sidebar included. */
   await page.mouse.click(4, 600);
   await expect(dialog(page)).toHaveCount(0);
@@ -364,7 +411,7 @@ test("the model picker searches OpenCode's ids, writes provider and model togeth
     }),
   );
   await open(page);
-  await openSettings(page, "agents");
+  await openSettings(page, "vault-ai");
   const picker = page.locator("[data-dag-setting-llm-model]");
   await expect(picker).toContainText("Automatic");
   await picker.click();
@@ -423,7 +470,7 @@ test("the Assistant's model row is the same picker, and choosing another provide
     }),
   );
   await open(page);
-  await openSettings(page, "agents");
+  await openSettings(page, "vault-ai");
   const picker = page.locator("[data-dag-setting-assistant-model]");
   await picker.click();
   await page.locator("[data-dag-model-search]").fill("glm");
@@ -439,6 +486,28 @@ test("the Assistant's model row is the same picker, and choosing another provide
   expect(saved.assistant).toMatchObject({ provider: "opencode", model: "opencode-go/glm-5.3-flash" });
 });
 
+test("Agent access changes the command with Read only, for each client", async ({ page }) => {
+  await open(page);
+  await openSettings(page, "agent-access");
+  const code = page.locator('[data-dag-setting-copy-value="mcp-claude-code"]');
+  await expect(code).toContainText("anydag mcp --vault");
+  await expect(code).not.toContainText("--read-only");
+
+  await page.locator("[data-dag-setting-agent-readonly]").click();
+  await expect(code).toContainText("--read-only");
+
+  await page.locator('[data-dag-agent-client="claude-desktop"]').click();
+  const json = page.locator('[data-dag-setting-copy-value="mcp-claude-desktop"]');
+  await expect(json).toBeVisible();
+  const parsed = JSON.parse((await json.textContent()) ?? "{}") as {
+    mcpServers: { anydag: { args: string[] } };
+  };
+  expect(parsed.mcpServers.anydag.args).toContain("--read-only");
+
+  await page.locator('[data-dag-agent-client="other"]').click();
+  await expect(page.locator('[data-dag-setting-copy-value="mcp-other-client"]')).toContainText("--read-only");
+});
+
 test("on a narrow window it is the list of tabs, then one tab with a way back", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await open(page);
@@ -451,7 +520,7 @@ test("on a narrow window it is the list of tabs, then one tab with a way back", 
   const box = (await page.locator(".dag-settings-modal").boundingBox())!;
   expect(Math.round(box.width)).toBe(390);
 
-  await page.locator('[data-dag-settings-tab-button="preferences"]').click();
+  await page.locator('[data-dag-settings-tab-button="vault-general"]').click();
   await expect(pane).toBeVisible();
   await expect(nav).toBeHidden();
   await expect(page.locator("[data-dag-setting-theme]")).toBeVisible();
@@ -459,7 +528,7 @@ test("on a narrow window it is the list of tabs, then one tab with a way back", 
 
   await page.locator("[data-dag-settings-back]").click();
   await expect(nav).toBeVisible();
-  await expect(page.locator('[data-dag-settings-tab-button="preferences"]')).toBeFocused();
+  await expect(page.locator('[data-dag-settings-tab-button="vault-general"]')).toBeFocused();
 });
 
 test("About says which version this is", async ({ page }) => {

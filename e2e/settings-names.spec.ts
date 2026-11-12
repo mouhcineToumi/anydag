@@ -47,7 +47,20 @@ async function open(page: Page) {
 }
 
 /** Every tab, including the two a cloud build draws (the suite's server is one). */
-const TABS: SettingsTab[] = ["calendar", "shortcuts", "privacy", "about", "preferences", "vault", "sync", "agents", "export"];
+const TABS: SettingsTab[] = [
+  "calendar",
+  "quizzes",
+  "providers",
+  "vault-general",
+  "vault-ai",
+  "vault-files",
+  "export",
+  "sync",
+  "agent-access",
+  "privacy",
+  "shortcuts",
+  "about",
+];
 
 test("the Sync fields are named by the words beside them", async ({ page }) => {
   await open(page);
@@ -73,21 +86,25 @@ test("every input, select and button on every tab has a name", async ({ page }) 
   await open(page);
   await openSettings(page, "calendar");
 
+  let total = 0;
   for (const tab of TABS) {
     await settingsTab(page, tab);
-    /* A hidden control is not in the accessibility tree; what a person can reach is. */
+    /* A hidden control is not in the accessibility tree; what a person can reach is. A reference
+       tab may hold none at all — AI providers outside the desktop app is one line — so what is
+       checked is every control that is drawn. */
     const controls = page.locator("[data-dag-settings] :is(input, select, button):visible");
     const count = await controls.count();
-    expect(count, `controls on the ${tab} tab`).toBeGreaterThan(0);
+    total += count;
     for (let i = 0; i < count; i++) {
       await expect(controls.nth(i), `control ${i} on the ${tab} tab`).toHaveAccessibleName(/\S/);
     }
   }
+  expect(total).toBeGreaterThan(20);
 });
 
 test("neither settings card holds a second banner, and the MCP command wraps in the box", async ({ page }) => {
   await open(page);
-  await openSettings(page, "agents");
+  await openSettings(page, "agent-access");
   await expect(page.locator("[data-dag-settings] header")).toHaveCount(0);
 
   const command = page.locator('[data-dag-setting-copy-value="mcp-claude-code"]');

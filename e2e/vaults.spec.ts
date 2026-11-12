@@ -242,7 +242,7 @@ test("a theme chosen in one vault is that vault's", async ({ page }) => {
   const scheme = () => page.evaluate(() => document.documentElement.style.colorScheme);
 
   await page.goto(`/?vault=${other.id}`);
-  await openSettings(page, "preferences");
+  await openSettings(page, "vault-general");
   await page.locator("[data-dag-setting-theme]").selectOption("paper-dark");
   await expect.poll(scheme).toBe("dark");
   await expect(page.locator("[data-dag-settings-vault]")).toContainText(`vault-${id}`);
@@ -264,7 +264,7 @@ test("closing one from its Settings tab leaves its folder, keeps it on the list,
   await ready(page);
   await openSwitcher(page);
   await page.locator("[data-dag-vault-settings]").click();
-  await expect(page.locator('[data-dag-settings-pane="vault"]')).toBeVisible();
+  await expect(page.locator('[data-dag-settings-pane="vault-general"]')).toBeVisible();
   await expect(page.locator("[data-dag-setting-vault-path]")).toHaveText(other.dir);
   await expect(page.locator("[data-dag-setting-vault-name]")).toHaveText(`vault-${id}`);
 
@@ -487,16 +487,17 @@ test("the desktop shell's folder dialog is used when there is one", async ({ pag
   const opened = (await now())!;
   made.push(opened.id);
   await expect(page).toHaveURL((u) => u.searchParams.get("vault") === opened.id);
-  await openSettings(page, "vault");
+  await openSettings(page, "vault-general");
   await expect(page.locator("[data-dag-setting-vault-reveal]")).toBeVisible();
 });
 
-test("the AI tab gives the lines that connect Claude Code and Claude Desktop to this vault", async ({ page }) => {
+test("the Agent access tab gives the lines that connect Claude Code and Claude Desktop to this vault", async ({ page }) => {
   await page.goto(`/?board=nothing-${id}`);
-  await openSettings(page, "agents");
+  await openSettings(page, "agent-access");
   await expect(page.locator('[data-dag-setting-copy-value="mcp-claude-code"]')).toContainText(
     `claude mcp add anydag -- anydag mcp --vault ${HOME}`,
   );
+  await page.locator('[data-dag-agent-client="claude-desktop"]').click();
   const json = await page.locator('[data-dag-setting-copy-value="mcp-claude-desktop"]').textContent();
   expect(JSON.parse(json ?? "{}")).toEqual({ mcpServers: { anydag: { command: "anydag", args: ["mcp", "--vault", HOME] } } });
 });

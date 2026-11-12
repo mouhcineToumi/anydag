@@ -3,30 +3,92 @@
  * which one was open last. No React and no icons, so the order the arrow keys walk and the tab a
  * stored value falls back to are unit tests rather than a browser.
  *
- * **Two groups, Notion's**, and the line between them is where a thing is kept. What belongs to the
- * person — their calendar, the keys, whether logs are sent, what this is — is under *App* and is the
- * same in every vault. What belongs to the vault this tab is in — the look, its files, which model
- * draws its diagrams and flashcards, how it exports — is under the vault's own name, and switches
- * when the vault does. The one setting that crosses the line (a quiz threshold, kept
- * with the practice records in the app's home) says so where it is drawn.
+ * **Three groups, and the line between them is where a setting is kept.** *You* is the person's, the
+ * same in every vault: the calendar's zone and week start, and the quiz practice threshold, which is
+ * kept with the practice records in the app's home. *This computer* is this machine's alone: the API
+ * keys the desktop app keeps in the system keyring. *This vault* is stored with the vault and switches
+ * when it does: its name and facts, the theme, the settings object (problems, pasted images, export,
+ * the diagram and Assistant models) and its sync link.
  *
- * Every setting the app has is in exactly one of these, each
- * where it belongs.
+ * The three reference pages — Privacy, Keyboard shortcuts and About — are tabs too, but drawn as
+ * quieter links at the foot rather than under a scope, because they are pages to read rather than
+ * settings to change. They keep a scope badge so every pane says what it belongs to.
+ *
+ * Every setting the app has is in exactly one of these, each where it is stored today. Moving one to
+ * another scope is a storage change and its own issue.
  */
 
 import { SETTINGS_TAB, readPref, writeLocal } from "./prefs";
 
-export type SettingsTab = "calendar" | "shortcuts" | "privacy" | "about" | "preferences" | "vault" | "agents" | "export" | "sync";
+export type SettingsTab =
+  | "calendar"
+  | "quizzes"
+  | "providers"
+  | "vault-general"
+  | "vault-ai"
+  | "vault-files"
+  | "export"
+  | "sync"
+  | "agent-access"
+  | "privacy"
+  | "shortcuts"
+  | "about";
 
-export type SettingsGroup = "account" | "vault";
+/** What a setting belongs to, and the one thing each pane's badge says. */
+export type SettingsGroup = "you" | "computer" | "vault";
+
+/** A heading over its tabs. `foot` is the quieter list drawn at the bottom, with no heading. */
+export type SettingsSection = SettingsGroup | "foot";
+
+export interface TabGroup<G extends string = SettingsGroup> {
+  group: G;
+  tabs: readonly SettingsTab[];
+}
 
 /** The tabs in the order they are drawn, which is also the order the arrow keys walk. */
-export const GROUPS: readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[] = [
-  { group: "account", tabs: ["calendar", "shortcuts", "privacy", "about"] },
-  { group: "vault", tabs: ["preferences", "vault", "sync", "agents", "export"] },
+export const GROUPS: readonly TabGroup[] = [
+  { group: "you", tabs: ["calendar", "quizzes"] },
+  { group: "computer", tabs: ["providers"] },
+  { group: "vault", tabs: ["vault-general", "vault-ai", "vault-files", "export", "sync", "agent-access"] },
 ];
 
-export const TABS: readonly SettingsTab[] = GROUPS.flatMap((g) => g.tabs);
+/** The reference pages at the foot, outside the groups and drawn as quieter links. */
+export const FOOT_TABS: readonly SettingsTab[] = ["privacy", "shortcuts", "about"];
+
+/** Draw order: each group's tabs, then the foot. `withoutCloudTabs` filters this list as drawn. */
+export const SECTIONS: readonly TabGroup<SettingsSection>[] = [...GROUPS, { group: "foot", tabs: FOOT_TABS }];
+
+export const TABS: readonly SettingsTab[] = SECTIONS.flatMap((g) => g.tabs);
+
+/** What each pane's badge says, and the word a group's heading uses. */
+export const SCOPE_LABEL: Readonly<Record<SettingsGroup, string>> = {
+  you: "You",
+  computer: "This computer",
+  vault: "This vault",
+};
+
+/**
+ * What each tab belongs to. The foot's pages carry one too: Privacy is the install's, Keyboard
+ * shortcuts are the person's, and About is the build's.
+ */
+const SCOPE_OF: Readonly<Record<SettingsTab, SettingsGroup>> = {
+  calendar: "you",
+  quizzes: "you",
+  providers: "computer",
+  "vault-general": "vault",
+  "vault-ai": "vault",
+  "vault-files": "vault",
+  export: "vault",
+  sync: "vault",
+  "agent-access": "vault",
+  privacy: "computer",
+  shortcuts: "you",
+  about: "computer",
+};
+
+export function scopeOf(tab: SettingsTab): SettingsGroup {
+  return SCOPE_OF[tab];
+}
 
 /**
  * The tabs that describe the app's server-backed features, and are drawn only when the build's
@@ -35,32 +97,39 @@ export const TABS: readonly SettingsTab[] = GROUPS.flatMap((g) => g.tabs);
  */
 export const CLOUD_TABS: readonly SettingsTab[] = ["privacy", "sync"];
 
-/** The group's tabs, with the switch's out when it is off. */
-export function withoutCloudTabs(
-  groups: readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[],
-  cloud: boolean,
-): readonly { group: SettingsGroup; tabs: readonly SettingsTab[] }[] {
-  if (cloud) return groups;
-  return groups
+/** The groups, with the switch's out when it is off. */
+export function withoutCloudTabs<G extends string>(sections: readonly TabGroup<G>[], cloud: boolean): readonly TabGroup<G>[] {
+  if (cloud) return sections;
+  return sections
     .map((g) => ({ group: g.group, tabs: g.tabs.filter((t) => !CLOUD_TABS.includes(t)) }))
     .filter((g) => g.tabs.length > 0);
 }
 
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   calendar: "Calendar",
-  shortcuts: "Shortcuts",
-  privacy: "Privacy",
-  about: "About",
-  preferences: "Preferences",
-  vault: "Vault",
+  quizzes: "Quizzes",
+  providers: "AI providers",
+  "vault-general": "General",
+  "vault-ai": "AI",
+  "vault-files": "Files and images",
+  export: "Export",
   sync: "Sync",
-  agents: "AI and agents",
-  export: "Import and export",
+  "agent-access": "Agent access",
+  privacy: "Privacy",
+  shortcuts: "Keyboard shortcuts",
+  about: "About",
 };
 
-export function groupOf(tab: SettingsTab): SettingsGroup {
-  return GROUPS.find((g) => g.tabs.includes(tab))!.group;
-}
+/**
+ * The ids a version before the scopes used, and the tab each one means now. A `dag:settings-tab`
+ * left in a browser — or in a home the preference sync carried — opens the nearest new tab rather
+ * than an empty pane. Preferences was split, so both of its old halves land on General.
+ */
+const LEGACY_TABS: Readonly<Record<string, SettingsTab>> = {
+  preferences: "vault-general",
+  vault: "vault-general",
+  agents: "vault-ai",
+};
 
 export function isTab(value: unknown): value is SettingsTab {
   return typeof value === "string" && (TABS as readonly string[]).includes(value);
@@ -69,11 +138,16 @@ export function isTab(value: unknown): value is SettingsTab {
 /**
  * The tab to open on when nobody asked for one: the last one this browser had open, or the first.
  * A stored value that is not a tab — one a later version renamed, or anything typed into the
- * console — is the first tab rather than an empty pane.
+ * console — is the first tab rather than an empty pane, except for the ids the scopes renamed, which
+ * open the tab that took their place.
  */
 export function lastTab(): SettingsTab {
   const stored = readPref(SETTINGS_TAB);
-  return isTab(stored) ? stored : TABS[0]!;
+  if (isTab(stored)) return stored;
+  /* Own keys only: a stored `toString` is not a tab from an older version, it is the object
+     prototype showing through. */
+  if (stored && Object.prototype.hasOwnProperty.call(LEGACY_TABS, stored)) return LEGACY_TABS[stored]!;
+  return TABS[0]!;
 }
 
 /** Remember the tab for the next opening. This browser's alone: see `SETTINGS_TAB`. */

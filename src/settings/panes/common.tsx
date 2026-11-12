@@ -22,11 +22,11 @@ export const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLi
  * a rule between them — the shape macOS and Notion share, which reads as a list of decisions
  * rather than a form. A group with no rows (only a line of prose) has no box.
  */
-export function Group({ title, children, footer }: { title?: string; children: ReactNode; footer?: ReactNode }) {
+export function Group({ title, children, footer }: { title?: string; children?: ReactNode; footer?: ReactNode }) {
   return (
     <section className="dag-settings__group">
       {title ? <h4 className="dag-settings__section">{title}</h4> : null}
-      <div className="dag-settings__card">{children}</div>
+      {children === undefined || children === null ? null : <div className="dag-settings__card">{children}</div>}
       {footer ? <div className="dag-settings__after">{footer}</div> : null}
     </section>
   );
@@ -120,6 +120,41 @@ export function Hint({ children, ...rest }: { children: ReactNode } & Record<`da
     <p className="dag-settings__hint" {...rest}>
       {children}
     </p>
+  );
+}
+
+/**
+ * A quiet list of facts — a name, a path, a version, a limit — as a label and a value, with no
+ * control and no box around it. A fact is not a setting: there is nothing here to press, so it must
+ * not read like the rows that can be changed. A `Fact` may still hold a button, for an action about
+ * the value such as *Show in folder*.
+ */
+export function Facts({ title, children, footer }: { title?: string; children: ReactNode; footer?: ReactNode }) {
+  return (
+    <section className="dag-settings__group">
+      {title ? <h4 className="dag-settings__section">{title}</h4> : null}
+      <dl className="dag-settings__facts">{children}</dl>
+      {footer ? <div className="dag-settings__after">{footer}</div> : null}
+    </section>
+  );
+}
+
+/** One fact in a {@link Facts} list. */
+export function Fact({
+  label,
+  children,
+  stack,
+  ...rest
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  stack?: boolean;
+} & Record<`data-${string}`, string>) {
+  return (
+    <div className={`dag-settings__fact${stack ? " dag-settings__fact--stack" : ""}`} {...rest}>
+      <dt className="dag-settings__factName">{label}</dt>
+      <dd className="dag-settings__factValue">{children}</dd>
+    </div>
   );
 }
 

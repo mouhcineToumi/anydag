@@ -133,7 +133,7 @@ with `follow`, `/__board/rename` (not a copy), `/__board/mvdir` — runs inside 
 the change broke rewritten through the store under its sha1 base, recomputed on a conflict. The
 arithmetic is `src/refs/relink.ts`, pure and browser-free; the answer carries
 `relinked: {links, files, missed}`, or `null` when the vault has it off (`dag:update-links` = `"0"` in
-`<vault>/.anydag/settings.json`; Settings → Vault, on by default). The CLI and MCP have it for nothing,
+`<vault>/.anydag/settings.json`; Settings → This vault → Files and images, on by default). The CLI and MCP have it for nothing,
 calling those routes. Seven things are load-bearing:
 
 - **The invariant is "names what it named".** A link that resolved to a document before and does not

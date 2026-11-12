@@ -1,7 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
-import { CALENDAR_HIDE, LIBRARY, THEME, TIME_ZONE, WEEK_START, readPref, resetPrefs, writePref } from "@/settings/prefs";
+import {
+  CALENDAR_HIDE,
+  LIBRARY,
+  THEME,
+  TIME_ZONE,
+  WEEK_START,
+  ATTACHMENTS,
+  UPDATE_LINKS,
+  readPref,
+  resetPrefs,
+  writePref,
+} from "@/settings/prefs";
 import {
   DEFAULTS,
   normalise,
@@ -177,6 +188,16 @@ describe("readSettings", () => {
     undo();
     expect(readSettings().export).toEqual({ scale: 4, paper: false, margin: 12 });
   });
+
+  it("resets the problems section alone, now that it shares no tab with the paste controls", () => {
+    writeSettings({ problems: { show: "off" }, paste: { size: "pixels" }, export: { scale: 4 } });
+    const undo = resetSettingsWithUndo(["problems"]);
+    expect(readSettings().problems).toEqual(DEFAULTS.problems);
+    expect(readSettings().paste.size).toBe("pixels");
+    expect(readSettings().export.scale).toBe(4);
+    undo();
+    expect(readSettings().problems.show).toBe("off");
+  });
 });
 
 describe("a snapshot reads no preference", () => {
@@ -312,5 +333,19 @@ describe("a preference reset", () => {
     writePref(TIME_ZONE, "Asia/Tokyo");
     undo();
     expect(readPref(TIME_ZONE)).toBe("Asia/Tokyo");
+  });
+
+  it("resets the theme alone, now that it shares no tab with the attachments folder", () => {
+    writePref(THEME, "neutral");
+    writePref(ATTACHMENTS, "files");
+    writePref(UPDATE_LINKS, "0");
+
+    const undo = resetPrefs([THEME]);
+    expect(readPref(THEME)).toBeNull();
+    expect(readPref(ATTACHMENTS)).toBe("files");
+    expect(readPref(UPDATE_LINKS)).toBe("0");
+
+    undo();
+    expect(readPref(THEME)).toBe("neutral");
   });
 });
