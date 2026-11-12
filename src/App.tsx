@@ -60,7 +60,6 @@ import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
 import { CalendarView } from "@/ui/Calendar";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
-import { BoardSettings } from "@/ui/BoardSettings";
 import { PageBar } from "@/ui/PageBar";
 import { ZoomBar } from "@/ui/ZoomBar";
 import { planRepair } from "@/edit/repair";
@@ -1831,8 +1830,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      The text outlives the dialog so "Try again" reopens it as it was left; it belongs to one item,
      and opening the dialog on another starts empty. */
   const [asking, setAsking] = useState(false);
-  /* The card for what this board says about itself — its theme and its flow — opened from the top bar's `⋯`. */
-  const [boardSettings, setBoardSettings] = useState(false);
   const [askFor, setAskFor] = useState<string | null>(null);
   const [askText, setAskText] = useState("");
   const rewriteCtl = useRef<AbortController | null>(null);
@@ -2330,7 +2327,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                     icon: SlidersHorizontal,
                     hook: "data-dag-board-settings-open",
                     disabled: !editor.enabled || locked,
-                    onSelect: () => setBoardSettings(true),
+                    onSelect: () => settings.show("board-layout"),
                   },
                   ...exportRows(boardExports(exportScale), async (kind) => {
                     await editor.exportAs(kind);
@@ -2601,16 +2598,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             onRepair={locked || !editor.enabled ? undefined : editor.repair}
           />
         ) : null}
-        {boardSettings && board && !snapshot && !locked ? (
-          <BoardSettings
-            board={board}
-            onMeta={editor.setMeta}
-            onClose={() => {
-              setBoardSettings(false);
-              focusBoard();
-            }}
-          />
-        ) : null}
         {help && !snapshot ? <Shortcuts onClose={closeHelp} /> : null}
         {editor.chord && !snapshot ? <WhichKey /> : null}
         {browsing && !snapshot ? (
@@ -2681,6 +2668,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             themeName={themeName}
             onTheme={chooseTheme}
             boardName={board?.name ?? null}
+            board={board}
+            onMeta={editor.setMeta}
+            editable={!locked}
             list={list}
             tab={settings.open.tab}
             onClose={settings.close}

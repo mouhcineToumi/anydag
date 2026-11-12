@@ -15,7 +15,9 @@ sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and t
 
 **The tabs are grouped by where each setting is kept**, which is the line the group headings draw.
 *You* is the person's, the same in every vault, kept in the app's home. *This computer* is this
-machine's alone. *This vault* is stored with the vault and switches when it does. The three
+machine's alone. *This vault* is stored with the vault and switches when it does. *This board* is
+the open board's own file, stored in its frontmatter, and its group is drawn **only while a board is
+open and editable** — not under `?snapshot=1`, and not when the vault is locked. The three
 reference pages are tabs too — so the arrow keys walk them — but they are drawn as quieter links at
 the foot, outside the groups. **Nothing about where a setting is stored changed with the grouping**;
 moving the theme or the model choices to another scope is issue #191.
@@ -31,15 +33,15 @@ moving the theme or the model choices to another scope is issue #191.
 | | Export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 | | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on |
 | | Agent access | the command that connects Claude Code, Claude Desktop or another MCP client to this vault, with a **Read only** switch that adds the server's own `--read-only` |
+| This board | Layout | the open board's row width and spacing, written to its frontmatter's `flow:` — drawn only while a board is open and editable |
 | *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) |
 | | Keyboard shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
 | | About | the build's `VERSION` and the server's |
 
-The headings and the words on the tabs are the scopes: *You*, *This computer* and *This vault*.
-Each heading is ink, with one short line under it in slate saying what it means — under the third,
-"Saved with <vault name>. Another vault has its own." Every pane repeats its scope in a small pill
-beside its title, so a tab read on its own (a narrow window shows one at a time) still says where it
-belongs.
+The headings and the words on the tabs are the scopes: *You*, *This computer*, *This vault* and
+*This board*. Each heading is ink, with one short line under it in slate saying what it means — under
+the third, "Saved with <vault name>. Another vault has its own."; under the fourth, "Saved in this board's file. Another board has its own." Every pane repeats its scope in a small pill beside its title, so a tab read on its
+own (a narrow window shows one at a time) still says where it belongs.
 
 **Facts are not settings.** A row that only shows a value — the vault's name and location, a version,
 the trash's "30 days", a path, a server's upload limit — is a quiet label and value list with no
@@ -85,10 +87,12 @@ Four things about the modal are load-bearing:
   back, and the next closes.
 - **The tab is this browser's** (`dag:settings-tab`, written with `writeLocal`, never synced) and a
   request that names one wins. `dag:chrome` carries `{ what, tab? }` (`src/ui/chrome.ts`), and a
-  request made while the modal is open moves it — the AI tab's *Add a key* opens AI providers.
-  `lastTab` maps the ids a version before the scopes used: `preferences` and `vault` open General,
-  `agents` opens AI, and anything else that is not a tab opens the first one. Under 720px the modal
-  is the window: the tab list, then one tab with a back arrow.
+  request made while the modal is open moves it — the AI tab's *Add a key* opens AI providers, and
+  the board's `⋯` opens *This board → Layout*. `lastTab` maps the ids a version before the scopes
+  used: `preferences` and `vault` open General, `agents` opens AI, and anything else that is not a
+  tab opens the first one. A remembered `board-layout` with no editable board open is not drawn and
+  opens the first one too, like any id this page cannot show. Under 720px the modal is the window:
+  the tab list, then one tab with a back arrow.
 
 **The words name the control.** Every `Field` row gives its name and hint ids and puts them on the
 control as `aria-labelledby`/`aria-describedby`, because a `plain` row is a `<div>` and the visible
@@ -96,6 +100,16 @@ words named nothing (#189). The modal's head is a `<div>`, not a second `<header
 has a banner. The Agent access command wraps in full rather than scrolling sideways where a keyboard
 cannot reach it, and is plain selectable text; the Read only switch is the server's `--read-only`,
 never a flag invented for the page.
+
+**This board → Layout is the one tab that writes a document rather than a preference.** It replaced
+the floating board-settings card in issue #185. *Row width* and *Spacing* are the frontmatter's
+`flow:`, with the same `px` suffix and the words a person knows them by; a live preview lays a few
+token-coloured boxes at the two numbers' own scale in `chrome.css` (no DOM measurement), and the
+foot says "Defaults: 4000 px and 80 px · Use defaults" from `FLOW_DEFAULT`, never literals. A value
+is written when it settles — a pause, Enter, or the field left — through `Editor.setMeta`, so each
+write is one `MetaOp` with the file's sha1 `base` and one undo entry. A number `FLOW_RANGE` will not
+accept is not written; it stays in the box and its row says the range. The old card and its CSS are
+gone; the menu row keeps its `data-dag-board-settings-open` hook because the e2e suite presses it.
 
 Everything below is from the card's first version, and still holds of the tabs that carry it.
 
@@ -191,7 +205,10 @@ live region `dag-settings__said` (`data-dag-setting-said`), and the event `dag:s
 The scopes added `dag-settings-modal__note` and `dag-settings-modal__scope`
 (`data-dag-settings-scope`), the quiet facts `dag-settings__fact*` (`dag-settings__facts`), and Agent
 access `dag-settings__client*` (`data-dag-agent-client`, `data-dag-agent-clients`,
-`data-dag-setting-agent-readonly`).
+`data-dag-setting-agent-readonly`). The Layout tab added `dag-settings__preview*`,
+`dag-settings__defaults` and `data-dag-board-flow-*`; its two numbers are `--board-flow-width` and
+`--board-flow-gap`, which are not theme tokens — no theme has an opinion about a board's flow — the
+same argument `--inspector-w` makes.
 `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
@@ -202,21 +219,20 @@ on a dark edge rather than glowing; in `paper` and `neutral` it is a soft tint o
 dialog and the welcome card all read it.
 
 **Contrast is a token choice, not a theme edit.** `muted` is 2.6:1 on Neutral's white card and 2.4:1
-on its panel, so text a person must read inside `[data-dag-settings]` and the board settings card —
-headings, hints, descriptions, placeholders and unit suffixes — takes `slate`, which every theme
-carries. The group headings are the exception in the other direction: they are `ink`, because they
-are the scopes the list is built on, and the one line under each is `slate`. Hints there are at
-least 12.5px, and prose is capped at 68ch with `text-wrap: pretty`.
-`muted` remains for disabled controls and dividers, and the sidebar's keycaps and folder names are a
-separate audit. `e2e/settings-contrast.spec.ts` measures every tab, the group headers and the card
-in all three themes against WCAG, `::placeholder` included; no colour in `themes/*/theme.json`
-changed.
+on its panel, so text a person must read inside `[data-dag-settings]` — headings, hints,
+descriptions, placeholders and unit suffixes — takes `slate`, which every theme carries. The group
+headings are the exception in the other direction: they are `ink`, because they are the scopes the
+list is built on, and the one line under each is `slate`. Hints there are at least 12.5px, and prose
+is capped at 68ch with `text-wrap: pretty`. `muted` remains for disabled controls and dividers, and
+the sidebar's keycaps and folder names are a separate audit. `e2e/settings-contrast.spec.ts`
+measures every tab, the group headers and the Layout pane in all three themes against WCAG,
+`::placeholder` included; no colour in `themes/*/theme.json` changed.
 
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);
 a config file the server reads (it would put a person's preference into every visual baseline, and
-`src/board/` could not read one anyway); per-board settings (the file already says what it can, in
-frontmatter and in `w=`, and a theme is not one of them — it is the reader's, see *Settings* above);
-un-embedding the fonts from an export (the layout was measured against the
+`src/board/` could not read one anyway); a per-board preferences store (the board's own settings are
+the file's — `flow:` and `w=` — and a theme is not one of them, it is the reader's, see *Settings*
+above); un-embedding the fonts from an export (the layout was measured against the
 theme's face, so a file without it is a different diagram); and the window keys — the library and
 the inspector's mode and width — which each have a control where they act. (There were five; the
 board list's went with the column.)

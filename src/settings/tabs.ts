@@ -3,12 +3,13 @@
  * which one was open last. No React and no icons, so the order the arrow keys walk and the tab a
  * stored value falls back to are unit tests rather than a browser.
  *
- * **Three groups, and the line between them is where a setting is kept.** *You* is the person's, the
+ * **Four groups, and the line between them is where a setting is kept.** *You* is the person's, the
  * same in every vault: the calendar's zone and week start, and the quiz practice threshold, which is
  * kept with the practice records in the app's home. *This computer* is this machine's alone: the API
  * keys the desktop app keeps in the system keyring. *This vault* is stored with the vault and switches
  * when it does: its name and facts, the theme, the settings object (problems, pasted images, export,
- * the diagram and Assistant models) and its sync link.
+ * the diagram and Assistant models) and its sync link. *This board* is the open board's own file:
+ * its flow, which is drawn only while that board is open and writable.
  *
  * The three reference pages — Privacy, Keyboard shortcuts and About — are tabs too, but drawn as
  * quieter links at the foot rather than under a scope, because they are pages to read rather than
@@ -30,12 +31,13 @@ export type SettingsTab =
   | "export"
   | "sync"
   | "agent-access"
+  | "board-layout"
   | "privacy"
   | "shortcuts"
   | "about";
 
 /** What a setting belongs to, and the one thing each pane's badge says. */
-export type SettingsGroup = "you" | "computer" | "vault";
+export type SettingsGroup = "you" | "computer" | "vault" | "board";
 
 /** A heading over its tabs. `foot` is the quieter list drawn at the bottom, with no heading. */
 export type SettingsSection = SettingsGroup | "foot";
@@ -45,11 +47,15 @@ export interface TabGroup<G extends string = SettingsGroup> {
   tabs: readonly SettingsTab[];
 }
 
+/** The board's own settings, drawn only while a board is open and editable. */
+export const BOARD_TABS: readonly SettingsTab[] = ["board-layout"];
+
 /** The tabs in the order they are drawn, which is also the order the arrow keys walk. */
 export const GROUPS: readonly TabGroup[] = [
   { group: "you", tabs: ["calendar", "quizzes"] },
   { group: "computer", tabs: ["providers"] },
   { group: "vault", tabs: ["vault-general", "vault-ai", "vault-files", "export", "sync", "agent-access"] },
+  { group: "board", tabs: BOARD_TABS },
 ];
 
 /** The reference pages at the foot, outside the groups and drawn as quieter links. */
@@ -65,6 +71,7 @@ export const SCOPE_LABEL: Readonly<Record<SettingsGroup, string>> = {
   you: "You",
   computer: "This computer",
   vault: "This vault",
+  board: "This board",
 };
 
 /**
@@ -81,6 +88,7 @@ const SCOPE_OF: Readonly<Record<SettingsTab, SettingsGroup>> = {
   export: "vault",
   sync: "vault",
   "agent-access": "vault",
+  "board-layout": "board",
   privacy: "computer",
   shortcuts: "you",
   about: "computer",
@@ -105,6 +113,26 @@ export function withoutCloudTabs<G extends string>(sections: readonly TabGroup<G
     .filter((g) => g.tabs.length > 0);
 }
 
+/**
+ * The groups as this page draws them: the cloud tabs out when the switch is off, and the board's
+ * out when no editable board is open. A `board-layout` tab remembered without a board is therefore
+ * not drawn, and `lastTab` falls back the way it does for any unknown id.
+ */
+export function withoutBoardTab<G extends string>(sections: readonly TabGroup<G>[], board: boolean): readonly TabGroup<G>[] {
+  if (board) return sections;
+  return sections
+    .map((g) => ({ group: g.group, tabs: g.tabs.filter((t) => !BOARD_TABS.includes(t)) }))
+    .filter((g) => g.tabs.length > 0);
+}
+
+/** Both filters, in the order a page meets them. */
+export function drawnSections<G extends string>(
+  sections: readonly TabGroup<G>[],
+  { cloud, board }: { cloud: boolean; board: boolean },
+): readonly TabGroup<G>[] {
+  return withoutBoardTab(withoutCloudTabs(sections, cloud), board);
+}
+
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   calendar: "Calendar",
   quizzes: "Quizzes",
@@ -115,6 +143,7 @@ export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   export: "Export",
   sync: "Sync",
   "agent-access": "Agent access",
+  "board-layout": "Layout",
   privacy: "Privacy",
   shortcuts: "Keyboard shortcuts",
   about: "About",
@@ -139,15 +168,17 @@ export function isTab(value: unknown): value is SettingsTab {
  * The tab to open on when nobody asked for one: the last one this browser had open, or the first.
  * A stored value that is not a tab — one a later version renamed, or anything typed into the
  * console — is the first tab rather than an empty pane, except for the ids the scopes renamed, which
- * open the tab that took their place.
+ * open the tab that took their place. `board-layout` without an editable board is not drawn either,
+ * so it falls back to the first tab like any other id this page cannot show.
  */
-export function lastTab(): SettingsTab {
+export function lastTab(board = false): SettingsTab {
+  const drawn = board ? TABS : TABS.filter((t) => !BOARD_TABS.includes(t));
   const stored = readPref(SETTINGS_TAB);
-  if (isTab(stored)) return stored;
+  if (isTab(stored) && drawn.includes(stored)) return stored;
   /* Own keys only: a stored `toString` is not a tab from an older version, it is the object
      prototype showing through. */
   if (stored && Object.prototype.hasOwnProperty.call(LEGACY_TABS, stored)) return LEGACY_TABS[stored]!;
-  return TABS[0]!;
+  return drawn[0]!;
 }
 
 /** Remember the tab for the next opening. This browser's alone: see `SETTINGS_TAB`. */

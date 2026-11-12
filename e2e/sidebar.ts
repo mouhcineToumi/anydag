@@ -31,6 +31,7 @@ export type SettingsTab =
   | "export"
   | "sync"
   | "agent-access"
+  | "board-layout"
   | "privacy"
   | "shortcuts"
   | "about";

@@ -256,7 +256,7 @@ test("a board's theme: changes nothing; the reader's choice and the snapshot def
   await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
 });
 
-test("the arrow keys walk the tabs across both groups, and the last tab is where it opens next", async ({ page }) => {
+test("the arrow keys walk the tabs across every group, and the last tab is where it opens next", async ({ page }) => {
   await open(page);
   await page.keyboard.press("Control+Comma");
   await expect(dialog(page)).toBeVisible();
@@ -278,6 +278,11 @@ test("the arrow keys walk the tabs across both groups, and the last tab is where
   await expect(selected).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "vault-ai");
+  /* The vault's remaining tabs, then This board, then the foot: one walk in drawn order. */
+  await page.locator('[data-dag-settings-tab-button="agent-access"]').click();
+  await page.keyboard.press("ArrowDown");
+  await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "board-layout");
+  await expect(page.locator('[data-dag-settings-pane="board-layout"] [data-dag-board-flow-width]')).toBeVisible();
   await page.keyboard.press("End");
   /* The reference pages are tabs too, walked after the last group. */
   await expect(selected).toHaveAttribute("data-dag-settings-tab-button", "about");
@@ -314,6 +319,7 @@ test("every tab says which scope it belongs to, under a heading that says what i
     ["export", "This vault"],
     ["sync", "This vault"],
     ["agent-access", "This vault"],
+    ["board-layout", "This board"],
     ["privacy", "This computer"],
     ["shortcuts", "You"],
     ["about", "This computer"],
@@ -328,6 +334,10 @@ test("every tab says which scope it belongs to, under a heading that says what i
   await expect(page.locator('[data-dag-settings-group="vault"] .dag-settings-modal__heading')).toHaveText("This vault");
   await expect(page.locator('[data-dag-settings-group="vault"] .dag-settings-modal__note')).toContainText(
     "Another vault has its own.",
+  );
+  await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__heading')).toHaveText("This board");
+  await expect(page.locator('[data-dag-settings-group="board"] .dag-settings-modal__note')).toContainText(
+    "Saved in this board's file. Another board has its own.",
   );
 });
 

@@ -3,19 +3,18 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { pageMore } from "./more";
 import { openSettings, settingsTab, type SettingsTab } from "./sidebar";
 
 /**
  * Text in Settings, measured rather than eyeballed.
  *
  * `--dag-color-muted` is 2.6:1 on Neutral's white card and 2.4:1 on its side panel, so anything a
- * person must read there is painted with `slate` instead. This walks every tab in every theme, and
- * the board settings card after it, and computes the WCAG contrast of each visible text node
- * against the nearest opaque background behind it — the same thing axe reports, without a
- * dependency the project would have to carry. Placeholders are measured through
- * `getComputedStyle(input, "::placeholder")`, because that colour does not appear on the input's
- * own computed style.
+ * person must read there is painted with `slate` instead. This walks every tab in every theme —
+ * including This board → Layout, which is drawn because the fixture opens a board — and computes
+ * the WCAG contrast of each visible text node against the nearest opaque background behind it — the
+ * same thing axe reports, without a dependency the project would have to carry. Placeholders are
+ * measured through `getComputedStyle(input, "::placeholder")`, because that colour does not appear
+ * on the input's own computed style.
  *
  * The threshold is 4.5:1, or 3:1 for large text (24px, or 18.66px and bold). Disabled controls are
  * skipped: WCAG exempts them, and the app fades them with `opacity`, which would make a measured
@@ -173,7 +172,10 @@ function audit(page: Page, selector: string): Promise<Audit> {
   }, selector);
 }
 
-test("text in Settings and the board settings card meets contrast in every theme", async ({ page }) => {
+test("text in Settings meets contrast in every theme", async ({ page }) => {
+  /* Every tab in every theme, with the default model's placeholder read through pseudo-element
+     styles: the walk is longer than the suite's 30-second default on a busy machine. */
+  test.setTimeout(60_000);
   /* Warm and dark as well as the default, because the token is the same and the surfaces are not:
      `slate` is 6.3:1 on Neutral's white and 5.8:1 on its panel, but it is the pair of values in a
      theme that decides, so each folder is measured in its own right. */
@@ -185,9 +187,11 @@ test("text in Settings and the board settings card meets contrast in every theme
     const tabs = await page
       .locator("[data-dag-settings-tab-button]")
       .evaluateAll((els) => els.map((el) => el.getAttribute("data-dag-settings-tab-button") as SettingsTab));
-    /* The cloud switch is on in the suite, so Privacy and Sync are drawn; both are checked. */
+    /* The cloud switch is on in the suite, so Privacy and Sync are drawn; both are checked. The
+       fixture opens a board, so This board → Layout is drawn and walked too. */
     expect(tabs).toContain("vault-general");
     expect(tabs).toContain("export");
+    expect(tabs).toContain("board-layout");
 
     /* The group headers are ink now, and the line under each is slate: both must clear 4.5:1 on the
        panel behind them, in every theme. */
@@ -209,15 +213,5 @@ test("text in Settings and the board settings card meets contrast in every theme
 
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
-
-    await pageMore(page, "data-dag-board-settings-open");
-    const card = page.locator("[data-dag-board-settings]");
-    await expect(card).toBeVisible();
-    const board = await audit(page, "[data-dag-board-settings]");
-    expect(board.text, `${theme} / board settings: text found`).toBeGreaterThanOrEqual(4);
-    expect(board.failures, `${theme} / board settings`).toEqual([]);
-
-    await page.keyboard.press("Escape");
-    await expect(card).toHaveCount(0);
   }
 });
