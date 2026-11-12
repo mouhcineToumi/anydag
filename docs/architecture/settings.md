@@ -20,7 +20,7 @@ sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and t
 | *the vault's name* | Preferences | the theme, problems, pasted images, and the quiz threshold (the person's, and says so) |
 | | Vault | where it is, where its attachments go, whether a rename updates the `[[wikilinks]]` to it, the open board's unused images, and Close vault — never deleting the folder |
 | | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on, like Privacy |
-| | AI and agents | the prompt card's provider, model and thinking; how to reach this vault from the CLI and MCP |
+| | AI and agents | the provider, model and thinking prompt cards, Rewrite and Generate flashcards share; the Assistant's; how to reach this vault from the CLI and MCP |
 | | Import and export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 
 The *Account* group keeps its name for what it now means: the person's, in every vault, kept in the

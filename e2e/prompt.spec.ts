@@ -103,6 +103,41 @@ test("P puts an empty card in the middle of the view with the caret in it, and t
   await expect.poll(read).toMatch(/```prompt \{#prompt-[a-z0-9]{4} x=\d+ y=\d+ w=420\}\nA queue between two workers\n```/);
 });
 
+test("the model chip names who would answer, and opens the AI settings", async ({ page }) => {
+  /* `*` for the `vault=` every scoped request carries (`src/vault/current.ts`). */
+  await page.route("**/__board/llm*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        default: "claude",
+        providers: [
+          {
+            id: "claude",
+            label: "Claude Code",
+            description: "Uses your Claude plan, through the Claude Code signed in on this computer.",
+            kind: "cli",
+            defaultModel: "sonnet",
+            models: ["sonnet"],
+            ready: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await open(page);
+  const chip = page.locator('[data-dag-model-chip="prompt"]');
+  await expect(chip).toHaveText("Claude Code · sonnet");
+  await chip.click();
+  await expect(page.locator("[data-dag-settings]")).toBeVisible();
+  await expect(page.locator("[data-dag-settings-pane=agents]")).toBeVisible();
+  /* The default is worded the same way as the Assistant's, and the model's default is in the hint,
+     not only in a placeholder that disappears as soon as somebody types. */
+  await expect(page.locator("[data-dag-setting-llm-provider] option").first()).toHaveText("Automatic · Claude Code");
+  await expect(page.locator("[data-dag-setting-llm-model]")).toHaveValue("");
+  await expect(page.getByText("Uses sonnet unless you enter another.")).toBeVisible();
+  await expect(page.getByText("Prompt cards, Rewrite in the panel, and Generate flashcards use this model.")).toBeVisible();
+});
+
 /**
  * The card's box against the view's, on the glass.
  *

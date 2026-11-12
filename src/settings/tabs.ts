@@ -5,8 +5,9 @@
  *
  * **Two groups, Notion's**, and the line between them is where a thing is kept. What belongs to the
  * person — their calendar, the keys, whether logs are sent, what this is — is under *App* and is the
- * same in every vault. What belongs to the vault this tab is in — the look, its files, which model draws its prompt cards, how it exports — is under the vault's own name, and
- * switches when the vault does. The one setting that crosses the line (a quiz threshold, kept
+ * same in every vault. What belongs to the vault this tab is in — the look, its files, which model
+ * draws its diagrams and flashcards, how it exports — is under the vault's own name, and switches
+ * when the vault does. The one setting that crosses the line (a quiz threshold, kept
  * with the practice records in the app's home) says so where it is drawn.
  *
  * Every setting the app has is in exactly one of these, each

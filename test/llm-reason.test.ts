@@ -42,6 +42,15 @@ describe("explainLlmReason", () => {
     expect(sentenceParts(said.sentence)).toContainEqual({ code: "GEMINI_API_KEY" });
   });
 
+  it("names Z.ai and OpenAI-compatible as the provider list does", () => {
+    expect(explain({ code: "not-installed", provider: "zai" }, "browser").sentence).toBe(
+      "Z.ai is not installed. Install it, then check again.",
+    );
+    expect(explain({ code: "no-key", provider: "custom" }, "browser").sentence).toBe(
+      "OpenAI-compatible needs an API key in the server's environment.",
+    );
+  });
+
   it("tells a signed-out coding agent how to sign in, and offers to check again", () => {
     const said = explain({ code: "not-signed-in", provider: "claude" }, "desktop", ["opencode"]);
     expect(said.sentence).toBe("Claude Code is installed but not signed in. Run claude once in a terminal to sign in.");

@@ -66,9 +66,9 @@ export type Settings = {
     margin: number;
   };
   /**
-   * Which model a prompt card asks. Ids only — the dev server holds every key and resolves these
-   * against its own table (`plugins/generate/providers.ts`); `null` is "whatever the server's
-   * default is", which is what a fresh browser should get.
+   * Which model prompt cards, Rewrite and Generate flashcards ask. Ids only — the dev server holds
+   * every key and resolves these against its own table (`plugins/generate/providers.ts`); `null` is
+   * "whatever the server's default is", which is what a fresh browser should get.
    */
   llm: {
     provider: string | null;

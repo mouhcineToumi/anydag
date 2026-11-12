@@ -332,6 +332,21 @@ describe("describeProviders", () => {
       reason: { code: "not-installed", provider: "opencode" },
     });
   });
+
+  it("names every provider as the app does, and explains in a description beside the name", () => {
+    const d = describeProviders({ GEMINI_API_KEY: KEY, PATH: "", HOME: "/nonexistent-home" });
+    expect(Object.fromEntries(d.providers.map((p) => [p.id, p.label]))).toEqual({
+      claude: "Claude Code",
+      gemini: "Gemini",
+      opencode: "OpenCode",
+      zai: "Z.ai",
+      custom: "OpenAI-compatible",
+    });
+    for (const p of d.providers) {
+      expect(p.label).not.toContain("(");
+      expect(p.description.trim()).not.toBe("");
+    }
+  });
 });
 
 describe("extraFor", () => {

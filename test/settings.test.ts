@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
 import { DEFAULTS, normalise, readSettings, resetSettings, STORE, writeSettings } from "@/settings/store";
+import type { Providers } from "@/settings/useProviders";
 
 /**
  * A stand-in for `localStorage`, plus the one that throws.
@@ -190,5 +192,48 @@ describe("the model a prompt card asks", () => {
     writeSettings({ llm: { provider: "opencode" } });
     writeSettings({ llm: { reasoning: "low" } });
     expect(readSettings().llm).toEqual({ provider: "opencode", model: null, reasoning: "low" });
+  });
+});
+
+describe("the model a surface says will answer", () => {
+  const list: Providers = {
+    default: "gemini",
+    providers: [
+      {
+        id: "gemini",
+        label: "Gemini",
+        description: "Google's Gemini, through an API key.",
+        kind: "http",
+        defaultModel: "gemini-3.8-flash",
+        models: [],
+        ready: true,
+      },
+      {
+        id: "claude",
+        label: "Claude Code",
+        description: "Uses your Claude plan.",
+        kind: "cli",
+        defaultModel: "sonnet",
+        models: [],
+        ready: true,
+      },
+    ],
+  };
+
+  it("takes the server's default provider and that provider's default model", () => {
+    const choice = modelChoice({ provider: null, model: null, reasoning: null }, list);
+    expect(choice).toEqual({ provider: "gemini", name: "Gemini", model: "gemini-3.8-flash" });
+    expect(modelChoiceText(choice)).toBe("Gemini · gemini-3.8-flash");
+  });
+
+  it("takes the provider and model somebody chose", () => {
+    const choice = modelChoice({ provider: "claude", model: "opus", reasoning: null }, list);
+    expect(choice).toEqual({ provider: "claude", name: "Claude Code", model: "opus" });
+    expect(modelChoiceText(choice)).toBe("Claude Code · opus");
+  });
+
+  it("says Automatic while neither the request nor the server has named one", () => {
+    expect(modelChoice({ provider: null, model: null, reasoning: null }, null)).toBeNull();
+    expect(modelChoiceText(null)).toBe("Automatic");
   });
 });

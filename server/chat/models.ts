@@ -9,6 +9,7 @@
 import { execFile } from "node:child_process";
 
 import { claudeReady, opencodeReady } from "../../plugins/generate/providers";
+import { PROVIDER_NAMES } from "../../src/settings/providerNames";
 import type { Provider } from "./types";
 
 interface ModelChoice {
@@ -69,7 +70,7 @@ export async function modelsFor(
   const claude = fake ? { ok: true as const, bin: "fake" } : claudeReady(env);
   out.push({
     provider: "claude",
-    label: "Claude Code",
+    label: PROVIDER_NAMES.claude,
     available: have.includes("claude") && claude.ok,
     ...(claude.ok ? {} : { why: claude.error }),
     models: CLAUDE_MODELS,
@@ -80,7 +81,7 @@ export async function modelsFor(
   const listed = !fake && opencode.ok && have.includes("opencode") ? await opencodeModels(opencode.bin) : [];
   out.push({
     provider: "opencode",
-    label: "OpenCode",
+    label: PROVIDER_NAMES.opencode,
     available: have.includes("opencode") && opencode.ok,
     ...(opencode.ok ? {} : { why: opencode.error }),
     models: listed.length ? listed : [{ id: OPENCODE_DEFAULT, label: OPENCODE_DEFAULT }],

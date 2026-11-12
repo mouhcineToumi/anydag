@@ -2,6 +2,7 @@ import { Check, ChevronDown, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { loadModels } from "@/assistant/api";
+import { defaultChoice } from "@/assistant/Composer";
 import type { ProviderModels } from "@/assistant/types";
 import { assertNever } from "@/board/useBoard";
 import { explainLlmReason, type LlmAction } from "@/settings/llmReason";
@@ -10,6 +11,7 @@ import { currentOf } from "@/vault/api";
 import { desktop } from "@/vault/desktop";
 import { useVaults } from "@/vault/useVaults";
 
+import { PROVIDER_NAMES, providerName } from "../providerNames";
 import { REASONING, resetSettings, writeSettings } from "../store";
 import { useSettings } from "../useSettings";
 import { TextField } from "@/ui/controls";
@@ -18,9 +20,10 @@ import { LlmSentence } from "@/ui/LlmSentence";
 import { Field, Group, Hint, ICON, Reset, copyText } from "./common";
 
 /**
- * Which model draws this workspace's prompt cards, and how an agent reaches it.
+ * Which model draws this workspace's diagrams and flashcards, and how an agent reaches it.
  *
- * The model half is the old card's *Prompt cards* section. The agent half is new to the page and
+ * The model half is the old card's *Prompt cards* section, now named after everything it drives —
+ * prompt cards, Rewrite and Generate flashcards share it. The agent half is new to the page and
  * read-only: the address an MCP client is pointed at, which `/api/health` already reports, and the
  * command that connects one. **A key is never the page's**: in the desktop app it is typed here and
  * goes straight to the shell, which keeps it encrypted (`safeStorage`) and hands it to the server
@@ -31,6 +34,7 @@ export function AgentsPane() {
   const s = useSettings();
   const [llm, refresh] = useProviders();
   const chosen = llm?.providers.find((p) => p.id === (s.llm.provider ?? llm.default));
+  const automatic = llm ? labelOf(llm, llm.default) : undefined;
   const keys = desktop()?.keys;
   const explained =
     chosen && !chosen.ready && chosen.reason
@@ -48,15 +52,7 @@ export function AgentsPane() {
       ? (explanation?.sentence ?? `${chosen.label} is not set up: ${chosen.error ?? "it could not answer"}.`)
       : null;
   /* In the app a key is typed below; anywhere else it is the server's environment, which is worth one line. */
-  const note =
-    problem ??
-    (chosen?.id === "claude"
-      ? "Uses your own Claude subscription, through the Claude Code signed in on this computer. No key, and it counts against that plan's usage."
-      : chosen?.id === "opencode"
-        ? "Uses the OpenCode signed in on this computer, with whatever it is signed in to (OpenCode Go, or a provider you connected). No key here, and it counts against that account."
-        : keys
-          ? null
-          : "Keys come from the server's environment. This only picks which provider to ask.");
+  const note = problem ?? (keys ? null : "Keys come from the server's environment. This only picks which provider to ask.");
   const act = (a: LlmAction) => {
     switch (a.kind) {
       case "settings":
@@ -77,33 +73,36 @@ export function AgentsPane() {
   return (
     <>
       <Group
-        title="Prompt cards"
+        title="Diagrams and flashcards"
         footer={
-          note ? (
-            <>
-              <Hint data-dag-setting-llm-hint="">
-                <LlmSentence text={note} />
-              </Hint>
-              {explanation ? (
-                <div className="dag-settings__actions">
-                  {explanation.actions.map((a) => (
-                    <button
-                      key={`${a.kind}:${a.label}`}
-                      type="button"
-                      className="dag-button"
-                      data-dag-setting-llm-act={a.kind}
-                      onClick={() => act(a)}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </>
-          ) : undefined
+          <>
+            <Hint data-dag-setting-llm-scope="">Prompt cards, Rewrite in the panel, and Generate flashcards use this model.</Hint>
+            {note ? (
+              <>
+                <Hint data-dag-setting-llm-hint="">
+                  <LlmSentence text={note} />
+                </Hint>
+                {explanation ? (
+                  <div className="dag-settings__actions">
+                    {explanation.actions.map((a) => (
+                      <button
+                        key={`${a.kind}:${a.label}`}
+                        type="button"
+                        className="dag-button"
+                        data-dag-setting-llm-act={a.kind}
+                        onClick={() => act(a)}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </>
         }
       >
-        <Field label="Provider" hint="A prompt card describes a diagram and this model draws it.">
+        <Field label="Provider" hint={chosen?.description}>
           <select
             className="dag-select dag-select--wide"
             data-dag-setting-llm-provider=""
@@ -112,7 +111,7 @@ export function AgentsPane() {
                that provider's own default rather than sending a Gemini name to Z.ai. */
             onChange={(e) => writeSettings({ llm: { provider: e.target.value || null, model: null } })}
           >
-            <option value="">Default{llm ? ` (${labelOf(llm, llm.default)})` : ""}</option>
+            <option value="">{automatic ? `Automatic · ${automatic}` : "Automatic"}</option>
             {(llm?.providers ?? []).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
@@ -121,13 +120,15 @@ export function AgentsPane() {
             ))}
           </select>
         </Field>
-        <Field label="Model">
+        <Field
+          label="Model"
+          hint={s.llm.model ? undefined : `Uses ${chosen?.defaultModel || "the provider's default"} unless you enter another.`}
+        >
           <TextField
             wide
             data-dag-setting-llm-model=""
             list="dag-llm-models"
             spellCheck={false}
-            placeholder={chosen?.defaultModel || "Default"}
             value={s.llm.model ?? ""}
             onChange={(e) => writeSettings({ llm: { model: e.target.value } })}
           />
@@ -161,7 +162,7 @@ export function AgentsPane() {
       <Agents />
 
       <Reset
-        what="the prompt card's and the Assistant's provider, model and thinking"
+        what="the diagram and flashcard model, and the Assistant's provider, model and thinking"
         onReset={() => resetSettings(["llm", "assistant"])}
       />
     </>
@@ -188,6 +189,10 @@ function AssistantGroup() {
     };
   }, []);
   const chosen = providers?.find((p) => p.provider === s.assistant.provider);
+  const automatic = providers?.length ? defaultChoice(providers, s.assistant).provider : null;
+  const automaticLabel = automatic
+    ? (providers?.find((p) => p.provider === automatic)?.label ?? providerName(automatic))
+    : undefined;
   const note = chosen && !chosen.available ? `${chosen.label} is not available: ${chosen.why ?? "it did not answer"}.` : null;
   return (
     <Group
@@ -210,7 +215,7 @@ function AssistantGroup() {
             writeSettings({ assistant: { provider: (e.target.value || null) as "claude" | "opencode" | null, model: null } })
           }
         >
-          <option value="">Whichever can answer</option>
+          <option value="">{automaticLabel ? `Automatic · ${automaticLabel}` : "Automatic"}</option>
           {(providers ?? []).map((p) => (
             <option key={p.provider} value={p.provider}>
               {p.label}
@@ -239,17 +244,18 @@ function AssistantGroup() {
   );
 }
 
-/** A provider's name for a person, off its id; the id itself when the list does not know it. */
-function labelOf(list: Providers, id: string): string {
-  return list.providers.find((p) => p.id === id)?.label ?? id;
+/** A provider's name for a person, off its id; `undefined` when neither the list nor the app knows it. */
+function labelOf(list: Providers | null, id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  return list?.providers.find((p) => p.id === id)?.label ?? providerName(id);
 }
 
 /** The keys a provider is read by, one row each — the env var names `plugins/generate/providers.ts`
  *  reads first for each provider, which the shell also accepts (`PROVIDER_KEY_ENVS`). */
 const KEYS: readonly { name: string; label: string }[] = [
-  { name: "GEMINI_API_KEY", label: "Gemini" },
-  { name: "ZAI_API_KEY", label: "Z.ai" },
-  { name: "ANYDAG_LLM_API_KEY", label: "OpenAI-compatible" },
+  { name: "GEMINI_API_KEY", label: PROVIDER_NAMES.gemini },
+  { name: "ZAI_API_KEY", label: PROVIDER_NAMES.zai },
+  { name: "ANYDAG_LLM_API_KEY", label: PROVIDER_NAMES.custom },
 ];
 
 /** In the desktop app only: store a provider's key. It is written, never read back. */
