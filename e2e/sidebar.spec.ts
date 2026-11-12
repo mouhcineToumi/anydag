@@ -403,18 +403,31 @@ test("its width is dragged, remembered, and put back by a double-click", async (
   await fresh(page);
   const nav = docked(page);
   const grip = page.locator("[data-dag-sidebar-grip]");
+  /* The grip draws the edge it moves on hover, rather than staying a transparent 7px strip. */
+  const edge = () => grip.evaluate((el) => getComputedStyle(el, "::after").backgroundColor);
+  const idle = await edge();
+  await grip.hover();
+  await expect.poll(edge).not.toBe(idle);
   const box = (await grip.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 200);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 80, box.y + 200, { steps: 4 });
   await page.mouse.up();
-  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(328);
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(352);
 
   await page.reload();
   await ready(page);
-  await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(328);
+  await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(352);
 
   await page.locator("[data-dag-sidebar-grip]").dblclick();
+  await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(272);
+});
+
+test("a width saved before the default grew is respected — only the default changed", async ({ page }) => {
+  await fresh(page);
+  await page.evaluate(() => localStorage.setItem("dag:sidebar-w", "248"));
+  await page.reload();
+  await ready(page);
   await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(248);
 });
 
@@ -481,6 +494,51 @@ test("a favourite is kept above the files, opens, follows a rename, and comes ou
 
   await more(`${folder}/other-renamed`, "unfavourite");
   await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(0);
+});
+
+test("the open file's row keeps its actions, and a favourite its star, without a hover", async ({ page }) => {
+  await fresh(page);
+  const more = (name: string) => page.locator(`[data-dag-sidebar-more="${name}"]`);
+  const star = (name: string) => page.locator(`[data-dag-sidebar-star="${name}"]`);
+
+  /* No pointer has crossed the column: the open board's `⋯` is up anyway. */
+  await page.mouse.move(900, 600);
+  await expect(more(board())).toBeVisible();
+  await expect(more(board())).toHaveAttribute("tabindex", "-1");
+
+  /* Another row keeps the hover reveal. */
+  await expect(more(other())).toBeHidden();
+  await expect(async () => {
+    await fileRow(page, other()).scrollIntoViewIfNeeded({ timeout: 1_000 });
+    const box = (await fileRow(page, other()).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(more(other())).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+
+  /* Favourited, the open row also keeps the star that takes it out again. */
+  await clickOnHover(page, `[data-dag-sidebar-file="${board()}"]`, `[data-dag-sidebar-more="${board()}"]`);
+  await page.locator('[data-dag-sidebar-menu-item="favourite"]').click();
+  await expect(star(board())).toBeVisible();
+  await expect(star(board())).toHaveAttribute("tabindex", "-1");
+  await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(1);
+  await star(board()).click();
+  await expect(star(board())).toHaveCount(0);
+  await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(0);
+
+  /* One tab stop for the whole tree, whatever its rows are wearing. */
+  await expect(page.locator('[data-dag-sidebar-row][tabindex="0"]')).toHaveCount(1);
+});
+
+test("a name too long for the column is whole in its tooltip", async ({ page }) => {
+  const long = "A board whose name is much longer than the sidebar is wide";
+  fs.writeFileSync(path.join(BOARDS, `${folder}/long-titled.board.md`), BOARD(long));
+  await fresh(page);
+  const name = fileRow(page, `${folder}/long-titled`).locator(".dag-sidebar__name");
+  await expect(name).toHaveText(long);
+  /* Cut short by the column... */
+  expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  /* ... and whole in the tooltip. The row's own title names the file; this one names what is drawn. */
+  await expect(name).toHaveAttribute("title", long);
 });
 
 test("a file is called its title — Untitled until somebody names it — and its name follows out of sight", async ({ page }) => {

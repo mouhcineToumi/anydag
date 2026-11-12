@@ -191,7 +191,7 @@ function hintOf(
 
 /** The width somebody gets before they drag it, and the two ends of the drag. A drag is also held
     to half the window (`dragCap`), as the CSS holds it. */
-export const SIDEBAR_W = 248;
+export const SIDEBAR_W = 272;
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 640;
 
@@ -1338,7 +1338,9 @@ export function Sidebar({
                     {...pressed(ahead(e.kind, e.name, current))}
                   >
                     <FileIcon entry={e} task={tasks[e.name]} project={projects[e.name]} event={events[e.name]} />
-                    <span className="dag-sidebar__name">{labelOf(e)}</span>
+                    <span className="dag-sidebar__name" title={labelOf(e)}>
+                      {labelOf(e)}
+                    </span>
                   </button>
                   <span className="dag-sidebar__tools">
                     <button
@@ -1613,6 +1615,19 @@ export function Sidebar({
                   <Plus {...SMALL} aria-hidden="true" />
                 </button>
               ) : null}
+              {line.type === "file" && isFavourite(line.entry) ? (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="dag-sidebar__tool"
+                  data-dag-sidebar-star={where}
+                  aria-label={`Remove ${where} from favourites`}
+                  title="Remove from favourites"
+                  onClick={() => files.favourite(line.entry.kind, where, false)}
+                >
+                  <StarOff {...SMALL} aria-hidden="true" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 tabIndex={-1}
@@ -1661,7 +1676,9 @@ export function Sidebar({
                   ) : (
                     <FolderIcon {...SMALL} aria-hidden="true" />
                   )}
-                  <span className="dag-sidebar__name">{line.name}</span>
+                  <span className="dag-sidebar__name" title={line.path}>
+                    {line.name}
+                  </span>
                 </button>
                 {tools}
                 {line.open && line.empty ? (
@@ -1701,7 +1718,9 @@ export function Sidebar({
                 <span className="dag-sidebar__indent" aria-hidden="true" />
                 <span className="dag-sidebar__chev" aria-hidden="true" />
                 <FileIcon entry={line.entry} task={tasks[where]} project={projects[where]} event={events[where]} />
-                <span className="dag-sidebar__name">{name}</span>
+                <span className="dag-sidebar__name" title={name}>
+                  {name}
+                </span>
               </button>
               {tools}
             </div>

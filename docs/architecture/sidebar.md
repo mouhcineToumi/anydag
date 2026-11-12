@@ -19,11 +19,13 @@ canvas only for somebody who chose to keep it: `ctrl+\` (Notion's chord) or the 
 and `dag:sidebar` remembers, with the person's preferences; while it is away a hover on the toggle floats it over
 the page; and a window under 720px never docks it — a phone, where it is a sheet over the whole
 window, and the home screen when nothing is open. From 720px it docks, and its
-default width gives way to a quarter of the window, never under 232px, which is what a 929px laptop
-window had room for and could not keep. A width somebody dragged is theirs up to half the window and
-640px: under the quarter rule the grip on that same window moved nothing at all.
+default width of 272px gives way to a quarter of the window, never under 232px, which is what a
+929px laptop window had room for and could not keep. A width somebody dragged is theirs up to half
+the window and 640px: under the quarter rule the grip on that same window moved nothing at all, and
+raising the default moves nobody's column — a width already saved is read as it was.
 `data-sidebar-sized` on `.dag-shell` (React's) and `data-sidebar-dragging` (the grip's, for the length
-of a drag) are what switch `--sidebar-cap`. It is open by default,
+of a drag) are what switch `--sidebar-cap`. The grip is a 7px strip that stays invisible until the
+pointer reaches it, and then draws the edge it moves as an accent hairline. It is open by default,
 because a new person has not learned the key yet. **The toggle is one button in the window's
 top-left corner that never moves** (Claude.ai's arrangement): `Shell` draws it above the
 column and the page, and the docked header or the toolbar keeps a slot for it.
@@ -52,7 +54,10 @@ Fourteen things are load-bearing:
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
   one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
   down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
-  Files and the only way a top-level file was made before #121. That menu's `here` is carried in the
+  Files and the only way a top-level file was made before #121. The open file's row keeps its `⋯` up
+  without a hover, and a favourite keeps its star beside it, so a first-time reader sees that a file
+  has actions; every other row keeps the hover reveal and every tool is `tabIndex=-1`, so the tree is
+  still one tab stop and `shift+F10` is the keyboard's way to the menu. That menu's `here` is carried in the
   state that opens it: the `+` says the open file's folder, the tree's space says the top level, and
   where there is no file to be in the head says *New at the top level* and offers no toggle. The menu
   opens when the vault is locked — as a row's does — with every entry `aria-disabled` and in the
@@ -75,7 +80,8 @@ Fourteen things are load-bearing:
   `server/names.ts`), in the same step, so what
   an agent or Obsidian reads on disk says exactly what the person typed. A `/` in a title is a character,
   never a folder — moving is Move to… and a drag. A row says its title, or its name's last part for
-  a file nobody titled, and the rows sort by what they say. With the column put away, it floats
+  a file nobody titled, and the rows sort by what they say; a name the column cuts short is whole in
+  the row's tooltip. With the column put away, it floats
   over the page to ask. **The menu is the only control beside Files**, with its title naming every
   kind it makes; the folder-with-plus that made a top-level folder at once is gone, because beside
   the `+` it read as a second kind of New. **Folder** is the menu's own row, made where the menu says
