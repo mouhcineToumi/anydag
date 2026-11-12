@@ -1,6 +1,7 @@
 import type { AttrValue } from "@/board/attrs";
 import type { PatchOp } from "@/board/patch";
 import type { BoardItem, DiagramType } from "@/board/types";
+import { LlmRequestError, reasonOf } from "@/settings/llmReason";
 
 /**
  * A prompt card's two halves that have no pointer in them: asking the dev server for a diagram, and
@@ -70,8 +71,8 @@ export async function requestDiagram(req: GenerateRequest, signal?: AbortSignal)
     body: JSON.stringify(req),
     signal,
   });
-  const body = (await res.json().catch(() => ({}))) as Partial<Generated> & { error?: string };
-  if (!res.ok) throw new Error(body.error ?? `the server answered ${res.status}`);
+  const body = (await res.json().catch(() => ({}))) as Partial<Generated> & { error?: string; reason?: unknown };
+  if (!res.ok) throw new LlmRequestError(body.error ?? `the server answered ${res.status}`, reasonOf(body.reason));
   return { diagnostics: [], attempts: 0, ok: false, ...body };
 }
 

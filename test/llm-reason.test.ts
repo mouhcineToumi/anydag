@@ -1,0 +1,97 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  explainLlmReason,
+  reasonOf,
+  sentenceParts,
+  type LlmReason,
+  type LlmReasonCode,
+  type ProviderStatus,
+} from "../src/settings/llmReason";
+
+/**
+ * A reason to one sentence and at most two actions, in plain words. No backticks, no `.env.local`
+ * in the desktop app, and no provider id on the screen — `src/settings/llmReason.ts` is the one
+ * place the four surfaces agree on what an AI failure says.
+ */
+
+const providers = (ready: string[]): ProviderStatus[] =>
+  ["claude", "gemini", "opencode", "zai", "custom"].map((id) => ({ id, ready: ready.includes(id) }));
+
+const explain = (reason: LlmReason, host: "desktop" | "browser" = "desktop", ready: string[] = []) =>
+  explainLlmReason(reason, { host, providers: providers(ready) })!;
+
+describe("explainLlmReason", () => {
+  it("says a key is missing, and offers the keyring in the app and another ready provider", () => {
+    const said = explain({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] }, "desktop", [
+      "claude",
+    ]);
+    expect(said.sentence).toBe("Gemini needs an API key.");
+    expect(said.actions).toEqual([
+      { kind: "settings", label: "Add a key" },
+      { kind: "provider", label: "Use Claude Code", provider: "claude" },
+    ]);
+  });
+
+  it("names the server's variable in a browser, drawn as code rather than backticks", () => {
+    const said = explain({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] }, "browser");
+    expect(said.sentence).toBe("Gemini needs an API key in the server's environment: GEMINI_API_KEY or GOOGLE_API_KEY.");
+    expect(said.sentence).not.toContain("`");
+    expect(said.sentence).not.toContain(".env.local");
+    expect(said.actions).toEqual([{ kind: "settings", label: "Open AI settings" }]);
+    expect(sentenceParts(said.sentence)).toContainEqual({ code: "GEMINI_API_KEY" });
+  });
+
+  it("tells a signed-out coding agent how to sign in, and offers to check again", () => {
+    const said = explain({ code: "not-signed-in", provider: "claude" }, "desktop", ["opencode"]);
+    expect(said.sentence).toBe("Claude Code is installed but not signed in. Run claude once in a terminal to sign in.");
+    expect(said.actions).toEqual([
+      { kind: "retry", label: "Check again" },
+      { kind: "provider", label: "Use OpenCode", provider: "opencode" },
+    ]);
+  });
+
+  it("has a next step for every reason, and at most two actions", () => {
+    const codes: LlmReasonCode[] = [
+      "no-key",
+      "needs-model",
+      "needs-base-url",
+      "not-installed",
+      "not-signed-in",
+      "too-old",
+      "unknown-provider",
+      "busy",
+      "timeout",
+      "provider-error",
+    ];
+    for (const code of codes) {
+      const said = explain({ code, provider: "gemini" }, "browser", ["claude", "opencode"]);
+      expect(said.sentence).not.toBe("");
+      expect(said.actions.length).toBeGreaterThan(0);
+      expect(said.actions.length).toBeLessThanOrEqual(2);
+      expect(said.sentence).not.toContain("`");
+      expect(said.sentence).not.toContain(".env.local");
+      expect(said.sentence).not.toMatch(/\b(gemini|claude|opencode|zai|custom)\b/);
+    }
+  });
+
+  it("gives a transient failure its sentence and Try again", () => {
+    expect(explain({ code: "busy", provider: "gemini" })).toEqual({
+      sentence: "The model is busy with other answers right now. Try again in a moment.",
+      actions: [{ kind: "retry", label: "Try again" }],
+    });
+    expect(explain({ code: "timeout", provider: "gemini" }).actions).toEqual([{ kind: "retry", label: "Try again" }]);
+    expect(explain({ code: "provider-error", provider: "gemini" }).sentence).toBe("The model could not answer.");
+  });
+
+  it("falls back to the server's own text for a missing or unknown reason", () => {
+    expect(explainLlmReason(undefined, { host: "browser" })).toBeNull();
+    expect(explainLlmReason({ code: "something-new" as LlmReasonCode }, { host: "browser" })).toBeNull();
+    expect(reasonOf({ code: "something-new" })).toBeUndefined();
+    expect(reasonOf({ code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY"] })).toEqual({
+      code: "no-key",
+      provider: "gemini",
+      keyEnv: ["GEMINI_API_KEY"],
+    });
+  });
+});

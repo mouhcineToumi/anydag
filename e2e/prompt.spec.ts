@@ -242,6 +242,28 @@ test("a refusal is said on the card, and the card stays", async ({ page }) => {
   problems = problems.filter((p) => !p.includes("400"));
 });
 
+test("a no-key refusal says what is missing in plain words, and opens the AI settings", async ({ page }) => {
+  await answer(page, 400, {
+    error: "provider `gemini` has no key — set GEMINI_API_KEY or GOOGLE_API_KEY in .env.local",
+    reason: { code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
+  });
+  await open(page);
+  await page.locator("[data-dag-prompt-go]").click();
+
+  const fail = page.locator("[data-dag-prompt-fail]");
+  await expect(fail).toContainText("Gemini needs an API key in the server's environment");
+  await expect(fail.locator("code").first()).toContainText("GEMINI_API_KEY");
+  await expect(fail).not.toContainText("`");
+  await expect(fail).not.toContainText(".env.local");
+
+  const action = fail.getByRole("button", { name: "Open AI settings" });
+  await expect(action).toBeVisible();
+  await action.click();
+  await expect(page.locator("[data-dag-settings]")).toBeVisible();
+  await expect(page.locator("[data-dag-settings-pane=agents]")).toBeVisible();
+  problems = problems.filter((p) => !p.includes("400"));
+});
+
 test("the thinking level picked in Settings rides with the request", async ({ page }) => {
   const asked = await answer(page, 200, { ok: true, draft: DRAFT, diagnostics: [], attempts: 1 });
   await open(page);

@@ -140,8 +140,11 @@ export function metaRoutes(app: Hono, s: Session): void {
       provider: typeof body.provider === "string" ? body.provider : null,
       model: typeof body.model === "string" ? body.model : null,
     });
-    if (!resolved.ok) throw err(400, resolved.error);
-    if (running >= RUNNING_MAX) throw err(429, `${RUNNING_MAX} answers are being written already — give it a moment`);
+    if (!resolved.ok) throw err(400, resolved.error, { reason: resolved.reason });
+    if (running >= RUNNING_MAX)
+      throw err(429, `${RUNNING_MAX} answers are being written already — give it a moment`, {
+        reason: { code: "busy", provider: resolved.value.spec.id },
+      });
     const attempts = Number(s.env.ANYDAG_LLM_ATTEMPTS) || 3;
     const timeout = Number(s.env.ANYDAG_LLM_TIMEOUT) || 120_000;
     const stop = new AbortController();
@@ -152,8 +155,11 @@ export function metaRoutes(app: Hono, s: Session): void {
       return await ask(completeFor(resolved.value, s.env, { reasoning }), attempts, stop.signal);
     } catch (e) {
       if (stop.signal.aborted && (stop.signal.reason as Error)?.message === "timeout")
-        throw err(504, "the model did not answer in time");
-      if (e instanceof LlmError) throw err(502, e.message);
+        throw err(504, "the model did not answer in time", {
+          reason: { code: "timeout", provider: resolved.value.spec.id },
+        });
+      if (e instanceof LlmError)
+        throw err(502, e.message, { reason: { code: "provider-error", provider: resolved.value.spec.id } });
       throw e;
     } finally {
       clearTimeout(timer);

@@ -37,6 +37,7 @@ import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
 import { FeedbackCard } from "@/feedback/FeedbackCard";
 import { Settings, useSettingsOpen } from "@/settings/Settings";
+import type { LlmReason } from "@/settings/llmReason";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
 import { ErrorItem } from "@/render/ErrorItem";
@@ -1822,7 +1823,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
    */
   const [pending, setPending] = useState(false);
   const [preview, setPreview] = useState<{ id: string; draft: Draft; lost: string[]; unparsed: boolean } | null>(null);
-  const [refusal, setRefusal] = useState<{ message: string; detail?: DraftDiagnostic[] } | null>(null);
+  const [refusal, setRefusal] = useState<{ message: string; reason?: LlmReason; detail?: DraftDiagnostic[] } | null>(null);
   /* The item a request or a refusal is about, so the toolbar can stand beside it after the
      selection has moved on. */
   const [runFor, setRunFor] = useState<string | null>(null);
@@ -1872,7 +1873,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         })
         .catch((e: Error) => {
           if (cancel.signal.aborted) return;
-          setRefusal({ message: e.message });
+          setRefusal({ message: e.message, reason: (e as { reason?: LlmReason }).reason });
         })
         .finally(() => {
           if (rewriteCtl.current === cancel) {
@@ -1931,6 +1932,14 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
     onRewrite([askFor], askText.trim());
   }, [askFor, askText, onRewrite]);
 
+  /* A reason's "Try again" (or another provider after switching to it): send the same change again
+     without reopening the dialog, so checking after a sign-in is one press and not a retype. */
+  const onRetry = useCallback(() => {
+    const target = runFor ?? askFor;
+    if (!target || !askText.trim()) return;
+    onRewrite([target], askText.trim());
+  }, [runFor, askFor, askText, onRewrite]);
+
   /* Escape lets go of the rewrite wherever focus is. The bar owns its own Escape — the settings
      card's idiom, and the one that works while a person is typing in the field, because the
      editor's key chain leaves a focused INPUT alone — but it only sees keys that pass through it.
@@ -1954,7 +1963,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const barRun: RewriteRun = preview
     ? { phase: "preview", ...preview, failed: refusal?.message }
     : refusal
-      ? { phase: "refused", id: runFor ?? undefined, message: refusal.message, detail: refusal.detail }
+      ? { phase: "refused", id: runFor ?? undefined, message: refusal.message, reason: refusal.reason, detail: refusal.detail }
       : pending
         ? { phase: "running", id: runFor ?? undefined }
         : { phase: "idle" };
@@ -2520,6 +2529,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             run={barRun}
             locked={locked}
             onAsk={onAsk}
+            onRetry={onRetry}
             onAccept={onAccept}
             onDiscard={onDiscard}
           />

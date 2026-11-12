@@ -23,10 +23,16 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { isDiagramType, type BoardItem } from "@/board/types";
+import { assertNever } from "@/board/useBoard";
 import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
-import { readSettings } from "@/settings/store";
+import { explainLlmReason, type LlmAction, type LlmReason } from "@/settings/llmReason";
+import { readSettings, writeSettings } from "@/settings/store";
+import { useProviders } from "@/settings/useProviders";
 import { useSettings } from "@/settings/useSettings";
+import { askPage } from "@/ui/chrome";
+import { LlmSentence } from "@/ui/LlmSentence";
+import { desktop } from "@/vault/desktop";
 
 import type { FragmentKind } from "@/dsl/sequence";
 
@@ -52,7 +58,7 @@ const SMALL = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin
 export type RewriteRun =
   | { phase: "idle" }
   | { phase: "running"; id?: string }
-  | { phase: "refused"; id?: string; message: string; detail?: DraftDiagnostic[] }
+  | { phase: "refused"; id?: string; message: string; reason?: LlmReason; detail?: DraftDiagnostic[] }
   /** `failed` is an Accept that was refused: the proposal stands, with the reason beside it. */
   | { phase: "preview"; id: string; draft: Draft; lost: string[]; unparsed: boolean; failed?: string };
 
@@ -66,6 +72,8 @@ interface Props {
   locked?: boolean;
   /** Open the dialog a change is described in — `App` holds it, and the text typed into it. */
   onAsk(): void;
+  /** Send the same change again, with the text already in the dialog — a reason's Try again. */
+  onRetry(): void;
   /** Write the standing proposal into the board — one `SetOp`, one undo entry. */
   onAccept(): void;
   /** Throw the proposal away, and cancel a request still in flight. Nothing has been written. */
@@ -113,7 +121,7 @@ interface Props {
  * style and layout pass forced once per wheel event; and the listeners and the observer were taken
  * down and put back after every render.
  */
-export function SelectionBar({ editor, items, boardName, run, locked = false, onAsk, onAccept, onDiscard }: Props) {
+export function SelectionBar({ editor, items, boardName, run, locked = false, onAsk, onRetry, onAccept, onDiscard }: Props) {
   const bar = useRef<HTMLDivElement>(null);
   /* One menu at a time: Export, or the ⋯ that holds what is used least. */
   const [menu, setMenu] = useState<null | "export" | "more" | "wrap">(null);
@@ -281,7 +289,7 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
       onDoubleClick={(e) => e.stopPropagation()}
     >
       {busy ? (
-        <Run run={run} onAccept={onAccept} onDiscard={onDiscard} onAsk={onAsk} />
+        <Run run={run} onAccept={onAccept} onDiscard={onDiscard} onAsk={onAsk} onRetry={onRetry} />
       ) : (
         <div className="dag-selbar__row">
           {many ? (
@@ -602,12 +610,16 @@ function Run({
   onAccept,
   onDiscard,
   onAsk,
+  onRetry,
 }: {
   run: Exclude<RewriteRun, { phase: "idle" }>;
   onAccept(): void;
   onDiscard(): void;
   onAsk(): void;
+  onRetry(): void;
 }) {
+  const [providers] = useProviders(run.phase === "refused" && Boolean(run.reason));
+
   if (run.phase === "running") {
     return (
       <div className="dag-selbar__row" data-dag-rewrite-running="">
@@ -629,19 +641,57 @@ function Run({
   }
 
   if (run.phase === "refused") {
+    const explanation = run.reason
+      ? explainLlmReason(run.reason, {
+          host: desktop()?.keys ? "desktop" : "browser",
+          providers: providers?.providers,
+        })
+      : null;
+    const act = (a: LlmAction) => {
+      switch (a.kind) {
+        case "settings":
+          askPage("settings", "agents");
+          return;
+        case "provider":
+          if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });
+          onRetry();
+          return;
+        case "retry":
+          onRetry();
+          return;
+        default:
+          return assertNever(a.kind);
+      }
+    };
     return (
       <div className="dag-rewrite__fail" role="alert">
         <div className="dag-selbar__row">
-          <span className="dag-rewrite__message">{run.message}</span>
-          <button
-            type="button"
-            className="dag-selbar__word"
-            data-dag-rewrite-retry=""
-            title="Change the description and ask again"
-            onClick={onAsk}
-          >
-            <RotateCcw {...SMALL} aria-hidden="true" /> Try again
-          </button>
+          <span className="dag-rewrite__message">
+            <LlmSentence text={explanation?.sentence ?? run.message} />
+          </span>
+          {explanation ? (
+            explanation.actions.map((a) => (
+              <button
+                key={`${a.kind}:${a.label}`}
+                type="button"
+                className="dag-selbar__word"
+                data-dag-rewrite-act={a.kind}
+                onClick={() => act(a)}
+              >
+                {a.label}
+              </button>
+            ))
+          ) : (
+            <button
+              type="button"
+              className="dag-selbar__word"
+              data-dag-rewrite-retry=""
+              title="Change the description and ask again"
+              onClick={onAsk}
+            >
+              <RotateCcw {...SMALL} aria-hidden="true" /> Try again
+            </button>
+          )}
           <button
             type="button"
             className="dag-icon"

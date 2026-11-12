@@ -270,6 +270,7 @@ describe("resolveProvider", () => {
     expect(resolveProvider({ PATH: "", HOME: "/nonexistent-home" })).toMatchObject({
       ok: false,
       error: expect.stringContaining("GEMINI_API_KEY"),
+      reason: { code: "no-key", provider: "gemini", keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
     });
     const r = resolveProvider({ GEMINI_API_KEY: KEY });
     expect(r.ok && r.value).toMatchObject({
@@ -299,7 +300,23 @@ describe("resolveProvider", () => {
   });
 
   it("refuses a provider it has never heard of", () => {
-    expect(resolveProvider({}, { provider: "openai-direct" })).toMatchObject({ ok: false });
+    expect(resolveProvider({}, { provider: "openai-direct" })).toMatchObject({
+      ok: false,
+      reason: { code: "unknown-provider", provider: "openai-direct" },
+    });
+  });
+
+  it("says which setup a provider is missing, beside the sentence a developer reads", () => {
+    expect(resolveProvider({}, { provider: "custom" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("needs a model"),
+      reason: { code: "needs-model", provider: "custom" },
+    });
+    expect(resolveProvider({ ANYDAG_LLM_MODEL: "qwen" }, { provider: "custom" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("ANYDAG_LLM_BASE_URL"),
+      reason: { code: "needs-base-url", provider: "custom" },
+    });
   });
 });
 
@@ -311,7 +328,8 @@ describe("describeProviders", () => {
     expect(d.providers.find((p) => p.id === "gemini")!.ready).toBe(true);
     expect(d.providers.find((p) => p.id === "opencode")).toMatchObject({
       ready: false,
-      reason: expect.stringContaining("not installed"),
+      error: expect.stringContaining("not installed"),
+      reason: { code: "not-installed", provider: "opencode" },
     });
   });
 });
@@ -512,10 +530,12 @@ describe.skipIf(process.platform === "win32")("finding Claude Code", () => {
     expect(resolveProvider({ PATH: "", HOME: home(null) }, { provider: "claude" })).toMatchObject({
       ok: false,
       error: expect.stringContaining("not installed"),
+      reason: { code: "not-installed", provider: "claude" },
     });
     expect(resolveProvider({ PATH: "", HOME: home(".local/bin/claude", false) }, { provider: "claude" })).toMatchObject({
       ok: false,
       error: expect.stringContaining("not signed in"),
+      reason: { code: "not-signed-in", provider: "claude" },
     });
   });
 
@@ -584,20 +604,24 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     expect(resolveProvider({ PATH: "", HOME: home(null) }, want)).toMatchObject({
       ok: false,
       error: expect.stringContaining("not installed"),
+      reason: { code: "not-installed", provider: "opencode" },
     });
     expect(resolveProvider({ PATH: "", HOME: home(".opencode/bin/opencode", "1.18.3") }, want)).toMatchObject({
       ok: false,
       error: expect.stringContaining("too old"),
+      reason: { code: "too-old", provider: "opencode" },
     });
     expect(resolveProvider({ PATH: "", HOME: home(".opencode/bin/opencode", "2.2.5", []) }, want)).toMatchObject({
       ok: false,
       error: expect.stringContaining("not signed in"),
+      reason: { code: "not-signed-in", provider: "opencode" },
     });
     /* Signed in to OpenCode Go, asked for a model of a provider it holds no login for. */
     const h = home(".opencode/bin/opencode");
     expect(resolveProvider({ PATH: "", HOME: h }, { provider: "opencode", model: "anthropic/claude-sonnet-5-5" })).toMatchObject({
       ok: false,
       error: expect.stringContaining("not signed in to anthropic"),
+      reason: { code: "not-signed-in", provider: "opencode" },
     });
   });
 

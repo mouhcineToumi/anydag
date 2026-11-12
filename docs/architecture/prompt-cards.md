@@ -19,7 +19,7 @@ goes away. It is a fence all the same, so an unrun prompt survives a reload, is 
 like anything else, and is in the file Claude reads. `as=` asks for a type; an unknown one is
 `WB_BAD_AS` and dropped, so the card still runs and the model chooses.
 
-Eight things are load-bearing:
+Nine things are load-bearing:
 
 - **The server writes nothing; the client commits the answer.** Undo here is a version of the file,
   and an edit the history did not make drops the stack. So `/generate` returns a draft, and
@@ -68,6 +68,15 @@ Eight things are load-bearing:
   `GET /__board/llm` reports which could answer and why not, and never a key; the page names a
   provider by id. `ANYDAG_LLM_MODEL` is the default provider's model only — a Gemini name sent to Z.ai
   because somebody picked Z.ai in the settings card is the bug that rule prevents.
+- **A failure is a sentence and a next step, not a developer's note.** The server keeps its
+  plain-text `error` — MCP tools and the CLI read it — and adds a machine-readable `reason`
+  (`{ code, provider?, keyEnv? }`) beside it on `/__board/generate` and per provider on
+  `/__board/llm`. `src/settings/llmReason.ts` is the one place the page turns a code into plain
+  words and at most two actions; the prompt card, Rewrite, Generate flashcards and Settings → AI
+  and agents all use it. It knows whether this is the desktop app (a key in the keyring) or a
+  browser (the server's environment), and offers **Use Claude Code** or **Use OpenCode** only when
+  that other provider is ready. A missing or unknown reason falls back to the server's `error`, so
+  a newer server never leaves the page with nothing to say.
 - **Two adapters and one interface.** `complete(messages, signal) → text`. HTTP is a bare `fetch`
   to `{base}/chat/completions` — no SDK — and scrubs the key out of anything a provider says back.
   **Gemini is sent `reasoning_effort: low`** (`ProviderSpec.defaults`): 3.x Flash thinks by default,
