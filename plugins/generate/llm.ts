@@ -401,27 +401,97 @@ export function claudeComplete(o: ClaudeOptions): Complete {
   };
 }
 
-/** Claude Code's `--effort` for a thinking level. It has no "none", so the least it can do is `low`. */
-const EFFORT: Record<string, string | undefined> = { none: "low", low: "low", medium: "medium", high: "high" };
-
-/** The `--effort` a run gets: what the settings card asked for, or nothing — Claude Code's own. */
-export const effortFor = (want?: Want): string | undefined => EFFORT[want?.reasoning?.trim() ?? ""];
-
-/** What a request may ask for on top of the provider's own settings. The settings card's half. */
-export interface Want {
-  /** How hard the model should think: `none` · `low` · `medium` · `high`, or `default` for its own. */
-  reasoning?: string | null;
+/**
+ * What a provider's own vocabulary calls each level of the one effort scale.
+ *
+ * Claude Code's `--effort` has low, medium and high and no Max: Max asks for its highest, high. It
+ * has no "none" either, so None — a value stored before the scale changed — is its lowest, low.
+ */
+function claudeEffort(level: string): string | undefined {
+  switch (level) {
+    case "none":
+    case "low":
+      return "low";
+    case "medium":
+      return "medium";
+    case "high":
+    case "max":
+      return "high";
+    default:
+      return undefined;
+  }
 }
 
 /**
- * OpenCode's variant for a thinking level, which is not the same vocabulary.
+ * OpenCode's variant, which is not the same vocabulary.
  *
  * A variant is the model's own word, and which exist is the model's business: GLM 5.3 Flash and
  * DeepSeek 4.1 Flash take `low`, `high` and `max` and refuse `none`, `minimal` and `medium`; Kimi K3
  * takes only `max`. So `none` asks for the least that exists widely, `medium` sends nothing — the
  * model's own default — and a model that has no such variant refuses in its own words on the card.
  */
-const VARIANT: Record<string, string | undefined> = { none: "low", low: "low", medium: undefined, high: "high" };
+function opencodeEffort(level: string): string | undefined {
+  switch (level) {
+    case "none":
+    case "low":
+      return "low";
+    case "medium":
+      return undefined;
+    case "high":
+      return "high";
+    case "max":
+      return "max";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The body field an OpenAI-compatible provider reads. Gemini 3.8 Flash takes none, low, medium and
+ * high and refuses `minimal`; Max is that highest, high.
+ */
+function httpEffort(level: string): string | undefined {
+  switch (level) {
+    case "none":
+      return "none";
+    case "low":
+      return "low";
+    case "medium":
+      return "medium";
+    case "high":
+    case "max":
+      return "high";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The one mapping from the app's effort scale to what a provider accepts. `undefined` is the
+ * provider's own setting — Automatic, or OpenCode's `medium`, which asks for nothing.
+ *
+ * It lives beside the three adapters that spell the values: Claude's `--effort`, OpenCode's
+ * `#variant`, and the HTTP `reasoning_effort`. The Assistant's turn uses it too, so a Max chosen in
+ * the composer cannot be sent to a harness that has no word for it.
+ */
+export function effortFor(provider: string, want?: Want): string | undefined {
+  const level = want?.reasoning?.trim();
+  if (!level || level === "default") return undefined;
+  switch (provider) {
+    case "claude":
+      return claudeEffort(level);
+    case "opencode":
+      return opencodeEffort(level);
+    default:
+      return httpEffort(level);
+  }
+}
+
+/** What a request may ask for on top of the provider's own settings. The settings card's half. */
+export interface Want {
+  /** One of the app's effort levels — `none` from an older preference included — or `default`. */
+  reasoning?: string | null;
+}
 
 /**
  * The variant a run gets: what the settings card asked for, else how this machine is set up.
@@ -432,7 +502,7 @@ const VARIANT: Record<string, string | undefined> = { none: "low", low: "low", m
 export function variantFor(env: Env, want?: Want): string | undefined {
   const asked = want?.reasoning?.trim();
   if (asked === "default") return undefined;
-  if (asked) return VARIANT[asked];
+  if (asked) return effortFor("opencode", want);
   return env.ANYDAG_LLM_VARIANT?.trim() || undefined;
 }
 
@@ -441,7 +511,7 @@ export function completeFor(r: Resolved, env: Env, want?: Want): Complete {
   if (r.spec.id === "claude")
     return claudeComplete({
       model: r.model,
-      effort: effortFor(want),
+      effort: effortFor("claude", want),
       env,
       bin: r.bin,
       timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000,
@@ -469,10 +539,19 @@ export function extraFor(r: Resolved, env: Env, want?: Want): Record<string, unk
   const extra: Record<string, unknown> = { ...r.spec.defaults };
   const t = Number(env.ANYDAG_LLM_TEMPERATURE);
   if (env.ANYDAG_LLM_TEMPERATURE && Number.isFinite(t)) extra.temperature = t;
-  for (const effort of [env.ANYDAG_LLM_REASONING?.trim(), want?.reasoning?.trim()]) {
-    if (!effort) continue;
-    if (effort === "default") delete extra.reasoning_effort;
-    else extra.reasoning_effort = effort;
+  const fromEnv = env.ANYDAG_LLM_REASONING?.trim();
+  if (fromEnv) {
+    if (fromEnv === "default") delete extra.reasoning_effort;
+    else extra.reasoning_effort = fromEnv;
+  }
+  const asked = want?.reasoning?.trim();
+  if (asked) {
+    if (asked === "default") delete extra.reasoning_effort;
+    else {
+      const mapped = effortFor(r.spec.id, want);
+      if (mapped) extra.reasoning_effort = mapped;
+      else delete extra.reasoning_effort;
+    }
   }
   return extra;
 }

@@ -417,6 +417,58 @@ test("a board the Assistant makes and embeds in the open note is drawn there, li
   problems = problems.filter((p) => !/Failed to load resource: net::ERR_FAILED/.test(p));
 });
 
+test("the composer's model picker searches a mocked OpenCode list, and the picked model writes the turn", async ({ page }) => {
+  await page.route("**/__board/chat/models*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        fake: true,
+        providers: [
+          {
+            provider: "claude",
+            label: "Claude Code",
+            available: true,
+            default: "claude-sonnet-5-5",
+            models: [{ id: "claude-sonnet-5-5", label: "Sonnet 5.5" }],
+            efforts: ["", "low", "medium", "high", "max"],
+          },
+          {
+            provider: "opencode",
+            label: "OpenCode",
+            available: true,
+            default: "opencode-go/glm-5.3-flash",
+            models: [
+              { id: "opencode-go/glm-5.3-flash", label: "GLM 5.3 Flash" },
+              { id: "opencode-go/kimi-k3", label: "Kimi K3" },
+            ],
+            efforts: ["", "low", "medium", "high", "max"],
+          },
+        ],
+      }),
+    }),
+  );
+  await page.goto("/?chat=new");
+  await expect(page.locator("[data-dag-chat-welcome]")).toBeVisible();
+  const picker = page.locator("button[data-dag-chat-model]");
+  await picker.click();
+  const search = page.locator("[data-dag-model-search]");
+  await expect(search).toBeFocused();
+  await search.fill("glm");
+  await expect(page.getByRole("option", { name: /GLM 5\.3 Flash/ })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(picker).toContainText("GLM 5.3 Flash");
+  await page.locator("[data-dag-chat-effort]").selectOption("max");
+  await say(page, "hello glm");
+
+  await chatId(page);
+  const turn = page.locator("[data-dag-chat-turn]");
+  await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  /* The turn remembers the scale's word and the model the picker chose wrote it. */
+  await expect(turn.locator("[data-dag-chat-model]")).toContainText("glm-5.3-flash");
+  await expect(turn.locator("[data-dag-chat-model]")).toContainText("max");
+});
+
 test("the composer's controls sit on one row, name the model, and the box can be made taller", async ({ page }) => {
   await page.goto("/?tasks=1");
   await page.locator("[data-dag-assistant-toggle]").click();
@@ -429,14 +481,13 @@ test("the composer's controls sit on one row, name the model, and the box can be
   expect(Math.abs(send!.y - scope!.y)).toBeLessThan(8);
 
   /* The model chip names the model, not the harness — and the effort is never "Default effort". */
-  const model = panel.locator("select[data-dag-chat-model]");
-  await expect(model).toHaveValue(/^(claude|opencode)\|/);
-  const shown = await model.evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? "");
+  const model = panel.locator("button[data-dag-chat-model]");
+  await expect(model).toContainText(/Sonnet|Opus|Haiku|Fable|GLM|Kimi|DeepSeek/);
+  const shown = await model.innerText();
   expect(shown).not.toContain("·");
-  const effort = await panel
-    .locator("select[data-dag-chat-effort]")
-    .evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? "");
-  expect(effort).not.toBe("Default effort");
+  const effortPicker = panel.locator("select[data-dag-chat-effort]");
+  await expect(effortPicker.locator("option").first()).toHaveText("Automatic");
+  await expect(effortPicker).toHaveValue(/^(|low|medium|high|max)$/);
 
   /* The box grows to most of the column, and goes back when it is told to. */
   const box = panel.locator("[data-dag-chat-input]");

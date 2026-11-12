@@ -1,21 +1,18 @@
 import { ArrowUp, ChevronDown, Layers, Square, UnfoldVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { Icon } from "@/render/Icon";
-import { MONO } from "@/render/icon-index";
 import { useSettings } from "@/settings/useSettings";
+import { EffortPicker } from "@/ui/EffortPicker";
+import { ModelPicker } from "@/ui/ModelPicker";
+import { pickerProvidersFromChat } from "@/ui/modelList";
 import { currentVault } from "@/vault/current";
 import { loadVaults } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
 
-import { modelLabel } from "./Thread";
 import { scopeOf } from "./scope";
 import type { ChatMeta, Mode, Provider, ProviderModels } from "./types";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-/** The mark a provider draws beside its model: a brand silhouette in the chrome's own ink. */
-const PROVIDER_MARK: Record<Provider, string> = { claude: "anthropic", opencode: "opencode" };
 
 /** What the next turn is sent with: the model it runs on and how hard it thinks. */
 export interface Choice {
@@ -40,9 +37,6 @@ export function defaultChoice(
   const model = at && at === wanted && pref.model ? pref.model : (at?.default ?? "claude-sonnet-5-5");
   return { provider, model, effort: "" };
 }
-
-/** A model's own short name, which is what a person says: the label, with a vendor's prefix off. */
-const shortModel = (m: { id: string; label: string }): string => modelLabel(m.label || m.id);
 
 export interface ComposerProps {
   meta: ChatMeta | null;
@@ -86,7 +80,6 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
 
   const at = models?.find((m) => m.provider === choice.provider);
   const unavailable = at && !at.available ? at : null;
-  const efforts = at?.efforts ?? ["", "low", "medium", "high", "max"];
   const can = text.trim() !== "" && !running && !unavailable;
 
   const send = () => {
@@ -122,48 +115,26 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
       <div className="dag-chat-composer__row">
         <Scope meta={meta} onGrant={(vault, mode) => onGrant(choice, vault, mode)} />
         <span className="dag-chat-modelpick">
-          <ProviderMark provider={choice.provider} />
-          <select
-            className="dag-select dag-chat-picker"
+          <ModelPicker
+            className="dag-chat-picker"
             data-dag-chat-model=""
-            aria-label="Model"
-            value={`${choice.provider}|${choice.model}`}
-            onChange={(e) => {
-              const [provider, ...rest] = e.target.value.split("|");
-              setOver((o) => ({ ...o, provider: provider as Provider, model: rest.join("|") }));
+            providers={pickerProvidersFromChat(models)}
+            provider={choice.provider}
+            model={choice.model}
+            defaultProvider={at?.default ?? choice.provider}
+            onChange={(picked) => {
+              const provider = (picked.provider ?? choice.provider) as Provider;
+              const p = models?.find((m) => m.provider === provider);
+              setOver((o) => ({ ...o, provider, model: picked.model ?? p?.default ?? choice.model }));
             }}
-          >
-            {(models ?? []).map((p) => {
-              const list =
-                p.models.some((m) => m.id === choice.model) || p.provider !== choice.provider
-                  ? p.models
-                  : [{ id: choice.model, label: choice.model }, ...p.models];
-              return (
-                <optgroup key={p.provider} label={p.available ? p.label : `${p.label} (unavailable)`} disabled={!p.available}>
-                  {list.map((m) => (
-                    <option key={m.id} value={`${p.provider}|${m.id}`} disabled={!p.available}>
-                      {shortModel(m)}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-            {!models ? <option value={`${choice.provider}|${choice.model}`}>{modelLabel(choice.model)}</option> : null}
-          </select>
+          />
         </span>
-        <select
-          className="dag-select dag-chat-picker dag-chat-picker--effort"
+        <EffortPicker
+          className="dag-chat-picker dag-chat-picker--effort"
           data-dag-chat-effort=""
-          aria-label="Effort"
           value={choice.effort}
-          onChange={(e) => setOver((o) => ({ ...o, effort: e.target.value }))}
-        >
-          {efforts.map((x) => (
-            <option key={x} value={x}>
-              {x === "" ? "Auto" : `${x.charAt(0).toUpperCase()}${x.slice(1)}`}
-            </option>
-          ))}
-        </select>
+          onChange={(level) => setOver((o) => ({ ...o, effort: level ?? "" }))}
+        />
         <button
           type="button"
           className="dag-icon dag-chat-composer__expand"
@@ -201,17 +172,6 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
         )}
       </div>
     </div>
-  );
-}
-
-/** The provider's logo: the bundle's silhouette, which takes the chrome's ink. A name the bundle
- * does not have — an icon set that has stopped carrying one — draws the Layers glyph instead. */
-function ProviderMark({ provider }: { provider: Provider }) {
-  const name = PROVIDER_MARK[provider];
-  return MONO.has(name) ? (
-    <Icon icon={{ mode: "mono", name }} size={ICON.size} stroke={ICON.strokeWidth} />
-  ) : (
-    <Layers {...ICON} aria-hidden="true" />
   );
 }
 

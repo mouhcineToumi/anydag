@@ -15,6 +15,7 @@ import path from "node:path";
 
 import type { Context, Next } from "hono";
 
+import { effortFor } from "../../plugins/generate/llm";
 import type { Session } from "../context";
 import { err } from "../http";
 import type { Harness, HarnessEvent, McpCommand, Running } from "./harness";
@@ -325,13 +326,16 @@ export class Assistant {
     else live.session = resume ?? null;
 
     const scratch = fs.mkdtempSync(path.join(this.opts.scratch ?? os.tmpdir(), `anydag-chat-${chat}-`));
+    /* The chat keeps the scale's word (`max`), which is what its header shows; the harness gets
+       what its provider calls it, and nothing when that provider has no such word. */
+    const effort = meta.effort ? effortFor(meta.provider, { reasoning: meta.effort }) : undefined;
     const run = () => {
       try {
         live.running = harness.run(
           {
             chat,
             model: meta.model,
-            ...(meta.effort ? { effort: meta.effort } : {}),
+            ...(effort ? { effort } : {}),
             system: systemPrompt(this.reach(meta)),
             prompt: seeded(unseen, words),
             ...(resume ? { resume } : { fresh }),

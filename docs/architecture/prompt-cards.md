@@ -52,16 +52,16 @@ Nine things are load-bearing:
   choice; anything else a model writes — `x=`, `#id`, `page=`, `hidden` — is dropped before the
   check, not after it.
 - **How hard the model thinks is the person's, not the machine's.** Settings → AI and agents offers
-  `none · low · medium · high` beside the provider, and the level rides with the request — so trying
-  `high` on a dense description is a select, not an edit to `.env.local` and a restart. It outranks
-  `ANYDAG_LLM_REASONING`, because the environment is how this machine is set up and the select is
-  somebody choosing now; `default` is a choice too, and means the model's own. **The level is passed
-  through rather than checked against a list**: which levels exist is the model's business — Gemini
-  3.8 Flash takes those four and refuses `minimal` in so many words, and that refusal is worth
-  showing on the card. The server checks only the shape, because it ends up in a request body. For
-  `opencode` it becomes a variant written `model#variant`, which is the *model's* vocabulary — GLM
-  5.3 Flash has `low`, `high` and `max`, Kimi K3 only `max` — so `variantFor()` maps none and low
-  onto `low`, high onto `high`, and the middle of the range is "say nothing".
+  the same scale everywhere — Automatic · Low · Medium · High · Max — beside the provider, and the
+  level rides with the request: trying `High` on a dense description is a select, not an edit to
+  `.env.local` and a restart. It outranks `ANYDAG_LLM_REASONING`, because the environment is how this
+  machine is set up and the select is somebody choosing now; `default` is a choice too, and means the
+  model's own. **One mapping decides what each provider calls the level** (`effortFor` in `llm.ts`):
+  Claude Code's `--effort` takes low, medium and high, so Max is High and `none`, read from an older
+  preference, is Low; OpenCode's `#variant` has `low`, `high` and `max`, so none and low map to `low`
+  and the middle is "say nothing"; an HTTP provider's `reasoning_effort` takes none through high, so
+  Max is High there too. The server checks only the shape, because an unknown level ends up in a
+  request body and a model that refuses it says so in its own words on the card.
 - **A provider is a row in a table** (`providers.ts`), resolved per request from `.env.local` and
   the process environment, so a key added mid-session counts; in the desktop app the person's own key
   is kept in the OS keychain and never in a file anybody syncs.
