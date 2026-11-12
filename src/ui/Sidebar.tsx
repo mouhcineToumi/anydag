@@ -36,6 +36,7 @@ import {
   FolderPlus,
   GraduationCap,
   Grid2x2Plus,
+  Home,
   Link as LinkMark,
   ListTodo,
   MessageCircleWarning,
@@ -1217,6 +1218,22 @@ export function Sidebar({
       )}
 
       <div className="dag-sidebar__acts">
+        {/* A phone has no mark to press: the toolbar hides its logo there with the breadcrumbs, and
+            the sheet's head is the vault and the way out. So the way home is a row of its own, at
+            the top of the sheet, opening what the logo opens on a desktop. */}
+        {sheet ? (
+          <button
+            type="button"
+            className="dag-sidebar__act"
+            data-dag-sidebar-sheet-home=""
+            aria-label="Home"
+            title="Home"
+            onClick={onHome}
+          >
+            <Home {...ICON} aria-hidden="true" />
+            <span>Home</span>
+          </button>
+        ) : null}
         <button type="button" className="dag-sidebar__act" data-dag-sidebar-search="" onClick={() => ask("search")}>
           <Search {...ICON} aria-hidden="true" />
           <span>Search</span>
@@ -1810,6 +1827,14 @@ export function Sidebar({
               return void refuseLocked();
             }
             const where = whereOf(menuLine);
+            /* A folder's menu opens the New menu scoped to it, where the folder's own `+` would
+               have — which a phone hides, and which a finger cannot hover. */
+            if (what === "new-in" && menuLine.type === "folder" && mode?.kind === "menu") {
+              const { at } = mode;
+              setMode(null);
+              setMaking({ x: at.x, y: at.y, below: at.y, left: at.x, here: where });
+              return;
+            }
             /* Into the trash at once, a folder with everything in it: nothing is asked,
                because the window offers to take it back — the three questions this asked went with
                the reason for them. */
@@ -2115,6 +2140,7 @@ const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>([
 ]);
 
 type Pick =
+  | "new-in"
   | "rename"
   | "duplicate"
   | "move"
@@ -2257,6 +2283,14 @@ function RowMenu({
         </>
       ) : (
         <>
+          {/* A folder's `+` is the same menu, but on a phone the plus is hidden and a finger has
+              no hover: this is the one way into the folder's New menu there. */}
+          {line.type === "folder" ? (
+            <>
+              {item("new-in", `New in “${leaf(line.path)}”…`, <FilePlus2 {...ICON} aria-hidden="true" />)}
+              <hr className="dag-vault__rule" />
+            </>
+          ) : null}
           {line.type === "file"
             ? favourite
               ? item("unfavourite", "Remove from favourites", <StarOff {...ICON} aria-hidden="true" />)
