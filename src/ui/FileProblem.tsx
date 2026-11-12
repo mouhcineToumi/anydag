@@ -111,7 +111,9 @@ export function FileProblem({
   };
 
   return (
-    <main className="dag-file-problem" data-dag-file-problem={problem.reason}>
+    /* A div, not a <main>: the page around it owns the one main landmark, and the card is its
+       content. The section inside is labelled by the title, so it is still a named region. */
+    <div className="dag-file-problem" data-dag-file-problem={problem.reason}>
       <section className="dag-file-problem__card" aria-labelledby="dag-file-problem-title">
         <h1 className="dag-file-problem__title" id="dag-file-problem-title">
           {copy.title}
@@ -161,6 +163,6 @@ export function FileProblem({
           </details>
         ) : null}
       </section>
-    </main>
+    </div>
   );
 }
