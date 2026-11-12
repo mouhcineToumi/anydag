@@ -724,7 +724,7 @@
   font-size: 11px;
   line-height: 16px;
   text-align: center;
-  color: var(--dag-color-muted);
+  color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
   border-radius: var(--dag-metric-radius-small);
@@ -847,8 +847,8 @@
  * the accent — the open file's tint without its cap, so the two read apart when they are one row — and
  * the bar under the tree says how many and what can be done to them.
  */
-.dag-sidebar__row[aria-selected="true"],
-.dag-sidebar__row[aria-selected="true"]:hover { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); box-shadow: inset 0 0 0 1px var(--dag-color-accent); }
+.dag-sidebar__line[aria-selected="true"] > .dag-sidebar__row,
+.dag-sidebar__line[aria-selected="true"] > .dag-sidebar__row:hover { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); box-shadow: inset 0 0 0 1px var(--dag-color-accent); }
 .dag-sidebar__bulk {
   display: flex;
   flex: none;
@@ -1650,7 +1650,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-top: 1px solid var(--dag-color-outlineSoft);
   font-family: var(--dag-font-sans);
   font-size: 12px;
-  color: var(--dag-color-muted);
+  color: var(--dag-color-slate);
 }
 
 /* ---- nothing open ---- */
@@ -1687,7 +1687,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   box-shadow: var(--elevation);
 }
 .dag-welcome__title { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: var(--dag-color-ink); }
-.dag-welcome__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--dag-color-muted); }
+.dag-welcome__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--dag-color-slate); }
 .dag-welcome__acts { display: flex; gap: 8px; margin-top: 14px; }
 .dag-welcome__act {
   display: inline-flex;
@@ -1706,7 +1706,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-welcome__act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 /* One of the two is the one to press, and it is the one that makes something: an empty board with
    two identical buttons asks a question it already knows the usual answer to. */
-.dag-welcome__act--go { border-color: var(--dag-color-accent); color: var(--dag-color-accent); }
+.dag-welcome__act--go {
+  border-color: var(--dag-color-accent);
+  color: color-mix(in srgb, var(--dag-color-accent) 90%, var(--dag-color-ink));
+}
 /* An empty board's three ways in: tiles rather than a row of buttons, each with the key
    that does the same thing under it, so the card teaches the keys it stands in for. */
 .dag-welcome--empty { padding: 20px 20px 18px; box-shadow: none; }

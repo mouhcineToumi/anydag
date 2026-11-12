@@ -49,6 +49,9 @@ Fourteen things are load-bearing:
   rename, `shift+F10` for the menu), and every row carries the folder a drop onto it means. Which
   folders are open is `dag:sidebar-open`, this browser's and deliberately not synced — view state,
   like a scroll position — written with `writeLocal`, which does not wake the preference sync.
+  **A row's `⋯` and a folder's `+` live inside its `role="treeitem"`**, because they act on that
+  row; the tree owns only treeitems and groups. The loading line, *Nothing here yet* and a refused
+  create sit beside it rather than in it, so the tree is never a tree with a paragraph in it.
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
   one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
   down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside

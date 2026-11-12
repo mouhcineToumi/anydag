@@ -2299,7 +2299,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   }, [soloGroup, groups, selected]);
 
   return (
-    <div className="dag-app" data-snapshot={snapshot ? "1" : undefined}>
+    <main className="dag-app" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
         <Toolbar
           boardName={boardName}
@@ -2719,6 +2719,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
           edit={editor.enabled && !locked ? editor.pages : undefined}
         />
       ) : null}
-    </div>
+    </main>
   );
 }

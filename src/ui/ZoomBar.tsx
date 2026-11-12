@@ -31,7 +31,7 @@ export function ZoomBar({ onZoom, onFit, onActual }: { onZoom(dir: 1 | -1): void
     return () => document.removeEventListener("dag:zoom", on);
   }, []);
   return (
-    <div className="dag-zoombar" data-dag-zoombar="" role="group" aria-label="Zoom">
+    <div className="dag-zoombar" data-dag-zoombar="" role="toolbar" aria-label="Zoom">
       <Tooltip name="Zoom out" shortcut="−">
         <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(-1)} aria-label="Zoom out (−)">
           <Minus {...ICON} aria-hidden="true" />
