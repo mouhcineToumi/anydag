@@ -64,14 +64,14 @@ export function BoardSettings({ board, onMeta, onClose }: Props) {
           onClose();
         }}
       >
-        <header className="dag-settings__head">
+        <div className="dag-settings__head">
           <SlidersHorizontal {...ICON} aria-hidden="true" />
           <h2>Board settings</h2>
           <span className="dag-toolbar__spacer" />
           <button type="button" className="dag-icon" aria-label="Close" data-dag-board-settings-close="" onClick={onClose}>
             <X {...ICON} aria-hidden="true" />
           </button>
-        </header>
+        </div>
 
         <div className="dag-board-settings__body">
           <div className="dag-board-settings__flow" role="group" aria-label="Flow">

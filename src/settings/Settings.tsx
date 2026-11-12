@@ -288,7 +288,7 @@ export function Settings({
           className="dag-settings-modal__pane"
           data-dag-settings-pane={tab}
         >
-          <header className="dag-settings-modal__head">
+          <div className="dag-settings-modal__head">
             <button
               type="button"
               className="dag-icon dag-settings-modal__back"
@@ -302,7 +302,7 @@ export function Settings({
               <ArrowLeft {...ICON} aria-hidden="true" />
             </button>
             <h3>{TAB_LABEL[tab]}</h3>
-          </header>
+          </div>
           <div className="dag-settings-modal__body">
             {tab === "calendar" ? (
               <CalendarPane />
