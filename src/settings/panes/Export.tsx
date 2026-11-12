@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 
 import { megabytes, readLimits, type Limits } from "@/files/upload";
 
-import { resetSettings, writeSettings } from "../store";
+import { resetSettingsWithUndo, writeSettings } from "../store";
+import { SETTLE } from "../feedback";
 import { useSettings } from "../useSettings";
 import { ScaledNumber, Switch } from "@/ui/controls";
 
@@ -22,7 +23,7 @@ export function ExportPane() {
   return (
     <>
       <Group title="Export">
-        <Field label="PNG resolution" hint="How many image pixels per board pixel.">
+        <Field label="PNG resolution" hint="How many image pixels per board pixel." save="export.scale">
           <select
             className="dag-select dag-select--narrow"
             data-dag-setting-export-scale=""
@@ -36,14 +37,19 @@ export function ExportPane() {
             ))}
           </select>
         </Field>
-        <Field label="Background" hint="Off exports the board on nothing, which suits a dark slide.">
+        <Field label="Background" hint="Off exports the board on nothing, which suits a dark slide." save="export.paper">
           <Switch
             data-dag-setting-export-paper=""
             checked={s.export.paper}
             onChange={(e) => writeSettings({ export: { paper: e.target.checked } })}
           />
         </Field>
-        <Field label="Margin" hint="Space around the board. A single item exports without either.">
+        <Field
+          label="Margin"
+          hint="Space around the board. A single item exports without either."
+          save="export.margin"
+          settle={SETTLE}
+        >
           <ScaledNumber
             data-dag-setting-export-margin=""
             value={s.export.margin}
@@ -67,7 +73,7 @@ export function ExportPane() {
         <UploadLimits />
       </Group>
 
-      <Reset what="the export settings" onReset={() => resetSettings(["export"])} />
+      <Reset what="Import and export" onReset={() => resetSettingsWithUndo(["export"])} />
     </>
   );
 }

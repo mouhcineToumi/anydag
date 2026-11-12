@@ -3332,6 +3332,78 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings__reset:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
 .dag-settings__reset:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+/* The confirmation beside a row that just wrote. It fades after about a second and a half; the
+   component takes it out of the DOM at the same moment. Reduced motion shows and hides it plain. */
+.dag-settings__saved {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  animation: dag-settings-saved 1.5s ease forwards;
+}
+.dag-settings__saved > svg { flex: none; }
+@keyframes dag-settings-saved {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dag-settings__saved { animation: none; }
+}
+/* The reset's toast, the trash notice's shape at the modal's foot: the same border, elevation and
+   action button, positioned against the card rather than the window. */
+.dag-settings__toast {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 12px;
+  font-size: 13px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-card);
+  box-shadow: 0 4px 16px var(--dag-color-shadow);
+}
+.dag-settings__toast > svg { flex: none; color: var(--dag-color-slate); }
+.dag-settings__toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-settings__toast-dot { flex: none; color: var(--dag-color-muted); }
+.dag-settings__toast-act {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dag-color-accent);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-settings__toast-act:hover { background: var(--dag-color-paper100); }
+.dag-settings__toast-act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+/* One polite live region for every save and reset in the modal; the ticks themselves are silent. */
+.dag-settings__said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 .dag-settings-modal .dag-settings__foot { justify-content: flex-start; margin-top: 28px; }
 
 /*

@@ -26,15 +26,16 @@ export function useCalendarHidden(): [ReadonlySet<CalKind>, (kind: CalKind, hide
     () => new Set(raw.split(",").filter((k): k is CalKind => (CAL_KINDS as readonly string[]).includes(k))),
     [raw],
   );
-  const set = useCallback(
-    (kind: CalKind, hide: boolean) => {
-      const next = new Set(hidden);
-      if (hide) next.add(kind);
-      else next.delete(kind);
-      writePref(CALENDAR_HIDE, next.size ? [...next].sort().join(",") : null);
-    },
-    [hidden],
-  );
+  const set = useCallback((kind: CalKind, hide: boolean) => {
+    /* Read the list at the moment of the click, not from the render that made this callback: a
+       reset clears several kinds in one gesture, and a captured set would put each earlier one back. */
+    const current = readPref(CALENDAR_HIDE, "") ?? "";
+    const next = new Set(current.split(",").filter((k): k is CalKind => (CAL_KINDS as readonly string[]).includes(k)));
+    if (hide) next.add(kind);
+    else next.delete(kind);
+    /* One list, several rows: the tick names the switch that was touched rather than all of them. */
+    writePref(CALENDAR_HIDE, next.size ? [...next].sort().join(",") : null, `${CALENDAR_HIDE}:${kind}`);
+  }, []);
   return [hidden, set];
 }
 

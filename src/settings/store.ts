@@ -22,6 +22,7 @@
  */
 
 import { storageKey } from "./prefs";
+import { markSaved } from "./saved";
 
 /** How wide a pasted or imported image is placed. */
 export type PasteSize =
@@ -99,6 +100,17 @@ export const DEFAULTS: Settings = {
   llm: { provider: null, model: null, reasoning: null },
   assistant: { provider: null, model: null },
 };
+
+/** A write to any part of the settings object: one section, or several at once. */
+export type SettingsPatch = {
+  problems?: Partial<Settings["problems"]>;
+  paste?: Partial<Settings["paste"]>;
+  export?: Partial<Settings["export"]>;
+  llm?: Partial<Settings["llm"]>;
+  assistant?: Partial<Settings["assistant"]>;
+};
+
+const SECTIONS = ["problems", "paste", "export", "llm", "assistant"] as const;
 
 /** Where they live. One key holding one object, so a bad value is one `catch` and a reset is one `removeItem`. */
 export const STORE = "dag:settings";
@@ -206,13 +218,7 @@ export function readSettings(): Settings {
 }
 
 /** Merge a patch into what is stored, section by section, and tell the window. */
-export function writeSettings(patch: {
-  problems?: Partial<Settings["problems"]>;
-  paste?: Partial<Settings["paste"]>;
-  export?: Partial<Settings["export"]>;
-  llm?: Partial<Settings["llm"]>;
-  assistant?: Partial<Settings["assistant"]>;
-}): Settings {
+export function writeSettings(patch: SettingsPatch): Settings {
   const now = readSettings();
   const next = normalise({
     problems: { ...now.problems, ...patch.problems },
@@ -222,7 +228,27 @@ export function writeSettings(patch: {
     assistant: { ...now.assistant, ...patch.assistant },
   });
   save(JSON.stringify(next));
+  announce(now, next, patch);
   return next;
+}
+
+/**
+ * Say which rows moved, after the write has landed.
+ *
+ * A patch is section-shaped but a tick is row-shaped, so this walks the fields the patch named and
+ * reports only those whose normalised value actually changed. The key is `section.field`, which is
+ * what `Field`'s `save` names.
+ */
+function announce(before: Settings, after: Settings, patch: SettingsPatch): void {
+  for (const section of SECTIONS) {
+    const changed = patch[section];
+    if (!changed) continue;
+    const was = before[section] as Record<string, unknown>;
+    const now = after[section] as Record<string, unknown>;
+    for (const field of Object.keys(changed)) {
+      if (was[field] !== now[field]) markSaved(`${section}.${field}`);
+    }
+  }
 }
 
 /**
@@ -230,13 +256,54 @@ export function writeSettings(patch: {
  * old object. With `only`, just those sections: each tab of the Settings modal resets what it shows
  * and nothing it does not, so a reset on the export tab cannot quietly change which model
  * draws a prompt card.
+ *
+ * A reset answers with its own toast rather than a tick per row, so it deliberately does not
+ * announce; {@link resetSettingsWithUndo} is the shape the modal uses.
  */
 export function resetSettings(only?: readonly (keyof Settings)[]): Settings {
   if (!only) {
     save(null);
     return DEFAULTS;
   }
-  return writeSettings(Object.fromEntries(only.map((k) => [k, DEFAULTS[k]])));
+  const now = readSettings();
+  const next = normalise({
+    ...now,
+    ...Object.fromEntries(only.map((k) => [k, DEFAULTS[k]])),
+  });
+  save(JSON.stringify(next));
+  return next;
+}
+
+/**
+ * A reset and the action that takes it back.
+ *
+ * The snapshot is taken *before* the reset and holds only the fields that are away from their
+ * default — exactly what the reset will change, and so exactly what Undo has to put back. A field
+ * already at its default is not in it, and a change made to that field after the reset is not
+ * overwritten when Undo runs. Undo goes through {@link writeSettings}, the same setter the controls
+ * use, so it is normalised and announced like any other change.
+ */
+export function resetSettingsWithUndo(only: readonly (keyof Settings)[]): () => void {
+  const before = changedSections(readSettings(), only);
+  resetSettings(only);
+  return () => {
+    writeSettings(before);
+  };
+}
+
+/** The fields of `only` that are away from their default now, as a patch a write can take. */
+function changedSections(now: Settings, only: readonly (keyof Settings)[]): SettingsPatch {
+  const patch: Record<string, Record<string, unknown>> = {};
+  for (const section of only) {
+    const was = now[section] as unknown as Record<string, unknown>;
+    const def = DEFAULTS[section] as unknown as Record<string, unknown>;
+    const fields: Record<string, unknown> = {};
+    for (const field of Object.keys(def)) {
+      if (was[field] !== def[field]) fields[field] = was[field];
+    }
+    if (Object.keys(fields).length > 0) patch[section] = fields;
+  }
+  return patch as SettingsPatch;
 }
 
 function save(value: string | null) {

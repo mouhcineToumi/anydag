@@ -85,6 +85,7 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
         <Field
           label="Attachments folder"
           hint="Where an uploaded file is kept, inside the vault. Files already there stay where they are."
+          save={ATTACHMENTS}
         >
           <TextField
             wide
@@ -153,6 +154,7 @@ function UpdateLinks() {
     <Field
       label="Update links when a file moves"
       hint="Renaming or moving a file rewrites the [[wikilinks]] to it in every other file."
+      save={UPDATE_LINKS}
     >
       <Switch
         data-dag-setting-update-links=""

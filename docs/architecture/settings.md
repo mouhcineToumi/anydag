@@ -7,7 +7,9 @@
 What the *app* does, as opposed to what a board says. A board file is the document Claude reads and
 every gesture on the canvas is a write to it; these are the other thing — preferences about this
 window that no board should carry. `src/settings/store.ts` owns the keys, `Settings.tsx` the modal,
-`tabs.ts` its tabs and `panes/` one file per tab. The gear at the
+`tabs.ts` its tabs and `panes/` one file per tab. `saved.ts` is the one announcement a write makes and
+`feedback.tsx` turns it into the tick beside a row, the modal's single polite live region, and the
+toast a reset raises. The gear at the
 sidebar's foot or `ctrl+,` opens it on the last tab this browser had open, and the vault switcher's
 *Vault settings…* on Vault.
 
@@ -50,9 +52,16 @@ Four things about the modal are load-bearing:
   `[data-dag-settings]`. Without the second half, a click on a blank part of a tab left the focus on
   the modal rather than on a control, and a Delete pressed there deleted the board's selection behind
   it — which the old card could do too.
-- **Every control saves as it changes, on every tab**, and each tab's Reset resets what that tab
-  shows and nothing else (`resetSettings(only)`). The attachments folder, the one text field, saves on
-  Enter or when it is left; Escape with a change in it takes the change back, and the next closes.
+- **Every control saves as it changes, on every tab, and says so.** The row that changed shows a
+  small slate `✓ Saved` for about a second and a half — a select at once, a text field after roughly
+  600 ms of no typing or when it is left. The tick itself is silent; one polite live region in the
+  modal announces each save once, so a screen reader hears one word rather than one per row. Each
+  tab's Reset names its scope in its own text ("Reset Import and export to defaults") and resets what
+  that tab shows and nothing else (`resetSettings(only)`; the Calendar's is `resetPrefs` over its
+  three keys). Before it resets it snapshots the values it will change, then raises the modal's
+  toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes the snapshot back through the same
+  setters. The attachments folder, the one text field that saves on Enter rather than as it is typed,
+  keeps doing that; Escape with a change in it takes the change back, and the next closes.
 - **The tab is this browser's** (`dag:settings-tab`, written with `writeLocal`, never synced) and a
   request that names one wins. `dag:chrome` carries `{ what, tab? }` (`src/ui/chrome.ts`). Under
   720px the modal is the window: the tab list, then one tab with a back arrow.
@@ -151,7 +160,10 @@ Names claimed, grepped first as this file has learned to: `dag-settings`, `dag-s
 — and for the modal `dag-settings-modal*`, `data-dag-settings-tab`, `data-dag-settings-tab-button`,
 `data-dag-settings-pane`, `data-dag-settings-group`, `data-dag-settings-view`, `data-dag-settings-back`,
 `data-dag-settings-close`, `data-dag-vault-settings`, and the
-storage key `dag:settings-tab`. `dag-settings__*` is also the vocabulary of other cards (the rewrite
+storage key `dag:settings-tab`. The save tick added `dag-settings__saved` (`data-dag-setting-saved`),
+the toast `dag-settings__toast*` (`data-dag-setting-reset-toast`, `data-dag-setting-reset-undo`), the
+live region `dag-settings__said` (`data-dag-setting-said`), and the event `dag:settings-saved`.
+`dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
 the translucent elevation colour every dialog and floating card draws with — because a shadow is a

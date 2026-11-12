@@ -18,7 +18,8 @@ import { pickerProvidersFromChat, pickerProvidersFromLlm } from "@/ui/modelList"
 import { TextField } from "@/ui/controls";
 
 import { PROVIDER_NAMES, providerName } from "../providerNames";
-import { resetSettings, writeSettings } from "../store";
+import { markSaved } from "../saved";
+import { resetSettingsWithUndo, writeSettings } from "../store";
 import { useSettings } from "../useSettings";
 
 import { Field, Group, Hint, ICON, Reset, copyText } from "./common";
@@ -106,7 +107,7 @@ export function AgentsPane() {
           </>
         }
       >
-        <Field label="Provider" hint={chosen?.description}>
+        <Field label="Provider" hint={chosen?.description} save="llm.provider">
           <select
             className="dag-select dag-select--wide"
             data-dag-setting-llm-provider=""
@@ -126,6 +127,7 @@ export function AgentsPane() {
         </Field>
         <Field
           label="Model"
+          save="llm.model"
           hint={s.llm.model ? undefined : `Uses ${chosen?.defaultModel || "the provider's default"} unless you choose another.`}
         >
           <ModelPicker
@@ -137,7 +139,7 @@ export function AgentsPane() {
             onChange={(choice) => writeSettings({ llm: { provider: choice.provider, model: choice.model } })}
           />
         </Field>
-        <Field label="Thinking" hint="More is slower, and rarely a better diagram. Low is usually enough.">
+        <Field label="Thinking" hint="More is slower, and rarely a better diagram. Low is usually enough." save="llm.reasoning">
           <EffortPicker
             data-dag-setting-llm-reasoning=""
             value={s.llm.reasoning}
@@ -152,10 +154,7 @@ export function AgentsPane() {
 
       <Agents />
 
-      <Reset
-        what="the diagram and flashcard model, and the Assistant's provider, model and thinking"
-        onReset={() => resetSettings(["llm", "assistant"])}
-      />
+      <Reset what="AI and agents" onReset={() => resetSettingsWithUndo(["llm", "assistant"])} />
     </>
   );
 }
@@ -195,7 +194,7 @@ function AssistantGroup() {
         </Hint>
       }
     >
-      <Field label="Provider" hint="What a new chat runs on.">
+      <Field label="Provider" hint="What a new chat runs on." save="assistant.provider">
         <select
           className="dag-select dag-select--wide"
           data-dag-setting-assistant-provider=""
@@ -215,7 +214,7 @@ function AssistantGroup() {
           ))}
         </select>
       </Field>
-      <Field label="Model">
+      <Field label="Model" save="assistant.model">
         <ModelPicker
           data-dag-setting-assistant-model=""
           providers={pickerProvidersFromChat(providers)}
@@ -261,7 +260,8 @@ function ProviderKeys({ onChange }: { onChange: () => void }) {
   const done = async (name: string, act: Promise<boolean>) => {
     setBusy(name);
     try {
-      await act;
+      const ok = await act;
+      if (ok) markSaved(`provider-key.${name}`);
       setStored(new Set(await keys.names()));
       setDraft((d) => ({ ...d, [name]: "" }));
       onChange();
@@ -280,7 +280,7 @@ function ProviderKeys({ onChange }: { onChange: () => void }) {
       }
     >
       {KEYS.map(({ name, label }) => (
-        <Field key={name} label={label} plain data-dag-setting-key={name}>
+        <Field key={name} label={label} plain data-dag-setting-key={name} save={`provider-key.${name}`}>
           <span className="dag-settings__actions">
             <TextField
               type="password"

@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 
 import { readPractice, setGraduate } from "@/ui/quiz/practice";
 
-import { resetSettings, writeSettings, type PasteSize, type ProblemsShow } from "../store";
+import { resetSettingsWithUndo, writeSettings, type PasteSize, type ProblemsShow } from "../store";
+import { SETTLE } from "../feedback";
+import { THEME } from "../prefs";
+import { markSaved } from "../saved";
 import { useSettings } from "../useSettings";
 import { TextField } from "@/ui/controls";
 
@@ -46,7 +49,11 @@ export function PreferencesPane({
   return (
     <>
       <Group title="Appearance">
-        <Field label="Theme" hint="A theme in the page's address still wins, so a shared link shows what it was meant to.">
+        <Field
+          label="Theme"
+          hint="A theme in the page's address still wins, so a shared link shows what it was meant to."
+          save={THEME}
+        >
           <select
             className="dag-select"
             data-dag-setting-theme=""
@@ -64,7 +71,11 @@ export function PreferencesPane({
       </Group>
 
       <Group title="Problems">
-        <Field label="When a board has an error" hint={PROBLEMS.find((p) => p.value === s.problems.show)?.hint}>
+        <Field
+          label="When a board has an error"
+          hint={PROBLEMS.find((p) => p.value === s.problems.show)?.hint}
+          save="problems.show"
+        >
           <select
             className="dag-select"
             data-dag-setting-problems=""
@@ -81,7 +92,7 @@ export function PreferencesPane({
       </Group>
 
       <Group title="Pasted images">
-        <Field label="Size" hint={PLACEMENT.find((p) => p.value === s.paste.size)?.hint}>
+        <Field label="Size" hint={PLACEMENT.find((p) => p.value === s.paste.size)?.hint} save="paste.size">
           <select
             className="dag-select"
             data-dag-setting-paste-size=""
@@ -96,7 +107,7 @@ export function PreferencesPane({
           </select>
         </Field>
         {s.paste.size === "width" ? (
-          <Field label="Width">
+          <Field label="Width" save="paste.width" settle={SETTLE}>
             <TextField
               data-dag-setting-paste-width=""
               type="number"
@@ -112,6 +123,8 @@ export function PreferencesPane({
         <Field
           label="Largest width kept"
           hint="Wider images are scaled down once, as PNG. Leave it empty to keep every original as it was pasted."
+          save="paste.maxWidth"
+          settle={SETTLE}
         >
           <TextField
             data-dag-setting-paste-max=""
@@ -131,7 +144,7 @@ export function PreferencesPane({
         <Graduate />
       </Group>
 
-      <Reset what="problems and pasted images (the theme stays)" onReset={() => resetSettings(["problems", "paste"])} />
+      <Reset what="Problems and pasted images" onReset={() => resetSettingsWithUndo(["problems", "paste"])} />
     </>
   );
 }
@@ -162,6 +175,7 @@ function Graduate() {
           ? "That did not save. Try again in a moment."
           : "How many times in a row you answer a question right in the Mistakes run before it leaves."
       }
+      save="practice.graduate"
     >
       <select
         className="dag-select dag-select--narrow"
@@ -172,7 +186,13 @@ function Graduate() {
           const next = Number(e.target.value);
           setN(next);
           setFailed(false);
-          void setGraduate(next).then((got) => (got === null ? setFailed(true) : setN(got)));
+          void setGraduate(next).then((got) => {
+            if (got === null) setFailed(true);
+            else {
+              setN(got);
+              markSaved("practice.graduate");
+            }
+          });
         }}
       >
         {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
