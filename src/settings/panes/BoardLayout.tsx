@@ -45,8 +45,17 @@ export function BoardLayoutPane({
   const file = useRef(board.flow);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* The file has two writers. When another one changes the flow, a box nobody is editing follows it,
+     so a later commit cannot put the old number back. A box with an unsaved edit keeps the edit. */
   useEffect(() => {
+    const was = file.current;
     file.current = board.flow;
+    const next = { ...drafts.current };
+    if (timer.current === null && next.width === String(was.width)) next.width = String(board.flow.width);
+    if (timer.current === null && next.gap === String(was.gap)) next.gap = String(board.flow.gap);
+    drafts.current = next;
+    setWidth(next.width);
+    setGap(next.gap);
   }, [board.flow]);
 
   const cancel = useCallback(() => {
