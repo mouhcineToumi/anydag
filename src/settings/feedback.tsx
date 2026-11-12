@@ -10,6 +10,11 @@ const RESET_FOR = 6000;
 /** How long a text field waits after typing before it says its write settled. Longer than a pause between two keystrokes. */
 export const SETTLE = 600;
 
+/* The rows on screen, by key and how many draw it. A preference written elsewhere while the modal is
+   open — the sidebar's width, the calendar noting the zone it saw — is not a save anyone made here,
+   and the live region must not say "Saved" for it. */
+const watched = new Map<string, number>();
+
 /**
  * The tick beside one row.
  *
@@ -38,6 +43,7 @@ export function useSaved(key: string | undefined, settle = 0): { shown: boolean;
 
   useEffect(() => {
     if (!key) return;
+    watched.set(key, (watched.get(key) ?? 0) + 1);
     const onSaved = (e: Event) => {
       if ((e as CustomEvent<SavedDetail>).detail?.key !== key) return;
       if (settle <= 0 || soon.current) {
@@ -53,6 +59,9 @@ export function useSaved(key: string | undefined, settle = 0): { shown: boolean;
     };
     addEventListener(SAVED, onSaved);
     return () => {
+      const n = (watched.get(key) ?? 1) - 1;
+      if (n > 0) watched.set(key, n);
+      else watched.delete(key);
       removeEventListener(SAVED, onSaved);
       if (pending.current !== null) {
         clearTimeout(pending.current);
@@ -97,7 +106,10 @@ export function SettingsFeedback({ children }: { children: ReactNode }) {
   const say = useCallback((text: string) => setSaid((old) => ({ text, alt: !old.alt })), []);
 
   useEffect(() => {
-    const onSaved = () => say("Saved");
+    const onSaved = (e: Event) => {
+      const key = (e as CustomEvent<SavedDetail>).detail?.key;
+      if (key && watched.has(key)) say("Saved");
+    };
     addEventListener(SAVED, onSaved);
     return () => removeEventListener(SAVED, onSaved);
   }, [say]);
