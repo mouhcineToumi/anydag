@@ -16,7 +16,31 @@
  * `paper-dark`, soft and low-contrast on the light themes. The geometry is chrome's, and the same
  * on every one of them so two dialogs never sit at two different heights above the page.
  */
-:root { --elevation: 0 12px 40px var(--dag-color-shadow); }
+:root {
+  --elevation: 0 12px 40px var(--dag-color-shadow);
+}
+
+/*
+ * The one focus ring the chrome draws: a 2px gap in the surface's own colour, then 2px of accent.
+ * `--focus-ring-inset` is the same ring for a row or a menu item, whose neighbours would cover the
+ * outer half. Neither name takes the `--dag-` prefix: no theme has an opinion about focus, and
+ * `check-theme.mjs` reads that prefix as a token every folder must carry.
+ */
+:root {
+  --focus-ring: 0 0 0 2px var(--dag-color-card), 0 0 0 4px var(--dag-color-accent);
+  --focus-ring-inset: inset 0 0 0 2px var(--dag-color-accent);
+}
+
+/*
+ * Every control in the shell's five regions takes the ring above, so a control added later cannot
+ * arrive wearing the browser's own black one. `:where()` keeps this at no specificity: every rule
+ * below still wins, and a row that needs the inset ring says so itself.
+ */
+:where(.dag-toolbar, .dag-sidebar, .dag-pagebar, .dag-dock, .dag-zoombar)
+  :where(button, a[href], input, select, textarea, summary):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 
 /*
  * The room the macOS window's traffic lights take at its top-left corner, in the desktop app, where
@@ -78,7 +102,7 @@
   cursor: pointer;
 }
 .dag-toolbar__board:hover { background: var(--dag-color-paper100); }
-.dag-toolbar__board:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-toolbar__board:focus-visible { box-shadow: var(--focus-ring); }
 .dag-toolbar__board .dag-toolbar__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-toolbar__board > svg { flex: none; color: var(--dag-color-muted); }
 
@@ -110,7 +134,7 @@
   cursor: pointer;
 }
 .dag-select:hover:not(:disabled) { border-color: var(--dag-color-mutedBorder); }
-.dag-select:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-select:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-select:disabled { opacity: 0.55; cursor: default; }
 
 .dag-switch {
@@ -139,7 +163,7 @@
 }
 .dag-switch:checked { background: var(--dag-color-accent); }
 .dag-switch:checked::before { transform: translateX(14px); }
-.dag-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-switch:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .dag-switch:disabled { opacity: 0.55; cursor: default; }
 
 .dag-check {
@@ -167,7 +191,7 @@
 }
 .dag-check:checked { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 .dag-check:checked::before { opacity: 1; }
-.dag-check:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-check:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 .dag-textfield {
   display: inline-flex;
@@ -183,7 +207,7 @@
 }
 .dag-textfield--wide { width: 240px; }
 .dag-textfield:hover { border-color: var(--dag-color-mutedBorder); }
-.dag-textfield:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-textfield:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-textfield > input {
   flex: 1;
   min-width: 0;
@@ -229,7 +253,7 @@
 .dag-modelpicker__button:focus-visible {
   outline: none;
   border-color: var(--dag-color-accent);
-  box-shadow: 0 0 0 3px var(--dag-color-accentSoft);
+  box-shadow: var(--focus-ring);
 }
 .dag-modelpicker__button:disabled { opacity: 0.55; cursor: default; }
 .dag-modelpicker__current { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
@@ -298,7 +322,7 @@
   border-radius: var(--dag-metric-radius-chip);
   outline: none;
 }
-.dag-modelpicker__customInput:focus { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-modelpicker__customInput:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-modelpicker__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
 /* The picker is opened from Settings, so at phone width its list is a finger's too. */
 @media (max-width: 719px) {
@@ -360,7 +384,7 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.dag-providers__check:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; border-radius: var(--dag-metric-radius-chip); }
+.dag-providers__check:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--dag-metric-radius-chip); }
 @media (max-width: 719px) {
   .dag-providers__row { padding: 12px; }
   .dag-providers__why, .dag-providers__setup { margin-left: 0; }
@@ -392,7 +416,7 @@
 }
 .dag-button > svg { flex: none; color: var(--dag-color-slate); }
 .dag-button:hover:not(:disabled) { background: var(--dag-color-paper100); border-color: var(--dag-color-mutedBorder); }
-.dag-button:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-button:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-button:disabled { opacity: 0.5; cursor: default; }
 .dag-button--danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
 .dag-button--danger:hover:not(:disabled) { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-danger); }
@@ -491,6 +515,8 @@
   box-shadow: inset 0 2px 0 var(--dag-color-accent);
 }
 .dag-tab:hover { color: var(--dag-color-ink); }
+.dag-tab:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-tab--on:focus-visible { box-shadow: var(--focus-ring-inset), inset 0 2px 0 var(--dag-color-accent); }
 .dag-tab-wrap { position: relative; display: inline-flex; align-items: stretch; flex: none; }
 /* Only on the page you are on, so the strip does not read as a row of dismissals. */
 .dag-tab-wrap .dag-tab--on { padding-right: 22px; }
@@ -525,6 +551,7 @@
   cursor: pointer;
 }
 .dag-tab__close:hover { color: var(--dag-color-danger); }
+.dag-tab__close:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 /* A page with problems: its name truncates, its count does not. */
 .dag-tab--flagged { display: inline-flex; align-items: center; gap: 6px; }
 .dag-tab__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -588,6 +615,7 @@
   cursor: pointer;
 }
 .dag-icon:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .dag-icon--on { background: var(--dag-color-paper200); color: var(--dag-color-ink); }
 
 /* ---- the sidebar ---- */
@@ -678,7 +706,7 @@
   cursor: pointer;
 }
 .dag-sidebar__logo:hover { background: var(--dag-color-paper200); }
-.dag-sidebar__logo:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-sidebar__logo:focus-visible { box-shadow: var(--focus-ring); }
 
 /*
  * The sidebar's one toggle. `Shell` draws it once, over the top-left corner of the
@@ -694,7 +722,7 @@
  * Names grepped first: `dag-sidebar-toggle*` and `data-dag-sidebar-toggle` were nobody's.
  */
 .dag-sidebar-toggle { position: absolute; top: 9px; left: calc(16px + var(--window-inset)); z-index: 1; }
-.dag-sidebar-toggle:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-sidebar-toggle:focus-visible { box-shadow: var(--focus-ring); }
 /* Over the docked column's `paper100`, the usual hover fill is the colour already behind it. */
 .dag-sidebar-toggle[data-dag-sidebar-toggle="docked"]:hover { background: var(--dag-color-paper200); }
 .dag-sidebar-toggle-slot { flex: none; width: 30px; height: 30px; }
@@ -747,7 +775,7 @@
 .dag-sidebar__account:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-sidebar__act:focus-visible,
 .dag-sidebar__row:focus-visible,
-.dag-sidebar__account:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-sidebar__account:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 /* No capitals: DESIGN.md sets nothing in all-caps but a badge. */
 .dag-sidebar__section {
@@ -803,7 +831,7 @@
 }
 .dag-sidebar__tool:hover { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
 .dag-sidebar__tool--danger:hover { color: var(--dag-color-danger); }
-.dag-sidebar__tool:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-sidebar__tool:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 /* A question asked in the row — a name, a folder to move to, whether to delete — never through a
    browser dialog, which blocks the page, cannot be themed and cannot be driven by the suite. */
@@ -838,8 +866,8 @@
   border-radius: var(--dag-metric-radius-chip);
 }
 /* DESIGN.md's input focus: an accent hairline and a soft ring, never a change of size. */
-.dag-sidebar__name-input:focus,
-.dag-sidebar__move:focus { outline: none; border-color: var(--dag-color-accent); box-shadow: 0 0 0 2px var(--dag-color-accentSoft); }
+.dag-sidebar__name-input:focus-visible,
+.dag-sidebar__move:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring-inset); }
 .dag-sidebar__name-input[aria-invalid="true"] { border-color: var(--dag-color-danger); }
 .dag-sidebar__name-why {
   position: absolute;
@@ -861,6 +889,9 @@
  */
 .dag-sidebar__row[aria-selected="true"],
 .dag-sidebar__row[aria-selected="true"]:hover { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); box-shadow: inset 0 0 0 1px var(--dag-color-accent); }
+/* The ring outranks the selection's hairline: both are the accent, and the ring is what the
+   keyboard asked for. */
+.dag-sidebar__row[aria-selected="true"]:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-sidebar__bulk {
   display: flex;
   flex: none;
@@ -1074,7 +1105,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-purge .dag-purge__go { color: var(--dag-color-card); background: var(--dag-color-danger); }
 .dag-purge .dag-purge__go:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: 0 0 0 2px var(--dag-color-dangerSoft); }
 .dag-purge .dag-purge__go:disabled:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: none; }
-.dag-purge button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-purge button:focus-visible { box-shadow: var(--focus-ring); }
 /* The one question about logs, asked once per install (`src/telemetry/Prompt.tsx`): the
    Settings card's shape over the whole window, above the Settings modal (50) because it may be up
    when somebody opens that. Two classes deep for the purge card's reason. Names grepped first:
@@ -1127,7 +1158,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 .dag-vault__button:hover,
 .dag-vault__button[aria-expanded="true"] { background: var(--dag-color-paper200); }
-.dag-vault__button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-vault__button:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-vault__name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-vault__chev { flex: none; color: var(--dag-color-slate); }
 /* A square where the account's avatar is round: a workspace is a place, the account a person. */
@@ -1247,7 +1278,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-sidebar__menu-switch:hover { color: var(--dag-color-ink); }
-.dag-sidebar__menu-switch:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 0; }
+.dag-sidebar__menu-switch:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 
 /*
@@ -1315,7 +1346,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-toolbar__crumb:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-toolbar__crumb:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-toolbar__crumb:focus-visible { box-shadow: var(--focus-ring); }
 .dag-toolbar__sep { padding: 0 2px; color: var(--dag-color-muted); }
 
 /*
@@ -1345,14 +1376,14 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 0 0 3px var(--dag-color-accentSoft);
 }
 .dag-toolbar__name:focus { outline: none; }
+.dag-toolbar__name:focus-visible { box-shadow: var(--focus-ring); }
 
 /* The top bar's `⋯`. Names grepped first: `dag-pagemore*` and `data-dag-page-more*` were nobody's. */
 .dag-pagemore { position: relative; display: flex; flex: none; }
 .dag-pagemore__toggle[aria-expanded="true"] { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
-.dag-pagemore__toggle:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-pagemore__toggle:focus-visible { box-shadow: var(--focus-ring); }
 .dag-pagemore__menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -1371,7 +1402,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-pagemore__group { display: flex; flex-direction: column; }
 .dag-pagemore__menu .dag-more__item { width: 100%; font-size: 13px; color: var(--dag-color-ink); }
 .dag-pagemore__menu .dag-more__item > svg { flex: none; color: var(--dag-color-slate); }
-.dag-pagemore__menu .dag-more__item:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-pagemore__menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-pagemore__menu .dag-more__item:disabled { color: var(--dag-color-muted); cursor: default; }
 .dag-pagemore__rule { height: 0; margin: 3px 4px; border: none; border-top: 1px solid var(--dag-color-outlineSoft); }
 .dag-pagemore__group:first-child > .dag-pagemore__rule { display: none; }
@@ -1586,7 +1617,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* The row is draggable, so the browser's own text selection and touch scrolling must not claim
    the gesture first — the same reason the canvas sets it. */
 .dag-board { touch-action: none; }
-.dag-board:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-board:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-board--on { color: var(--dag-color-ink); background: var(--dag-color-paper200); font-weight: 600; }
 
 /* Matches in the text of every board and note, under the names in the search card. Two
@@ -1620,7 +1651,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-hit:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-hit:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-hit:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-hit__where { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .dag-hit__where svg { flex: none; color: var(--dag-color-muted); }
 .dag-hit__doc {
@@ -1715,7 +1746,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-welcome__act:hover { background: var(--dag-color-paper100); }
-.dag-welcome__act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-welcome__act:focus-visible { box-shadow: var(--focus-ring); }
 /* One of the two is the one to press, and it is the one that makes something: an empty board with
    two identical buttons asks a question it already knows the usual answer to. */
 .dag-welcome__act--go { border-color: var(--dag-color-accent); color: var(--dag-color-accent); }
@@ -1749,7 +1780,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* The canvas says it has the keys only when nothing on it does: with an item selected, its own
    outline is where an arrow or a Delete lands, and a ring round the whole board on the first nudge
    says nothing a person did not already know. */
-.dag-viewport:focus-visible:not(:has([data-dag-selected])) { box-shadow: inset 0 0 0 2px var(--dag-color-accent); }
+.dag-viewport:focus-visible:not(:has([data-dag-selected])) { box-shadow: var(--focus-ring-inset); }
 
 /* ---- the two cards that report trouble ---- */
 
@@ -2247,7 +2278,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   width: 100%;
   min-width: 0;
 }
-.dag-input:focus, .dag-inspector__body:focus { outline: 2px solid var(--dag-color-accent); outline-offset: -1px; }
+.dag-input:focus-visible { box-shadow: var(--focus-ring); }
+.dag-inspector__body:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-inspector__body {
   flex: 1;
   min-height: 160px;
@@ -2345,7 +2377,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
     var(--dag-color-card);
 }
 .dag-swatch--on { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
-.dag-swatch:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-swatch:focus-visible { box-shadow: var(--focus-ring); }
 .dag-props__status { flex: none; }
 .dag-props__label { flex: 1; min-width: 80px; }
 .dag-props__arrow { flex: none; font-family: var(--dag-font-mono); }
@@ -2451,7 +2483,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 .dag-iconpick__mode:hover { color: var(--dag-color-ink); }
 .dag-iconpick__mode--on { color: var(--dag-color-ink); border-bottom-color: var(--dag-color-accent); }
-.dag-iconpick__mode:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-iconpick__mode:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 /* The candidates. A grid of small cards: the glyph on top, the name under it — recognising a logo
    at a glance is the point, and the name is there to confirm what the eye already said. */
@@ -2478,7 +2510,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-iconpick__opt:hover { border-color: var(--dag-color-accent); }
-.dag-iconpick__opt:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-iconpick__opt:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-iconpick__glyph {
   display: flex;
   align-items: center;
@@ -2638,8 +2670,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-radius: var(--dag-metric-radius-small);
   cursor: text;
 }
-.dag-git-chip:not(:disabled):hover,
-.dag-git-chip:focus-visible { border-color: var(--dag-color-accent); }
+.dag-git-chip:not(:disabled):hover { border-color: var(--dag-color-accent); }
+.dag-git-chip:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-git-chip:disabled { cursor: default; }
 .dag-git-plus { border: 0; padding: 0; }
 .dag-git-newbranch {
@@ -2797,7 +2829,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   touch-action: none;
 }
 .dag-component:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
-.dag-component:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-component:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-component__icon {
   display: inline-flex;
   align-items: center;
@@ -2837,7 +2869,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-component__toggle:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-component__toggle:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-component__toggle:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-component__toggle svg { transition: transform 120ms ease; }
 .dag-component__toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
 .dag-component__parts {
@@ -2893,7 +2925,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   touch-action: none;
 }
 .dag-object:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
-.dag-object:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-object:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-object__pic {
   display: flex;
   align-items: center;
@@ -2925,7 +2957,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: pointer;
 }
 .dag-shelf__more:hover { background: var(--dag-color-paper100); }
-.dag-shelf__more:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-shelf__more:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 /* The chip that follows the pointer while a component is dragged, and the diagram it may land on. */
 .dag-ghost {
@@ -3162,7 +3194,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-rewrite-dialog__lede strong { color: var(--dag-color-ink); font-weight: 600; }
 .dag-rewrite-dialog__foot { align-items: center; justify-content: space-between; margin-top: 12px; }
 .dag-rewrite-dialog__hint { font-size: 11.5px; color: var(--dag-color-muted); }
-.dag-rewrite-dialog .dag-feedback__text:focus { outline: 2px solid var(--dag-color-accentSoft); border-color: var(--dag-color-accent); }
+.dag-rewrite-dialog .dag-feedback__text:focus-visible { box-shadow: var(--focus-ring); border-color: var(--dag-color-accent); }
 
 /* The Layout tab's preview: the flow's own width and gap, drawn at one scale from the two numbers
    set as custom properties — no DOM measurement, and no literal that claims a board size. The
@@ -3417,7 +3449,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings__more > summary > .dag-settings__value { margin-left: auto; }
 .dag-settings__more > summary > svg { flex: none; color: var(--dag-color-slate); transform: rotate(-90deg); transition: transform 0.15s ease; }
 .dag-settings__more[open] > summary > svg { transform: none; }
-.dag-settings__more > summary:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; border-radius: var(--dag-metric-radius-tile); }
+.dag-settings__more > summary:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-tile); }
 .dag-settings__types { margin: 0; padding: 0 16px 14px; font-family: var(--dag-font-mono); font-size: 12px; line-height: 1.8; word-spacing: 6px; color: var(--dag-color-slate); }
 .dag-settings__moreBody { padding: 0 16px 14px; }
 .dag-settings__link {
@@ -3438,7 +3470,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings__link > svg { color: var(--dag-color-slate); }
 .dag-settings__link:hover { background: var(--dag-color-paper100); }
-.dag-settings__link:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-settings__link:focus-visible { box-shadow: var(--focus-ring); }
 .dag-settings__problem { margin: 0; padding: 0 16px 12px; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); border-top: none !important; }
 .dag-settings__reset {
   display: inline-flex;
@@ -3455,7 +3487,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-settings__reset:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-settings__reset:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-settings__reset:focus-visible { box-shadow: var(--focus-ring); }
 /* The confirmation beside a row that just wrote. It fades after about a second and a half; the
    component takes it out of the DOM at the same moment. Reduced motion shows and hides it plain. */
 .dag-settings__saved {
@@ -3515,7 +3547,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-settings__toast-act:hover { background: var(--dag-color-paper100); }
-.dag-settings__toast-act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-settings__toast-act:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* One polite live region for every save and reset in the modal; the ticks themselves are silent. */
 .dag-settings__said {
   position: absolute;
@@ -3617,7 +3649,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings-modal__tab > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-settings-modal__tab:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-settings-modal__tab[aria-selected="true"] { font-weight: 500; color: var(--dag-color-ink); background: var(--dag-color-paper200); }
-.dag-settings-modal__tab:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-settings-modal__tab:focus-visible { box-shadow: var(--focus-ring-inset); }
 /* The reference pages at the foot: quieter than the settings, which is what they are. */
 .dag-settings-modal__tab--foot { height: 30px; font-size: 12.5px; }
 .dag-settings-modal__tab--foot > svg { color: var(--dag-color-slate); }
@@ -3654,7 +3686,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings__client:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-settings__client[aria-selected="true"] { font-weight: 500; color: var(--dag-color-ink); background: var(--dag-color-paper200); border-color: var(--dag-color-outline); }
-.dag-settings__client:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-settings__client:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-settings-modal__mark { flex: none; color: var(--dag-color-slate); }
 /* Only on a narrow window, where one tab is drawn at a time and this is the way back to the list. */
 .dag-settings-modal__back { display: none; }
@@ -3691,7 +3723,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-settings-modal__open:hover { background: var(--dag-color-paper200); }
-.dag-settings-modal__open:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-settings-modal__open:focus-visible { box-shadow: var(--focus-ring); }
 .dag-settings-modal__open > svg { flex: none; color: var(--dag-color-slate); }
 .dag-settings-modal__open > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-settings-modal__copy {
@@ -3732,7 +3764,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-settings__feature:hover { background: var(--dag-color-paper100); }
-.dag-settings__feature:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; border-radius: var(--dag-metric-radius-tile); }
+.dag-settings__feature:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-tile); }
 .dag-settings__featureMark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--dag-color-ink); }
 .dag-settings__featureText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dag-settings__featureChevron { flex: none; color: var(--dag-color-slate); }
@@ -3752,7 +3784,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-settings__featureBack:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-settings__featureBack:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-settings__featureBack:focus-visible { box-shadow: var(--focus-ring-inset); }
 /* A phone, or a window as narrow as one: the whole window, the list of tabs, then one tab with a way
    back — the shape a phone's own settings have. `719px` is the breakpoint the Tasks and quiz pages
    already fold at. */
@@ -3882,7 +3914,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-modelchip:hover { color: var(--dag-color-ink); border-color: var(--dag-color-mutedBorder); }
-.dag-modelchip:focus-visible { outline: 2px solid var(--dag-color-accentSoft); outline-offset: 1px; }
+.dag-modelchip:focus-visible { box-shadow: var(--focus-ring); }
 .dag-prompt__bar .dag-modelchip { max-width: 42%; }
 
 /* ---- the prompt card ----
@@ -3931,7 +3963,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   border-radius: 6px;
   cursor: text;
 }
-.dag-prompt__text:focus { outline: 2px solid var(--dag-color-accentSoft); border-color: var(--dag-color-accent); }
+.dag-prompt__text:focus-visible { box-shadow: var(--focus-ring); border-color: var(--dag-color-accent); }
 .dag-prompt__text:disabled { color: var(--dag-color-muted); }
 .dag-prompt__bar { display: flex; align-items: center; gap: 8px; }
 .dag-prompt__as {
@@ -4206,6 +4238,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-zoombar__pct:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-zoombar__pct:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /*
  * A board on a phone: fitted, pinched and panned with fingers, a tap to select and a drag
@@ -4269,6 +4302,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-more__item:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-more__item:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 .dag-more__item span { flex: 1; }
 .dag-more__item kbd {
   font-family: var(--dag-font-mono);
@@ -4308,7 +4342,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 /* The logo goes home from here too — the column is away, which is when this bar carries it. The
    hover is the bar's own (`dag-toolbar__board`'s), not the column's. */
 .dag-toolbar__logo:hover { background: var(--dag-color-paper100); }
-.dag-toolbar__logo:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-toolbar__logo:focus-visible { box-shadow: var(--focus-ring); }
 
 /*
  * The mark and the name as one thing.
@@ -4470,7 +4504,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-feedback__kind:hover { color: var(--dag-color-ink); }
 .dag-feedback__kind[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
-.dag-feedback__kind:focus-visible { outline: 2px solid var(--dag-color-accentSoft); }
+.dag-feedback__kind:focus-visible { box-shadow: var(--focus-ring); }
 .dag-feedback__files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .dag-feedback__file {
   display: inline-flex;
@@ -4579,7 +4613,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   border-radius: var(--dag-metric-radius-chip);
 }
 .dag-view-bar__edit:hover { background: var(--dag-color-paper100); }
-.dag-view-bar__edit:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-view-bar__edit:focus-visible { box-shadow: var(--focus-ring); }
 .dag-view-missing { margin: 48px auto; color: var(--dag-color-muted); font-size: 13px; }
 
 /*
@@ -4648,7 +4682,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-backlinks__toggle:hover,
 .dag-backlinks__toggle[aria-expanded="true"] { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
-.dag-backlinks__toggle:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-backlinks__toggle:focus-visible { box-shadow: var(--focus-ring); }
 .dag-backlinks__list {
   position: absolute;
   top: calc(100% + 6px);
@@ -4699,7 +4733,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-readonly--on:hover { border-color: var(--dag-color-accent); }
-.dag-readonly:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-readonly:focus-visible { box-shadow: var(--focus-ring); }
 /* Under the bar's right end, where the switch is: told, never asked, so it takes no focus and stays
    clear of the page's own cards (Share's and Export's are 40, the Settings modal 50). */
 .dag-readonly-notice {
@@ -4750,13 +4784,13 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-readonly-notice__dismiss:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-readonly-notice__dismiss:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-readonly-notice__dismiss:focus-visible { box-shadow: var(--focus-ring); }
 /* A control that writes while the app is locked. It keeps its press — which the notice answers, so
    the page is never silently dead — but reads as unavailable before one, and its `title` names the
    word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control
    that moves under the pointer is one more thing that looks broken. */
 [data-dag-readonly-blocked] { opacity: 0.55; cursor: not-allowed; }
-[data-dag-readonly-blocked]:focus-visible { outline: 2px solid var(--dag-color-muted); outline-offset: 2px; }
+[data-dag-readonly-blocked]:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__new-locked {
   display: flex;
   align-items: center;
@@ -4799,7 +4833,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
 }
 .dag-export__toggle:hover,
 .dag-export__toggle[aria-expanded="true"] { background: var(--dag-color-paper100); }
-.dag-export__toggle:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-export__toggle:focus-visible { box-shadow: var(--focus-ring); }
 .dag-export__toggle:disabled { cursor: progress; color: var(--dag-color-slate); }
 .dag-export__menu {
   position: absolute;
@@ -4817,7 +4851,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   box-shadow: 0 8px 24px var(--dag-color-shadow);
 }
 .dag-export__menu .dag-more__item { color: var(--dag-color-ink); }
-.dag-export__menu .dag-more__item:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-export__menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-export__failed {
   position: absolute;
   top: calc(100% + 6px);
@@ -4912,7 +4946,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
 }
 button.dag-task-status { cursor: pointer; }
 button.dag-task-status:hover { background: var(--dag-color-paper200); }
-button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 
 .dag-task-due { flex: none; font-size: 12px; color: var(--dag-color-slate); white-space: nowrap; }
 .dag-task-due[data-overdue] { color: var(--dag-color-dangerText); font-weight: 500; }
@@ -4974,7 +5008,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-taskbar__choice:hover:not(:disabled) { color: var(--dag-color-ink); }
 .dag-taskbar__choice[aria-checked="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper); box-shadow: 0 0 0 1px var(--dag-color-outline); }
-.dag-taskbar__choice:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-taskbar__choice:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-taskbar__choice:disabled { cursor: default; opacity: 0.6; }
 .dag-taskbar__due { display: inline-flex; align-items: center; gap: 6px; }
 .dag-taskbar__label { font-weight: 500; }
@@ -4988,7 +5022,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   border-radius: var(--dag-metric-radius-chip);
   padding: 3px 6px;
 }
-.dag-taskbar__due input:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-taskbar__due input:focus-visible { box-shadow: var(--focus-ring); }
 .dag-taskbar__clear,
 .dag-taskbar__untask {
   display: inline-flex;
@@ -5038,11 +5072,11 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 /* A value that reads as text until the pointer offers to change it, Notion's property list. */
 .dag-facts__value input:hover:not(:disabled),
-.dag-facts__value input:focus { background: var(--dag-color-paper100); }
+.dag-facts__value input:focus-visible { background: var(--dag-color-paper100); }
 .dag-facts__value input::-webkit-calendar-picker-indicator { opacity: 0; cursor: pointer; }
 .dag-facts__value input:hover::-webkit-calendar-picker-indicator,
-.dag-facts__value input:focus::-webkit-calendar-picker-indicator { opacity: 0.55; }
-.dag-facts__value input:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-facts__value input:focus-visible::-webkit-calendar-picker-indicator { opacity: 0.55; }
+.dag-facts__value input:focus-visible { box-shadow: var(--focus-ring); }
 .dag-facts__date { position: relative; display: inline-flex; }
 /* An empty date says *Empty*, in the label's colour, until it is focused and is a date input again. */
 .dag-facts__date--empty input { background: transparent; }
@@ -5067,7 +5101,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   .dag-facts .dag-taskbar__choice { justify-content: center; min-height: 38px; }
 }
 .dag-taskbar__clear:focus-visible,
-.dag-taskbar__untask:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-taskbar__untask:focus-visible { box-shadow: var(--focus-ring); }
 
 /*
  * Projects: a folder holding a note with a `project:`. The glyph wears
@@ -5104,7 +5138,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-projectbar__swatch > svg { color: var(--dag-color-muted); }
 .dag-projectbar__swatch:hover:not(:disabled),
 .dag-projectbar__swatch[aria-expanded="true"] { background: var(--dag-color-paper100); }
-.dag-projectbar__swatch:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-projectbar__swatch:focus-visible { box-shadow: var(--focus-ring); }
 .dag-projectbar__swatch:disabled { cursor: default; }
 .dag-projectbar__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dag-h); }
 .dag-projectbar__dot[data-none] { background: transparent; box-shadow: inset 0 0 0 1px var(--dag-color-outline); }
@@ -5132,7 +5166,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-projectbar__hue[aria-checked="true"] { box-shadow: 0 0 0 2px var(--dag-color-paper), 0 0 0 3px var(--dag-color-ink); }
-.dag-projectbar__hue:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-projectbar__hue:focus-visible { box-shadow: var(--focus-ring); }
 .dag-projectbar__hue:disabled { cursor: default; opacity: 0.6; }
 .dag-projectbar__clear { margin-left: 0; }
 .dag-projectbar__counts { display: inline-flex; align-items: center; gap: 12px; color: var(--dag-color-slate); }
@@ -5150,7 +5184,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-projectbar__tasks:hover { background: var(--dag-color-paper100); }
-.dag-projectbar__tasks:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-projectbar__tasks:focus-visible { box-shadow: var(--focus-ring); }
 /* A project and a task bar on one note stack, and so do their read-only lines. */
 .dag-projectbar + .dag-taskbar { margin-top: -12px; }
 .dag-note-view > .dag-taskbar--read + .dag-taskbar--read { margin-top: 0; }
@@ -5192,7 +5226,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-tasks__layout-choice[aria-checked="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
-.dag-tasks__layout-choice:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-tasks__layout-choice:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 .dag-tasks {
   flex: 1;
@@ -5216,7 +5250,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
 }
-.dag-tasks__filter:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-tasks__filter:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tasks__count { font-size: 12px; color: var(--dag-color-muted); }
 /* On a phone the count goes under the filters, whole, rather than three words stacked beside them. */
 @media (max-width: 719px) {
@@ -5250,7 +5284,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate 120ms ease; }
 .dag-tasks__twisty[aria-expanded="false"] > svg:first-child { rotate: -90deg; }
-.dag-tasks__twisty:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-tasks__twisty:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-tasks__n { font-weight: 500; color: var(--dag-color-muted); }
 .dag-tasks__rows { display: flex; flex-direction: column; border-top: 1px solid var(--dag-color-outlineSoft); }
 .dag-tasks__row {
@@ -5288,7 +5322,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-tasks__title:hover { text-decoration: underline; text-decoration-color: var(--dag-color-outline); }
-.dag-tasks__title:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-tasks__title:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-tasks__row .dag-task-status[data-dag-task-status="done"] + .dag-tasks__title { color: var(--dag-color-slate); }
 .dag-tasks__folder { flex: none; max-width: 30%; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-muted); }
 
@@ -5313,7 +5347,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-tasks__add-row input::placeholder { color: var(--dag-color-muted); }
 .dag-tasks__add-row input:focus { outline: none; }
-.dag-tasks__add-row:focus-within { color: var(--dag-color-slate); }
+.dag-tasks__add-row:focus-within { color: var(--dag-color-slate); box-shadow: var(--focus-ring-inset); }
 .dag-tasks__add-problem {
   margin: 0;
   padding: 0 9px 4px 31px;
@@ -5349,7 +5383,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   user-select: none;
 }
 .dag-tasks__card:hover { border-color: var(--dag-color-slate); }
-.dag-tasks__card:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-tasks__card:focus-visible { box-shadow: var(--focus-ring-inset); }
 /* What the drag moves, not what was pressed, is what must stop answering `elementFromPoint`. */
 .dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: 0 8px 24px var(--dag-color-shadow); }
 .dag-tasks__card-top { display: flex; align-items: flex-start; gap: 6px; }
@@ -5409,7 +5443,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-embed .dag-embed__open:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
-.dag-embed .dag-embed__open:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-embed .dag-embed__open:focus-visible { box-shadow: var(--focus-ring); }
 
 /* A sidebar row held over the canvas, which is where it would land. */
 .dag-viewport[data-dag-drop-file] { outline: 2px dashed var(--dag-color-accent); outline-offset: -6px; }
@@ -5437,7 +5471,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-toolbar__practice:hover:not(:disabled) { border-color: var(--dag-color-accent); }
 .dag-toolbar__practice:disabled { color: var(--dag-color-muted); background: transparent; cursor: default; }
-.dag-toolbar__practice:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-toolbar__practice:focus-visible { box-shadow: var(--focus-ring); }
 .dag-backlinks + .dag-toolbar__practice,
 .dag-toolbar__practice + .dag-export { margin-left: 0; }
 
@@ -5464,7 +5498,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
 }
-.dag-quizzes__filter:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-quizzes__filter:focus-visible { box-shadow: var(--focus-ring); }
 .dag-quizzes__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -5497,7 +5531,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-quizzes__open:hover .dag-quizzes__title { text-decoration: underline; text-decoration-color: var(--dag-color-outline); }
-.dag-quizzes__open:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; border-radius: var(--dag-metric-radius-small); }
+.dag-quizzes__open:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-small); }
 .dag-quizzes__title {
   display: flex;
   align-items: center;
@@ -5532,7 +5566,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-quizzes__practice:hover:not(:disabled) { border-color: var(--dag-color-accent); }
 .dag-quizzes__practice:disabled { color: var(--dag-color-muted); background: var(--dag-color-paper200); cursor: default; }
-.dag-quizzes__practice:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-quizzes__practice:focus-visible { box-shadow: var(--focus-ring); }
 /* The bar's: every quiz in the chosen folder as one run. */
 .dag-quizzes__practice-folder { margin-top: 0; align-self: center; }
 .dag-quizzes__count { font-weight: 400; color: var(--dag-color-muted); }
@@ -5549,7 +5583,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-quizzes__new input::placeholder { color: var(--dag-color-muted); }
 .dag-quizzes__new input:focus { outline: none; }
-.dag-quizzes__new:focus-within { color: var(--dag-color-slate); }
+.dag-quizzes__new:focus-within { color: var(--dag-color-slate); box-shadow: var(--focus-ring-inset); }
 .dag-quizzes__empty { max-width: 1040px; margin: 16px auto; font-size: 13px; color: var(--dag-color-muted); }
 
 /* A quiz's form. */
@@ -5587,7 +5621,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: text;
 }
 .dag-quiz__rich[data-dag-quiz-open-field],
-.dag-quiz__rich:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 1px var(--dag-color-accent); }
+.dag-quiz__rich:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-quiz__rich-view { min-height: 20px; padding: 7px 10px; outline: none; overflow-wrap: anywhere; }
 .dag-quiz__rich-view > :first-child { margin-top: 0; }
 .dag-quiz__rich-view > :last-child { margin-bottom: 0; }
@@ -5637,7 +5671,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-quiz__more:hover:not(:disabled) { color: var(--dag-color-ink); }
-.dag-quiz__more:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-quiz__more:focus-visible { box-shadow: var(--focus-ring); }
 /* A flashcard in a run: the tag says which kind, nothing more. */
 .dag-run__flashcard-tag {
   margin-inline-start: 8px;
@@ -5698,7 +5732,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-quiz__add-option:hover:not(:disabled),
 .dag-quiz__add:hover { color: var(--dag-color-ink); border-color: var(--dag-color-slate); }
 .dag-quiz__add-option:focus-visible,
-.dag-quiz__add:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-quiz__add:focus-visible { box-shadow: var(--focus-ring); }
 .dag-quiz__check { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--dag-color-slate); }
 .dag-quiz__hint { color: var(--dag-color-muted); }
 .dag-quiz__note { margin: 0 0 10px; font-size: 13px; color: var(--dag-color-warningText); }
@@ -5719,7 +5753,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-quiz__fix:hover { border-color: var(--dag-color-slate); }
-.dag-quiz__fix:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-quiz__fix:focus-visible { box-shadow: var(--focus-ring); }
 /* The text the form has no field for, shown as it reads, and where it can go. */
 .dag-quiz__stray { flex-basis: 100%; }
 .dag-quiz__stray-text {
@@ -5873,7 +5907,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-run__answer--code { font-family: var(--dag-font-mono); font-size: 13px; tab-size: 2; }
 .dag-run__answer::placeholder { color: var(--dag-color-muted); }
-.dag-run__answer:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -1px; border-color: transparent; }
+.dag-run__answer:focus-visible { box-shadow: var(--focus-ring); border-color: transparent; }
 .dag-run__answer[readonly] { color: var(--dag-color-slate); background: var(--dag-color-paper100); }
 .dag-run__judge { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .dag-run__judge-ask { font-size: 14px; font-weight: 600; margin-inline-end: 4px; }
@@ -5909,7 +5943,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 }
 .dag-run__button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 .dag-run__button:disabled { color: var(--dag-color-muted); background: var(--dag-color-paper200); border-color: transparent; cursor: default; }
-.dag-run__button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-run__button:focus-visible { box-shadow: var(--focus-ring); }
 .dag-run__score { margin-block: 8px; font-size: 28px; font-weight: 600; }
 .dag-run__note { margin-block: 0; font-size: 14px; color: var(--dag-color-slate); }
 .dag-run__tally { margin-block: 0 8px; font-size: 14px; color: var(--dag-color-slate); }
@@ -6054,7 +6088,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-cal-dots__num { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; }
 .dag-cal-dots__day[data-today] .dag-cal-dots__num { color: var(--dag-color-accent); font-weight: 700; }
 .dag-cal-dots__day[aria-selected="true"] .dag-cal-dots__num { color: var(--dag-color-card); background: var(--dag-color-accent); font-weight: 600; }
-.dag-cal-dots__day:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-cal-dots__day:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-cal-dots__marks { display: flex; gap: 3px; height: 5px; }
 .dag-cal-dots__marks i { width: 5px; height: 5px; border-radius: 50%; background: var(--dag-color-muted); }
 .dag-cal-dots__marks i[data-kind="event"] { background: var(--dag-color-accent); }
@@ -6075,7 +6109,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-calendar__today:hover { background: var(--dag-color-paper100); }
-.dag-calendar__today:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-calendar__today:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__step { display: inline-flex; gap: 2px; }
 .dag-calendar__title { flex: 1 1 auto; margin: 0; min-width: 12ch; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
 .dag-calendar__views { display: inline-flex; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); }
@@ -6106,7 +6140,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-calendar__kind[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-style: solid; }
-.dag-calendar__kind:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-calendar__kind:focus-visible { box-shadow: var(--focus-ring); }
 
 /* One thing on the calendar: a link to its note. */
 .dag-calendar__item {
@@ -6131,7 +6165,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
 .dag-calendar__item[data-kind="event"] { background: var(--dag-color-accentSoft); }
 .dag-calendar__item[data-kind="note"] { color: var(--dag-color-slate); background: transparent; }
 .dag-calendar__item:hover { box-shadow: inset 0 0 0 1px var(--dag-color-outline); }
-.dag-calendar__item:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-calendar__item:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-calendar__item[data-done] .dag-calendar__name { color: var(--dag-color-muted); text-decoration: line-through; }
 .dag-calendar__item[data-before] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .dag-calendar__item[data-after] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
@@ -6182,7 +6216,7 @@ button.dag-task-status:focus-visible { outline: 2px solid var(--dag-color-accent
   cursor: pointer;
 }
 .dag-cal-day__n:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
-.dag-cal-day__n:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-cal-day__n:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-cal-day[data-today] .dag-cal-day__n { font-weight: 700; color: var(--dag-color-accent); box-shadow: inset 0 0 0 1.5px var(--dag-color-accent); }
 .dag-cal-week > .dag-calendar__item { margin: 0 4px; }
 .dag-cal-more {
@@ -6343,7 +6377,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
 }
-.dag-calendar__new input:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-calendar__new input:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__new-acts { display: flex; justify-content: flex-end; gap: 8px; }
 .dag-calendar__new-cancel,
 .dag-calendar__new-make {
@@ -6570,7 +6604,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-tablepage__pop:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
 .dag-tablepage__pop[data-on] { color: var(--dag-color-accent); background: var(--dag-color-accentSoft); }
 .dag-tablepage__pop[aria-expanded="true"] { border-color: var(--dag-color-outline); }
-.dag-tablepage__pop:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-tablepage__pop:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tablepage__count { padding: 0 6px; font-size: 12px; color: var(--dag-color-muted); white-space: nowrap; }
 .dag-tablepage__status { min-width: 0; overflow: hidden; font-size: 12px; color: var(--dag-color-warningText); white-space: nowrap; text-overflow: ellipsis; }
 .dag-tablepage__spacer { flex: 1; }
@@ -6614,7 +6648,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   text-underline-offset: 2px;
   cursor: pointer;
 }
-.dag-tablepage__show:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-tablepage__show:focus-visible { box-shadow: var(--focus-ring); }
 
 /* A file's problems in words: above the grid for a tab's, in the card a mark opens for a column's or a row's. */
 .dag-tablepage__issues {
@@ -6657,7 +6691,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-tablepage__problem-fix:hover:not(:disabled) { background: var(--dag-color-paper100); }
 .dag-tablepage__problem-fix:disabled { color: var(--dag-color-muted); cursor: default; }
-.dag-tablepage__problem-fix:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-tablepage__problem-fix:focus-visible { box-shadow: var(--focus-ring); }
 .dag-grid__menu > .dag-tablepage__problems { width: 320px; padding: 2px 8px; }
 
 /* Sort and Filter: a line per key or rule, in the grid's card. */
@@ -6675,15 +6709,15 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-chip);
 }
 .dag-tablepage__rule input { flex: 1; width: 120px; }
-.dag-tablepage__rule select:focus,
-.dag-tablepage__rule input:focus { outline: none; border-color: var(--dag-color-accent); }
+.dag-tablepage__rule select:focus-visible,
+.dag-tablepage__rule input:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-tablepage__rule .dag-icon { flex: none; width: 24px; height: 24px; }
 .dag-tablepage__rule-actions { display: flex; gap: 4px; }
 .dag-tablepage__hint { margin: 2px 4px; font-size: 12px; color: var(--dag-color-muted); }
 
 /* The grid. `separate`, so a sticky header keeps its border as the rows scroll under it. */
 .dag-grid-wrap { position: relative; width: max-content; min-width: 100%; outline: none; }
-.dag-grid-wrap:focus-visible .dag-grid__corner { box-shadow: inset 0 0 0 2px var(--dag-color-accent); }
+.dag-grid-wrap:focus-visible .dag-grid__corner { box-shadow: var(--focus-ring-inset); }
 .dag-grid-wrap--empty { padding: 16px 0; }
 .dag-grid {
   border-collapse: separate;
@@ -6804,7 +6838,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   cursor: pointer;
 }
 .dag-grid .dag-grid__flag[data-severity="error"] { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
-.dag-grid .dag-grid__flag:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-grid .dag-grid__flag:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-grid .dag-grid__gutter > .dag-grid__flag { position: absolute; top: 50%; left: 3px; transform: translateY(-50%); }
 .dag-grid__grip { display: none; vertical-align: middle; color: var(--dag-color-slate); }
 .dag-grid tr:hover > .dag-grid__gutter .dag-grid__num { display: none; }
@@ -6945,7 +6979,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
 }
-.dag-grid__menu-field input:focus { outline: none; border-color: var(--dag-color-accent); }
+.dag-grid__menu-field input:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-grid__menu-types { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; }
 .dag-grid__menu-type,
 .dag-grid__menu-item {
@@ -6972,7 +7006,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-grid__menu-item--danger,
 .dag-grid__menu-item--danger > svg { color: var(--dag-color-dangerText); }
 .dag-grid__menu-type:focus-visible,
-.dag-grid__menu-item:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-grid__menu-item:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-grid__menu-sep { height: 1px; margin: 3px 2px; background: var(--dag-color-outlineSoft); }
 
 /* A table on a board, or in a note: its mark, its title, the tab and how many rows, then the rows. */
@@ -7072,7 +7106,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: 6px;
   padding: 6px 8px;
 }
-.dag-math-field__tex:focus { outline: 2px solid var(--dag-color-accent); outline-offset: -1px; }
+.dag-math-field__tex:focus-visible { box-shadow: var(--focus-ring); }
 .dag-math-field__foot {
   font-size: 12px;
   color: var(--dag-color-muted);
@@ -7111,7 +7145,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
 }
-.dag-trash__filter:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-trash__filter:focus-visible { box-shadow: var(--focus-ring); }
 .dag-trash__intro { margin: 0 auto 16px; font-size: 13px; line-height: 1.5; color: var(--dag-color-slate); }
 .dag-trash__none { margin: 24px auto; font-size: 13px; color: var(--dag-color-muted); }
 
@@ -7142,7 +7176,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-trash .dag-icon.dag-trash__danger { color: var(--dag-color-dangerText); }
 .dag-trash__plain:disabled,
 .dag-trash__empty:disabled { opacity: 0.5; cursor: default; }
-.dag-trash button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-trash button:focus-visible { box-shadow: var(--focus-ring); }
 .dag-trash__link {
   margin-left: 6px;
   padding: 0;
@@ -7259,7 +7293,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-trash-notice__act:hover { background: var(--dag-color-paper100); }
 .dag-trash-notice__act:disabled { opacity: 0.5; cursor: default; }
-.dag-trash-notice button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-trash-notice button:focus-visible { box-shadow: var(--focus-ring); }
 .dag-trash-notice__close { flex: none; }
 @media (max-width: 719px) {
   .dag-trash-notice { left: 12px; right: 12px; bottom: 72px; max-width: none; }
@@ -7332,7 +7366,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-assistant__row:hover { background: var(--dag-color-paper100); }
 .dag-assistant__row[aria-current="page"] { background: var(--dag-color-paper200); font-weight: 600; }
-.dag-assistant__row:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
+.dag-assistant__row:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-assistant__rowtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-assistant__rowvault { flex: none; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--dag-color-muted); }
 .dag-assistant__live { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-color-accent); }
@@ -7428,7 +7462,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 
 /* The composer. */
 .dag-chat-composer { position: relative; flex: none; display: flex; flex-direction: column; gap: 6px; margin: 0 20px 16px; padding: 8px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); }
-.dag-chat-composer:focus-within { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
+.dag-chat-composer:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-chat-composer__input { width: 100%; box-sizing: border-box; min-height: 24px; max-height: 200px; padding: 4px 4px; resize: none; font: inherit; font-size: 14px; line-height: 1.5; color: var(--dag-color-ink); background: transparent; border: none; outline: none; }
 /* Expanded by its toggle: most of the column, and it goes back on sending (the component clears the state). */
 .dag-chat-composer__input--tall { min-height: 320px; max-height: 60vh; }
@@ -7447,7 +7481,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer__expand { flex: none; width: 24px; height: 24px; }
 .dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-paper); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }
 .dag-chat-send:disabled { opacity: 0.35; cursor: default; }
-.dag-chat-send:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 2px; }
+.dag-chat-send:focus-visible { box-shadow: var(--focus-ring); }
 .dag-chat-send--stop { background: var(--dag-color-ink); }
 
 /* The menu is the composer's width, not the chip's: a chip at the foot of a narrow panel is nowhere near
