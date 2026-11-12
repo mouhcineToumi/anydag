@@ -6,6 +6,8 @@ import { DIAGRAM_TYPES, type BoardItem, type DiagramType } from "@/board/types";
 import type { Generated } from "@/edit/generate";
 import type { EditorCtl } from "@/edit/useEditor";
 import { explainLlmReason, type LlmAction, type LlmReason } from "@/settings/llmReason";
+import { ModelChip } from "@/settings/ModelChip";
+import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
 import { writeSettings } from "@/settings/store";
 import { useProviders } from "@/settings/useProviders";
 import { useSettings } from "@/settings/useSettings";
@@ -46,7 +48,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   const [now, setNow] = useState(() => Date.now());
   const area = useRef<HTMLTextAreaElement>(null);
   const settings = useSettings();
-  const [providers] = useProviders(run.state === "failed" && Boolean(run.reason));
+  const [providers] = useProviders();
 
   /* The file wins whenever the person is not typing into this box: Claude may have rewritten the
      prompt, or an undo put an older one back. */
@@ -125,7 +127,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
     }
   };
 
-  const who = settings.llm.model ?? settings.llm.provider ?? "the default model";
+  const who = modelChoiceText(modelChoice(settings.llm, providers));
 
   if (!ctl) {
     return (
@@ -196,6 +198,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
         onKeyDown={onKeyDown}
       />
       <div className="dag-prompt__bar" onPointerDown={mine} onDoubleClick={mine}>
+        <ModelChip where="prompt" />
         <select
           className="dag-prompt__as"
           data-dag-prompt-as=""

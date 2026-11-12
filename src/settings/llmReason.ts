@@ -13,6 +13,8 @@
  * providers are ready; `test/llm-reason.test.ts` holds the sentences and the action limits.
  */
 
+import { providerName } from "./providerNames";
+
 export type LlmReasonCode =
   | "no-key"
   | "needs-model"
@@ -67,16 +69,7 @@ export interface ExplainOptions {
   providers?: readonly ProviderStatus[];
 }
 
-/** What the app calls each provider. Never its id: an id is the protocol's word, not a person's. */
-const NAME: Readonly<Record<string, string>> = {
-  claude: "Claude Code",
-  gemini: "Gemini",
-  opencode: "OpenCode",
-  zai: "Z.ai",
-  custom: "OpenAI-compatible",
-};
-
-const nameOf = (id?: string): string => (id ? (NAME[id] ?? "The model provider") : "The model provider");
+const nameOf = (id?: string): string => providerName(id) ?? "The model provider";
 
 /** How each coding agent's CLI signs in, in the words its own installer uses. */
 const SIGN_IN: Readonly<Record<string, string>> = {

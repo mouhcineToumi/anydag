@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { PROVIDER_NAMES } from "../../src/settings/providerNames";
+
 /**
  * Who can write a diagram for a prompt card, and how each is reached.
  *
@@ -63,7 +65,10 @@ const OPENCODE_DEFAULT_MODEL = "opencode-go/glm-5.3-flash";
 
 export interface ProviderSpec {
   id: string;
+  /** The app's one name for it (`src/settings/providerNames.ts`). */
   label: string;
+  /** What the name no longer explains: whose plan or login it uses, or what the endpoint is. */
+  description: string;
   kind: ProviderKind;
   /** `http` only. `custom` reads it from `ANYDAG_LLM_BASE_URL` instead. */
   baseURL?: string;
@@ -82,7 +87,8 @@ export interface ProviderSpec {
 export const PROVIDERS: ProviderSpec[] = [
   {
     id: "claude",
-    label: "Claude (your subscription)",
+    label: PROVIDER_NAMES.claude,
+    description: "Uses your Claude plan, through the Claude Code signed in on this computer.",
     kind: "cli",
     keyEnv: [],
     /* Claude Code's aliases for the latest of each, so the row does not go stale with a release. */
@@ -91,7 +97,8 @@ export const PROVIDERS: ProviderSpec[] = [
   },
   {
     id: "gemini",
-    label: "Gemini",
+    label: PROVIDER_NAMES.gemini,
+    description: "Google's Gemini, through an API key.",
     kind: "http",
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
     keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
@@ -104,7 +111,8 @@ export const PROVIDERS: ProviderSpec[] = [
   },
   {
     id: "opencode",
-    label: "OpenCode (your login)",
+    label: PROVIDER_NAMES.opencode,
+    description: "Uses your OpenCode login and whatever it is signed in to. No key here.",
     kind: "cli",
     keyEnv: [],
     defaultModel: OPENCODE_DEFAULT_MODEL,
@@ -112,7 +120,8 @@ export const PROVIDERS: ProviderSpec[] = [
   },
   {
     id: "zai",
-    label: "Z.ai (GLM)",
+    label: PROVIDER_NAMES.zai,
+    description: "GLM, from Z.ai, through an API key.",
     kind: "http",
     baseURL: "https://api.z.ai/api/paas/v4",
     keyEnv: ["ZHIPU_API_KEY", "ZAI_API_KEY"],
@@ -121,7 +130,8 @@ export const PROVIDERS: ProviderSpec[] = [
   },
   {
     id: "custom",
-    label: "Custom (OpenAI-compatible)",
+    label: PROVIDER_NAMES.custom,
+    description: "Any endpoint that speaks the OpenAI chat-completions dialect.",
     kind: "http",
     keyEnv: ["ANYDAG_LLM_API_KEY"],
     defaultModel: "",
@@ -446,6 +456,8 @@ export function resolveProvider(
 export interface PublicProvider {
   id: string;
   label: string;
+  /** What the name no longer explains, as one line under the provider's row in Settings. */
+  description: string;
   kind: ProviderKind;
   defaultModel: string;
   models: string[];
@@ -464,6 +476,7 @@ export function describeProviders(env: Env): { default: string; providers: Publi
       return {
         id: spec.id,
         label: spec.label,
+        description: spec.description,
         kind: spec.kind,
         defaultModel: r.ok ? r.value.model : spec.defaultModel,
         models: spec.models,

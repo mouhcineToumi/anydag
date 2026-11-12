@@ -27,6 +27,7 @@ import { assertNever } from "@/board/useBoard";
 import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
 import { explainLlmReason, type LlmAction, type LlmReason } from "@/settings/llmReason";
+import { ModelChip } from "@/settings/ModelChip";
 import { readSettings, writeSettings } from "@/settings/store";
 import { useProviders } from "@/settings/useProviders";
 import { useSettings } from "@/settings/useSettings";
@@ -311,16 +312,19 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
                 <PanelRightOpen {...ICON} aria-hidden="true" />
               </Tool>
               {isDiagramType(one.type) ? (
-                <button
-                  type="button"
-                  className="dag-icon dag-icon--accent"
-                  data-dag-rewrite-open=""
-                  aria-label="Change with AI"
-                  title="Change with AI: describe the change, and a model rewrites this diagram for you to accept"
-                  onClick={onAsk}
-                >
-                  <Sparkles {...ICON} aria-hidden="true" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="dag-icon dag-icon--accent"
+                    data-dag-rewrite-open=""
+                    aria-label="Change with AI"
+                    title="Change with AI: describe the change, and a model rewrites this diagram for you to accept"
+                    onClick={onAsk}
+                  >
+                    <Sparkles {...ICON} aria-hidden="true" />
+                  </button>
+                  <ModelChip where="rewrite" />
+                </>
               ) : null}
               <span className="dag-dock__rule" />
             </>

@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 
 import { assertNever } from "@/board/useBoard";
 import { explainLlmReason, type LlmAction, type LlmReason } from "@/settings/llmReason";
+import { ModelChip } from "@/settings/ModelChip";
 import { readSettings, writeSettings } from "@/settings/store";
 import { useProviders } from "@/settings/useProviders";
 import { askPage } from "@/ui/chrome";
@@ -221,6 +222,14 @@ export function GenerateCards({
         <header className="dag-settings__head">
           <Sparkles {...ICON} className="dag-rewrite-dialog__mark" aria-hidden="true" />
           <h2>Generate flashcards</h2>
+          <ModelChip
+            where="flashcards"
+            onOpen={() => {
+              /* The dialog and Settings share a layer; the dialog goes first so the tab is the one on top. */
+              close();
+              askPage("settings", "agents");
+            }}
+          />
           <span className="dag-toolbar__spacer" />
           <button type="button" className="dag-icon" aria-label="Close" data-dag-flashcards-close="" onClick={close}>
             <X {...ICON} aria-hidden="true" />

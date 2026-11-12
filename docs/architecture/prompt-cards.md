@@ -104,6 +104,12 @@ panel for one — the panel would take the focus straight back. `as` is in no ha
 `Item`'s memo comparison, because the select draws it. Under `?snapshot=1` the card draws its
 description read-only.
 
+**A model chip says who would answer, on all three surfaces that ask.** The prompt card, the Rewrite
+bar and the Generate flashcards dialog each draw `<provider name> · <model>` — the provider from
+`readSettings().llm` or `GET /__board/llm`'s default, the model from the setting or that provider's
+`defaultModel` — and the chip opens Settings → AI and agents. It is text only for now; the
+provider's mark arrives with #182.
+
 **`scripts/generate.mjs`** is the card without the card — the same route, the answer printed with
 its attempts, time and every leftover diagnostic — and is how models are compared. The e2e spec mocks `/generate` in every check: what is under test is what the page does
 with an answer, and a real model would make the suite slow, paid for and different every run.
