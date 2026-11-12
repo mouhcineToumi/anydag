@@ -236,7 +236,10 @@ export function Toolbar({
             Tasks page, the calendar, a quiz — still writes files, and the lock is about all of them. */}
         {sidebar && locked ? <LockButton /> : null}
         {sidebar ? <AssistantToggle /> : null}
-        <PageMore items={rows} />
+        {/* With nothing open there is no page to have a menu: the `⋯` held Lock and nothing else,
+            over a card whose whole job is to say what can be done. Listing pages pass a title and
+            keep theirs; a file passes its name. */}
+        {sidebar && (boardName || title) ? <PageMore items={rows} /> : null}
       </div>
     </header>
   );

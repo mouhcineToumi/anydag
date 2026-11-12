@@ -85,7 +85,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Links, and drawing bare | [`links.md`](links.md) |
 | Logs | [`logs.md`](logs.md) |
 | Notes | [`notes.md`](notes.md) |
-| Nothing open | [`sidebar.md`](sidebar.md) |
+| Home | [`sidebar.md`](sidebar.md) |
 | Parity | [`cli.md`](cli.md) |
 | Picking a node | [`editing.md`](editing.md) |
 | Pictures | [`free-canvas.md`](free-canvas.md) |

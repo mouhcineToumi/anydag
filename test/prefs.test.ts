@@ -9,6 +9,7 @@ import {
   FILE_LIST,
   PREF_KEYS,
   QUIZ_ABOUT,
+  RECENT_FILES,
   SETTINGS_TAB,
   SIDEBAR_FOLDERS,
   STAMP,
@@ -142,6 +143,7 @@ describe("the preference list", () => {
       LAST,
       VAULT_STAMP,
       FILE_LIST,
+      RECENT_FILES,
       LOCKED,
       RECENT_KEY,
     ]);

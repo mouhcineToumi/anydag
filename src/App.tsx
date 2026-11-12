@@ -16,6 +16,7 @@ import {
   everyFile,
   useBoardList,
   useSavedComponents,
+  FILE_KINDS,
   type BoardTree,
   type FileKind,
 } from "@/board/useBoard";
@@ -53,7 +54,8 @@ import { NoteView, type NoteHandle } from "@/ui/NoteView";
 import type { ProjectMembers } from "@/ui/ProjectBar";
 import { nameWhenOpened } from "@/ui/NoteTitle";
 import { LayoutToggle, NO_PROJECT, TasksView, type ProjectFilter, type TasksLayout } from "@/ui/Tasks";
-import { EmptyBoard, Welcome } from "@/ui/Welcome";
+import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
+import { rememberOpened } from "@/ui/recents";
 import { CALENDAR_VIEW, LIBRARY, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
 import { MAX_DAYS, VIEWS, type CalView } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
@@ -308,6 +310,20 @@ export function App() {
     go(next);
   }, [go]);
   const ref = query.get("ref");
+
+  /* Home's recent list: the page that opened a file is what knows it did, and this is the one place
+     every way of opening one passes through — a sidebar row, a reference, a link, a cold load. The
+     name is written to this browser's storage for this vault and nowhere else; `recents.ts` owns the
+     key and the shape. Opening a page is read-only as far as the folder is concerned. */
+  const opened = useMemo<Readonly<Record<FileKind, string | null>>>(
+    () => ({ board, note, quiz, table, file }),
+    [board, note, quiz, table, file],
+  );
+  useEffect(() => {
+    const kind = FILE_KINDS.find((k) => opened[k] !== null);
+    const name = kind ? opened[kind] : null;
+    if (kind && name) rememberOpened(kind, name);
+  }, [opened]);
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
      the target being renamed or moved. It is resolved once and replaced by the name it stands for
@@ -1682,6 +1698,36 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   /* Read only: the selection, the keys that read and a pan stay; everything that writes is
      not drawn, and `useEditor` refuses it underneath. A snapshot is read-only already. */
   const locked = useLocked() && !snapshot;
+  /* Home's starting tiles: the sidebar's own flow when there is a shell (it makes, opens and names
+     the file where it is drawn), and the two this page can make by itself if a page is rendered
+     without one — which only a test or a snapshot does, and a snapshot draws no Home. */
+  const startFromHome = useCallback(
+    (kind: StartKind) => {
+      if (locked) return refuseLocked();
+      if (sidebar) return sidebar.create(kind);
+      switch (kind) {
+        case "board":
+          void createBoard("untitled", blankBoardText()).then((made) => "name" in made && openBoard(made.name));
+          return;
+        case "note":
+          void createNote("untitled", blankNoteText()).then((made) => {
+            if ("error" in made) return;
+            /* Named in its own title, as one made from the sidebar is. */
+            nameWhenOpened(made.name);
+            openNote(made.name);
+          });
+          return;
+        case "task":
+        case "event":
+        case "quiz":
+        case "table":
+          /* A task, an event, a quiz and a table are the sidebar's to make; without one there is no
+             page to make them on, and no path here in the app. */
+          return;
+      }
+    },
+    [locked, sidebar, openBoard, openNote],
+  );
   const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
 
   /* Whether the board browser is up. Plain state and nothing more: a dialog somebody opened for
@@ -2636,27 +2682,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         {!snapshot && !boardName ? (
           <Welcome
             locked={locked}
-            /* The sidebar's own way to begin a file — made, opened, and named where it is drawn —
-               so the welcome card and New board are one gesture rather than two that drift. */
-            onCreate={() =>
-              locked
-                ? refuseLocked()
-                : sidebar
-                  ? sidebar.create("board")
-                  : void createBoard("untitled", blankBoardText()).then((made) => "name" in made && openBoard(made.name))
-            }
-            onWrite={() =>
-              locked
-                ? refuseLocked()
-                : sidebar
-                  ? sidebar.create("note")
-                  : void createNote("untitled", blankNoteText()).then((made) => {
-                      if ("error" in made) return;
-                      /* Named in its own title, as one made from the sidebar is. */
-                      nameWhenOpened(made.name);
-                      openNote(made.name);
-                    })
-            }
+            list={list}
+            onStart={startFromHome}
+            onOpenFile={(kind, name) => setQuery(pageQuery(kind, name))}
             onOpen={openBrowser}
           />
         ) : null}

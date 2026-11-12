@@ -114,8 +114,11 @@ Fourteen things are load-bearing:
   `useBoardList` starts from `dag:file-list` — the last list fetched in this workspace, kept with the
   uid it was fetched for and through `readPref`, so a snapshot reads none of it — and the fetch
   replaces it. `BoardTree.loaded` says there is an answer at all, which is what tells *Loading your
-  files…* from *Nothing here yet*; `fresh` says the server has answered on this page load, and only a
+  files…* from a vault that really holds nothing; `fresh` says the server has answered on this page
+  load, and only a
   fresh list resolves an id to a name, because a kept one may name a file that has moved since.
+  **An empty vault draws no line under the tree at all**: the Home card says *This vault is empty*,
+  and a second set of instructions in the column was the thing that said it twice.
 - **A drag carries a chip, and the tree scrolls under it**. On the first move a
   `.dag-sidebar-ghost` — the row's mark and name, or *N items* — is put on `<body>` and moved by a
   painted transform, `pointer-events: none` so `elementFromPoint` still finds the row; the rows it
@@ -134,10 +137,15 @@ Fourteen things are load-bearing:
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
-`dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
+`dag:favourites`, the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
-`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, the storage key `dag:file-list` and the event
-`dag:follow`. The retired `dag-sidebar__*` of the old board-list column
+`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, the storage keys `dag:file-list` and
+`dag:recent-files` and the event `dag:follow`. The Home card's own names — `dag-welcome--home`,
+`dag-welcome--vault-empty`, `dag-welcome__acts--home`, `dag-welcome__section`, `dag-welcome__sectiontitle`,
+`dag-welcome__rows`, `dag-welcome__row`, `dag-welcome__rowtitle`, `dag-welcome__rowmeta`,
+`data-dag-welcome-empty`, `data-dag-welcome-start`, `data-dag-welcome-more`, `data-dag-home-recent`,
+`data-dag-home-recent-item`, `data-dag-home-recent-kind`, `data-dag-home-due` and `data-dag-home-due-item` —
+were grepped too; the diagram owns none of them. The retired `dag-sidebar__*` of the old board-list column
 survives only in a comment in `chrome.css`. The sidebar's rows are deliberately **not**
 `data-dag-board` or `.dag-board`: the search keeps those, and `boards.spec.ts` counts `.dag-board`.
 
@@ -198,7 +206,8 @@ none of them is about. `sidebar.spec.ts` clears the key and checks what a person
 `e2e/sidebar.ts` docks it for a check that needs a row.
 
 **Out, and why:** a manual order within a folder (nothing stores one); pages
-inside pages; titles instead of names (`/list` carries names alone); Recent.
+inside pages; titles instead of names (`/list` carries names alone); and Recent, which is Home's
+(`src/ui/recents.ts`) rather than a second list in the column.
 
 ## Choosing a board
 
@@ -309,15 +318,46 @@ scroll past the top. `e2e/hover.ts` gained the other half — `boundingBox()` an
 scrolled out of an `overflow: auto` list, with a real viewport coordinate outside it, so
 `mouse.move` lands on whatever is drawn there and the hover silently does nothing.
 
-### Nothing open
+### Home
 
 **The app used to open a board nobody asked for.** `boardName` was `?board=` *or `boards[0]`*, so a
 cold load landed on whichever file sorted first — a reference fixture as often as not — and the
 only signal that this was an accident rather than a choice was not recognising it. It is
-`query.get("board")` now, and `src/ui/Welcome.tsx` stands where the fallback did: an empty board,
-with **Start drawing** (which makes one, because there is nothing to draw *on* until one exists)
-and **Open a board**. The layer is `pointer-events: none` and the card turns it back on, so the
-paper behind it still pans and zooms — an invitation, not a gate.
+`query.get("board")` now, and `src/ui/Welcome.tsx` stands where the fallback did. The layer is
+`pointer-events: none` and the card turns it back on, so the paper behind it still pans and zooms —
+an invitation, not a gate.
+
+**It is three parts, and no more.** First the ways to start, as tiles that carry the key that does
+the same thing: **Board** (`B`), **Note** (`N`), **Task** (`T`), **More…** (`M`, which opens Event,
+Quiz and Table under them) and **Search** (the board dialog's `space O`). Those bare letters are
+live only while Home is showing, where there is no board, no text box and no dialog to want them;
+the card leaves the keys alone once any of those is up.
+
+Then **Recent**, the last five files this browser opened in this vault, newest first, each a row
+that opens it again. It is not the index and it is not a preference: `src/ui/recents.ts` keeps
+`kind` + `name` in `localStorage` under `dag:recent-files`, scoped to the vault by `storageKey` and
+written by the page when a file's address comes up in `App`. Opening a vault therefore writes no
+byte of it — the folder never learns what somebody looked at — and a name the list no longer holds
+is filtered out rather than drawn as a row that opens nothing. The list is five, as the issue says;
+a repeated open moves rather than duplicates.
+
+Then **Due soon**: the tasks the sidebar's own `/__board/list` says are not done and are due by the
+end of the coming week, soonest first. It reuses `list.tasks` and `list.titles`, so it is the same
+answer the Tasks page draws and there is no second request or second parser. A task past its date
+is still due and stays at the top, marked *Overdue*.
+
+**An empty vault gets its own card.** The same *Nothing open* over a folder of two hundred files and
+a folder of none said the same thing in both, and the sidebar's *Nothing here yet* line was a second
+set of instructions a few pixels away. The title is **This vault is empty**, every kind is a tile,
+and Search is not offered because it can find nothing. The sidebar draws no line of its own for the
+same state. *Empty* means the server answered and the vault holds no files and no folders: before
+that answer the card stays *Nothing open*, so a listing on its way is never mistaken for an empty
+vault.
+
+**With nothing open the bar has no `⋯`.** It held Lock and nothing else over a card whose whole job
+is to say what can be done, so `Toolbar` draws it only for a file (`boardName`) or a listing page
+(which passes a `title`). The Assistant keeps its place there: with nothing open is exactly when
+somebody may want to ask it about the vault.
 
 One thing had to give for it. **`contentBounds` answers `1 × 1` when nothing is placed**, and
 fitting a 1px box is the maximum zoom, so the window's first resize left the empty plane reading
