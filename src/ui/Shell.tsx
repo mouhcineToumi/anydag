@@ -156,6 +156,10 @@ const BLANK: Readonly<Record<TextKind, (title: string) => string>> = {
   table: blankTableText,
 };
 
+/* The pages the logs toast waits for — a file somebody is working on. Home, the listing pages, an
+   attachment and an empty vault are not one. */
+const LOGS_PAGES = ["board", "note", "quiz", "table"] as const satisfies readonly FileKind[];
+
 function readFavourites(): string[] {
   try {
     const raw = JSON.parse(readPref(FAVOURITES) ?? "[]") as unknown;
@@ -364,6 +368,10 @@ export function Shell({
   /* What is open is always visible: its folders are opened whenever it changes. Opened, never shut
      — the rest of the tree stays as the person left it. */
   const current = board ?? note ?? quiz ?? table ?? file;
+  /* The logs question asks once a file somebody is working on has been open for a moment — never on
+     Home, a listing page, an attachment or an empty vault. `kind:name` so moving between two files
+     of one name, or between kinds, starts the wait again. */
+  const asking = LOGS_PAGES.map((kind) => (opened[kind] ? `${kind}:${opened[kind]}` : null)).find((key) => key !== null) ?? null;
   useEffect(() => {
     if (!current) return;
     const up = ancestors(current);
@@ -971,7 +979,7 @@ export function Shell({
             onClose={() => setTrashed(null)}
           />
         ) : null}
-        {cloud ? <TelemetryPrompt /> : null}
+        {cloud ? <TelemetryPrompt page={asking} /> : null}
       </SidebarContext.Provider>
     </div>
   );
