@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaultKey } from "./vault";
+import { vaultKey, vaulted } from "./vault";
 import { clickOnHover } from "./hover";
 
 /**
@@ -379,6 +379,64 @@ test("on a phone with nothing open, the sidebar is the home screen", async ({ pa
   await page.locator("[data-dag-sidebar-tasks]").click();
   await expect(sidebar(page)).toHaveCount(0);
   await expect(page).toHaveURL(/tasks=1/);
+});
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test("the sheet's Home row goes home from a board", async ({ page }) => {
+    /* The toolbar hides the mark at this width, and the sheet's head has no logo: the row is the
+       only way back to the welcome card once a file is open. */
+    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await ready(page);
+    await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
+
+    await page.locator("[data-dag-sidebar-toggle]").tap();
+    const sheet = page.locator("[data-dag-sidebar][data-sheet]");
+    await expect(sheet).toBeVisible();
+    const home = sheet.locator("[data-dag-sidebar-sheet-home]");
+    await expect(home).toBeVisible();
+    await expect(home).toHaveText("Home");
+
+    /* At the top of the sheet's navigation, above Search — where the logo is on a desktop. */
+    const top = async (sel: string) => (await page.locator(sel).boundingBox())!.y;
+    expect(await top("[data-dag-sidebar-sheet-home]")).toBeLessThan(await top("[data-dag-sidebar-search]"));
+
+    await home.tap();
+    await expect(page.locator("[data-dag-welcome]")).toBeVisible();
+    /* No page key is left: the address names the vault, as Home always does. */
+    expect(new URL(page.url()).searchParams.get("board")).toBe(null);
+  });
+
+  test("a folder's ⋯ makes a note in that folder", async ({ page }) => {
+    /* The folder's `+` is hidden here and a finger has no hover, so this menu item is the way a
+       phone fills a folder. */
+    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await ready(page);
+    await page.locator("[data-dag-sidebar-toggle]").tap();
+    await expect(page.locator("[data-dag-sidebar][data-sheet]")).toBeVisible();
+
+    await page.locator(`[data-dag-sidebar-more="${folder}"]`).tap();
+    const newIn = page.locator('[data-dag-sidebar-menu-item="new-in"]');
+    await expect(newIn).toHaveText(`New in “${folder}”…`);
+    await newIn.tap();
+
+    /* The same New menu the `+` opens, scoped to this folder. */
+    const menu = page.locator("[data-dag-sidebar-new-menu]");
+    await expect(menu).toBeVisible();
+    await expect(page.locator("[data-dag-sidebar-new-where]")).toHaveAttribute("data-dag-sidebar-new-where", folder);
+    await expect(page.locator("[data-dag-sidebar-new-where]")).toContainText("New in");
+
+    await menu.locator('[data-dag-sidebar-new-kind="note"]').tap();
+    await expect.poll(() => new URL(page.url()).searchParams.get("note"), { timeout: 10_000 }).toBe(`${folder}/Untitled`);
+    expect(fs.existsSync(path.join(BOARDS, `${folder}/Untitled.md`))).toBe(true);
+    await expect(page.locator("[data-dag-note-view]")).toBeVisible();
+
+    /* And it is in that folder's branch of the tree, not at the top level. */
+    await page.locator("[data-dag-sidebar-toggle]").tap();
+    await expect(fileRow(page, `${folder}/Untitled`)).toBeVisible();
+    await expect(fileRow(page, `${folder}/Untitled`)).toHaveAttribute("data-dag-kind", "note");
+  });
 });
 
 test("a folder in the breadcrumb is shown in the sidebar", async ({ page }) => {

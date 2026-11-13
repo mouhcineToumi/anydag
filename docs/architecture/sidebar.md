@@ -18,7 +18,9 @@ This is the app's navigation, and it costs
 canvas only for somebody who chose to keep it: `ctrl+\` (Notion's chord) or the toggle puts it away
 and `dag:sidebar` remembers, with the person's preferences; while it is away a hover on the toggle floats it over
 the page; and a window under 720px never docks it — a phone, where it is a sheet over the whole
-window, and the home screen when nothing is open. From 720px it docks, and its
+window, and the home screen when nothing is open. The sheet carries a **Home** row at the top,
+because the toolbar hides its logo there with the breadcrumbs and the sheet's head has no mark:
+without it, a file open on a phone had no way back to the welcome card. From 720px it docks, and its
 default width of 272px gives way to a quarter of the window, never under 232px, which is what a
 929px laptop window had room for and could not keep. A width somebody dragged is theirs up to half
 the window and 640px: under the quarter rule the grip on that same window moved nothing at all, and
@@ -55,7 +57,9 @@ Fourteen things are load-bearing:
   row; the tree owns only treeitems and groups. The loading line, *Nothing here yet* and a refused
   create sit beside it rather than in it, so the tree is never a tree with a paragraph in it.
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
-  one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
+  one menu; a folder's `+` makes things in it, and that row menu's **New in “<folder>”…** opens the
+  New menu scoped to that folder — the way a folder is filled on a phone, where the `+` is hidden
+  and a finger has no hover. The tree's own empty space — below the last row,
   down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
   Files and the only way a top-level file was made before #121. The open file's row keeps its `⋯` up
   without a hover, and a favourite keeps its star beside it, so a first-time reader sees that a file
@@ -156,7 +160,8 @@ a quiz's answer ticks or a table's strip is under 24×24 — `e2e/touch-targets.
 floors, at 390×844 and 1440×900.
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
-`dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
+`dag-toolbar__crumb*`, `data-dag-toolbar-home`, `data-dag-sidebar-sheet-home`, the storage keys
+`dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
 `data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, `dag-sidebar__failed*`, `dag-sidebar__retry`,
