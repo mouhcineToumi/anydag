@@ -426,7 +426,7 @@
  * Disabled is a soft tint rather than the quiet button's half-opacity: the shape of the action stays
  * on the card, and it reads as *not yet* instead of as a second secondary.
  */
-.dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-button--primary { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); border-color: var(--dag-color-accent); opacity: 0.9; }
 .dag-button--primary:disabled {
   color: var(--dag-color-slate);
@@ -4590,7 +4590,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   font: inherit;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--dag-color-paper);
+  color: var(--dag-color-card);
   background: var(--dag-color-accent);
   border: 0;
   border-radius: 6px;
@@ -5941,7 +5941,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-run__button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-run__button--primary { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 .dag-run__button:disabled { color: var(--dag-color-muted); background: var(--dag-color-paper200); border-color: transparent; cursor: default; }
 .dag-run__button:focus-visible { box-shadow: var(--focus-ring); }
 .dag-run__score { margin-block: 8px; font-size: 28px; font-weight: 600; }
@@ -7479,7 +7479,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-picker .dag-modelpicker__button { height: 28px; font-size: 12px; }
 .dag-chat-picker--effort { max-width: 96px; field-sizing: content; padding-right: 24px; }
 .dag-chat-composer__expand { flex: none; width: 24px; height: 24px; }
-.dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-paper); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }
+.dag-chat-send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--dag-color-card); background: var(--dag-color-accent); border: none; border-radius: 50%; cursor: pointer; }
 .dag-chat-send:disabled { opacity: 0.35; cursor: default; }
 .dag-chat-send:focus-visible { box-shadow: var(--focus-ring); }
 .dag-chat-send--stop { background: var(--dag-color-ink); }
