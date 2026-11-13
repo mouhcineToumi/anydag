@@ -1184,24 +1184,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-purge .dag-purge__go:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: 0 0 0 2px var(--dag-color-dangerSoft); }
 .dag-purge .dag-purge__go:disabled:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: none; }
 .dag-purge button:focus-visible { box-shadow: var(--focus-ring); }
-/* The one question about logs, asked once per install (`src/telemetry/Prompt.tsx`): the
-   Settings card's shape over the whole window, above the Settings modal (50) because it may be up
-   when somebody opens that. Two classes deep for the purge card's reason. Names grepped first:
-   `dag-telemetry*` and `data-dag-telemetry*` were nobody's. */
-.dag-settings__scrim.dag-telemetry-ask__scrim {
-  position: fixed;
-  z-index: 70;
-  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
-}
-.dag-telemetry-ask { width: 480px; }
-.dag-telemetry-ask__mark { flex: none; color: var(--dag-color-accent); }
-.dag-telemetry-ask__lead { margin: 8px 0 12px; font-size: 13px; line-height: 1.5; color: var(--dag-color-ink); }
-.dag-telemetry-ask__label { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
-.dag-telemetry-ask__list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
-.dag-telemetry-ask__hint { margin: 12px 0 0; font-size: 12px; color: var(--dag-color-slate); }
-.dag-telemetry-ask__failed { margin: 8px 0 0; font-size: 12px; color: var(--dag-color-dangerText); }
-.dag-telemetry-ask__foot { gap: 8px; }
-/* The Privacy tab's two lists. */
+/* The Privacy tab's two lists, which the logs toast (`src/telemetry/Prompt.tsx`) says again when
+   *What's sent* is opened. Names grepped first: `dag-telemetry*` and `data-dag-telemetry*` were
+   nobody's. */
 .dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: 12.5px; line-height: 1.55; color: var(--dag-color-slate); text-wrap: pretty; }
 .dag-sidebar__menu-who {
   margin: 0;
@@ -1595,9 +1580,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   flex-direction: column;
   width: 420px;
   max-width: calc(100% - 48px);
-  /* A tall window should show more boards, not more empty card — so it grows to a share of the
-     viewport rather than to a fixed number of rows, and stops before it becomes a second column. */
-  height: min(560px, calc(100% - 64px));
+  /* **As tall as its results, up to the same ceiling.** It used to be the ceiling on every search,
+     so one board and none were both a 560px card with two empty thirds — and a miss, which now has
+     something to offer, would have had the most empty space of all. The list is what grows. */
+  max-height: min(560px, calc(100% - 64px));
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
@@ -1644,7 +1630,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-panel__clear:hover { color: var(--dag-color-ink); }
 
 .dag-panel__list {
-  flex: 1;
+  /* `auto` rather than `0`: the card has no height of its own, so the list's content is what makes
+     it tall, and it shrinks — and scrolls — only once the card reaches its maximum. */
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 8px;
@@ -1669,6 +1657,35 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* An empty folder says so, and the line is also what a board can be dropped onto: a heading alone
    is four pixels of target. */
 .dag-panel__empty--folder { padding: 4px 8px 6px; font-style: italic; }
+
+/*
+ * What a miss offers: the words somebody typed, as a board or a note.
+ *
+ * Rows of the same height and radius as the board rows, with the mark's column kept, so the card
+ * does not change shape between "found it" and "make it". The board comes first because Enter
+ * presses it; the words are the title, so they are the text, not a second field to fill in.
+ */
+.dag-hits__make { margin-top: 4px; }
+.dag-hits__new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: 13px;
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-hits__new:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-hits__new:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-hits__new > svg { flex: none; color: var(--dag-color-muted); }
+.dag-hits__make-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- folders, as a tree ---- */
 
@@ -1749,6 +1766,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-board { touch-action: none; }
 .dag-board:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-board--on { color: var(--dag-color-ink); background: var(--dag-color-paper200); font-weight: 600; }
+/* A file found by name and in its text: the row is its one entry, and this says the second half. */
+.dag-board__also { font-weight: 400; font-style: italic; }
 
 /* Matches in the text of every board and note, under the names in the search card. Two
    lines a row, because a match is two facts: where it is, and the words around it. The words are
@@ -1908,6 +1927,72 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-welcome__act--tile > svg { margin-bottom: 2px; }
 .dag-welcome__act--tile kbd { font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); }
 .dag-welcome__act--tile.dag-welcome__act--go kbd { color: var(--dag-color-slate); }
+
+/*
+ * Home proper: the ways to start, then the files this browser opened last, then what is due.
+ *
+ * The card is wider than the other two because the two lists need a line for a title and a line
+ * for what it is; the title and hint stay centred, while a row reads from the left like a list.
+ * The tiles are a grid rather than the row `EmptyBoard` draws, so *More…* can open its kinds under
+ * them without moving the ones already there.
+ */
+.dag-welcome--home {
+  width: 520px;
+  gap: 0;
+  padding: 24px;
+  align-items: stretch;
+  text-align: left;
+}
+.dag-welcome--home > svg { align-self: center; }
+.dag-welcome--home > .dag-welcome__title,
+.dag-welcome--home > .dag-welcome__hint { text-align: center; }
+.dag-welcome--vault-empty { width: 460px; }
+.dag-welcome__unlock { align-self: center; margin-top: 14px; }
+.dag-welcome__acts--home {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+.dag-welcome--vault-empty .dag-welcome__acts--home { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dag-welcome__acts--home .dag-welcome__act--tile { width: auto; min-height: 66px; padding: 10px 8px; }
+.dag-welcome__section { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; }
+.dag-welcome__sectiontitle {
+  margin: 0 0 2px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dag-color-slate);
+}
+.dag-welcome__rows { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; }
+.dag-welcome__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-welcome__row:hover { background: var(--dag-color-paper100); }
+.dag-welcome__row:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-welcome__row > svg { flex: none; color: var(--dag-color-slate); }
+.dag-welcome__rowtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-welcome__rowmeta { flex: none; margin-left: auto; padding-left: 8px; font-size: 11.5px; color: var(--dag-color-slate); }
+@media (max-width: 719px) {
+  .dag-welcome--home,
+  .dag-welcome--vault-empty { width: 100%; max-width: calc(100% - 32px); padding: 18px; }
+  .dag-welcome--home .dag-welcome__acts--home { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 719px) {
   .dag-welcome__act--tile { width: 100%; min-height: 52px; flex-direction: row; gap: 10px; justify-content: flex-start; }
   .dag-welcome__act--tile kbd { display: none; }
@@ -3782,7 +3867,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings__toast > svg { flex: none; color: var(--dag-color-slate); }
 .dag-settings__toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-settings__toast-dot { flex: none; color: var(--dag-color-muted); }
-.dag-settings__toast-act {
+.dag-settings__toast-act,
+.dag-telemetry-toast__act {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -3797,8 +3883,10 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-settings__toast-act:hover { background: var(--dag-color-paper100); }
-.dag-settings__toast-act:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-settings__toast-act:hover,
+.dag-telemetry-toast__act:hover { background: var(--dag-color-paper100); }
+.dag-settings__toast-act:focus-visible,
+.dag-telemetry-toast__act:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* One polite live region for every save and reset in the modal; the ticks themselves are silent. */
 .dag-settings__said {
   position: absolute;
@@ -7527,11 +7615,13 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-trash__plain { min-height: 36px; }
 }
 
-/* The notice a delete raises: at the page's bottom-left, and **above the board's dock** rather than
-   beside it — a long title reaches the dock in the middle of the canvas, and at the dock's own height
-   the two overlapped. The sidebar's width is the page's left edge while it is docked.
-   Fixed, because it belongs to the window rather than to whichever page is under it. */
-.dag-trash-notice {
+/* The notice a delete raises, and the logs question (`src/telemetry/Prompt.tsx`): the same toast at
+   the page's bottom-left, and **above the board's dock** rather than beside it — a long title reaches
+   the dock in the middle of the canvas, and at the dock's own height the two overlapped. The
+   sidebar's width is the page's left edge while it is docked. Fixed, because it belongs to the
+   window rather than to whichever page is under it. */
+.dag-trash-notice,
+.dag-telemetry-toast {
   position: fixed;
   left: calc(var(--trash-notice-left, 0px) + 16px);
   bottom: 104px;
@@ -7548,8 +7638,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
-.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
-.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
 .dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
 .dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .dag-trash-notice__act {
@@ -7572,9 +7662,37 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-trash-notice__act:disabled { opacity: 0.5; cursor: default; }
 .dag-trash-notice button:focus-visible { box-shadow: var(--focus-ring); }
 .dag-trash-notice__close { flex: none; }
+/* The logs question is the same toast with room for the list behind *What's sent*: a column, above
+   the page rather than over it, and never in front of a delete's own notice. */
+.dag-telemetry-toast {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: min(560px, calc(100vw - 32px));
+  padding: 10px 10px 10px 12px;
+  z-index: 44;
+}
+.dag-telemetry-toast__row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dag-telemetry-toast__mark { flex: none; color: var(--dag-color-accent); }
+.dag-telemetry-toast__text { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
+.dag-telemetry-toast__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
+.dag-telemetry-toast__what {
+  padding: 8px 10px;
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-small);
+}
+.dag-telemetry-toast__label { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
+.dag-telemetry-toast__list { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
+.dag-telemetry-toast__hint { margin: 0; font-size: 12px; color: var(--dag-color-slate); }
+.dag-telemetry-toast__failed { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
 @media (max-width: 719px) {
-  .dag-trash-notice { left: 12px; right: 12px; bottom: 72px; max-width: none; }
+  .dag-trash-notice,
+  .dag-telemetry-toast { left: 12px; right: 12px; bottom: 72px; max-width: none; }
   .dag-trash-notice__act { min-height: 36px; }
+  .dag-telemetry-toast { width: auto; }
+  .dag-telemetry-toast .dag-button,
+  .dag-telemetry-toast__act { min-height: 36px; }
 }
 
 /* Sync: the sidebar's status row and the Settings tab's own bits. Colour from the

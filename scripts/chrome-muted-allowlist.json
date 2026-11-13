@@ -24,5 +24,6 @@
   ".dag-grid__menu-item:disabled": "a disabled control: the column action is unavailable here",
   ".dag-trash__mark": "the kind mark on a trash row; an icon",
   ".dag-trash-notice__mark": "the mark on the trash notice; an icon",
-  ".dag-vault__item:disabled .dag-vault__title, .dag-vault__item:disabled .dag-vault__path": "a disabled control: the name and path of a vault whose folder is missing"
+  ".dag-vault__item:disabled .dag-vault__title, .dag-vault__item:disabled .dag-vault__path": "a disabled control: the name and path of a vault whose folder is missing",
+  ".dag-hits__new > svg": "the mark beside Search's make-a-file row; an aria-hidden icon"
 }

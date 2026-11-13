@@ -1,9 +1,10 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaulted } from "./vault";
+import { suiteVault, vaulted } from "./vault";
 
 /**
  * Home: the AnyDag logo goes back to the welcome card.
@@ -54,13 +55,40 @@ const note = () => `${folder}/idea`;
 const quiz = () => `${folder}/drill`;
 const table = () => `${folder}/grid`;
 
-test.beforeEach(({}, info) => {
+/** Tomorrow, written as a task's `due:` is — what "due soon" has to include. */
+function tomorrow(): string {
+  const at = new Date();
+  at.setDate(at.getDate() + 1);
+  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+}
+
+test.beforeEach(async ({ page }, info) => {
   folder = `e2e-home-${info.testId.toLowerCase().replace(/[^a-z0-9]+/g, "")}`;
   fs.mkdirSync(path.join(BOARDS, folder), { recursive: true });
   fs.writeFileSync(path.join(BOARDS, `${board()}.board.md`), BOARD);
   fs.writeFileSync(path.join(BOARDS, `${note()}.note.md`), NOTE);
   fs.writeFileSync(path.join(BOARDS, `${quiz()}.quiz.md`), QUIZ);
   fs.writeFileSync(path.join(BOARDS, `${table()}.table.md`), TABLE);
+  /* **Writing a file is not the server knowing it.** The four fixtures land with `fs` and the
+     watcher reports them a moment later; a page opened in that window asks about a file the
+     listing does not name yet and draws *Nothing open* instead of the page this check is about.
+     Waiting on the list is the same one-round-trip rule the rest of the suite follows. */
+  const vault = await suiteVault(page);
+  await expect
+    .poll(
+      async () => {
+        const body = (await (await page.request.get("/__board/list", { params: { vault } })).json()) as {
+          boards: string[];
+          notes: string[];
+          quizzes: string[];
+          tables: string[];
+        };
+        const names = new Set([...body.boards, ...body.notes, ...body.quizzes, ...body.tables]);
+        return [board(), note(), quiz(), table()].every((name) => names.has(name));
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
 });
 test.afterEach(() => {
   /* Only the folder this check made, and only when it knows which (`CLAUDE.md`, *Things that will bite*). */
@@ -78,37 +106,37 @@ const PAGES: { what: string; url: () => string; here: (page: Page) => Promise<vo
   {
     what: "a board",
     url: () => `/?board=${board()}`,
-    here: (page) => expect(page.locator('[data-dag-item="a"]')).toBeVisible(),
+    here: (page) => expect(page.locator('[data-dag-item="a"]')).toBeVisible({ timeout: 10_000 }),
   },
   {
     what: "a note",
     url: () => `/?note=${note()}`,
-    here: (page) => expect(page.locator(".dag-note-view")).toBeVisible(),
+    here: (page) => expect(page.locator(".dag-note-view")).toBeVisible({ timeout: 10_000 }),
   },
   {
     what: "a quiz",
     url: () => `/?quiz=${quiz()}`,
-    here: (page) => expect(page.locator("[data-dag-quiz-question]")).toBeVisible(),
+    here: (page) => expect(page.locator("[data-dag-quiz-question]")).toBeVisible({ timeout: 10_000 }),
   },
   {
     what: "a table",
     url: () => `/?table=${table()}`,
-    here: (page) => expect(page.locator("[data-dag-grid]")).toBeVisible(),
+    here: (page) => expect(page.locator("[data-dag-grid]")).toBeVisible({ timeout: 10_000 }),
   },
   {
     what: "the calendar",
     url: () => "/?calendar=1",
-    here: (page) => expect(page.locator("[data-dag-calendar]")).toBeVisible(),
+    here: (page) => expect(page.locator("[data-dag-calendar]")).toBeVisible({ timeout: 10_000 }),
   },
   {
     what: "tasks",
     url: () => "/?tasks=1",
-    here: (page) => expect(page.locator("[data-dag-tasks]")).toBeVisible(),
+    here: (page) => expect(page.locator("[data-dag-tasks]")).toBeVisible({ timeout: 10_000 }),
   },
   {
     what: "the assistant",
     url: () => "/?chat=new",
-    here: (page) => expect(page.locator("[data-dag-chat-welcome]")).toBeVisible(),
+    here: (page) => expect(page.locator("[data-dag-chat-welcome]")).toBeVisible({ timeout: 10_000 }),
   },
 ];
 
@@ -141,7 +169,7 @@ for (const { what, url, here } of PAGES) {
 
 test("pressing Enter on the logo goes home from a note", async ({ page }) => {
   await page.goto(await vaulted(page, `/?note=${note()}`));
-  await expect(page.locator(".dag-note-view")).toBeVisible();
+  await expect(page.locator(".dag-note-view")).toBeVisible({ timeout: 10_000 });
 
   await logo(page).focus();
   await expect(logo(page)).toBeFocused();
@@ -151,7 +179,7 @@ test("pressing Enter on the logo goes home from a note", async ({ page }) => {
 
 test("the logo says it can be clicked", async ({ page }) => {
   await page.goto(await vaulted(page, "/?tasks=1"));
-  await expect(page.locator("[data-dag-tasks]")).toBeVisible();
+  await expect(page.locator("[data-dag-tasks]")).toBeVisible({ timeout: 10_000 });
 
   /* Named for what it does — and, since #203, holding the wordmark it shows, because a spoken
      name must contain the visible one (WCAG 2.5.3, label in name). */
@@ -180,12 +208,90 @@ test.describe("docked", () => {
 
   test("the column's own logo goes home from a board", async ({ page }) => {
     await page.goto(await vaulted(page, `/?board=${board()}`));
-    await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
+    await expect(page.locator('[data-dag-item="a"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator(".dag-toolbar .dag-toolbar__logo")).toHaveCount(0);
 
     await page.locator("[data-dag-sidebar-home]").click();
     await expect(welcome(page)).toBeVisible();
     await page.goBack();
-    await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
+    await expect(page.locator('[data-dag-item="a"]')).toBeVisible({ timeout: 10_000 });
   });
+});
+
+test("opening three files and going home lists them newest first", async ({ page }) => {
+  await page.goto(await vaulted(page, `/?board=${board()}`));
+  await expect(page.locator('[data-dag-item="a"]')).toBeVisible({ timeout: 10_000 });
+  await page.goto(await vaulted(page, `/?note=${note()}`));
+  await expect(page.locator(".dag-note-view")).toBeVisible({ timeout: 10_000 });
+  await page.goto(await vaulted(page, `/?quiz=${quiz()}`));
+  await expect(page.locator("[data-dag-quiz-question]")).toBeVisible({ timeout: 10_000 });
+
+  await logo(page).click();
+  await expect(welcome(page)).toBeVisible();
+
+  const rows = page.locator("[data-dag-home-recent-item]");
+  await expect(rows).toHaveCount(3);
+  /* The stored order, not the list's: the newest file first — the quiz, the note, then the board. */
+  expect(await rows.evaluateAll((els) => els.map((el) => el.getAttribute("data-dag-home-recent-item")))).toEqual([
+    quiz(),
+    note(),
+    board(),
+  ]);
+
+  /* A row opens what it names. */
+  await rows.first().click();
+  await expect(page.locator("[data-dag-quiz-question]")).toBeVisible({ timeout: 10_000 });
+});
+
+test("a task due this week is on Home, and a done one is not", async ({ page }) => {
+  const due = tomorrow();
+  const task = (name: string, title: string, status: string) =>
+    fs.writeFileSync(
+      path.join(BOARDS, `${folder}/${name}.note.md`),
+      `---\ntitle: ${title}\nstatus: ${status}\ndue: ${due}\n---\n`,
+    );
+  task("rent", "Pay rent", "todo");
+  task("settled", "Already settled", "done");
+
+  await page.goto(await vaulted(page, "/"));
+  /* The watcher may report the two files a moment after the page's first listing; the row arrives
+     when the list does, which is what `useBoardList` redraws on. Other workers share the vault, so
+     this looks for its own two rows rather than counting the list. */
+  const dueRow = page.locator(`[data-dag-home-due-item="${folder}/rent"]`);
+  await expect(dueRow).toBeVisible({ timeout: 10_000 });
+  await expect(dueRow).toContainText("Pay rent");
+  await expect(page.locator(`[data-dag-home-due-item="${folder}/settled"]`)).toHaveCount(0);
+});
+
+test("an empty vault says so, offers every kind, and no Search", async ({ page }) => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-e2e-home-"));
+  const name = `empty-${test
+    .info()
+    .testId.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")}`;
+  let made = "";
+  try {
+    const r = await page.request.post("/api/vaults/create", { data: { parent, name } });
+    expect(r.ok(), await r.text()).toBe(true);
+    made = ((await r.json()) as { vault: { id: string } }).vault.id;
+    /* Opening a vault makes it the server's default, and a page that names no vault lands there.
+       The suite's own is put back at once, as `vaults.spec.ts` does. */
+    await page.request.post("/api/vaults/open", { data: { path: fs.realpathSync(BOARDS) } });
+
+    await page.goto(`/?vault=${made}`);
+    await expect(welcome(page)).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-dag-welcome-empty]")).toBeVisible();
+    await expect(welcome(page)).toContainText("This vault is empty");
+
+    /* Every kind is a tile, and Search — which can find nothing — is not offered. */
+    await expect(page.locator("[data-dag-welcome-start]")).toHaveCount(6);
+    await expect(page.locator("[data-dag-welcome-open]")).toHaveCount(0);
+    await expect(page.getByText("Nothing here yet")).toHaveCount(0);
+  } finally {
+    /* Off the page first: closing the vault a tab is in sends it elsewhere, with a 404 on the way. */
+    await page.goto("about:blank").catch(() => undefined);
+    await page.request.post("/api/vaults/open", { data: { path: fs.realpathSync(BOARDS) } }).catch(() => undefined);
+    if (made) await page.request.post("/api/vaults/close", { data: { id: made, forget: true } }).catch(() => undefined);
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
 });

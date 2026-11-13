@@ -36,6 +36,7 @@ import {
   FolderPlus,
   GraduationCap,
   Grid2x2Plus,
+  Home,
   Link as LinkMark,
   ListTodo,
   MessageCircleWarning,
@@ -273,8 +274,11 @@ export interface SidebarFiles {
    * a status — or an event, a note that starts with a start. Resolves `null` once it was made and
    * opened, or the sentence saying why it was not — which the column says under the tree. A locked
    * app answers through the lock's own notice instead, so it resolves `null` too.
+   *
+   * **A `title` makes the file under that title instead of asking for one**: the search's way,
+   * where the words somebody typed are the name and opening it is the whole of the gesture.
    */
-  newFile(kind: TextKind | "task" | "event", folder: string): Promise<string | null>;
+  newFile(kind: TextKind | "task" | "event", folder: string, title?: string): Promise<string | null>;
   /**
    * Upload files from the computer into a folder: each becomes an attachment, listed here
    * like any other file. Resolves to the sentences for any the server — or its upload limits —
@@ -1227,6 +1231,22 @@ export function Sidebar({
       )}
 
       <div className="dag-sidebar__acts">
+        {/* A phone has no mark to press: the toolbar hides its logo there with the breadcrumbs, and
+            the sheet's head is the vault and the way out. So the way home is a row of its own, at
+            the top of the sheet, opening what the logo opens on a desktop. */}
+        {sheet ? (
+          <button
+            type="button"
+            className="dag-sidebar__act"
+            data-dag-sidebar-sheet-home=""
+            aria-label="Home"
+            title="Home"
+            onClick={onHome}
+          >
+            <Home {...ICON} aria-hidden="true" />
+            <span>Home</span>
+          </button>
+        ) : null}
         <button type="button" className="dag-sidebar__act" data-dag-sidebar-search="" onClick={() => ask("search")}>
           <Search {...ICON} aria-hidden="true" />
           <span>Search</span>
@@ -1442,9 +1462,8 @@ export function Sidebar({
         }}
         /* The browser's own menu is kept off the column, as a row's is: the tree answers right-clicks.
            A row — and whatever hangs off it, its `⋯` and its folder's *Empty* line — is that row's
-           menu's; the tree's own space, below the rows and around the nothing-here line, is the
-           **top level's**: the `+` menu, at the pointer, making into the folder the tree says is
-           nothing — where there is no row to be in. */
+           menu's; the tree's own space, below the rows, is the **top level's**: the `+` menu, at the
+           pointer, making into the folder the tree says is nothing — where there is no row to be in. */
         onContextMenu={(e) => {
           if ((e.target as Element).closest(".dag-sidebar__line")) return;
           e.preventDefault();
@@ -1467,8 +1486,6 @@ export function Sidebar({
           <p className="dag-sidebar__none" role="status" data-dag-sidebar-loading="">
             Loading your files…
           </p>
-        ) : lines.length === 0 && !failed ? (
-          <p className="dag-sidebar__none">Nothing here yet. Make a board, a note, a quiz or a table above.</p>
         ) : null}
         {/* Only treeitems and their groups live in the tree. A status, an empty line or a
             refused create is a sibling before it, so a screen reader hears a file tree rather
@@ -1866,6 +1883,14 @@ export function Sidebar({
               return void refuseLocked();
             }
             const where = whereOf(menuLine);
+            /* A folder's menu opens the New menu scoped to it, where the folder's own `+` would
+               have — which a phone hides, and which a finger cannot hover. */
+            if (what === "new-in" && menuLine.type === "folder" && mode?.kind === "menu") {
+              const { at } = mode;
+              setMode(null);
+              setMaking({ x: at.x, y: at.y, below: at.y, left: at.x, here: where });
+              return;
+            }
             /* Into the trash at once, a folder with everything in it: nothing is asked,
                because the window offers to take it back — the three questions this asked went with
                the reason for them. */
@@ -2171,6 +2196,7 @@ const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>([
 ]);
 
 type Pick =
+  | "new-in"
   | "rename"
   | "duplicate"
   | "move"
@@ -2313,6 +2339,14 @@ function RowMenu({
         </>
       ) : (
         <>
+          {/* A folder's `+` is the same menu, but on a phone the plus is hidden and a finger has
+              no hover: this is the one way into the folder's New menu there. */}
+          {line.type === "folder" ? (
+            <>
+              {item("new-in", `New in “${leaf(line.path)}”…`, <FilePlus2 {...ICON} aria-hidden="true" />)}
+              <hr className="dag-vault__rule" />
+            </>
+          ) : null}
           {line.type === "file"
             ? favourite
               ? item("unfavourite", "Remove from favourites", <StarOff {...ICON} aria-hidden="true" />)

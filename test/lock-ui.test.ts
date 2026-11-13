@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import type { BoardTree } from "@/board/useBoard";
 import { EmptyBoard, Welcome } from "@/ui/Welcome";
 
 /**
@@ -16,6 +17,26 @@ import { EmptyBoard, Welcome } from "@/ui/Welcome";
 const HINT = "Read only — unlock (Ctrl+Shift+L)";
 const noop = () => {};
 
+/** A vault with one board: *Nothing open*, not *This vault is empty*. */
+const LIST: BoardTree = {
+  loaded: true,
+  fresh: true,
+  boards: ["one"],
+  folders: [],
+  notes: [],
+  titles: {},
+  tasks: {},
+  projects: {},
+  events: {},
+  created: {},
+  ids: {},
+  quizzes: [],
+  questions: {},
+  tables: [],
+  files: [],
+  sizes: {},
+};
+
 /** The opening tag of the element that carries `hook`, which is where its attributes are said. */
 function tag(markup: string, hook: string): string {
   const found = markup.match(new RegExp(`<[a-z]+[^>]*${hook}[^>]*>`));
@@ -24,7 +45,7 @@ function tag(markup: string, hook: string): string {
 }
 
 const welcome = (locked: boolean) =>
-  renderToStaticMarkup(createElement(Welcome, { locked, onCreate: noop, onWrite: noop, onOpen: noop }));
+  renderToStaticMarkup(createElement(Welcome, { locked, list: LIST, onStart: noop, onOpenFile: noop, onOpen: noop }));
 
 const emptyBoard = (locked: boolean) =>
   renderToStaticMarkup(createElement(EmptyBoard, { locked, onNote: noop, onLibrary: noop, onPrompt: noop }));

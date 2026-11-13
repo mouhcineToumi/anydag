@@ -78,6 +78,12 @@ export const SIDEBAR_FOLDERS = "dag:sidebar-open";
  */
 export const FILE_LIST = "dag:file-list";
 /**
+ * The files Home remembers opening, per vault: the last five, newest first. A cache of this
+ * browser's, never a preference and never in `PREF_KEYS` — the folder does not know what somebody
+ * looked at, and opening a vault still writes no byte of it. `src/ui/recents.ts` owns the shape.
+ */
+export const RECENT_FILES = "dag:recent-files";
+/**
  * Whether the Tasks page is a list or a board — this browser's for `SIDEBAR_FOLDERS`'s
  * reason: which way somebody looks at their tasks is view state, and not something to write to the
  * settings that travel every time they switch.
@@ -187,10 +193,10 @@ export const VAULT_STAMP = "dag:vault-prefs-at";
 /**
  * Every key this browser keeps a copy of **per vault**: the vault's preferences, the settings
  * object (`store.ts`'s `dag:settings`), which folders are open — they are the vault's folders —
- * and the clock that dates them. They are stored as `key@slug`, so two tabs in two vaults never read
- * each other's favourites (`vault/current.ts`).
+ * the cached file list, Home's recent files, and the clock that dates them. They are stored as
+ * `key@slug`, so two tabs in two vaults never read each other's favourites (`vault/current.ts`).
  */
-const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST]);
+const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST, RECENT_FILES]);
 
 /** Where `key` is kept in `localStorage` for this tab: scoped to the vault when it is a vault's. */
 export function storageKey(key: string): string {
