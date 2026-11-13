@@ -1252,7 +1252,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  /* The modal layer, under the toasts: a file deleted from the sheet says so over it. */
+  z-index: var(--dag-ui-layer-modal);
   width: auto;
   height: auto;
   padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
@@ -1429,14 +1430,6 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  * list was the sidebar, and one of the two surfaces using them is now a modal and the other was
  * never a sidebar — so the name says what they are, which is the parts of a filterable list panel.
  */
-.dag-browser__scrim {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
-}
 .dag-browser {
   display: flex;
   flex-direction: column;
@@ -1448,8 +1441,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   max-height: min(560px, calc(100% - 64px));
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
   overflow: hidden;
 }
 
@@ -3333,8 +3326,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 18px 22px 16px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-settings__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .dag-settings__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -3512,49 +3505,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 @media (prefers-reduced-motion: reduce) {
   .dag-settings__saved { animation: none; }
 }
-/* The reset's toast, the trash notice's shape at the modal's foot: the same border, elevation and
-   action button, positioned against the card rather than the window. */
-.dag-settings__toast {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100% - 32px);
-  padding: 8px 8px 8px 12px;
-  font-size: 13px;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-settings__toast > svg { flex: none; color: var(--dag-color-slate); }
-.dag-settings__toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dag-settings__toast-dot { flex: none; color: var(--dag-color-muted); }
-.dag-settings__toast-act,
-.dag-telemetry-toast__act {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-settings__toast-act:hover,
-.dag-telemetry-toast__act:hover { background: var(--dag-color-paper100); }
-.dag-settings__toast-act:focus-visible,
-.dag-telemetry-toast__act:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 /* One polite live region for every save and reset in the modal; the ticks themselves are silent. */
 .dag-settings__said {
   position: absolute;
@@ -3577,15 +3527,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
  * is asked from inside it. Names grepped first: `dag-settings-modal*` and `data-dag-settings-*` were
  * nobody's; `dag-settings__*` is the card's vocabulary, which the tabs reuse for their rows.
  */
-.dag-settings-modal__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--dag-color-ink) 10%, transparent);
-}
 .dag-settings-modal {
   position: relative;
   display: grid;
@@ -3596,8 +3537,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-settings-modal:focus { outline: none; }
 .dag-settings-modal__nav {
@@ -3796,7 +3737,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
    back — the shape a phone's own settings have. `719px` is the breakpoint the Tasks and quiz pages
    already fold at. */
 @media (max-width: 719px) {
-  .dag-settings-modal__scrim { align-items: stretch; justify-content: stretch; }
+  .dag-dialog[data-dag-settings] { align-items: stretch; justify-content: stretch; }
   .dag-settings-modal {
     grid-template-columns: minmax(0, 1fr);
     width: 100%;
@@ -3830,7 +3771,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-settings-modal .dag-settings__reset { min-height: 44px; padding: 0 10px; }
   .dag-settings-modal .dag-settings__client { min-height: 44px; }
   .dag-settings-modal .dag-settings__more > summary { min-height: 44px; }
-  .dag-settings-modal .dag-settings__toast-act { min-height: 44px; }
+  .dag-settings-modal .dag-toast__act { min-height: 44px; }
   .dag-settings-modal .dag-settings__link { min-height: 44px; }
   .dag-settings-modal .dag-providers__check { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; padding: 0 4px; vertical-align: middle; }
   [data-dag-settings] a[href] { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
@@ -4055,31 +3996,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-problems__pill--error { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
 .dag-problems__pill:hover { background: var(--dag-color-paper100); }
 
-.dag-problems__toast {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 100%;
-  padding: 8px 8px 8px 12px;
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-dangerBorder);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-problems__icon { flex: none; color: var(--dag-color-dangerText); }
-.dag-problems__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.dag-problems__toast .dag-problems__msg {
-  font-size: 12.5px;
-  color: var(--dag-color-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dag-problems__code {
-  font-family: var(--dag-font-mono);
-  font-size: 10.5px;
-  color: var(--dag-color-muted);
-}
 .dag-problems__show {
   flex: none;
   height: 26px;
@@ -4094,7 +4010,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-problems__show:hover { background: var(--dag-color-paper200); }
-.dag-problems__toast .dag-icon { flex: none; width: 26px; height: 26px; }
 
 .dag-problems__tray {
   display: flex;
@@ -4426,32 +4341,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
    `dag-note-view__editor` and `data-dag-note-first` were unclaimed. */
 .dag-note-view__first > .dag-note-view__page { margin: 0; padding-block: 0; max-width: none; }
 .dag-note-view__editor[hidden] { display: none; }
-.dag-note-view__notice {
-  max-width: 820px;
-  margin: 16px auto 0;
-  padding: 10px 14px;
-  border-radius: var(--dag-metric-radius-small);
-  background: var(--dag-color-paper100);
-  color: var(--dag-color-slate);
-  font-size: 13px;
-}
-.dag-note-view__notice--ask {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--dag-color-warningSoft);
-  color: var(--dag-color-ink);
-}
-.dag-note-view__notice--ask span { flex: 1; }
-.dag-note-view__notice--ask button {
-  font: inherit;
-  padding: 4px 10px;
-  border-radius: var(--dag-metric-radius-chip);
-  border: 1px solid var(--dag-color-outline);
-  background: var(--dag-color-card);
-  color: var(--dag-color-ink);
-  cursor: pointer;
-}
 /* A note's title, at the top of its page: Notion's page title. The field and the read-only
    heading are one class, so a picture of a note is laid out exactly as the page is. It sits in the
    editor's own 54px gutter, as the task bar under it does, and is a size up from the Markdown ramp's
@@ -4509,11 +4398,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
  * logs question, because the sidebar's foot is where it opens and every page has one. Names
  * grepped first: `dag-feedback__*` had only the textarea above, `data-dag-feedback*` was nobody's.
  */
-.dag-settings__scrim.dag-feedback__scrim {
-  position: fixed;
-  z-index: 60;
-  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
-}
 .dag-feedback { width: 520px; }
 .dag-feedback[data-dragging] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft), var(--elevation); }
 .dag-feedback__mark { flex: none; color: var(--dag-color-accent); }
@@ -6549,27 +6433,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-embed__preview { padding: 12px; border-top: 1px solid var(--dag-color-outlineSoft); background: var(--dag-color-paper); }
 .dag-embed__preview .dag-pdf__pages { max-height: 70vh; overflow: auto; }
 .dag-embed__chev--open { transform: rotate(180deg); }
-/* What a drop onto the board was refused with, over the canvas, until it goes or is put away. */
-.dag-upload-notice {
-  position: absolute;
-  top: 12px;
-  left: var(--canvas-mid, 50%);
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: min(560px, calc(var(--canvas-w, 100%) - 32px));
-  padding: 8px 8px 8px 14px;
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
-  background: var(--dag-color-card);
-  color: var(--dag-color-ink);
-  font-size: 13px;
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-upload-notice__lines { flex: 1; display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
-.dag-upload-notice__lines p { margin: 0; }
 /* A refusal's backticked name — `.exe`, a file's name — drawn as code wherever one is said. */
 .dag-said__code {
   font-family: var(--dag-font-mono);
@@ -7129,10 +6992,161 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* The sidebar's menu says why a locked row offers less. */
 .dag-sidebar__menu-locked { margin: 4px 8px 2px; font-size: 11.5px; color: var(--dag-color-muted); }
 
+/* ---- The toast and the dialog frame (#208) ----------------------------------------------
+   One toast (`src/ui/Toast.tsx`) and one stack for every notice the app raises, and one frame
+   (`src/ui/Dialog.tsx`) for every modal: Settings, Feedback, Search and the logs question. Every
+   size, corner, shadow, layer and duration here is a `--dag-ui-*` token, and every colour the
+   theme's. Names grepped first: `dag-toast*`, `dag-dialog*`, `data-dag-toast*`, `data-dag-dialog`
+   and `--toasts-left` were nobody's. */
+
+/* The stack: bottom centre of the page — right of a docked sidebar, so `--toasts-left` is the
+   sidebar's width while it is docked, the trash notice's old rule — and above a board's dock.
+   Newest at the bottom, nearest the dock; three at most are drawn, and an older one waits under
+   them until one goes. It takes no pointer itself, so the page between toasts stays usable. */
+.dag-toasts {
+  position: fixed;
+  left: var(--toasts-left, 0px);
+  right: 0;
+  bottom: var(--dag-ui-space-5);
+  z-index: var(--dag-ui-layer-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  padding: 0 var(--dag-ui-space-4);
+  pointer-events: none;
+}
+.dag-toasts:empty { display: none; }
+.dag-toasts > :nth-last-child(n + 4) { display: none; }
+.dag-shell:has(.dag-dock) .dag-toasts { bottom: 104px; }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-toasts { --toasts-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-toasts { --toasts-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
+
+/* A toast: the mark, one line, the actions, the ×. */
+.dag-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  max-width: min(680px, 100%);
+  min-height: calc(var(--dag-ui-control-md) + 2 * var(--dag-ui-space-1) + 2px);
+  padding: var(--dag-ui-space-1) var(--dag-ui-space-1) var(--dag-ui-space-1) var(--dag-ui-space-3);
+  font-size: var(--dag-ui-text-md);
+  line-height: var(--dag-ui-leading-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  pointer-events: auto;
+  animation: dag-toast-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+@keyframes dag-toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dag-toast { animation: none; } }
+.dag-toast__mark { flex: none; color: var(--dag-color-slate); }
+.dag-toast--accent .dag-toast__mark { color: var(--dag-color-accent); }
+.dag-toast--danger .dag-toast__mark { color: var(--dag-color-dangerText); }
+/* One line, always: a sentence too long for it ends in an ellipsis, with the whole of it the title. */
+.dag-toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A line with a name in it gives way in the name's middle: the words around it keep their size,
+   the name's head shrinks to an ellipsis, and its tail — the extension — stays. */
+.dag-toast__text:has(.dag-toast__name) { display: flex; }
+.dag-toast__words { flex: none; white-space: pre; }
+.dag-toast__name { display: flex; flex: 0 1 auto; min-width: 0; }
+.dag-toast__head { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.dag-toast__tail { flex: none; white-space: pre; }
+/* Where a problem is, before what it is: quieter, and the first thing to give way. */
+.dag-toast__aside { color: var(--dag-color-slate); }
+.dag-toast__acts { flex: none; display: flex; align-items: center; gap: var(--dag-ui-space-1); }
+.dag-toast__act {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dag-ui-space-1);
+  height: var(--dag-ui-control-md);
+  padding: 0 var(--dag-ui-space-2);
+  font: inherit;
+  font-size: var(--dag-ui-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  white-space: nowrap;
+  color: var(--dag-color-accent);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-toast__act:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-toast__act:disabled { opacity: 0.5; cursor: default; }
+.dag-toast__act--primary { padding: 0 var(--dag-ui-space-3); color: var(--dag-color-paper); background: var(--dag-color-accent); }
+.dag-toast__act--primary:hover:not(:disabled) { background: var(--dag-color-accent); opacity: 0.9; }
+.dag-toast button:focus-visible { outline: var(--dag-ui-focus-width) solid var(--dag-color-accent); outline-offset: var(--dag-ui-focus-offset); }
+.dag-toast__close { flex: none; }
+/* Settings' reset toast is drawn inside its modal, at the card's foot, where the trap can reach it. */
+.dag-settings-modal > .dag-toast {
+  position: absolute;
+  left: 50%;
+  bottom: var(--dag-ui-space-4);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--dag-ui-space-4));
+  transform: translateX(-50%);
+}
+
+/* On a phone the stack is the window's width less a margin, and the actions take their own row
+   under the line, so the line keeps the room a sentence needs. */
+@media (max-width: 719px) {
+  .dag-toasts { left: 0; bottom: 72px; padding: 0 var(--dag-ui-space-3); }
+  .dag-toasts > .dag-toast {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "mark text close" "acts acts acts";
+    column-gap: var(--dag-ui-space-2);
+    width: 100%;
+    max-width: none;
+  }
+  .dag-toasts .dag-toast__mark { grid-area: mark; }
+  .dag-toasts .dag-toast__text { grid-area: text; }
+  .dag-toasts .dag-toast__close { grid-area: close; }
+  .dag-toasts .dag-toast__acts { grid-area: acts; justify-content: flex-end; }
+  .dag-toast__act { min-height: 36px; }
+}
+
+/* The dialog frame: over the whole window, sidebar included, and dimming it. The scrim is
+   `color.shadow` — the translucent elevation colour every card's shadow is drawn in, dark in every
+   theme (a mix of `ink` would have lightened the page in Paper Dark) — because no theme has a
+   colour of its own for a scrim. One rule, so a `color.scrim` is one line to change. */
+.dag-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dag-ui-layer-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dag-color-shadow);
+}
+.dag-dialog > [role="dialog"]:focus { outline: none; }
+/* Electron's drag region ignores what is drawn over it (`desktop.md`): over the window's top row a
+   press on the scrim or the card would drag the window. The whole frame is cut out of the region. */
+[data-dag-window] .dag-dialog { -webkit-app-region: no-drag; }
+
+/* The logs question's dialog, behind its toast's *What's sent*: the full list, then the answer. */
+.dag-telemetry-dialog { width: 480px; }
+.dag-telemetry-dialog__mark { flex: none; color: var(--dag-color-accent); }
+.dag-telemetry-dialog .dag-settings__foot { gap: var(--dag-ui-space-2); }
+.dag-telemetry-dialog__label { margin: var(--dag-ui-space-3) 0 2px; font-size: var(--dag-ui-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-telemetry-dialog__list { margin: 0; padding-left: 18px; font-size: var(--dag-ui-text-md); line-height: var(--dag-ui-leading-md); color: var(--dag-color-slate); }
+.dag-telemetry-dialog__hint { margin: var(--dag-ui-space-3) 0 0; font-size: var(--dag-ui-text-sm); color: var(--dag-color-slate); }
+.dag-telemetry-dialog__failed { margin: var(--dag-ui-space-2) 0 0; font-size: var(--dag-ui-text-sm); color: var(--dag-color-dangerText); }
+
 /* ---- The trash ------------------------------------------------------------------------
-   A page of what was deleted, and the notice a delete raises in place of the question it used to
-   ask. Chrome, so lengths are written here and every colour is the theme's. Names grepped first:
-   `dag-trash*`, `dag-trash-notice*` and `data-dag-trash*` were nobody's. */
+   A page of what was deleted. The notice a delete raises is a toast (`src/ui/Toast.tsx`, above).
+   Chrome, so lengths are written here and every colour is the theme's. Names grepped first:
+   `dag-trash*` and `data-dag-trash*` were nobody's. */
 
 .dag-app--trash { background: var(--dag-color-paper); color: var(--dag-color-ink); }
 .dag-trash {
@@ -7262,85 +7276,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-trash__plain { min-height: 36px; }
 }
 
-/* The notice a delete raises, and the logs question (`src/telemetry/Prompt.tsx`): the same toast at
-   the page's bottom-left, and **above the board's dock** rather than beside it — a long title reaches
-   the dock in the middle of the canvas, and at the dock's own height the two overlapped. The
-   sidebar's width is the page's left edge while it is docked. Fixed, because it belongs to the
-   window rather than to whichever page is under it. */
-.dag-trash-notice,
-.dag-telemetry-toast {
-  position: fixed;
-  left: calc(var(--trash-notice-left, 0px) + 16px);
-  bottom: 104px;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: min(560px, calc(100vw - 32px));
-  padding: 6px 6px 6px 12px;
-  font-size: 13px;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-shell:has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
-.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
-.dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
-.dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.dag-trash-notice__act {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 0 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-trash-notice__act:hover { background: var(--dag-color-paper100); }
-.dag-trash-notice__act:disabled { opacity: 0.5; cursor: default; }
-.dag-trash-notice button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
-.dag-trash-notice__close { flex: none; }
-/* The logs question is the same toast with room for the list behind *What's sent*: a column, above
-   the page rather than over it, and never in front of a delete's own notice. */
-.dag-telemetry-toast {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  width: min(560px, calc(100vw - 32px));
-  padding: 10px 10px 10px 12px;
-  z-index: 44;
-}
-.dag-telemetry-toast__row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.dag-telemetry-toast__mark { flex: none; color: var(--dag-color-accent); }
-.dag-telemetry-toast__text { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
-.dag-telemetry-toast__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
-.dag-telemetry-toast__what {
-  padding: 8px 10px;
-  background: var(--dag-color-paper100);
-  border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
-}
-.dag-telemetry-toast__label { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
-.dag-telemetry-toast__list { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
-.dag-telemetry-toast__hint { margin: 0; font-size: 12px; color: var(--dag-color-slate); }
-.dag-telemetry-toast__failed { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
-@media (max-width: 719px) {
-  .dag-trash-notice,
-  .dag-telemetry-toast { left: 12px; right: 12px; bottom: 72px; max-width: none; }
-  .dag-trash-notice__act { min-height: 36px; }
-  .dag-telemetry-toast { width: auto; }
-  .dag-telemetry-toast .dag-button,
-  .dag-telemetry-toast__act { min-height: 36px; }
-}
 
 /* Sync: the sidebar's status row and the Settings tab's own bits. Colour from the
    theme's tokens only. */
@@ -7567,7 +7502,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* The quiz page's dialog: the settings card's shell, put on the body and fixed over the window, the
    feedback card's way — inside the quiz column it covered only the column. Names are
    `dag-flashcards*`, grepped first: "card" is taken three times over on a quiz's page alone. */
-.dag-settings__scrim.dag-flashcards__scrim { position: fixed; z-index: 50; background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent); }
+.dag-settings__scrim.dag-flashcards__scrim { position: fixed; z-index: var(--dag-ui-layer-modal); background: var(--dag-color-shadow); }
 .dag-flashcards { width: 560px; display: flex; flex-direction: column; }
 .dag-flashcards__from { display: flex; gap: 16px; margin: 0 0 8px; }
 .dag-flashcards__from .dag-quiz__check { margin: 0; }

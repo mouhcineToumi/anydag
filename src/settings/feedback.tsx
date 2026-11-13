@@ -1,6 +1,8 @@
 import { Check } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { Toast, toastAct } from "@/ui/Toast";
+
 import { SAVED, type SavedDetail } from "./saved";
 
 /** How long the tick beside a row stays up, fade included. */
@@ -93,13 +95,12 @@ export function useResetToast(): ShowReset {
  * toast a reset raises.
  *
  * The tick itself is `aria-hidden`, because the region already says "Saved" — a live region per row
- * would read the same word as many times as there are controls. The reset toast is the trash
- * notice's shape at the modal's foot: it stays while the pointer or the focus is on it, so it cannot
+ * would read the same word as many times as there are controls. The reset toast is the app's one
+ * `Toast`, drawn at the modal's foot: it stays while the pointer or the focus is on it, so it cannot
  * go from under a hand reaching for Undo.
  */
 export function SettingsFeedback({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ scope: string; undo(): void } | null>(null);
-  const [held, setHeld] = useState(false);
   const [said, setSaid] = useState({ text: "", alt: false });
 
   /* A second identical string is not announced again, so alternate a zero-width space after it. */
@@ -117,50 +118,42 @@ export function SettingsFeedback({ children }: { children: ReactNode }) {
   const show = useCallback<ShowReset>(
     (scope, undo) => {
       setToast({ scope, undo });
-      setHeld(false);
       say(`${scope} reset. Undo is available for six seconds.`);
     },
     [say],
   );
 
-  useEffect(() => {
-    if (!toast || held) return;
-    const timer = setTimeout(() => setToast(null), RESET_FOR);
-    return () => clearTimeout(timer);
-  }, [toast, held]);
-
   return (
     <ResetContext.Provider value={show}>
       {children}
       {toast ? (
-        <div
-          className="dag-settings__toast"
+        /* The app's one toast, drawn inside the modal at its foot rather than in the page's stack:
+           the modal keeps the focus, and Undo has to be within the reach of Tab. */
+        <Toast
+          inline
+          icon={Check}
           data-dag-setting-reset-toast={toast.scope}
-          onPointerEnter={() => setHeld(true)}
-          onPointerLeave={() => setHeld(false)}
-          onFocus={() => setHeld(true)}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
-          }}
+          title={`${toast.scope} reset`}
+          timeout={RESET_FOR}
+          renew={toast}
+          onTimeout={() => setToast(null)}
+          actions={
+            <button
+              type="button"
+              className={toastAct()}
+              data-dag-setting-reset-undo=""
+              onClick={() => {
+                const undo = toast.undo;
+                setToast(null);
+                undo();
+              }}
+            >
+              Undo
+            </button>
+          }
         >
-          <Check size={14} strokeWidth={2} aria-hidden="true" />
-          <span className="dag-settings__toast-text">{toast.scope} reset</span>
-          <span className="dag-settings__toast-dot" aria-hidden="true">
-            ·
-          </span>
-          <button
-            type="button"
-            className="dag-settings__toast-act"
-            data-dag-setting-reset-undo=""
-            onClick={() => {
-              const undo = toast.undo;
-              setToast(null);
-              undo();
-            }}
-          >
-            Undo
-          </button>
-        </div>
+          {toast.scope} reset
+        </Toast>
       ) : null}
       <span className="dag-settings__said" role="status" aria-live="polite" aria-atomic="true" data-dag-setting-said="">
         {said.text}

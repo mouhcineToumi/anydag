@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ChevronDown, X } from "lucide-react";
+import { AlertCircle, ChevronDown } from "lucide-react";
 
 import { itemName } from "@/board/types";
 import type { Fix, Repair } from "@/edit/repair";
 import type { ProblemsShow } from "@/settings/store";
 
 import { count, freshErrors, type Problem } from "./problemList";
+import { Toast, toastAct } from "./Toast";
 
 /** Lucide at one size and weight, stated once. */
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -57,23 +58,15 @@ interface Props {
 export function Problems({ problems, show, editing, pageName, onShow, repairOf, onRepair }: Props) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<Problem[] | null>(null);
+  /* Bumped by each new notification, so a second one starts its wait again. */
+  const [raised, setRaised] = useState(0);
   /* The keys at the last settled reading. A ref, not state: it decides what is new and draws nothing. */
   const seen = useRef<Set<string>>(new Set());
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { errors, warnings } = count(problems);
   /* One string standing for the whole set, so the settle effect fires on a change of *content* —
      `problems` is a fresh array after every write whether or not anything in it changed. */
   const signature = useMemo(() => problems.map((p) => `${p.key}@${p.line}`).join("\n"), [problems]);
-
-  const stopHiding = () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = null;
-  };
-  const hideIn = (ms: number) => {
-    stopHiding();
-    hideTimer.current = setTimeout(() => setToast(null), ms);
-  };
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -81,7 +74,7 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
       seen.current = new Set(problems.map((p) => p.key));
       if (fresh.length > 0 && show === "notify") {
         setToast(fresh);
-        hideIn(SHOW_FOR);
+        setRaised((n) => n + 1);
       }
       /* A notification about something that has since been fixed is a notification about nothing. */
       if (problems.every((p) => p.severity !== "error")) setToast(null);
@@ -90,8 +83,6 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
     /* `signature` stands for `problems`; `editing` and `show` are read when it fires. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
-
-  useEffect(() => stopHiding, []);
 
   /* Fixed or empty: the list has nothing to say, and an open tray over an empty board is a bug. */
   useEffect(() => {
@@ -141,37 +132,29 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
           </ul>
         </div>
       ) : first ? (
-        <div
-          className="dag-problems__toast"
+        /* In the app's one stack with every other notice (#208): where it is, quieter, then what. */
+        <Toast
+          icon={AlertCircle}
+          tone="danger"
           data-dag-problems-toast={first.code}
-          role="status"
-          aria-live="polite"
-          onPointerEnter={stopHiding}
-          onPointerLeave={() => hideIn(SHOW_FOR / 2)}
+          title={[where(first), first.words].filter(Boolean).join(" · ")}
+          timeout={SHOW_FOR}
+          renew={raised}
+          onTimeout={() => setToast(null)}
+          onDismiss={() => setToast(null)}
+          dismissData={{ "data-dag-problems-dismiss": "" }}
+          actions={
+            first.item ? (
+              <button type="button" className={toastAct()} data-dag-problems-show="" onClick={() => go(first)}>
+                Show
+              </button>
+            ) : null
+          }
         >
-          <AlertCircle {...ICON} aria-hidden="true" className="dag-problems__icon" />
-          <span className="dag-problems__text">
-            {where(first) ? <span className="dag-problems__code">{where(first)}</span> : null}
-            <span className="dag-problems__msg">
-              {first.words}
-              {toast!.length > 1 ? ` (and ${toast!.length - 1} more)` : ""}
-            </span>
-          </span>
-          {first.item ? (
-            <button type="button" className="dag-problems__show" data-dag-problems-show="" onClick={() => go(first)}>
-              Show
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="dag-icon"
-            data-dag-problems-dismiss=""
-            aria-label="Dismiss"
-            onClick={() => (stopHiding(), setToast(null))}
-          >
-            <X {...ICON} aria-hidden="true" />
-          </button>
-        </div>
+          {where(first) ? <span className="dag-toast__aside">{where(first)} · </span> : null}
+          {first.words}
+          {toast!.length > 1 ? ` (and ${toast!.length - 1} more)` : ""}
+        </Toast>
       ) : null}
 
       <button
