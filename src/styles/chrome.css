@@ -192,6 +192,10 @@
 .dag-check:checked { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 .dag-check:checked::before { opacity: 1; }
 .dag-check:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A quiz's ticks are a finger's or a pointer's target, and 16px is neither (#209). The box is 24
+   and the glyph inside it is unchanged; Settings is out of this issue's scope (#188). */
+.dag-quiz .dag-check,
+.dag-flashcards .dag-check { width: 24px; height: 24px; }
 
 .dag-textfield {
   display: inline-flex;
@@ -518,8 +522,9 @@
 .dag-tab:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 .dag-tab--on:focus-visible { box-shadow: var(--focus-ring-inset), inset 0 2px 0 var(--dag-color-accent); }
 .dag-tab-wrap { position: relative; display: inline-flex; align-items: stretch; flex: none; }
-/* Only on the page you are on, so the strip does not read as a row of dismissals. */
-.dag-tab-wrap .dag-tab--on { padding-right: 22px; }
+/* Only on the page you are on, so the strip does not read as a row of dismissals. 30px holds the
+   24px close button and the 4px it keeps from the tab's edge (#209). */
+.dag-tab-wrap .dag-tab--on { padding-right: 30px; }
 /* The tab being carried must not answer `elementFromPoint` — otherwise the drop target is always
    the thing in your hand. On the *wrap*, not on the `.dag-tab` inside it: the wrap is what the
    drag translates, so it is the wrap that ends up over the tab being aimed at, and disabling only
@@ -543,7 +548,11 @@
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
-  padding: 2px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
@@ -594,6 +603,15 @@
   border-radius: var(--dag-metric-radius-chip) var(--dag-metric-radius-chip) 0 0;
   padding: 4px 8px;
   outline: none;
+}
+/* A finger's strip: the tab and its close are 44px, so the bar is taller on a phone (#209). */
+@media (max-width: 719px) {
+  .dag-pagebar { height: 48px; }
+  /* 48 − the bar's top rule − 3 = the tab's 44. */
+  .dag-pagebar__scroll { padding-top: 3px; }
+  .dag-tab-wrap .dag-tab--on { padding-right: 50px; }
+  .dag-tab__close { right: 2px; width: 44px; height: 44px; }
+  .dag-tab__add { min-width: 44px; }
 }
 
 .dag-icon {
@@ -1266,6 +1284,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar__menu-where strong { color: var(--dag-color-ink); font-weight: 600; }
 .dag-sidebar__menu-switch {
   flex: none;
+  min-height: 24px;
   padding: 2px 4px;
   font: inherit;
   font-size: 12px;
@@ -1313,17 +1332,21 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] .dag-sidebar__indent { width: calc(var(--depth, 0) * 18px); left: 10px; }
 .dag-sidebar[data-sheet] .dag-sidebar__section h2,
 /* A finger has no hover: a row's tools are always there on a phone, not only under a pointer. */
-.dag-sidebar[data-sheet] .dag-sidebar__tools { display: flex; top: 8px; background: transparent; }
-.dag-sidebar[data-sheet] .dag-sidebar__tool { width: 28px; height: 28px; }
-.dag-sidebar[data-sheet] .dag-sidebar__row:has(+ .dag-sidebar__tools) { padding-right: 40px; }
+.dag-sidebar[data-sheet] .dag-sidebar__tools { display: flex; top: 0; background: transparent; }
+/* 44×44 each, even though the ⋯ and the + keep their 14px glyph (#209). */
+.dag-sidebar[data-sheet] .dag-sidebar__tool { width: 44px; height: 44px; }
+.dag-sidebar[data-sheet] .dag-sidebar__row:has(+ .dag-sidebar__tools) { padding-right: 52px; }
 .dag-sidebar[data-sheet] .dag-sidebar__tool[data-dag-sidebar-add] { display: none; }
 .dag-sidebar[data-sheet] .dag-sidebar__name-input,
-.dag-sidebar[data-sheet] .dag-sidebar__move { height: 36px; font-size: 15px; }
+.dag-sidebar[data-sheet] .dag-sidebar__move { height: 44px; font-size: 15px; }
+.dag-sidebar[data-sheet] .dag-sidebar__menu-switch { min-height: 44px; }
+/* Settings shares the foot with Trash and the two cloud rows; it was the one 28px row left. */
+.dag-sidebar[data-sheet] .dag-sidebar__account { min-height: 44px; }
 .dag-sidebar[data-sheet] .dag-sidebar__foot { padding: 8px 12px 16px; }
 .dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
 /* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
 .dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: 15px; }
-.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: 40px; height: 40px; }
+.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: 44px; height: 44px; }
 .dag-sidebar[data-sheet] .dag-sidebar__bulk-count { font-size: 14px; }
 
 /* The folders above the open file, in the toolbar. Each shows its folder in the sidebar. */
@@ -1425,7 +1448,13 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-toolbar .dag-export { display: none; }
   .dag-toolbar__end { gap: 0; }
   .dag-toolbar__board { height: 44px; padding: 0 6px; font-size: 15px; }
-  .dag-toolbar__name { height: 36px; font-size: 15px; }
+  .dag-toolbar__name { height: 44px; font-size: 15px; }
+  /* The editor's sparkle is the one mark left at 30px; the practice button and the Tasks
+     List/Board switch are the bar's other controls that did not grow with the rest (#209). */
+  .dag-toolbar .dag-toolbar__assistant { width: 44px; height: 44px; }
+  .dag-toolbar__practice { height: 44px; padding: 0 12px; }
+  .dag-toolbar .dag-tasks__layout { height: 44px; }
+  .dag-toolbar .dag-tasks__layout-choice { height: 38px; }
   .dag-backlinks__word,
   .dag-export__word,
   .dag-readonly__word { display: none; }
@@ -1499,12 +1528,18 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   outline: none;
   width: 100%;
   min-width: 0;
+  /* A field's own box is its line of text otherwise: 16px is under the 24 a pointer needs (#209). */
+  min-height: 24px;
 }
 .dag-panel__input::placeholder { color: var(--dag-color-slate); }
 .dag-panel__clear {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
-  padding: 2px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
@@ -1694,6 +1729,16 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   font-family: var(--dag-font-sans);
   font-size: 12px;
   color: var(--dag-color-slate);
+}
+
+/* The search on a phone: the field, its clear button and every row are a finger's height. */
+@media (max-width: 719px) {
+  .dag-browser { max-width: calc(100% - 24px); height: min(640px, calc(100% - 32px)); }
+  .dag-panel__search { padding: 8px 12px; }
+  .dag-panel__input { min-height: 44px; font-size: 15px; }
+  .dag-panel__clear { width: 44px; height: 44px; }
+  .dag-board { min-height: 44px; padding: 12px 8px; }
+  .dag-hit { min-height: 44px; padding: 10px 8px; }
 }
 
 /* ---- nothing open ---- */
@@ -4935,8 +4980,9 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  /* The glyph is 14px; the button is the 24px WCAG 2.5.8 asks for (#209). */
+  width: 24px;
+  height: 24px;
   padding: 0;
   color: inherit;
   background: transparent;
@@ -5214,6 +5260,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 24px;
   padding: 3px 10px;
   font: inherit;
   font-size: 12px;
@@ -5274,6 +5321,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 24px;
   padding: 2px 6px 2px 2px;
   font: inherit;
   color: inherit;
@@ -5661,6 +5709,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-height: 24px;
   margin: -4px 0 10px;
   padding: 2px 4px;
   font: inherit;
@@ -5686,6 +5735,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-quiz__card-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
 .dag-quiz__confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-quiz__confirm > button {
+  min-height: 24px;
   padding: 3px 8px;
   font: inherit;
   font-size: 12px;
@@ -5701,7 +5751,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 /* At the top of the row, which an option holding a code block makes tall. */
 .dag-quiz__option { display: flex; align-items: flex-start; gap: 6px; }
 .dag-quiz__option > .dag-quiz__rich { margin: 0; flex: 1; min-width: 0; }
-.dag-quiz__option > .dag-check { margin: 11px 4px 0 2px; }
+.dag-quiz__option > .dag-check { margin: 5px 4px 0 2px; }
 /* One right answer is a choice of one: a circle, as a radio is everywhere else. */
 .dag-check--round { border-radius: 50%; }
 /* A right answer is ticked in the success colour: it is the key, not a setting. */
@@ -5743,6 +5793,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-quiz__problem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 0; font-size: 12px; color: var(--dag-color-warningText); }
 .dag-quiz__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
 .dag-quiz__fix {
+  min-height: 24px;
   padding: 2px 8px;
   font: inherit;
   font-size: 12px;
@@ -5779,6 +5830,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   background: var(--dag-color-warningSoft);
 }
 .dag-quiz__conflict > button {
+  min-height: 24px;
   padding: 3px 10px;
   font: inherit;
   font-size: 12px;
@@ -5868,7 +5920,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-run__option[data-dag-run-picked] { border-color: var(--dag-color-accent); background: var(--dag-color-accentSoft); }
 .dag-run__option[data-dag-run-mark="right"] { border-color: var(--dag-color-successBorder); background: var(--dag-color-successSoft); }
 .dag-run__option[data-dag-run-mark="wrong"] { border-color: var(--dag-color-dangerBorder); background: var(--dag-color-dangerSoft); }
-.dag-run__option > input { flex: none; margin: 0; accent-color: var(--dag-color-accent); }
+.dag-run__option > input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--dag-color-accent); }
 .dag-run__option:has(input:disabled) { cursor: default; }
 .dag-run__key {
   flex: none;
@@ -6116,6 +6168,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__count { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-calendar__count input {
   width: 52px;
+  min-height: 24px;
   padding: 3px 6px;
   font: inherit;
   font-size: 12px;
@@ -6150,6 +6203,9 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   align-items: center;
   gap: 4px;
   min-width: 0;
+  /* A bar is a link, and 20px was its one line of text (#209). The week's timed blocks below stay
+     the event's own height, which is what the grid means by it. */
+  min-height: 24px;
   padding: 1px 6px;
   box-sizing: border-box;
   font-size: 12px;
@@ -6192,7 +6248,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-cal-week {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: 30px repeat(var(--lanes), 20px) 18px 1fr;
+  grid-template-rows: 30px repeat(var(--lanes), 24px) 24px 1fr;
   row-gap: 2px;
   border-bottom: 1px solid var(--dag-color-outlineSoft);
 }
@@ -6203,8 +6259,9 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-cal-day[data-dag-cal-picked] { background: var(--dag-color-accentSoft); }
 .dag-cal-day__n {
   min-width: 24px;
-  height: 22px;
-  margin: 4px 6px;
+  height: 24px;
+  /* 24 + two 3px margins is the week's 30px header row. */
+  margin: 3px 6px;
   padding: 0 6px;
   font: inherit;
   font-size: 12px;
@@ -6212,7 +6269,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: 11px;
+  border-radius: 12px;
   cursor: pointer;
 }
 .dag-cal-day__n:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -6221,6 +6278,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-cal-week > .dag-calendar__item { margin: 0 4px; }
 .dag-cal-more {
   justify-self: start;
+  min-height: 24px;
   margin: 0 6px;
   padding: 0 4px;
   font: inherit;
@@ -6256,7 +6314,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-cal-cols__day[data-today] .dag-cal-cols__n,
 .dag-cal-cols__day[data-today] .dag-cal-cols__weekday { color: var(--dag-color-accent); }
 .dag-cal-allday {
-  grid-template-rows: repeat(var(--lanes), 20px);
+  grid-template-rows: repeat(var(--lanes), 24px);
   row-gap: 2px;
   min-height: 28px;
   max-height: 30%;
@@ -6591,6 +6649,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 24px;
   padding: 4px 10px;
   font: inherit;
   font-size: 12px;
@@ -6627,6 +6686,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-warningSoft);
 }
 .dag-tablepage__conflict > button {
+  min-height: 24px;
   padding: 3px 10px;
   font: inherit;
   font-size: 12px;
@@ -6639,7 +6699,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 
 /* The status line's count of problems is a button: it takes you to the first. */
 .dag-tablepage__show {
-  padding: 0;
+  min-height: 24px;
+  padding: 4px 0;
   font: inherit;
   color: inherit;
   background: none;
@@ -6680,6 +6741,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-tablepage__problem-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
 .dag-tablepage__problem-fix {
+  min-height: 24px;
   padding: 3px 10px;
   font: inherit;
   font-size: 12px;
@@ -6828,8 +6890,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   color: var(--dag-color-warningText);
   background: var(--dag-color-warningSoft);
@@ -6886,6 +6948,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-grid__input {
   display: block;
   width: 100%;
+  min-height: 24px;
   margin: 0;
   padding: 0;
   font: inherit;

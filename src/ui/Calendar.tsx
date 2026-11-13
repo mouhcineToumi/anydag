@@ -517,7 +517,7 @@ function ShowMenu({
             <>
               <p className="dag-calendar__show-head">Project</p>
               <select
-                className="dag-tasks__project"
+                className="dag-select dag-tasks__project"
                 aria-label="Show the calendar of"
                 value={scopeValue}
                 data-dag-calendar-project=""
