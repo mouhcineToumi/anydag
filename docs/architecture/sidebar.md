@@ -212,6 +212,10 @@ folder. Six things about it:
   row under a pointer in the middle of picking them. A selection is kept by whether its rows exist,
   not by whether they are drawn, so a picked row in a folder somebody shut stays picked; one deleted
   elsewhere is let go.
+- **The bar says what its actions do.** Each action is its mark and its word — *Move*, *To vault*,
+  *Trash* — so none of them is a guess until hovered; a narrow column wraps them onto the line under
+  the count, the trash wears the danger colour, and the `×` beside the count lets the selection go as
+  Escape does.
 
 Names claimed, grepped first: `dag-sidebar__bulk*`, `data-dag-sidebar-bulk*`, `data-dag-sidebar-picked`
 (and `data-dag-bulk-delete*`, gone with its modal).

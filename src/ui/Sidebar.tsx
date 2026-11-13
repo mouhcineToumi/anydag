@@ -2468,53 +2468,53 @@ function SelectionBar({
   return (
     <div className="dag-sidebar__bulk" role="toolbar" aria-label={`${count} selected`} data-dag-sidebar-bulk={count}>
       <span className="dag-sidebar__bulk-count">{count} selected</span>
+      <button
+        type="button"
+        className="dag-sidebar__tool"
+        data-dag-sidebar-bulk-act="clear"
+        aria-label="Clear the selection"
+        title="Clear the selection (Escape)"
+        onClick={onClear}
+      >
+        <X {...SMALL} aria-hidden="true" />
+      </button>
       <span className="dag-sidebar__bulk-acts">
         {locked ? null : (
           <button
             type="button"
-            className="dag-sidebar__tool"
+            className="dag-sidebar__tool dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="move"
-            aria-label={`Move ${count} to a folder`}
             title="Move to…"
             onClick={() => onAsk("move")}
           >
             <FolderInput {...SMALL} aria-hidden="true" />
+            <span>Move</span>
           </button>
         )}
         {vaults.length && !locked ? (
           <button
             type="button"
-            className="dag-sidebar__tool"
+            className="dag-sidebar__tool dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="transfer"
-            aria-label={`Move ${count} to another vault`}
             title="Move to vault…"
             onClick={() => onAsk("transfer")}
           >
             <ArrowRightLeft {...SMALL} aria-hidden="true" />
+            <span>To vault</span>
           </button>
         ) : null}
         {locked ? null : (
           <button
             type="button"
-            className="dag-sidebar__tool dag-sidebar__tool--danger"
+            className="dag-sidebar__tool dag-sidebar__tool--danger dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="delete"
-            aria-label={`Delete ${count}`}
             title="Delete — they go to the trash"
             onClick={() => onAsk("delete")}
           >
             <Trash2 {...SMALL} aria-hidden="true" />
+            <span>Trash</span>
           </button>
         )}
-        <button
-          type="button"
-          className="dag-sidebar__tool"
-          data-dag-sidebar-bulk-act="clear"
-          aria-label="Clear the selection"
-          title="Clear the selection (Escape)"
-          onClick={onClear}
-        >
-          <X {...SMALL} aria-hidden="true" />
-        </button>
       </span>
     </div>
   );
