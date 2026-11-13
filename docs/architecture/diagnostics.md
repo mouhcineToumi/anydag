@@ -85,7 +85,7 @@ and the frame mark are the other two readers.
 |---|---|
 | a diagram's frame | an outline in the problem colour and a count by its title, while it has any |
 | the count, bottom centre | how many errors and warnings there are; a click opens the list |
-| the notification, above it | the first *new* error, in words, with Show and ×, for six seconds |
+| the notification, in the app's toast stack (#208) | the first *new* error, in words, with Show and ×, for six seconds |
 | the list | every problem, in words, with the kind of item and its page; a row opens it |
 | the panel's Problems block, at the top | the open item's own problems, each with Show and the fix a row can carry out |
 

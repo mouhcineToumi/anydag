@@ -41,6 +41,28 @@ type a font size, corner, shadow, layer or duration, against `scripts/chrome-lit
 count may only fall. Every step is the value the chrome already used most, so a rule that moves onto
 a token draws the same.
 
+**One toast and one dialog frame** (#208). Every notice the app raises is a `Toast`
+(`src/ui/Toast.tsx`): an icon, **one line** of message, its actions, a ×, in one stack at the bottom
+centre of the page — right of a docked sidebar, above a board's dock — on `--dag-ui-layer-toast`.
+Three at most are drawn; an older one waits under them. A name in the line is a `ToastName`, which
+gives way in its middle (`Quarterly planning for…data teams`) with the whole name its title, so a
+sixty-character file name is still one line. A toast is declarative: the component that owns the
+state draws one where it drew its notice and it is portalled into `ToastHost`'s stack in `Shell`,
+so the trash notice, the problems dock, a refused upload, the note's states and the logs question
+kept their own logic and lost their own boxes. A toast with a `timeout` is held while the pointer
+or the focus is on it; one without stays for as long as what it says is true. Every dialog is a
+`Dialog` (`src/ui/Dialog.tsx`), the Settings modal's frame lifted out: a portal on the body on
+`--dag-ui-layer-modal`, one scrim, Tab kept inside, Escape and a press outside to close, every key
+stopped at its edge, and **the rest of the document `inert`** while it is up — all but the dialog
+and the toast stack, which sits above it. Settings, Feedback, Search and the logs question's *What's
+sent* use it. The read-only lock has no notice to move: #231 made it one pill in the top bar.
+
+**The scrim is `color.shadow`**, because no theme has a colour for one. It is the translucent
+elevation colour every card's shadow is drawn in, dark in every theme; the mixes of `ink` it
+replaced (10% for Settings, 14% for Feedback, none for Search) *lightened* the page in Paper Dark,
+whose ink is near white. It is one rule (`.dag-dialog`), so a `color.scrim` is one line if a theme
+ever wants its own.
+
 ## Layout, per diagram type
 
 Three knobs in `theme.metric.elk`, and each exists because a board looked wrong without it:

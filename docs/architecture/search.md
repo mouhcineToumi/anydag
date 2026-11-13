@@ -16,6 +16,11 @@ own. `src/search/results.ts` is that rule, and `test/search-results.test.ts` hol
 **The card is as tall as its results, up to its old ceiling** — 560px, or the window less 64px. One
 row is a small card, not two empty thirds of a tall one.
 
+**It is a dialog in the app's one frame** (`src/ui/Dialog.tsx`, #208): over the sidebar too, with the
+scrim every dialog has, the page behind it `inert`, and Tab kept inside. It said `aria-modal="true"`
+while sitting inside the page with no scrim, and Tab walked out of it into the sidebar behind;
+`e2e/search.spec.ts` presses Tab thirty times and checks the focus after each.
+
 **A miss offers to make what was typed**: *New board “…”* and *New note “…”*, in the open file's
 folder, and Enter presses the board. Both go through the sidebar's own create
 (`useSidebar().create`, `newFile` in `src/ui/Shell.tsx`), so a file begins one way whether it was

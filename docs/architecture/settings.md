@@ -82,12 +82,13 @@ The provider's mark is its own logo; a provider with no mark in `icons/` falls b
 
 Four things about the modal are load-bearing:
 
-- **It is over everything, in a portal on `<body>`** at z-index 50, the sidebar dimmed under it. The
-  card it replaced sat inside the page and left the sidebar live beside it. A delete question asked
-  from inside it sits above it, at 60 — which is where `.dag-purge__scrim` had
-  always claimed to be and never was (see *Things that will bite*).
-- **It owns every key aimed at it.** It handles Escape and `ctrl+,` itself, walks its tabs on the
-  arrows (`stepTab`), keeps Tab inside, and stops every other key at its edge; and `useEditor`, whose
+- **It is over everything, in the app's dialog frame** (`src/ui/Dialog.tsx`, #208): a portal on
+  `<body>` on `--dag-ui-layer-modal`, the sidebar dimmed under it and `inert` with the rest of the
+  page. The card it replaced sat inside the page and left the sidebar live beside it. Feedback,
+  Search and the logs question's *What's sent* are the same frame; a dialog asked for from inside
+  it is drawn after it, on the same layer, and so above it.
+- **It owns every key aimed at it.** The frame handles Escape, keeps Tab inside and stops every
+  other key at its edge; the modal adds `ctrl+,` and walks its tabs on the arrows (`stepTab`); and `useEditor`, whose
   window handler runs first in the capture phase, returns on any key whose target is inside
   `[data-dag-settings]`. Without the second half, a click on a blank part of a tab left the focus on
   the modal rather than on a control, and a Delete pressed there deleted the board's selection behind
@@ -243,7 +244,8 @@ Names claimed, grepped first as this file has learned to: `dag-settings`, `dag-s
 `data-dag-settings-pane`, `data-dag-settings-group`, `data-dag-settings-view`, `data-dag-settings-back`,
 `data-dag-settings-close`, `data-dag-vault-settings`, and the
 storage key `dag:settings-tab`. The save tick added `dag-settings__saved` (`data-dag-setting-saved`),
-the toast `dag-settings__toast*` (`data-dag-setting-reset-toast`, `data-dag-setting-reset-undo`), the
+the toast (`data-dag-setting-reset-toast`, `data-dag-setting-reset-undo` — the app's one `Toast`, drawn
+`inline` at the card's foot so Tab can reach its Undo; `dag-settings__toast*` is retired), the
 live region `dag-settings__said` (`data-dag-setting-said`), and the event `dag:settings-saved`.
 The scopes added `dag-settings-modal__note` and `dag-settings-modal__scope`
 (`data-dag-settings-scope`), the quiet facts `dag-settings__fact*` (`dag-settings__facts`), and Agent
