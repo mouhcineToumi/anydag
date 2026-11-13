@@ -153,7 +153,7 @@
   background: var(--dag-color-outline);
   border-radius: 9999px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 .dag-switch::before {
   content: "";
@@ -165,7 +165,7 @@
   background: var(--dag-color-card);
   border-radius: 50%;
   box-shadow: 0 1px 2px var(--dag-color-shadow);
-  transition: transform 0.15s ease;
+  transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 .dag-switch:checked { background: var(--dag-color-accent); }
 .dag-switch:checked::before { transform: translateX(14px); }
@@ -693,10 +693,9 @@
   border-left: none;
   border-radius: 0 var(--dag-metric-radius-card) var(--dag-metric-radius-card) 0;
   box-shadow: var(--elevation);
-  animation: dag-sidebar-in 120ms ease-out;
+  animation: dag-sidebar-in var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sidebar-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .dag-sidebar[data-mode="overlay"] { animation: none; } }
 
 /* Floating, it hangs under a toolbar that already carries the mark and the toggle, so it has no
    header of its own; the first row gets the room the header's edge would have given it. */
@@ -1053,9 +1052,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   );
   pointer-events: none;
 }
-.dag-sidebar__chev { flex: none; width: 14px; height: 14px; color: var(--dag-color-muted); transition: transform 120ms; }
+.dag-sidebar__chev { flex: none; width: 14px; height: 14px; color: var(--dag-color-muted); transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-sidebar__row[aria-expanded="true"] .dag-sidebar__chev { transform: rotate(90deg); }
-@media (prefers-reduced-motion: reduce) { .dag-sidebar__chev { transition: none; } }
 .dag-sidebar__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-sidebar__empty {
   margin: 0;
@@ -1391,10 +1389,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-radius: 0;
   box-shadow: none;
   font-size: 15px;
-  animation: dag-sheet-in 140ms ease-out;
+  animation: dag-sheet-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sheet-in { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .dag-sidebar[data-sheet] { animation: none; } }
 .dag-sidebar[data-sheet] .dag-vault__button { height: 44px; }
 .dag-sidebar[data-sheet] .dag-vault__name { font-size: 16px; }
 .dag-sidebar[data-sheet] .dag-sidebar__act,
@@ -2913,7 +2910,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
    open. Drawn as a `ChevronDown` and turned a quarter anticlockwise for the shut state, rather
    than swapping two Lucide components — one glyph that moves reads as the same triangle, and two
    that replace each other read as a flicker. */
-.dag-props__adv-head svg { transition: transform 120ms ease; transform: rotate(-90deg); }
+.dag-props__adv-head svg { transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); transform: rotate(-90deg); }
 .dag-props__adv-head[aria-expanded="true"] svg { transform: rotate(0deg); }
 
 /* The text-style toggles (`dag-props__em`, not a swatch row: emphasis is a binary, not a pick of
@@ -3212,7 +3209,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 .dag-component__toggle:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
 .dag-component__toggle:focus-visible { box-shadow: var(--focus-ring-inset); }
-.dag-component__toggle svg { transition: transform 120ms ease; }
+.dag-component__toggle svg { transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-component__toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
 .dag-component__parts {
   margin: 2px 0 6px 19px;
@@ -3501,7 +3498,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-selbar .dag-rewrite__go:hover { color: var(--dag-color-card); background: var(--dag-color-accent); box-shadow: 0 0 0 2px var(--dag-color-accentSoft); }
 .dag-rewrite__spin { animation: dag-rewrite-spin 0.9s linear infinite; }
 @keyframes dag-rewrite-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dag-rewrite__spin { animation: none; } }
 .dag-rewrite__notes {
   display: flex;
   flex-direction: column;
@@ -3789,7 +3785,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings__more > summary::-webkit-details-marker { display: none; }
 .dag-settings__more > summary > .dag-settings__value { margin-left: auto; }
-.dag-settings__more > summary > svg { flex: none; color: var(--dag-color-slate); transform: rotate(-90deg); transition: transform 0.15s ease; }
+.dag-settings__more > summary > svg { flex: none; color: var(--dag-color-slate); transform: rotate(-90deg); transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
 .dag-settings__more[open] > summary > svg { transform: none; }
 .dag-settings__more > summary:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-tile); }
 .dag-settings__types { margin: 0; padding: 0 16px 14px; font-family: var(--dag-font-mono); font-size: 12px; line-height: 1.8; word-spacing: 6px; color: var(--dag-color-slate); }
@@ -3846,9 +3842,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 @keyframes dag-settings-saved {
   0%, 70% { opacity: 1; }
   100% { opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dag-settings__saved { animation: none; }
 }
 /* The reset's toast, the trash notice's shape at the modal's foot: the same border, elevation and
    action button, positioned against the card rather than the window. */
@@ -4186,7 +4179,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     background: var(--dag-color-outline);
     border-radius: 9999px;
     box-shadow: none;
-    transition: background-color 0.15s ease;
+    transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
   }
   .dag-settings-modal .dag-switch::after {
     content: "";
@@ -4198,7 +4191,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     background: var(--dag-color-card);
     border-radius: 50%;
     box-shadow: 0 1px 2px var(--dag-color-shadow);
-    transition: transform 0.15s ease;
+    transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
   }
   .dag-settings-modal .dag-switch:checked { background: transparent; }
   .dag-settings-modal .dag-switch:checked::before { background: var(--dag-color-accent); transform: none; }
@@ -4349,7 +4342,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-prompt__acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .dag-prompt__spin { animation: dag-prompt-spin 0.9s linear infinite; }
 @keyframes dag-prompt-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dag-prompt__spin { animation: none; } }
 /* ---- the problems dock ---- */
 
 /*
@@ -5638,7 +5630,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate 120ms ease; }
+.dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-tasks__twisty[aria-expanded="false"] > svg:first-child { rotate: -90deg; }
 .dag-tasks__twisty:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-tasks__n { font-weight: 500; color: var(--dag-color-slate); }
@@ -6208,7 +6200,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-run__head { display: flex; align-items: center; gap: 12px; margin-block-end: 20px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-run__where { flex: none; }
 .dag-run__progress { position: relative; flex: 1; height: 4px; overflow: hidden; background: var(--dag-color-paper200); border-radius: 2px; }
-.dag-run__progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--dag-color-accent); transition: width 160ms ease; }
+.dag-run__progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--dag-color-accent); transition: width var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
 .dag-run__question { margin-block: 0 12px; font-size: 20px; font-weight: 600; line-height: 1.35; }
 .dag-run__prompt { margin-bottom: 8px; }
 .dag-run__hint { margin-block: 0 10px; font-size: 12px; color: var(--dag-color-slate); }
@@ -7433,7 +7425,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
 }
 .dag-code__copy svg { width: 14px; height: 14px; }
 .dag-code__copy:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -7445,9 +7437,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-code__copy[data-dag-code-copy="failed"] { opacity: 1; }
 @media (hover: none) {
   .dag-code__copy { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dag-code__copy { transition: none; }
 }
 
 /* An equation's field in the note editor: its TeX under it, what KaTeX made of it under that.
@@ -7602,7 +7591,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-trash__row:hover { background: var(--dag-color-paper100); }
 @media (hover: hover) {
-  .dag-trash__acts { opacity: 0; transition: opacity 120ms ease; }
+  .dag-trash__acts { opacity: 0; transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
   .dag-trash__row:hover .dag-trash__acts,
   .dag-trash__row:focus-within .dag-trash__acts { opacity: 1; }
 }
@@ -7707,7 +7696,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-sync-row[data-tone="warn"] > svg { color: var(--dag-color-warning); }
 .dag-sync-row[data-dag-sync-row="syncing"] > svg { animation: dag-sync-spin 1.2s linear infinite; }
 @keyframes dag-sync-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dag-sync-row[data-dag-sync-row="syncing"] > svg { animation: none; } }
 .dag-sync__confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dag-sync__code { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dag-sync__code code {
@@ -7820,7 +7808,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-tool { font-size: 12px; color: var(--dag-color-slate); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); background: var(--dag-color-card); }
 .dag-chat-tool > summary { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px; cursor: pointer; list-style: none; }
 .dag-chat-tool > summary::-webkit-details-marker { display: none; }
-.dag-chat-tool__chev { flex: none; transition: transform 0.12s ease; }
+.dag-chat-tool__chev { flex: none; transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-chat-tool[open] .dag-chat-tool__chev { transform: rotate(90deg); }
 .dag-chat-tool__verb { font-weight: 600; color: var(--dag-color-ink); }
 .dag-chat-tool__target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--dag-font-mono); color: var(--dag-color-slate); }
@@ -7918,9 +7906,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-assistant-panel { position: fixed; inset: 0; z-index: 40; width: auto; max-width: none; border-left: none; }
   .dag-chat-composer { margin-inline: 12px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .dag-chat-tool__chev { transition: none; }
-}
 
 /* -- Generate flashcards (#140) -------------------------------------------------------------- */
 /* The quiz page's dialog: the settings card's shell, put on the body and fixed over the window, the
@@ -7949,3 +7934,24 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-flashcards__faces p { margin: 0; }
 .dag-flashcards__faces p + p { margin-top: 4px; }
 .dag-flashcards__card:has(.dag-check:not(:checked)) .dag-flashcards__faces { opacity: 0.5; }
+
+/*
+ * Motion, from one place (#206). Every transition and entrance in the chrome reads
+ * `--dag-ui-motion-fast` or `--dag-ui-motion-base` with `--dag-ui-motion-ease`, so asking the
+ * system for less motion is answered here once rather than in a block beside each rule (there were
+ * eight). The two durations go to 0: `!important` because the theme writes them on `<html>`'s own
+ * style, which an ordinary rule cannot outrank. What turns rather than moves — the three spinners —
+ * and the *Saved* tick's timed fade have a period, not a duration, so they stop instead; the tick
+ * then stays, which is the version of "it saved" that does not move. **It is the last rule in the
+ * file on purpose**: a spinner's own `animation` is the same specificity, and the later rule wins.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dag-ui-motion-fast: 0ms !important;
+    --dag-ui-motion-base: 0ms !important;
+  }
+  .dag-rewrite__spin,
+  .dag-prompt__spin,
+  .dag-sync-row[data-dag-sync-row="syncing"] > svg,
+  .dag-settings__saved { animation: none; }
+}

@@ -39,7 +39,12 @@ diagram's: before, `--dag-metric-radius-chip` was every button's corner, so a th
 a chip without rounding the app. `check-literals.mjs` counts the rules in `chrome.css` that still
 type a font size, corner, shadow, layer or duration, against `scripts/chrome-literals.json`, and the
 count may only fall. Every step is the value the chrome already used most, so a rule that moves onto
-a token draws the same.
+a token draws the same. **Motion moved first** (#206): every transition and entrance reads `fast` (120 ms) or
+`base` (160 ms) and the one easing, and a single `prefers-reduced-motion` block — the last rule in
+`chrome.css`, so it outranks a spinner's own `animation` — zeroes both durations with `!important`
+(the theme writes them on `<html>`'s own style) and stops the three spinners. Those and the *Saved*
+tick's fade have a period, not a duration; they are the four transitions the count still allows.
+`e2e/motion.spec.ts` reads the computed durations both ways.
 
 ## Layout, per diagram type
 
