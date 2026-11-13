@@ -37,6 +37,7 @@
     "icons:build": "node scripts/icons/vendor.mjs && node scripts/icons/build.mjs",
     "check:icons": "node scripts/check-icons.mjs",
     "check:skill": "node scripts/check-skill.mjs",
+    "check:design": "node scripts/check-design.mjs",
     "lint": "biome lint .",
     "lint:promises": "eslint .",
     "format": "biome format --write .",

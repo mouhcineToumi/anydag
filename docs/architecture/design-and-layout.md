@@ -40,6 +40,9 @@ a chip without rounding the app. `check-literals.mjs` counts the rules in `chrom
 type a font size, corner, shadow, layer or duration, against `scripts/chrome-literals.json`, and the
 count may only fall. Every step is the value the chrome already used most, so a rule that moves onto
 a token draws the same.
+Which of these a screen should use for what — colour roles with their measured contrast, the type
+scale, the controls, the layers, focus, motion, icons and the voice — is [`DESIGN.md`](../../DESIGN.md)
+at the root, held to the code by `check:design`.
 
 **One toast and one dialog frame** (#208). Every notice the app raises is a `Toast`
 (`src/ui/Toast.tsx`): an icon, **one line** of message, its actions, a ×, in one stack at the bottom
