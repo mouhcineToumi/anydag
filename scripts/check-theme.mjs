@@ -59,6 +59,18 @@ const UNITLESS = new Set([
   }
 }
 
+/* The `ui` groups, read out of `UI_UNITS` in `applyTheme.ts` for the same reason as `UNITLESS`. */
+const UI_GROUPS = (() => {
+  const source = fs.readFileSync(path.join(root, "src", "theme", "applyTheme.ts"), "utf8");
+  const body = /const UI_UNITS[^=]*=\s*\{([\s\S]*?)\};/.exec(source)?.[1] ?? "";
+  const groups = [...body.matchAll(/^\s*([a-z]+):/gm)].map((m) => m[1]);
+  if (groups.length === 0) {
+    console.error("could not read UI_UNITS out of src/theme/applyTheme.ts — has its shape changed?");
+    process.exit(1);
+  }
+  return groups;
+})();
+
 function walk(prefix, value, out) {
   if (value === null || value === undefined) return;
   if (typeof value === "string" || typeof value === "number") {
@@ -77,6 +89,9 @@ function provides(theme) {
   walk("--dag-color", theme.color, out);
   walk("--dag-type", theme.type, out);
   walk("--dag-metric", theme.metric, out);
+  /* `ui` is flattened group by group in `applyTheme.ts` (`UI_UNITS`): the names are the same
+     `--dag-ui-<group>-<step>` the walk gives, so the walk is enough to name them. */
+  walk("--dag-ui", theme.ui, out);
   out.add("--dag-font-sans");
   out.add("--dag-font-mono");
   for (const hue of Object.keys(theme.color.hues)) out.add(`--dag-tint-${hue}`);
@@ -214,6 +229,14 @@ function shapeErrors(theme) {
     if (!theme.color?.hues?.[hue]) out.push(`color.hues.${hue} is missing — parsers assign it by name`);
   }
   if (!(theme.type?.base > 0)) out.push("type.base must be a positive number");
+
+  /* The chrome's scale (#205). Every group `applyTheme.ts` flattens must be there, because a
+     missing one is a whole family of `--dag-ui-*` that resolves to nothing in that theme only. The
+     groups are read out of `UI_UNITS` rather than listed again here. */
+  for (const group of UI_GROUPS) {
+    const steps = theme.ui?.[group];
+    if (!steps || typeof steps !== "object" || Object.keys(steps).length === 0) out.push(`ui.${group} is missing`);
+  }
 
   const shadow = shadowAlpha(theme.color?.shadow);
   if (shadow === null || !(shadow > 0 && shadow < 1)) {

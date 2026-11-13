@@ -98,6 +98,47 @@ for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))
   }
 }
 
+/* 4. The chrome's scale (#205). In `chrome.css`, a font size, a corner, a shadow, a layer or a
+      duration reads `--dag-ui-*`. The chrome had none of these and typed its own (26 font sizes,
+      28 shadows, 19 z-indexes) or borrowed the diagram's (`--dag-metric-radius-chip` as every
+      button's corner, which counts as a literal here: it is the diagram's number, not the
+      chrome's). The rules that still type one are counted per property against
+      `scripts/chrome-literals.json`, and the count may only go down: a new literal fails, and a
+      migration that removes some lowers the file in the same commit. */
+const CHROME = "src/styles/chrome.css";
+const CHROME_ALLOW = "scripts/chrome-literals.json";
+const STRUCTURAL = {
+  "font-size": /^(?:inherit|initial|unset|1em|100%)$/,
+  "border-radius": /^(?:0|inherit|initial|unset|50%)$/,
+  "box-shadow": /^(?:none|inherit|initial|unset|inset\b.*)$/,
+  "z-index": /^(?:auto|-?\d)$/,
+  transition: /^(?:none|inherit|initial|unset)$|^(?:(?!\d*\.?\d+m?s\b).)*$/,
+};
+const chromeCounts = Object.fromEntries(Object.keys(STRUCTURAL).map((k) => [k, 0]));
+const chromeText = strip(fs.readFileSync(path.join(root, CHROME), "utf8"), ".css");
+for (const m of chromeText.matchAll(
+  /(?<![\w-])(font-size|border-radius|box-shadow|z-index|transition|animation)\s*:\s*([^;{}]+)/g,
+)) {
+  const prop = m[1] === "animation" ? "transition" : m[1];
+  const value = m[2].trim().replace(/\s*!important$/, "");
+  if (value.includes("var(--dag-ui-")) continue;
+  if (STRUCTURAL[prop].test(value)) continue;
+  chromeCounts[prop] += 1;
+}
+const chromeAllowed = JSON.parse(fs.readFileSync(path.join(root, CHROME_ALLOW), "utf8"));
+const lowered = [];
+for (const [prop, count] of Object.entries(chromeCounts)) {
+  const allowed = chromeAllowed[prop] ?? 0;
+  if (count > allowed) {
+    findings.push({
+      file: CHROME,
+      line: 0,
+      what: `a ${prop} literal`,
+      text: `${count} rules type their own ${prop}; ${allowed} allowed — read a --dag-ui-* variable instead`,
+    });
+  } else if (count < allowed) lowered.push(`${prop} ${allowed} → ${count}`);
+}
+
 if (findings.length) {
   console.error(`${findings.length} hardcoded style value(s) — every one of these belongs in a theme:\n`);
   let last = "";
@@ -106,6 +147,12 @@ if (findings.length) {
     console.error(`    ${String(f.line).padStart(4)}  ${f.what.padEnd(18)} ${f.text}`);
   }
   process.exit(1);
+}
+
+if (lowered.length) {
+  console.log(
+    `note: chrome.css types fewer literals than ${CHROME_ALLOW} allows (${lowered.join(", ")}); lower it in this commit`,
+  );
 }
 
 /* 5. Text in the app chrome never uses `muted`. It is 2.46:1 on Paper's page and 2.29:1 on its
