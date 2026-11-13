@@ -19,6 +19,7 @@ import { search, snippet, type Hit } from "@/search/engine";
 import { byDocument } from "@/search/results";
 import { useCorpus } from "@/search/useCorpus";
 
+import { Dialog } from "./Dialog";
 import { useSidebar } from "./Shell";
 import { flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type Entry, type Tree } from "./tree";
 
@@ -366,117 +367,111 @@ export function BoardBrowser({
   );
 
   return (
-    <div className="dag-browser__scrim" data-dag-boards="" onPointerDown={onClose}>
-      <section
-        className="dag-browser"
-        role="dialog"
-        aria-label="Boards"
-        aria-modal="true"
-        onPointerDown={(e) => e.stopPropagation()}
-        onKeyDown={onEscape}
-      >
-        <div className="dag-panel__search">
-          <Search {...ICON} aria-hidden="true" />
-          <input
-            ref={searchRef}
-            type="text"
-            className="dag-panel__input"
-            placeholder={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
-            aria-label={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
-            spellCheck={false}
-            autoComplete="off"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onSearchKey}
-          />
-          {/* One ×, which does what Escape does: with words typed it takes them back, and
+    /* The app's dialog frame (`ui/Dialog.tsx`): over the sidebar too, with the scrim every dialog
+       has, the page behind it inert, and Tab kept inside — it said `aria-modal` and Tab walked out
+       of it into the sidebar. */
+    <Dialog scrim={{ "data-dag-boards": "" }} onClose={onClose} className="dag-browser" aria-label="Boards" onKeyDown={onEscape}>
+      <div className="dag-panel__search">
+        <Search {...ICON} aria-hidden="true" />
+        <input
+          ref={searchRef}
+          type="text"
+          className="dag-panel__input"
+          placeholder={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
+          aria-label={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
+          spellCheck={false}
+          autoComplete="off"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onSearchKey}
+        />
+        {/* One ×, which does what Escape does: with words typed it takes them back, and
               with none it closes. Two of them side by side, one clearing and one closing, looked
               the same and did different things. */}
-          <button
-            className="dag-panel__clear"
-            data-dag-boards-close=""
-            aria-label={query ? "Clear search" : "Close"}
-            title={query ? "Clear (Escape)" : "Close (Escape)"}
-            onClick={() => {
-              if (!query) return onClose();
-              setQuery("");
-              searchRef.current?.focus();
-            }}
-          >
-            <X {...ICON} aria-hidden="true" />
-          </button>
-        </div>
+        <button
+          className="dag-panel__clear"
+          data-dag-boards-close=""
+          aria-label={query ? "Clear search" : "Close"}
+          title={query ? "Clear (Escape)" : "Close (Escape)"}
+          onClick={() => {
+            if (!query) return onClose();
+            setQuery("");
+            searchRef.current?.focus();
+          }}
+        >
+          <X {...ICON} aria-hidden="true" />
+        </button>
+      </div>
 
-        <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey}>
-          {entries.length === 0 && terms.length === 0 ? (
-            <p className="dag-panel__empty">nothing here yet: the sidebar makes a board or a note</p>
-          ) : null}
+      <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey}>
+        {entries.length === 0 && terms.length === 0 ? (
+          <p className="dag-panel__empty">nothing here yet: the sidebar makes a board or a note</p>
+        ) : null}
 
-          {terms.length === 0 || shown.length > 0 || root.folders.length > 0 ? renderFolder(root) : null}
+        {terms.length === 0 || shown.length > 0 || root.folders.length > 0 ? renderFolder(root) : null}
 
-          {terms.length > 0 && (split.hits.length > 0 || hits.length === 0) ? (
-            <section className="dag-hits" aria-label={split.hits.length > 0 ? "In the text" : undefined} data-dag-hits="">
-              {split.hits.length > 0 ? <h2 className="dag-hits__head">In the text</h2> : null}
-              {split.hits.map((h, i) => (
-                <button
-                  /* With its place: two units of one document can share a part — two blocks with no
+        {terms.length > 0 && (split.hits.length > 0 || hits.length === 0) ? (
+          <section className="dag-hits" aria-label={split.hits.length > 0 ? "In the text" : undefined} data-dag-hits="">
+            {split.hits.length > 0 ? <h2 className="dag-hits__head">In the text</h2> : null}
+            {split.hits.map((h, i) => (
+              <button
+                /* With its place: two units of one document can share a part — two blocks with no
                      anchor on one line of a table, say — and a key React sees twice is a console
                      warning, which is a failed suite. */
-                  key={`${h.doc.id}#${h.unit.part ?? ""}#${i}`}
-                  type="button"
-                  className="dag-hit"
-                  data-dag-hit={h.doc.name}
-                  data-dag-hit-kind={h.doc.kind}
-                  data-dag-hit-part={h.unit.part ?? ""}
-                  title={h.doc.name}
-                  onClick={() => openHit(h)}
-                >
-                  <span className="dag-hit__where">
-                    <KindMark kind={h.doc.kind} name={h.doc.name} />
-                    <span className="dag-hit__doc">{h.doc.title ?? leaf(h.doc.name)}</span>
-                    <span className="dag-hit__what">{WHAT[h.unit.what] ?? kindWord(h.unit.what)}</span>
-                  </span>
-                  <span className="dag-hit__text">
-                    {snippet(h.unit.text, h.terms).map((r, i) =>
-                      r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>,
-                    )}
-                  </span>
+                key={`${h.doc.id}#${h.unit.part ?? ""}#${i}`}
+                type="button"
+                className="dag-hit"
+                data-dag-hit={h.doc.name}
+                data-dag-hit-kind={h.doc.kind}
+                data-dag-hit-part={h.unit.part ?? ""}
+                title={h.doc.name}
+                onClick={() => openHit(h)}
+              >
+                <span className="dag-hit__where">
+                  <KindMark kind={h.doc.kind} name={h.doc.name} />
+                  <span className="dag-hit__doc">{h.doc.title ?? leaf(h.doc.name)}</span>
+                  <span className="dag-hit__what">{WHAT[h.unit.what] ?? kindWord(h.unit.what)}</span>
+                </span>
+                <span className="dag-hit__text">
+                  {snippet(h.unit.text, h.terms).map((r, i) =>
+                    r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>,
+                  )}
+                </span>
+              </button>
+            ))}
+            {hits.length === 0 ? (
+              <p className="dag-panel__empty" data-dag-hits-empty="">
+                {!corpus.loaded
+                  ? "reading the text of every board and note…"
+                  : shown.length === 0 && root.folders.length === 0
+                    ? `nothing matches “${query}”`
+                    : `no text matches “${query}”`}
+              </p>
+            ) : null}
+            {miss && sidebar ? (
+              <div className="dag-hits__make">
+                {/* The board first: it is what Enter on a miss makes. */}
+                <button type="button" className="dag-hits__new" data-dag-hits-new-board="" onClick={() => create("board")}>
+                  <Plus {...ICON} aria-hidden="true" />
+                  <span className="dag-hits__make-name">New board “{query.trim()}”</span>
                 </button>
-              ))}
-              {hits.length === 0 ? (
-                <p className="dag-panel__empty" data-dag-hits-empty="">
-                  {!corpus.loaded
-                    ? "reading the text of every board and note…"
-                    : shown.length === 0 && root.folders.length === 0
-                      ? `nothing matches “${query}”`
-                      : `no text matches “${query}”`}
-                </p>
-              ) : null}
-              {miss && sidebar ? (
-                <div className="dag-hits__make">
-                  {/* The board first: it is what Enter on a miss makes. */}
-                  <button type="button" className="dag-hits__new" data-dag-hits-new-board="" onClick={() => create("board")}>
-                    <Plus {...ICON} aria-hidden="true" />
-                    <span className="dag-hits__make-name">New board “{query.trim()}”</span>
-                  </button>
-                  <button type="button" className="dag-hits__new" data-dag-hits-new-note="" onClick={() => create("note")}>
-                    <Plus {...ICON} aria-hidden="true" />
-                    <span className="dag-hits__make-name">New note “{query.trim()}”</span>
-                  </button>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-        </div>
+                <button type="button" className="dag-hits__new" data-dag-hits-new-note="" onClick={() => create("note")}>
+                  <Plus {...ICON} aria-hidden="true" />
+                  <span className="dag-hits__make-name">New note “{query.trim()}”</span>
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
 
-        <p className="dag-panel__count">
-          {shown.length === entries.length
-            ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
-            : `${shown.length} of ${entries.length}`}
-          {terms.length > 0 ? ` · ${hits.length} in the text` : null}
-        </p>
-      </section>
-    </div>
+      <p className="dag-panel__count">
+        {shown.length === entries.length
+          ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
+          : `${shown.length} of ${entries.length}`}
+        {terms.length > 0 ? ` · ${hits.length} in the text` : null}
+      </p>
+    </Dialog>
   );
 }
 

@@ -1,8 +1,10 @@
-import { Trash2, Undo2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Trash2, Undo2 } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
 
 import type { FileKind, TrashEntry } from "@/board/useBoard";
+import { Button } from "@/ui/controls";
 
+import { Toast, ToastName, ToastWords } from "./Toast";
 import { restoreFromTrash } from "./trashApi";
 import { counted, leaf } from "./tree";
 
@@ -18,18 +20,33 @@ export interface Gone {
 /** How long the notice stays when nobody is near it. Long enough to read and reach; the trash keeps it after. */
 const SHOWN = 8000;
 
-/** What went, in a sentence. */
-function said(gone: readonly Gone[], titles: Readonly<Record<string, string>>): string {
-  if (gone.length > 1) return `Moved ${counted(gone.length, ["item", "items"])} to the trash.`;
+/**
+ * What went, in a sentence, and the same sentence as one line for the toast: the name in it gives
+ * way in the middle when the line is too long for the toast, so a sixty-character name is still one
+ * line and still ends in its extension.
+ */
+function said(gone: readonly Gone[], titles: Readonly<Record<string, string>>): { text: string; line: ReactNode } {
+  const plain = (text: string) => ({ text, line: <ToastWords>{text}</ToastWords> });
+  const named = (before: string, name: string, after: string) => ({
+    text: `${before}${name}${after}`,
+    line: (
+      <>
+        <ToastWords>{before}</ToastWords>
+        <ToastName text={name} />
+        <ToastWords>{after}</ToastWords>
+      </>
+    ),
+  });
+  if (gone.length > 1) return plain(`Moved ${counted(gone.length, ["item", "items"])} to the trash.`);
   const e = gone[0]!.entry;
   if (e.kind === "folder") {
     const inside = e.holds
       ? [e.holds.boards, e.holds.notes, e.holds.quizzes, e.holds.tables, e.holds.files].reduce((n, l) => n + l.length, 0)
       : 0;
     const what = inside === 1 ? "the file" : `the ${counted(inside, ["file", "files"])}`;
-    return `Moved the folder “${leaf(e.name)}”${inside ? ` and ${what} in it` : ""} to the trash.`;
+    return named("Moved the folder “", leaf(e.name), `”${inside ? ` and ${what} in it` : ""} to the trash.`);
   }
-  return `Moved “${e.title ?? titles[e.name] ?? leaf(e.name)}” to the trash.`;
+  return named("Moved “", e.title ?? titles[e.name] ?? leaf(e.name), "” to the trash.");
 }
 
 /**
@@ -58,15 +75,8 @@ export function TrashNotice({
   onClose(): void;
 }) {
   const [state, setState] = useState<"shown" | "restoring" | { failed: string }>("shown");
-  const [held, setHeld] = useState(false);
   const close = useRef(onClose);
   close.current = onClose;
-
-  useEffect(() => {
-    if (held || state !== "shown") return;
-    const timer = window.setTimeout(() => close.current(), SHOWN);
-    return () => window.clearTimeout(timer);
-  }, [held, state]);
 
   const undo = async () => {
     setState("restoring");
@@ -91,50 +101,41 @@ export function TrashNotice({
   };
 
   const busy = state === "restoring";
+  const line = said(gone, titles);
+  const text = typeof state === "object" ? state.failed : busy ? "Putting it back…" : line.text;
   return (
-    <div
-      className="dag-trash-notice"
-      role="status"
+    <Toast
+      icon={Trash2}
       data-dag-trash-notice=""
-      onPointerEnter={() => setHeld(true)}
-      onPointerLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
-      }}
+      title={text}
+      /* It goes on its own only while it is offering Undo: a failure stays until it is read. */
+      timeout={state === "shown" ? SHOWN : undefined}
+      onTimeout={() => close.current()}
+      onDismiss={busy ? undefined : () => close.current()}
+      dismissData={{ "data-dag-trash-dismiss": "" }}
+      actions={
+        <>
+          {state === "shown" ? (
+            <Button data-dag-trash-undo="" onClick={() => void undo()}>
+              <Undo2 size={14} strokeWidth={2} aria-hidden="true" />
+              Undo
+            </Button>
+          ) : null}
+          <Button
+            variant="quiet"
+            data-dag-trash-view=""
+            disabled={busy}
+            onClick={() => {
+              onTrash();
+              close.current();
+            }}
+          >
+            View trash
+          </Button>
+        </>
+      }
     >
-      <Trash2 size={16} strokeWidth={2} aria-hidden="true" className="dag-trash-notice__mark" />
-      <p className="dag-trash-notice__text">
-        {typeof state === "object" ? state.failed : busy ? "Putting it back…" : said(gone, titles)}
-      </p>
-      {state === "shown" ? (
-        <button type="button" className="dag-trash-notice__act" data-dag-trash-undo="" onClick={() => void undo()}>
-          <Undo2 size={14} strokeWidth={2} aria-hidden="true" />
-          Undo
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="dag-trash-notice__act"
-        data-dag-trash-view=""
-        disabled={busy}
-        onClick={() => {
-          onTrash();
-          close.current();
-        }}
-      >
-        View trash
-      </button>
-      <button
-        type="button"
-        className="dag-icon dag-trash-notice__close"
-        data-dag-trash-dismiss=""
-        aria-label="Dismiss"
-        disabled={busy}
-        onClick={() => close.current()}
-      >
-        <X size={14} strokeWidth={2} aria-hidden="true" />
-      </button>
-    </div>
+      {state === "shown" ? line.line : <ToastWords>{text}</ToastWords>}
+    </Toast>
   );
 }

@@ -17,7 +17,7 @@ open page for a few seconds; changed in Settings → Privacy or with `anydag tel
 |---|---|
 | `api/protocol/logs.ts` | what a log may hold: `EVENTS`, each prop a count, a duration, a boolean or one word of a list; `scrub`; `cleanEvent` and `cleanBatch`, which every hop runs |
 | `src/telemetry/client.ts` | the page's half: the answer (`useTelemetry`), `track`, `fail`, the error listeners, a post every 30 s and on `pagehide` |
-| `src/telemetry/Prompt.tsx` · `what.ts` | the first-run toast, drawn by `Shell` once a file is open · the two lists it and the Privacy tab both say |
+| `src/telemetry/Prompt.tsx` · `what.ts` | the first-run toast and its *What's sent* dialog, drawn by `Shell` once a file is open · the two lists it and the Privacy tab both say |
 | `server/telemetry.ts` · `server/routes/telemetry.ts` | the answer in the home's `kv`, the install id, what is held, the route summary, where it goes, the send |
 | `api/server/routes/logs.ts` | `POST /v1/logs` on the api server: open, rate-limited, one JSONL file a day in `<data>/logs/` |
 
@@ -61,7 +61,10 @@ Eight things are load-bearing:
   person goes next: a question that left with the file and came back three seconds into the next
   one would be asked twice. `useEditor`'s capture-phase key handler still skips
   targets inside `[data-dag-telemetry-ask]` as it skips `[data-dag-settings]`, so a key aimed at one
-  of its buttons does not reach the board; Escape in the toast is *No*.
+  of its buttons does not reach the board; Escape in the toast is *No*. It is the app's one `Toast`
+  (#208), in the stack with every other notice; *What's sent* opens the app's dialog frame with the
+  two lists and the same two answers, the toast stepping aside while it is up, and Escape there goes
+  back to the toast.
 - **`/v1/logs` is open, and stands in for a token with limits**: 256 KB a batch, 30 a minute an
   address, 3000 a minute in all, and what is over is `{accepted: 0}` rather than an error a client
   would retry. Nothing about the request — no address, no header — is written. `ANYDAG_API_LOGS=off`

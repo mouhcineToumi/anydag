@@ -1,6 +1,5 @@
 import { ExternalLink, MessageCircleWarning, Paperclip, X } from "lucide-react";
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
-import { createPortal } from "react-dom";
 
 import {
   feedbackProblem,
@@ -9,6 +8,8 @@ import {
   type FeedbackKind,
   type FeedbackSent,
 } from "../../api/protocol/feedback";
+import { Button, IconButton } from "@/ui/controls";
+import { Dialog } from "@/ui/Dialog";
 
 const ICON = { size: 16, strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -166,203 +167,182 @@ export function FeedbackCard({ document: doc, onClose }: { document: FeedbackDoc
 
   const env = status && status !== "failed" ? status.env : null;
 
-  return createPortal(
-    <div className="dag-settings__scrim dag-feedback__scrim" data-dag-feedback="" onPointerDown={busy ? undefined : onClose}>
-      <section
-        className="dag-settings dag-feedback"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="dag-feedback-title"
-        data-dragging={dragging ? "" : undefined}
-        onPointerDown={(e) => e.stopPropagation()}
-        onPaste={onPaste}
-        onDragOver={(e) => {
+  /* The app's dialog frame (`ui/Dialog.tsx`): Escape and a press outside close it, unless a send is
+     in flight; Tab stays inside; ctrl+Enter sends. */
+  return (
+    <Dialog
+      scrim={{ "data-dag-feedback": "" }}
+      onClose={busy ? undefined : onClose}
+      className="dag-settings dag-feedback"
+      aria-labelledby="dag-feedback-title"
+      data-dragging={dragging ? "" : undefined}
+      onPaste={onPaste}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" && !busy) {
-            e.preventDefault();
-            onClose();
-          } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            void send();
-          }
-          e.stopPropagation();
-        }}
-      >
-        <header className="dag-settings__head">
-          <MessageCircleWarning {...ICON} className="dag-feedback__mark" aria-hidden="true" />
-          <h2 id="dag-feedback-title">Send feedback</h2>
-          <span className="dag-toolbar__spacer" />
-          <button
-            type="button"
-            className="dag-icon"
-            aria-label="Close"
-            data-dag-feedback-close=""
-            disabled={busy}
-            onClick={onClose}
-          >
-            <X {...ICON} aria-hidden="true" />
-          </button>
-        </header>
+          void send();
+        }
+      }}
+    >
+      <header className="dag-settings__head">
+        <MessageCircleWarning {...ICON} className="dag-feedback__mark" aria-hidden="true" />
+        <h2 id="dag-feedback-title">Send feedback</h2>
+        <span className="dag-toolbar__spacer" />
+        <IconButton aria-label="Close" shortcut="Escape" data-dag-feedback-close="" disabled={busy} onClick={onClose}>
+          <X {...ICON} aria-hidden="true" />
+        </IconButton>
+      </header>
 
-        {sending.state === "sent" ? (
-          <div className="dag-feedback__sent" role="status" data-dag-feedback-sent="">
-            <p>Thank you. Your feedback is now an issue on GitHub:</p>
-            <a href={sending.url} target="_blank" rel="noreferrer" data-dag-feedback-link="">
-              <ExternalLink {...ICON} aria-hidden="true" />
-              <span>{sending.url.replace(/^https:\/\/github\.com\//, "")}</span>
-            </a>
+      {sending.state === "sent" ? (
+        <div className="dag-feedback__sent" role="status" data-dag-feedback-sent="">
+          <p>Thank you. Your feedback is now an issue on GitHub:</p>
+          <a href={sending.url} target="_blank" rel="noreferrer" data-dag-feedback-link="">
+            <ExternalLink {...ICON} aria-hidden="true" />
+            <span>{sending.url.replace(/^https:\/\/github\.com\//, "")}</span>
+          </a>
+        </div>
+      ) : (
+        <>
+          <div className="dag-feedback__kinds" role="group" aria-label="Kind">
+            {(
+              [
+                ["bug", "Something is wrong"],
+                ["idea", "An idea"],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                className="dag-feedback__kind"
+                aria-pressed={draft.kind === k}
+                data-dag-feedback-kind={k}
+                onClick={() => setDraft({ ...draft, kind: k })}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        ) : (
-          <>
-            <div className="dag-feedback__kinds" role="group" aria-label="Kind">
-              {(
-                [
-                  ["bug", "Something is wrong"],
-                  ["idea", "An idea"],
-                ] as const
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  className="dag-feedback__kind"
-                  aria-pressed={draft.kind === k}
-                  data-dag-feedback-kind={k}
-                  onClick={() => setDraft({ ...draft, kind: k })}
-                >
-                  {label}
+          <textarea
+            ref={input}
+            className="dag-feedback__text"
+            data-dag-feedback-text=""
+            rows={5}
+            value={draft.text}
+            placeholder={
+              draft.kind === "bug" ? "What happened, and what did you expect? Steps help." : "What would you like AnyDag to do?"
+            }
+            aria-label="Your feedback"
+            onChange={(e) => setDraft({ ...draft, text: e.target.value })}
+          />
+
+          <div className="dag-feedback__files">
+            {draft.files.map((f, i) => (
+              <span key={`${f.name}-${i}`} className="dag-feedback__file" data-dag-feedback-file={f.name}>
+                <span className="dag-feedback__file-name">{f.name}</span>
+                <span className="dag-feedback__file-size">{kb(f.size)}</span>
+                <button type="button" className="dag-icon" aria-label={`Remove ${f.name}`} onClick={() => remove(i)}>
+                  <X size={12} strokeWidth={2} aria-hidden="true" />
                 </button>
-              ))}
-            </div>
-            <textarea
-              ref={input}
-              className="dag-feedback__text"
-              data-dag-feedback-text=""
-              rows={5}
-              value={draft.text}
-              placeholder={
-                draft.kind === "bug" ? "What happened, and what did you expect? Steps help." : "What would you like AnyDag to do?"
-              }
-              aria-label="Your feedback"
-              onChange={(e) => setDraft({ ...draft, text: e.target.value })}
-            />
-
-            <div className="dag-feedback__files">
-              {draft.files.map((f, i) => (
-                <span key={`${f.name}-${i}`} className="dag-feedback__file" data-dag-feedback-file={f.name}>
-                  <span className="dag-feedback__file-name">{f.name}</span>
-                  <span className="dag-feedback__file-size">{kb(f.size)}</span>
-                  <button type="button" className="dag-icon" aria-label={`Remove ${f.name}`} onClick={() => remove(i)}>
-                    <X size={12} strokeWidth={2} aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-              {draft.files.length < MAX_FEEDBACK_FILES ? (
-                <button
-                  type="button"
-                  className="dag-feedback__add"
-                  data-dag-feedback-add=""
-                  onClick={() => picker.current?.click()}
-                >
-                  <Paperclip size={13} strokeWidth={2} aria-hidden="true" />
-                  <span>Add a screenshot, video or file</span>
-                </button>
-              ) : null}
-              <input
-                ref={picker}
-                type="file"
-                hidden
-                multiple
-                accept="image/*,video/*,application/pdf,text/*"
-                data-dag-feedback-picker=""
-                onChange={(e) => {
-                  add([...(e.target.files ?? [])]);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-            {doc ? (
-              <label className="dag-feedback__attach">
-                <input
-                  type="checkbox"
-                  checked={draft.attach}
-                  data-dag-feedback-attach=""
-                  onChange={(e) => setDraft({ ...draft, attach: e.target.checked })}
-                />
-                <span>
-                  Attach this {doc.kind} (<code>{fileName(doc)}</code>)
-                </span>
-              </label>
-            ) : null}
-
-            <div className="dag-feedback__consent" data-dag-feedback-consent="">
-              <p className="dag-feedback__label">What leaves this machine when you press Send</p>
-              <ul>
-                <li>Your text{draft.kind === "bug" ? ", as a bug report" : ", as an idea"}</li>
-                {draft.files.map((f, i) => (
-                  <li key={`${f.name}-${i}`}>
-                    The file <code>{f.name}</code>
-                  </li>
-                ))}
-                {attached ? (
-                  <li>
-                    The whole text of <code>{fileName(attached)}</code>
-                  </li>
-                ) : null}
-                <li>{env ? `AnyDag ${env.version}, ${env.os}, ${env.arch}` : "The app's version, system and processor"}</li>
-              </ul>
-              <p className="dag-feedback__hint">
-                Nothing else is attached. It becomes a <strong>public</strong> GitHub issue in mouhcineToumi/anydag, and the files
-                are stored by GitHub; we keep no copy. An issue can be removed on request, but GitHub offers no way to delete an
-                uploaded file, so anyone who kept its address could still open it.
-              </p>
-            </div>
-          </>
-        )}
-
-        {unavailable ? (
-          <p className="dag-feedback__error" role="alert" data-dag-feedback-error="">
-            Feedback is not available in this copy of AnyDag: it has no feedback relay set.
-          </p>
-        ) : null}
-        {sending.state === "failed" ? (
-          <p className="dag-feedback__error" role="alert" data-dag-feedback-error="">
-            Not sent: {sending.error}. Your draft is kept.
-          </p>
-        ) : problem && draft.text.trim() ? (
-          <p className="dag-feedback__error" data-dag-feedback-problem="">
-            {problem}
-          </p>
-        ) : null}
-
-        <footer className="dag-settings__foot dag-feedback__foot">
-          {sending.state === "sent" ? (
-            <button type="button" className="dag-button" onClick={onClose}>
-              Close
-            </button>
-          ) : (
-            <>
-              <span className="dag-rewrite-dialog__hint">
-                <kbd>ctrl</kbd> <kbd>Enter</kbd> to send
               </span>
+            ))}
+            {draft.files.length < MAX_FEEDBACK_FILES ? (
               <button
                 type="button"
-                className="dag-button dag-button--primary"
-                data-dag-feedback-send=""
-                disabled={!canSend}
-                onClick={() => void send()}
+                className="dag-feedback__add"
+                data-dag-feedback-add=""
+                onClick={() => picker.current?.click()}
               >
-                {busy ? "Sending…" : "Send"}
+                <Paperclip size={13} strokeWidth={2} aria-hidden="true" />
+                <span>Add a screenshot, video or file</span>
               </button>
-            </>
-          )}
-        </footer>
-      </section>
-    </div>,
-    document.body,
+            ) : null}
+            <input
+              ref={picker}
+              type="file"
+              hidden
+              multiple
+              accept="image/*,video/*,application/pdf,text/*"
+              data-dag-feedback-picker=""
+              onChange={(e) => {
+                add([...(e.target.files ?? [])]);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          {doc ? (
+            <label className="dag-feedback__attach">
+              <input
+                type="checkbox"
+                checked={draft.attach}
+                data-dag-feedback-attach=""
+                onChange={(e) => setDraft({ ...draft, attach: e.target.checked })}
+              />
+              <span>
+                Attach this {doc.kind} (<code>{fileName(doc)}</code>)
+              </span>
+            </label>
+          ) : null}
+
+          <div className="dag-feedback__consent" data-dag-feedback-consent="">
+            <p className="dag-feedback__label">What leaves this machine when you press Send</p>
+            <ul>
+              <li>Your text{draft.kind === "bug" ? ", as a bug report" : ", as an idea"}</li>
+              {draft.files.map((f, i) => (
+                <li key={`${f.name}-${i}`}>
+                  The file <code>{f.name}</code>
+                </li>
+              ))}
+              {attached ? (
+                <li>
+                  The whole text of <code>{fileName(attached)}</code>
+                </li>
+              ) : null}
+              <li>{env ? `AnyDag ${env.version}, ${env.os}, ${env.arch}` : "The app's version, system and processor"}</li>
+            </ul>
+            <p className="dag-feedback__hint">
+              Nothing else is attached. It becomes a <strong>public</strong> GitHub issue in mouhcineToumi/anydag, and the files
+              are stored by GitHub; we keep no copy. An issue can be removed on request, but GitHub offers no way to delete an
+              uploaded file, so anyone who kept its address could still open it.
+            </p>
+          </div>
+        </>
+      )}
+
+      {unavailable ? (
+        <p className="dag-feedback__error" role="alert" data-dag-feedback-error="">
+          Feedback is not available in this copy of AnyDag: it has no feedback relay set.
+        </p>
+      ) : null}
+      {sending.state === "failed" ? (
+        <p className="dag-feedback__error" role="alert" data-dag-feedback-error="">
+          Not sent: {sending.error}. Your draft is kept.
+        </p>
+      ) : problem && draft.text.trim() ? (
+        <p className="dag-feedback__error" data-dag-feedback-problem="">
+          {problem}
+        </p>
+      ) : null}
+
+      <footer className="dag-settings__foot dag-feedback__foot">
+        {sending.state === "sent" ? (
+          <Button onClick={onClose}>Close</Button>
+        ) : (
+          <>
+            <span className="dag-rewrite-dialog__hint">
+              <kbd>ctrl</kbd> <kbd>Enter</kbd> to send
+            </span>
+            <Button variant="primary" data-dag-feedback-send="" disabled={!canSend} onClick={() => void send()}>
+              {busy ? "Sending…" : "Send"}
+            </Button>
+          </>
+        )}
+      </footer>
+    </Dialog>
   );
 }

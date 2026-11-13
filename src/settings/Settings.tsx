@@ -18,12 +18,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { createPortal } from "react-dom";
 
 import { assertNever, type BoardTree } from "@/board/useBoard";
 import type { Board } from "@/board/types";
 import { useFeatures } from "@/features";
 import { ShortcutList } from "@/edit/Shortcuts";
+import { Dialog } from "@/ui/Dialog";
 import { currentOf } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
 
@@ -112,9 +112,10 @@ export function useSettingsOpen() {
  *
  * Four things are load-bearing:
  *
- * - **It is over everything**, sidebar included, in a portal on `<body>` — it used to sit inside the
- *   page and leave the sidebar live beside it, so a click there did two things at once. The scrim
- *   dims what is behind it, and a press on it closes the modal.
+ * - **It is over everything**, sidebar included, in the app's dialog frame (`ui/Dialog.tsx`) — it
+ *   used to sit inside the page and leave the sidebar live beside it, so a click there did two
+ *   things at once. The scrim dims what is behind it, which is `inert` while it is up, and a press
+ *   on it closes the modal.
  * - **It owns every key aimed at it.** `useEditor` counts a focused BUTTON, SELECT or INPUT as
  *   somebody typing and leaves them alone, and ignores anything inside `[data-dag-settings]`; the
  *   modal handles Escape and `ctrl+,` itself and stops every other key at its edge, so an arrow or a
@@ -221,45 +222,12 @@ export function Settings({
     focusTab(next);
   };
 
+  /* The frame (`ui/Dialog.tsx`) closes on Escape, keeps Tab inside and stops every key at its edge;
+     `ctrl+,` is the one more key that closes this dialog, as it opened it. */
   const onKey = (e: ReactKeyboardEvent<HTMLElement>) => {
-    /* A portal inside a tab (the vault's delete question) bubbles here through React but is not
-       in this element: its keys are its own. */
-    if (!card.current?.contains(e.target as Node)) return;
-    const mod = e.ctrlKey || e.metaKey;
-    if (e.key === "Escape" && !e.defaultPrevented) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key === ",") {
       e.preventDefault();
-      e.stopPropagation();
       onClose();
-      return;
-    }
-    if (mod && !e.altKey && e.key === ",") {
-      e.preventDefault();
-      e.stopPropagation();
-      onClose();
-      return;
-    }
-    if (e.key === "Tab") trap(e);
-    /* Every other key stops here, so none reaches the page behind the modal: see the note above. */
-    e.stopPropagation();
-  };
-
-  /** Tab and shift+Tab go round the modal and never leave it — it is modal, so there is nowhere else. */
-  const trap = (e: ReactKeyboardEvent<HTMLElement>) => {
-    const all = Array.from(
-      card.current?.querySelectorAll<HTMLElement>(
-        'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])',
-      ) ?? [],
-    ).filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0);
-    if (all.length === 0) return;
-    const first = all[0]!;
-    const last = all[all.length - 1]!;
-    const at = document.activeElement;
-    if (e.shiftKey && (at === first || !all.includes(at as HTMLElement))) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && (at === last || !all.includes(at as HTMLElement))) {
-      e.preventDefault();
-      first.focus();
     }
   };
 
@@ -363,93 +331,88 @@ export function Settings({
     }
   };
 
-  return createPortal(
-    <div className="dag-settings-modal__scrim" data-dag-settings="" onPointerDown={onClose}>
-      <section
-        ref={card}
-        tabIndex={-1}
-        className="dag-settings-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-        data-dag-settings-view={view}
-        data-dag-settings-tab={tab}
-        onPointerDown={(e) => e.stopPropagation()}
-        onKeyDown={onKey}
-      >
-        <SettingsFeedback>
-          <nav className="dag-settings-modal__nav" aria-label="Settings">
-            <h2 className="dag-settings-modal__title">Settings</h2>
-            {groups.map((g) => {
-              const group = g.group;
-              const heading = `${id}-group-${group}`;
-              return (
-                <section
-                  key={group}
-                  className="dag-settings-modal__group"
-                  data-dag-settings-group={group}
-                  /* Which vault the third group's tabs are kept with: its name is in the line below. */
-                  {...(group === "vault" ? { "data-dag-settings-vault": vault.id } : {})}
-                >
-                  <p id={heading} className="dag-settings-modal__heading">
-                    {SCOPE_LABEL[group]}
-                  </p>
-                  <p className="dag-settings-modal__note">{noteFor(group)}</p>
-                  <div role="tablist" aria-orientation="vertical" aria-labelledby={heading}>
-                    {g.tabs.map((t) => tabButton(t))}
-                  </div>
-                </section>
-              );
-            })}
-            {foot.length > 0 ? (
-              <div className="dag-settings-modal__group dag-settings-modal__foot" data-dag-settings-group="foot">
-                <div role="tablist" aria-orientation="vertical" aria-label="More settings">
-                  {foot.map((t) => tabButton(t, true))}
-                </div>
-              </div>
-            ) : null}
-          </nav>
-
-          <div
-            id={paneId}
-            role="tabpanel"
-            aria-labelledby={tabId(tab)}
-            className="dag-settings-modal__pane"
-            data-dag-settings-pane={tab}
-          >
-            <div className="dag-settings-modal__head">
-              <button
-                type="button"
-                className="dag-icon dag-settings-modal__back"
-                aria-label="All settings"
-                data-dag-settings-back=""
-                onClick={() => {
-                  setView("list");
-                  focusTab(tab);
-                }}
+  return (
+    <Dialog
+      cardRef={card}
+      scrim={{ "data-dag-settings": "" }}
+      onClose={onClose}
+      className="dag-settings-modal"
+      aria-label="Settings"
+      data-dag-settings-view={view}
+      data-dag-settings-tab={tab}
+      onKeyDown={onKey}
+    >
+      <SettingsFeedback>
+        <nav className="dag-settings-modal__nav" aria-label="Settings">
+          <h2 className="dag-settings-modal__title">Settings</h2>
+          {groups.map((g) => {
+            const group = g.group;
+            const heading = `${id}-group-${group}`;
+            return (
+              <section
+                key={group}
+                className="dag-settings-modal__group"
+                data-dag-settings-group={group}
+                /* Which vault the third group's tabs are kept with: its name is in the line below. */
+                {...(group === "vault" ? { "data-dag-settings-vault": vault.id } : {})}
               >
-                <ArrowLeft {...ICON} aria-hidden="true" />
-              </button>
-              <h3>{TAB_LABEL[tab]}</h3>
-              <span className="dag-settings-modal__scope" data-dag-settings-scope={scopeOf(tab)}>
-                {SCOPE_LABEL[scopeOf(tab)]}
-              </span>
+                <p id={heading} className="dag-settings-modal__heading">
+                  {SCOPE_LABEL[group]}
+                </p>
+                <p className="dag-settings-modal__note">{noteFor(group)}</p>
+                <div role="tablist" aria-orientation="vertical" aria-labelledby={heading}>
+                  {g.tabs.map((t) => tabButton(t))}
+                </div>
+              </section>
+            );
+          })}
+          {foot.length > 0 ? (
+            <div className="dag-settings-modal__group dag-settings-modal__foot" data-dag-settings-group="foot">
+              <div role="tablist" aria-orientation="vertical" aria-label="More settings">
+                {foot.map((t) => tabButton(t, true))}
+              </div>
             </div>
-            <div className="dag-settings-modal__body">{pane()}</div>
-          </div>
+          ) : null}
+        </nav>
 
-          <button
-            type="button"
-            className="dag-icon dag-settings-modal__close"
-            aria-label="Close settings"
-            data-dag-settings-close=""
-            onClick={onClose}
-          >
-            <X {...ICON} aria-hidden="true" />
-          </button>
-        </SettingsFeedback>
-      </section>
-    </div>,
-    document.body,
+        <div
+          id={paneId}
+          role="tabpanel"
+          aria-labelledby={tabId(tab)}
+          className="dag-settings-modal__pane"
+          data-dag-settings-pane={tab}
+        >
+          <div className="dag-settings-modal__head">
+            <button
+              type="button"
+              className="dag-icon dag-settings-modal__back"
+              aria-label="All settings"
+              data-dag-settings-back=""
+              onClick={() => {
+                setView("list");
+                focusTab(tab);
+              }}
+            >
+              <ArrowLeft {...ICON} aria-hidden="true" />
+            </button>
+            <h3>{TAB_LABEL[tab]}</h3>
+            <span className="dag-settings-modal__scope" data-dag-settings-scope={scopeOf(tab)}>
+              {SCOPE_LABEL[scopeOf(tab)]}
+            </span>
+          </div>
+          <div className="dag-settings-modal__body">{pane()}</div>
+        </div>
+
+        <button
+          type="button"
+          className="dag-icon dag-settings-modal__close"
+          aria-label="Close settings"
+          data-dag-settings-close=""
+          onClick={onClose}
+        >
+          <X {...ICON} aria-hidden="true" />
+        </button>
+      </SettingsFeedback>
+    </Dialog>
   );
 }

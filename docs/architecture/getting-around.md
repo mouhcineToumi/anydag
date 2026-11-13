@@ -54,3 +54,6 @@ it; it is `pointer-events: none`, so it cannot take the press it describes; and 
 leave, blur, Escape and press. The wrapper adds no drawing of its own — it only measures the control
 and carries the handlers. The control keeps its `aria-label`, because the bubble is a visual name
 for a pointer or keyboard user, not the accessible name.
+
+Since #207 every `IconButton` in the chrome wears it, saying its label (*Design rules*,
+`design-and-layout.md`), so the dock and the zoom bar no longer wrap their buttons by hand.

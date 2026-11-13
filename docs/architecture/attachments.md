@@ -44,7 +44,7 @@ Nine things are load-bearing:
   need. The size is checked as it streams in, so an oversized file is refused at its first megabyte
   over. The page checks the same two limits before it sends anything (`refusal` in
   `src/files/upload.ts`, the server's sentences word for word), and a board says a refused drop in
-  `UploadNotice`, off the `dag:upload-problem` document event, which a board write the server never
+  `UploadNotice` — a toast a refusal, in the app's one stack (#208) — off the `dag:upload-problem` document event, which a board write the server never
   received raises as well (`useBoard`, *Editing*).
 - **A reference is an id**, as to anything: a rename or a move changes no file that names it, and one
   stored file serves every note and board that does. `attachmentOf` in `src/render/assets.ts` is how
@@ -79,7 +79,7 @@ file exists — an `<img>` pointed at a missing file is a 404 on the console, wh
 
 Names claimed, grepped first: `dag-file*`, `dag-pdf*`, `dag-embed--file`, `dag-embed--picture`,
 `dag-embed__filerow`, `dag-embed__preview`, `dag-embed__title`, `dag-embed__chev--open`,
-`dag-upload-notice*`, `dag-blocks-drop`, `dag-sidebar-files`, `data-dag-file*`, `data-dag-pdf*`,
+`dag-blocks-drop`, `dag-sidebar-files`, `data-dag-file*`, `data-dag-pdf*`,
 `data-dag-embed-download`, `data-dag-embed-kind`, `data-dag-embed-picture`, `data-dag-embed-preview`,
 `data-dag-embed-previewing`, `data-dag-note-drop`, `data-dag-note-upload-problem`,
 `data-dag-sidebar-upload*`, `data-dag-sidebar-uploading`, `data-dag-unlink*`,

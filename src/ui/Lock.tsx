@@ -2,6 +2,7 @@ import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { LOCK_KEYS, LOCK_REFUSED, setLocked, toggleLock, useLocked } from "@/settings/lock";
+import { Button } from "@/ui/controls";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 
@@ -44,8 +45,7 @@ export function LockButton() {
         <Lock {...ICON} />
         <span className="dag-readonly__word">Read only</span>
       </span>
-      <button
-        type="button"
+      <Button
         className="dag-readonly__unlock"
         data-dag-readonly-unlock=""
         title={`Unlock (${LOCK_KEYS})`}
@@ -55,7 +55,7 @@ export function LockButton() {
         onClick={() => setLocked(false)}
       >
         Unlock
-      </button>
+      </Button>
       <span className="dag-readonly__said" role="status" aria-live="polite" aria-atomic="true">
         {refusals ? "Read only: unlock to change this." : ""}
       </span>

@@ -105,6 +105,32 @@ test("a board deleted from the sidebar is in the trash, and Restore puts it back
   await expect.poll(() => new URL(page.url()).searchParams.get("board")).toBe(plan);
 });
 
+test("a sixty-character name is one line in the notice, cut in the middle, with the whole of it the title", async ({ page }) => {
+  const ws = await workspace(page);
+  const long = "Quarterly planning review for the platform and the data teams".slice(0, 60);
+  expect(long).toHaveLength(60);
+  const name = await make(page, ws, "long", long);
+  await page.goto(`/?board=${encodeURIComponent(name)}&vault=${ws}`);
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await openSidebar(page);
+
+  await clickOnHover(page, `[data-dag-sidebar-file="${name}"]`, `[data-dag-sidebar-more="${name}"]`);
+  await page.locator('[data-dag-sidebar-menu-item="delete"]').click();
+  const notice = page.locator("[data-dag-trash-notice]");
+  await expect(notice).toContainText("to the trash.");
+  /* One line: the toast is as tall as its buttons, and the line as tall as one line of text. It
+     used to wrap a long name over three. */
+  const line = await notice.locator(".dag-toast__text").boundingBox();
+  const lineHeight = await notice
+    .locator(".dag-toast__text")
+    .evaluate((el) => Number.parseFloat(getComputedStyle(el).lineHeight));
+  expect(line!.height).toBeLessThanOrEqual(lineHeight + 1);
+  expect((await notice.boundingBox())!.height).toBeLessThan(lineHeight * 2.5);
+  /* The name gives way in its middle, and says itself whole on hover. */
+  await expect(notice.locator(".dag-toast__name")).toHaveAttribute("title", long);
+  await expect(notice.locator("[data-dag-trash-undo]")).toBeVisible();
+});
+
 test("Delete forever asks in its row, and Empty trash asks once", async ({ page }) => {
   const ws = await workspace(page);
   for (const n of ["one", "two", "three"]) await trashed(page, ws, await make(page, ws, n, n.toUpperCase()));

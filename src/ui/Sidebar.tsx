@@ -99,6 +99,7 @@ import {
   type Picked,
   type Row,
 } from "./tree";
+import { IconButton } from "./controls";
 import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
@@ -1197,6 +1198,7 @@ export function Sidebar({
       {place === "docked" ? (
         <div className="dag-sidebar__head">
           <span className="dag-sidebar-toggle-slot" aria-hidden="true" />
+          {/* The wordmark, not a `Button`: it is drawn exactly where the toolbar draws its own. */}
           <button
             type="button"
             className="dag-sidebar__logo"
@@ -1216,20 +1218,18 @@ export function Sidebar({
       {sheet ? (
         <div className="dag-sidebar__sheethead">
           <VaultSwitcher onSettings={() => ask("settings", "vault-general")} />
-          <button
-            type="button"
-            className="dag-icon dag-sidebar__close"
-            data-dag-sidebar-close=""
-            aria-label="Close the sidebar"
-            onClick={onDismiss}
-          >
+          <IconButton className="dag-sidebar__close" data-dag-sidebar-close="" aria-label="Close the sidebar" onClick={onDismiss}>
             <X size={22} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
       ) : (
         <VaultSwitcher onSettings={() => ask("settings", "vault-general")} />
       )}
 
+      {/* The column's own rows — these places, the tree's files and folders, the menus' items, the
+          account — stay `<button>`s drawn as rows rather than `Button`s: a row is full width, its
+          name runs out in an ellipsis and its hover is the column's, which a button is not. The
+          small square tools beside them are `IconButton`s. */}
       <div className="dag-sidebar__acts">
         {/* A phone has no mark to press: the toolbar hides its logo there with the breadcrumbs, and
             the sheet's head is the vault and the way out. So the way home is a row of its own, at
@@ -1373,17 +1373,17 @@ export function Sidebar({
                     </span>
                   </button>
                   <span className="dag-sidebar__tools">
-                    <button
-                      type="button"
+                    <IconButton
                       tabIndex={-1}
+                      size="sm"
                       className="dag-sidebar__tool"
                       data-dag-sidebar-unfavourite={e.name}
                       aria-label={`Remove ${e.name} from favourites`}
-                      title="Remove from favourites"
+                      tip="Remove from favourites"
                       onClick={() => files.favourite(e.kind, e.name, false)}
                     >
                       <StarOff {...SMALL} aria-hidden="true" />
-                    </button>
+                    </IconButton>
                   </span>
                 </div>
               );
@@ -1400,8 +1400,8 @@ export function Sidebar({
             working in one wants the next file, with the top level one press away. The folder button
             that made a top-level folder at once looked like a second kind of New and is gone; Folder
             is the menu's row, made where the menu says. */}
-        <button
-          type="button"
+        <IconButton
+          size="sm"
           className="dag-sidebar__tool dag-sidebar__tool--shown dag-sidebar__plus"
           data-dag-sidebar-new=""
           aria-haspopup="menu"
@@ -1426,7 +1426,7 @@ export function Sidebar({
           }}
         >
           <Plus {...SMALL} aria-hidden="true" />
-        </button>
+        </IconButton>
       </div>
       <div
         className="dag-sidebar__tree"
@@ -1654,45 +1654,45 @@ export function Sidebar({
             const tools = (
               <span className="dag-sidebar__tools">
                 {line.type === "folder" && !locked ? (
-                  <button
-                    type="button"
+                  <IconButton
                     tabIndex={-1}
+                    size="sm"
                     className="dag-sidebar__tool"
                     data-dag-sidebar-add={line.path}
                     aria-label={`New in ${line.path}`}
-                    title="New board, note, task, quiz, table or folder here, or upload files"
+                    tip="New board, note, task, quiz, table or folder here, or upload files"
                     onClick={(e) => openMenu(line, e.currentTarget, true)}
                   >
                     <Plus {...SMALL} aria-hidden="true" />
-                  </button>
+                  </IconButton>
                 ) : null}
                 {line.type === "file" && isFavourite(line.entry) ? (
-                  <button
-                    type="button"
+                  <IconButton
                     tabIndex={-1}
+                    size="sm"
                     className="dag-sidebar__tool"
                     data-dag-sidebar-star={where}
                     aria-label={`Remove ${where} from favourites`}
-                    title="A favourite: click to remove it"
+                    tip="A favourite: click to remove it"
                     onClick={() => files.favourite(line.entry.kind, where, false)}
                   >
                     {/* Filled: it says what the file is, where the favourites list's crossed-out star
                         says what the click does. */}
                     <Star {...SMALL} fill="currentColor" aria-hidden="true" />
-                  </button>
+                  </IconButton>
                 ) : null}
-                <button
-                  type="button"
+                <IconButton
                   tabIndex={-1}
+                  size="sm"
                   className="dag-sidebar__tool"
                   data-dag-sidebar-more={where}
                   aria-label={`More for ${where}`}
                   aria-haspopup="menu"
-                  title="Rename, move, delete (right-click, or shift+F10)"
+                  tip="Rename, move, delete (right-click, or shift+F10)"
                   onClick={(e) => openMenu(line, e.currentTarget)}
                 >
                   <MoreHorizontal {...SMALL} aria-hidden="true" />
-                </button>
+                </IconButton>
               </span>
             );
 
@@ -2114,6 +2114,7 @@ function NewMenu({
             "New at the top level"
           )}
         </span>
+        {/* A word in the sentence it ends, not a `Button`. The menu's rows below are menu items. */}
         {here ? (
           <button
             type="button"
@@ -2302,6 +2303,7 @@ function RowMenu({
     }
   };
 
+  /* Menu items (`dag-more__item`), not `Button`s: full-width rows moved by the arrow keys. */
   const item = (what: Pick, label: string, icon: ReactNode, danger = false) =>
     locked && !READ_PICKS.has(what) ? null : (
       <button
@@ -2502,16 +2504,18 @@ function SelectionBar({
   return (
     <div className="dag-sidebar__bulk" role="toolbar" aria-label={`${count} selected`} data-dag-sidebar-bulk={count}>
       <span className="dag-sidebar__bulk-count">{count} selected</span>
-      <button
-        type="button"
+      <IconButton
+        size="sm"
         className="dag-sidebar__tool"
         data-dag-sidebar-bulk-act="clear"
         aria-label="Clear the selection"
-        title="Clear the selection (Escape)"
+        tip="Clear the selection (Escape)"
         onClick={onClear}
       >
         <X {...SMALL} aria-hidden="true" />
-      </button>
+      </IconButton>
+      {/* Words, not `IconButton`s: the bar labels what it does (#215), and the labels are what a
+          first-time reader needs. Each keeps the bar's own tool box, a finger's 44 on a phone. */}
       <span className="dag-sidebar__bulk-acts">
         {locked ? null : (
           <button
@@ -2601,6 +2605,7 @@ function BulkMenu({
       onClose();
     }
   };
+  /* Menu items, as `RowMenu`'s are: rows of a menu, not `Button`s. */
   const item = (what: "move" | "transfer" | "delete" | "clear", label: string, icon: ReactNode, danger = false) => (
     <button
       type="button"
@@ -2700,6 +2705,8 @@ function NameBox({
  * Settings, at the foot: the one way to it with the pointer, opening where the last
  * visit left off, as `ctrl+,` does.
  */
+/* The foot's three rows — sync, feedback, Settings — are the column's rows, as its places at the
+   top are (`dag-sidebar__act`), not `Button`s. */
 /** A linked vault's sync status, one quiet row; nothing at all when it is not linked. */
 function SyncRow({ onOpen }: { onOpen(): void }) {
   const status = useSyncStatus();

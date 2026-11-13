@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
 
+import { Button, IconButton } from "@/ui/controls";
 import { Tooltip } from "@/ui/Tooltip";
 
 /**
@@ -32,33 +33,28 @@ export function ZoomBar({ onZoom, onFit, onActual }: { onZoom(dir: 1 | -1): void
   }, []);
   return (
     <div className="dag-zoombar" data-dag-zoombar="" role="toolbar" aria-label="Zoom">
-      <Tooltip name="Zoom out" shortcut="−">
-        <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(-1)} aria-label="Zoom out (−)">
-          <Minus {...ICON} aria-hidden="true" />
-        </button>
-      </Tooltip>
+      <IconButton className="dag-zoombar__step" onClick={() => onZoom(-1)} aria-label="Zoom out (−)" tip="Zoom out" shortcut="−">
+        <Minus {...ICON} aria-hidden="true" />
+      </IconButton>
       {/* Not a label: a control. "100%" that only reported would be the one thing on the board you
           can read and not act on, and the `0` key already means this. */}
       <Tooltip name="Back to 100%" shortcut="0">
-        <button
+        <Button
+          variant="quiet"
           className="dag-zoombar__pct"
           data-dag-zoom-actual=""
           onClick={onActual}
           aria-label={`Zoom to 100% (currently ${Math.round(zoom * 100)}%) (0)`}
         >
           {Math.round(zoom * 100)}%
-        </button>
+        </Button>
       </Tooltip>
-      <Tooltip name="Zoom in" shortcut="+">
-        <button className="dag-icon dag-zoombar__step" onClick={() => onZoom(1)} aria-label="Zoom in (+)">
-          <Plus {...ICON} aria-hidden="true" />
-        </button>
-      </Tooltip>
-      <Tooltip name="Fit to content" shortcut="F">
-        <button className="dag-icon" onClick={onFit} aria-label="Fit to content (F)">
-          <Maximize2 {...ICON} aria-hidden="true" />
-        </button>
-      </Tooltip>
+      <IconButton className="dag-zoombar__step" onClick={() => onZoom(1)} aria-label="Zoom in (+)" tip="Zoom in" shortcut="+">
+        <Plus {...ICON} aria-hidden="true" />
+      </IconButton>
+      <IconButton onClick={onFit} aria-label="Fit to content (F)" tip="Fit to content" shortcut="F">
+        <Maximize2 {...ICON} aria-hidden="true" />
+      </IconButton>
     </div>
   );
 }

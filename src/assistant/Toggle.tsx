@@ -1,6 +1,7 @@
 import { Sparkles } from "lucide-react";
 
 import { chordFor } from "@/edit/bindings";
+import { IconButton } from "@/ui/controls";
 
 import { toggleAssistant, usePanel } from "./panelState";
 
@@ -9,16 +10,15 @@ export function AssistantToggle() {
   const { open } = usePanel();
   const chord = chordFor("assistant");
   return (
-    <button
-      type="button"
-      className="dag-icon dag-toolbar__assistant"
+    <IconButton
+      className="dag-toolbar__assistant"
       data-dag-assistant-toggle=""
       aria-pressed={open}
       aria-label="Assistant"
-      title={chord ? `Assistant (${chord})` : "Assistant"}
+      shortcut={chord}
       onClick={toggleAssistant}
     >
       <Sparkles size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-    </button>
+    </IconButton>
   );
 }

@@ -66,7 +66,7 @@ file the release does not have.
 
 **`npm run checks` is the fast tier** (`scripts/checks.sh`): `biome lint` → `biome format` (check only) → knip → typecheck →
 `check:version` → `check:case` → `check:theme` → `check:literals` → `check:icons` → `check:skill` →
-vitest (parity included). It has three readers — the pre-commit hook, CI's `checks.yml`, and
+`check:design` → vitest (parity included). It has three readers — the pre-commit hook, CI's `checks.yml`, and
 `scripts/gate.sh` — one list, so a check added is added everywhere. It needs no browser and no
 network and takes about half a minute, which is what lets it sit in a commit hook: `tsc` is
 incremental (its build info under `node_modules/.cache/tsc/`, which CI caches too) and the unit suite
@@ -177,6 +177,14 @@ vocabulary is `chart`'s statement and form words; *Writing a note* names every b
 the CLI* is a command `anydag help --json` lists, and every command group is named; and the quiz and
 table code tables match `QUIZ_CODES` and `TABLE_CODES`. A missing skill is a failure, not a skip. The
 cheat sheets under `skills/anydag/references/dsl` are a symlink to `docs/dsl/`, so they cannot drift.
+
+`check:design` holds `DESIGN.md`, the chrome's design system, to the code in the same way. Every
+`--dag-*` variable it names exists in every theme. Every theme path it puts in backticks
+(`ui.layer.toast`) resolves in every theme. Every class or `data-dag-*` attribute it puts in
+backticks occurs under `src/` as a whole name, and every repository path exists. A trailing `*` or
+`…`, or a `<placeholder>`, makes a name a prefix. The names `DESIGN.md` gives as open decisions
+(`color.scrim`) are listed in the script and must stay missing; when one lands, the check fails
+until the file catches up.
 
 `test/parity.test.ts` runs in `npm run checks` too, so **a route, a command or a tool that
 `docs/parity.json` does not name fails the commit that adds it** (see *Parity* in `cli.md`).

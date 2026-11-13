@@ -16,6 +16,7 @@ import { type Vault, closeVault, createVault, currentOf, loadVaults, openVault, 
 import { switchVault } from "@/vault/current";
 import { desktop } from "@/vault/desktop";
 import { useHome, useVaults } from "@/vault/useVaults";
+import { Button, IconButton } from "@/ui/controls";
 
 const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -210,18 +211,13 @@ export function OpenFolderForm({ onCancel }: { onCancel?(): void }) {
       </label>
       <div className="dag-vault__form-acts">
         {onCancel ? (
-          <button type="button" className="dag-button" onClick={onCancel} disabled={busy}>
+          <Button onClick={onCancel} disabled={busy}>
             <span>Cancel</span>
-          </button>
+          </Button>
         ) : null}
-        <button
-          type="submit"
-          className="dag-button dag-button--primary"
-          data-dag-vault-open-go=""
-          disabled={busy || !path.trim()}
-        >
+        <Button type="submit" variant="primary" data-dag-vault-open-go="" disabled={busy || !path.trim()}>
           <span>{busy ? "Opening…" : "Open"}</span>
-        </button>
+        </Button>
       </div>
       {/* Always in the flow, so a refusal replaces a line rather than pushing the actions down. */}
       <VaultProblem text={problem} className="dag-vault__form-error" />
@@ -291,32 +287,21 @@ export function CreateVaultForm({ onCancel }: { onCancel?(): void }) {
             onChange={(e) => setParent(e.target.value)}
           />
           {browse ? (
-            <button
-              type="button"
-              className="dag-button"
-              data-dag-vault-create-browse=""
-              disabled={busy}
-              onClick={() => void browse().then((p) => p && setParent(p))}
-            >
+            <Button data-dag-vault-create-browse="" disabled={busy} onClick={() => void browse().then((p) => p && setParent(p))}>
               <span>Browse…</span>
-            </button>
+            </Button>
           ) : null}
         </span>
       </label>
       <div className="dag-vault__form-acts">
         {onCancel ? (
-          <button type="button" className="dag-button" onClick={onCancel} disabled={busy}>
+          <Button onClick={onCancel} disabled={busy}>
             <span>Cancel</span>
-          </button>
+          </Button>
         ) : null}
-        <button
-          type="submit"
-          className="dag-button dag-button--primary"
-          data-dag-vault-create-go=""
-          disabled={busy || !name.trim() || !where.trim()}
-        >
+        <Button type="submit" variant="primary" data-dag-vault-create-go="" disabled={busy || !name.trim() || !where.trim()}>
           <span>{busy ? "Creating…" : "Create"}</span>
-        </button>
+        </Button>
       </div>
       {/* Always in the flow, so a refusal replaces a line rather than pushing the actions down. */}
       <VaultProblem text={problem} className="dag-vault__form-error" />
@@ -347,16 +332,15 @@ export function RecentVaults() {
         <div key={v.id} className="dag-vault__line">
           <VaultRow vault={v} home={home} onPick={() => void enterVault(v).catch((e) => setProblem(sayOf(e)))} />
           {!v.open ? (
-            <button
-              type="button"
-              className="dag-icon dag-vault__forget"
+            <IconButton
+              className="dag-vault__forget"
               data-dag-vault-forget={v.id}
               aria-label={`Remove ${v.name} from the list`}
-              title="Remove from the list"
+              tip="Remove from the list"
               onClick={() => void closeVault(v.id, true).catch((e) => setProblem(sayOf(e)))}
             >
               <X {...ICON} aria-hidden="true" />
-            </button>
+            </IconButton>
           ) : null}
         </div>
       ))}
@@ -456,6 +440,8 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
 
   return (
     <div className="dag-vault" ref={wrap} onKeyDown={onKey}>
+      {/* The switcher is a picker's trigger, drawn as the vault it names, not a button with words on
+          it; the menu's own rows below are menu items (`dag-more__item`), moved by the arrow keys. */}
       <button
         ref={button}
         type="button"
@@ -491,17 +477,16 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
                 }}
               />
               {!v.open ? (
-                <button
-                  type="button"
+                <IconButton
                   role="menuitem"
-                  className="dag-icon dag-vault__forget"
+                  className="dag-vault__forget"
                   data-dag-vault-forget={v.id}
                   aria-label={`Remove ${v.name} from the list`}
-                  title="Remove from the list"
+                  tip="Remove from the list"
                   onClick={() => void closeVault(v.id, true).catch((error) => setProblem(sayOf(error)))}
                 >
                   <X {...ICON} aria-hidden="true" />
-                </button>
+                </IconButton>
               ) : null}
             </div>
           ))}
