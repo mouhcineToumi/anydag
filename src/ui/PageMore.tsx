@@ -1,6 +1,8 @@
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent as KeyEvent } from "react";
 
+import { IconButton } from "@/ui/controls";
+
 /**
  * One row of the top bar's `⋯`.
  *
@@ -89,19 +91,17 @@ export function PageMore({ items }: { items: MoreItem[] }) {
 
   return (
     <div className={narrowOnly ? "dag-pagemore dag-pagemore--narrow" : "dag-pagemore"} ref={box}>
-      <button
+      <IconButton
         ref={toggle}
-        type="button"
-        className="dag-icon dag-pagemore__toggle"
+        className="dag-pagemore__toggle"
         data-dag-page-more=""
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="More"
-        title="More"
         onClick={() => setOpen((v) => !v)}
       >
         <MoreHorizontal {...ICON} aria-hidden="true" />
-      </button>
+      </IconButton>
       {open ? (
         <div
           className="dag-pagemore__menu"
@@ -116,6 +116,7 @@ export function PageMore({ items }: { items: MoreItem[] }) {
             return (
               <div key={it.key} className={it.narrow ? "dag-pagemore__group dag-pagemore__group--narrow" : "dag-pagemore__group"}>
                 {it.split ? <hr className="dag-pagemore__rule" /> : null}
+                {/* A menu item, not a `Button`: a full-width row of the menu, moved by the arrow keys. */}
                 <button
                   type="button"
                   role="menuitem"

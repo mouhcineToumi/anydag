@@ -4181,9 +4181,12 @@ export function useEditor({
          capture phase, and a click on a blank part of the modal leaves the focus on the modal
          itself rather than on a control — so without this an arrow or a Delete pressed there moved
          or deleted what is selected on the board behind it. Its Escape and `ctrl+,` are its own.
-         The logs toast (`telemetry/Prompt.tsx`) and the feedback card are the same rule: a key
-         aimed at one of their controls must not reach the board. */
-      if (e.target instanceof Element && e.target.closest("[data-dag-settings],[data-dag-telemetry-ask],[data-dag-feedback]"))
+         Every dialog in the app's frame (`ui/Dialog.tsx`) and every toast (`ui/Toast.tsx`) is the
+         same rule: a key aimed at one of their controls must not reach the board. */
+      if (
+        e.target instanceof Element &&
+        e.target.closest("[data-dag-settings],[data-dag-dialog],[data-dag-toast],[data-dag-telemetry-ask],[data-dag-feedback]")
+      )
         return;
       if (typing(e.target)) {
         /* Focus reached a control while a chord was open. The chord was never meant for it, and

@@ -50,8 +50,9 @@ Eight things are load-bearing:
 - **Nobody is pinged.** An `@name` in the text is broken with a zero-width space, a document goes in
   a `<details>` inside a fence longer than any backtick run in it, and a file name is escaped.
   Without that, the relay would let anyone mention any GitHub account from the maintainer's token.
-- **The card is a modal the board cannot hear behind.** `useEditor`'s capture-phase handler skips
-  `[data-dag-feedback]` as it skips `[data-dag-settings]`. A paste stops at the card, and a pasted
+- **The card is a modal the board cannot hear behind**, in the app's dialog frame (`src/ui/Dialog.tsx`,
+  #208): Tab kept inside, the page `inert`. `useEditor`'s capture-phase handler skips
+  `[data-dag-feedback]` and every `[data-dag-dialog]` as it skips `[data-dag-settings]`. A paste stops at the card, and a pasted
   picture becomes an attachment. The draft lives in memory, one per tab. Closing the card or a
   failed send keeps it; only a send that became an issue clears it.
 

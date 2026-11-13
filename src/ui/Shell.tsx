@@ -64,10 +64,12 @@ import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
+import { IconButton } from "@/ui/controls";
 import { usePanel } from "@/assistant/panelState";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
+import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
 import { ancestors, follow, keyOf, leaf, rebase, type Change } from "./tree";
 
@@ -874,120 +876,121 @@ export function Shell({
       data-sidebar-sized={width === SIDEBAR_W ? undefined : ""}
     >
       <SidebarContext.Provider value={ctl}>
-        {/* First in the DOM, so first in the tab order, which is where it is drawn. */}
-        <button
-          type="button"
-          className="dag-icon dag-sidebar-toggle"
-          data-dag-sidebar-toggle={mode ?? "away"}
-          aria-label={shut ? "Hide the sidebar" : "Show the sidebar"}
-          title={shut ? "Hide the sidebar (Ctrl+\\)" : "Show the sidebar (Ctrl+\\)"}
-          onClick={toggle}
-          /* A press does not take the focus, so it stays on the board: a focused button eats the
+        <ToastHost>
+          {/* First in the DOM, so first in the tab order, which is where it is drawn. */}
+          <IconButton
+            className="dag-sidebar-toggle"
+            data-dag-sidebar-toggle={mode ?? "away"}
+            aria-label={shut ? "Hide the sidebar" : "Show the sidebar"}
+            title={shut ? "Hide the sidebar (Ctrl+\\)" : "Show the sidebar (Ctrl+\\)"}
+            onClick={toggle}
+            /* A press does not take the focus, so it stays on the board: a focused button eats the
              canvas's keys — `typing()` counts one — and the `space` that opens a chord would press
              it again. The dock gives the focus back after a press; this has no board to give it
              to, so it never takes it. Tab and Enter still reach it, and keep it: it is one element,
              so the focus has nowhere to fall. */
-          onMouseDown={(e) => e.preventDefault()}
-          /* The peek is for a column that is away: over a docked one there is nothing to slide in. */
-          onPointerEnter={mode === "docked" || narrow ? undefined : peek}
-          onPointerLeave={mode === "docked" || narrow ? undefined : unpeek}
-        >
-          {/* One glyph for both states, as Claude.ai's is, and not only for the look. Swapping the
+            onMouseDown={(e) => e.preventDefault()}
+            /* The peek is for a column that is away: over a docked one there is nothing to slide in. */
+            onPointerEnter={mode === "docked" || narrow ? undefined : peek}
+            onPointerLeave={mode === "docked" || narrow ? undefined : unpeek}
+          >
+            {/* One glyph for both states, as Claude.ai's is, and not only for the look. Swapping the
               icon replaces the node under a pointer that has not moved, and React reads the new
               node's `pointerover` as the pointer *entering* the button: a click that put the column
               away peeked it straight back. The label and the tooltip say which way it goes. */}
-          <PanelLeft size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-        </button>
-        {mode ? (
-          <Sidebar
-            mode={mode}
-            boards={boards}
-            notes={notes}
-            folders={folders}
-            titles={titles}
-            ids={ids}
-            tasks={tasks}
-            projects={projects}
-            events={events}
-            quizzes={quizzes}
-            questions={questions}
-            tables={tables}
-            attachments={attachments}
-            sizes={sizes}
-            loading={loading}
-            failed={listFailed}
-            onRetry={onRetryList}
-            board={board}
-            note={note}
-            quiz={quiz}
-            table={table}
-            file={file}
-            tasksOpen={tasksOpen}
-            onTasks={() => {
-              openTasks();
-              dismiss();
-            }}
-            calendarOpen={calendarOpen}
-            onCalendar={() => {
-              openCalendar();
-              dismiss();
-            }}
-            quizzesOpen={quizzesOpen}
-            mistakes={mistakes}
-            onQuizzes={() => {
-              openQuizzes();
-              dismiss();
-            }}
-            onPracticeFolder={(folder) => {
-              openQuizzes(`folder:${folder}`);
-              dismiss();
-            }}
-            assistantOpen={assistantOpen}
-            onAssistant={() => {
-              openAssistant();
-              dismiss();
-            }}
-            trashOpen={trashOpen}
-            onTrash={() => {
-              openTrash();
-              dismiss();
-            }}
-            onHome={openHome}
-            openFolders={openFolders}
-            onFolder={(path, isOpen) =>
-              setFolders((had) => {
-                if (had.has(path) === isOpen) return had;
-                const next = new Set(had);
-                if (isOpen) next.add(path);
-                else next.delete(path);
-                return next;
-              })
-            }
-            shown={shown}
-            naming={naming}
-            favourites={favourites}
-            files={files}
-            onOpen={onOpen}
-            onWidth={onWidth}
-            onPointerEnter={mode === "overlay" && peeking ? cancelLeave : undefined}
-            onPointerLeave={mode === "overlay" && peeking && !pinned ? unpeek : undefined}
-            onDismiss={dismiss}
-            sheet={narrow}
-          />
-        ) : null}
-        {children}
-        {panel.open && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
-        {trashed ? (
-          <TrashNotice
-            key={trashed.n}
-            gone={trashed.gone}
-            titles={titles}
-            onRestored={restored}
-            onTrash={openTrash}
-            onClose={() => setTrashed(null)}
-          />
-        ) : null}
-        {cloud ? <TelemetryPrompt page={asking} /> : null}
+            <PanelLeft size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
+          </IconButton>
+          {mode ? (
+            <Sidebar
+              mode={mode}
+              boards={boards}
+              notes={notes}
+              folders={folders}
+              titles={titles}
+              ids={ids}
+              tasks={tasks}
+              projects={projects}
+              events={events}
+              quizzes={quizzes}
+              questions={questions}
+              tables={tables}
+              attachments={attachments}
+              sizes={sizes}
+              loading={loading}
+              failed={listFailed}
+              onRetry={onRetryList}
+              board={board}
+              note={note}
+              quiz={quiz}
+              table={table}
+              file={file}
+              tasksOpen={tasksOpen}
+              onTasks={() => {
+                openTasks();
+                dismiss();
+              }}
+              calendarOpen={calendarOpen}
+              onCalendar={() => {
+                openCalendar();
+                dismiss();
+              }}
+              quizzesOpen={quizzesOpen}
+              mistakes={mistakes}
+              onQuizzes={() => {
+                openQuizzes();
+                dismiss();
+              }}
+              onPracticeFolder={(folder) => {
+                openQuizzes(`folder:${folder}`);
+                dismiss();
+              }}
+              assistantOpen={assistantOpen}
+              onAssistant={() => {
+                openAssistant();
+                dismiss();
+              }}
+              trashOpen={trashOpen}
+              onTrash={() => {
+                openTrash();
+                dismiss();
+              }}
+              onHome={openHome}
+              openFolders={openFolders}
+              onFolder={(path, isOpen) =>
+                setFolders((had) => {
+                  if (had.has(path) === isOpen) return had;
+                  const next = new Set(had);
+                  if (isOpen) next.add(path);
+                  else next.delete(path);
+                  return next;
+                })
+              }
+              shown={shown}
+              naming={naming}
+              favourites={favourites}
+              files={files}
+              onOpen={onOpen}
+              onWidth={onWidth}
+              onPointerEnter={mode === "overlay" && peeking ? cancelLeave : undefined}
+              onPointerLeave={mode === "overlay" && peeking && !pinned ? unpeek : undefined}
+              onDismiss={dismiss}
+              sheet={narrow}
+            />
+          ) : null}
+          {children}
+          {panel.open && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {trashed ? (
+            <TrashNotice
+              key={trashed.n}
+              gone={trashed.gone}
+              titles={titles}
+              onRestored={restored}
+              onTrash={openTrash}
+              onClose={() => setTrashed(null)}
+            />
+          ) : null}
+          {cloud ? <TelemetryPrompt page={asking} /> : null}
+        </ToastHost>
       </SidebarContext.Provider>
     </div>
   );

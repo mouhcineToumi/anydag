@@ -30,6 +30,80 @@ CLI's exports open `?snapshot=1`, which reads no preference, so they use the app
 unless the URL names one. This is the same refusal as the accent one layer out: a document may not
 decide how its reader sees it, and one vault must look the same board to board.
 
+**The chrome has its own scale, apart from the diagram's** (#205). `theme.ui` holds the app's font
+sizes and line heights, two weights, corners, three elevations, five layers, two durations and an
+easing, control heights, the focus ring and spacing; `applyTheme()` writes them as
+`--dag-ui-<group>-<step>`, with the group's unit (`UI_UNITS`), and `check:theme` proves every theme
+has every group. They exist so the chrome stops typing its own numbers and stops borrowing the
+diagram's: before, `--dag-metric-radius-chip` was every button's corner, so a theme could not round
+a chip without rounding the app. `check-literals.mjs` counts the rules in `chrome.css` that still
+type a font size, corner, shadow, layer or duration, against `scripts/chrome-literals.json`, and the
+count may only fall. Every step is the value the chrome already used most, so a rule that moves onto
+a token draws the same. **Motion moved first** (#206): every transition and entrance reads `fast` (120 ms) or
+`base` (160 ms) and the one easing, and a single `prefers-reduced-motion` block — the last rule in
+`chrome.css`, so it outranks a spinner's own `animation` — zeroes both durations with `!important`
+(the theme writes them on `<html>`'s own style) and stops the three spinners. Those, the *Saved*
+tick's fade and the lock pill's shake (#216) have a period, not a duration; they are the five
+transitions the count still allows.
+`e2e/motion.spec.ts` reads the computed durations both ways.
+Which of these a screen should use for what — colour roles with their measured contrast, the type
+scale, the controls, the layers, focus, motion, icons and the voice — is [`DESIGN.md`](../../DESIGN.md)
+at the root, held to the code by `check:design`.
+
+**One toast and one dialog frame** (#208). Every notice the app raises is a `Toast`
+(`src/ui/Toast.tsx`): an icon, **one line** of message, its actions, a ×, in one stack at the bottom
+centre of the page — right of a docked sidebar, above a board's dock — on `--dag-ui-layer-toast`.
+Three at most are drawn; an older one waits under them. A name in the line is a `ToastName`, which
+gives way in its middle (`Quarterly planning for…data teams`) with the whole name its title, so a
+sixty-character file name is still one line. A toast is declarative: the component that owns the
+state draws one where it drew its notice and it is portalled into `ToastHost`'s stack in `Shell`,
+so the trash notice, the problems dock, a refused upload, the note's states and the logs question
+kept their own logic and lost their own boxes. A toast with a `timeout` is held while the pointer
+or the focus is on it; one without stays for as long as what it says is true. Every dialog is a
+`Dialog` (`src/ui/Dialog.tsx`), the Settings modal's frame lifted out: a portal on the body on
+`--dag-ui-layer-modal`, one scrim, Tab kept inside, Escape and a press outside to close, every key
+stopped at its edge, and **the rest of the document `inert`** while it is up — all but the dialog
+and the toast stack, which sits above it. Settings, Feedback, Search and the logs question's *What's
+sent* use it. The read-only lock has no notice to move: #231 made it one pill in the top bar.
+
+**The scrim is `color.shadow`**, because no theme has a colour for one. It is the translucent
+elevation colour every card's shadow is drawn in, dark in every theme; the mixes of `ink` it
+replaced (10% for Settings, 14% for Feedback, none for Search) *lightened* the page in Paper Dark,
+whose ink is near white. It is one rule (`.dag-dialog`), so a `color.scrim` is one line if a theme
+ever wants its own.
+
+**The chrome's buttons are two components** (#207), `Button` and `IconButton` in
+`src/ui/controls.tsx`, beside `Switch`, `Check` and `TextField`. The shell had 42 mixes of height,
+corner, size, weight, fill and border, 16 to 37 px tall, and four kinds of primary — white with an
+accent border, pale, solid and round. Now there are four variants — `primary` (solid accent: the one
+action a card asks for), `secondary` (bordered, the default), `quiet` (no box) and `danger` — and
+three sizes, `sm` 24, `md` 30 and `touch` 44, from `--dag-ui-control-*`, with the corner
+`--dag-ui-radius-control` and the words `--dag-ui-text-*`. **Under 720px `md` is `touch` by
+itself**, in the stylesheet, so no screen has to remember to grow its buttons on a phone; `sm` was a
+choice and stays small. The classes are `dag-button--<variant>`, `dag-button--<size>`,
+`dag-icon--<size>` and `dag-icon--danger`; a bare `.dag-button` is still the secondary at `md`, for
+the screens that have not moved yet. `IconButton` is square and quiet, **needs an `aria-label`**,
+and its tooltip is the drawn one (`Tooltip`) saying that label — or `tip` where the accessible name
+carries more, with `shortcut` for the chord. A `title` passed to it is kept as the one tooltip and
+none is drawn: that is how a control says a sentence rather than a name (*New*'s list of kinds, the
+lock's hint). Without a label it renders nothing in development and says why on the console; a build
+renders it anyway, since a missing control is worse than an unnamed one. `test/controls-button.test.ts`
+holds the classes, the pass-through of every `data-dag-*` and the refusal.
+
+The shell is on them: the sidebar's square tools, its close, the top bar's sidebar toggle,
+Assistant and `⋯`, the home card's *Unlock* and the no-vault card, the dock, the zoom bar, the vault menu's forms and
+*Remove from the list*, the lock's *Unlock*, and every toast's actions and × — the `Toast` takes
+`Button`s as its `actions` and draws its own × as an `IconButton`, so a notice has no button family
+of its own. What stays a `<button>` says why where it is: a row of the sidebar or a list (full width,
+an ellipsis, the column's hover), a menu item (moved by the arrow keys), the vault switcher (a
+picker's trigger), the wordmark, the folders and the title in the top bar (words that go somewhere),
+the home card's and the empty board's tiles (a key under each name), Home's *Recent* and *Due
+soon* rows, the selection bar's labelled *Move*, *To vault* and *Trash* (#215: words in the bar's own
+tool box), and the dock's *Locked* chip (a word and a glyph in
+the dock's own rhythm). Out of scope: the
+buttons inside the diagram, Settings (#186), the page tabs and the problems dock; the other local
+families (`dag-prompt__btn`, `dag-run__button`, `dag-chat-send`…) fold in one screen at a time.
+
 ## Layout, per diagram type
 
 Three knobs in `theme.metric.elk`, and each exists because a board looked wrong without it:

@@ -7,7 +7,6 @@
   ".dag-pagemore__menu .dag-more__item:disabled": "a disabled control: a page action this board does not offer",
   ".dag-hit__where svg": "the kind mark beside a search hit; an aria-hidden icon",
   ".dag-inspector__name::before": "the separator dot before the picked item's name",
-  ".dag-settings__toast-dot": "the decorative dot in the Settings save toast; not text",
   ".dag-prompt__text:disabled": "a disabled control: a prompt card that cannot be edited",
   ".dag-board__kind": "the kind mark before a board's name in the search list; an aria-hidden icon",
   ".dag-task-glyph[data-status=\"todo\"]": "the status mark for a to-do task; an aria-hidden icon",
@@ -23,7 +22,6 @@
   ".dag-grid__head-in > svg": "the mark inside a table column header; an icon",
   ".dag-grid__menu-item:disabled": "a disabled control: the column action is unavailable here",
   ".dag-trash__mark": "the kind mark on a trash row; an icon",
-  ".dag-trash-notice__mark": "the mark on the trash notice; an icon",
   ".dag-vault__item:disabled .dag-vault__title, .dag-vault__item:disabled .dag-vault__path": "a disabled control: the name and path of a vault whose folder is missing",
   ".dag-hits__new > svg": "the mark beside Search's make-a-file row; an aria-hidden icon"
 }

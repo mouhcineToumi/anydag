@@ -19,7 +19,7 @@ import {
 import type { Tool } from "@/canvas/Viewport";
 import { chordFor, type Command } from "@/edit/bindings";
 import { LOCK_KEYS, lockedAffordance, refuseLocked, setLocked } from "@/settings/lock";
-import { Tooltip } from "@/ui/Tooltip";
+import { IconButton } from "@/ui/controls";
 
 /**
  * The dock: what a person reaches for, over the board rather than across the top of it.
@@ -96,7 +96,7 @@ export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: bo
   const [more, setMore] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setMore(false), []);
-  /* The dock's writing controls are wrapped in a drawn `Tooltip`, so they cannot take
+  /* The dock's writing controls are `IconButton`s with a drawn tooltip, so they cannot take
      `lockedAffordance`'s native `title` — it would draw as well (`dock.spec.ts`). */
   const blocked = locked ? { "aria-disabled": true as const, "data-dag-readonly-blocked": "" as const } : {};
   const act = (write: () => void) => (locked ? () => refuseLocked() : write);
@@ -151,42 +151,42 @@ export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: bo
       {edit ? (
         <>
           <div className="dag-dock__group dag-dock__group--tools" role="radiogroup" aria-label="Tool">
-            <Tooltip name="Select: click an item, drag the paper to select several" shortcut={chordFor("select")}>
-              <button
-                className={edit.tool === "select" ? "dag-icon dag-icon--on" : "dag-icon"}
-                role="radio"
-                aria-checked={edit.tool === "select"}
-                aria-label={`Select${hint("select")}`}
-                onClick={() => edit.onTool("select")}
-              >
-                <MousePointer2 {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
-            <Tooltip name="Hand: drag the paper to move around" shortcut={chordFor("hand")}>
-              <button
-                className={edit.tool === "hand" ? "dag-icon dag-icon--on" : "dag-icon"}
-                role="radio"
-                aria-checked={edit.tool === "hand"}
-                aria-label={`Hand${hint("hand")}`}
-                onClick={() => edit.onTool("hand")}
-              >
-                <Hand {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
+            <IconButton
+              className={edit.tool === "select" ? "dag-icon--on" : undefined}
+              role="radio"
+              aria-checked={edit.tool === "select"}
+              aria-label={`Select${hint("select")}`}
+              onClick={() => edit.onTool("select")}
+              tip="Select: click an item, drag the paper to select several"
+              shortcut={chordFor("select")}
+            >
+              <MousePointer2 {...ICON} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              className={edit.tool === "hand" ? "dag-icon--on" : undefined}
+              role="radio"
+              aria-checked={edit.tool === "hand"}
+              aria-label={`Hand${hint("hand")}`}
+              onClick={() => edit.onTool("hand")}
+              tip="Hand: drag the paper to move around"
+              shortcut={chordFor("hand")}
+            >
+              <Hand {...ICON} aria-hidden="true" />
+            </IconButton>
             {/* The pen, beside the two tools it is a third of: all three
             change what a press on the paper means, which is what makes them one radiogroup. */}
-            <Tooltip name="Pen: draw a freehand stroke; it becomes an item" shortcut={chordFor("pen")}>
-              <button
-                className={edit.tool === "pen" ? "dag-icon dag-icon--on" : "dag-icon"}
-                role="radio"
-                aria-checked={edit.tool === "pen"}
-                aria-label={`Pen${hint("pen")}`}
-                {...blocked}
-                onClick={act(() => edit.onTool("pen"))}
-              >
-                <Pencil {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
+            <IconButton
+              className={edit.tool === "pen" ? "dag-icon--on" : undefined}
+              role="radio"
+              aria-checked={edit.tool === "pen"}
+              aria-label={`Pen${hint("pen")}`}
+              {...blocked}
+              onClick={act(() => edit.onTool("pen"))}
+              tip="Pen: draw a freehand stroke; it becomes an item"
+              shortcut={chordFor("pen")}
+            >
+              <Pencil {...ICON} aria-hidden="true" />
+            </IconButton>
           </div>
 
           <span className="dag-dock__rule dag-dock__rule--make" />
@@ -195,72 +195,66 @@ export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: bo
             {/* Promoted, and accented, the way both references promote exactly one thing. Ours is the
             prompt card rather than an "AI" button, because the card is a real item on the board
             that survives a reload and is undone like anything else. */}
-            <Tooltip name="Prompt card: describe a diagram and a model draws it" shortcut={chordFor("prompt")}>
-              <button
-                className="dag-icon dag-icon--accent"
-                data-dag-dock-prompt=""
-                aria-label={`Prompt card${hint("prompt")}`}
-                {...blocked}
-                onClick={act(edit.onPrompt)}
-              >
-                <Sparkles {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
-            <Tooltip name="Ready-made components to click or drag onto the board" shortcut={chordFor("library")}>
-              <button
-                className={edit.library ? "dag-icon dag-icon--on" : "dag-icon"}
-                data-dag-library-toggle=""
-                aria-pressed={edit.library}
-                aria-label={`Library${hint("library")}`}
-                {...blocked}
-                onClick={act(() => edit.onLibrary(!edit.library))}
-              >
-                <LibraryBig {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
-            <Tooltip
-              name="Tidy up: line every item up in rows, columns and grids with even gaps; with a selection, just those"
+            <IconButton
+              className="dag-icon--accent"
+              data-dag-dock-prompt=""
+              aria-label={`Prompt card${hint("prompt")}`}
+              {...blocked}
+              onClick={act(edit.onPrompt)}
+              tip="Prompt card: describe a diagram and a model draws it"
+              shortcut={chordFor("prompt")}
+            >
+              <Sparkles {...ICON} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              className={edit.library ? "dag-icon--on" : undefined}
+              data-dag-library-toggle=""
+              aria-pressed={edit.library}
+              aria-label={`Library${hint("library")}`}
+              {...blocked}
+              onClick={act(() => edit.onLibrary(!edit.library))}
+              tip="Ready-made components to click or drag onto the board"
+              shortcut={chordFor("library")}
+            >
+              <LibraryBig {...ICON} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              data-dag-tidy=""
+              aria-label={`Tidy up${hint("tidy")}`}
+              {...blocked}
+              onClick={act(edit.onTidy)}
+              tip="Tidy up: line every item up in rows, columns and grids with even gaps; with a selection, just those"
               shortcut={chordFor("tidy")}
             >
-              <button
-                className="dag-icon"
-                data-dag-tidy=""
-                aria-label={`Tidy up${hint("tidy")}`}
-                {...blocked}
-                onClick={act(edit.onTidy)}
-              >
-                <LayoutGrid {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
+              <LayoutGrid {...ICON} aria-hidden="true" />
+            </IconButton>
           </div>
 
           <span className="dag-dock__rule dag-dock__rule--make" />
 
           <div className="dag-dock__group dag-dock__group--history">
-            <Tooltip name="Undo" shortcut="Ctrl+Z">
-              <button
-                className="dag-icon"
-                data-dag-undo=""
-                disabled={!locked && !edit.canUndo}
-                aria-label="Undo (Ctrl+Z)"
-                {...blocked}
-                onClick={act(edit.onUndo)}
-              >
-                <Undo2 {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
-            <Tooltip name="Redo" shortcut="Ctrl+Shift+Z">
-              <button
-                className="dag-icon"
-                data-dag-redo=""
-                disabled={!locked && !edit.canRedo}
-                aria-label="Redo (Ctrl+Shift+Z)"
-                {...blocked}
-                onClick={act(edit.onRedo)}
-              >
-                <Redo2 {...ICON} aria-hidden="true" />
-              </button>
-            </Tooltip>
+            <IconButton
+              data-dag-undo=""
+              disabled={!locked && !edit.canUndo}
+              aria-label="Undo (Ctrl+Z)"
+              {...blocked}
+              onClick={act(edit.onUndo)}
+              tip="Undo"
+              shortcut="Ctrl+Z"
+            >
+              <Undo2 {...ICON} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              data-dag-redo=""
+              disabled={!locked && !edit.canRedo}
+              aria-label="Redo (Ctrl+Shift+Z)"
+              {...blocked}
+              onClick={act(edit.onRedo)}
+              tip="Redo"
+              shortcut="Ctrl+Shift+Z"
+            >
+              <Redo2 {...ICON} aria-hidden="true" />
+            </IconButton>
           </div>
 
           <span className="dag-dock__rule dag-dock__rule--more" />
@@ -268,18 +262,17 @@ export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: bo
       ) : null}
 
       <div className="dag-more" ref={wrap}>
-        <Tooltip name="Everything else: links, components, import, shortcuts">
-          <button
-            className={more ? "dag-icon dag-icon--on" : "dag-icon"}
-            data-dag-more=""
-            aria-haspopup="menu"
-            aria-expanded={more}
-            aria-label="More"
-            onClick={() => setMore((v) => !v)}
-          >
-            <MoreHorizontal {...ICON} aria-hidden="true" />
-          </button>
-        </Tooltip>
+        <IconButton
+          className={more ? "dag-icon--on" : undefined}
+          data-dag-more=""
+          aria-haspopup="menu"
+          aria-expanded={more}
+          aria-label="More"
+          onClick={() => setMore((v) => !v)}
+          tip="Everything else: links, components, import, shortcuts"
+        >
+          <MoreHorizontal {...ICON} aria-hidden="true" />
+        </IconButton>
         {more ? <MoreMenu edit={edit} locked={locked} onDone={close} /> : null}
       </div>
     </div>
@@ -299,7 +292,9 @@ export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: bo
  */
 function MoreMenu({ edit, locked = false, onDone }: { edit?: DockActions; locked?: boolean; onDone(): void }) {
   /* The menu's writing rows wear the shared lock affordance and keep their press, which shakes the
-     top bar's pill. Shortcuts still reads. */
+     top bar's pill. Shortcuts still reads. Its rows are `dag-more__item`, not `Button`: a menu item
+     is a row of a menu — full width, its chord at the end, focus moved by the arrow keys — and a
+     button drawn as one would be neither. */
   const blocked = lockedAffordance(locked);
   const act = (write: () => void) => (locked ? () => refuseLocked() : write);
   return (

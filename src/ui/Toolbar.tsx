@@ -157,6 +157,8 @@ export function Toolbar({
           is the way home here too, as it is in the column's head: one press to the welcome card.
           `?snapshot=1` drops this whole header, which is what keeps the reference baselines
           independent of it. */}
+      {/* The logo, the folders and the title below are words that take you somewhere — the wordmark,
+          a path, a name — drawn as text in the bar, not as `Button`s with a box round them. */}
       {away ? (
         <button
           type="button"

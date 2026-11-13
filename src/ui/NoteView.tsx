@@ -1,4 +1,4 @@
-import { Calendar, CalendarDays, X } from "lucide-react";
+import { AlertCircle, Calendar, CalendarDays, GitMerge, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 
 import { useBlockEditor, type NoteEditor } from "@/blocks";
@@ -21,12 +21,14 @@ import { Said } from "@/files/Said";
 import { uploadFiles } from "@/files/upload";
 import { refuseLocked } from "@/settings/lock";
 import { typing } from "@/edit/useEditor";
+import { Button } from "@/ui/controls";
 
 import { EventBar, EventLine } from "./EventBar";
 import { FileProblem } from "./FileProblem";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { TaskGlyph, TaskLine } from "./TaskGlyph";
+import { Toast } from "./Toast";
 
 /**
  * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
@@ -65,6 +67,16 @@ type Status =
   | { kind: "failed"; retrying: boolean; title?: boolean }
   /** Both writers changed the same lines. What the other one wrote, kept until the person decides. */
   | { kind: "conflict"; theirs: Held; mine: string };
+
+/* What the note's toasts say: one line each, the whole of it in the title when the toast is narrow. */
+const DELETED = "This note was deleted. What is on screen is not saved anywhere.";
+const CONFLICT = "This note was changed somewhere else, where you were writing.";
+function failedLine(status: Extract<Status, { kind: "failed" }>): string {
+  if (status.title) return "The title could not be saved. The note keeps the name it had.";
+  return status.retrying
+    ? "Not saved yet: the server did not answer. Trying again in a moment."
+    : "Your last change could not be saved. It is tried again with the next one.";
+}
 
 const q = (name: string) => `name=${encodeURIComponent(name)}&kind=note`;
 
@@ -832,35 +844,51 @@ export function NoteView({
 
   return (
     <main className="dag-note-view" data-dag-note-view={name} data-dag-ready={settled ? "" : undefined}>
+      {/* The note's states that last, in the app's one toast stack (#208): each stays for as long
+          as it is true, and the conflict until it is answered. */}
       {status.kind === "deleted" ? (
-        <p className="dag-note-view__notice" role="status" data-dag-note-deleted="">
-          This note was deleted. What is on screen is not saved anywhere.
-        </p>
+        <Toast icon={Trash2} data-dag-note-deleted="" title={DELETED}>
+          {DELETED}
+        </Toast>
       ) : null}
       {status.kind === "failed" ? (
-        <p className="dag-note-view__notice" role="alert" data-dag-note-failed="">
-          {status.title
-            ? "The title could not be saved. The note keeps the name it had."
-            : status.retrying
-              ? "Your last change is not saved yet. The server did not answer, so it will be tried again in a moment."
-              : "Your last change could not be saved. It will be tried again with the next one."}
-        </p>
+        <Toast icon={AlertCircle} tone="danger" role="alert" data-dag-note-failed="" title={failedLine(status)}>
+          {failedLine(status)}
+        </Toast>
       ) : null}
       {attachProblems.map((problem) => (
-        <p key={problem} className="dag-note-view__notice" role="alert" data-dag-note-upload-problem="">
+        <Toast
+          key={problem}
+          icon={AlertCircle}
+          tone="danger"
+          role="alert"
+          data-dag-note-upload-problem=""
+          title={problem}
+          onDismiss={() => setAttachProblems((had) => had.filter((p) => p !== problem))}
+        >
           <Said text={problem} />
-        </p>
+        </Toast>
       ))}
       {status.kind === "conflict" ? (
-        <div className="dag-note-view__notice dag-note-view__notice--ask" role="alert" data-dag-note-conflict="">
-          <span>This note was changed somewhere else, in the same place you were writing.</span>
-          <button type="button" data-dag-note-keep="" onClick={() => void keepMine()}>
-            Keep mine
-          </button>
-          <button type="button" data-dag-note-theirs="" onClick={takeTheirs}>
-            Use theirs
-          </button>
-        </div>
+        <Toast
+          icon={GitMerge}
+          tone="accent"
+          role="alert"
+          data-dag-note-conflict=""
+          title={CONFLICT}
+          actions={
+            <>
+              <Button data-dag-note-keep="" onClick={() => void keepMine()}>
+                Keep mine
+              </Button>
+              <Button data-dag-note-theirs="" onClick={takeTheirs}>
+                Use theirs
+              </Button>
+            </>
+          }
+        >
+          {CONFLICT}
+        </Toast>
       ) : null}
 
       {snapshot ? (

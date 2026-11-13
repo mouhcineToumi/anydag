@@ -1,34 +1,40 @@
 /*
  * The app around the board: toolbar, pickers, and the two cards that report trouble.
  *
- * Exempt from `scripts/check-literals.mjs`, deliberately. None of this is a diagram: it is never
- * exported, never screenshotted by the skill, and no theme has an opinion about the height of a
- * zoom button. Holding it to the same rule would mean inventing theme keys nobody would ever set,
- * which is how a design system stops meaning anything. Colours still come from the theme, because
- * the chrome has to sit next to the board without arguing with it — and the colour rule admits no
- * exceptions anywhere in `src/`.
+ * Not held to the diagram surface's length rule: none of this is a diagram, it is never exported,
+ * and no theme has an opinion about the height of one zoom button. Colours still come from the
+ * theme, because the chrome has to sit next to the board without arguing with it — and the colour
+ * rule admits no exceptions anywhere in `src/`.
+ *
+ * What it does have is its own scale, the theme's `ui` family (#205): `--dag-ui-text-*`,
+ * `-leading-*`, `-weight-*`, `-radius-*`, `-elevation-*`, `-layer-*`, `-motion-*`, `-control-*`,
+ * `-focus-*` and `-space-*`. A font size, corner, shadow, layer or duration reads one of those,
+ * not a number and not a diagram token (`--dag-metric-radius-chip` is a diagram chip's corner).
+ * `scripts/check-literals.mjs` counts the rules that still type their own against
+ * `scripts/chrome-literals.json`, and the count only goes down. A component's own stacking
+ * (`z-index` 1–9) and an inset ring are structure, not scale, and are not counted.
  */
 
 /*
  * The elevation every full-size overlay shares — the Settings modal, the board browser, the
  * rewrite dialog, the welcome card, the shortcut sheet, the floating sidebar, a calendar card and
  * an equation's field. The theme owns the colour (`color.shadow`): dark and translucent on
- * `paper-dark`, soft and low-contrast on the light themes. The geometry is chrome's, and the same
- * on every one of them so two dialogs never sit at two different heights above the page.
+ * `paper-dark`, soft and low-contrast on the light themes. The geometry is `ui.elevation.modal`,
+ * the same on every theme so two dialogs never sit at two different heights above the page.
  */
-:root {
-  --elevation: 0 12px 40px var(--dag-color-shadow);
-}
+:root { --elevation: var(--dag-ui-elevation-modal); }
 
 /*
- * The one focus ring the chrome draws: a 2px gap in the surface's own colour, then 2px of accent.
- * `--focus-ring-inset` is the same ring for a row or a menu item, whose neighbours would cover the
- * outer half. Neither name takes the `--dag-` prefix: no theme has an opinion about focus, and
+ * The one focus ring the chrome draws: a gap in the surface's own colour, then a band of accent —
+ * `ui.focus.offset` and `ui.focus.width`, 2px and 2px in every theme today. `--focus-ring-inset` is
+ * the same ring for a row or a menu item, whose neighbours would cover the outer half. Neither
+ * name takes the `--dag-` prefix: they are the chrome's composition of the theme's tokens, and
  * `check-theme.mjs` reads that prefix as a token every folder must carry.
  */
 :root {
-  --focus-ring: 0 0 0 2px var(--dag-color-card), 0 0 0 4px var(--dag-color-accent);
-  --focus-ring-inset: inset 0 0 0 2px var(--dag-color-accent);
+  --focus-ring: 0 0 0 var(--dag-ui-focus-offset) var(--dag-color-card),
+    0 0 0 calc(var(--dag-ui-focus-offset) + var(--dag-ui-focus-width)) var(--dag-color-accent);
+  --focus-ring-inset: inset 0 0 0 var(--dag-ui-focus-width) var(--dag-color-accent);
 }
 
 /*
@@ -147,7 +153,7 @@
   background: var(--dag-color-outline);
   border-radius: 9999px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 .dag-switch::before {
   content: "";
@@ -159,7 +165,7 @@
   background: var(--dag-color-card);
   border-radius: 50%;
   box-shadow: 0 1px 2px var(--dag-color-shadow);
-  transition: transform 0.15s ease;
+  transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 .dag-switch:checked { background: var(--dag-color-accent); }
 .dag-switch:checked::before { transform: translateX(14px); }
@@ -400,29 +406,43 @@
 .dag-settings__control > .dag-modelpicker { width: 260px; }
 .dag-settings__control > .dag-effort { width: 200px; }
 
+/*
+ * `Button` and `IconButton` (`src/ui/controls.tsx`, #207). Every number is a `ui` token: the
+ * height is `--dag-ui-control-<size>`, the corner `--dag-ui-radius-control`, the words
+ * `--dag-ui-text-*`. `.dag-button` alone is still the secondary at `md`, for the screens that have
+ * not moved onto the component yet. Names grepped first: `dag-button--{secondary,quiet,sm,md,touch}`
+ * and `dag-icon--{sm,md,touch,danger}` were nobody's.
+ */
 .dag-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 30px;
+  height: var(--dag-ui-control-md);
   padding: 0 12px;
   font: inherit;
   font-family: var(--dag-font-sans);
-  font-size: 13px;
+  font-size: var(--dag-ui-text-md);
   font-weight: 500;
   white-space: nowrap;
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-button > svg { flex: none; color: var(--dag-color-slate); }
 .dag-button:hover:not(:disabled) { background: var(--dag-color-paper100); border-color: var(--dag-color-mutedBorder); }
 .dag-button:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-button:disabled { opacity: 0.5; cursor: default; }
+.dag-button--sm { gap: 4px; height: var(--dag-ui-control-sm); padding: 0 8px; font-size: var(--dag-ui-text-sm); }
+.dag-button--touch { gap: 8px; height: var(--dag-ui-control-touch); padding: 0 16px; }
+/* No box: words that act, where a row of bordered buttons would be louder than what they act on. */
+.dag-button--quiet { color: var(--dag-color-slate); background: transparent; border-color: transparent; }
+.dag-button--quiet:hover:not(:disabled) { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: transparent; }
+.dag-button--quiet > svg { color: inherit; }
 .dag-button--danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
+.dag-button--danger > svg { color: inherit; }
 .dag-button--danger:hover:not(:disabled) { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-danger); }
 /*
  * The one action a card is asking for: filled in the accent. It used to be spelled twice, scoped to
@@ -431,6 +451,7 @@
  * on the card, and it reads as *not yet* instead of as a second secondary.
  */
 .dag-button--primary { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-button--primary > svg { color: inherit; }
 .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); border-color: var(--dag-color-accent); opacity: 0.9; }
 .dag-button--primary:disabled {
   color: var(--dag-color-slate);
@@ -618,8 +639,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: var(--dag-ui-control-md);
+  height: var(--dag-ui-control-md);
   color: var(--dag-color-slate);
   background: transparent;
   /* No box around a glyph. A row of bordered squares reads as a row of boxes rather than a row of
@@ -629,11 +650,20 @@
      and shift the icon inside by a pixel. The problems dock had already unset this twice, locally;
      that it had to is what says the default was wrong. */
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-icon:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-icon--sm { width: var(--dag-ui-control-sm); height: var(--dag-ui-control-sm); }
+.dag-icon--touch { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+.dag-icon--danger:hover:not(:disabled) { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
 .dag-icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A finger's under 720px, for `Button` and `IconButton` both: `md` is the size nobody chose, so it is
+   the one that grows; `sm` was chosen, and stays. */
+@media (max-width: 719px) {
+  .dag-button--md { gap: 8px; height: var(--dag-ui-control-touch); padding: 0 16px; }
+  .dag-icon--md { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+}
 .dag-icon--on { background: var(--dag-color-paper200); color: var(--dag-color-ink); }
 
 /* ---- the sidebar ---- */
@@ -687,10 +717,9 @@
   border-left: none;
   border-radius: 0 var(--dag-metric-radius-card) var(--dag-metric-radius-card) 0;
   box-shadow: var(--elevation);
-  animation: dag-sidebar-in 120ms ease-out;
+  animation: dag-sidebar-in var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sidebar-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .dag-sidebar[data-mode="overlay"] { animation: none; } }
 
 /* Floating, it hangs under a toolbar that already carries the mark and the toggle, so it has no
    header of its own; the first row gets the room the header's edge would have given it. */
@@ -836,19 +865,8 @@
 .dag-sidebar__line:hover > .dag-sidebar__tools,
 .dag-sidebar__line:focus-within > .dag-sidebar__tools { display: flex; }
 .dag-sidebar__line--on > .dag-sidebar__tools { display: flex; background: var(--dag-color-accentSoft); }
-.dag-sidebar__tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-small);
-  cursor: pointer;
-}
+/* `IconButton size="sm"`: the size, corner and colour are the component's. The hover is not the
+   usual `paper100`, which is the row's own ground under a hovered row, so the tool would vanish. */
 .dag-sidebar__tool:hover { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
 .dag-sidebar__tool--danger { color: var(--dag-color-dangerText); }
 /* The hover keeps `dangerText`: `danger` on `dangerSoft` is under 4.5:1, and this one carries a word. */
@@ -1047,9 +1065,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   );
   pointer-events: none;
 }
-.dag-sidebar__chev { flex: none; width: 14px; height: 14px; color: var(--dag-color-muted); transition: transform 120ms; }
+.dag-sidebar__chev { flex: none; width: 14px; height: 14px; color: var(--dag-color-muted); transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-sidebar__row[aria-expanded="true"] .dag-sidebar__chev { transform: rotate(90deg); }
-@media (prefers-reduced-motion: reduce) { .dag-sidebar__chev { transition: none; } }
 .dag-sidebar__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-sidebar__empty {
   margin: 0;
@@ -1373,11 +1390,12 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  */
 .dag-sidebar__sheethead { display: flex; align-items: center; gap: 4px; flex: none; padding: 8px 8px 4px 0; }
 .dag-sidebar__sheethead .dag-vault { flex: 1; min-width: 0; padding-top: 0; }
-.dag-sidebar__close { width: 44px; height: 44px; flex: none; }
+.dag-sidebar__close { flex: none; }
 .dag-sidebar[data-sheet] {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  /* The modal layer, under the toasts: a file deleted from the sheet says so over it. */
+  z-index: var(--dag-ui-layer-modal);
   width: auto;
   height: auto;
   padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
@@ -1385,10 +1403,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-radius: 0;
   box-shadow: none;
   font-size: 15px;
-  animation: dag-sheet-in 140ms ease-out;
+  animation: dag-sheet-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sheet-in { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .dag-sidebar[data-sheet] { animation: none; } }
 .dag-sidebar[data-sheet] .dag-vault__button { height: 44px; }
 .dag-sidebar[data-sheet] .dag-vault__name { font-size: 16px; }
 .dag-sidebar[data-sheet] .dag-sidebar__act,
@@ -1510,7 +1527,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-toolbar { height: 52px; gap: 2px; padding: 0 4px; }
   .dag-toolbar[data-dag-toolbar-edge] { padding-left: calc(4px + var(--window-inset)); }
   .dag-toolbar .dag-sidebar-toggle-slot { width: 44px; height: 44px; }
-  .dag-sidebar-toggle { top: 4px; left: calc(4px + var(--window-inset)); width: 44px; height: 44px; }
+  .dag-sidebar-toggle { top: 4px; left: calc(4px + var(--window-inset)); }
   .dag-toolbar .dag-toolbar__logo,
   .dag-toolbar .dag-toolbar__crumbs,
   .dag-toolbar .dag-export { display: none; }
@@ -1538,11 +1555,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
     white-space: nowrap;
     border: 0;
   }
-  .dag-readonly__pill { justify-content: center; min-width: 40px; height: 36px; padding: 0 8px; }
-  /* The pill is a word, not a control; Unlock is the control, and a finger's 44 like the bar's others (#209). */
-  .dag-readonly__unlock { height: 44px; }
-  .dag-toolbar .dag-backlinks__toggle,
-  .dag-pagemore__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
+  /* As tall as Unlock beside it, which is a `Button` and so a finger's here by itself. */
+  .dag-readonly__pill { justify-content: center; min-width: 40px; height: var(--dag-ui-control-touch); padding: 0 8px; }
+  .dag-toolbar .dag-backlinks__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
   .dag-pagemore--narrow { display: flex; }
   .dag-pagemore__group--narrow { display: flex; }
   .dag-pagemore__menu .dag-more__item { height: 44px; font-size: 15px; }
@@ -1567,14 +1582,6 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  * list was the sidebar, and one of the two surfaces using them is now a modal and the other was
  * never a sidebar — so the name says what they are, which is the parts of a filterable list panel.
  */
-.dag-browser__scrim {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
-}
 .dag-browser {
   display: flex;
   flex-direction: column;
@@ -1586,8 +1593,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   max-height: min(560px, calc(100% - 64px));
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
   overflow: hidden;
 }
 
@@ -2907,7 +2914,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
    open. Drawn as a `ChevronDown` and turned a quarter anticlockwise for the shut state, rather
    than swapping two Lucide components — one glyph that moves reads as the same triangle, and two
    that replace each other read as a flicker. */
-.dag-props__adv-head svg { transition: transform 120ms ease; transform: rotate(-90deg); }
+.dag-props__adv-head svg { transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); transform: rotate(-90deg); }
 .dag-props__adv-head[aria-expanded="true"] svg { transform: rotate(0deg); }
 
 /* The text-style toggles (`dag-props__em`, not a swatch row: emphasis is a binary, not a pick of
@@ -3206,7 +3213,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 }
 .dag-component__toggle:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
 .dag-component__toggle:focus-visible { box-shadow: var(--focus-ring-inset); }
-.dag-component__toggle svg { transition: transform 120ms ease; }
+.dag-component__toggle svg { transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-component__toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
 .dag-component__parts {
   margin: 2px 0 6px 19px;
@@ -3495,7 +3502,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-selbar .dag-rewrite__go:hover { color: var(--dag-color-card); background: var(--dag-color-accent); box-shadow: 0 0 0 2px var(--dag-color-accentSoft); }
 .dag-rewrite__spin { animation: dag-rewrite-spin 0.9s linear infinite; }
 @keyframes dag-rewrite-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dag-rewrite__spin { animation: none; } }
 .dag-rewrite__notes {
   display: flex;
   flex-direction: column;
@@ -3665,8 +3671,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 18px 22px 16px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-settings__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .dag-settings__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -3783,7 +3789,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 }
 .dag-settings__more > summary::-webkit-details-marker { display: none; }
 .dag-settings__more > summary > .dag-settings__value { margin-left: auto; }
-.dag-settings__more > summary > svg { flex: none; color: var(--dag-color-slate); transform: rotate(-90deg); transition: transform 0.15s ease; }
+.dag-settings__more > summary > svg { flex: none; color: var(--dag-color-slate); transform: rotate(-90deg); transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
 .dag-settings__more[open] > summary > svg { transform: none; }
 .dag-settings__more > summary:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-tile); }
 .dag-settings__types { margin: 0; padding: 0 16px 14px; font-family: var(--dag-font-mono); font-size: 12px; line-height: 1.8; word-spacing: 6px; color: var(--dag-color-slate); }
@@ -3844,49 +3850,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 @media (prefers-reduced-motion: reduce) {
   .dag-settings__saved { animation: none; }
 }
-/* The reset's toast, the trash notice's shape at the modal's foot: the same border, elevation and
-   action button, positioned against the card rather than the window. */
-.dag-settings__toast {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100% - 32px);
-  padding: 8px 8px 8px 12px;
-  font-size: 13px;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-settings__toast > svg { flex: none; color: var(--dag-color-slate); }
-.dag-settings__toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dag-settings__toast-dot { flex: none; color: var(--dag-color-muted); }
-.dag-settings__toast-act,
-.dag-telemetry-toast__act {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-settings__toast-act:hover,
-.dag-telemetry-toast__act:hover { background: var(--dag-color-paper100); }
-.dag-settings__toast-act:focus-visible,
-.dag-telemetry-toast__act:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* One polite live region for every save and reset in the modal; the ticks themselves are silent. */
 .dag-settings__said {
   position: absolute;
@@ -3909,15 +3872,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
  * is asked from inside it. Names grepped first: `dag-settings-modal*` and `data-dag-settings-*` were
  * nobody's; `dag-settings__*` is the card's vocabulary, which the tabs reuse for their rows.
  */
-.dag-settings-modal__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--dag-color-ink) 10%, transparent);
-}
 .dag-settings-modal {
   position: relative;
   display: grid;
@@ -3928,8 +3882,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-settings-modal:focus { outline: none; }
 .dag-settings-modal__nav {
@@ -4128,7 +4082,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
    back — the shape a phone's own settings have. `719px` is the breakpoint the Tasks and quiz pages
    already fold at. */
 @media (max-width: 719px) {
-  .dag-settings-modal__scrim { align-items: stretch; justify-content: stretch; }
+  .dag-dialog[data-dag-settings] { align-items: stretch; justify-content: stretch; }
   .dag-settings-modal {
     grid-template-columns: minmax(0, 1fr);
     width: 100%;
@@ -4162,7 +4116,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-settings-modal .dag-settings__reset { min-height: 44px; padding: 0 10px; }
   .dag-settings-modal .dag-settings__client { min-height: 44px; }
   .dag-settings-modal .dag-settings__more > summary { min-height: 44px; }
-  .dag-settings-modal .dag-settings__toast-act { min-height: 44px; }
   .dag-settings-modal .dag-settings__link { min-height: 44px; }
   .dag-settings-modal .dag-providers__check { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; padding: 0 4px; vertical-align: middle; }
   [data-dag-settings] a[href] { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
@@ -4180,7 +4133,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     background: var(--dag-color-outline);
     border-radius: 9999px;
     box-shadow: none;
-    transition: background-color 0.15s ease;
+    transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
   }
   .dag-settings-modal .dag-switch::after {
     content: "";
@@ -4192,7 +4145,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     background: var(--dag-color-card);
     border-radius: 50%;
     box-shadow: 0 1px 2px var(--dag-color-shadow);
-    transition: transform 0.15s ease;
+    transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
   }
   .dag-settings-modal .dag-switch:checked { background: transparent; }
   .dag-settings-modal .dag-switch:checked::before { background: var(--dag-color-accent); transform: none; }
@@ -4343,7 +4296,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-prompt__acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .dag-prompt__spin { animation: dag-prompt-spin 0.9s linear infinite; }
 @keyframes dag-prompt-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dag-prompt__spin { animation: none; } }
 /* ---- the problems dock ---- */
 
 /*
@@ -4387,31 +4339,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-problems__pill--error { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
 .dag-problems__pill:hover { background: var(--dag-color-paper100); }
 
-.dag-problems__toast {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 100%;
-  padding: 8px 8px 8px 12px;
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-dangerBorder);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-problems__icon { flex: none; color: var(--dag-color-dangerText); }
-.dag-problems__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.dag-problems__toast .dag-problems__msg {
-  font-size: 12.5px;
-  color: var(--dag-color-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dag-problems__code {
-  font-family: var(--dag-font-mono);
-  font-size: 10.5px;
-  color: var(--dag-color-slate);
-}
 .dag-problems__show {
   flex: none;
   height: 26px;
@@ -4426,7 +4353,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-problems__show:hover { background: var(--dag-color-paper200); }
-.dag-problems__toast .dag-icon { flex: none; width: 26px; height: 26px; }
 
 .dag-problems__tray {
   display: flex;
@@ -4582,22 +4508,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-icon--accent { color: var(--dag-color-accent); }
 .dag-icon--accent:hover { color: var(--dag-color-accent); background: var(--dag-color-paper100); }
 
-/* The percentage is a button, so it wears the icon button's metrics with room for four glyphs. */
-.dag-zoombar__pct {
-  min-width: 52px;
-  height: 30px;
-  padding: 0 6px;
-  font-family: var(--dag-font-sans);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-zoombar__pct:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-zoombar__pct:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* The percentage is a quiet `Button` with room for four glyphs, in figures that do not move. */
+.dag-zoombar__pct { min-width: 52px; padding: 0 6px; font-size: var(--dag-ui-text-sm); font-variant-numeric: tabular-nums; }
 
 /*
  * A board on a phone: fitted, pinched and panned with fingers, a tap to select and a drag
@@ -4613,10 +4525,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-dock > .dag-more,
   .dag-zoombar .dag-zoombar__step { display: none; }
   .dag-dock { left: calc(var(--canvas-x, 0px) + 12px); transform: none; }
-  .dag-dock .dag-icon,
-  .dag-zoombar .dag-icon { width: 44px; height: 44px; }
   .dag-dock__locked { height: 44px; }
-  .dag-zoombar__pct { height: 44px; }
 }
 @media (pointer: coarse) {
   .dag-handle,
@@ -4760,32 +4669,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
    `dag-note-view__editor` and `data-dag-note-first` were unclaimed. */
 .dag-note-view__first > .dag-note-view__page { margin: 0; padding-block: 0; max-width: none; }
 .dag-note-view__editor[hidden] { display: none; }
-.dag-note-view__notice {
-  max-width: 820px;
-  margin: 16px auto 0;
-  padding: 10px 14px;
-  border-radius: var(--dag-metric-radius-small);
-  background: var(--dag-color-paper100);
-  color: var(--dag-color-slate);
-  font-size: 13px;
-}
-.dag-note-view__notice--ask {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--dag-color-warningSoft);
-  color: var(--dag-color-ink);
-}
-.dag-note-view__notice--ask span { flex: 1; }
-.dag-note-view__notice--ask button {
-  font: inherit;
-  padding: 4px 10px;
-  border-radius: var(--dag-metric-radius-chip);
-  border: 1px solid var(--dag-color-outline);
-  background: var(--dag-color-card);
-  color: var(--dag-color-ink);
-  cursor: pointer;
-}
 /* A note's title, at the top of its page: Notion's page title. The field and the read-only
    heading are one class, so a picture of a note is laid out exactly as the page is. It sits in the
    editor's own 54px gutter, as the task bar under it does, and is a size up from the Markdown ramp's
@@ -4843,11 +4726,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
  * logs question, because the sidebar's foot is where it opens and every page has one. Names
  * grepped first: `dag-feedback__*` had only the textarea above, `data-dag-feedback*` was nobody's.
  */
-.dag-settings__scrim.dag-feedback__scrim {
-  position: fixed;
-  z-index: 60;
-  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
-}
 .dag-feedback { width: 520px; }
 .dag-feedback[data-dragging] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft), var(--elevation); }
 .dag-feedback__mark { flex: none; color: var(--dag-color-accent); }
@@ -5104,21 +4982,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 @media (prefers-reduced-motion: reduce) {
   .dag-readonly__pill--shake { animation: none; }
 }
-.dag-readonly__unlock {
-  flex: none;
-  height: 30px;
-  padding: 0 10px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-readonly__unlock:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-accent); }
-.dag-readonly__unlock:focus-visible { box-shadow: var(--focus-ring); }
+/* Unlock is a `Button` (secondary, `md`): it draws itself. */
+.dag-readonly__unlock { flex: none; }
 /* The refusal, said to a reader; the shake is its visual half. */
 .dag-readonly__said {
   position: absolute;
@@ -5632,7 +5497,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate 120ms ease; }
+.dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-tasks__twisty[aria-expanded="false"] > svg:first-child { rotate: -90deg; }
 .dag-tasks__twisty:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-tasks__n { font-weight: 500; color: var(--dag-color-slate); }
@@ -6202,7 +6067,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-run__head { display: flex; align-items: center; gap: 12px; margin-block-end: 20px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-run__where { flex: none; }
 .dag-run__progress { position: relative; flex: 1; height: 4px; overflow: hidden; background: var(--dag-color-paper200); border-radius: 2px; }
-.dag-run__progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--dag-color-accent); transition: width 160ms ease; }
+.dag-run__progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--dag-color-accent); transition: width var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
 .dag-run__question { margin-block: 0 12px; font-size: 20px; font-weight: 600; line-height: 1.35; }
 .dag-run__prompt { margin-bottom: 8px; }
 .dag-run__hint { margin-block: 0 10px; font-size: 12px; color: var(--dag-color-slate); }
@@ -6897,27 +6762,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-embed__preview { padding: 12px; border-top: 1px solid var(--dag-color-outlineSoft); background: var(--dag-color-paper); }
 .dag-embed__preview .dag-pdf__pages { max-height: 70vh; overflow: auto; }
 .dag-embed__chev--open { transform: rotate(180deg); }
-/* What a drop onto the board was refused with, over the canvas, until it goes or is put away. */
-.dag-upload-notice {
-  position: absolute;
-  top: 12px;
-  left: var(--canvas-mid, 50%);
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: min(560px, calc(var(--canvas-w, 100%) - 32px));
-  padding: 8px 8px 8px 14px;
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
-  background: var(--dag-color-card);
-  color: var(--dag-color-ink);
-  font-size: 13px;
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-upload-notice__lines { flex: 1; display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
-.dag-upload-notice__lines p { margin: 0; }
 /* A refusal's backticked name — `.exe`, a file's name — drawn as code wherever one is said. */
 .dag-said__code {
   font-family: var(--dag-font-mono);
@@ -7427,7 +7271,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
 }
 .dag-code__copy svg { width: 14px; height: 14px; }
 .dag-code__copy:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -7439,9 +7283,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-code__copy[data-dag-code-copy="failed"] { opacity: 1; }
 @media (hover: none) {
   .dag-code__copy { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dag-code__copy { transition: none; }
 }
 
 /* An equation's field in the note editor: its TeX under it, what KaTeX made of it under that.
@@ -7482,10 +7323,138 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* The sidebar's menu says why a locked row offers less. */
 .dag-sidebar__menu-locked { margin: 4px 8px 2px; font-size: 11.5px; color: var(--dag-color-slate); }
 
+/* ---- The toast and the dialog frame (#208) ----------------------------------------------
+   One toast (`src/ui/Toast.tsx`) and one stack for every notice the app raises, and one frame
+   (`src/ui/Dialog.tsx`) for every modal: Settings, Feedback, Search and the logs question. Every
+   size, corner, shadow, layer and duration here is a `--dag-ui-*` token, and every colour the
+   theme's. Names grepped first: `dag-toast*`, `dag-dialog*`, `data-dag-toast*`, `data-dag-dialog`
+   and `--toasts-left` were nobody's. */
+
+/* The stack: bottom centre of the page — right of a docked sidebar, so `--toasts-left` is the
+   sidebar's width while it is docked, the trash notice's old rule — and above a board's dock.
+   Newest at the bottom, nearest the dock; three at most are drawn, and an older one waits under
+   them until one goes. It takes no pointer itself, so the page between toasts stays usable. */
+.dag-toasts {
+  position: fixed;
+  left: var(--toasts-left, 0px);
+  right: 0;
+  bottom: var(--dag-ui-space-5);
+  z-index: var(--dag-ui-layer-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  padding: 0 var(--dag-ui-space-4);
+  pointer-events: none;
+}
+.dag-toasts:empty { display: none; }
+.dag-toasts > :nth-last-child(n + 4) { display: none; }
+.dag-shell:has(.dag-dock) .dag-toasts { bottom: 104px; }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-toasts { --toasts-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-toasts { --toasts-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
+
+/* A toast: the mark, one line, the actions, the ×. */
+.dag-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  max-width: min(680px, 100%);
+  min-height: calc(var(--dag-ui-control-md) + 2 * var(--dag-ui-space-1) + 2px);
+  padding: var(--dag-ui-space-1) var(--dag-ui-space-1) var(--dag-ui-space-1) var(--dag-ui-space-3);
+  font-size: var(--dag-ui-text-md);
+  line-height: var(--dag-ui-leading-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  pointer-events: auto;
+  animation: dag-toast-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+@keyframes dag-toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dag-toast { animation: none; } }
+.dag-toast__mark { flex: none; color: var(--dag-color-slate); }
+.dag-toast--accent .dag-toast__mark { color: var(--dag-color-accent); }
+.dag-toast--danger .dag-toast__mark { color: var(--dag-color-dangerText); }
+/* One line, always: a sentence too long for it ends in an ellipsis, with the whole of it the title. */
+.dag-toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A line with a name in it gives way in the name's middle: the words around it keep their size,
+   the name's head shrinks to an ellipsis, and its tail — the extension — stays. */
+.dag-toast__text:has(.dag-toast__name) { display: flex; }
+.dag-toast__words { flex: none; white-space: pre; }
+.dag-toast__name { display: flex; flex: 0 1 auto; min-width: 0; }
+.dag-toast__head { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.dag-toast__tail { flex: none; white-space: pre; }
+/* Where a problem is, before what it is: quieter, and the first thing to give way. */
+.dag-toast__aside { color: var(--dag-color-slate); }
+.dag-toast__acts { flex: none; display: flex; align-items: center; gap: var(--dag-ui-space-1); }
+.dag-toast__close { flex: none; }
+/* Settings' reset toast is drawn inside its modal, at the card's foot, where the trap can reach it. */
+.dag-settings-modal > .dag-toast {
+  position: absolute;
+  left: 50%;
+  bottom: var(--dag-ui-space-4);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--dag-ui-space-4));
+  transform: translateX(-50%);
+}
+
+/* On a phone the stack is the window's width less a margin, and the actions take their own row
+   under the line, so the line keeps the room a sentence needs. */
+@media (max-width: 719px) {
+  .dag-toasts { left: 0; bottom: 72px; padding: 0 var(--dag-ui-space-3); }
+  .dag-toasts > .dag-toast {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "mark text close" "acts acts acts";
+    column-gap: var(--dag-ui-space-2);
+    width: 100%;
+    max-width: none;
+  }
+  .dag-toasts .dag-toast__mark { grid-area: mark; }
+  .dag-toasts .dag-toast__text { grid-area: text; }
+  .dag-toasts .dag-toast__close { grid-area: close; }
+  .dag-toasts .dag-toast__acts { grid-area: acts; justify-content: flex-end; }
+}
+
+/* The dialog frame: over the whole window, sidebar included, and dimming it. The scrim is
+   `color.shadow` — the translucent elevation colour every card's shadow is drawn in, dark in every
+   theme (a mix of `ink` would have lightened the page in Paper Dark) — because no theme has a
+   colour of its own for a scrim. One rule, so a `color.scrim` is one line to change. */
+.dag-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dag-ui-layer-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dag-color-shadow);
+}
+.dag-dialog > [role="dialog"]:focus { outline: none; }
+/* Electron's drag region ignores what is drawn over it (`desktop.md`): over the window's top row a
+   press on the scrim or the card would drag the window. The whole frame is cut out of the region. */
+[data-dag-window] .dag-dialog { -webkit-app-region: no-drag; }
+
+/* The logs question's dialog, behind its toast's *What's sent*: the full list, then the answer. */
+.dag-telemetry-dialog { width: 480px; }
+.dag-telemetry-dialog__mark { flex: none; color: var(--dag-color-accent); }
+.dag-telemetry-dialog .dag-settings__foot { gap: var(--dag-ui-space-2); }
+.dag-telemetry-dialog__label { margin: var(--dag-ui-space-3) 0 2px; font-size: var(--dag-ui-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-telemetry-dialog__list { margin: 0; padding-left: 18px; font-size: var(--dag-ui-text-md); line-height: var(--dag-ui-leading-md); color: var(--dag-color-slate); }
+.dag-telemetry-dialog__hint { margin: var(--dag-ui-space-3) 0 0; font-size: var(--dag-ui-text-sm); color: var(--dag-color-slate); }
+.dag-telemetry-dialog__failed { margin: var(--dag-ui-space-2) 0 0; font-size: var(--dag-ui-text-sm); color: var(--dag-color-dangerText); }
+
 /* ---- The trash ------------------------------------------------------------------------
-   A page of what was deleted, and the notice a delete raises in place of the question it used to
-   ask. Chrome, so lengths are written here and every colour is the theme's. Names grepped first:
-   `dag-trash*`, `dag-trash-notice*` and `data-dag-trash*` were nobody's. */
+   A page of what was deleted. The notice a delete raises is a toast (`src/ui/Toast.tsx`, above).
+   Chrome, so lengths are written here and every colour is the theme's. Names grepped first:
+   `dag-trash*` and `data-dag-trash*` were nobody's. */
 
 .dag-app--trash { background: var(--dag-color-paper); color: var(--dag-color-ink); }
 .dag-trash {
@@ -7596,7 +7565,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-trash__row:hover { background: var(--dag-color-paper100); }
 @media (hover: hover) {
-  .dag-trash__acts { opacity: 0; transition: opacity 120ms ease; }
+  .dag-trash__acts { opacity: 0; transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
   .dag-trash__row:hover .dag-trash__acts,
   .dag-trash__row:focus-within .dag-trash__acts { opacity: 1; }
 }
@@ -7615,85 +7584,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-trash__plain { min-height: 36px; }
 }
 
-/* The notice a delete raises, and the logs question (`src/telemetry/Prompt.tsx`): the same toast at
-   the page's bottom-left, and **above the board's dock** rather than beside it — a long title reaches
-   the dock in the middle of the canvas, and at the dock's own height the two overlapped. The
-   sidebar's width is the page's left edge while it is docked. Fixed, because it belongs to the
-   window rather than to whichever page is under it. */
-.dag-trash-notice,
-.dag-telemetry-toast {
-  position: fixed;
-  left: calc(var(--trash-notice-left, 0px) + 16px);
-  bottom: 104px;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: min(560px, calc(100vw - 32px));
-  padding: 6px 6px 6px 12px;
-  font-size: 13px;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-}
-.dag-shell:has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
-.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) :is(.dag-trash-notice, .dag-telemetry-toast) { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
-.dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
-.dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.dag-trash-notice__act {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 0 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-trash-notice__act:hover { background: var(--dag-color-paper100); }
-.dag-trash-notice__act:disabled { opacity: 0.5; cursor: default; }
-.dag-trash-notice button:focus-visible { box-shadow: var(--focus-ring); }
-.dag-trash-notice__close { flex: none; }
-/* The logs question is the same toast with room for the list behind *What's sent*: a column, above
-   the page rather than over it, and never in front of a delete's own notice. */
-.dag-telemetry-toast {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  width: min(560px, calc(100vw - 32px));
-  padding: 10px 10px 10px 12px;
-  z-index: 44;
-}
-.dag-telemetry-toast__row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.dag-telemetry-toast__mark { flex: none; color: var(--dag-color-accent); }
-.dag-telemetry-toast__text { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
-.dag-telemetry-toast__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
-.dag-telemetry-toast__what {
-  padding: 8px 10px;
-  background: var(--dag-color-paper100);
-  border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
-}
-.dag-telemetry-toast__label { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
-.dag-telemetry-toast__list { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
-.dag-telemetry-toast__hint { margin: 0; font-size: 12px; color: var(--dag-color-slate); }
-.dag-telemetry-toast__failed { margin: 0; font-size: 12px; color: var(--dag-color-dangerText); }
-@media (max-width: 719px) {
-  .dag-trash-notice,
-  .dag-telemetry-toast { left: 12px; right: 12px; bottom: 72px; max-width: none; }
-  .dag-trash-notice__act { min-height: 36px; }
-  .dag-telemetry-toast { width: auto; }
-  .dag-telemetry-toast .dag-button,
-  .dag-telemetry-toast__act { min-height: 36px; }
-}
 
 /* Sync: the sidebar's status row and the Settings tab's own bits. Colour from the
    theme's tokens only. */
@@ -7701,7 +7591,6 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-sync-row[data-tone="warn"] > svg { color: var(--dag-color-warning); }
 .dag-sync-row[data-dag-sync-row="syncing"] > svg { animation: dag-sync-spin 1.2s linear infinite; }
 @keyframes dag-sync-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dag-sync-row[data-dag-sync-row="syncing"] > svg { animation: none; } }
 .dag-sync__confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dag-sync__code { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dag-sync__code code {
@@ -7814,7 +7703,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-tool { font-size: 12px; color: var(--dag-color-slate); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); background: var(--dag-color-card); }
 .dag-chat-tool > summary { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px; cursor: pointer; list-style: none; }
 .dag-chat-tool > summary::-webkit-details-marker { display: none; }
-.dag-chat-tool__chev { flex: none; transition: transform 0.12s ease; }
+.dag-chat-tool__chev { flex: none; transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-chat-tool[open] .dag-chat-tool__chev { transform: rotate(90deg); }
 .dag-chat-tool__verb { font-weight: 600; color: var(--dag-color-ink); }
 .dag-chat-tool__target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--dag-font-mono); color: var(--dag-color-slate); }
@@ -7912,15 +7801,12 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-assistant-panel { position: fixed; inset: 0; z-index: 40; width: auto; max-width: none; border-left: none; }
   .dag-chat-composer { margin-inline: 12px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .dag-chat-tool__chev { transition: none; }
-}
 
 /* -- Generate flashcards (#140) -------------------------------------------------------------- */
 /* The quiz page's dialog: the settings card's shell, put on the body and fixed over the window, the
    feedback card's way — inside the quiz column it covered only the column. Names are
    `dag-flashcards*`, grepped first: "card" is taken three times over on a quiz's page alone. */
-.dag-settings__scrim.dag-flashcards__scrim { position: fixed; z-index: 50; background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent); }
+.dag-settings__scrim.dag-flashcards__scrim { position: fixed; z-index: var(--dag-ui-layer-modal); background: var(--dag-color-shadow); }
 .dag-flashcards { width: 560px; display: flex; flex-direction: column; }
 .dag-flashcards__from { display: flex; gap: 16px; margin: 0 0 8px; }
 .dag-flashcards__from .dag-quiz__check { margin: 0; }
@@ -7943,3 +7829,24 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-flashcards__faces p { margin: 0; }
 .dag-flashcards__faces p + p { margin-top: 4px; }
 .dag-flashcards__card:has(.dag-check:not(:checked)) .dag-flashcards__faces { opacity: 0.5; }
+
+/*
+ * Motion, from one place (#206). Every transition and entrance in the chrome reads
+ * `--dag-ui-motion-fast` or `--dag-ui-motion-base` with `--dag-ui-motion-ease`, so asking the
+ * system for less motion is answered here once rather than in a block beside each rule (there were
+ * eight). The two durations go to 0: `!important` because the theme writes them on `<html>`'s own
+ * style, which an ordinary rule cannot outrank. What turns rather than moves — the three spinners —
+ * and the *Saved* tick's timed fade have a period, not a duration, so they stop instead; the tick
+ * then stays, which is the version of "it saved" that does not move. **It is the last rule in the
+ * file on purpose**: a spinner's own `animation` is the same specificity, and the later rule wins.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dag-ui-motion-fast: 0ms !important;
+    --dag-ui-motion-base: 0ms !important;
+  }
+  .dag-rewrite__spin,
+  .dag-prompt__spin,
+  .dag-sync-row[data-dag-sync-row="syncing"] > svg,
+  .dag-settings__saved { animation: none; }
+}

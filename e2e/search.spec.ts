@@ -271,3 +271,28 @@ test("the list follows an edit made while the card is open", async ({ page }) =>
   );
   await expect(hit(page, board(), "late")).toBeVisible({ timeout: 10_000 });
 });
+
+test("Tab never leaves the search: thirty presses, and the focus is in the dialog after each", async ({ page }) => {
+  await page.goto(`/?board=${board()}`);
+  await ready(page);
+  await searchFor(page, word);
+  await expect(hit(page, board(), "far")).toBeVisible();
+  /* It said `aria-modal="true"` and Tab walked out of it into the sidebar behind (#208). */
+  const inside = () => page.evaluate(() => !!document.activeElement?.closest("[data-dag-boards] [role='dialog']"));
+  for (let i = 0; i < 30; i++) {
+    await page.keyboard.press("Tab");
+    expect(await inside(), `after Tab ${i + 1}`).toBe(true);
+  }
+  for (let i = 0; i < 5; i++) {
+    await page.keyboard.press("Shift+Tab");
+    expect(await inside(), `after Shift+Tab ${i + 1}`).toBe(true);
+  }
+  /* And what is behind it cannot be reached at all while it is up. */
+  expect(
+    await page.evaluate(() => (document.querySelector("[data-dag-sidebar-toggle]") as HTMLElement).closest("[inert]") !== null),
+  ).toBe(true);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-boards]")).toHaveCount(0);
+  expect(await page.evaluate(() => document.querySelectorAll("[inert]").length)).toBe(0);
+});

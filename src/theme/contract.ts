@@ -607,12 +607,51 @@ export interface ThemeMetric {
   grid: number;
 }
 
+/**
+ * The app chrome's scale — the sidebar, the top bar, menus, dialogs, notices — kept apart from
+ * `type` and `metric`, which are the diagram's (#205).
+ *
+ * Before this the chrome typed its own numbers (26 font sizes, 28 shadows, 19 z-indexes) or
+ * borrowed the diagram's (`metric.radius.chip` as every button's corner), so a theme could not
+ * round a diagram chip without rounding every button, and a new popover had to guess a layer.
+ * Every step here is the value the chrome already used most, so reading a token changes nothing
+ * on screen; what it changes is that the next screen has something to copy.
+ *
+ * Flattened by `applyTheme()` to `--dag-ui-<group>-<step>`. The unit is the group's, not the
+ * leaf's (see `UI_UNITS` there): lengths are px, durations ms, weights and layers bare numbers,
+ * and `elevation` and `motion.ease` are CSS values already.
+ */
+interface ThemeUi {
+  /** Font sizes, px. `md` is a row, a menu item, a button; `display` is a note's title. */
+  text: { xs: number; sm: number; md: number; lg: number; xl: number; title: number; display: number };
+  /** The line height that goes with each `text` step, px. */
+  leading: { xs: number; sm: number; md: number; lg: number; xl: number; title: number; display: number };
+  /** Two weights: everything else is one of these. */
+  weight: { regular: number; strong: number };
+  /** Corners, px: a control, a panel or card, a dialog, a pill. */
+  radius: { control: number; surface: number; dialog: number; pill: number };
+  /** `box-shadow` values: a bar on the page, a menu or popover, a dialog. Drawn in `color.shadow`. */
+  elevation: { raised: string; overlay: string; modal: string };
+  /** `z-index` of each layer above the page. A component's own stacking (1–9) stays local. */
+  layer: { chrome: number; popover: number; modal: number; toast: number; tooltip: number };
+  /** Durations, ms, and the one easing. */
+  motion: { fast: number; base: number; ease: string };
+  /** Control heights, px: small, default, and a finger's (under 720px). */
+  control: { sm: number; md: number; touch: number };
+  /** The focus ring: its width and its gap from the control, px. */
+  focus: { width: number; offset: number };
+  /** Spacing steps, px, on `metric.grid`'s rhythm. */
+  space: { "1": number; "2": number; "3": number; "4": number; "5": number };
+}
+
 export interface Theme {
   name: string;
   fonts: { sans: string; mono: string };
   color: ThemeColor;
   type: ThemeType;
   metric: ThemeMetric;
+  /** The app chrome's scale, apart from the diagram's. */
+  ui: ThemeUi;
   /** Node kind → Lucide icon name. `icon=` in the DSL overrides per node. */
   icons: Record<string, string>;
 }
