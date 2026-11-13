@@ -101,7 +101,7 @@
   color: var(--dag-color-ink);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   padding: 4px 8px;
   cursor: pointer;
 }
@@ -134,7 +134,7 @@
   background-size: 4px 4px;
   background-repeat: no-repeat;
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-select:hover:not(:disabled) { border-color: var(--dag-color-mutedBorder); }
@@ -149,7 +149,7 @@
   height: 18px;
   margin: 0;
   background: var(--dag-color-outline);
-  border-radius: 9999px;
+  border-radius: var(--dag-ui-radius-pill);
   cursor: pointer;
   transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
@@ -180,7 +180,7 @@
   margin: 0;
   background: var(--dag-color-card);
   border: 1.5px solid var(--dag-color-mutedBorder);
-  border-radius: 4px;
+  border-radius: 4px; /* a 16px box: the control corner would make it a circle */
   cursor: pointer;
 }
 .dag-check::before {
@@ -211,7 +211,7 @@
   padding: 0 10px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-textfield--wide { width: 240px; }
 .dag-textfield:hover { border-color: var(--dag-color-mutedBorder); }
@@ -254,7 +254,7 @@
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-modelpicker__button:hover:not(:disabled) { border-color: var(--dag-color-mutedBorder); }
@@ -277,7 +277,7 @@
   padding: 6px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-modelpicker__search { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 8px; border-bottom: 1px solid var(--dag-color-outlineSoft); }
@@ -305,7 +305,7 @@
 .dag-modelpicker__status { display: inline-flex; align-items: center; gap: 5px; }
 .dag-modelpicker__status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dag-color-success); }
 .dag-modelpicker__status[data-dag-model-ready="0"]::before { background: var(--dag-color-danger); }
-.dag-modelpicker__option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: var(--dag-metric-radius-chip); cursor: pointer; }
+.dag-modelpicker__option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: var(--dag-ui-radius-control); cursor: pointer; }
 .dag-modelpicker__option--active { background: var(--dag-color-accentSoft); }
 .dag-modelpicker__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .dag-modelpicker__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--dag-color-ink); }
@@ -327,7 +327,7 @@
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   outline: none;
 }
 .dag-modelpicker__customInput:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
@@ -364,7 +364,7 @@
   white-space: nowrap;
   color: var(--dag-color-warningText);
   background: var(--dag-color-warningSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-providers__pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dag-color-warning); }
 .dag-providers__pill[data-dag-provider-pill="ready"] { color: var(--dag-color-successText); background: var(--dag-color-successSoft); }
@@ -392,7 +392,7 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.dag-providers__check:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--dag-metric-radius-chip); }
+.dag-providers__check:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--dag-ui-radius-control); }
 @media (max-width: 719px) {
   .dag-providers__row { padding: 12px; }
   .dag-providers__why, .dag-providers__setup { margin-left: 0; }
@@ -526,7 +526,7 @@
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
   border-bottom: none;
-  border-radius: var(--dag-metric-radius-chip) var(--dag-metric-radius-chip) 0 0;
+  border-radius: var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0 0;
   padding: 0 10px;
   cursor: pointer;
 }
@@ -575,7 +575,7 @@
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-tab__close:hover { color: var(--dag-color-danger); }
@@ -593,7 +593,7 @@
   font-weight: 700;
   line-height: 16px;
   text-align: center;
-  border-radius: 999px;
+  border-radius: var(--dag-ui-radius-pill);
   color: var(--dag-color-warningText);
   background: var(--dag-color-warningSoft);
   border: 1px solid var(--dag-color-warning);
@@ -619,7 +619,7 @@
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-chip) var(--dag-metric-radius-chip) 0 0;
+  border-radius: var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0 0;
   padding: 4px 8px;
   outline: none;
 }
@@ -713,7 +713,7 @@
   z-index: var(--dag-ui-layer-popover);
   border: 1px solid var(--dag-color-outline);
   border-left: none;
-  border-radius: 0 var(--dag-metric-radius-card) var(--dag-metric-radius-card) 0;
+  border-radius: 0 var(--dag-ui-radius-surface) var(--dag-ui-radius-surface) 0;
   box-shadow: var(--dag-ui-elevation-overlay);
   animation: dag-sidebar-in var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
 }
@@ -747,7 +747,7 @@
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-sidebar__logo:hover { background: var(--dag-color-paper200); }
@@ -794,7 +794,7 @@
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-sidebar__act > svg { flex: none; }
@@ -812,7 +812,7 @@
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: 4px; /* a key, not a pill: the control corner rounds an 18px box into one */
 }
 .dag-sidebar__act:hover .dag-sidebar__keys kbd { color: var(--dag-color-slate); }
 .dag-sidebar__act:hover,
@@ -857,7 +857,7 @@
   right: 4px;
   display: none;
   gap: 2px;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   background: var(--dag-color-paper200);
 }
 .dag-sidebar__line:hover > .dag-sidebar__tools,
@@ -901,7 +901,7 @@
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 /* DESIGN.md's input focus: an accent hairline and a soft ring, never a change of size. */
 .dag-sidebar__name-input:focus-visible,
@@ -917,7 +917,7 @@
   font-size: 11px;
   color: var(--dag-color-dangerText);
   background: var(--dag-color-dangerSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 
 /*
@@ -942,7 +942,7 @@
   box-sizing: border-box;
   background: var(--dag-color-accentSoft);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-sidebar__bulk > .dag-sidebar__move { margin-left: -6px; }
 .dag-sidebar__bulk-count { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1004,7 +1004,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-overlay);
   pointer-events: none;
   will-change: transform;
@@ -1033,7 +1033,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-sidebar__row > svg { flex: none; }
@@ -1100,7 +1100,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-warningSoft);
   border: 1px solid var(--dag-color-warning);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-sidebar__failed-mark {
   grid-column: 1;
@@ -1120,7 +1120,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-sidebar__retry:hover { background: var(--dag-color-paper200); }
@@ -1139,7 +1139,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-sidebar__avatar {
@@ -1167,7 +1167,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   padding: 4px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
   z-index: var(--dag-ui-layer-popover);
 }
@@ -1231,7 +1231,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-vault__button:hover,
@@ -1249,7 +1249,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   font-size: 11px;
   font-weight: 600;
   color: var(--dag-color-ink);
@@ -1374,7 +1374,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   text-underline-offset: 2px;
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-sidebar__menu-switch:hover { color: var(--dag-color-ink); }
@@ -1445,7 +1445,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1481,7 +1481,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-toolbar__name:focus { outline: none; }
 .dag-toolbar__name:focus-visible { box-shadow: var(--focus-ring); }
@@ -1501,7 +1501,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   padding: 4px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
   z-index: var(--dag-ui-layer-popover);
 }
@@ -1629,7 +1629,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-panel__clear:hover { color: var(--dag-color-ink); }
@@ -1684,7 +1684,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-hits__new:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -1740,7 +1740,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   color: var(--dag-color-slate);
 }
 .dag-folder-row:hover { background: var(--dag-color-paper100); }
@@ -1756,7 +1756,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   padding: 6px 8px;
   cursor: pointer;
   /* A long name is truncated rather than wrapped: the rows stay one height, and the `title`
@@ -1801,7 +1801,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-hit:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -1831,7 +1831,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-hit__text mark {
   color: var(--dag-color-ink);
   background: var(--dag-color-accentSoft);
-  border-radius: 2px;
+  border-radius: 2px; /* a highlight a line tall */
   font-weight: 600;
 }
 
@@ -1890,7 +1890,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-welcome__title { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: var(--dag-color-ink); }
@@ -1905,7 +1905,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   padding: 7px 12px;
   cursor: pointer;
 }
@@ -1985,7 +1985,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   text-align: left;
   background: none;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-welcome__row:hover { background: var(--dag-color-paper100); }
@@ -2042,7 +2042,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   text-align: center;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-file-problem__title {
@@ -2077,7 +2077,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-file-problem__act:hover { background: var(--dag-color-paper100); }
@@ -2097,7 +2097,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-file-problem__details {
   margin-top: 16px;
@@ -2129,7 +2129,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-pending {
   background: var(--dag-color-card);
   border: 1px dashed var(--dag-color-externalBorder);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   padding: 16px;
 }
 .dag-pending__head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -2139,7 +2139,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   font-weight: 600;
   color: var(--dag-color-slate);
   background: var(--dag-color-paper100);
-  border-radius: var(--dag-metric-radius-pill);
+  border-radius: var(--dag-ui-radius-pill);
   padding: 3px 9px;
 }
 .dag-pending__title { font-size: var(--dag-type-nodeTitle); font-weight: 600; }
@@ -2156,7 +2156,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-error {
   background: var(--dag-color-dangerSoft);
   border: 1px solid var(--dag-color-dangerBorder);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   padding: 14px 16px;
 }
 .dag-error__title { font-size: var(--dag-type-nodeTitle); font-weight: 600; color: var(--dag-color-dangerText); }
@@ -2190,7 +2190,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   min-width: 200px;
   padding: 12px 14px;
   border: 1px dashed var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   background: var(--dag-color-paper100);
 }
 .dag-broken__what {
@@ -2219,7 +2219,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   height: 18px;
   padding: 0 5px;
   box-sizing: border-box;
-  border-radius: 9px;
+  border-radius: var(--dag-ui-radius-pill);
   background: var(--dag-color-danger);
   color: var(--dag-color-paper);
   font: 600 11px/18px var(--dag-font-sans);
@@ -2250,7 +2250,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-item[data-dag-selected] {
   outline: 2px solid var(--dag-color-accent);
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: 4px; /* hugs the diagram item, not a control */
   /* `content-visibility: auto` brings paint containment, which clips the chip above the item and
      the handle at its corner. A selected item is on screen — that is how it got selected — so
      there is nothing for the containment to save on it. */
@@ -2265,7 +2265,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   content: "";
   position: absolute;
   inset: -3px;
-  border-radius: 6px;
+  border-radius: 6px; /* hugs the diagram item, not a control */
   box-shadow: 0 0 0 6px var(--dag-color-accentSoft);
   pointer-events: none;
 }
@@ -2322,7 +2322,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   width: 11px;
   height: 11px;
   border: 2px solid var(--dag-color-accent);
-  border-radius: 3px;
+  border-radius: 3px; /* a handle a few pixels across */
   background: var(--dag-color-card);
   z-index: 2;
 }
@@ -2614,7 +2614,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   padding: 5px 8px;
   width: 100%;
   min-width: 0;
@@ -2665,7 +2665,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   padding: 5px 10px;
   cursor: pointer;
 }
@@ -2707,7 +2707,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   flex: none;
   padding: 0;
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: 4px; /* a box under 20px: the control corner would make it a circle */
   cursor: pointer;
 }
 /* "No hue of its own" is the absence of a colour, so it is drawn as one: the paper, struck
@@ -2741,7 +2741,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-props__out:hover { color: var(--dag-color-ink); background: var(--dag-color-card); }
@@ -2762,7 +2762,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-props__add:hover,
@@ -2801,7 +2801,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   height: 26px;
   color: var(--dag-color-ink);
   background: var(--dag-t, var(--dag-t-default));
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   overflow: hidden;
 }
 .dag-iconpick__current--brand { background: var(--dag-color-brandTile); }
@@ -2847,7 +2847,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   font: inherit;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-iconpick__opt:hover { border-color: var(--dag-color-accent); }
@@ -2860,7 +2860,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   height: 22px;
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
-  border-radius: 4px;
+  border-radius: 4px; /* a small glyph tile */
   overflow: hidden;
 }
 /* A colour logo is drawn for light backgrounds — the same tile the card gives it, in every theme. */
@@ -2904,7 +2904,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: none;
   border: none;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-props__adv-head:hover { color: var(--dag-color-ink); }
@@ -2930,7 +2930,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-props__em--bold { font-weight: 700; }
@@ -2950,7 +2950,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-props__choice:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
@@ -3008,7 +3008,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   padding: 0;
   background: transparent;
   border: 1px dashed transparent;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: text;
 }
 .dag-git-chip:not(:disabled):hover { border-color: var(--dag-color-accent); }
@@ -3023,7 +3023,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-accent);
   background: var(--dag-color-card);
   border: 1px dashed var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-git-newbranch:hover { background: var(--dag-color-paper); }
@@ -3046,7 +3046,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-raised);
 }
 .dag-card-text .dag-rich-field .dag-blocks--field .bn-editor {
@@ -3065,7 +3065,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-raised);
   outline: none;
 }
@@ -3129,7 +3129,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: none;
   border: 1px solid var(--dag-color-outline);
-  border-radius: 4px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-inspector__problem-act:hover { background: var(--dag-color-paper100); }
@@ -3164,7 +3164,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -3181,7 +3181,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-component__text { display: flex; flex-direction: column; min-width: 0; }
 .dag-component__name { font-size: 12.5px; font-weight: 600; }
@@ -3206,7 +3206,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: 0;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-component__toggle:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -3260,7 +3260,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -3294,7 +3294,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-accent);
   background: transparent;
   border: 0;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-shelf__more:hover { background: var(--dag-color-paper100); }
@@ -3311,7 +3311,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-raised);
   pointer-events: none;
   z-index: var(--dag-ui-layer-popover);
@@ -3390,7 +3390,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   top: 0;
   left: 0;
   border: 1px dashed var(--dag-color-accent);
-  border-radius: 6px;
+  border-radius: 6px; /* the rubber band over diagram items */
   pointer-events: none;
   z-index: 1;
 }
@@ -3427,7 +3427,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 3px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-raised);
   z-index: var(--dag-ui-layer-chrome);
   user-select: none;
@@ -3453,7 +3453,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
   border-bottom-width: 2px;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: 4px; /* a key, not a pill: the control corner rounds an 18px box into one */
   padding: 0 5px;
 }
 
@@ -3490,7 +3490,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -3557,7 +3557,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   height: 16px;
   background: var(--dag-color-paper200);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-settings__previewBox--warm {
   background: var(--dag-color-accentSoft);
@@ -3592,7 +3592,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 18px 22px 20px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-shortcuts__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -3601,7 +3601,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-shortcuts__section { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--dag-color-ink); }
 .dag-shortcuts__list {
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-tile);
+  border-radius: var(--dag-ui-radius-surface);
 }
 .dag-shortcuts__row {
   display: flex;
@@ -3638,7 +3638,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 7px 12px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
   pointer-events: none;
   z-index: var(--dag-ui-layer-popover);
@@ -3689,7 +3689,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings__card {
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-tile);
+  border-radius: var(--dag-ui-radius-surface);
 }
 .dag-settings__card > * + * { border-top: 1px solid var(--dag-color-outlineSoft); }
 /* The AI groups wear the prompt card's look (`.dag-prompt`): the heading is its Sparkles in small
@@ -3761,7 +3761,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   font-family: var(--dag-font-mono);
   font-size: 11.5px;
   background: var(--dag-color-paper100);
-  border-radius: 4px;
+  border-radius: 4px; /* inline code a line tall */
   padding: 1px 4px;
 }
 .dag-settings__prose {
@@ -3789,7 +3789,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-settings__more > summary > .dag-settings__value { margin-left: auto; }
 .dag-settings__more > summary > svg { flex: none; color: var(--dag-color-slate); transform: rotate(-90deg); transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
 .dag-settings__more[open] > summary > svg { transform: none; }
-.dag-settings__more > summary:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-tile); }
+.dag-settings__more > summary:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-ui-radius-control); }
 .dag-settings__types { margin: 0; padding: 0 16px 14px; font-family: var(--dag-font-mono); font-size: 12px; line-height: 1.8; word-spacing: 6px; color: var(--dag-color-slate); }
 .dag-settings__moreBody { padding: 0 16px 14px; }
 .dag-settings__link {
@@ -3805,7 +3805,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: none;
   border: none;
-  border-radius: var(--dag-metric-radius-tile);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-settings__link > svg { color: var(--dag-color-slate); }
@@ -3823,7 +3823,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: none;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-settings__reset:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -3933,7 +3933,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-settings-modal__tab > svg { flex: none; }
@@ -3960,7 +3960,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   line-height: 1.4;
   color: var(--dag-color-slate);
   background: var(--dag-color-paper200);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   white-space: nowrap;
 }
 .dag-settings__clients { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -3972,7 +3972,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   cursor: pointer;
 }
 .dag-settings__client:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -3991,9 +3991,9 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   text-align: center;
   color: var(--dag-color-slate);
   background: var(--dag-color-paper100);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
 }
-.dag-settings-modal__list { margin: 14px 0 0; padding: 0; list-style: none; border: 1px solid var(--dag-color-outlineSoft); border-radius: var(--dag-metric-radius-chip); }
+.dag-settings-modal__list { margin: 14px 0 0; padding: 0; list-style: none; border: 1px solid var(--dag-color-outlineSoft); border-radius: var(--dag-ui-radius-surface); }
 .dag-settings-modal__item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 4px 6px 4px 4px; }
 .dag-settings-modal__item + .dag-settings-modal__item { border-top: 1px solid var(--dag-color-outlineSoft); }
 .dag-settings-modal__item > .dag-settings__unit { flex: none; }
@@ -4010,7 +4010,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-settings-modal__open:hover { background: var(--dag-color-paper200); }
@@ -4023,7 +4023,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   gap: 6px;
   padding: 2px 2px 2px 10px;
   background: var(--dag-color-paper100);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-settings-modal__copy > code {
   flex: 1;
@@ -4055,7 +4055,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   cursor: pointer;
 }
 .dag-settings__feature:hover { background: var(--dag-color-paper100); }
-.dag-settings__feature:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-tile); }
+.dag-settings__feature:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-ui-radius-control); }
 .dag-settings__featureMark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--dag-color-ink); }
 .dag-settings__featureText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dag-settings__featureChevron { flex: none; color: var(--dag-color-slate); }
@@ -4071,7 +4071,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: none;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-settings__featureBack:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -4129,7 +4129,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     width: 32px;
     height: 18px;
     background: var(--dag-color-outline);
-    border-radius: 9999px;
+    border-radius: var(--dag-ui-radius-pill);
     box-shadow: none;
     transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
   }
@@ -4161,7 +4161,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     margin: 0;
     background: var(--dag-color-card);
     border: 1.5px solid var(--dag-color-mutedBorder);
-    border-radius: 4px;
+    border-radius: 4px; /* a 16px box: the control corner would make it a circle */
     box-sizing: border-box;
     transform: none;
     opacity: 1;
@@ -4200,7 +4200,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-modelchip:hover { color: var(--dag-color-ink); border-color: var(--dag-color-mutedBorder); }
@@ -4220,7 +4220,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 10px 12px 12px;
   background: var(--dag-color-card);
   border: 1px dashed var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   color: var(--dag-color-ink);
   font-size: 13px;
 }
@@ -4250,7 +4250,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: text;
 }
 .dag-prompt__text:focus-visible { box-shadow: var(--focus-ring); border-color: var(--dag-color-accent); }
@@ -4265,7 +4265,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 5px;
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-prompt__btn {
   display: inline-flex;
@@ -4278,7 +4278,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 5px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -4330,7 +4330,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-warningText);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: 999px;
+  border-radius: var(--dag-ui-radius-pill);
   box-shadow: var(--dag-ui-elevation-raised);
   cursor: pointer;
 }
@@ -4347,7 +4347,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-problems__show:hover { background: var(--dag-color-paper200); }
@@ -4360,7 +4360,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   max-height: 320px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
   overflow: hidden;
 }
@@ -4387,7 +4387,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: transparent;
   border: none;
   border-left: 2px solid var(--dag-color-warning);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-problems__row--error { border-left-color: var(--dag-color-danger); }
@@ -4427,7 +4427,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   color: var(--dag-color-ink);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
   font-family: var(--dag-font-sans);
   font-size: 12px;
@@ -4469,7 +4469,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 3px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-raised);
   z-index: var(--dag-ui-layer-chrome);
   user-select: none;
@@ -4498,7 +4498,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-dock__locked:hover { background: var(--dag-color-paper200); }
@@ -4551,7 +4551,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 4px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
   z-index: var(--dag-ui-layer-popover);
 }
@@ -4568,7 +4568,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-more__item:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -4606,7 +4606,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 /* The logo goes home from here too — the column is away, which is when this bar carries it. The
@@ -4718,7 +4718,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-feedback__text::placeholder { color: var(--dag-color-slate); }
 
@@ -4738,7 +4738,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-feedback__kind:hover { color: var(--dag-color-ink); }
@@ -4755,7 +4755,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-feedback__file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-feedback__file-size { flex: none; color: var(--dag-color-slate); }
@@ -4769,7 +4769,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px dashed var(--dag-color-outline);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-feedback__add:hover { color: var(--dag-color-ink); border-color: var(--dag-color-mutedBorder); }
@@ -4780,7 +4780,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 10px 12px;
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-feedback__label { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); }
 .dag-feedback__consent ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--dag-color-slate); }
@@ -4833,7 +4833,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-card);
   background: var(--dag-color-accent);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 
@@ -4849,7 +4849,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   text-decoration: none;
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-view-bar__edit:hover { background: var(--dag-color-paper100); }
 .dag-view-bar__edit:focus-visible { box-shadow: var(--focus-ring); }
@@ -4879,7 +4879,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-embed {
   display: block;
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   background: var(--dag-color-card);
   overflow: hidden;
 }
@@ -4916,7 +4916,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-backlinks__toggle:hover,
@@ -4933,7 +4933,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 4px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-backlinks__row {
@@ -4944,7 +4944,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   padding: 6px 8px;
   color: var(--dag-color-ink);
   text-decoration: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-backlinks__row:hover { background: var(--dag-color-paper100); }
 .dag-backlinks__title { font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4968,7 +4968,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   white-space: nowrap;
 }
 .dag-readonly__pill > svg { flex: none; color: var(--dag-color-slate); }
@@ -5040,7 +5040,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   color: var(--dag-color-ink);
   background: transparent;
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-export__toggle:hover,
@@ -5059,7 +5059,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   padding: 4px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-export__menu .dag-more__item { color: var(--dag-color-ink); }
@@ -5076,7 +5076,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   color: var(--dag-color-dangerText);
   background: var(--dag-color-dangerSoft);
   border: 1px solid var(--dag-color-dangerBorder);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 
 /*
@@ -5155,7 +5155,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   color: inherit;
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 button.dag-task-status { cursor: pointer; }
 button.dag-task-status:hover { background: var(--dag-color-paper200); }
@@ -5175,7 +5175,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   text-align: center;
   color: var(--dag-color-slate);
   background: var(--dag-color-paper200);
-  border-radius: 9px;
+  border-radius: var(--dag-ui-radius-pill);
 }
 .dag-sidebar__act[aria-current="page"] { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 
@@ -5203,7 +5203,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   padding: 2px;
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-taskbar__choice {
   display: inline-flex;
@@ -5216,7 +5216,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-taskbar__choice:hover:not(:disabled) { color: var(--dag-color-ink); }
@@ -5232,7 +5232,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color-scheme: inherit;
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   padding: 3px 6px;
 }
 .dag-taskbar__due input:focus-visible { box-shadow: var(--focus-ring); }
@@ -5246,7 +5246,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-taskbar__clear { margin-left: -12px; padding: 4px; }
@@ -5280,7 +5280,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color-scheme: inherit;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   padding: 3px 8px;
 }
 /* A value that reads as text until the pointer offers to change it, Notion's property list. */
@@ -5345,7 +5345,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-projectbar__swatch > svg { color: var(--dag-color-muted); }
@@ -5365,7 +5365,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   gap: 8px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-projectbar__hues { display: inline-flex; align-items: center; gap: 4px; }
@@ -5393,7 +5393,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-projectbar__tasks:hover { background: var(--dag-color-paper100); }
@@ -5416,14 +5416,14 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   text-overflow: ellipsis;
   color: var(--dag-color-ink);
   background: var(--dag-t, var(--dag-color-paper100));
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-project-chip > span { overflow: hidden; text-overflow: ellipsis; }
 .dag-tasks__card-meta .dag-project-chip { max-width: 60%; }
 .dag-select.dag-tasks__project { flex: 0 1 220px; min-width: 0; }
 
 /* The Tasks page. */
-.dag-tasks__layout { display: inline-flex; margin-left: auto; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); }
+.dag-tasks__layout { display: inline-flex; margin-left: auto; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-control); }
 .dag-tasks__layout-choice {
   display: inline-flex;
   align-items: center;
@@ -5436,7 +5436,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-tasks__layout-choice[aria-checked="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -5462,7 +5462,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-tasks__filter:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tasks__filter::placeholder { color: var(--dag-color-slate); }
@@ -5495,7 +5495,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: inherit;
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
@@ -5581,7 +5581,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   padding: 10px;
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
 }
 .dag-tasks__column .dag-tasks__head { padding: 2px 4px 8px; }
 .dag-tasks__column[data-dag-tasks-over] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 1px var(--dag-color-accent); }
@@ -5593,7 +5593,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   padding: 8px 10px;
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -5653,7 +5653,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   color: var(--dag-color-slate);
   text-decoration: none;
   cursor: pointer;
@@ -5682,7 +5682,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-accent);
   background: var(--dag-color-accentSoft);
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-toolbar__practice:hover:not(:disabled) { border-color: var(--dag-color-accent); }
@@ -5712,7 +5712,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-quizzes__filter:focus-visible { box-shadow: var(--focus-ring); }
 .dag-quizzes__grid {
@@ -5730,7 +5730,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   padding: 16px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
 }
 .dag-quizzes__card--new { justify-content: center; border-style: dashed; background: transparent; }
 .dag-quizzes__open {
@@ -5747,7 +5747,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   cursor: pointer;
 }
 .dag-quizzes__open:hover .dag-quizzes__title { text-decoration: underline; text-decoration-color: var(--dag-color-outline); }
-.dag-quizzes__open:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-metric-radius-small); }
+.dag-quizzes__open:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-ui-radius-control); }
 .dag-quizzes__title {
   display: flex;
   align-items: center;
@@ -5777,7 +5777,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-accent);
   background: var(--dag-color-accentSoft);
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-quizzes__practice:hover:not(:disabled) { border-color: var(--dag-color-accent); }
@@ -5833,7 +5833,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: text;
 }
 .dag-quiz__rich[data-dag-quiz-open-field],
@@ -5861,7 +5861,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   padding: 14px 16px 6px;
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
 }
 .dag-quiz__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dag-quiz__card-number { font-size: 13px; font-weight: 600; color: var(--dag-color-slate); }
@@ -5897,7 +5897,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   font-weight: 600;
   color: var(--dag-color-accent);
   background: var(--dag-color-paper200);
-  border-radius: var(--dag-metric-radius-pill);
+  border-radius: var(--dag-ui-radius-pill);
   vertical-align: 1px;
 }
 .dag-quiz__card-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
@@ -5910,7 +5910,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-quiz__confirm > .dag-quiz__danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); background: var(--dag-color-dangerSoft); }
@@ -5943,7 +5943,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px dashed var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-quiz__add { display: flex; margin-top: 4px; }
@@ -5968,7 +5968,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-quiz__fix:hover { border-color: var(--dag-color-slate); }
@@ -5982,7 +5982,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border-left: 3px solid var(--dag-color-warningText);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-quiz__stray-text > :first-child { margin-top: 0; }
 .dag-quiz__stray-text > :last-child { margin-bottom: 0; }
@@ -6005,7 +6005,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 
@@ -6041,7 +6041,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
 }
 .dag-run__about-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -8px 4px 0; }
 .dag-run__about-title { min-width: 0; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); overflow-wrap: anywhere; }
@@ -6057,7 +6057,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   margin-top: 8px;
   padding: 10px 14px;
   background: var(--dag-color-paper100);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
 }
 @container (max-width: 819px) {
   .dag-run__about,
@@ -6067,7 +6067,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-run__title { margin-top: 24px; font-size: 22px; font-weight: 600; }
 .dag-run__head { display: flex; align-items: center; gap: 12px; margin-block-end: 20px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-run__where { flex: none; }
-.dag-run__progress { position: relative; flex: 1; height: 4px; overflow: hidden; background: var(--dag-color-paper200); border-radius: 2px; }
+.dag-run__progress { position: relative; flex: 1; height: 4px; overflow: hidden; background: var(--dag-color-paper200); /* a 4px bar */ border-radius: 2px; }
 .dag-run__progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--dag-color-accent); transition: width var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
 .dag-run__question { margin-block: 0 12px; font-size: 20px; font-weight: 600; line-height: 1.35; }
 .dag-run__prompt { margin-bottom: 8px; }
@@ -6081,7 +6081,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   font-size: 15px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-run__option:hover { border-color: var(--dag-color-outline); }
@@ -6122,7 +6122,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   resize: vertical;
 }
 .dag-run__answer--code { font-family: var(--dag-font-mono); font-size: 13px; tab-size: 2; }
@@ -6142,7 +6142,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: var(--dag-color-paper100);
   border-left: 3px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-run__why > :first-child { margin-top: 0; }
 .dag-run__why > :last-child { margin-bottom: 0; }
@@ -6158,7 +6158,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-run__button--primary { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
@@ -6215,7 +6215,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-accent);
   text-decoration: none;
   background: var(--dag-color-accentSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-embed__quiz-practice:hover { text-decoration: underline; }
 
@@ -6266,7 +6266,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   padding: 6px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-calendar__show-head { margin: 4px 6px 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); }
@@ -6282,7 +6282,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   height: 14px;
   color: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: 4px; /* a box under 20px: the control corner would make it a circle */
 }
 .dag-calendar__kind[aria-pressed="true"] .dag-calendar__tick { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
 
@@ -6301,7 +6301,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-cal-dots__day[data-out] { color: var(--dag-color-slate); }
@@ -6315,7 +6315,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-cal-dots__marks i[data-kind="task"] { background: var(--dag-color-hues-ochre); }
 .dag-cal-dots__list { display: flex; flex-direction: column; gap: 4px; padding: 12px 4px 16px; border-top: 1px solid var(--dag-color-outline); }
 .dag-cal-dots__list h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--dag-color-ink); }
-.dag-cal-dots__list .dag-calendar__item { min-height: 44px; padding: 0 10px; font-size: 15px; line-height: 20px; border-radius: var(--dag-metric-radius-chip); }
+.dag-cal-dots__list .dag-calendar__item { min-height: 44px; padding: 0 10px; font-size: 15px; line-height: 20px; border-radius: var(--dag-ui-radius-control); }
 .dag-cal-dots__none { margin: 0; font-size: 14px; color: var(--dag-color-slate); }
 .dag-calendar__today {
   padding: 5px 12px;
@@ -6325,14 +6325,14 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-calendar__today:hover { background: var(--dag-color-paper100); }
 .dag-calendar__today:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__step { display: inline-flex; gap: 2px; }
 .dag-calendar__title { flex: 1 1 auto; margin: 0; min-width: 12ch; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
-.dag-calendar__views { display: inline-flex; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); }
+.dag-calendar__views { display: inline-flex; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-control); }
 .dag-calendar__count { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dag-color-slate); }
 .dag-calendar__count input {
   width: 52px;
@@ -6343,7 +6343,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-calendar__kinds { display: inline-flex; gap: 4px; }
 .dag-calendar__kind {
@@ -6357,7 +6357,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px dashed var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-calendar__kind[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-style: solid; }
@@ -6382,7 +6382,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   text-decoration: none;
   white-space: nowrap;
   background: var(--dag-color-paper100);
-  border-radius: 4px;
+  border-radius: var(--dag-ui-radius-control);
   overflow: hidden;
   cursor: pointer;
 }
@@ -6408,7 +6408,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   grid-template-rows: auto repeat(var(--weeks), minmax(max-content, 1fr));
   overflow: auto;
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   user-select: none;
 }
 .dag-cal-names { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--dag-color-outlineSoft); }
@@ -6437,7 +6437,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-cal-day__n:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -6455,7 +6455,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-cal-more:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -6470,7 +6470,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   user-select: none;
 }
 .dag-cal-cols__head,
@@ -6545,7 +6545,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   height: calc(var(--len) * var(--hour) / 60);
   background: var(--dag-color-accentSoft);
   border: 1px solid var(--dag-color-accent);
-  border-radius: 4px;
+  border-radius: var(--dag-ui-radius-control);
   pointer-events: none;
 }
 /* An event or a task being moved: what it was is dimmed, where it goes is the ghost — the
@@ -6590,7 +6590,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   padding: 12px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-calendar__new-when { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--dag-color-slate); }
@@ -6601,7 +6601,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-calendar__new input:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__new-acts { display: flex; justify-content: flex-end; gap: 8px; }
@@ -6611,7 +6611,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   font: inherit;
   font-size: 12px;
   font-weight: 500;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-calendar__new-cancel { color: var(--dag-color-slate); background: transparent; border: 1px solid transparent; }
@@ -6673,7 +6673,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   gap: 4px;
   padding: 3px 8px;
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   color: var(--dag-color-ink);
   font-size: 12px;
   font-weight: 600;
@@ -6687,19 +6687,19 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   max-width: 100%;
   max-height: 78vh;
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   background: var(--dag-color-card);
 }
 .dag-file__played { display: flex; justify-content: center; }
 .dag-file__audio { width: 100%; max-width: 640px; }
-.dag-file__video { max-width: 100%; max-height: 78vh; border-radius: var(--dag-metric-radius-small); background: var(--dag-color-ink); }
+.dag-file__video { max-width: 100%; max-height: 78vh; border-radius: var(--dag-ui-radius-control); background: var(--dag-color-ink); }
 .dag-file__text {
   margin: 0;
   padding: 16px 20px;
   max-height: 78vh;
   overflow: auto;
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
   background: var(--dag-color-card);
   font: 13px/1.5 var(--dag-font-mono);
   white-space: pre-wrap;
@@ -6714,7 +6714,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   padding: 40px 24px;
   max-width: 420px;
   border: 1px dashed var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
   color: var(--dag-color-slate);
   text-align: center;
 }
@@ -6734,7 +6734,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   gap: 4px;
   padding: 4px 8px;
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-control);
   background: var(--dag-color-card);
   font-size: 12px;
   color: var(--dag-color-slate);
@@ -6748,14 +6748,14 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   gap: 12px;
   padding: 12px;
   overflow-x: auto;
-  border-radius: var(--dag-metric-radius-small);
+  border-radius: var(--dag-ui-radius-surface);
   background: var(--dag-color-paper100);
 }
 .dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: var(--dag-ui-elevation-raised); }
 
 /* A file in a note: a picture drawn, anything else a card whose Preview opens it in place. */
 .dag-embed.dag-embed--picture { margin: 0; border: none; background: transparent; }
-.dag-embed--picture img { display: block; max-width: 100%; border-radius: var(--dag-metric-radius-small); }
+.dag-embed--picture img { display: block; max-width: 100%; border-radius: var(--dag-ui-radius-control); }
 .dag-embed.dag-embed--file { width: 100%; }
 .dag-embed__filerow { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 8px 0 12px; }
 .dag-embed.dag-embed--placed.dag-embed--file { padding: 0; }
@@ -6768,7 +6768,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   font-family: var(--dag-font-mono);
   font-size: 0.92em;
   padding: 0 3px;
-  border-radius: 3px;
+  border-radius: 3px; /* inline code a line tall */
   background: color-mix(in srgb, var(--dag-color-ink) 7%, transparent);
   overflow-wrap: anywhere;
 }
@@ -6804,7 +6804,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   cursor: pointer;
 }
 .dag-tablepage__pop:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
@@ -6840,7 +6840,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 
@@ -6883,7 +6883,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   white-space: pre-wrap;
 }
 .dag-tablepage__problem-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -6895,7 +6895,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-tablepage__problem-fix:hover:not(:disabled) { background: var(--dag-color-paper100); }
@@ -6915,7 +6915,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-tablepage__rule input { flex: 1; width: 120px; }
 .dag-tablepage__rule select:focus-visible,
@@ -6985,7 +6985,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-grid__plus:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
@@ -7043,7 +7043,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-warningText);
   background: var(--dag-color-warningSoft);
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-grid .dag-grid__flag[data-severity="error"] { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
@@ -7070,7 +7070,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-card);
   background: var(--dag-color-card);
   border: 1.5px solid var(--dag-color-outline);
-  border-radius: 4px;
+  border-radius: 4px; /* a small box: the control corner would make it a circle */
   vertical-align: top;
 }
 .dag-grid--edit .dag-grid__check { cursor: pointer; }
@@ -7087,7 +7087,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   vertical-align: top;
   color: var(--dag-color-ink);
   background: var(--dag-t, var(--dag-color-paper100));
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-grid .dag-grid__link { color: var(--dag-color-accent); text-decoration: underline; text-decoration-color: var(--dag-color-outline); text-underline-offset: 2px; }
 
@@ -7122,7 +7122,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   white-space: normal;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-grid__options-item {
@@ -7137,7 +7137,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-grid__options-item:hover,
@@ -7158,7 +7158,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-grid__add:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
@@ -7176,7 +7176,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   padding: 4px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-surface);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-grid__menu-field { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px 6px; font-size: 11px; color: var(--dag-color-slate); }
@@ -7187,7 +7187,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-grid__menu-field input:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-grid__menu-types { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; }
@@ -7203,7 +7203,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-grid__menu-type > svg,
@@ -7269,7 +7269,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-slate);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
@@ -7297,7 +7297,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   padding: 8px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: 8px;
+  border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-math-field__tex {
@@ -7310,7 +7310,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
   padding: 6px 8px;
 }
 .dag-math-field__tex:focus-visible { box-shadow: var(--focus-ring); }
@@ -7478,7 +7478,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-trash__filter:focus-visible { box-shadow: var(--focus-ring); }
 .dag-trash__intro { margin: 0 auto 16px; font-size: 13px; line-height: 1.5; color: var(--dag-color-slate); }
@@ -7499,7 +7499,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-slate);
   background: transparent;
   border: 1px solid var(--dag-color-outlineSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-trash__plain:hover,
@@ -7532,7 +7532,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   padding: 8px 10px;
   font-size: 13px;
   background: var(--dag-color-dangerSoft);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-trash__ask--row { margin: 0; padding: 2px 4px 2px 10px; font-size: 12px; }
 .dag-trash__said { margin: 0 auto 12px; font-size: 13px; color: var(--dag-color-slate); }
@@ -7562,7 +7562,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   gap: 10px;
   min-height: 44px;
   padding: 4px 6px;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-trash__row:hover { background: var(--dag-color-paper100); }
 @media (hover: hover) {
@@ -7599,7 +7599,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   overflow-wrap: anywhere;
   padding: 6px 8px;
   border: 1px solid var(--dag-color-outline);
-  border-radius: 6px;
+  border-radius: var(--dag-ui-radius-control);
   background: var(--dag-color-paper100);
   color: var(--dag-color-ink);
   user-select: all;
@@ -7646,7 +7646,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: transparent;
   border: none;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-assistant__row:hover { background: var(--dag-color-paper100); }
@@ -7671,7 +7671,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
 }
 .dag-assistant__space { flex: 1; }
 .dag-assistant__problem { font-size: 12px; color: var(--dag-color-dangerText); }
@@ -7688,7 +7688,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 20px 8px; }
 .dag-chat-turns { display: flex; flex-direction: column; gap: 28px; max-width: 760px; margin-inline: auto; }
 .dag-chat-turn { display: flex; flex-direction: column; gap: 8px; }
-.dag-chat-asked { align-self: flex-end; max-width: 85%; padding: 8px 12px; background: var(--dag-color-paper200); border-radius: var(--dag-metric-radius-card); }
+.dag-chat-asked { align-self: flex-end; max-width: 85%; padding: 8px 12px; background: var(--dag-color-paper200); border-radius: var(--dag-ui-radius-surface); }
 .dag-chat-asked p { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dag-chat-model { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--dag-color-slate); }
 .dag-chat-model__elsewhere { color: var(--dag-color-warningText); }
@@ -7701,7 +7701,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-empty p { margin: 0; }
 
 /* A tool call, folded to the one line it is. */
-.dag-chat-tool { font-size: 12px; color: var(--dag-color-slate); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); background: var(--dag-color-card); }
+.dag-chat-tool { font-size: 12px; color: var(--dag-color-slate); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); background: var(--dag-color-card); }
 .dag-chat-tool > summary { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px; cursor: pointer; list-style: none; }
 .dag-chat-tool > summary::-webkit-details-marker { display: none; }
 .dag-chat-tool__chev { flex: none; transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
@@ -7713,14 +7713,14 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-tool[data-dag-chat-tool-state="error"] .dag-chat-tool__flag { color: var(--dag-color-dangerText); }
 .dag-chat-tool__body { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px 8px; border-top: 1px solid var(--dag-color-outline); }
 .dag-chat-tool__label { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dag-color-slate); }
-.dag-chat-tool__body pre { margin: 0; max-height: 220px; overflow: auto; padding: 6px 8px; font-family: var(--dag-font-mono); font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--dag-color-ink); background: var(--dag-color-paper100); border-radius: var(--dag-metric-radius-small); }
+.dag-chat-tool__body pre { margin: 0; max-height: 220px; overflow: auto; padding: 6px 8px; font-family: var(--dag-font-mono); font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--dag-color-ink); background: var(--dag-color-paper100); border-radius: var(--dag-ui-radius-control); }
 
-.dag-chat-error { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.45; color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); border: 1px solid var(--dag-color-dangerBorder); border-radius: var(--dag-metric-radius-chip); }
+.dag-chat-error { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.45; color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); border: 1px solid var(--dag-color-dangerBorder); border-radius: var(--dag-ui-radius-surface); }
 .dag-chat-error svg { flex: none; margin-top: 2px; }
 .dag-chat-error--inline { flex: none; margin: 0 20px 8px; }
 
 /* Approvals, access requests and block cards: one card shape, a line of words and the answer. */
-.dag-chat-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 13px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); }
+.dag-chat-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 13px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); }
 .dag-chat-card--ask { border-color: var(--dag-color-warning); background: var(--dag-color-warningSoft); }
 .dag-chat-card--ask > svg { flex: none; color: var(--dag-color-warningText); }
 .dag-chat-card__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
@@ -7746,7 +7746,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-changes__none { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dag-color-slate); }
 
 /* The composer. */
-.dag-chat-composer { position: relative; flex: none; display: flex; flex-direction: column; gap: 6px; margin: 0 20px 16px; padding: 8px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); }
+.dag-chat-composer { position: relative; flex: none; display: flex; flex-direction: column; gap: 6px; margin: 0 20px 16px; padding: 8px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); }
 .dag-chat-composer:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-chat-composer__input { width: 100%; box-sizing: border-box; min-height: 24px; max-height: 200px; padding: 4px 4px; resize: none; font: inherit; font-size: 14px; line-height: 1.5; color: var(--dag-color-ink); background: transparent; border: none; outline: none; }
 /* Expanded by its toggle: most of the column, and it goes back on sending (the component clears the state). */
@@ -7772,11 +7772,11 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* The menu is the composer's width, not the chip's: a chip at the foot of a narrow panel is nowhere near
    a 300px menu's left edge, and one anchored to it ran off the window. */
 .dag-chat-scope { position: static; }
-.dag-chat-scope__chip { display: inline-flex; align-items: center; gap: 6px; max-width: 200px; height: 28px; padding: 0 8px; font: inherit; font-size: 12px; color: var(--dag-color-slate); background: transparent; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-chip); cursor: pointer; }
+.dag-chat-scope__chip { display: inline-flex; align-items: center; gap: 6px; max-width: 200px; height: 28px; padding: 0 8px; font: inherit; font-size: 12px; color: var(--dag-color-slate); background: transparent; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-control); cursor: pointer; }
 .dag-chat-scope__chip > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__chip:hover { background: var(--dag-color-paper100); }
 .dag-chat-scope__more { color: var(--dag-color-accent); font-weight: 600; }
-.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: var(--dag-ui-layer-popover); padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: var(--dag-ui-elevation-overlay); }
+.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: var(--dag-ui-layer-popover); padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); box-shadow: var(--dag-ui-elevation-overlay); }
 .dag-chat-scope__line { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 4px 6px; font-size: 12px; }
 .dag-chat-scope__line strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__line > span { color: var(--dag-color-slate); }

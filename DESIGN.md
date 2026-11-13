@@ -169,9 +169,9 @@ labels.
   the grid the diagram snaps to (`metric.grid`).
 - **Corners**: `--dag-ui-radius-control` (9) for a button or field, `--dag-ui-radius-surface` (12)
   for a card, a menu or a toast, `--dag-ui-radius-dialog` (16) for a dialog, and
-  `--dag-ui-radius-pill` (999) for a pill. Most older rules still borrow the diagram's
-  `--dag-metric-radius-chip`. That ties a button's corner to a diagram chip's, and #205 exists to
-  undo it.
+  `--dag-ui-radius-pill` (999) for a pill. The chrome no longer reads the diagram's
+  `--dag-metric-radius-*` (#206): a chip's corner and a button's are now separate numbers. The few
+  literal corners left are on boxes too small for 9px (checkboxes, swatches, inline code).
 - **Elevation**: `--dag-ui-elevation-raised` for a bar on the page, `--dag-ui-elevation-overlay` for
   a menu, popover or toast, and `--dag-ui-elevation-modal` for a dialog. All three are drawn in
   `color.shadow`, so a dark theme gets depth instead of a halo.

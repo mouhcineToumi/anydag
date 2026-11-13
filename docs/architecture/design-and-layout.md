@@ -53,6 +53,10 @@ layer; a shadow with no blur (a ring, an accent bar), an inset one and `--focus-
 elevation, and `check-literals.mjs` does not count them. Both counts are zero. A popover portalled to
 `<body>` out of a dialog (the model picker) is `modal + 1`. `e2e/layers.spec.ts` reads the computed
 layers and shadows.
+**Corners moved third** (#206): the chrome no longer reads `--dag-metric-radius-*`. A corner is chosen
+by role: `control` (9) for buttons, fields, rows and tabs, `surface` (12) for cards, menus, popovers
+and docks, `dialog` (16), `pill` (999). What stays literal is a box too small for 9px (a checkbox, a key,
+swatch, inline code, a progress bar), the diagram's selection ring, and the `50%` circles.
 Which of these a screen should use for what — colour roles with their measured contrast, the type
 scale, the controls, the layers, focus, motion, icons and the voice — is [`DESIGN.md`](../../DESIGN.md)
 at the root, held to the code by `check:design`.
