@@ -660,7 +660,7 @@
      a quarter of the window, and never under 232px — which at 929px is exactly 232, the width a
      laptop window has room for. A width somebody dragged is theirs up to half the window:
      under the quarter rule the grip on that same window moved nothing at all. */
-  width: min(var(--sidebar-w, 248px), var(--sidebar-cap));
+  width: min(var(--sidebar-w, 272px), var(--sidebar-cap));
   --sidebar-cap: max(232px, 25vw);
   height: 100%;
   min-height: 0;
@@ -817,10 +817,12 @@
 .dag-sidebar__favs { flex: none; max-height: 30%; overflow-y: auto; padding: 0 8px; scrollbar-width: thin; }
 
 /*
- * A row's own tools — the folder's `+` and everybody's `⋯` — on the hovered, focused or open row,
- * over the end of the name on the row's own ground so the ellipsis reads as the name running under
- * them. `tabIndex=-1` on each: the keyboard reaches the same menu with `shift+F10`, and a Tab stop
- * per row per tool would make the tree a hundred stops long.
+ * A row's own tools — the folder's `+`, a favourite's star and everybody's `⋯` — on the hovered,
+ * focused or open row, over the end of the name on the row's own ground so the ellipsis reads as
+ * the name running under them. The open row is the one that keeps them up without a pointer, so
+ * the first thing somebody sees is a file with actions. `tabIndex=-1` on each: the keyboard
+ * reaches the same menu with `shift+F10`, and a Tab stop per row per tool would make the tree a
+ * hundred stops long.
  */
 .dag-sidebar__tools {
   position: absolute;
@@ -1009,8 +1011,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
    Ink rather than accent text, because accent on its own tint is the pair DESIGN.md forbids. */
 .dag-sidebar__row--on { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); font-weight: 600; }
 .dag-sidebar__row--on:hover { background: var(--dag-color-accentSoft); }
-/* The open file's ⋯ is always shown, so its title ends in an ellipsis before it rather than under it. */
+/* The open file's ⋯ is always shown, so its title ends in an ellipsis before it rather than under it.
+   A favourite's star sits beside it, and the open row keeps room for both. */
 .dag-sidebar__line--on > .dag-sidebar__row { padding-right: 32px; }
+.dag-sidebar__line--on:has(> .dag-sidebar__tools > [data-dag-sidebar-star]) > .dag-sidebar__row { padding-right: 60px; }
 /* The vault's attachments folder: last, and a step quieter, since nobody files work there. */
 .dag-sidebar__row[data-dag-sidebar-store] { color: var(--dag-color-slate); }
 /* One guide rule per level, under the middle of the chevron above it, the way the search draws its
@@ -1314,8 +1318,18 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: ew-resize;
   touch-action: none;
 }
-.dag-sidebar__grip:hover,
-.dag-sidebar__grip:active { background: var(--dag-color-accentSoft); }
+/* The edge it moves, drawn on the line the column's border already occupies. */
+.dag-sidebar__grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: transparent;
+}
+.dag-sidebar__grip:hover::after,
+.dag-sidebar__grip:active::after { background: var(--dag-color-accent); }
 
 /* New, the + beside Files since the UI review. */
 .dag-sidebar__tool[aria-expanded="true"] { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
@@ -7499,8 +7513,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
-.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
-.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
 .dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
 .dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .dag-trash-notice__act {
