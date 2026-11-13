@@ -2,7 +2,7 @@
  * Logs, on the page: the person's answer, and the events this page adds to them.
  *
  * The answer is the app's server's (`server/telemetry.ts`), asked once when the page starts and
- * changed with `setConsent`; `useTelemetry` is how the Privacy tab and the first-run card follow it.
+ * changed with `setConsent`; `useTelemetry` is how the Privacy tab and the first-run toast follow it.
  * Events are held here and posted to `POST /api/telemetry/events` every half minute and when the
  * page goes away, and the server cleans them again before keeping any.
  *

@@ -27,9 +27,9 @@ export default async function globalSetup(): Promise<void> {
     await new Promise((r) => setTimeout(r, 1000));
   }
   /* **The logs question is answered, no**, on the dev server's home, the first time the suite runs
-     there: it is asked once per install over every page, and a card over every check would take
-     every click meant for the board. `telemetry.spec.ts` stands in its own answer with a route, so
-     what this home says is never what it is testing. An answer somebody already gave is left. */
+     there: it is asked once per install, and a toast over every open file would take a click meant
+     for the board. `telemetry.spec.ts` stands in its own answer with a route, so what this home
+     says is never what it is testing. An answer somebody already gave is left. */
   try {
     const asked = (await (await fetch(`${ORIGIN}/api/telemetry`)).json()) as { consent: boolean | null };
     if (asked.consent === null) {
