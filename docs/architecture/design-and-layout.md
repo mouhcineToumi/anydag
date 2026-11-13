@@ -41,6 +41,34 @@ type a font size, corner, shadow, layer or duration, against `scripts/chrome-lit
 count may only fall. Every step is the value the chrome already used most, so a rule that moves onto
 a token draws the same.
 
+**The chrome's buttons are two components** (#207), `Button` and `IconButton` in
+`src/ui/controls.tsx`, beside `Switch`, `Check` and `TextField`. The shell had 42 mixes of height,
+corner, size, weight, fill and border, 16 to 37 px tall, and four kinds of primary — white with an
+accent border, pale, solid and round. Now there are four variants — `primary` (solid accent: the one
+action a card asks for), `secondary` (bordered, the default), `quiet` (no box) and `danger` — and
+three sizes, `sm` 24, `md` 30 and `touch` 44, from `--dag-ui-control-*`, with the corner
+`--dag-ui-radius-control` and the words `--dag-ui-text-*`. **Under 720px `md` is `touch` by
+itself**, in the stylesheet, so no screen has to remember to grow its buttons on a phone; `sm` was a
+choice and stays small. The classes are `dag-button--<variant>`, `dag-button--<size>`,
+`dag-icon--<size>` and `dag-icon--danger`; a bare `.dag-button` is still the secondary at `md`, for
+the screens that have not moved yet. `IconButton` is square and quiet, **needs an `aria-label`**,
+and its tooltip is the drawn one (`Tooltip`) saying that label — or `tip` where the accessible name
+carries more, with `shortcut` for the chord. A `title` passed to it is kept as the one tooltip and
+none is drawn: that is how a control says a sentence rather than a name (*New*'s list of kinds, the
+lock's hint). Without a label it renders nothing in development and says why on the console; a build
+renders it anyway, since a missing control is worse than an unnamed one. `test/controls-button.test.ts`
+holds the classes, the pass-through of every `data-dag-*` and the refusal.
+
+The shell is on them: the sidebar's square tools, its close, the top bar's sidebar toggle,
+Assistant and `⋯`, the home and no-vault cards, the dock, the zoom bar, the vault menu's forms and
+*Remove from the list*, and the trash, lock and upload notices. What stays a `<button>` says why where
+it is: a row of the sidebar or a list (full width, an ellipsis, the column's hover), a menu item (moved
+by the arrow keys), the vault switcher (a picker's trigger), the wordmark, the folders and the title in
+the top bar (words that go somewhere), the empty board's tiles (a key under each name), and the lock,
+which is a glyph unlocked and a pill locked and must keep focus across the press. Out of scope: the
+buttons inside the diagram, Settings (#186), the page tabs and the problems dock; the other local
+families (`dag-prompt__btn`, `dag-run__button`, `dag-chat-send`…) fold in one screen at a time.
+
 ## Layout, per diagram type
 
 Three knobs in `theme.metric.elk`, and each exists because a board looked wrong without it:

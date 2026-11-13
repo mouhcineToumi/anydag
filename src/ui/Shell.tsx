@@ -64,6 +64,7 @@ import { LockNotice, useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
+import { IconButton } from "@/ui/controls";
 import { usePanel } from "@/assistant/panelState";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
@@ -844,9 +845,8 @@ export function Shell({
     >
       <SidebarContext.Provider value={ctl}>
         {/* First in the DOM, so first in the tab order, which is where it is drawn. */}
-        <button
-          type="button"
-          className="dag-icon dag-sidebar-toggle"
+        <IconButton
+          className="dag-sidebar-toggle"
           data-dag-sidebar-toggle={mode ?? "away"}
           aria-label={shut ? "Hide the sidebar" : "Show the sidebar"}
           title={shut ? "Hide the sidebar (Ctrl+\\)" : "Show the sidebar (Ctrl+\\)"}
@@ -866,7 +866,7 @@ export function Shell({
               node's `pointerover` as the pointer *entering* the button: a click that put the column
               away peeked it straight back. The label and the tooltip say which way it goes. */}
           <PanelLeft size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-        </button>
+        </IconButton>
         {mode ? (
           <Sidebar
             mode={mode}

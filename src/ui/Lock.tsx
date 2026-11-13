@@ -13,6 +13,7 @@ import {
   toggleLock,
   useLocked,
 } from "@/settings/lock";
+import { Button, IconButton } from "@/ui/controls";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 
@@ -29,6 +30,8 @@ const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  */
 export function LockButton() {
   const locked = useLocked();
+  /* Not `IconButton`: locked, the same control is a pill with a word on it, and one element that
+     changes its drawing keeps focus across the press, where swapping components would drop it. */
   return (
     <button
       type="button"
@@ -127,23 +130,14 @@ export function LockNotice() {
       {said === "unlocked" ? <LockOpen {...ICON} /> : <Lock {...ICON} />}
       <span>{lockNoticeText(said)}</span>
       {locked ? (
-        <button
-          type="button"
-          className="dag-readonly-notice__unlock"
-          data-dag-readonly-unlock=""
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => setLocked(false)}
-        >
+        <Button data-dag-readonly-unlock="" onMouseDown={(e) => e.preventDefault()} onClick={() => setLocked(false)}>
           Unlock
-        </button>
+        </Button>
       ) : null}
       {said === "refused" ? (
-        <button
-          type="button"
-          className="dag-readonly-notice__dismiss"
+        <IconButton
           data-dag-readonly-dismiss=""
           aria-label="Dismiss"
-          title="Dismiss"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             held.current = false;
@@ -151,7 +145,7 @@ export function LockNotice() {
           }}
         >
           <X {...ICON} />
-        </button>
+        </IconButton>
       ) : null}
     </div>
   );

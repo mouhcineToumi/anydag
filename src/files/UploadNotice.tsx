@@ -8,6 +8,9 @@
  */
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+
+import { IconButton } from "@/ui/controls";
+
 import { Said } from "./Said";
 
 /** How long a refusal stays up when nobody puts it away. */
@@ -40,9 +43,9 @@ export function UploadNotice() {
           </p>
         ))}
       </div>
-      <button type="button" className="dag-icon" aria-label="Dismiss" title="Dismiss" onClick={() => setSaid([])}>
+      <IconButton aria-label="Dismiss" onClick={() => setSaid([])}>
         <X size={14} strokeWidth={2} aria-hidden="true" />
-      </button>
+      </IconButton>
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { chordFor } from "@/edit/bindings";
 import { lockedAffordance, refuseLocked, setLocked } from "@/settings/lock";
 
+import { Button } from "@/ui/controls";
+
 import { Logo } from "./Logo";
 import { CreateVaultForm, OpenFolderForm, RecentVaults, pickFolder, enterPath } from "./Vaults";
 
@@ -64,48 +66,25 @@ export function Welcome({
         </p>
         <div className="dag-welcome__acts">
           {locked ? (
-            <button
-              type="button"
-              className="dag-welcome__act dag-welcome__act--go"
-              data-dag-welcome-unlock=""
-              onClick={() => setLocked(false)}
-            >
+            <Button variant="primary" data-dag-welcome-unlock="" onClick={() => setLocked(false)}>
               <LockOpen {...ICON} aria-hidden="true" />
               <span>Unlock</span>
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className="dag-welcome__act dag-welcome__act--go"
-            data-dag-welcome-new=""
-            {...blocked}
-            onClick={() => (locked ? refuseLocked() : onCreate())}
-          >
+          <Button variant="primary" data-dag-welcome-new="" {...blocked} onClick={() => (locked ? refuseLocked() : onCreate())}>
             <FilePlus2 {...ICON} aria-hidden="true" />
             <span>New board</span>
-          </button>
+          </Button>
           {onWrite ? (
-            <button
-              type="button"
-              className="dag-welcome__act"
-              data-dag-welcome-note=""
-              {...blocked}
-              onClick={() => (locked ? refuseLocked() : onWrite())}
-            >
+            <Button data-dag-welcome-note="" {...blocked} onClick={() => (locked ? refuseLocked() : onWrite())}>
               <NotebookPen {...ICON} aria-hidden="true" />
               <span>New note</span>
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className="dag-welcome__act"
-            data-dag-welcome-open=""
-            title={open ? `Search (${open})` : "Search"}
-            onClick={onOpen}
-          >
+          <Button data-dag-welcome-open="" title={open ? `Search (${open})` : "Search"} onClick={onOpen}>
             <Search {...ICON} aria-hidden="true" />
             <span>Search</span>
-          </button>
+          </Button>
         </div>
       </section>
     </div>
@@ -156,16 +135,13 @@ export function EmptyBoard({
         </p>
         <div className="dag-welcome__acts">
           {locked ? (
-            <button
-              type="button"
-              className="dag-welcome__act dag-welcome__act--go"
-              data-dag-empty-board-unlock=""
-              onClick={() => setLocked(false)}
-            >
+            <Button variant="primary" data-dag-empty-board-unlock="" onClick={() => setLocked(false)}>
               <LockOpen {...ICON} aria-hidden="true" />
               <span>Unlock</span>
-            </button>
+            </Button>
           ) : null}
+          {/* Tiles, not `Button`s: each is a card with its key under its name, which is what makes the
+              card teach the keys it stands in for. */}
           {acts.map(({ key, label, hint, icon: Icon, go, lead }) => (
             <button
               key={key}
@@ -232,24 +208,14 @@ export function NoVault() {
           <CreateVaultForm onCancel={() => setAsking(null)} />
         ) : (
           <div className="dag-welcome__acts">
-            <button
-              type="button"
-              className="dag-welcome__act dag-welcome__act--go"
-              data-dag-welcome-open-folder=""
-              onClick={() => void open()}
-            >
+            <Button variant="primary" data-dag-welcome-open-folder="" onClick={() => void open()}>
               <FolderOpen {...ICON} aria-hidden="true" />
               <span>Open folder…</span>
-            </button>
-            <button
-              type="button"
-              className="dag-welcome__act"
-              data-dag-welcome-create-vault=""
-              onClick={() => setAsking("create")}
-            >
+            </Button>
+            <Button data-dag-welcome-create-vault="" onClick={() => setAsking("create")}>
               <FolderPlus {...ICON} aria-hidden="true" />
               <span>Create vault…</span>
-            </button>
+            </Button>
           </div>
         )}
         {problem ? (

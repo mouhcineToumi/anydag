@@ -378,29 +378,43 @@
 .dag-settings__control > .dag-modelpicker { width: 260px; }
 .dag-settings__control > .dag-effort { width: 200px; }
 
+/*
+ * `Button` and `IconButton` (`src/ui/controls.tsx`, #207). Every number is a `ui` token: the
+ * height is `--dag-ui-control-<size>`, the corner `--dag-ui-radius-control`, the words
+ * `--dag-ui-text-*`. `.dag-button` alone is still the secondary at `md`, for the screens that have
+ * not moved onto the component yet. Names grepped first: `dag-button--{secondary,quiet,sm,md,touch}`
+ * and `dag-icon--{sm,md,touch,danger}` were nobody's.
+ */
 .dag-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 30px;
+  height: var(--dag-ui-control-md);
   padding: 0 12px;
   font: inherit;
   font-family: var(--dag-font-sans);
-  font-size: 13px;
+  font-size: var(--dag-ui-text-md);
   font-weight: 500;
   white-space: nowrap;
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-button > svg { flex: none; color: var(--dag-color-slate); }
 .dag-button:hover:not(:disabled) { background: var(--dag-color-paper100); border-color: var(--dag-color-mutedBorder); }
 .dag-button:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft); }
 .dag-button:disabled { opacity: 0.5; cursor: default; }
+.dag-button--sm { gap: 4px; height: var(--dag-ui-control-sm); padding: 0 8px; font-size: var(--dag-ui-text-sm); }
+.dag-button--touch { gap: 8px; height: var(--dag-ui-control-touch); padding: 0 16px; }
+/* No box: words that act, where a row of bordered buttons would be louder than what they act on. */
+.dag-button--quiet { color: var(--dag-color-slate); background: transparent; border-color: transparent; }
+.dag-button--quiet:hover:not(:disabled) { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: transparent; }
+.dag-button--quiet > svg { color: inherit; }
 .dag-button--danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
+.dag-button--danger > svg { color: inherit; }
 .dag-button--danger:hover:not(:disabled) { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-danger); }
 /*
  * The one action a card is asking for: filled in the accent. It used to be spelled twice, scoped to
@@ -409,6 +423,7 @@
  * on the card, and it reads as *not yet* instead of as a second secondary.
  */
 .dag-button--primary { color: var(--dag-color-paper); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-button--primary > svg { color: inherit; }
 .dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); border-color: var(--dag-color-accent); opacity: 0.9; }
 .dag-button--primary:disabled {
   color: var(--dag-color-slate);
@@ -579,8 +594,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: var(--dag-ui-control-md);
+  height: var(--dag-ui-control-md);
   color: var(--dag-color-slate);
   background: transparent;
   /* No box around a glyph. A row of bordered squares reads as a row of boxes rather than a row of
@@ -590,10 +605,20 @@
      and shift the icon inside by a pixel. The problems dock had already unset this twice, locally;
      that it had to is what says the default was wrong. */
   border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
+  border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
 .dag-icon:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-icon--sm { width: var(--dag-ui-control-sm); height: var(--dag-ui-control-sm); }
+.dag-icon--touch { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+.dag-icon--danger:hover:not(:disabled) { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
+.dag-icon:focus-visible { outline: var(--dag-ui-focus-width) solid var(--dag-color-accent); outline-offset: calc(0px - var(--dag-ui-focus-width)); }
+/* A finger's under 720px, for `Button` and `IconButton` both: `md` is the size nobody chose, so it is
+   the one that grows; `sm` was chosen, and stays. */
+@media (max-width: 719px) {
+  .dag-button--md { gap: 8px; height: var(--dag-ui-control-touch); padding: 0 16px; }
+  .dag-icon--md { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+}
 .dag-icon--on { background: var(--dag-color-paper200); color: var(--dag-color-ink); }
 
 /* ---- the sidebar ---- */
@@ -794,22 +819,9 @@
 .dag-sidebar__line:hover > .dag-sidebar__tools,
 .dag-sidebar__line:focus-within > .dag-sidebar__tools { display: flex; }
 .dag-sidebar__line--on > .dag-sidebar__tools { display: flex; background: var(--dag-color-accentSoft); }
-.dag-sidebar__tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-small);
-  cursor: pointer;
-}
+/* `IconButton size="sm"`: the size, corner and colour are the component's. The hover is not the
+   usual `paper100`, which is the row's own ground under a hovered row, so the tool would vanish. */
 .dag-sidebar__tool:hover { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
-.dag-sidebar__tool--danger:hover { color: var(--dag-color-danger); }
-.dag-sidebar__tool:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: -2px; }
 
 /* A question asked in the row — a name, a folder to move to, whether to delete — never through a
    browser dialog, which blocks the page, cannot be themed and cannot be driven by the suite. */
@@ -1263,7 +1275,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  */
 .dag-sidebar__sheethead { display: flex; align-items: center; gap: 4px; flex: none; padding: 8px 8px 4px 0; }
 .dag-sidebar__sheethead .dag-vault { flex: 1; min-width: 0; padding-top: 0; }
-.dag-sidebar__close { width: 44px; height: 44px; flex: none; }
+.dag-sidebar__close { flex: none; }
 .dag-sidebar[data-sheet] {
   position: fixed;
   inset: 0;
@@ -1394,7 +1406,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-toolbar { height: 52px; gap: 2px; padding: 0 4px; }
   .dag-toolbar[data-dag-toolbar-edge] { padding-left: calc(4px + var(--window-inset)); }
   .dag-toolbar .dag-sidebar-toggle-slot { width: 44px; height: 44px; }
-  .dag-sidebar-toggle { top: 4px; left: calc(4px + var(--window-inset)); width: 44px; height: 44px; }
+  .dag-sidebar-toggle { top: 4px; left: calc(4px + var(--window-inset)); }
   .dag-toolbar .dag-toolbar__logo,
   .dag-toolbar .dag-toolbar__crumbs,
   .dag-toolbar .dag-export { display: none; }
@@ -1407,8 +1419,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-readonly--on { justify-content: center; min-width: 40px; height: 36px; margin: 0 2px; padding: 0 8px; }
   .dag-readonly.dag-icon { width: 44px; height: 44px; }
   .dag-readonly-notice { top: 58px; right: 8px; }
-  .dag-toolbar .dag-backlinks__toggle,
-  .dag-pagemore__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
+  .dag-toolbar .dag-backlinks__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
   .dag-pagemore--narrow { display: flex; }
   .dag-pagemore__group--narrow { display: flex; }
   .dag-pagemore__menu .dag-more__item { height: 44px; font-size: 15px; }
@@ -4197,21 +4208,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-icon--accent { color: var(--dag-color-accent); }
 .dag-icon--accent:hover { color: var(--dag-color-accent); background: var(--dag-color-paper100); }
 
-/* The percentage is a button, so it wears the icon button's metrics with room for four glyphs. */
-.dag-zoombar__pct {
-  min-width: 52px;
-  height: 30px;
-  padding: 0 6px;
-  font-family: var(--dag-font-sans);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-zoombar__pct:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+/* The percentage is a quiet `Button` with room for four glyphs, in figures that do not move. */
+.dag-zoombar__pct { min-width: 52px; padding: 0 6px; font-size: var(--dag-ui-text-sm); font-variant-numeric: tabular-nums; }
 
 /*
  * A board on a phone: fitted, pinched and panned with fingers, a tap to select and a drag
@@ -4227,9 +4225,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-dock > .dag-more,
   .dag-zoombar .dag-zoombar__step { display: none; }
   .dag-dock { left: calc(var(--canvas-x, 0px) + 12px); transform: none; }
-  .dag-dock .dag-icon,
-  .dag-zoombar .dag-icon { width: 44px; height: 44px; }
-  .dag-zoombar__pct { height: 44px; }
 }
 @media (pointer: coarse) {
   .dag-handle,
@@ -4727,36 +4722,6 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   pointer-events: auto;
 }
 .dag-readonly-notice > svg { flex: none; color: var(--dag-color-accent); }
-.dag-readonly-notice__unlock {
-  flex: none;
-  height: 26px;
-  padding: 0 10px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-paper100);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-readonly-notice__unlock:hover { background: var(--dag-color-paper200); }
-.dag-readonly-notice__dismiss {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--dag-color-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-readonly-notice__dismiss:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-readonly-notice__dismiss:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 /* A control that writes while the app is locked. It keeps its press — which the notice answers, so
    the page is never silently dead — but reads as unavailable before one, and its `title` names the
    word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control
@@ -7247,29 +7212,9 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
 .dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
 .dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.dag-trash-notice__act {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 0 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: transparent;
-  border: none;
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-trash-notice__act:hover { background: var(--dag-color-paper100); }
-.dag-trash-notice__act:disabled { opacity: 0.5; cursor: default; }
-.dag-trash-notice button:focus-visible { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
 .dag-trash-notice__close { flex: none; }
 @media (max-width: 719px) {
   .dag-trash-notice { left: 12px; right: 12px; bottom: 72px; max-width: none; }
-  .dag-trash-notice__act { min-height: 36px; }
 }
 
 /* Sync: the sidebar's status row and the Settings tab's own bits. Colour from the

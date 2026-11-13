@@ -2,6 +2,7 @@ import { Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { FileKind, TrashEntry } from "@/board/useBoard";
+import { Button, IconButton } from "@/ui/controls";
 
 import { restoreFromTrash } from "./trashApi";
 import { counted, leaf } from "./tree";
@@ -108,14 +109,13 @@ export function TrashNotice({
         {typeof state === "object" ? state.failed : busy ? "Putting it back…" : said(gone, titles)}
       </p>
       {state === "shown" ? (
-        <button type="button" className="dag-trash-notice__act" data-dag-trash-undo="" onClick={() => void undo()}>
+        <Button data-dag-trash-undo="" onClick={() => void undo()}>
           <Undo2 size={14} strokeWidth={2} aria-hidden="true" />
           Undo
-        </button>
+        </Button>
       ) : null}
-      <button
-        type="button"
-        className="dag-trash-notice__act"
+      <Button
+        variant="quiet"
         data-dag-trash-view=""
         disabled={busy}
         onClick={() => {
@@ -124,17 +124,16 @@ export function TrashNotice({
         }}
       >
         View trash
-      </button>
-      <button
-        type="button"
-        className="dag-icon dag-trash-notice__close"
+      </Button>
+      <IconButton
+        className="dag-trash-notice__close"
         data-dag-trash-dismiss=""
         aria-label="Dismiss"
         disabled={busy}
         onClick={() => close.current()}
       >
         <X size={14} strokeWidth={2} aria-hidden="true" />
-      </button>
+      </IconButton>
     </div>
   );
 }
