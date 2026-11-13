@@ -268,9 +268,11 @@ on its panel, so text a person must read inside `[data-dag-settings]` — headin
 descriptions, placeholders and unit suffixes — takes `slate`, which every theme carries. The group
 headings are the exception in the other direction: they are `ink`, because they are the scopes the
 list is built on, and the one line under each is `slate`. Hints there are at least 12.5px, and prose
-is capped at 68ch with `text-wrap: pretty`. `muted` remains for disabled controls and dividers, and
-the sidebar's keycaps and folder names are a separate audit. `e2e/settings-contrast.spec.ts`
-measures every tab, the group headers and the Layout pane in all three themes against WCAG,
+is capped at 68ch with `text-wrap: pretty`. `muted` remains for disabled controls and dividers. The
+rest of the chrome followed the same rule in #202 — its keycaps, counts, hints and placeholders take
+`slate`, and `check-literals.mjs` refuses a `muted` text colour there — while only a disabled control,
+a separator or a decorative glyph may keep it. `e2e/settings-contrast.spec.ts` measures every tab, the
+group headers and the Layout pane in all three themes against WCAG,
 `::placeholder` included; no colour in `themes/*/theme.json` changed.
 
 **Deliberately out**: a lossy quality slider (there is nothing to compress, and the content is text);

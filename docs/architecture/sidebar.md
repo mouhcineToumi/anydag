@@ -49,6 +49,9 @@ Fourteen things are load-bearing:
   rename, `shift+F10` for the menu), and every row carries the folder a drop onto it means. Which
   folders are open is `dag:sidebar-open`, this browser's and deliberately not synced — view state,
   like a scroll position — written with `writeLocal`, which does not wake the preference sync.
+  **A row's `⋯` and a folder's `+` live inside its `role="treeitem"`**, because they act on that
+  row; the tree owns only treeitems and groups. The loading line, *Nothing here yet* and a refused
+  create sit beside it rather than in it, so the tree is never a tree with a paragraph in it.
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
   one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
   down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
@@ -131,6 +134,13 @@ Fourteen things are load-bearing:
   glide a few pixels a frame as fast as another writer added a row. `shownKey` remembers which file
   it has shown. `e2e/folders.spec.ts` holds it (*a file somebody else makes does not bring the list
   back to the open board*), and the glide's own check passed under load only after it.
+
+**A phone's shell is finger-sized.** Under 720px the sheet's acts, its rows, the Settings row and each
+row's `⋯` are 44×44; the `⋯` keeps its 14px glyph inside a 44px box, because a phone has no
+right-click and that button is the only way to rename, move or delete. The page tabs' close and the
+search card's field and rows follow the same floor. At every width nothing in the shell, the search,
+a quiz's answer ticks or a table's strip is under 24×24 — `e2e/touch-targets.spec.ts` holds both
+floors, at 390×844 and 1440×900.
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and

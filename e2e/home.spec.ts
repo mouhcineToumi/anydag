@@ -153,8 +153,9 @@ test("the logo says it can be clicked", async ({ page }) => {
   await page.goto(await vaulted(page, "/?tasks=1"));
   await expect(page.locator("[data-dag-tasks]")).toBeVisible();
 
-  /* Named for what it does, not for what it is. */
-  await expect(logo(page)).toHaveAttribute("aria-label", "Home");
+  /* Named for what it does — and, since #203, holding the wordmark it shows, because a spoken
+     name must contain the visible one (WCAG 2.5.3, label in name). */
+  await expect(logo(page)).toHaveAttribute("aria-label", "AnyDag home");
   /* A hand over it sees a pointer and a fill, and the keyboard reaches it. */
   const fill = () => logo(page).evaluate((el) => getComputedStyle(el).backgroundColor);
   const resting = await fill();
