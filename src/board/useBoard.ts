@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { CODES } from "../dsl/codes";
 import { concerns, onBoard, onBoards, onFile, onNote, onQuiz, onTable, type BoardChange } from "./events";
 import { GUESSED, guessed, shown, tick } from "./guess";
 import { refresher } from "./refresher";
@@ -45,9 +46,33 @@ interface Write {
   after: Version;
 }
 
+/**
+ * Why a page has no document to draw.
+ *
+ * **The reason is not the message.** `missing` is a 404 (or the change feed watching a file go),
+ * `unreachable` is a `fetch` that rejected with no answer, and `unreadable` is every other answer or
+ * failure — a 5xx, an error body, or text that did not become the kind's document. The page draws a
+ * different sentence and a different set of actions for each (`src/ui/FileProblem.tsx`), and the raw
+ * message and code stay under a disclosure.
+ */
+export interface LoadProblem {
+  reason: "missing" | "unreachable" | "unreadable";
+  /** The server's message or the exception's, for the bug-report disclosure. Never the sentence shown. */
+  message?: string;
+  /** A diagnostic code, where one exists — `EB_UNREADABLE` for a board. */
+  code?: string;
+  /** The file's text, when the bytes arrived and reading them as this kind failed. */
+  text?: string;
+}
+
 export interface BoardHandle {
   board: Board | null;
+  /** The sentence a board page used to draw. Kept for the read-only view's plain `Missing` card. */
   error: string | null;
+  /** Why the board could not be loaded, for a page that offers what to do about it. */
+  problem: LoadProblem | null;
+  /** Ask for the board again — the unreachable state's *Try again*. */
+  reload(): void;
   /** Change items. Resolves to what was written, or `null` when the edit could not be applied. */
   patch(ops: PatchOp[]): Promise<Write | null>;
   /** Replace the whole file — the undo path. Same contract as `patch`. */
@@ -63,46 +88,86 @@ export interface BoardHandle {
 
 export function useBoard(name: string | null): BoardHandle {
   const [board, setBoard] = useState<Board | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [docId, setDocId] = useState<string | null>(null);
+  /* A version of the load, so *Try again* asks the same question again rather than waiting for a
+     change on the feed that a dead server will never send. */
+  const [attempt, setAttempt] = useState(0);
   /* A ref, not state: a write must read the version as of the moment it is called, and a value
      captured in a render closure is one HMR push out of date exactly when it matters. */
   const held = useRef<Version | null>(null);
 
   const adopt = useCallback((boardName: string, v: Version) => {
-    held.current = v;
-    setBoard(parseBoard(boardName, v.text));
+    try {
+      const parsed = parseBoard(boardName, v.text);
+      held.current = v;
+      setBoard(parsed);
+      setProblem(null);
+    } catch (e) {
+      /* The bytes arrived and the board could not become one: unreadable, and *Open as text* has
+         something to show. A defect in the parser must not be reported as a dead server. */
+      held.current = v;
+      setBoard(null);
+      setProblem({
+        reason: "unreadable",
+        message: e instanceof Error ? e.message : String(e),
+        code: CODES.EB_UNREADABLE,
+        text: v.text,
+      });
+    }
   }, []);
 
   useEffect(() => {
     setDocId(null);
     if (!name) {
       setBoard(null);
+      setProblem(null);
       held.current = null;
       return;
     }
     let live = true;
-    setError(null);
+    setProblem(null);
 
     /* Opening is the one read a prefetch may answer; the feed's refetch below never is. */
     openDoc("board", name)
       .then(async (r) => {
-        const data = (await r.json()) as { text?: string; base?: string; error?: string; id?: string };
+        let data: { text?: string; base?: string; error?: string; id?: string };
+        try {
+          data = (await r.json()) as typeof data;
+        } catch (e) {
+          if (live)
+            setProblem({
+              reason: "unreadable",
+              message: e instanceof Error ? e.message : String(e),
+              code: CODES.EB_UNREADABLE,
+            });
+          return;
+        }
         if (!live) return;
         setDocId(data.id ?? null);
         if (!r.ok) {
-          setError(data.error ?? `could not load \`${name}\``);
+          /* A 404 is the page's one honest "there is no such file"; every other answer is the
+             server failing to read it. `!r.ok` without a 404 used to be drawn as the same
+             `EB_UNREADABLE` card as a dead server, which is how a network error and a missing file
+             came to say the same thing. */
+          setProblem({
+            reason: r.status === 404 ? "missing" : "unreadable",
+            message: data.error ?? `the server answered ${r.status}`,
+            ...(r.status === 404 ? {} : { code: CODES.EB_UNREADABLE }),
+          });
           setBoard(null);
           return;
         }
         adopt(name, { text: data.text ?? "", base: data.base ?? "" });
       })
-      .catch((e: Error) => live && setError(e.message));
+      .catch((e: Error) =>
+        live ? setProblem({ reason: "unreachable", message: e.message, code: CODES.EB_UNREADABLE }) : undefined,
+      );
 
     return () => {
       live = false;
     };
-  }, [name, adopt]);
+  }, [name, adopt, attempt]);
 
   useEffect(() => {
     if (!name) return;
@@ -110,7 +175,7 @@ export function useBoard(name: string | null): BoardHandle {
     const off = onBoard((change) => {
       if (!concerns(change, name)) return;
       if (change.sha1 === null) {
-        setError(`\`${name}\` was deleted`);
+        setProblem({ reason: "missing", message: `\`${name}\` was deleted` });
         held.current = null;
         return;
       }
@@ -125,7 +190,7 @@ export function useBoard(name: string | null): BoardHandle {
         .then(async (r) => {
           const data = (await r.json()) as { text?: string; base?: string };
           if (!live || !r.ok) return;
-          setError(null);
+          setProblem(null);
           adopt(name, { text: data.text ?? "", base: data.base ?? "" });
         })
         .catch(() => undefined);
@@ -200,8 +265,18 @@ export function useBoard(name: string | null): BoardHandle {
   );
   const put = useCallback((text: string): Promise<Write | null> => write("put", { text }, false), [write]);
   const current = useCallback(() => held.current, []);
+  const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { board, error, patch, put, current, docId };
+  return {
+    board,
+    error: problem ? (problem.message ?? "the file could not be loaded") : null,
+    problem,
+    reload,
+    patch,
+    put,
+    current,
+    docId,
+  };
 }
 
 /** What the list draws: every board, every note, and every folder — the empty ones included. */
