@@ -1908,6 +1908,72 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-welcome__act--tile > svg { margin-bottom: 2px; }
 .dag-welcome__act--tile kbd { font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); }
 .dag-welcome__act--tile.dag-welcome__act--go kbd { color: var(--dag-color-slate); }
+
+/*
+ * Home proper: the ways to start, then the files this browser opened last, then what is due.
+ *
+ * The card is wider than the other two because the two lists need a line for a title and a line
+ * for what it is; the title and hint stay centred, while a row reads from the left like a list.
+ * The tiles are a grid rather than the row `EmptyBoard` draws, so *More…* can open its kinds under
+ * them without moving the ones already there.
+ */
+.dag-welcome--home {
+  width: 520px;
+  gap: 0;
+  padding: 24px;
+  align-items: stretch;
+  text-align: left;
+}
+.dag-welcome--home > svg { align-self: center; }
+.dag-welcome--home > .dag-welcome__title,
+.dag-welcome--home > .dag-welcome__hint { text-align: center; }
+.dag-welcome--vault-empty { width: 460px; }
+.dag-welcome__unlock { align-self: center; margin-top: 14px; }
+.dag-welcome__acts--home {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+.dag-welcome--vault-empty .dag-welcome__acts--home { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dag-welcome__acts--home .dag-welcome__act--tile { width: auto; min-height: 66px; padding: 10px 8px; }
+.dag-welcome__section { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; }
+.dag-welcome__sectiontitle {
+  margin: 0 0 2px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dag-color-slate);
+}
+.dag-welcome__rows { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; }
+.dag-welcome__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-welcome__row:hover { background: var(--dag-color-paper100); }
+.dag-welcome__row:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-welcome__row > svg { flex: none; color: var(--dag-color-slate); }
+.dag-welcome__rowtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-welcome__rowmeta { flex: none; margin-left: auto; padding-left: 8px; font-size: 11.5px; color: var(--dag-color-slate); }
+@media (max-width: 719px) {
+  .dag-welcome--home,
+  .dag-welcome--vault-empty { width: 100%; max-width: calc(100% - 32px); padding: 18px; }
+  .dag-welcome--home .dag-welcome__acts--home { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 719px) {
   .dag-welcome__act--tile { width: 100%; min-height: 52px; flex-direction: row; gap: 10px; justify-content: flex-start; }
   .dag-welcome__act--tile kbd { display: none; }

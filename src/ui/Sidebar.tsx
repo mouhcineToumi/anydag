@@ -1459,9 +1459,8 @@ export function Sidebar({
         }}
         /* The browser's own menu is kept off the column, as a row's is: the tree answers right-clicks.
            A row — and whatever hangs off it, its `⋯` and its folder's *Empty* line — is that row's
-           menu's; the tree's own space, below the rows and around the nothing-here line, is the
-           **top level's**: the `+` menu, at the pointer, making into the folder the tree says is
-           nothing — where there is no row to be in. */
+           menu's; the tree's own space, below the rows, is the **top level's**: the `+` menu, at the
+           pointer, making into the folder the tree says is nothing — where there is no row to be in. */
         onContextMenu={(e) => {
           if ((e.target as Element).closest(".dag-sidebar__line")) return;
           e.preventDefault();
@@ -1484,8 +1483,6 @@ export function Sidebar({
           <p className="dag-sidebar__none" role="status" data-dag-sidebar-loading="">
             Loading your files…
           </p>
-        ) : lines.length === 0 && !failed ? (
-          <p className="dag-sidebar__none">Nothing here yet. Make a board, a note, a quiz or a table above.</p>
         ) : null}
         {/* Only treeitems and their groups live in the tree. A status, an empty line or a
             refused create is a sibling before it, so a screen reader hears a file tree rather
