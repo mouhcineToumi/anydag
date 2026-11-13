@@ -16,13 +16,11 @@
  */
 
 /*
- * The elevation every full-size overlay shares — the Settings modal, the board browser, the
- * rewrite dialog, the welcome card, the shortcut sheet, the floating sidebar, a calendar card and
- * an equation's field. The theme owns the colour (`color.shadow`): dark and translucent on
- * `paper-dark`, soft and low-contrast on the light themes. The geometry is `ui.elevation.modal`,
- * the same on every theme so two dialogs never sit at two different heights above the page.
+ * Elevation is three tokens (`ui.elevation.raised`, `overlay`, `modal`), each drawn in the theme's
+ * `color.shadow` and the same geometry on every theme: a small lift, a menu or floating panel, a
+ * dialog. A layer is one of five (`ui.layer`: chrome 10, popover 20, modal 30, toast 40, tooltip 50);
+ * a `z-index` of 1–9 orders siblings inside one component and is not a layer.
  */
-:root { --elevation: var(--dag-ui-elevation-modal); }
 
 /*
  * The one focus ring the chrome draws: a gap in the surface's own colour, then a band of accent —
@@ -164,7 +162,7 @@
   height: 14px;
   background: var(--dag-color-card);
   border-radius: 50%;
-  box-shadow: 0 1px 2px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-raised);
   transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 .dag-switch:checked { background: var(--dag-color-accent); }
@@ -272,7 +270,7 @@
 .dag-provider-mark--name { width: auto; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .dag-modelpicker__popover {
   position: fixed;
-  z-index: 60;
+  z-index: calc(var(--dag-ui-layer-modal) + 1);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -280,7 +278,7 @@
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-modelpicker__search { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 8px; border-bottom: 1px solid var(--dag-color-outlineSoft); }
 .dag-modelpicker__searchIcon { flex: none; color: var(--dag-color-muted); }
@@ -712,11 +710,11 @@
   bottom: 8px;
   /* Its size comes from its two edges; the docked `height: 100%` would push the foot off the glass. */
   height: auto;
-  z-index: 25;
+  z-index: var(--dag-ui-layer-popover);
   border: 1px solid var(--dag-color-outline);
   border-left: none;
   border-radius: 0 var(--dag-metric-radius-card) var(--dag-metric-radius-card) 0;
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-overlay);
   animation: dag-sidebar-in var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sidebar-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -993,7 +991,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 90;
+  z-index: var(--dag-ui-layer-tooltip);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1007,7 +1005,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
   pointer-events: none;
   will-change: transform;
 }
@@ -1170,11 +1168,11 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-  z-index: 6;
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
 }
 /* A row's menu, placed where it was asked for rather than hung off the account. */
-.dag-sidebar__menu--row { position: fixed; right: auto; bottom: auto; min-width: 184px; z-index: 40; }
+.dag-sidebar__menu--row { position: fixed; right: auto; bottom: auto; min-width: 184px; }
 .dag-sidebar__menu-danger:hover { color: var(--dag-color-danger); }
 
 /* Deleting a folder with everything in it: the Settings card's shape, over the whole
@@ -1188,7 +1186,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
    whatever the rule said, and nothing noticed until the Settings modal (50) opened it. */
 .dag-settings__scrim.dag-purge__scrim {
   position: fixed;
-  z-index: 60;
+  z-index: var(--dag-ui-layer-modal);
   background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
 }
 .dag-purge { width: 420px; }
@@ -1258,7 +1256,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--vault-t);
   box-shadow: inset 0 0 0 1px var(--vault-h);
 }
-.dag-vault__menu { top: calc(100% + 4px); bottom: auto; left: 8px; right: 8px; z-index: 30; max-height: 70vh; overflow-y: auto; }
+.dag-vault__menu { top: calc(100% + 4px); bottom: auto; left: 8px; right: 8px; z-index: var(--dag-ui-layer-popover); max-height: 70vh; overflow-y: auto; }
 /* Two classes deep: a menu item's every `span` is `flex: 1`, and the mark is a span. */
 .dag-vault__item > .dag-vault__mark { flex: none; }
 .dag-vault__item { height: auto; min-height: 38px; padding: 4px 8px; }
@@ -1504,8 +1502,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-  z-index: 30;
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
 }
 .dag-pagemore__group { display: flex; flex-direction: column; }
 .dag-pagemore__menu .dag-more__item { width: 100%; font-size: 13px; color: var(--dag-color-ink); }
@@ -1878,7 +1876,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 6;
+  z-index: calc(var(--dag-ui-layer-chrome) + 1) /* over the dock, under the floating sidebar */;
 }
 .dag-welcome {
   display: flex;
@@ -1893,7 +1891,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-welcome__title { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: var(--dag-color-ink); }
 .dag-welcome__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--dag-color-slate); }
@@ -2022,7 +2020,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   position: absolute;
   inset: 0;
   display: flex;
-  z-index: 6;
+  z-index: calc(var(--dag-ui-layer-chrome) + 1) /* covers the dock, as it always did; under the floating sidebar */;
   background: var(--dag-color-paper);
 }
 .dag-file-problem {
@@ -2045,7 +2043,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-file-problem__title {
   margin: 0;
@@ -3049,7 +3047,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 1px 6px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-raised);
 }
 .dag-card-text .dag-rich-field .dag-blocks--field .bn-editor {
   padding: 2px 6px;
@@ -3068,7 +3066,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-small);
-  box-shadow: 0 1px 6px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-raised);
   outline: none;
 }
 
@@ -3314,9 +3312,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-accent);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-raised);
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--dag-ui-layer-popover);
 }
 /* While anything is being dragged — an item, a component — the cursor says so everywhere and no
    text on the board lights up under the pointer's path. */
@@ -3430,8 +3428,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-shadow);
-  z-index: 5;
+  box-shadow: var(--dag-ui-elevation-raised);
+  z-index: var(--dag-ui-layer-chrome);
   user-select: none;
 }
 .dag-selbar__row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; }
@@ -3584,7 +3582,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
+  z-index: var(--dag-ui-layer-modal);
 }
 .dag-shortcuts {
   width: 600px;
@@ -3595,7 +3593,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-modal);
 }
 .dag-shortcuts__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dag-shortcuts__head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -3641,9 +3639,9 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 8px 28px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
   pointer-events: none;
-  z-index: 7;
+  z-index: var(--dag-ui-layer-popover);
 }
 .dag-whichkey__leader { flex: none; }
 .dag-whichkey__list { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
@@ -3661,7 +3659,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
+  z-index: var(--dag-ui-layer-modal);
 }
 .dag-settings {
   width: 460px;
@@ -4144,7 +4142,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
     height: 14px;
     background: var(--dag-color-card);
     border-radius: 50%;
-    box-shadow: 0 1px 2px var(--dag-color-shadow);
+    box-shadow: var(--dag-ui-elevation-raised);
     transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
   }
   .dag-settings-modal .dag-switch:checked { background: transparent; }
@@ -4316,7 +4314,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   align-items: center;
   gap: 6px;
   max-width: min(640px, calc(var(--canvas-w, 100%) - 32px));
-  z-index: 6;
+  z-index: calc(var(--dag-ui-layer-chrome) + 1) /* over the dock it shares the bottom centre with */;
   user-select: none;
 }
 
@@ -4333,7 +4331,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: 999px;
-  box-shadow: 0 2px 8px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-raised);
   cursor: pointer;
 }
 .dag-problems__pill--error { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
@@ -4363,7 +4361,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
   overflow: hidden;
 }
 .dag-problems__head {
@@ -4423,14 +4421,14 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 
 .dag-tip__bubble {
   position: fixed;
-  z-index: 60;
+  z-index: var(--dag-ui-layer-tooltip);
   max-width: min(280px, calc(100vw - 16px));
   padding: 6px 9px;
   background: var(--dag-color-card);
   color: var(--dag-color-ink);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
   font-family: var(--dag-font-sans);
   font-size: 12px;
   line-height: 1.4;
@@ -4472,11 +4470,14 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 2px 8px var(--dag-color-shadow);
-  z-index: 5;
+  box-shadow: var(--dag-ui-elevation-raised);
+  z-index: var(--dag-ui-layer-chrome);
   user-select: none;
 }
 .dag-dock { left: var(--canvas-mid, 50%); transform: translateX(-50%); }
+/* The transform makes the dock its own stacking context, so its menu can rise no higher than the dock:
+   while the menu is open the whole dock is a popover, over the problems list and the notices. */
+.dag-dock:has(.dag-more__menu) { z-index: var(--dag-ui-layer-popover); }
 /* `--canvas-right` is whatever the panels take, so this stays 12px off the *drawing's* edge
    instead of being drawn on top of the library. */
 .dag-zoombar { right: calc(var(--canvas-right, 0px) + 12px); }
@@ -4551,8 +4552,8 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-  z-index: 6;
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
 }
 .dag-more__item {
   position: relative;
@@ -4727,7 +4728,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
  * grepped first: `dag-feedback__*` had only the textarea above, `data-dag-feedback*` was nobody's.
  */
 .dag-feedback { width: 520px; }
-.dag-feedback[data-dragging] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft), var(--elevation); }
+.dag-feedback[data-dragging] { border-color: var(--dag-color-accent); box-shadow: 0 0 0 3px var(--dag-color-accentSoft), var(--dag-ui-elevation-modal); }
 .dag-feedback__mark { flex: none; color: var(--dag-color-accent); }
 .dag-feedback__kinds { display: flex; gap: 4px; margin: 10px 0 8px; }
 .dag-feedback__kind {
@@ -4925,7 +4926,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 40;
+  z-index: var(--dag-ui-layer-popover);
   width: 320px;
   max-height: 360px;
   overflow: auto;
@@ -4933,7 +4934,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-backlinks__row {
   display: grid;
@@ -5050,7 +5051,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 40;
+  z-index: var(--dag-ui-layer-popover);
   min-width: 212px;
   display: flex;
   flex-direction: column;
@@ -5059,7 +5060,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-export__menu .dag-more__item { color: var(--dag-color-ink); }
 .dag-export__menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
@@ -5067,7 +5068,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 40;
+  z-index: var(--dag-ui-layer-popover);
   width: 280px;
   margin: 0;
   padding: 8px 10px;
@@ -5359,13 +5360,13 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 20;
+  z-index: var(--dag-ui-layer-popover);
   padding: 8px 10px;
   gap: 8px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-projectbar__hues { display: inline-flex; align-items: center; gap: 4px; }
 .dag-projectbar__hue {
@@ -5600,7 +5601,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tasks__card:hover { border-color: var(--dag-color-slate); }
 .dag-tasks__card:focus-visible { box-shadow: var(--focus-ring-inset); }
 /* What the drag moves, not what was pressed, is what must stop answering `elementFromPoint`. */
-.dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: 0 8px 24px var(--dag-color-shadow); }
+.dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: var(--dag-ui-elevation-overlay); }
 .dag-tasks__card-top { display: flex; align-items: flex-start; gap: 6px; }
 .dag-tasks__card-title { flex: 1; min-width: 0; padding-top: 2px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .dag-tasks__card-meta { display: flex; align-items: center; gap: 8px; padding-left: 28px; }
@@ -6257,7 +6258,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 30;
+  z-index: var(--dag-ui-layer-popover);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -6266,7 +6267,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-calendar__show-head { margin: 4px 6px 2px; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); }
 .dag-calendar__show-menu .dag-calendar__kind { justify-content: flex-start; height: 30px; border: none; color: var(--dag-color-ink); background: transparent; }
@@ -6581,7 +6582,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* The card that names what was drawn. */
 .dag-calendar__new {
   position: fixed;
-  z-index: 60;
+  z-index: var(--dag-ui-layer-popover);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -6590,7 +6591,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-calendar__new-when { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--dag-color-slate); }
 .dag-calendar__new input {
@@ -6750,7 +6751,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   background: var(--dag-color-paper100);
 }
-.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: 0 1px 3px var(--dag-color-shadow); }
+.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: var(--dag-ui-elevation-raised); }
 
 /* A file in a note: a picture drawn, anything else a card whose Preview opens it in place. */
 .dag-embed.dag-embed--picture { margin: 0; border: none; background: transparent; }
@@ -7111,7 +7112,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   position: absolute;
   top: calc(100% + 10px);
   left: -9px;
-  z-index: 30;
+  z-index: var(--dag-ui-layer-popover);
   display: flex;
   flex-direction: column;
   min-width: 220px;
@@ -7122,7 +7123,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-grid__options-item {
   display: flex;
@@ -7167,7 +7168,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 /* A column's or a row's menu, and the Sort and Filter cards: at the pointer, over everything. */
 .dag-grid__menu {
   position: fixed;
-  z-index: 60;
+  z-index: var(--dag-ui-layer-popover);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -7176,7 +7177,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  box-shadow: 0 8px 24px var(--dag-color-shadow);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-grid__menu-field { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px 6px; font-size: 11px; color: var(--dag-color-slate); }
 .dag-grid__menu-field input {
@@ -7289,7 +7290,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
    A portal on <body>, fixed, so the editor's own DOM never holds it. */
 .dag-math-field {
   position: fixed;
-  z-index: 30;
+  z-index: var(--dag-ui-layer-popover);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -7297,7 +7298,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: 8px;
-  box-shadow: var(--elevation);
+  box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-math-field__tex {
   width: 100%;
@@ -7775,7 +7776,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-scope__chip > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__chip:hover { background: var(--dag-color-paper100); }
 .dag-chat-scope__more { color: var(--dag-color-accent); font-weight: 600; }
-.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 20; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: 0 8px 24px var(--dag-color-shadow); }
+.dag-chat-scope__menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: var(--dag-ui-layer-popover); padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-metric-radius-card); box-shadow: var(--dag-ui-elevation-overlay); }
 .dag-chat-scope__line { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 4px 6px; font-size: 12px; }
 .dag-chat-scope__line strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-scope__line > span { color: var(--dag-color-slate); }
@@ -7798,7 +7799,7 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 @media (max-width: 719px) {
   .dag-assistant { grid-template-columns: minmax(0, 1fr); }
   .dag-assistant__history { display: none; }
-  .dag-assistant-panel { position: fixed; inset: 0; z-index: 40; width: auto; max-width: none; border-left: none; }
+  .dag-assistant-panel { position: fixed; inset: 0; z-index: var(--dag-ui-layer-modal); width: auto; max-width: none; border-left: none; }
   .dag-chat-composer { margin-inline: 12px; }
 }
 
