@@ -261,9 +261,9 @@ dialog, the delete questions), so a change to one of its rules is a change to al
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
 the translucent elevation colour every dialog and floating card draws with — because a shadow is a
 colour the theme owns while how wide a dialog is is not. In `paper-dark` it is black, so the card sits
-on a dark edge rather than glowing; in `paper` and `neutral` it is a soft tint of ink. The shared
-`--elevation` rule is where the geometry lives, and the Settings modal, the board browser, the rewrite
-dialog and the welcome card all read it.
+on a dark edge rather than glowing; in `paper` and `neutral` it is a soft tint of ink. The geometry
+is `--dag-ui-elevation-modal`, and the Settings modal, the board browser, the rewrite dialog and the
+welcome card all read it.
 
 **Contrast is a token choice, not a theme edit.** `muted` is 2.6:1 on Neutral's white card and 2.4:1
 on its panel, so text a person must read inside `[data-dag-settings]` — headings, hints,

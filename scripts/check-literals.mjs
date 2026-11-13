@@ -110,9 +110,31 @@ const CHROME_ALLOW = "scripts/chrome-literals.json";
 const STRUCTURAL = {
   "font-size": /^(?:inherit|initial|unset|1em|100%)$/,
   "border-radius": /^(?:0|inherit|initial|unset|50%)$/,
-  "box-shadow": /^(?:none|inherit|initial|unset|inset\b.*)$/,
+  "box-shadow": /^(?:none|inherit|initial|unset)$/, // and see `isRing` below
   "z-index": /^(?:auto|-?\d)$/,
   transition: /^(?:none|inherit|initial|unset)$|^(?:(?!\d*\.?\d+m?s\b).)*$/,
+};
+/* A shadow part that is not elevation: the focus rings (`--focus-ring*` are built from `--dag-ui-focus-*`),
+   an inset shadow, and a ring or a bar, which has no blur (`0 0 0 2px accentSoft`, `0 2px 0 accent`). */
+const isRing = (v) => {
+  const parts = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i <= v.length; i++) {
+    const c = v[i];
+    if (c === "(") depth++;
+    else if (c === ")") depth--;
+    else if ((c === "," && depth === 0) || i === v.length) {
+      parts.push(v.slice(from, i).trim());
+      from = i + 1;
+    }
+  }
+  return parts.every(
+    (p) =>
+      /^inset\b/.test(p) ||
+      /^var\(--focus-ring(?:-inset)?\)$/.test(p) ||
+      /^-?[\d.]+(?:px)?\s+-?[\d.]+(?:px)?\s+0(?:px)?\s/.test(p),
+  );
 };
 const chromeCounts = Object.fromEntries(Object.keys(STRUCTURAL).map((k) => [k, 0]));
 const chromeText = strip(fs.readFileSync(path.join(root, CHROME), "utf8"), ".css");
@@ -123,6 +145,7 @@ for (const m of chromeText.matchAll(
   const value = m[2].trim().replace(/\s*!important$/, "");
   if (value.includes("var(--dag-ui-")) continue;
   if (STRUCTURAL[prop].test(value)) continue;
+  if (prop === "box-shadow" && isRing(value)) continue;
   chromeCounts[prop] += 1;
 }
 const chromeAllowed = JSON.parse(fs.readFileSync(path.join(root, CHROME_ALLOW), "utf8"));

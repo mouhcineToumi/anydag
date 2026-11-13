@@ -210,6 +210,36 @@ test("the count opens the list, and a row opens the panel", async ({ page }) => 
   await expect(page.locator("[data-dag-problems-tray]")).toHaveCount(0);
 });
 
+test("the dock's menu opens over the problems count, and the count is over the dock", async ({ page }) => {
+  /* Both sit at the bottom centre. The dock's transform makes it a stacking context, so its menu can
+     rise no higher than the dock: it was drawn under the count (#206, DS-9). */
+  await open(page, GHOST);
+  await expect(pill(page)).toBeVisible();
+  await page.locator("[data-dag-more]").click();
+  const menu = page.locator("[data-dag-more-menu]");
+  await expect(menu).toBeVisible();
+  /* Siblings in one stacking context, so their z-index is what decides which is drawn on top. */
+  const order = () =>
+    page.evaluate(() => {
+      const dock = document.querySelector(".dag-dock") as HTMLElement;
+      const problems = document.querySelector("[data-dag-problems]") as HTMLElement;
+      return {
+        siblings: dock.parentElement === problems.parentElement,
+        dock: Number(getComputedStyle(dock).zIndex),
+        problems: Number(getComputedStyle(problems).zIndex),
+      };
+    });
+  const opened = await order();
+  expect(opened.siblings).toBe(true);
+  expect(opened.dock).toBeGreaterThan(opened.problems);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  const shut = await order();
+  expect(shut.problems).toBeGreaterThan(shut.dock);
+  await pill(page).click();
+  await expect(page.locator('[data-dag-problems-row="E_UNKNOWN_ID"]')).toBeVisible();
+});
+
 test("the panel deletes a link to nothing from its row", async ({ page }) => {
   await open(page, GHOST);
   await page.locator("[data-dag-problems-show]").click();

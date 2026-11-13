@@ -260,12 +260,14 @@ item over its siblings, a grip over its column) stays local and literal.
 | Toast | `--dag-ui-layer-toast` | 40 | The toast stack, **above a dialog** |
 | Tooltip | `--dag-ui-layer-tooltip` | 50 | Tooltips, above everything |
 
-**What ships.** Only the dialog frame, the sidebar sheet, the flashcards scrim and the toast stack
-read these tokens so far. At #218, 22 rules still typed a `z-index`, and some disagree with the table:
-the tooltip bubble (`dag-tip__bubble`), the model picker's popover and the purge scrim are at 60;
-the export menu and the backlinks list are at 40; the page's `⋯` menu and the vault menu are at 30;
-the old Settings and shortcuts scrims are at 20. Move each one onto its layer when its screen is
-touched. A new overlay reads its layer and never types a number.
+**What ships.** Every menu and popover, the leader-key overlay, the floating sidebar and the
+drag chip are on `popover`; every dialog, scrim and sheet on `modal`; the toast stack on `toast`; a
+tooltip and the sidebar's drag ghost on `tooltip`; the dock, zoom cluster and selection bar on
+`chrome`. `check-literals.mjs` counts `z-index` and `box-shadow` literals in `chrome.css` at zero.
+Three spots are written as an offset on purpose: the model picker's popover is portalled to
+`<body>` from inside Settings, so it is `modal + 1`; the welcome and file-problem layers cover the
+dock and sit under the floating sidebar, so they are `chrome + 1`. A new overlay reads its layer
+and never types a number.
 
 ### Toast
 

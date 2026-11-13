@@ -45,7 +45,14 @@ a token draws the same. **Motion moved first** (#206): every transition and entr
 (the theme writes them on `<html>`'s own style) and stops the three spinners. Those, the *Saved*
 tick's fade and the lock pill's shake (#216) have a period, not a duration; they are the five
 transitions the count still allows.
-`e2e/motion.spec.ts` reads the computed durations both ways.
+`e2e/motion.spec.ts` reads the computed durations both ways. **Elevation and layers moved second**
+(#206): `chrome.css` has three shadows (`raised` for a lift, `overlay` for a menu, popover or floating
+panel, `modal` for a dialog) and five layers (`chrome`, `popover`, `modal`, `toast`, `tooltip`); the
+local `--elevation` is gone. A `z-index` of 1–9 orders siblings inside one component and is not a
+layer; a shadow with no blur (a ring, an accent bar), an inset one and `--focus-ring*` are not
+elevation, and `check-literals.mjs` does not count them. Both counts are zero. A popover portalled to
+`<body>` out of a dialog (the model picker) is `modal + 1`. `e2e/layers.spec.ts` reads the computed
+layers and shadows.
 Which of these a screen should use for what — colour roles with their measured contrast, the type
 scale, the controls, the layers, focus, motion, icons and the voice — is [`DESIGN.md`](../../DESIGN.md)
 at the root, held to the code by `check:design`.
