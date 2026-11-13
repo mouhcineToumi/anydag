@@ -21,7 +21,21 @@ export async function openSidebar(page: Page): Promise<void> {
 }
 
 /** The Settings modal's tabs, by the id `src/settings/tabs.ts` gives each. */
-export type SettingsTab = "calendar" | "shortcuts" | "privacy" | "about" | "preferences" | "vault" | "agents" | "export" | "sync";
+export type SettingsTab =
+  | "appearance"
+  | "ai"
+  | "calendar"
+  | "quizzes"
+  | "providers"
+  | "vault-general"
+  | "vault-files"
+  | "export"
+  | "sync"
+  | "agent-access"
+  | "board-layout"
+  | "privacy"
+  | "shortcuts"
+  | "about";
 
 /**
  * Settings sits at the sidebar's foot, not behind the dock's `⋯`. A modal of tabs, so a check that

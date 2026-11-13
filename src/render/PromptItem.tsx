@@ -1,10 +1,19 @@
 import { AlertTriangle, LoaderCircle, RotateCcw, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type SyntheticEvent } from "react";
 
+import { assertNever } from "@/board/useBoard";
 import { DIAGRAM_TYPES, type BoardItem, type DiagramType } from "@/board/types";
 import type { Generated } from "@/edit/generate";
 import type { EditorCtl } from "@/edit/useEditor";
+import { explainLlmReason, type LlmAction, type LlmReason } from "@/settings/llmReason";
+import { ModelChip } from "@/settings/ModelChip";
+import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
+import { writeSettings } from "@/settings/store";
+import { useProviders } from "@/settings/useProviders";
 import { useSettings } from "@/settings/useSettings";
+import { askPage } from "@/ui/chrome";
+import { LlmSentence } from "@/ui/LlmSentence";
+import { desktop } from "@/vault/desktop";
 
 /**
  * A prompt card: somebody describes a diagram, and a model on the dev server draws it in the card's
@@ -24,7 +33,7 @@ import { useSettings } from "@/settings/useSettings";
 type Run =
   | { state: "idle" }
   | { state: "running"; started: number; cancel: AbortController }
-  | { state: "failed"; message: string; result?: Generated };
+  | { state: "failed"; message: string; reason?: LlmReason; result?: Generated };
 
 const ICON = { size: 14, strokeWidth: 2 } as const;
 /** How long typing waits before it is written — the panel's figure, for the panel's reason. */
@@ -39,6 +48,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   const [now, setNow] = useState(() => Date.now());
   const area = useRef<HTMLTextAreaElement>(null);
   const settings = useSettings();
+  const [providers] = useProviders();
 
   /* The file wins whenever the person is not typing into this box: Claude may have rewritten the
      prompt, or an undo put an older one back. */
@@ -101,7 +111,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
       setRun({ state: "failed", message: result.error ?? "the diagram still has problems", result });
     } catch (e) {
       if (cancel.signal.aborted) return setRun({ state: "idle" });
-      setRun({ state: "failed", message: (e as Error).message });
+      setRun({ state: "failed", message: (e as Error).message, reason: (e as { reason?: LlmReason }).reason });
     } finally {
       if (live.current === cancel) live.current = null;
     }
@@ -117,7 +127,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
     }
   };
 
-  const who = settings.llm.model ?? settings.llm.provider ?? "the default model";
+  const who = modelChoiceText(modelChoice(settings.llm, providers));
 
   if (!ctl) {
     return (
@@ -134,6 +144,28 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   const failed = run.state === "failed" ? run : null;
   const draft = failed?.result?.draft;
   const shown = (failed?.result?.diagnostics ?? []).filter((d) => d.severity === "error").slice(0, 3);
+  const explanation = failed?.reason
+    ? explainLlmReason(failed.reason, {
+        host: desktop()?.keys ? "desktop" : "browser",
+        providers: providers?.providers,
+      })
+    : null;
+  const act = (a: LlmAction) => {
+    switch (a.kind) {
+      case "settings":
+        askPage("settings", "ai");
+        return;
+      case "provider":
+        if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });
+        void go();
+        return;
+      case "retry":
+        void go();
+        return;
+      default:
+        return assertNever(a.kind);
+    }
+  };
 
   return (
     <div className="dag-prompt" data-dag-prompt={run.state} style={item.h !== undefined ? { minHeight: item.h } : undefined}>
@@ -166,6 +198,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
         onKeyDown={onKeyDown}
       />
       <div className="dag-prompt__bar" onPointerDown={mine} onDoubleClick={mine}>
+        <ModelChip where="prompt" />
         <select
           className="dag-prompt__as"
           data-dag-prompt-as=""
@@ -210,7 +243,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
         <div className="dag-prompt__fail" role="alert" data-dag-prompt-fail="" onPointerDown={mine}>
           <p className="dag-prompt__status">
             <AlertTriangle {...ICON} aria-hidden="true" />
-            {failed.message}
+            <LlmSentence text={explanation?.sentence ?? failed.message} />
             {failed.result?.model
               ? `; ${failed.result.model}, ${failed.result.attempts} attempt${failed.result.attempts === 1 ? "" : "s"}`
               : ""}
@@ -226,6 +259,17 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
             </ul>
           ) : null}
           <div className="dag-prompt__acts">
+            {explanation?.actions.map((a) => (
+              <button
+                key={`${a.kind}:${a.label}`}
+                type="button"
+                className="dag-prompt__btn"
+                data-dag-prompt-act={a.kind}
+                onClick={() => act(a)}
+              >
+                {a.label}
+              </button>
+            ))}
             {draft ? (
               <button
                 type="button"

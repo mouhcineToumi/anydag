@@ -161,6 +161,28 @@ test("a tab names its vault in the address and in every request, and each vault 
   expect(heard).toEqual([]);
 });
 
+test("two vaults whose names start alike wear different monograms, and each is found by its name", async ({ page }) => {
+  const one = await vault(page, `Terra one ${id}`);
+  const two = await vault(page, `Terra two ${id}`);
+  await page.goto(`/?vault=${one.id}&tasks=1`);
+  await openSwitcher(page);
+
+  const rowOne = page.locator(`[data-dag-vault="${one.id}"]`);
+  const rowTwo = page.locator(`[data-dag-vault="${two.id}"]`);
+  await expect(rowOne.locator(".dag-vault__mark")).toHaveText("TO");
+  await expect(rowTwo.locator(".dag-vault__mark")).toHaveText("TT");
+
+  /* The name is the accessible name; the shortened path is only its description. */
+  await expect(page.getByRole("menuitemradio", { name: `Terra one ${id}`, exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: `Terra two ${id}`, exact: true })).toBeVisible();
+  await expect(rowOne.locator(".dag-vault__title")).toHaveText(`Terra one ${id}`);
+  await expect(rowOne.locator(".dag-vault__path")).toContainText("…");
+  await expect(rowOne.locator(".dag-vault__path")).toContainText(`Terra one ${id}`);
+
+  /* The close item says which vault it closes. */
+  await expect(page.getByRole("menuitem", { name: /Close vault/ })).toContainText(`Terra one ${id}`);
+});
+
 test("a folder opened from the switcher is the vault the tab goes to, and the typed path is refused when it is no folder", async ({
   page,
 }) => {
@@ -175,9 +197,14 @@ test("a folder opened from the switcher is the vault the tab goes to, and the ty
   await openSwitcher(page);
   await page.locator("[data-dag-vault-open]").click();
   const field = page.locator("[data-dag-vault-open-path]");
-  await field.fill(path.join(parent, "no-such-folder"));
+  const bad = path.join(parent, "no-such-folder");
+  await field.fill(bad);
   await field.press("Enter");
-  await expect(page.locator("[data-dag-vault-problem]")).toContainText("not a folder");
+  const problem = page.locator("[data-dag-vault-problem]");
+  await expect(problem).toContainText("not a folder");
+  /* The server names the path between backticks; the page draws code, not punctuation. */
+  await expect(problem.locator("code")).toHaveText(bad);
+  await expect(problem).not.toContainText("`");
 
   await field.fill(folder);
   await field.press("Enter");
@@ -236,22 +263,45 @@ test("a board moves to another vault from its row, keeping its id", async ({ pag
   expect((await ids(other.id))[`moving-${id}`]).toBe(ident);
 });
 
-test("a theme chosen in one vault is that vault's", async ({ page }) => {
+test("a theme chosen in one vault is the person's, the same in every vault", async ({ page }) => {
+  /* It was the vault's until #191: opening another vault changed how the app looked. */
   const other = await vault(page);
   const home = await homeId(page);
   const scheme = () => page.evaluate(() => document.documentElement.style.colorScheme);
 
   await page.goto(`/?vault=${other.id}`);
-  await openSettings(page, "preferences");
+  await openSettings(page, "appearance");
+  await expect(page.locator("[data-dag-settings-scope]")).toHaveText("You");
   await page.locator("[data-dag-setting-theme]").selectOption("paper-dark");
   await expect.poll(scheme).toBe("dark");
-  await expect(page.locator("[data-dag-settings-vault]")).toContainText(`vault-${id}`);
 
   await page.goto(`/?vault=${home}&tasks=1`);
-  await expect.poll(scheme).toBe("light");
-
-  await page.goto(`/?vault=${other.id}&tasks=1`);
   await expect.poll(scheme).toBe("dark");
+
+  /* Back to the default, so the next check in this worker starts light. */
+  await openSettings(page, "appearance");
+  await page.locator("[data-dag-setting-theme]").selectOption("paper");
+  await expect.poll(scheme).toBe("light");
+});
+
+test("a vault's old theme is carried over to the person once", async ({ page }) => {
+  /* Before #191 the theme was kept per vault, as `dag:theme@<vault>` in this browser. */
+  const other = await vault(page);
+  const scheme = () => page.evaluate(() => document.documentElement.style.colorScheme);
+  await page.goto(`/?vault=${other.id}&tasks=1`);
+  await page.evaluate((v) => {
+    localStorage.removeItem("dag:theme");
+    localStorage.setItem(`dag:theme@${v}`, "paper-dark");
+  }, other.id);
+  await page.reload();
+  await expect.poll(scheme).toBe("dark");
+  expect(await page.evaluate(() => localStorage.getItem("dag:theme"))).toBe("paper-dark");
+  /* Once: the vault's copy is left as it was, and a later change is the person's alone. */
+  await openSettings(page, "appearance");
+  await page.locator("[data-dag-setting-theme]").selectOption("paper");
+  await page.reload();
+  await expect.poll(scheme).toBe("light");
+  await page.evaluate((v) => localStorage.removeItem(`dag:theme@${v}`), other.id);
 });
 
 test("closing one from its Settings tab leaves its folder, keeps it on the list, and the tab goes to another vault", async ({
@@ -264,7 +314,7 @@ test("closing one from its Settings tab leaves its folder, keeps it on the list,
   await ready(page);
   await openSwitcher(page);
   await page.locator("[data-dag-vault-settings]").click();
-  await expect(page.locator('[data-dag-settings-pane="vault"]')).toBeVisible();
+  await expect(page.locator('[data-dag-settings-pane="vault-general"]')).toBeVisible();
   await expect(page.locator("[data-dag-setting-vault-path]")).toHaveText(other.dir);
   await expect(page.locator("[data-dag-setting-vault-name]")).toHaveText(`vault-${id}`);
 
@@ -342,6 +392,7 @@ test("with no vault open the page is the picker: open a folder, create a vault, 
 
   await expect(page.locator("[data-dag-novault]")).toBeVisible();
   await expect(page.locator("[data-dag-welcome-open-folder]")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recent one", exact: true })).toBeEnabled();
   await expect(page.locator(`[data-dag-vault="r1"]`)).toBeEnabled();
   await expect(page.locator(`[data-dag-vault="r2"]`)).toBeDisabled();
   await expect(page.locator(`[data-dag-vault="r2"]`)).toContainText("not found");
@@ -487,16 +538,17 @@ test("the desktop shell's folder dialog is used when there is one", async ({ pag
   const opened = (await now())!;
   made.push(opened.id);
   await expect(page).toHaveURL((u) => u.searchParams.get("vault") === opened.id);
-  await openSettings(page, "vault");
+  await openSettings(page, "vault-general");
   await expect(page.locator("[data-dag-setting-vault-reveal]")).toBeVisible();
 });
 
-test("the AI tab gives the lines that connect Claude Code and Claude Desktop to this vault", async ({ page }) => {
+test("the Agent access tab gives the lines that connect Claude Code and Claude Desktop to this vault", async ({ page }) => {
   await page.goto(`/?board=nothing-${id}`);
-  await openSettings(page, "agents");
+  await openSettings(page, "agent-access");
   await expect(page.locator('[data-dag-setting-copy-value="mcp-claude-code"]')).toContainText(
     `claude mcp add anydag -- anydag mcp --vault ${HOME}`,
   );
+  await page.locator('[data-dag-agent-client="claude-desktop"]').click();
   const json = await page.locator('[data-dag-setting-copy-value="mcp-claude-desktop"]').textContent();
   expect(JSON.parse(json ?? "{}")).toEqual({ mcpServers: { anydag: { command: "anydag", args: ["mcp", "--vault", HOME] } } });
 });

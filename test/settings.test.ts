@@ -1,6 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DEFAULTS, normalise, readSettings, resetSettings, STORE, writeSettings } from "@/settings/store";
+import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
+import {
+  CALENDAR_HIDE,
+  LIBRARY,
+  THEME,
+  TIME_ZONE,
+  WEEK_START,
+  ATTACHMENTS,
+  UPDATE_LINKS,
+  readPref,
+  resetPrefs,
+  writePref,
+} from "@/settings/prefs";
+import {
+  DEFAULTS,
+  normalise,
+  REASONING,
+  readSettings,
+  resetSettings,
+  resetSettingsWithUndo,
+  STORE,
+  writeSettings,
+} from "@/settings/store";
+import type { Providers } from "@/settings/useProviders";
 
 /**
  * A stand-in for `localStorage`, plus the one that throws.
@@ -135,6 +158,46 @@ describe("readSettings", () => {
     expect(readSettings().paste).toEqual(DEFAULTS.paste);
     expect(readSettings().llm.provider).toBe("opencode");
   });
+
+  it("a reset's Undo puts every value it changed back", () => {
+    writeSettings({
+      export: { scale: 4, paper: false, margin: 12 },
+      paste: { size: "pixels", width: 900, maxWidth: 1600 },
+      llm: { provider: "opencode", model: "a-model", reasoning: "high" },
+    });
+    const before = readSettings();
+
+    const undo = resetSettingsWithUndo(["export", "paste"]);
+    expect(readSettings().export).toEqual(DEFAULTS.export);
+    expect(readSettings().paste).toEqual(DEFAULTS.paste);
+    /* A section the reset did not name is not in the snapshot and is not touched by the undo. */
+    expect(readSettings().llm).toEqual(before.llm);
+
+    undo();
+    expect(readSettings()).toEqual(before);
+  });
+
+  it("leaves a field the reset did not change alone, including a later change to it", () => {
+    /* `paper` is already the default, so the reset changes only the other two and the snapshot
+       holds only those. */
+    writeSettings({ export: { scale: 4, paper: true, margin: 12 } });
+    const undo = resetSettingsWithUndo(["export"]);
+    expect(readSettings().export).toEqual(DEFAULTS.export);
+
+    writeSettings({ export: { paper: false } });
+    undo();
+    expect(readSettings().export).toEqual({ scale: 4, paper: false, margin: 12 });
+  });
+
+  it("resets the problems section alone, now that it shares no tab with the paste controls", () => {
+    writeSettings({ problems: { show: "off" }, paste: { size: "pixels" }, export: { scale: 4 } });
+    const undo = resetSettingsWithUndo(["problems"]);
+    expect(readSettings().problems).toEqual(DEFAULTS.problems);
+    expect(readSettings().paste.size).toBe("pixels");
+    expect(readSettings().export.scale).toBe(4);
+    undo();
+    expect(readSettings().problems.show).toBe("off");
+  });
 });
 
 describe("a snapshot reads no preference", () => {
@@ -172,11 +235,30 @@ describe("the model a prompt card asks", () => {
   });
 
   it("keeps a thinking level it offers and drops one it does not", () => {
+    expect(REASONING).toEqual(["none", "low", "medium", "high", "max"]);
     expect(normalise({ llm: { reasoning: "high" } }).llm.reasoning).toBe("high");
-    /* Gemini refuses `minimal` and the card never offers it: a hand-edited file saying so is
-       dropped rather than sent for the provider to reject. */
+    expect(normalise({ llm: { reasoning: "max" } }).llm.reasoning).toBe("max");
+    /* `none` was a level before Max existed; it is still read rather than becoming Automatic. */
+    expect(normalise({ llm: { reasoning: "none" } }).llm.reasoning).toBe("none");
+    /* The card never offers `minimal`: a hand-edited file saying so is dropped rather than sent
+       for a provider to reject. */
     expect(normalise({ llm: { reasoning: "minimal" } }).llm.reasoning).toBeNull();
     expect(normalise({ llm: { reasoning: 7 } }).llm.reasoning).toBeNull();
+  });
+
+  it("reads a provider this build dropped as Automatic, and drops its model with it", () => {
+    for (const provider of ["gemini", "zai"]) {
+      expect(normalise({ llm: { provider, model: `${provider}-model`, reasoning: "low" } }).llm).toEqual({
+        provider: null,
+        model: null,
+        reasoning: "low",
+      });
+    }
+    expect(normalise({ llm: { provider: "custom", model: "qwen3:32b" } }).llm).toEqual({
+      provider: "custom",
+      model: "qwen3:32b",
+      reasoning: null,
+    });
   });
 
   it("loads an Assistant default stored with the old mode, and drops the mode", () => {
@@ -190,5 +272,95 @@ describe("the model a prompt card asks", () => {
     writeSettings({ llm: { provider: "opencode" } });
     writeSettings({ llm: { reasoning: "low" } });
     expect(readSettings().llm).toEqual({ provider: "opencode", model: null, reasoning: "low" });
+  });
+});
+
+describe("the model a surface says will answer", () => {
+  const list: Providers = {
+    default: "custom",
+    providers: [
+      {
+        id: "custom",
+        label: "OpenAI-compatible",
+        description: "Any endpoint that speaks the OpenAI chat-completions dialect.",
+        kind: "http",
+        defaultModel: "qwen3:32b",
+        models: [],
+        ready: true,
+      },
+      {
+        id: "claude",
+        label: "Claude Code",
+        description: "Uses your Claude plan.",
+        kind: "cli",
+        defaultModel: "sonnet",
+        models: [],
+        ready: true,
+      },
+    ],
+  };
+
+  it("takes the server's default provider and that provider's default model", () => {
+    const choice = modelChoice({ provider: null, model: null, reasoning: null }, list);
+    expect(choice).toEqual({ provider: "custom", name: "OpenAI-compatible", model: "qwen3:32b" });
+    expect(modelChoiceText(choice)).toBe("OpenAI-compatible · qwen3:32b");
+  });
+
+  it("takes the provider and model somebody chose", () => {
+    const choice = modelChoice({ provider: "claude", model: "opus", reasoning: null }, list);
+    expect(choice).toEqual({ provider: "claude", name: "Claude Code", model: "opus" });
+    expect(modelChoiceText(choice)).toBe("Claude Code · opus");
+  });
+
+  it("says Automatic while neither the request nor the server has named one", () => {
+    expect(modelChoice({ provider: null, model: null, reasoning: null }, null)).toBeNull();
+    expect(modelChoiceText(null)).toBe("Automatic");
+  });
+});
+
+describe("a preference reset", () => {
+  it("removes only its own keys, and Undo puts every value back", () => {
+    writePref(THEME, "neutral");
+    writePref(WEEK_START, "0");
+    writePref(CALENDAR_HIDE, "event,note");
+    writePref(TIME_ZONE, "Asia/Tokyo");
+    writePref(LIBRARY, "1");
+
+    const undo = resetPrefs([THEME, WEEK_START, CALENDAR_HIDE, TIME_ZONE]);
+    expect(readPref(THEME)).toBeNull();
+    expect(readPref(WEEK_START)).toBeNull();
+    expect(readPref(CALENDAR_HIDE)).toBeNull();
+    expect(readPref(TIME_ZONE)).toBeNull();
+    /* A key outside the reset is not the reset's to remove. */
+    expect(readPref(LIBRARY)).toBe("1");
+
+    undo();
+    expect(readPref(THEME)).toBe("neutral");
+    expect(readPref(WEEK_START)).toBe("0");
+    expect(readPref(CALENDAR_HIDE)).toBe("event,note");
+    expect(readPref(TIME_ZONE)).toBe("Asia/Tokyo");
+    expect(readPref(LIBRARY)).toBe("1");
+  });
+
+  it("leaves an absent key out of the snapshot, so a later choice survives Undo", () => {
+    const undo = resetPrefs([TIME_ZONE]);
+    expect(readPref(TIME_ZONE)).toBeNull();
+    writePref(TIME_ZONE, "Asia/Tokyo");
+    undo();
+    expect(readPref(TIME_ZONE)).toBe("Asia/Tokyo");
+  });
+
+  it("resets the theme alone, now that it shares no tab with the attachments folder", () => {
+    writePref(THEME, "neutral");
+    writePref(ATTACHMENTS, "files");
+    writePref(UPDATE_LINKS, "0");
+
+    const undo = resetPrefs([THEME]);
+    expect(readPref(THEME)).toBeNull();
+    expect(readPref(ATTACHMENTS)).toBe("files");
+    expect(readPref(UPDATE_LINKS)).toBe("0");
+
+    undo();
+    expect(readPref(THEME)).toBe("neutral");
   });
 });

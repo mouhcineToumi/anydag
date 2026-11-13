@@ -13,6 +13,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* A button draws its own 13.33px system font unless told otherwise; the chrome's buttons take the
+   size and face of where they sit, and a class that sets a size still wins. */
+button { font: inherit; }
+
 .dag-app { display: flex; flex-direction: column; height: 100%; }
 
 /* The window: the sidebar, then the page. `?snapshot=1` renders no shell at all, so a

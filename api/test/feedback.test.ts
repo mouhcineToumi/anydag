@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 import { attachmentUrl, GitHub, GitHubError } from "../server/github";
 import { issueBody, issueTitle } from "../server/routes/feedback";
@@ -91,6 +91,13 @@ const send = (h: Harness, body: FormData | string, headers: Record<string, strin
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
 const MP4 = new Uint8Array(64).fill(7);
+
+/* Each test opens its own PGlite database, which takes seconds on a busy machine. Past vitest's five,
+   the test fails and `afterEach` closes a database still opening, so every test after it fails too
+   (#234). A slow machine should make this suite slow, not red. */
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+/* The unit suite shares a worker between files (`isolate: false`), so the next file gets the defaults back. */
+afterAll(() => vi.resetConfig());
 
 let h: Harness | null = null;
 afterEach(async () => {

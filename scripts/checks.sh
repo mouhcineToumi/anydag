@@ -71,5 +71,8 @@ node scripts/check-icons.mjs
 step "check:skill"
 node scripts/check-skill.mjs
 
+step "check:design"
+node scripts/check-design.mjs
+
 step "unit"
 npx vitest run

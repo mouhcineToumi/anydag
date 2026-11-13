@@ -40,11 +40,11 @@ is not also in the document Claude reads. `src/edit/useEditor.ts` turns gestures
 | a prompt card's Insert anyway | the same, with a draft that still has errors, to be fixed where it lands |
 | an image pasted or imported | `w=` from the placement rule — its size on screen by default, not a fixed width — and `page=`, the page it was pasted on |
 | the Settings modal (the gear at the sidebar's foot, or `ctrl+,`) | nothing in the board: a preference is not part of what a `?board=…` link means |
-| Settings → Vault's Unused images, then its confirm | the files in *this* board's legacy `.assets/` that no board's text names — never another board's, and never the directory |
+| Settings → This vault → Files and images' Unused images, then its confirm | the files in *this* board's legacy `.assets/` that no board's text names — never another board's, and never the directory |
 | a diagram's two side handles | `aspect=` — the shape ELK folds to — and `w=` removed |
 | the item view's Advanced → Wrapping, on a laid-out diagram | `aspect=` set to a ratio, to `0` (never wrap), or taken off (the theme's shape) — the one way to take it back off |
 | the item view's Frame colour, on a diagram | `hue=` on the fence line — the tint of the frame's hairline and its title band |
-| the top bar's `⋯` → Board settings | `flow:` in the frontmatter, through a `MetaOp` — only what differs from the default is written |
+| the top bar's `⋯` → Board settings, which opens Settings → This board → Layout | `flow:` in the frontmatter, through a `MetaOp` — only what differs from the default is written |
 | the problems dock's repair, under a row for the settings block, an unknown fence, a bad `layout=` or `aspect=` | the readable settings kept and the rest dropped · the fence's label changed · that one attribute taken off — each one write, so one ctrl+Z |
 | a second click on a card, once its diagram is selected | nothing: a pick is not an edit |
 | a click on an edge's line inside a diagram | nothing, likewise |
@@ -607,13 +607,14 @@ Four things a person could only change by typing, each now a control (`feat(canv
   pseudo-element to freeze. **A bare frame has no band to tint** and keeps the hairline (and the
   group radius it otherwise drops). The two swatch rows in a lone-node diagram's panel are told apart
   by hook and label: `data-dag-prop-hue` is the node's, `data-dag-frame-hue` the frame's.
-- **The board's frontmatter** — `flow: {width, gap}` — is *Board settings* in the top
-  bar's `⋯`, a card over the board (`src/ui/BoardSettings.tsx`) written through `Editor.setMeta`, one
-  `MetaOp` and one undo entry, as the page tabs write `pages:`. Only what differs from
-  `FLOW_DEFAULT` is written and `flow:` leaves the file when both are the default, so a board nobody
-  changed stays as short as it was; a number outside `FLOW_RANGE` is put back in the box with the
-  range said. **There is no theme row**: a theme is the reader's, never the board's (#162), so a
-  `theme:` in the frontmatter is left in the file and read by nothing (`design-and-layout.md`).
+- **The board's frontmatter** — `flow: {width, gap}` — is *Settings → This board → Layout*,
+  which the top bar's `⋯` opens (`src/settings/panes/BoardLayout.tsx`), written through
+  `Editor.setMeta`, one `MetaOp` and one undo entry, as the page tabs write `pages:`. Only what
+  differs from `FLOW_DEFAULT` is written and `flow:` leaves the file when both are the default, so a
+  board nobody changed stays as short as it was; a number outside `FLOW_RANGE` is not written, stays
+  in the box and its row says the range. **There is no theme row**: a theme is the reader's, never
+  the board's (#162), so a `theme:` in the frontmatter is left in the file and read by nothing
+  (`design-and-layout.md`).
 - **A file that would not parse far enough to have a control** gets a repair in words, under its
   row in the problems dock (`src/edit/repair.ts` plans it, `Problems.tsx` draws it, `Editor.repair`
   does it). `EB_FRONTMATTER` keeps every top-level setting that reads on its own, **byte for byte**,

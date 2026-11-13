@@ -31,7 +31,7 @@
 | `server/` | the local server: the token and `Host` gate, the vault store, the app's home and its SQLite index, every route, the MCP tools | React, the DOM; the page's state — it answers routes and writes files |
 | `desktop/` | the Electron shell: spawning the server, the `anydag://` scheme and the token on every request, windows, the folder dialog, deep links, the `anydag` shim, `safeStorage`, updates | the vault's format: it is a browser and a process manager around the server |
 | `api/` | the api server, a separate self-hostable process (and api.anydag.com's: `docs/architecture/api.md`): `protocol/` (the wire and the cryptography, shared with the client), `server/` (Hono, Postgres or PGlite, blobs on disk, quotas, the usage ledger, `/metrics`, the admin CLI, the feature switches) | a path, a byte of plaintext, the app: everything it stores is sealed by the client |
-| `src/telemetry/` | the page's half of logs: the answer as the server last said it, the events this page holds, the first-run question | what a log may hold — `api/protocol/logs.ts` decides that, and every hop runs it |
+| `src/telemetry/` | the page's half of logs: the answer as the server last said it, the events this page holds, the first-run toast | what a log may hold — `api/protocol/logs.ts` decides that, and every hop runs it |
 | `server/sync/` | the app's sync client: `SyncEngine`, its state and bases in the app's home, the loop per linked vault, linking | the server's storage; the page — it says a `SyncStatus` and nothing else |
 
 `src/edit/` is the layer that grew to reach inside a diagram, and it split along one line:
@@ -60,4 +60,7 @@ through an unchecked cast). `check-literals.mjs` is the other half, and it exist
 file once claimed `check-theme.mjs` did its job, and 99 px literals had accumulated behind the
 claim. The app chrome is exempt and lives in `src/styles/chrome.css`: no theme has an opinion about
 the height of a zoom button, and inventing keys nobody would set is how a design system stops
-meaning anything.
+meaning anything. Its fifth section does hold the chrome's text tone: a `color: var(--dag-color-muted)`
+there is refused unless its selector is listed, with a reason, in
+`scripts/chrome-muted-allowlist.json` — and only a disabled control, a separator or a decorative
+glyph belongs there. Readable text is `slate`; `muted` is not a text colour.

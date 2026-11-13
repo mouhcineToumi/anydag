@@ -21,7 +21,9 @@
  * one string so `test/settings.test.ts` can hold it in Node.
  */
 
-import { storageKey } from "./prefs";
+import { AI, storageKey, writePref } from "./prefs";
+import { RETIRED_PROVIDER_IDS } from "./providerNames";
+import { markSaved } from "./saved";
 
 /** How wide a pasted or imported image is placed. */
 export type PasteSize =
@@ -66,17 +68,16 @@ export type Settings = {
     margin: number;
   };
   /**
-   * Which model a prompt card asks. Ids only — the dev server holds every key and resolves these
-   * against its own table (`plugins/generate/providers.ts`); `null` is "whatever the server's
-   * default is", which is what a fresh browser should get.
+   * Which model prompt cards, Rewrite and Generate flashcards ask. Ids only — the dev server holds
+   * every key and resolves these against its own table (`plugins/generate/providers.ts`); `null` is
+   * "whatever the server's default is", which is what a fresh browser should get.
    */
   llm: {
     provider: string | null;
     model: string | null;
     /**
      * How hard the model should think, for the providers that have a word for it: one of
-     * `REASONING`, or `null` for the provider's own setting (Gemini's is `low`, which is what
-     * `plugins/generate/providers.ts` measured as the best of speed and drawing).
+     * `REASONING`, or `null` for the provider's own setting.
      */
     reasoning: string | null;
   };
@@ -100,6 +101,28 @@ export const DEFAULTS: Settings = {
   assistant: { provider: null, model: null },
 };
 
+/** A write to any part of the settings object: one section, or several at once. */
+export type SettingsPatch = {
+  problems?: Partial<Settings["problems"]>;
+  paste?: Partial<Settings["paste"]>;
+  export?: Partial<Settings["export"]>;
+  llm?: Partial<Settings["llm"]>;
+  assistant?: Partial<Settings["assistant"]>;
+};
+
+const SECTIONS = ["problems", "paste", "export", "llm", "assistant"] as const;
+
+/**
+ * **Two homes for one object** (#191). `problems`, `paste` and `export` are the vault's, kept under
+ * {@link STORE} and carried in the vault's bundle. `llm` and `assistant` — which model each AI feature
+ * uses — are the person's, kept under `AI` (`prefs.ts`) and carried in the person's bundle, the same
+ * in every vault. Every reader still gets one `Settings` from `readSettings`, and every writer still
+ * calls `writeSettings`: only where a section is stored moved.
+ */
+const PERSON_SECTIONS = ["llm", "assistant"] as const;
+type PersonSection = (typeof PERSON_SECTIONS)[number];
+const isPerson = (k: string): k is PersonSection => (PERSON_SECTIONS as readonly string[]).includes(k);
+
 /** Where they live. One key holding one object, so a bad value is one `catch` and a reset is one `removeItem`. */
 export const STORE = "dag:settings";
 
@@ -110,13 +133,19 @@ const SIZES: readonly PasteSize[] = ["screen", "pixels", "width"];
 const SHOWS: readonly ProblemsShow[] = ["notify", "badge", "off"];
 
 /**
- * The thinking levels the card offers.
+ * The effort scale every AI surface shows, low to high.
  *
- * Not a contract with any provider: the server passes the word through and a model that has never
- * heard of it refuses in its own words, which the card shows. Gemini 3.8 Flash takes these four and
- * rejects `minimal`; OpenCode maps them onto a variant written `model#variant`.
+ * Not a contract with any provider: the server maps each level to what that provider accepts —
+ * Claude's `--effort`, OpenCode's `#variant`, an HTTP provider's `reasoning_effort` — and a model
+ * with no Max (an HTTP provider) takes High instead (`effortFor` in `plugins/generate/llm.ts`).
  */
-export const REASONING = ["none", "low", "medium", "high"] as const;
+export const EFFORTS = ["low", "medium", "high", "max"] as const;
+
+/**
+ * Every value a stored thinking preference may hold, including `none` from before Max existed.
+ * `normalise` reads all of them; the card offers `EFFORTS`, with `null` as Automatic.
+ */
+export const REASONING = ["none", ...EFFORTS] as const;
 
 /** A short id-like string, or `null`. The server says whether it names anything. */
 const ident = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" && v.length <= 200 ? v.trim() : null);
@@ -140,6 +169,10 @@ export function normalise(raw: unknown): Settings {
   const l = o.llm ?? {};
   const ast = o.assistant ?? {};
   const max = p.maxWidth;
+  /* A provider this build dropped reads as Automatic, and its model goes with it: a Gemini model
+     name means nothing to whichever provider the default now is. */
+  const storedProvider = ident(l.provider);
+  const retired = storedProvider !== null && RETIRED_PROVIDER_IDS.includes(storedProvider);
   return {
     problems: {
       show: SHOWS.includes(q.show as ProblemsShow) ? (q.show as ProblemsShow) : DEFAULTS.problems.show,
@@ -158,8 +191,8 @@ export function normalise(raw: unknown): Settings {
       margin: Math.round(num(e.margin, 0, 40, DEFAULTS.export.margin)),
     },
     llm: {
-      provider: ident(l.provider),
-      model: ident(l.model),
+      provider: retired ? null : storedProvider,
+      model: retired ? null : ident(l.model),
       /* A level the app does not offer is dropped rather than sent: this is a hand-editable file. */
       reasoning: (REASONING as readonly string[]).includes(String(l.reasoning)) ? String(l.reasoning) : null,
     },
@@ -186,27 +219,30 @@ export function isSnapshot(): boolean {
   }
 }
 
-/** The current settings. `DEFAULTS` for a snapshot, for a browser with site data blocked, and for junk. */
-export function readSettings(): Settings {
-  if (isSnapshot()) return DEFAULTS;
+/** One stored JSON object, or `null` for none, junk or a blocked accessor. */
+function stored(key: string): Record<string, unknown> | null {
   try {
-    const raw = localStorage.getItem(storageKey(STORE));
-    return normalise(raw ? JSON.parse(raw) : null);
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
   } catch {
-    /* A blocked accessor throws, and so does a half-written string. The defaults are still a
-       perfectly good answer and it is not worth taking the page down for. */
-    return DEFAULTS;
+    /* A blocked accessor throws, and so does a half-written string. */
+    return null;
   }
 }
 
+/** The current settings. `DEFAULTS` for a snapshot, for a browser with site data blocked, and for junk. */
+export function readSettings(): Settings {
+  if (isSnapshot()) return DEFAULTS;
+  /* The vault's sections from the vault's key, the AI choices from the person's — and only from
+     there: a vault's old `llm` is read once, by `migrate.ts`, and never again. */
+  const vault = stored(storageKey(STORE)) ?? {};
+  const person = stored(storageKey(AI)) ?? {};
+  return normalise({ ...vault, llm: person.llm, assistant: person.assistant });
+}
+
 /** Merge a patch into what is stored, section by section, and tell the window. */
-export function writeSettings(patch: {
-  problems?: Partial<Settings["problems"]>;
-  paste?: Partial<Settings["paste"]>;
-  export?: Partial<Settings["export"]>;
-  llm?: Partial<Settings["llm"]>;
-  assistant?: Partial<Settings["assistant"]>;
-}): Settings {
+export function writeSettings(patch: SettingsPatch): Settings {
   const now = readSettings();
   const next = normalise({
     problems: { ...now.problems, ...patch.problems },
@@ -215,8 +251,63 @@ export function writeSettings(patch: {
     llm: { ...now.llm, ...patch.llm },
     assistant: { ...now.assistant, ...patch.assistant },
   });
-  save(JSON.stringify(next));
+  write(next, Object.keys(patch));
+  announce(now, next, patch);
   return next;
+}
+
+/**
+ * Store `next`, in the home of each section `touched` names: the vault's key when any of the vault's
+ * sections changed, the person's when either AI section did. A write to one never rewrites the other,
+ * so picking a model does not stamp the vault's bundle, nor an export scale the person's.
+ */
+function write(next: Settings, touched: readonly string[]): void {
+  if (touched.some((k) => !isPerson(k))) save(JSON.stringify(vaultPart(next)));
+  if (touched.some(isPerson)) savePerson(next);
+}
+
+/** The vault's sections of a whole settings object: what its key and its bundle carry. */
+export function vaultPart(s: Settings): Omit<Settings, PersonSection> {
+  return { problems: s.problems, paste: s.paste, export: s.export };
+}
+
+/** The person's sections of a whole settings object: what `dag:ai` carries. */
+export function personPart(s: Settings): Pick<Settings, PersonSection> {
+  return { llm: s.llm, assistant: s.assistant };
+}
+
+/**
+ * Write the AI choices to the person's key, through `prefs.ts` so the change is stamped and pushed
+ * in the person's bundle, then tell the window the settings changed — with `account` as the detail,
+ * so `sync.ts` does not push the vault's bundle for a change that is not in it.
+ */
+function savePerson(next: Settings): void {
+  if (isSnapshot()) return;
+  writePref(AI, JSON.stringify(personPart(next)), "ai");
+  try {
+    dispatchEvent(new CustomEvent(EVENT, { detail: "account" }));
+  } catch {
+    /* No `window`. Nothing is listening either. */
+  }
+}
+
+/**
+ * Say which rows moved, after the write has landed.
+ *
+ * A patch is section-shaped but a tick is row-shaped, so this walks the fields the patch named and
+ * reports only those whose normalised value actually changed. The key is `section.field`, which is
+ * what `Field`'s `save` names.
+ */
+function announce(before: Settings, after: Settings, patch: SettingsPatch): void {
+  for (const section of SECTIONS) {
+    const changed = patch[section];
+    if (!changed) continue;
+    const was = before[section] as Record<string, unknown>;
+    const now = after[section] as Record<string, unknown>;
+    for (const field of Object.keys(changed)) {
+      if (was[field] !== now[field]) markSaved(`${section}.${field}`);
+    }
+  }
 }
 
 /**
@@ -224,13 +315,55 @@ export function writeSettings(patch: {
  * old object. With `only`, just those sections: each tab of the Settings modal resets what it shows
  * and nothing it does not, so a reset on the export tab cannot quietly change which model
  * draws a prompt card.
+ *
+ * A reset answers with its own toast rather than a tick per row, so it deliberately does not
+ * announce; {@link resetSettingsWithUndo} is the shape the modal uses.
  */
 export function resetSettings(only?: readonly (keyof Settings)[]): Settings {
   if (!only) {
     save(null);
+    if (!isSnapshot()) writePref(AI, null, "ai");
     return DEFAULTS;
   }
-  return writeSettings(Object.fromEntries(only.map((k) => [k, DEFAULTS[k]])));
+  const now = readSettings();
+  const next = normalise({
+    ...now,
+    ...Object.fromEntries(only.map((k) => [k, DEFAULTS[k]])),
+  });
+  write(next, only);
+  return next;
+}
+
+/**
+ * A reset and the action that takes it back.
+ *
+ * The snapshot is taken *before* the reset and holds only the fields that are away from their
+ * default — exactly what the reset will change, and so exactly what Undo has to put back. A field
+ * already at its default is not in it, and a change made to that field after the reset is not
+ * overwritten when Undo runs. Undo goes through {@link writeSettings}, the same setter the controls
+ * use, so it is normalised and announced like any other change.
+ */
+export function resetSettingsWithUndo(only: readonly (keyof Settings)[]): () => void {
+  const before = changedSections(readSettings(), only);
+  resetSettings(only);
+  return () => {
+    writeSettings(before);
+  };
+}
+
+/** The fields of `only` that are away from their default now, as a patch a write can take. */
+function changedSections(now: Settings, only: readonly (keyof Settings)[]): SettingsPatch {
+  const patch: Record<string, Record<string, unknown>> = {};
+  for (const section of only) {
+    const was = now[section] as unknown as Record<string, unknown>;
+    const def = DEFAULTS[section] as unknown as Record<string, unknown>;
+    const fields: Record<string, unknown> = {};
+    for (const field of Object.keys(def)) {
+      if (was[field] !== def[field]) fields[field] = was[field];
+    }
+    if (Object.keys(fields).length > 0) patch[section] = fields;
+  }
+  return patch as SettingsPatch;
 }
 
 function save(value: string | null) {

@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=24.7"
   },
-  "version": "0.4.0",
+  "version": "0.5.0",
   "main": "desktop/dist/main.cjs",
   "desktopName": "anydag.desktop",
   "bin": {
@@ -37,6 +37,7 @@
     "icons:build": "node scripts/icons/vendor.mjs && node scripts/icons/build.mjs",
     "check:icons": "node scripts/check-icons.mjs",
     "check:skill": "node scripts/check-skill.mjs",
+    "check:design": "node scripts/check-design.mjs",
     "lint": "biome lint .",
     "lint:promises": "eslint .",
     "format": "biome format --write .",
@@ -121,6 +122,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@biomejs/biome": "2.6.6",
     "@blocknote/server-util": "0.57.0",
     "@iconify-json/fluent-emoji-flat": "^1.2.6",

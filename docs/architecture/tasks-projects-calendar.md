@@ -19,6 +19,7 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 | Where | What it does with one |
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
+| Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
 | the Tasks page, `?tasks=1` | a list — *In progress*, *To do*, *Done*, each by due date then title — or a board of three columns a card is dragged between; a filter, and a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
 | the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
 | a board, or a note, embedding one | a card — status as a button, title, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
@@ -185,7 +186,10 @@ Nine things are load-bearing:
   writes.
 - **A timed event of a day or more goes in the all-day row**, as every calendar draws a trip; shorter,
   it is in the hour grid, cut at midnight into each day it touches. A month caps a week at four lanes
-  and says how many more a day holds, which opens that day on its own.
+  and says how many more a day holds, which opens that day on its own. **A day's number is a 24px
+  button in its 30px header, and an all-day bar is 24px tall**; a timed block in the hour grid keeps
+  its event's own height, because that height is the duration — the one deliberate exception to the
+  24px floor `e2e/touch-targets.spec.ts` holds.
 - **A drag on empty time makes an event, and a drag on an event or a task moves it**. A
   press anywhere but on an item starts a range, snapped to a quarter of an hour in the grid and to days
   in the all-day row and a month, and a small card asks for the title; the file is named after it, in

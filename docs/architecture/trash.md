@@ -11,9 +11,9 @@ kind, or a folder with everything in it — moves the thing to the vault's trash
 | Where | What it does |
 |---|---|
 | the sidebar | Delete on a row, a picked row's menu or the selection's bar: to the trash at once, nothing asked; a **Trash** row at the foot opens the page |
-| the notice | *Moved “Plan” to the trash* · **Undo** (every entry the delete made, the open file reopened, a favourite a favourite again) · **View trash**; eight seconds, held while the pointer or the focus is on it |
+| the notice | *Moved “Plan” to the trash* · **Undo** (every entry the delete made, the open file reopened, a favourite a favourite again) · **View trash**; eight seconds, held while the pointer or the focus is on it. The app's one `Toast` (#208): one line, the name cut in its middle when it is long, the whole name its title |
 | the Trash page, `?trash=1` | newest first: the mark, the title, where it was, what a folder held, *Deleted 3 days ago · 27 days left*; Restore; Delete forever, asked in its row; a filter; Empty trash, asked once |
-| Settings → Vault | how many days, read-only — the server's |
+| Settings → This vault → General | how many days, read-only — the server's |
 | `anydag trash ls\|restore\|rm\|empty` · `trash_list`, `trash_restore`, `trash_delete`, `trash_empty` | the same four, by an entry's id or the name it had; the two that delete for good ask, or want a `confirm` |
 
 | Route | Does |
@@ -62,8 +62,9 @@ load-bearing:
 Deleting a file **on disk** — a file manager, an agent's own tools — is not a delete through the app,
 and is for good: the trash is the app's. The skill says so.
 
-Names claimed, grepped first: `dag-trash*`, `dag-trash-notice*`, `dag-app--trash`, `data-dag-trash*`,
-`data-dag-sidebar-trash`, `data-dag-setting-trash-days`, `--trash-notice-left`, the event
+Names claimed, grepped first: `dag-trash*`, `dag-app--trash`, `data-dag-trash*` (the notice keeps
+`data-dag-trash-notice`; its box is the toast's now, and `dag-trash-notice*` and `--trash-notice-left`
+are retired), `data-dag-sidebar-trash`, `data-dag-setting-trash-days`, the event
 `dag:trash` (in `test/prefs.test.ts`'s list), and the query key `trash`.
 
 **Out, and why:** opening a trashed document read-only — the page lists, restores

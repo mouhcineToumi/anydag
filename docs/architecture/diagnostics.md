@@ -81,11 +81,21 @@ Every diagnostic is still there for an agent — `board_diagnose`, `/__board/dia
 and decides which diagnostics a person sees; `src/ui/Problems.tsx` is the dock, and the editor panel
 and the frame mark are the other two readers.
 
+**A file that cannot be opened at all is not a diagnostic.** `src/ui/FileProblem.tsx` is one card,
+drawn by a board, a note, a quiz and a table, and chosen by a `switch` on the load's reason: a 404 is
+`missing` (search for it, look in the trash, go home), a `fetch` that rejected is `unreachable` (the
+server is not answering, and *Try again* asks once), and every other answer or failure is
+`unreadable` (*Open as text* when the bytes arrived, and go home). `LoadProblem` (`src/board/useBoard.ts`)
+carries the server's message and a code for the closed *Details for a bug report*; nothing outside
+it names `EB_UNREADABLE`, because a code is for an issue rather than for the person in front of the
+screen. A mistake *inside* a board the app could read stays a diagnostic with its line:col. Names
+claimed, grepped first: `dag-file-problem*`, `data-dag-file-problem*`.
+
 | Where | Shows |
 |---|---|
 | a diagram's frame | an outline in the problem colour and a count by its title, while it has any |
 | the count, bottom centre | how many errors and warnings there are; a click opens the list |
-| the notification, above it | the first *new* error, in words, with Show and ×, for six seconds |
+| the notification, in the app's toast stack (#208) | the first *new* error, in words, with Show and ×, for six seconds |
 | the list | every problem, in words, with the kind of item and its page; a row opens it |
 | the panel's Problems block, at the top | the open item's own problems, each with Show and the fix a row can carry out |
 

@@ -1,4 +1,6 @@
-import { useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
+
+import { Tooltip } from "@/ui/Tooltip";
 
 /**
  * The form controls the chrome shares, so a select in Settings and a select in the inspector are
@@ -8,6 +10,10 @@ import { useState, type InputHTMLAttributes, type ReactNode } from "react";
  * purpose: the keyboard, the screen reader and Playwright's `selectOption` and `check` all know
  * those, and a hand-made listbox would have to earn each of them back. What changes is the drawing,
  * in `chrome.css` under `.dag-select`, `.dag-switch`, `.dag-check` and `.dag-textfield`.
+ *
+ * `Button` and `IconButton` are the chrome's buttons (#207). Before them the shell had 42 mixes of
+ * height, corner, size, weight, fill and border, from 16 to 37 px tall, and four kinds of primary.
+ * Every number they draw with is a `--dag-ui-*` token, so a theme changes all of them or none.
  */
 
 type Data = Record<`data-${string}`, string | number | undefined>;
@@ -79,5 +85,90 @@ export function ScaledNumber({
       }}
       {...rest}
     />
+  );
+}
+
+/** What a button is for: the one action a card asks for, an ordinary one, one with no box, one that destroys. */
+export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+
+/**
+ * How tall: `sm` 24 (inside a row or a dense bar), `md` 30 (the default), `touch` 44 (a finger's).
+ * **Under 720px `md` is `touch` by itself** — the stylesheet says so — so a screen does not have to
+ * remember to make its buttons a finger's on a phone; a `sm` stays small on purpose.
+ */
+export type ButtonSize = "sm" | "md" | "touch";
+
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & Data & { ref?: Ref<HTMLButtonElement> };
+
+const join = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
+
+/**
+ * A button with words on it, and an icon before them if it has one. `type` is `button` unless the
+ * caller says `submit`: a button in a form that submits by accident is the default HTML gives you.
+ * Every other attribute — `data-dag-*`, `aria-*`, `title`, `disabled` — passes through untouched,
+ * because the end-to-end suite finds controls by them.
+ */
+export function Button({
+  variant = "secondary",
+  size = "md",
+  className,
+  type = "button",
+  ...rest
+}: ButtonProps & { variant?: ButtonVariant; size?: ButtonSize }) {
+  return (
+    <button type={type} className={join("dag-button", `dag-button--${variant}`, `dag-button--${size}`, className)} {...rest} />
+  );
+}
+
+/**
+ * A button that is only an icon: square, quiet unless it destroys, and **named by its `aria-label`**,
+ * which is also what its tooltip says — the drawn one (`Tooltip`), because the native `title` does
+ * not appear dependably in the desktop app on macOS. `tip` replaces the words of the tooltip where
+ * the accessible name carries more (the row it acts on, the chord), and `shortcut` adds the chord.
+ *
+ * **A `title` is kept, and then there is no drawn tooltip.** It is how a control says a sentence
+ * rather than a name — what *New* can make, or that the app is locked and how to unlock it — and one
+ * control shows one tooltip.
+ *
+ * **Without a label it refuses to render in development**: an icon with no name is a button a
+ * screen reader announces as "button", and nothing in a review shows that. In a build it renders
+ * anyway, since a missing control is worse than an unnamed one.
+ */
+export function IconButton({
+  variant = "quiet",
+  size = "md",
+  className,
+  type = "button",
+  tip,
+  shortcut,
+  title,
+  ...rest
+}: Omit<ButtonProps, "aria-label"> & {
+  "aria-label": string;
+  variant?: "quiet" | "danger";
+  size?: ButtonSize;
+  /** The tooltip's words, where they differ from the accessible name. */
+  tip?: string;
+  /** The chord, drawn after the name in the tooltip. */
+  shortcut?: string;
+}) {
+  const label = rest["aria-label"];
+  if (!label?.trim() && import.meta.env.DEV) {
+    console.error("IconButton needs an aria-label: it is the button's only name, and its tooltip.");
+    return null;
+  }
+  const button = (
+    <button
+      type={type}
+      className={join("dag-icon", `dag-icon--${size}`, variant === "danger" && "dag-icon--danger", className)}
+      title={title}
+      {...rest}
+    />
+  );
+  if (title !== undefined) return button;
+  return (
+    <Tooltip name={tip ?? label} shortcut={shortcut}>
+      {button}
+    </Tooltip>
   );
 }

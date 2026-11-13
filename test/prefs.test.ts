@@ -9,6 +9,7 @@ import {
   FILE_LIST,
   PREF_KEYS,
   QUIZ_ABOUT,
+  RECENT_FILES,
   SETTINGS_TAB,
   SIDEBAR_FOLDERS,
   STAMP,
@@ -20,6 +21,7 @@ import {
 } from "@/settings/prefs";
 import { LOCKED } from "@/settings/lock";
 import { STORE } from "@/settings/store";
+import { RECENT_KEY } from "@/ui/modelList";
 import { LAST } from "@/vault/current";
 
 /**
@@ -90,6 +92,8 @@ const EVENTS = new Set([
   "dag:link-bend",
   "dag:settings",
   "dag:prefs",
+  /* A setting's write landed, and the row that owns it says Saved: `settings/saved.ts`. */
+  "dag:settings-saved",
   /* The sidebar asking the page for a card it renders — search, settings or feedback.
      Not `dag:settings`, which is the settings-changed event above: one name meaning two things is
      the namespace hazard this list exists to keep visible. */
@@ -139,7 +143,9 @@ describe("the preference list", () => {
       LAST,
       VAULT_STAMP,
       FILE_LIST,
+      RECENT_FILES,
       LOCKED,
+      RECENT_KEY,
     ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);
@@ -172,14 +178,19 @@ describe("the preference list", () => {
     /* Nor whether this browser is locked: a phone stays locked while the
        laptop edits, and a lock that followed the account would lock the laptop too. */
     expect(PREF_KEYS as readonly string[]).not.toContain(LOCKED);
+    /* Nor the five models this browser picked last: a quick choice here need not become a list on
+       every other machine, and the picker works without it. */
+    expect(PREF_KEYS as readonly string[]).not.toContain(RECENT_KEY);
   });
 
   it("splits into the account's half and the vault's, with nothing in both or neither", () => {
     expect([...ACCOUNT_PREF_KEYS, ...VAULT_PREF_KEYS].sort()).toEqual([...PREF_KEYS].sort());
     expect(ACCOUNT_PREF_KEYS.filter((k) => (VAULT_PREF_KEYS as readonly string[]).includes(k))).toEqual([]);
-    /* The settings card and the favourites switch with the vault, and how
-       the window is laid out does not. */
-    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:theme", "dag:update-links"]);
+    /* The favourites, the attachments folder and the links switch go with the vault; how the window
+       is laid out, the theme and the AI choices are the person's (#191). */
+    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:update-links"]);
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:theme");
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:ai");
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {

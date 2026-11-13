@@ -104,6 +104,12 @@ Twelve things are load-bearing:
   `ready`**: its spawn reads the keys and the home secret, `safeStorage` throws before `ready`, and
   that throw read as "no keyring" — every first launch stored the home secret merely encoded. The
   macOS smoke log is what showed it.
+- **OpenAI-compatible's address and model are not keys** and are kept apart from them, in plain
+  text beside them (`provider-env.json`, mode 0600), as `ANYDAG_LLM_BASE_URL` and
+  `ANYDAG_LLM_MODEL` — the names `.env.local` uses, handed to the server the same way at spawn. The
+  page may read them back (`providerEnv.get`), because the field has to show what is set; setting
+  one restarts the server like a key does. An address is `http(s)://` only, because it is where the
+  server will send the key.
 - **On macOS the window has no title bar** (`titleBarStyle: "hiddenInset"`, #78): the traffic
   lights sit in the page's top row, centred on its 48px. The page learns it from the bridge
   (`platform`, `isFullScreen`, `onFullScreen`) and `src/ui/windowInset.ts` puts
@@ -132,8 +138,8 @@ Twelve things are load-bearing:
   `anydag shim —` the sh one carries, and says `setlocal`, or its `set` would outlive it in the
   shell that ran it. A Mac app running from its disk image or a translocated quarantine path writes
   none: that path is gone next launch. `~/.local/bin` is not on a Mac's PATH and
-  Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → AI
-  and agents writes the MCP lines with that absolute path.
+  Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → This vault → Agent access writes the MCP lines with that absolute
+  path.
 
 **Not yet, and why:** signing certificates, so the builds are unsigned and an unsigned Mac updates
 by hand (the release workflow signs and notarises the moment the secrets exist); Windows on arm64

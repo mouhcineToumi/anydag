@@ -1,36 +1,42 @@
-import { FolderOpen, Images, Power, X } from "lucide-react";
+import { Images, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { closeVault, currentOf, loadVaults, vaultsNow } from "@/vault/api";
-import { switchVault } from "@/vault/current";
-import { desktop } from "@/vault/desktop";
-import { useVaults } from "@/vault/useVaults";
-import { readTrash } from "@/ui/trashApi";
-import { refuseLocked, useLocked } from "../lock";
-
-import { ATTACHMENTS, UPDATE_LINKS, readFlag, readPref, writeFlag, writePref } from "../prefs";
 import { Switch, TextField } from "@/ui/controls";
 
-import { Field, Group, ICON } from "./common";
+import { SETTLE } from "../feedback";
+import { refuseLocked, useLocked } from "../lock";
+import { ATTACHMENTS, UPDATE_LINKS, readFlag, readPref, resetPrefs, writeFlag, writePref } from "../prefs";
+import { resetSettingsWithUndo, writeSettings, type PasteSize } from "../store";
+import { useSettings } from "../useSettings";
+
+import { Field, Group, ICON, Reset } from "./common";
+
+const PLACEMENT: { value: PasteSize; label: string; hint: string }[] = [
+  { value: "screen", label: "As it appeared", hint: "The size it was on your screen. Usually right." },
+  { value: "pixels", label: "Actual pixels", hint: "One image pixel per board pixel, so a 2× capture stays sharp zoomed out." },
+  { value: "width", label: "Fixed width", hint: "Every image lands at the same width." },
+];
 
 /**
- * The vault itself: where it is, where it keeps attachments, what its files leave behind, and
- * closing it. **There is nothing here that removes the folder**, and nothing that renames it — it is
- * a folder the person already owns, and the file manager is the place for that.
+ * The vault's files and pictures: where an uploaded file is kept, whether a rename rewrites the
+ * `[[wikilinks]]` to it, how a pasted image lands, and the images this board no longer draws.
  *
- * The attachments folder is the vault's own setting (`dag:attachments`, in the vault's bundle at
- * `<vault>/.anydag/settings.json`): the server reads it when the vault opens and again whenever the
- * bundle is written, so a change applies to the next upload without a restart. Relative to the vault's
- * root, and `attachments` when empty.
+ * The attachments folder and link updating are the vault's own settings (`dag:attachments` and
+ * `dag:update-links`, in the vault's bundle at `<vault>/.anydag/settings.json`): the server reads
+ * them when the vault opens and again whenever the bundle is written, so a change applies to the
+ * next upload or rename without a restart. A pasted image's placement is the settings object's,
+ * which is kept with this vault too.
+ *
+ * **Unused images covers the open board only**, never the vault: the same refusal `/rmdir` makes by
+ * not being recursive. A vault-wide button is one click that reaches into every board.
  */
-export function VaultPane({ boardName }: { boardName: string | null }) {
-  const here = currentOf(useVaults());
-  useEffect(() => void loadVaults(), []);
-  const reveal = desktop()?.revealInFolder;
+export function FilesPane({ boardName }: { boardName: string | null }) {
+  const s = useSettings();
 
   const stored = readPref(ATTACHMENTS) ?? "";
   const [draft, setDraft] = useState(stored);
   const [problem, setProblem] = useState<string | null>(null);
+  const [links, setLinks] = useState(() => readFlag(UPDATE_LINKS, true));
 
   const commit = () => {
     const v = draft.trim().replace(/^\/+|\/+$/g, "");
@@ -43,48 +49,13 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
     if (v !== stored) writePref(ATTACHMENTS, v || null);
   };
 
-  const closeThis = async () => {
-    try {
-      await closeVault(here.id);
-    } catch {
-      return;
-    }
-    const next = (vaultsNow() ?? []).find((v) => v.open && v.id !== here.id);
-    switchVault(next?.id ?? "");
-  };
-
   return (
     <>
-      <Group title="Folder">
-        <Field label="Name" plain>
-          <span className="dag-settings__value" data-dag-setting-vault-name="">
-            {here.name}
-          </span>
-        </Field>
-        <Field label="Location" plain stack>
-          <span className="dag-settings__path">
-            <span className="dag-settings__pathtext" data-dag-setting-vault-path="" title={here.path}>
-              {here.path}
-            </span>
-            {reveal ? (
-              <button
-                type="button"
-                className="dag-button"
-                data-dag-setting-vault-reveal=""
-                onClick={() => void reveal(here.path)}
-              >
-                <FolderOpen size={14} strokeWidth={2} aria-hidden="true" />
-                <span>Show in folder</span>
-              </button>
-            ) : null}
-          </span>
-        </Field>
-      </Group>
-
       <Group title="Attachments">
         <Field
           label="Attachments folder"
           hint="Where an uploaded file is kept, inside the vault. Files already there stay where they are."
+          save={ATTACHMENTS}
         >
           <TextField
             wide
@@ -117,74 +88,92 @@ export function VaultPane({ boardName }: { boardName: string | null }) {
       </Group>
 
       <Group title="Links">
-        <UpdateLinks />
+        <Field
+          label="Update links when a file moves"
+          hint="Renaming or moving a file rewrites the [[wikilinks]] to it in every other file."
+          save={UPDATE_LINKS}
+        >
+          <Switch
+            data-dag-setting-update-links=""
+            checked={links}
+            onChange={(e) => {
+              setLinks(e.target.checked);
+              writeFlag(UPDATE_LINKS, e.target.checked);
+            }}
+          />
+        </Field>
+      </Group>
+
+      <Group title="Pasted images">
+        <Field label="Size" hint={PLACEMENT.find((p) => p.value === s.paste.size)?.hint} save="paste.size">
+          <select
+            className="dag-select"
+            data-dag-setting-paste-size=""
+            value={s.paste.size}
+            onChange={(e) => writeSettings({ paste: { size: e.target.value as PasteSize } })}
+          >
+            {PLACEMENT.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {s.paste.size === "width" ? (
+          <Field label="Width" save="paste.width" settle={SETTLE}>
+            <TextField
+              data-dag-setting-paste-width=""
+              type="number"
+              min={40}
+              max={4000}
+              step={20}
+              suffix="px"
+              value={s.paste.width}
+              onChange={(e) => writeSettings({ paste: { width: Number(e.target.value) } })}
+            />
+          </Field>
+        ) : null}
+        <Field
+          label="Largest width kept"
+          hint="Wider images are scaled down once, as PNG. Leave it empty to keep every original as it was pasted."
+          save="paste.maxWidth"
+          settle={SETTLE}
+        >
+          <TextField
+            data-dag-setting-paste-max=""
+            type="number"
+            min={64}
+            max={8000}
+            step={100}
+            placeholder="No limit"
+            suffix="px"
+            value={s.paste.maxWidth ?? ""}
+            onChange={(e) => writeSettings({ paste: { maxWidth: e.target.value === "" ? null : Number(e.target.value) } })}
+          />
+        </Field>
       </Group>
 
       <Group title="Storage">
         <UnusedImages boardName={boardName} />
-        <TrashDays />
       </Group>
 
-      <Group title="Close">
-        <Field
-          label="Close this vault"
-          hint="The folder and its files stay as they are, and the vault stays on the recent list."
-          plain
-        >
-          <button type="button" className="dag-button" data-dag-vault-close-setting="" onClick={() => void closeThis()}>
-            <Power size={14} strokeWidth={2} aria-hidden="true" />
-            <span>Close vault</span>
-          </button>
-        </Field>
-      </Group>
-    </>
-  );
-}
-
-/**
- * Obsidian's *Automatically update internal links*: on, a rename, a move or a folder moved rewrites
- * every `[[wikilink]]` in the vault that named what moved, so it still does (`server/relink.ts`). The
- * vault's own setting, `dag:update-links`, read by the server on every rename — so it holds for the
- * CLI and an agent too. A `dag:` reference holds an id and never needed it.
- */
-function UpdateLinks() {
-  const [on, setOn] = useState(() => readFlag(UPDATE_LINKS, true));
-  return (
-    <Field
-      label="Update links when a file moves"
-      hint="Renaming or moving a file rewrites the [[wikilinks]] to it in every other file."
-    >
-      <Switch
-        data-dag-setting-update-links=""
-        checked={on}
-        onChange={(e) => {
-          setOn(e.target.checked);
-          writeFlag(UPDATE_LINKS, e.target.checked);
+      <Reset
+        what="Files and images"
+        onReset={() => {
+          const undoPaste = resetSettingsWithUndo(["paste"]);
+          const undoPrefs = resetPrefs([ATTACHMENTS, UPDATE_LINKS]);
+          setDraft("");
+          setLinks(true);
+          setProblem(null);
+          return () => {
+            undoPaste();
+            undoPrefs();
+            setDraft(readPref(ATTACHMENTS) ?? "");
+            setLinks(readFlag(UPDATE_LINKS, true));
+          };
         }}
       />
-    </Field>
-  );
-}
-
-/**
- * How long the trash keeps what is deleted: the server's `ANYDAG_TRASH_DAYS`, read off
- * the trash itself, said here as the upload limits are said under Import and export — read-only.
- */
-function TrashDays() {
-  const [days, setDays] = useState<number | null>(null);
-  useEffect(() => {
-    let live = true;
-    void readTrash().then((got) => live && setDays(got?.days ?? null));
-    return () => {
-      live = false;
-    };
-  }, []);
-  return (
-    <Field label="Trash keeps files for" hint="Restore them from the trash at the foot of the sidebar." plain>
-      <span className="dag-settings__value" data-dag-setting-trash-days={days ?? ""}>
-        {days === null ? "…" : `${days} ${days === 1 ? "day" : "days"}`}
-      </span>
-    </Field>
+    </>
   );
 }
 

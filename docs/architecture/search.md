@@ -8,6 +8,25 @@
 matches file names as it always has, and under them lists every match **in the text** of every board
 and note, in one ranked list. A result opens its document where the words are.
 
+**A file is listed once.** A document whose name already matched is not repeated under the words:
+the name is its best match, so its blocks stay out of the text list and its row says
+*and in the text*. The text list therefore holds the matches in documents that have no row of their
+own. `src/search/results.ts` is that rule, and `test/search-results.test.ts` holds it.
+
+**The card is as tall as its results, up to its old ceiling** — 560px, or the window less 64px. One
+row is a small card, not two empty thirds of a tall one.
+
+**It is a dialog in the app's one frame** (`src/ui/Dialog.tsx`, #208): over the sidebar too, with the
+scrim every dialog has, the page behind it `inert`, and Tab kept inside. It said `aria-modal="true"`
+while sitting inside the page with no scrim, and Tab walked out of it into the sidebar behind;
+`e2e/search.spec.ts` presses Tab thirty times and checks the focus after each.
+
+**A miss offers to make what was typed**: *New board “…”* and *New note “…”*, in the open file's
+folder, and Enter presses the board. Both go through the sidebar's own create
+(`useSidebar().create`, `newFile` in `src/ui/Shell.tsx`), so a file begins one way whether it was
+asked for here or from the `+`, and the file that is made opens. A name that matched something is
+not a miss: the offers appear only when there is no name, no text and no folder.
+
 The design is **local-first, with the grammar on the server**, and it is a split of the work rather
 than a choice of platform. Parsing a search in the browser would mean parsing every board and
 every note on every keystroke, which is the slowest thing the page does (remark runs at
@@ -79,9 +98,9 @@ Seven things are load-bearing:
   and scrolls it to the middle.
 - **The note's mark is a CSS highlight, never an attribute** — see *Things that will bite*.
 
-Names claimed, grepped first: `dag-hit*`, `dag-hits*`, `data-dag-hit*`, `data-dag-hits*`, the event
-`dag:target` (in `test/prefs.test.ts`'s list of events, which is what caught it), and the highlight
-name `dag-found`.
+Names claimed, grepped first: `dag-hit*`, `dag-hits*`, `data-dag-hit*`, `data-dag-hits*` (a miss's offers are `dag-hits__new`
+and `data-dag-hits-new-board` / `-note`, inside them, because `data-dag-new-note` is the notes' claim), `dag-board__also`, the event `dag:target` (in `test/prefs.test.ts`'s list of events, which is what caught
+it), and the highlight name `dag-found`.
 
 **Out, and why:** a match inside a diagram opening on its card rather than on the diagram (a card's
 id is the dialect's, and framing one needs the layout's box, which `App` has but a result cannot

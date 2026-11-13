@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 
 import { megabytes, readLimits, type Limits } from "@/files/upload";
 
-import { resetSettings, writeSettings } from "../store";
+import { resetSettingsWithUndo, writeSettings } from "../store";
+import { SETTLE } from "../feedback";
 import { useSettings } from "../useSettings";
 import { ScaledNumber, Switch } from "@/ui/controls";
 
-import { Field, Group, Reset } from "./common";
+import { Fact, Facts, Field, Group, Reset } from "./common";
 
 /** The board grid an export margin is counted in: `metric.grid` in every theme. */
 const GRID = 8;
@@ -22,7 +23,7 @@ export function ExportPane() {
   return (
     <>
       <Group title="Export">
-        <Field label="PNG resolution" hint="How many image pixels per board pixel.">
+        <Field label="PNG resolution" hint="How many image pixels per board pixel." save="export.scale">
           <select
             className="dag-select dag-select--narrow"
             data-dag-setting-export-scale=""
@@ -36,14 +37,19 @@ export function ExportPane() {
             ))}
           </select>
         </Field>
-        <Field label="Background" hint="Off exports the board on nothing, which suits a dark slide.">
+        <Field label="Background" hint="Off exports the board on nothing, which suits a dark slide." save="export.paper">
           <Switch
             data-dag-setting-export-paper=""
             checked={s.export.paper}
             onChange={(e) => writeSettings({ export: { paper: e.target.checked } })}
           />
         </Field>
-        <Field label="Margin" hint="Space around the board. A single item exports without either.">
+        <Field
+          label="Margin"
+          hint="Space around the board. A single item exports without either."
+          save="export.margin"
+          settle={SETTLE}
+        >
           <ScaledNumber
             data-dag-setting-export-margin=""
             value={s.export.margin}
@@ -63,11 +69,9 @@ export function ExportPane() {
         </p>
       </Group>
 
-      <Group title="Attachments">
-        <UploadLimits />
-      </Group>
+      <UploadLimits />
 
-      <Reset what="the export settings" onReset={() => resetSettings(["export"])} />
+      <Reset what="Export" onReset={() => resetSettingsWithUndo(["export"])} />
     </>
   );
 }
@@ -86,22 +90,23 @@ function UploadLimits() {
     };
   }, []);
   return (
-    <>
-      <Field label="Largest file" plain>
+    <Facts title="Attachments">
+      <Fact label="Largest file">
         <span className="dag-settings__value" data-dag-setting-upload-max={limits?.maxBytes ?? ""}>
           {limits ? megabytes(limits.maxBytes) : "…"}
         </span>
-      </Field>
-      <details className="dag-settings__more">
-        <summary>
-          <span className="dag-settings__name">File types</span>
-          <span className="dag-settings__value">{limits ? `${limits.types.length} kinds` : "…"}</span>
-          <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
-        </summary>
-        <p className="dag-settings__types" data-dag-setting-upload-types="">
-          {limits ? limits.types.map((t) => `.${t}`).join("  ") : ""}
-        </p>
-      </details>
-    </>
+      </Fact>
+      <Fact label="File types" stack>
+        <details className="dag-settings__more">
+          <summary>
+            <span className="dag-settings__value">{limits ? `${limits.types.length} kinds` : "…"}</span>
+            <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
+          </summary>
+          <p className="dag-settings__types" data-dag-setting-upload-types="">
+            {limits ? limits.types.map((t) => `.${t}`).join("  ") : ""}
+          </p>
+        </details>
+      </Fact>
+    </Facts>
   );
 }

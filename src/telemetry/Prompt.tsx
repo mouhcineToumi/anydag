@@ -1,29 +1,48 @@
-import { Activity } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Activity, X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { Dialog } from "@/ui/Dialog";
+import { Button, IconButton } from "@/ui/controls";
+import { Toast } from "@/ui/Toast";
 
 import { setConsent, useTelemetry } from "./client";
 import { NEVER, SENT } from "./what";
 
+/** The question, in one line. */
+const ASK = "Send anonymous logs to help fix crashes? Never your files or names.";
+
+/** How long a file stays open before the question appears: it is about using the app, not arriving. */
+const ASK_AFTER = 3000;
+
 /**
- * The question asked once per install, on the first page of the app anybody opens: may the app send
+ * The question asked once per install, after a file has been open for a moment: may the app send
  * logs. Nothing is sent before it is answered, and either answer is the end of it — Settings →
  * Privacy is where it changes. Drawn by `Shell`, so never on a snapshot, a read-only view or the
  * vault picker.
  *
- * A modal because it is a question the person answers rather than a notice they may ignore, and
- * because a default nobody chose is exactly what this card exists to avoid. Escape is *No*.
+ * A toast rather than a modal: arriving is not the moment to be asked, and a board, note, quiz or
+ * table being open is the moment it is about. It does not take the focus, so the page stays usable
+ * behind it; a key aimed at one of its buttons stops there, and Escape in it is *No*. *What's sent*
+ * opens the app's dialog frame with the two lists and the same two answers; Escape there goes back
+ * to the toast.
  */
-export function TelemetryPrompt() {
+export function TelemetryPrompt({ page }: { page: string | null }) {
   const status = useTelemetry();
+  /* Once asked, it stays until it is answered: moving to another file, or Home, does not take it
+     away and bring it back three seconds later. */
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const card = useRef<HTMLDivElement>(null);
-  const asking = status?.consent === null;
+  const [what, setWhat] = useState(false);
 
   useEffect(() => {
-    if (asking) card.current?.focus();
-  }, [asking]);
+    if (shown || !page) return;
+    /* A new page restarts the wait: the question comes after one file has been open a moment. */
+    const timer = window.setTimeout(() => setShown(true), ASK_AFTER);
+    return () => window.clearTimeout(timer);
+  }, [page, shown]);
+
+  const asking = shown && status?.consent === null;
 
   if (!asking) return null;
 
@@ -36,66 +55,83 @@ export function TelemetryPrompt() {
     });
   };
 
-  return createPortal(
-    <div className="dag-settings__scrim dag-telemetry-ask__scrim" data-dag-telemetry-ask="">
-      <div
-        ref={card}
-        className="dag-settings dag-telemetry-ask"
-        role="dialog"
-        aria-modal="true"
+  /* *What's sent* is the same question asked at length, in the app's dialog frame: the lists, then
+     the answer. While it is up the toast steps aside, so the question is on screen once. */
+  if (what)
+    return (
+      <Dialog
+        className="dag-settings dag-telemetry-dialog"
         aria-labelledby="dag-telemetry-ask-title"
-        tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" && !busy) {
-            e.preventDefault();
-            e.stopPropagation();
-            answer(false);
-          }
-          /* Every other key stops here: the board's own keys must not act behind a question. */
-          e.stopPropagation();
-        }}
+        scrim={{ "data-dag-telemetry-ask": "" }}
+        onClose={busy ? undefined : () => setWhat(false)}
       >
         <header className="dag-settings__head">
-          <Activity size={16} strokeWidth={2} aria-hidden="true" className="dag-telemetry-ask__mark" />
-          <h2 id="dag-telemetry-ask-title">Help improve AnyDag?</h2>
+          <Activity size={14} strokeWidth={2} aria-hidden="true" className="dag-telemetry-dialog__mark" />
+          <h2 id="dag-telemetry-ask-title">Send anonymous logs?</h2>
+          <span className="dag-toolbar__spacer" />
+          <IconButton aria-label="Back" tip="Back" shortcut="Escape" disabled={busy} onClick={() => setWhat(false)}>
+            <X size={14} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
         </header>
-        <p className="dag-telemetry-ask__lead">
-          AnyDag can send anonymous logs about how it is running, so crashes get found and fixed. It is off until you say yes.
-        </p>
-        <p className="dag-telemetry-ask__label">What is sent</p>
-        <ul className="dag-telemetry-ask__list">
-          {SENT.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <p className="dag-telemetry-ask__label">Never sent</p>
-        <ul className="dag-telemetry-ask__list">
-          {NEVER.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <p className="dag-telemetry-ask__hint">You can change this at any time in Settings → Privacy.</p>
+        <div id="dag-telemetry-ask-what">
+          <p className="dag-telemetry-dialog__label">What is sent</p>
+          <ul className="dag-telemetry-dialog__list">
+            {SENT.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="dag-telemetry-dialog__label">Never sent</p>
+          <ul className="dag-telemetry-dialog__list">
+            {NEVER.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="dag-telemetry-dialog__hint">You can change this at any time in Settings → Privacy.</p>
+        </div>
         {failed ? (
-          <p className="dag-telemetry-ask__failed" role="alert">
+          <p className="dag-telemetry-dialog__failed" role="alert">
             That did not save. Try again in a moment.
           </p>
         ) : null}
-        <footer className="dag-settings__foot dag-telemetry-ask__foot">
-          <button type="button" className="dag-button" data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
-            No thanks
-          </button>
-          <button
-            type="button"
-            className="dag-button dag-button--primary"
-            data-dag-telemetry-yes=""
-            disabled={busy}
-            onClick={() => answer(true)}
-          >
-            Send anonymous logs
-          </button>
-        </footer>
-      </div>
-    </div>,
-    document.body,
+        <div className="dag-settings__foot">
+          <Button data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
+            No
+          </Button>
+          <Button variant="primary" data-dag-telemetry-yes="" disabled={busy} onClick={() => answer(true)}>
+            Send
+          </Button>
+        </div>
+      </Dialog>
+    );
+
+  return (
+    <Toast
+      icon={Activity}
+      tone="accent"
+      data-dag-telemetry-ask=""
+      title={failed ? `${ASK} That did not save. Try again in a moment.` : ASK}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !busy) {
+          e.preventDefault();
+          e.stopPropagation();
+          answer(false);
+        }
+      }}
+      actions={
+        <>
+          <Button variant="quiet" data-dag-telemetry-what="" aria-haspopup="dialog" onClick={() => setWhat(true)}>
+            What's sent
+          </Button>
+          <Button data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
+            No
+          </Button>
+          <Button variant="primary" data-dag-telemetry-yes="" disabled={busy} onClick={() => answer(true)}>
+            Send
+          </Button>
+        </>
+      }
+    >
+      {failed ? "That did not save. Try again in a moment." : ASK}
+    </Toast>
   );
 }

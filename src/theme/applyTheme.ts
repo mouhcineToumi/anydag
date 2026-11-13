@@ -62,11 +62,38 @@ function walk(prefix: string, value: unknown, out: Map<string, string>): void {
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) walk(`${prefix}-${k}`, v, out);
 }
 
+/**
+ * The unit of each `ui` group (#205). Keyed by group rather than leaf, because the leaves repeat
+ * across groups (`md` is a font size and a control height) and `UNITLESS` above is by leaf: one
+ * shared leaf name would make a size unitless or a weight a length. A string passes through.
+ */
+const UI_UNITS: Record<keyof Theme["ui"], "px" | "ms" | ""> = {
+  text: "px",
+  leading: "px",
+  weight: "",
+  radius: "px",
+  elevation: "",
+  layer: "",
+  motion: "ms",
+  control: "px",
+  focus: "px",
+  space: "px",
+};
+
+function uiVars(ui: Theme["ui"], out: Map<string, string>): void {
+  for (const group of Object.keys(UI_UNITS) as (keyof Theme["ui"])[]) {
+    for (const [step, value] of Object.entries((ui?.[group] ?? {}) as Record<string, string | number>)) {
+      out.set(`--dag-ui-${group}-${step}`, typeof value === "number" ? `${value}${UI_UNITS[group]}` : value);
+    }
+  }
+}
+
 function themeVars(theme: Theme): Map<string, string> {
   const out = new Map<string, string>();
   walk("--dag-color", theme.color, out);
   walk("--dag-type", theme.type, out);
   walk("--dag-metric", theme.metric, out);
+  uiVars(theme.ui, out);
   out.set("--dag-font-sans", theme.fonts.sans);
   out.set("--dag-font-mono", theme.fonts.mono);
 

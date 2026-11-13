@@ -18,12 +18,16 @@ This is the app's navigation, and it costs
 canvas only for somebody who chose to keep it: `ctrl+\` (Notion's chord) or the toggle puts it away
 and `dag:sidebar` remembers, with the person's preferences; while it is away a hover on the toggle floats it over
 the page; and a window under 720px never docks it — a phone, where it is a sheet over the whole
-window, and the home screen when nothing is open. From 720px it docks, and its
-default width gives way to a quarter of the window, never under 232px, which is what a 929px laptop
-window had room for and could not keep. A width somebody dragged is theirs up to half the window and
-640px: under the quarter rule the grip on that same window moved nothing at all.
+window, and the home screen when nothing is open. The sheet carries a **Home** row at the top,
+because the toolbar hides its logo there with the breadcrumbs and the sheet's head has no mark:
+without it, a file open on a phone had no way back to the welcome card. From 720px it docks, and its
+default width of 272px gives way to a quarter of the window, never under 232px, which is what a
+929px laptop window had room for and could not keep. A width somebody dragged is theirs up to half
+the window and 640px: under the quarter rule the grip on that same window moved nothing at all, and
+raising the default moves nobody's column — a width already saved is read as it was.
 `data-sidebar-sized` on `.dag-shell` (React's) and `data-sidebar-dragging` (the grip's, for the length
-of a drag) are what switch `--sidebar-cap`. It is open by default,
+of a drag) are what switch `--sidebar-cap`. The grip is a 7px strip that stays invisible until the
+pointer reaches it, and then draws the edge it moves as an accent hairline. It is open by default,
 because a new person has not learned the key yet. **The toggle is one button in the window's
 top-left corner that never moves** (Claude.ai's arrangement): `Shell` draws it above the
 column and the page, and the docked header or the toolbar keeps a slot for it.
@@ -49,10 +53,18 @@ Fourteen things are load-bearing:
   rename, `shift+F10` for the menu), and every row carries the folder a drop onto it means. Which
   folders are open is `dag:sidebar-open`, this browser's and deliberately not synced — view state,
   like a scroll position — written with `writeLocal`, which does not wake the preference sync.
+  **A row's `⋯` and a folder's `+` live inside its `role="treeitem"`**, because they act on that
+  row; the tree owns only treeitems and groups. The loading line, *Nothing here yet* and a refused
+  create sit beside it rather than in it, so the tree is never a tree with a paragraph in it.
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
-  one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
+  one menu; a folder's `+` makes things in it, and that row menu's **New in “<folder>”…** opens the
+  New menu scoped to that folder — the way a folder is filled on a phone, where the `+` is hidden
+  and a finger has no hover. The tree's own empty space — below the last row,
   down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
-  Files and the only way a top-level file was made before #121. That menu's `here` is carried in the
+  Files and the only way a top-level file was made before #121. The open file's row keeps its `⋯` up
+  without a hover, and a favourite keeps its star beside it, so a first-time reader sees that a file
+  has actions; every other row keeps the hover reveal and every tool is `tabIndex=-1`, so the tree is
+  still one tab stop and `shift+F10` is the keyboard's way to the menu. That menu's `here` is carried in the
   state that opens it: the `+` says the open file's folder, the tree's space says the top level, and
   where there is no file to be in the head says *New at the top level* and offers no toggle. The menu
   opens when the vault is locked — as a row's does — with every entry `aria-disabled` and in the
@@ -75,7 +87,8 @@ Fourteen things are load-bearing:
   `server/names.ts`), in the same step, so what
   an agent or Obsidian reads on disk says exactly what the person typed. A `/` in a title is a character,
   never a folder — moving is Move to… and a drag. A row says its title, or its name's last part for
-  a file nobody titled, and the rows sort by what they say. With the column put away, it floats
+  a file nobody titled, and the rows sort by what they say; a name the column cuts short is whole in
+  the row's tooltip. With the column put away, it floats
   over the page to ask. **The menu is the only control beside Files**, with its title naming every
   kind it makes; the folder-with-plus that made a top-level folder at once is gone, because beside
   the `+` it read as a second kind of New. **Folder** is the menu's own row, made where the menu says
@@ -114,8 +127,18 @@ Fourteen things are load-bearing:
   `useBoardList` starts from `dag:file-list` — the last list fetched in this workspace, kept with the
   uid it was fetched for and through `readPref`, so a snapshot reads none of it — and the fetch
   replaces it. `BoardTree.loaded` says there is an answer at all, which is what tells *Loading your
-  files…* from *Nothing here yet*; `fresh` says the server has answered on this page load, and only a
+  files…* from a vault that really holds nothing; `fresh` says the server has answered on this page
+  load, and only a
   fresh list resolves an id to a name, because a kept one may name a file that has moved since.
+  **A listing that cannot be asked for is a third state, not a longer wait.** `useBoardList` returns
+  `{ tree, failed, retry }`: a 500 or a refused connection sets `failed`, the column draws
+  *Can't reach your files*, one line saying nothing saved is lost, and **Try again** — and the
+  `refresher` under it keeps asking by itself on a growing delay (1 s doubling to 30 s). A list this
+  browser already had stays below the message, dimmed (`data-dag-sidebar-stale`), so a server that
+  went quiet does not take the rows away; the first answer clears `failed` and the message goes
+  without a reload.
+  **An empty vault draws no line under the tree at all**: the Home card says *This vault is empty*,
+  and a second set of instructions in the column was the thing that said it twice.
 - **A drag carries a chip, and the tree scrolls under it**. On the first move a
   `.dag-sidebar-ghost` — the row's mark and name, or *N items* — is put on `<body>` and moved by a
   painted transform, `pointer-events: none` so `elementFromPoint` still finds the row; the rows it
@@ -132,12 +155,26 @@ Fourteen things are load-bearing:
   it has shown. `e2e/folders.spec.ts` holds it (*a file somebody else makes does not bring the list
   back to the open board*), and the glide's own check passed under load only after it.
 
+**A phone's shell is finger-sized.** Under 720px the sheet's acts, its rows, the Settings row and each
+row's `⋯` are 44×44; the `⋯` keeps its 14px glyph inside a 44px box, because a phone has no
+right-click and that button is the only way to rename, move or delete. The page tabs' close and the
+search card's field and rows follow the same floor. At every width nothing in the shell, the search,
+a quiz's answer ticks or a table's strip is under 24×24 — `e2e/touch-targets.spec.ts` holds both
+floors, at 390×844 and 1440×900.
+
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
-`dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
+`dag-toolbar__crumb*`, `data-dag-toolbar-home`, `data-dag-sidebar-sheet-home`, the storage keys
+`dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
-`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, the storage key `dag:file-list` and the event
-`dag:follow`. The retired `dag-sidebar__*` of the old board-list column
+`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, `dag-sidebar__failed*`, `dag-sidebar__retry`,
+`data-dag-sidebar-failed`, `data-dag-sidebar-stale`, the storage keys `dag:file-list` and
+`dag:recent-files` and the event `dag:follow`. The Home card's own names — `dag-welcome--home`,
+`dag-welcome--vault-empty`, `dag-welcome__acts--home`, `dag-welcome__section`, `dag-welcome__sectiontitle`,
+`dag-welcome__rows`, `dag-welcome__row`, `dag-welcome__rowtitle`, `dag-welcome__rowmeta`,
+`data-dag-welcome-empty`, `data-dag-welcome-start`, `data-dag-welcome-more`, `data-dag-home-recent`,
+`data-dag-home-recent-item`, `data-dag-home-recent-kind`, `data-dag-home-due` and `data-dag-home-due-item` —
+were grepped too; the diagram owns none of them. The retired `dag-sidebar__*` of the old board-list column
 survives only in a comment in `chrome.css`. The sidebar's rows are deliberately **not**
 `data-dag-board` or `.dag-board`: the search keeps those, and `boards.spec.ts` counts `.dag-board`.
 
@@ -188,6 +225,10 @@ folder. Six things about it:
   row under a pointer in the middle of picking them. A selection is kept by whether its rows exist,
   not by whether they are drawn, so a picked row in a folder somebody shut stays picked; one deleted
   elsewhere is let go.
+- **The bar says what its actions do.** Each action is its mark and its word — *Move*, *To vault*,
+  *Trash* — so none of them is a guess until hovered; a narrow column wraps them onto the line under
+  the count, the trash wears the danger colour, and the `×` beside the count lets the selection go as
+  Escape does.
 
 Names claimed, grepped first: `dag-sidebar__bulk*`, `data-dag-sidebar-bulk*`, `data-dag-sidebar-picked`
 (and `data-dag-bulk-delete*`, gone with its modal).
@@ -198,7 +239,8 @@ none of them is about. `sidebar.spec.ts` clears the key and checks what a person
 `e2e/sidebar.ts` docks it for a check that needs a row.
 
 **Out, and why:** a manual order within a folder (nothing stores one); pages
-inside pages; titles instead of names (`/list` carries names alone); Recent.
+inside pages; titles instead of names (`/list` carries names alone); and Recent, which is Home's
+(`src/ui/recents.ts`) rather than a second list in the column.
 
 ## Choosing a board
 
@@ -309,15 +351,47 @@ scroll past the top. `e2e/hover.ts` gained the other half — `boundingBox()` an
 scrolled out of an `overflow: auto` list, with a real viewport coordinate outside it, so
 `mouse.move` lands on whatever is drawn there and the hover silently does nothing.
 
-### Nothing open
+### Home
 
 **The app used to open a board nobody asked for.** `boardName` was `?board=` *or `boards[0]`*, so a
 cold load landed on whichever file sorted first — a reference fixture as often as not — and the
 only signal that this was an accident rather than a choice was not recognising it. It is
-`query.get("board")` now, and `src/ui/Welcome.tsx` stands where the fallback did: an empty board,
-with **Start drawing** (which makes one, because there is nothing to draw *on* until one exists)
-and **Open a board**. The layer is `pointer-events: none` and the card turns it back on, so the
-paper behind it still pans and zooms — an invitation, not a gate.
+`query.get("board")` now, and `src/ui/Welcome.tsx` stands where the fallback did. The layer is
+`pointer-events: none` and the card turns it back on, so the paper behind it still pans and zooms —
+an invitation, not a gate.
+
+**It is three parts, and no more.** First the ways to start, as tiles: **Board**, **Note**, **Task**,
+**More…** (which opens Event, Quiz and Table under them) and **Search**, which shows the board
+dialog's `space O`. The tiles have **no bare-letter keys** of their own: the app moved every command
+off bare letters after a typed letter landed in a board file (*The leader key*, `editing.md`), and a
+single-key shortcut that cannot be turned off is WCAG 2.1.4's failure. They are buttons, and Tab
+reaches them.
+
+Then **Recent**, the last five files this browser opened in this vault, newest first, each a row
+that opens it again. It is not the index and it is not a preference: `src/ui/recents.ts` keeps
+`kind` + `name` in `localStorage` under `dag:recent-files`, scoped to the vault by `storageKey` and
+written by the page when a file's address comes up in `App`. Opening a vault therefore writes no
+byte of it — the folder never learns what somebody looked at — and a name the list no longer holds
+is filtered out rather than drawn as a row that opens nothing. The list is five, as the issue says;
+a repeated open moves rather than duplicates.
+
+Then **Due soon**: the tasks the sidebar's own `/__board/list` says are not done and are due by the
+end of the coming week, soonest first. It reuses `list.tasks` and `list.titles`, so it is the same
+answer the Tasks page draws and there is no second request or second parser. A task past its date
+is still due and stays at the top, marked *Overdue*.
+
+**An empty vault gets its own card.** The same *Nothing open* over a folder of two hundred files and
+a folder of none said the same thing in both, and the sidebar's *Nothing here yet* line was a second
+set of instructions a few pixels away. The title is **This vault is empty**, every kind is a tile,
+and Search is not offered because it can find nothing. The sidebar draws no line of its own for the
+same state. *Empty* means the server answered and the vault holds no files and no folders: before
+that answer the card stays *Nothing open*, so a listing on its way is never mistaken for an empty
+vault.
+
+**With nothing open the bar has no `⋯`.** It held Lock and nothing else over a card whose whole job
+is to say what can be done, so `Toolbar` draws it only for a file (`boardName`) or a listing page
+(which passes a `title`). The Assistant keeps its place there: with nothing open is exactly when
+somebody may want to ask it about the vault.
 
 One thing had to give for it. **`contentBounds` answers `1 × 1` when nothing is placed**, and
 fitting a 1px box is the maximum zoom, so the window's first resize left the empty plane reading

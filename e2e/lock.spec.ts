@@ -10,7 +10,7 @@ import { vaulted } from "./vault";
 /**
  * The lock. Read only, so nothing changes by accident: every check here
  * reads the **file** after trying to change it, because the whole of the feature is that the file
- * does not move — and the notice, because a press that did nothing and said nothing would read as a
+ * does not move — and the pill, because a press that did nothing and said nothing would read as a
  * broken page.
  *
  * Each test writes into a folder of its own, for the suite's eight workers over one `boards/`.
@@ -66,7 +66,8 @@ async function ready(page: Page) {
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 
-const notice = (page: Page) => page.locator("[data-dag-readonly-notice]");
+const lock = (page: Page) => page.locator("[data-dag-readonly]");
+const pill = (page: Page) => page.locator("[data-dag-readonly-pill]");
 
 test("the top bar's switch and ctrl+shift+L lock and unlock, every tab of the browser hears it, and a reload keeps it", async ({
   page,
@@ -77,40 +78,78 @@ test("the top bar's switch and ctrl+shift+L lock and unlock, every tab of the br
   const { name } = board();
   await page.goto(`/?board=${name}`);
   await ready(page);
-  const button = page.locator("[data-dag-readonly]");
   /* Unlocked, the bar carries no lock at all: the switch is in the ⋯ (the UI review). */
-  await expect(button).toHaveCount(0);
+  await expect(lock(page)).toHaveCount(0);
   await page.locator("[data-dag-page-more]").click();
   await expect(page.locator("[data-dag-readonly-lock]")).toBeVisible();
   await page.keyboard.press("Escape");
 
   await page.keyboard.press("Control+Shift+L");
-  await expect(button).toHaveAttribute("data-dag-readonly", "on");
-  await expect(button).toHaveText(/Read only/);
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "locked");
+  await expect(lock(page)).toHaveAttribute("data-dag-readonly", "on");
+  await expect(pill(page)).toHaveText(/Read only/);
+  /* The one lock display, with its way out beside it. */
+  await expect(page.locator("[data-dag-readonly-unlock]")).toHaveText("Unlock");
   await expect(page.locator("html")).toHaveAttribute("data-dag-locked", "");
 
   /* Another tab of this browser is locked too, through the `storage` event. */
   const other = await context.newPage();
   await other.goto(`/?board=${name}`);
   await ready(other);
-  await expect(other.locator("[data-dag-readonly]")).toHaveAttribute("data-dag-readonly", "on");
+  await expect(lock(other)).toHaveAttribute("data-dag-readonly", "on");
 
   /* A reload is still locked: it is this browser's, until it is unlocked. */
   await page.reload();
   await ready(page);
-  await expect(page.locator("[data-dag-readonly]")).toHaveAttribute("data-dag-readonly", "on");
+  await expect(lock(page)).toHaveAttribute("data-dag-readonly", "on");
 
-  await page.locator("[data-dag-readonly]").click();
-  await expect(page.locator("[data-dag-readonly]")).toHaveCount(0);
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "unlocked");
-  await expect(other.locator("[data-dag-readonly]")).toHaveCount(0);
+  await page.locator("[data-dag-readonly-unlock]").click();
+  await expect(lock(page)).toHaveCount(0);
+  await expect(lock(other)).toHaveCount(0);
 
   /* And the ⋯'s row locks it again. */
   await page.locator("[data-dag-page-more]").click();
   await page.locator("[data-dag-readonly-lock]").click();
-  await expect(page.locator("[data-dag-readonly]")).toHaveAttribute("data-dag-readonly", "on");
+  await expect(lock(page)).toHaveAttribute("data-dag-readonly", "on");
   await other.close();
+});
+
+test("the Read only pill meets 4.5:1 in every theme", async ({ page }) => {
+  const { name } = board();
+  await lockFirst(page);
+  for (const theme of ["neutral", "paper", "paper-dark"]) {
+    await page.goto(`/?board=${name}&theme=${theme}`);
+    await ready(page);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const ratio = await pill(page).evaluate((el) => {
+      interface Rgb {
+        r: number;
+        g: number;
+        b: number;
+      }
+      const parse = (value: string): Rgb | null => {
+        const m = /^rgba?\(([^)]+)\)$/.exec(value.trim());
+        if (!m) return null;
+        const parts = m[1]!
+          .split(/[,\s/]+/)
+          .filter(Boolean)
+          .map(Number);
+        if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
+        return { r: parts[0]!, g: parts[1]!, b: parts[2]! };
+      };
+      const linear = (value: number): number => {
+        const c = value / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      const luminance = (c: Rgb): number => 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b);
+      const style = getComputedStyle(el);
+      const fg = parse(style.color)!;
+      const bg = parse(style.backgroundColor)!;
+      const x = luminance(fg);
+      const y = luminance(bg);
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    });
+    expect(ratio, `${theme}: Read only on its pill`).toBeGreaterThanOrEqual(4.5);
+  }
 });
 
 test("with nothing open, a locked card says read only and unlocks in place", async ({ page }) => {
@@ -120,6 +159,7 @@ test("with nothing open, a locked card says read only and unlocks in place", asy
   await expect(card).toBeVisible({ timeout: 10_000 });
   await expect(card).toContainText("Read only: nothing here can be changed until you unlock.");
   await expect(card.locator("[data-dag-welcome-unlock]")).toBeVisible();
+  await expect(pill(page)).toContainText("Read only");
 
   /* Both writes are visibly unavailable before they are pressed, and say the chord on hover. */
   for (const what of ["new", "note"]) {
@@ -129,50 +169,54 @@ test("with nothing open, a locked card says read only and unlocks in place", asy
     await expect(act).toHaveAttribute("data-dag-readonly-blocked", "");
   }
 
-  /* The page-loaded *read only* line says its piece and leaves the controls under it alone. */
-  const notice = page.locator("[data-dag-readonly-notice]");
-  await expect(notice).toBeVisible();
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "locked");
-  await expect(notice).toBeHidden({ timeout: 5000 });
-
   /* Unlock is in place, and the card becomes a card that can start something — no reload. */
   await card.locator("[data-dag-welcome-unlock]").click();
   await expect(page.locator("html")).not.toHaveAttribute("data-dag-locked", "");
   await expect(card.locator("[data-dag-welcome-unlock]")).toHaveCount(0);
   await expect(card.locator("[data-dag-welcome-new]")).not.toHaveAttribute("aria-disabled", "true");
   await expect(card.locator("[data-dag-welcome-note]")).not.toHaveAttribute("aria-disabled", "true");
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "unlocked");
+  await expect(lock(page)).toHaveCount(0);
 });
 
-test("a refused write leaves a notice with Unlock that waits for its dismiss", async ({ page }) => {
+test("a refused write shakes the Read only pill, opens no second notice, and Unlock works after it", async ({ page }) => {
   const { name } = board();
   await lockFirst(page);
   await page.goto(`/?board=${name}`);
   await ready(page);
   await openSidebar(page);
 
+  await expect(pill(page)).not.toHaveAttribute("data-dag-readonly-shake", "");
   await page.locator("[data-dag-sidebar-new]").click({ force: true });
-  const notice = page.locator("[data-dag-readonly-notice]");
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "refused");
-  await expect(notice).toContainText("Read only: unlock to change this.");
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
+  /* The refusal is said to a reader by the clipped live line inside the pill — the one place it is
+     said — rather than drawn as a second notice under the bar. */
+  await expect(page.locator("[data-dag-readonly] .dag-readonly__said")).toHaveText("Read only: unlock to change this.");
+  await expect(page.getByText("Read only: unlock to change this.")).toHaveCount(1);
 
-  /* A refusal does not flash: it is still here after the announcements would have gone. */
-  await page.waitForTimeout(3000);
-  await expect(notice).toBeVisible();
+  /* The animation plays rather than the class merely being there; reduced motion is its own
+     check below. */
+  await expect(pill(page)).toHaveCSS("animation-name", "dag-readonly-shake");
 
-  /* The × puts it away so what is under it can be reached; a new refusal brings it back. */
-  await notice.locator("[data-dag-readonly-dismiss]").click();
-  await expect(notice).toHaveCount(0);
-  await page.locator("[data-dag-sidebar-new]").click({ force: true });
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "refused");
-
-  await notice.locator("[data-dag-readonly-unlock]").click();
-  await expect(page.locator("[data-dag-readonly]")).toHaveCount(0);
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "unlocked");
+  await page.locator("[data-dag-readonly-unlock]").click();
+  await expect(lock(page)).toHaveCount(0);
 
   /* The same control works again without a reload. */
   await page.locator("[data-dag-sidebar-new]").click();
   await expect(page.locator("[data-dag-sidebar-new-menu]")).toBeVisible();
+});
+
+test("the refusal shakes nothing under prefers-reduced-motion", async ({ page }) => {
+  const { name } = board();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await lockFirst(page);
+  await page.goto(`/?board=${name}`);
+  await ready(page);
+
+  await page.locator("[data-dag-dock-prompt]").click({ force: true });
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
+  await expect(pill(page)).toHaveCSS("animation-name", "none");
+  /* The refusal is still said, to a reader. */
+  await expect(page.locator(".dag-readonly__said")).toHaveText("Read only: unlock to change this.");
 });
 
 test("a locked board is selected and panned, never moved, deleted, pasted onto or typed into", { tag: "@smoke" }, async ({
@@ -183,8 +227,17 @@ test("a locked board is selected and panned, never moved, deleted, pasted onto o
   await lockFirst(page);
   await page.goto(`/?board=${name}`);
   await ready(page);
-  /* Every tool on the dock makes something, so there is none; the zoom is its own bar. */
-  await expect(page.locator(".dag-dock")).toHaveCount(0);
+  /* The dock stays, so the tools do not vanish without a reason: the writing ones are visibly
+     unavailable, the two reading tools are not, and its Locked chip is the way back. */
+  const dock = page.locator("[data-dag-dock]");
+  await expect(dock).toBeVisible();
+  await expect(dock.locator("[data-dag-dock-locked]")).toHaveText("Locked");
+  await expect(dock.locator("[data-dag-dock-prompt]")).toHaveAttribute("aria-disabled", "true");
+  await expect(dock.locator("[data-dag-tidy]")).toHaveAttribute("aria-disabled", "true");
+  await expect(dock.locator("[data-dag-library-toggle]")).toHaveAttribute("aria-disabled", "true");
+  for (const tool of ["Select", "Hand"])
+    await expect(dock.getByRole("radio", { name: new RegExp(`^${tool}`) })).not.toHaveAttribute("aria-disabled", "true");
+  await expect(dock.getByRole("radio", { name: /^Pen/ })).toHaveAttribute("aria-disabled", "true");
 
   const item = page.locator('[data-dag-item="one"]');
   const at = (await item.boundingBox())!;
@@ -199,7 +252,7 @@ test("a locked board is selected and panned, never moved, deleted, pasted onto o
   await expect(page.locator("[data-dag-selbar-delete], [data-dag-selbar-duplicate]")).toHaveCount(0);
 
   await page.keyboard.press("Delete");
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "refused");
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
   await page.keyboard.press("Control+d");
   await page.keyboard.press("Control+z");
   await page.keyboard.press("Enter");
@@ -215,9 +268,12 @@ test("a locked board is selected and panned, never moved, deleted, pasted onto o
   expect(fs.readFileSync(file, "utf8")).toBe(before);
   await expect(page.locator(".dag-item")).toHaveCount(2);
 
-  /* Unlocked, the board is a board again. */
-  await page.keyboard.press("Control+Shift+L");
-  await expect(page.locator(".dag-dock")).toBeVisible();
+  /* The dock's own Locked chip unlocks, and the board is a board again: the pill goes and the
+     make tools come back. */
+  await dock.locator("[data-dag-dock-locked]").click();
+  await expect(lock(page)).toHaveCount(0);
+  await expect(dock.locator("[data-dag-dock-locked]")).toHaveCount(0);
+  await expect(dock.locator("[data-dag-dock-prompt]")).not.toHaveAttribute("aria-disabled", "true");
 });
 
 test("a locked note is read where it is written, and typing into it says why nothing happens", async ({ page }) => {
@@ -233,7 +289,7 @@ test("a locked note is read where it is written, and typing into it says why not
 
   await editor.getByText("Something to read.").click();
   await page.keyboard.type("xyz");
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "refused");
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
 
   /* The `⋯` says what unlocking gives back, greyed, rather than leaving it out. */
   await page.locator("[data-dag-page-more]").click();
@@ -253,7 +309,7 @@ test("the sidebar opens and selects while locked, and makes, renames and deletes
   await openSidebar(page);
 
   await page.locator("[data-dag-sidebar-new]").click({ force: true });
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "refused");
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
   await expect(page.locator("[data-dag-sidebar-new-menu]")).toHaveCount(0);
   await expect(page.locator("[data-dag-sidebar-add]")).toHaveCount(0);
 
@@ -268,12 +324,12 @@ test("the sidebar opens and selects while locked, and makes, renames and deletes
   await row.focus();
   await page.keyboard.press("F2");
   await expect(page.locator("[data-dag-sidebar-name]")).toHaveCount(0);
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "refused");
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
   expect(fs.existsSync(file)).toBe(true);
   expect(fs.readFileSync(file, "utf8")).toBe(before);
 });
 
-test("a locked table is read, and its grid answers a keystroke with the notice", async ({ page }) => {
+test("a locked table is read, and its grid answers a keystroke by drawing the eye to the pill", async ({ page }) => {
   const file = path.join(dir, "costs.table.md");
   const text =
     "---\ntitle: Costs\n---\n\n## Costs {#costs}\n\n| Item {#item} | Amount {#amount number} |\n| --- | ---: |\n| Hosting {#r1aaaa} | 120 |\n";
@@ -285,7 +341,7 @@ test("a locked table is read, and its grid answers a keystroke with the notice",
   await cell.click();
   await page.keyboard.type("9");
   await page.keyboard.press("Enter");
-  await expect(notice(page)).toHaveAttribute("data-dag-readonly-notice", "refused");
+  await expect(pill(page)).toHaveAttribute("data-dag-readonly-shake", "");
   await expect(page.locator("[data-dag-grid-editing]")).toHaveCount(0);
   await expect(page.locator("[data-dag-tablepage-undo]")).toBeDisabled();
   await page.waitForTimeout(500);

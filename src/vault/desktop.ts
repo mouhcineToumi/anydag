@@ -18,6 +18,11 @@ export interface DesktopBridge {
     unset(name: string): Promise<boolean>;
     names(): Promise<string[]>;
   };
+  /** The OpenAI-compatible address and model, which are not secrets and so may be read back. */
+  providerEnv?: {
+    get(): Promise<Record<string, string>>;
+    set(name: string, value: string): Promise<boolean>;
+  };
   /** `process.platform` of the shell: `"darwin"` is the one whose window has no title bar. */
   platform?: string;
   /** Whether the window is in full screen now. */

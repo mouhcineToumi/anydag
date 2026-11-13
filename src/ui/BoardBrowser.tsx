@@ -4,6 +4,7 @@ import {
   FileText,
   Folder as FolderIcon,
   GraduationCap,
+  Plus,
   Search,
   Table2,
   Workflow,
@@ -15,9 +16,12 @@ import { itemName } from "@/board/types";
 import type { FileKind } from "@/board/useBoard";
 import { FileIcon } from "@/files/FileIcon";
 import { search, snippet, type Hit } from "@/search/engine";
+import { byDocument } from "@/search/results";
 import { useCorpus } from "@/search/useCorpus";
 
-import { flatten, keyOf, labelOf, leaf, prune, tokens, tree, type Entry, type Tree } from "./tree";
+import { Dialog } from "./Dialog";
+import { useSidebar } from "./Shell";
+import { flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type Entry, type Tree } from "./tree";
 
 interface Props {
   boards: string[];
@@ -76,11 +80,15 @@ const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  * Enter and Space already open one, and the only thing left to write is which button an arrow key
  * moves to.
  *
- * **It is a search, and only a search.** Making, renaming, moving, duplicating and
- * deleting a file used to happen here too, on four icons that appeared on every row's hover; they
- * are the sidebar's now, on each row's `⋯`, and this card is what `space O`, the toolbar's name and
- * the sidebar's Search row open. A control in two places is two places to keep in step, and the
- * one kept is the one that is up while the files are being worked on.
+ * **It is a search, and almost only a search.** Renaming, moving, duplicating and deleting a file
+ * used to happen here too, on four icons that appeared on every row's hover; they are the sidebar's
+ * now, on each row's `⋯`, and this card is what `space O`, the toolbar's name and the sidebar's
+ * Search row open. A control in two places is two places to keep in step, and the one kept is the
+ * one that is up while the files are being worked on.
+ *
+ * The one thing it makes is what a miss offers: the words somebody typed, as a board or a note, in
+ * the open file's folder. That goes through the sidebar's own create (`useSidebar().create`), so a
+ * file begins one way whether it was asked for here or from the `+`.
  */
 /** No notes, as one array rather than a fresh one per render — which would recompute the tree every time. */
 const NO_NOTES: string[] = [];
@@ -122,6 +130,9 @@ export function BoardBrowser({
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  /* The sidebar's own create path, for a miss: one way a file begins. `null` only where the whole
+     Shell is absent — a snapshot, which draws no search either. */
+  const sidebar = useSidebar();
 
   /* The card takes focus when it opens, and it takes it into the search box rather than onto the
      card itself: what a person came here to do is find a board, and a dialog that opens with the
@@ -185,6 +196,24 @@ export function BoardBrowser({
   const corpus = useCorpus();
   const hits = useMemo<Hit[]>(() => (corpus.engine && query.trim() ? search(corpus.engine, query) : []), [corpus.engine, query]);
 
+  /*
+   * A file that matched by name is already a row; listing its blocks under the words would say the
+   * same file twice. It appears once, by its name — its best match — and the row says the words are
+   * in its text as well. `byDocument` is the whole of that rule, and `test/search-results.test.ts`
+   * holds it.
+   */
+  const named = useMemo(() => new Set(shown.map(keyOf)), [shown]);
+  const split = useMemo(() => byDocument(hits, named), [hits, named]);
+
+  /* Where a file made from a miss goes: the folder the open file is in, as the sidebar's New does.
+     Nothing open is the top level. */
+  const here = parentOf(board ?? note ?? quiz ?? table ?? file ?? "");
+
+  /* A miss is no name, no text and no folder: there is nothing to show, so there is something to
+     make. Not while the corpus is still being read — a hit may be a moment away, and "nothing
+     matches" must not become a button somebody presses before the answer lands. */
+  const miss = terms.length > 0 && corpus.loaded && shown.length === 0 && root.folders.length === 0 && hits.length === 0;
+
   /**
    * Opening a board is what this is for, so it is also what closes it.
    *
@@ -207,11 +236,25 @@ export function BoardBrowser({
     [onOpenAt, onOpen, onClose],
   );
 
+  /**
+   * Make what was typed. The sidebar's New path in the open folder: it makes the file under that
+   * title, opens it, and closes this card. The board is first, which is what Enter on a miss presses.
+   */
+  const create = useCallback(
+    (kind: "board" | "note") => {
+      const title = query.trim();
+      if (!title || !sidebar) return;
+      sidebar.create(kind, here, title);
+      onClose();
+    },
+    [query, sidebar, here, onClose],
+  );
+
   /** Move focus along the rendered rows. The DOM is the list, so nothing has to be kept in step. */
   const step = useCallback((from: EventTarget | null, dir: 1 | -1) => {
     const rows = Array.from(
       listRef.current?.querySelectorAll<HTMLButtonElement>(
-        "[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit]",
+        "[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit],[data-dag-hits-new-board],[data-dag-hits-new-note]",
       ) ?? [],
     );
     if (rows.length === 0) return;
@@ -226,11 +269,13 @@ export function BoardBrowser({
       step(null, 1);
     } else if (e.key === "Enter") {
       /* Type enough to leave one board standing and press Enter — the search is the picker. With
-         no name left standing, the best match in the text is the first row, so it is what opens. */
+         no name left standing, the best match in the text is the first row, so it is what opens;
+         with nothing at all, the first of the two offers — New board — is what Enter makes. */
       e.preventDefault();
       if (query.trim() && shown[0]) open(shown[0]);
       else if (hits[0]) openHit(hits[0]);
       else if (shown[0]) open(shown[0]);
+      else if (miss) create("board");
     }
   };
 
@@ -285,6 +330,9 @@ export function BoardBrowser({
               with no mark was the one a reader had to work out by elimination. */}
           <KindMark kind={kind} name={name} className="dag-board__kind" />
           {labelOf(entry)}
+          {/* The same file, found twice, said once: its name is the row and this is the second
+              half. Its block matches are not repeated in the section below. */}
+          {split.inText.has(keyOf(entry)) ? <span className="dag-board__also"> · and in the text</span> : null}
         </button>
       </div>
     );
@@ -319,104 +367,111 @@ export function BoardBrowser({
   );
 
   return (
-    <div className="dag-browser__scrim" data-dag-boards="" onPointerDown={onClose}>
-      <section
-        className="dag-browser"
-        role="dialog"
-        aria-label="Boards"
-        aria-modal="true"
-        onPointerDown={(e) => e.stopPropagation()}
-        onKeyDown={onEscape}
-      >
-        <div className="dag-panel__search">
-          <Search {...ICON} aria-hidden="true" />
-          <input
-            ref={searchRef}
-            type="text"
-            className="dag-panel__input"
-            placeholder={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
-            aria-label={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
-            spellCheck={false}
-            autoComplete="off"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onSearchKey}
-          />
-          {/* One ×, which does what Escape does: with words typed it takes them back, and
+    /* The app's dialog frame (`ui/Dialog.tsx`): over the sidebar too, with the scrim every dialog
+       has, the page behind it inert, and Tab kept inside — it said `aria-modal` and Tab walked out
+       of it into the sidebar. */
+    <Dialog scrim={{ "data-dag-boards": "" }} onClose={onClose} className="dag-browser" aria-label="Boards" onKeyDown={onEscape}>
+      <div className="dag-panel__search">
+        <Search {...ICON} aria-hidden="true" />
+        <input
+          ref={searchRef}
+          type="text"
+          className="dag-panel__input"
+          placeholder={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
+          aria-label={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
+          spellCheck={false}
+          autoComplete="off"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onSearchKey}
+        />
+        {/* One ×, which does what Escape does: with words typed it takes them back, and
               with none it closes. Two of them side by side, one clearing and one closing, looked
               the same and did different things. */}
-          <button
-            className="dag-panel__clear"
-            data-dag-boards-close=""
-            aria-label={query ? "Clear search" : "Close"}
-            title={query ? "Clear (Escape)" : "Close (Escape)"}
-            onClick={() => {
-              if (!query) return onClose();
-              setQuery("");
-              searchRef.current?.focus();
-            }}
-          >
-            <X {...ICON} aria-hidden="true" />
-          </button>
-        </div>
+        <button
+          className="dag-panel__clear"
+          data-dag-boards-close=""
+          aria-label={query ? "Clear search" : "Close"}
+          title={query ? "Clear (Escape)" : "Close (Escape)"}
+          onClick={() => {
+            if (!query) return onClose();
+            setQuery("");
+            searchRef.current?.focus();
+          }}
+        >
+          <X {...ICON} aria-hidden="true" />
+        </button>
+      </div>
 
-        <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey}>
-          {entries.length === 0 && terms.length === 0 ? (
-            <p className="dag-panel__empty">nothing here yet: the sidebar makes a board or a note</p>
-          ) : null}
+      <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey}>
+        {entries.length === 0 && terms.length === 0 ? (
+          <p className="dag-panel__empty">nothing here yet: the sidebar makes a board or a note</p>
+        ) : null}
 
-          {terms.length === 0 || shown.length > 0 || root.folders.length > 0 ? renderFolder(root) : null}
+        {terms.length === 0 || shown.length > 0 || root.folders.length > 0 ? renderFolder(root) : null}
 
-          {terms.length > 0 ? (
-            <section className="dag-hits" aria-label="In the text" data-dag-hits="">
-              <h2 className="dag-hits__head">In the text</h2>
-              {hits.map((h, i) => (
-                <button
-                  /* With its place: two units of one document can share a part — two blocks with no
+        {terms.length > 0 && (split.hits.length > 0 || hits.length === 0) ? (
+          <section className="dag-hits" aria-label={split.hits.length > 0 ? "In the text" : undefined} data-dag-hits="">
+            {split.hits.length > 0 ? <h2 className="dag-hits__head">In the text</h2> : null}
+            {split.hits.map((h, i) => (
+              <button
+                /* With its place: two units of one document can share a part — two blocks with no
                      anchor on one line of a table, say — and a key React sees twice is a console
                      warning, which is a failed suite. */
-                  key={`${h.doc.id}#${h.unit.part ?? ""}#${i}`}
-                  type="button"
-                  className="dag-hit"
-                  data-dag-hit={h.doc.name}
-                  data-dag-hit-kind={h.doc.kind}
-                  data-dag-hit-part={h.unit.part ?? ""}
-                  title={h.doc.name}
-                  onClick={() => openHit(h)}
-                >
-                  <span className="dag-hit__where">
-                    <KindMark kind={h.doc.kind} name={h.doc.name} />
-                    <span className="dag-hit__doc">{h.doc.title ?? leaf(h.doc.name)}</span>
-                    <span className="dag-hit__what">{WHAT[h.unit.what] ?? kindWord(h.unit.what)}</span>
-                  </span>
-                  <span className="dag-hit__text">
-                    {snippet(h.unit.text, h.terms).map((r, i) =>
-                      r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>,
-                    )}
-                  </span>
+                key={`${h.doc.id}#${h.unit.part ?? ""}#${i}`}
+                type="button"
+                className="dag-hit"
+                data-dag-hit={h.doc.name}
+                data-dag-hit-kind={h.doc.kind}
+                data-dag-hit-part={h.unit.part ?? ""}
+                title={h.doc.name}
+                onClick={() => openHit(h)}
+              >
+                <span className="dag-hit__where">
+                  <KindMark kind={h.doc.kind} name={h.doc.name} />
+                  <span className="dag-hit__doc">{h.doc.title ?? leaf(h.doc.name)}</span>
+                  <span className="dag-hit__what">{WHAT[h.unit.what] ?? kindWord(h.unit.what)}</span>
+                </span>
+                <span className="dag-hit__text">
+                  {snippet(h.unit.text, h.terms).map((r, i) =>
+                    r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>,
+                  )}
+                </span>
+              </button>
+            ))}
+            {hits.length === 0 ? (
+              <p className="dag-panel__empty" data-dag-hits-empty="">
+                {!corpus.loaded
+                  ? "reading the text of every board and note…"
+                  : shown.length === 0 && root.folders.length === 0
+                    ? `nothing matches “${query}”`
+                    : `no text matches “${query}”`}
+              </p>
+            ) : null}
+            {miss && sidebar ? (
+              <div className="dag-hits__make">
+                {/* The board first: it is what Enter on a miss makes. */}
+                <button type="button" className="dag-hits__new" data-dag-hits-new-board="" onClick={() => create("board")}>
+                  <Plus {...ICON} aria-hidden="true" />
+                  <span className="dag-hits__make-name">New board “{query.trim()}”</span>
                 </button>
-              ))}
-              {hits.length === 0 ? (
-                <p className="dag-panel__empty" data-dag-hits-empty="">
-                  {!corpus.loaded
-                    ? "reading the text of every board and note…"
-                    : shown.length === 0 && root.folders.length === 0
-                      ? `nothing matches “${query}”`
-                      : `no text matches “${query}”`}
-                </p>
-              ) : null}
-            </section>
-          ) : null}
-        </div>
+                <button type="button" className="dag-hits__new" data-dag-hits-new-note="" onClick={() => create("note")}>
+                  <Plus {...ICON} aria-hidden="true" />
+                  <span className="dag-hits__make-name">New note “{query.trim()}”</span>
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
 
-        <p className="dag-panel__count">
-          {shown.length === entries.length
-            ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
-            : `${shown.length} of ${entries.length}`}
-          {terms.length > 0 ? ` · ${hits.length} in the text` : null}
-        </p>
-      </section>
-    </div>
+      <p className="dag-panel__count">
+        {shown.length === entries.length
+          ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
+          : `${shown.length} of ${entries.length}`}
+        {terms.length > 0 ? ` · ${hits.length} in the text` : null}
+      </p>
+    </Dialog>
   );
 }
 

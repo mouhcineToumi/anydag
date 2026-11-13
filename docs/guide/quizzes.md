@@ -29,7 +29,7 @@ on, or use the arrow keys to move without answering.
 ## Mistakes
 
 Every question you get wrong goes into **Mistakes**, on the Quizzes page. Practise Mistakes and a
-question leaves once you get it right a few times in a row, twice by default (Settings → Preferences
+question leaves once you get it right a few times in a row, twice by default (Settings → You → Quizzes
 sets it between 1 and 10). This is spaced practice without the bookkeeping.
 
 You can also practise **every quiz in a folder** as one run: the folder's menu in the sidebar →

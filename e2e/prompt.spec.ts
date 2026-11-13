@@ -103,6 +103,99 @@ test("P puts an empty card in the middle of the view with the caret in it, and t
   await expect.poll(read).toMatch(/```prompt \{#prompt-[a-z0-9]{4} x=\d+ y=\d+ w=420\}\nA queue between two workers\n```/);
 });
 
+test("the model chip names who would answer, and opens the AI settings", async ({ page }) => {
+  /* `*` for the `vault=` every scoped request carries (`src/vault/current.ts`). */
+  await page.route("**/__board/llm*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        default: "claude",
+        providers: [
+          {
+            id: "claude",
+            label: "Claude Code",
+            description: "Uses your Claude plan, through the Claude Code signed in on this computer.",
+            kind: "cli",
+            defaultModel: "sonnet",
+            models: ["sonnet"],
+            ready: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await open(page);
+  const chip = page.locator('[data-dag-model-chip="prompt"]');
+  await expect(chip).toHaveText("Claude Code · sonnet");
+  await chip.click();
+  await expect(page.locator("[data-dag-settings]")).toBeVisible();
+  await expect(page.locator("[data-dag-settings-pane=ai]")).toBeVisible();
+  /* The default is worded the same way as the Assistant's, and the model's default is in the hint,
+     not only in a placeholder that disappears as soon as somebody types. */
+  await expect(page.locator("[data-dag-setting-llm-provider] option").first()).toHaveText("Automatic · Claude Code");
+  await expect(page.locator("[data-dag-setting-llm-model]")).toContainText("Automatic");
+  await expect(page.getByText("Uses sonnet unless you choose another.")).toBeVisible();
+  await expect(page.getByText("Prompt cards, Rewrite in the panel, and Generate flashcards use this model.")).toBeVisible();
+});
+
+test("the model picker searches the list, picks with the keyboard, and the choice rides with the request", async ({ page }) => {
+  const asked = await answer(page, 200, { ok: true, draft: DRAFT, diagnostics: [], attempts: 1 });
+  await page.route("**/__board/llm*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        default: "claude",
+        providers: [
+          {
+            id: "claude",
+            label: "Claude Code",
+            description: "Uses your Claude plan.",
+            kind: "cli",
+            defaultModel: "sonnet",
+            models: ["sonnet"],
+            ready: true,
+          },
+          {
+            id: "opencode",
+            label: "OpenCode",
+            description: "Uses your OpenCode login.",
+            kind: "cli",
+            defaultModel: "opencode-go/glm-5.3-flash",
+            models: ["opencode-go/glm-5.3-flash", "opencode-go/kimi-k3"],
+            ready: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await open(page);
+  await page.keyboard.press("Control+Comma");
+  await settingsTab(page, "ai");
+  const picker = page.locator("[data-dag-setting-llm-model]");
+  await picker.click();
+  const search = page.locator("[data-dag-model-search]");
+  await expect(search).toBeFocused();
+  await search.fill("glm");
+  await expect(page.getByRole("option", { name: /GLM 5\.3 Flash/ })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(picker).toContainText("GLM 5.3 Flash");
+  await expect(page.locator("[data-dag-setting-llm-provider]")).toHaveValue("opencode");
+  /* Choosing another provider's model wrote the provider with it, and the card uses both. */
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-settings]")).toHaveCount(0);
+  await page.locator("[data-dag-prompt-go]").click();
+  await expect.poll(read).not.toContain("```prompt");
+  expect(asked).toEqual([
+    {
+      prompt: "A browser talking to an API that stores orders in Postgres.",
+      provider: "opencode",
+      model: "opencode-go/glm-5.3-flash",
+      reasoning: null,
+    },
+  ]);
+});
+
 /**
  * The card's box against the view's, on the glass.
  *
@@ -178,8 +271,8 @@ test("Generate puts the diagram exactly where the card was, and one ctrl+Z bring
     draft: DRAFT,
     diagnostics: [],
     attempts: 1,
-    provider: "gemini",
-    model: "gemini-3.8-flash",
+    provider: "custom",
+    model: "qwen3:32b",
     ms: 900,
   });
   await open(page);
@@ -233,12 +326,34 @@ test("a draft that still has errors is shown, and Insert anyway puts it down to 
 });
 
 test("a refusal is said on the card, and the card stays", async ({ page }) => {
-  await answer(page, 400, { error: "provider `gemini` has no key — set GEMINI_API_KEY or GOOGLE_API_KEY in .env.local" });
+  await answer(page, 400, { error: "provider `custom` has no address — set ANYDAG_LLM_BASE_URL in .env.local" });
   await open(page);
   await page.locator("[data-dag-prompt-go]").click();
-  await expect(page.locator("[data-dag-prompt-fail]")).toContainText("GEMINI_API_KEY");
+  await expect(page.locator("[data-dag-prompt-fail]")).toContainText("ANYDAG_LLM_BASE_URL");
   expect(read()).toContain("```prompt {#ask");
   /* A 400 is a console error in Chromium's own words; it is the answer this check is about. */
+  problems = problems.filter((p) => !p.includes("400"));
+});
+
+test("a no-key refusal says what is missing in plain words, and opens the AI settings", async ({ page }) => {
+  await answer(page, 400, {
+    error: "provider `custom` has no key — set ANYDAG_LLM_API_KEY in .env.local",
+    reason: { code: "no-key", provider: "custom", keyEnv: ["ANYDAG_LLM_API_KEY"] },
+  });
+  await open(page);
+  await page.locator("[data-dag-prompt-go]").click();
+
+  const fail = page.locator("[data-dag-prompt-fail]");
+  await expect(fail).toContainText("OpenAI-compatible needs an API key in the server's environment");
+  await expect(fail.locator("code").first()).toContainText("ANYDAG_LLM_API_KEY");
+  await expect(fail).not.toContainText("`");
+  await expect(fail).not.toContainText(".env.local");
+
+  const action = fail.getByRole("button", { name: "Open AI settings" });
+  await expect(action).toBeVisible();
+  await action.click();
+  await expect(page.locator("[data-dag-settings]")).toBeVisible();
+  await expect(page.locator("[data-dag-settings-pane=ai]")).toBeVisible();
   problems = problems.filter((p) => !p.includes("400"));
 });
 
@@ -247,7 +362,7 @@ test("the thinking level picked in Settings rides with the request", async ({ pa
   await open(page);
   /* Chosen the way a person chooses it: the card, not `localStorage`. */
   await page.keyboard.press("Control+Comma");
-  await settingsTab(page, "agents");
+  await settingsTab(page, "ai");
   await page.locator("[data-dag-setting-llm-reasoning]").selectOption("high");
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-settings]")).toHaveCount(0);

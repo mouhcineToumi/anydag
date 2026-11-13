@@ -1,10 +1,10 @@
-import { Calendar, CalendarDays, X } from "lucide-react";
+import { AlertCircle, Calendar, CalendarDays, GitMerge, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 
 import { useBlockEditor, type NoteEditor } from "@/blocks";
 import { concerns, onNote } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
-import { retitleFile } from "@/board/useBoard";
+import { retitleFile, type LoadProblem } from "@/board/useBoard";
 import { joinNote, pageTitle, splitNote } from "@/note/format";
 import { blockAt, load, plan, saved, settle, type Loaded, type NoteBlock } from "@/note/markdown";
 import { anchorsOf } from "@/note/anchors";
@@ -21,11 +21,14 @@ import { Said } from "@/files/Said";
 import { uploadFiles } from "@/files/upload";
 import { refuseLocked } from "@/settings/lock";
 import { typing } from "@/edit/useEditor";
+import { Button } from "@/ui/controls";
 
 import { EventBar, EventLine } from "./EventBar";
+import { FileProblem } from "./FileProblem";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { TaskGlyph, TaskLine } from "./TaskGlyph";
+import { Toast } from "./Toast";
 
 /**
  * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
@@ -54,11 +57,10 @@ interface Opened {
 
 type Status =
   | { kind: "loading" }
-  /** The read that opens the note got no answer — the server did not reply, or replied with a 5xx.
-      It goes again on its own; until it lands there is nothing to draw but this. */
-  | { kind: "unread" }
+  /** The read that opens the note got no answer, or an answer that was not a note. The page draws
+      `FileProblem`; a 5xx goes again on its own, and *Try again* asks at once. */
+  | { kind: "problem"; problem: LoadProblem }
   | { kind: "ready" }
-  | { kind: "missing" }
   | { kind: "deleted" }
   /** `retrying`: a timer is set and the same text will go again without anybody typing. `title`:
       what failed was naming the note, not a save of its text. */
@@ -66,19 +68,49 @@ type Status =
   /** Both writers changed the same lines. What the other one wrote, kept until the person decides. */
   | { kind: "conflict"; theirs: Held; mine: string };
 
+/* What the note's toasts say: one line each, the whole of it in the title when the toast is narrow. */
+const DELETED = "This note was deleted. What is on screen is not saved anywhere.";
+const CONFLICT = "This note was changed somewhere else, where you were writing.";
+function failedLine(status: Extract<Status, { kind: "failed" }>): string {
+  if (status.title) return "The title could not be saved. The note keeps the name it had.";
+  return status.retrying
+    ? "Not saved yet: the server did not answer. Trying again in a moment."
+    : "Your last change could not be saved. It is tried again with the next one.";
+}
+
 const q = (name: string) => `name=${encodeURIComponent(name)}&kind=note`;
 
 /**
  * `opening` is the read that opens the note, which a prefetch may answer; every other is asked now.
- * `null` is the server saying there is no such note; **a 5xx, or no answer at all, throws** — it is
- * not an answer about the note, and taking it for "missing" or for nothing is how a note page sat
- * blank for good (#123).
+ * A 404 is the server saying there is no such note. **A 5xx is not that answer**, and neither is a
+ * `fetch` that rejected: taking either for "missing" is how a note page sat blank for good (#123).
+ * `again` is whether the same read could succeed later without anybody doing anything.
  */
-async function fetchNote(name: string, opening = false): Promise<{ text: string; base: string } | null> {
+type NoteRead = { ok: true; text: string; base: string } | { ok: false; problem: LoadProblem; again: boolean };
+
+async function fetchNote(name: string, opening = false): Promise<NoteRead> {
   const r = await (opening ? openDoc("note", name) : fetch(`/__board/get?${q(name)}`));
-  if (r.status >= 500) throw new Error(`the server answered ${r.status}`);
-  if (!r.ok) return null;
-  return (await r.json()) as { text: string; base: string };
+  if (r.status === 404) return { ok: false, problem: { reason: "missing" }, again: false };
+  if (!r.ok) {
+    let message = `the server answered ${r.status}`;
+    try {
+      const body = (await r.json()) as { error?: string };
+      if (typeof body.error === "string" && body.error) message = body.error;
+    } catch {
+      /* A non-JSON refusal is still an answer; the status is the fact that was learned. */
+    }
+    return { ok: false, problem: { reason: "unreadable", message }, again: r.status >= 500 };
+  }
+  try {
+    const got = (await r.json()) as { text: string; base: string };
+    return { ok: true, text: got.text, base: got.base };
+  } catch (e) {
+    return {
+      ok: false,
+      problem: { reason: "unreadable", message: e instanceof Error ? e.message : String(e) },
+      again: true,
+    };
+  }
 }
 
 /**
@@ -181,6 +213,10 @@ export function NoteView({
   onEvent,
   members,
   onRenamed,
+  onProblem,
+  onSearch,
+  onTrash,
+  onHome,
   handle,
 }: {
   name: string;
@@ -206,9 +242,17 @@ export function NoteView({
   onEvent?(event: NoteEvent | undefined): void;
   /** What the project holds, when the note is one — read off the listing by the page around it. */
   members?: ProjectMembers;
+  /** Why the note has no text, so the page's toolbar can stop naming a file that is not open. */
+  onProblem?(problem: LoadProblem | null): void;
+  /** The ways forward the missing-note card offers. */
+  onSearch?(): void;
+  onTrash?(): void;
+  onHome?(): void;
   handle?: MutableRefObject<NoteHandle | null>;
 }) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  /* Bumped by *Try again*, so the read that opens the note can be asked for again at once. */
+  const [attempt, setAttempt] = useState(0);
   /* Asked for as the page mounts, beside the note's own fetch — and never for a snapshot. */
   const BlockEditor = useBlockEditor(!snapshot);
   /* Whether the editor may mount yet: at once once one has come up on this page, and otherwise
@@ -286,6 +330,13 @@ export function NoteView({
   /* This note's permanent id, which the reference picker leaves out of its own list. */
   const self = useIndex().docs.find((d) => d.kind === "note" && d.name === name)?.id ?? null;
 
+  /* Tell the page around the note when there is no note to name in the top bar. */
+  const onProblemRef = useRef(onProblem);
+  onProblemRef.current = onProblem;
+  useEffect(() => {
+    onProblemRef.current?.(status.kind === "problem" ? status.problem : null);
+  }, [status]);
+
   /** Take a text as the one the editor opens with — a first open, or "take theirs". */
   const openText = useCallback(
     (text: string, base: string) => {
@@ -320,13 +371,34 @@ export function NoteView({
       fetchNote(name, opening).then(
         (got) => {
           if (!live) return;
-          if (!got) return setStatus({ kind: "missing" });
-          openText(got.text, got.base);
-          setStatus({ kind: "ready" });
+          if (!got.ok) {
+            setStatus({ kind: "problem", problem: got.problem });
+            /* A failure that could go away does, on the save's own backoff — the note page used to
+               sit blank for ever when the api restarted under it (#123). */
+            if (got.again && got.problem.reason !== "missing")
+              retry = setTimeout(() => void read(Math.min(wait * 2, RETRY_LAST_MS), false), wait);
+            return;
+          }
+          try {
+            openText(got.text, got.base);
+            setStatus({ kind: "ready" });
+          } catch (e) {
+            setStatus({
+              kind: "problem",
+              problem: {
+                reason: "unreadable",
+                message: e instanceof Error ? e.message : String(e),
+                text: got.text,
+              },
+            });
+          }
         },
-        () => {
+        (e: Error) => {
           if (!live) return;
-          setStatus({ kind: "unread" });
+          setStatus({
+            kind: "problem",
+            problem: { reason: "unreachable", message: e.message },
+          });
           retry = setTimeout(() => void read(Math.min(wait * 2, RETRY_LAST_MS), false), wait);
         },
       );
@@ -335,7 +407,7 @@ export function NoteView({
       live = false;
       if (retry) clearTimeout(retry);
     };
-  }, [name, openText]);
+  }, [name, openText, attempt]);
 
   /** Put a text the other writer made into the open editor, block by block. */
   const adopt = useCallback(
@@ -470,8 +542,8 @@ export function NoteView({
           nameRef.current = to;
           const got = await fetchNote(to).catch(() => null);
           const h = held.current;
-          const f = got ? splitNote(got.text) : null;
-          if (got && f && h && f.body === h.text.slice(h.front.length)) {
+          const f = got?.ok ? splitNote(got.text) : null;
+          if (got?.ok && f && h && f.body === h.text.slice(h.front.length)) {
             /* Only the frontmatter moved, which the editor never holds: the text is taken as it
                is, and the span map still describes the body, so a save pending from typing in the
                meantime is written against the renamed file rather than meeting it as a 409. That
@@ -482,7 +554,7 @@ export function NoteView({
             tell(taskOf(f.front));
             tellProject(projectOf(f.front));
             tellEvent(eventOf(f.front));
-          } else if (got && !timer.current && editor.current) adopt(got.text, got.base);
+          } else if (got?.ok && !timer.current && editor.current) adopt(got.text, got.base);
           else named(next);
           ok = true;
           if (to !== from) onRenamedRef.current?.(from, to);
@@ -597,7 +669,7 @@ export function NoteView({
       if (timer.current || writing.current) return;
       void fetchNote(nameRef.current)
         .then((got) => {
-          if (!got || got.base === held.current?.base) return;
+          if (!got.ok || got.base === held.current?.base) return;
           if (timer.current || writing.current) return;
           adopt(got.text, got.base);
         })
@@ -699,6 +771,10 @@ export function NoteView({
   }, [status, openText]);
 
   const done = snapshot ? body !== null : ready;
+  /* A note that is not there, or not readable, is as finished as it will get: the card is the page,
+     and a snapshot or a check waiting for `data-dag-ready` must not wait for a file that is gone. */
+  const problem = status.kind === "problem" ? status.problem : null;
+  const settled = done || problem !== null;
 
   /* A note just made from the sidebar or the welcome card is named here, in its own title, rather
      than in its sidebar row — once, when it opens. */
@@ -735,7 +811,7 @@ export function NoteView({
   /* The same signal a board raises when it is finished, on the same element, so `snapshot.mjs` and
      the suite wait for a note exactly as they wait for a board: the text loaded and the editor up. */
   useEffect(() => {
-    if (!done) return;
+    if (!settled) return;
     /* And its equations drawn by KaTeX, in the editor as on the read-only page. */
     let live = true;
     void drawnSettled().then(() => {
@@ -745,49 +821,74 @@ export function NoteView({
       live = false;
       delete document.documentElement.dataset.dagReady;
     };
-  }, [done]);
+  }, [settled]);
+
+  /* Nothing to draw and nothing coming: one card, the same every kind draws. A note that was opened
+     before and then failed a later read keeps what it has — this only takes the page when there is
+     no text behind it. */
+  if (problem && body === null && opened === null) {
+    return (
+      <main className="dag-note-view dag-note-view--problem" data-dag-note-view={name} data-dag-ready="">
+        <FileProblem
+          kind="note"
+          name={name}
+          problem={problem}
+          onSearch={snapshot ? undefined : onSearch}
+          onTrash={snapshot ? undefined : onTrash}
+          onHome={snapshot ? undefined : onHome}
+          onRetry={snapshot || problem.reason !== "unreachable" ? undefined : () => setAttempt((n) => n + 1)}
+        />
+      </main>
+    );
+  }
 
   return (
-    <main className="dag-note-view" data-dag-note-view={name} data-dag-ready={done ? "" : undefined}>
-      {status.kind === "missing" ? (
-        <p className="dag-note-view__notice" role="status">
-          There is no note called {name}.
-        </p>
-      ) : null}
-      {status.kind === "unread" ? (
-        <p className="dag-note-view__notice" role="status" data-dag-note-unread="">
-          This note could not be read just now. Trying again…
-        </p>
-      ) : null}
+    <main className="dag-note-view" data-dag-note-view={name} data-dag-ready={settled ? "" : undefined}>
+      {/* The note's states that last, in the app's one toast stack (#208): each stays for as long
+          as it is true, and the conflict until it is answered. */}
       {status.kind === "deleted" ? (
-        <p className="dag-note-view__notice" role="status" data-dag-note-deleted="">
-          This note was deleted. What is on screen is not saved anywhere.
-        </p>
+        <Toast icon={Trash2} data-dag-note-deleted="" title={DELETED}>
+          {DELETED}
+        </Toast>
       ) : null}
       {status.kind === "failed" ? (
-        <p className="dag-note-view__notice" role="alert" data-dag-note-failed="">
-          {status.title
-            ? "The title could not be saved. The note keeps the name it had."
-            : status.retrying
-              ? "Your last change is not saved yet. The server did not answer, so it will be tried again in a moment."
-              : "Your last change could not be saved. It will be tried again with the next one."}
-        </p>
+        <Toast icon={AlertCircle} tone="danger" role="alert" data-dag-note-failed="" title={failedLine(status)}>
+          {failedLine(status)}
+        </Toast>
       ) : null}
       {attachProblems.map((problem) => (
-        <p key={problem} className="dag-note-view__notice" role="alert" data-dag-note-upload-problem="">
+        <Toast
+          key={problem}
+          icon={AlertCircle}
+          tone="danger"
+          role="alert"
+          data-dag-note-upload-problem=""
+          title={problem}
+          onDismiss={() => setAttachProblems((had) => had.filter((p) => p !== problem))}
+        >
           <Said text={problem} />
-        </p>
+        </Toast>
       ))}
       {status.kind === "conflict" ? (
-        <div className="dag-note-view__notice dag-note-view__notice--ask" role="alert" data-dag-note-conflict="">
-          <span>This note was changed somewhere else, in the same place you were writing.</span>
-          <button type="button" data-dag-note-keep="" onClick={() => void keepMine()}>
-            Keep mine
-          </button>
-          <button type="button" data-dag-note-theirs="" onClick={takeTheirs}>
-            Use theirs
-          </button>
-        </div>
+        <Toast
+          icon={GitMerge}
+          tone="accent"
+          role="alert"
+          data-dag-note-conflict=""
+          title={CONFLICT}
+          actions={
+            <>
+              <Button data-dag-note-keep="" onClick={() => void keepMine()}>
+                Keep mine
+              </Button>
+              <Button data-dag-note-theirs="" onClick={takeTheirs}>
+                Use theirs
+              </Button>
+            </>
+          }
+        >
+          {CONFLICT}
+        </Toast>
       ) : null}
 
       {snapshot ? (
@@ -842,6 +943,7 @@ export function NoteView({
                 attach={locked ? refuseFiles : attach}
                 resolve={resolve}
                 scheme={scheme}
+                label={title || name}
                 self={self}
                 editable={!locked && status.kind !== "conflict"}
               />

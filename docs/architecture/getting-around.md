@@ -41,7 +41,9 @@ small card means to look at it closely; `0` and the zoom figure remain 100% rath
 ### The dock's tooltip
 
 The dock and the zoom cluster are icon-only, so a control's name and chord live in a tooltip rather
-than on its face. The browser's `title` was that tooltip until macOS stopped showing it in the
+than on its face. Both are `role="toolbar"` with a label, and both sit inside the board's `<main>`
+beside `.dag-viewport`; the page's top bar is a `<header>` inside that main, so a board has one main
+landmark and no second banner. The browser's `title` was that tooltip until macOS stopped showing it in the
 desktop app — at least not within the time a person waits — so `src/ui/Tooltip.tsx` draws it instead,
 and the `title` is gone from those controls. `src/ui/tooltipPlace.ts` holds the placement arithmetic:
 400 ms after hover or keyboard focus, above the control (upward from the dock) unless there is no
@@ -52,3 +54,6 @@ it; it is `pointer-events: none`, so it cannot take the press it describes; and 
 leave, blur, Escape and press. The wrapper adds no drawing of its own — it only measures the control
 and carries the handlers. The control keeps its `aria-label`, because the bubble is a visual name
 for a pointer or keyboard user, not the accessible name.
+
+Since #207 every `IconButton` in the chrome wears it, saying its label (*Design rules*,
+`design-and-layout.md`), so the dock and the zoom bar no longer wrap their buttons by hand.

@@ -23,8 +23,22 @@
 
 import { scopedKey } from "@/vault/current";
 
-/** Where the reader's own choice of theme lives. */
+import { markSaved } from "./saved";
+
+/**
+ * Where the reader's own choice of theme lives. **The person's, in every vault** (#191): it was the
+ * vault's until then, so opening another vault changed how the app looked. A vault's old value is
+ * carried over once by `migrate.ts`.
+ */
 export const THEME = "dag:theme";
+/**
+ * Which model each AI feature uses: the `llm` and `assistant` sections of the settings object, as one
+ * JSON string. **The person's, in every vault** (#191), beside the keys and sign-ins, which were
+ * always this computer's: a second vault no longer starts the Assistant on another provider.
+ * `store.ts` reads and writes it with the rest of the settings object, so nothing that reads a
+ * setting changed; `migrate.ts` carries a vault's old choice over once.
+ */
+export const AI = "dag:ai";
 /** Where the library remembers whether it was open. */
 export const LIBRARY = "dag:library";
 /**
@@ -63,6 +77,12 @@ export const SIDEBAR_FOLDERS = "dag:sidebar-open";
  * carries the vault it was fetched for, and nothing is drawn from it for any other.
  */
 export const FILE_LIST = "dag:file-list";
+/**
+ * The files Home remembers opening, per vault: the last five, newest first. A cache of this
+ * browser's, never a preference and never in `PREF_KEYS` — the folder does not know what somebody
+ * looked at, and opening a vault still writes no byte of it. `src/ui/recents.ts` owns the shape.
+ */
+export const RECENT_FILES = "dag:recent-files";
 /**
  * Whether the Tasks page is a list or a board — this browser's for `SIDEBAR_FOLDERS`'s
  * reason: which way somebody looks at their tasks is view state, and not something to write to the
@@ -141,6 +161,7 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
  */
 export const PREF_KEYS = [
   THEME,
+  AI,
   LIBRARY,
   INSPECTOR_WIDTH,
   SIDEBAR,
@@ -155,12 +176,12 @@ export const PREF_KEYS = [
 ] as const;
 
 /**
- * **The half of `PREF_KEYS` that switches with the vault**: the
- * theme and the favourites — which name files, and a vault's files are its own — travel with the
- * settings object in the vault's bundle. Everything else in `PREF_KEYS` is how the window is laid
- * out, and stays the person's: a sidebar docked in one vault is docked in the next.
+ * **The half of `PREF_KEYS` that switches with the vault**: the favourites — which name files, and a
+ * vault's files are its own — the attachments folder and the links switch, which the server reads
+ * out of the vault's bundle. Everything else in `PREF_KEYS` is the person's, the same in every vault:
+ * how the window is laid out, the theme and the AI choices (#191).
  */
-export const VAULT_PREF_KEYS = [THEME, FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
+export const VAULT_PREF_KEYS = [FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
 export const ACCOUNT_PREF_KEYS = PREF_KEYS.filter((k) => !(VAULT_PREF_KEYS as readonly string[]).includes(k));
 
 /**
@@ -172,10 +193,10 @@ export const VAULT_STAMP = "dag:vault-prefs-at";
 /**
  * Every key this browser keeps a copy of **per vault**: the vault's preferences, the settings
  * object (`store.ts`'s `dag:settings`), which folders are open — they are the vault's folders —
- * and the clock that dates them. Under any vault but the default they are stored as `key@slug`,
- * so two tabs in two vaults never read each other's theme (`vault/current.ts`).
+ * the cached file list, Home's recent files, and the clock that dates them. They are stored as
+ * `key@slug`, so two tabs in two vaults never read each other's favourites (`vault/current.ts`).
  */
-const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST]);
+const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST, RECENT_FILES]);
 
 /** Where `key` is kept in `localStorage` for this tab: scoped to the vault when it is a vault's. */
 export function storageKey(key: string): string {
@@ -245,8 +266,13 @@ export function readFlag(key: string, fallback: boolean): boolean {
   return raw === null ? fallback : raw !== "0";
 }
 
-/** Write one, and tell the window — which is how it reaches the sync. */
-export function writePref(key: string, value: string | null): void {
+/**
+ * Write one, and tell the window — which is how it reaches the sync.
+ *
+ * `savedAs` names the row a tick belongs to when several rows share one storage key — the calendar's
+ * kinds are one comma list but three switches; without it, toggling one would tick all three.
+ */
+export function writePref(key: string, value: string | null, savedAs: string = key): void {
   if (snapshot()) return;
   try {
     if (value === null) localStorage.removeItem(storageKey(key));
@@ -255,10 +281,41 @@ export function writePref(key: string, value: string | null): void {
     /* Remembering is the nicety; honouring it for this session is the point. */
   }
   announce(PER_VAULT.has(key) ? "vault" : "account");
+  markSaved(savedAs);
 }
 
-export function writeFlag(key: string, value: boolean): void {
-  writePref(key, value ? "1" : "0");
+export function writeFlag(key: string, value: boolean, savedAs?: string): void {
+  writePref(key, value ? "1" : "0", savedAs);
+}
+
+/** The values of `keys` that exist now — what a reset will change, and what its Undo puts back. */
+function snapshotPrefs(keys: readonly string[]): Record<string, string | null> {
+  const snapshot: Record<string, string | null> = {};
+  for (const key of keys) {
+    const value = readPref(key);
+    if (value !== null) snapshot[key] = value;
+  }
+  return snapshot;
+}
+
+/** Put a snapshot back through {@link writePref}, so each one announces and reaches the sync. */
+function restorePrefs(snapshot: Record<string, string | null>): void {
+  for (const [key, value] of Object.entries(snapshot)) writePref(key, value);
+}
+
+/**
+ * Remove every key that is set, which is the default for these preferences — the calendar's zone,
+ * its week start and its hidden kinds are all absent until somebody chooses — and hand back the
+ * Undo.
+ *
+ * The snapshot is taken before the reset and holds only the keys that exist, so Undo puts back every
+ * value the reset changed and touches nothing chosen afterwards. Undo writes it through the same
+ * accessor the controls use, so a value that was there comes back exactly as it was.
+ */
+export function resetPrefs(keys: readonly string[]): () => void {
+  const before = snapshotPrefs(keys);
+  for (const key of keys) if (readPref(key) !== null) writePref(key, null);
+  return () => restorePrefs(before);
 }
 
 /**

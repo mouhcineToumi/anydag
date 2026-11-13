@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { refComponents, urlTransform } from "@/refs/Ref";
+import { providerName } from "@/settings/providerNames";
 
 import type { Block, Step, Turn, UndoRecord } from "./types";
 import { blockUndone } from "./types";
@@ -28,10 +29,10 @@ const Said = memo(function Said({ text }: { text: string }) {
 });
 
 /** What a harness is called to the person. */
-const providerLabel = (p: string): string => (p === "claude" ? "Claude Code" : p === "opencode" ? "OpenCode" : p);
+const providerLabel = (p: string): string => providerName(p) ?? p;
 
 /** A model's id with the vendor's prefix off, which is how a person says it. */
-export const modelLabel = (id: string): string => id.replace(/^claude-/, "").replace(/^[a-z0-9-]+\//, "");
+const modelLabel = (id: string): string => id.replace(/^claude-/, "").replace(/^[a-z0-9-]+\//, "");
 
 export interface Actions {
   /** The person's answer to an approval or an access card. */

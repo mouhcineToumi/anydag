@@ -613,9 +613,9 @@ export interface Editor {
   replace(id: string, next: { type?: ItemType; body?: string; attrs?: Record<string, AttrValue | null> }): void;
   setAttrs(id: string, attrs: Record<string, AttrValue | null>): void;
   /**
-   * Set keys in the board's frontmatter, `null` removing one — `theme:` and `flow:`, which the board
-   * settings card writes, beside the `pages:` the page tabs do. One patch, so one undo entry.
-   * Resolves to whether it was written.
+   * Set keys in the board's frontmatter, `null` removing one — `theme:` and `flow:`, which the
+   * Settings modal's This board → Layout tab writes, beside the `pages:` the page tabs do. One patch,
+   * so one undo entry. Resolves to whether it was written.
    */
   setMeta(meta: Record<string, unknown>): Promise<boolean>;
   /**
@@ -4181,9 +4181,12 @@ export function useEditor({
          capture phase, and a click on a blank part of the modal leaves the focus on the modal
          itself rather than on a control — so without this an arrow or a Delete pressed there moved
          or deleted what is selected on the board behind it. Its Escape and `ctrl+,` are its own.
-         The logs question (`telemetry/Prompt.tsx`) and the feedback card are the same kind of card,
-         and the same rule. */
-      if (e.target instanceof Element && e.target.closest("[data-dag-settings],[data-dag-telemetry-ask],[data-dag-feedback]"))
+         Every dialog in the app's frame (`ui/Dialog.tsx`) and every toast (`ui/Toast.tsx`) is the
+         same rule: a key aimed at one of their controls must not reach the board. */
+      if (
+        e.target instanceof Element &&
+        e.target.closest("[data-dag-settings],[data-dag-dialog],[data-dag-toast],[data-dag-telemetry-ask],[data-dag-feedback]")
+      )
         return;
       if (typing(e.target)) {
         /* Focus reached a control while a chord was open. The chord was never meant for it, and

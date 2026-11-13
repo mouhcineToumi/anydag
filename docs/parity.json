@@ -103,7 +103,7 @@
     {
       "id": "vault.settings",
       "area": "Vaults",
-      "what": "A vault's preferences — the settings card, the theme, the favourites",
+      "what": "A vault's preferences — the settings card's vault half, the favourites, the attachments folder",
       "rest": ["GET /api/vault/settings", "PUT /api/vault/settings"],
       "cli": ["settings"],
       "mcp": ["settings"]
@@ -929,6 +929,14 @@
       "area": "Models",
       "what": "Which model providers could answer",
       "rest": ["GET /__board/llm"],
+      "cli": {"admin": false},
+      "mcp": ["llm"]
+    },
+    {
+      "id": "models.test",
+      "area": "Models",
+      "what": "Make one short call to a provider, to see that it really answers",
+      "rest": ["POST /__board/llm/test"],
       "cli": {"admin": false},
       "mcp": ["llm"]
     },

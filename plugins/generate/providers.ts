@@ -3,14 +3,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { PROVIDER_NAMES } from "../../src/settings/providerNames";
+
 /**
  * Who can write a diagram for a prompt card, and how each is reached.
  *
  * Two kinds, and one interface in front of both (`llm.ts`):
  *
- * - **`http`** — an OpenAI-compatible `chat/completions` endpoint and a key. Gemini is the default
- *   over HTTP; Z.ai is GLM from the people who make it; `custom` is anything else that speaks the
- *   dialect — OpenRouter, Ollama, a local vLLM — named entirely from the environment.
+ * - **`http`** — an OpenAI-compatible `chat/completions` endpoint and a key. `custom` is anything
+ *   that speaks the dialect — OpenRouter, Ollama, a local vLLM, and Gemini or Z.ai through their
+ *   OpenAI-compatible endpoints — named from the environment.
  * - **`cli`** — a coding agent's own command line, which reuses whatever it is logged into.
  *   `claude` is Claude Code in print mode, on the person's own Claude subscription: no key, because
  *   the login is the CLI's. `opencode` is OpenCode 2 the same way, on whatever it is signed into —
@@ -26,11 +28,47 @@ import path from "node:path";
 
 export type ProviderKind = "http" | "cli";
 
+/** Why a provider cannot answer, in words a machine can act on. The plain `error` stays beside it. */
+export type LlmReasonCode =
+  | "no-key"
+  | "needs-model"
+  | "needs-base-url"
+  | "not-installed"
+  | "not-signed-in"
+  | "too-old"
+  | "unknown-provider"
+  | "busy"
+  | "timeout"
+  | "provider-error";
+
+export interface LlmReason {
+  code: LlmReasonCode;
+  provider?: string;
+  /** For `no-key`: the environment variables the server reads, in the order it reads them. */
+  keyEnv?: string[];
+}
+
+/** A refusal a route can send as `{ error, reason }`: the sentence MCP reads, and the code the page reads. */
+export interface Failure {
+  ok: false;
+  error: string;
+  reason: LlmReason;
+}
+
+const refusal = (error: string, code: LlmReasonCode, provider?: string, keyEnv?: string[]): Failure => ({
+  ok: false,
+  error,
+  reason: { code, ...(provider ? { provider } : {}), ...(keyEnv ? { keyEnv } : {}) },
+});
+
 const OPENCODE_DEFAULT_MODEL = "opencode-go/glm-5.3-flash";
 
 export interface ProviderSpec {
   id: string;
+  /** The app's one name for it (`src/settings/providerNames.ts`). */
   label: string;
+  /** What the name no longer explains: whose plan or login it uses, or what the endpoint is. */
+  description: string;
   kind: ProviderKind;
   /** `http` only. `custom` reads it from `ANYDAG_LLM_BASE_URL` instead. */
   baseURL?: string;
@@ -39,17 +77,15 @@ export interface ProviderSpec {
   defaultModel: string;
   /** Suggestions for the settings card, not a whitelist: any model the endpoint knows is accepted. */
   models: string[];
-  /**
-   * Body fields sent unless the environment says otherwise (`ANYDAG_LLM_REASONING`, `ANYDAG_LLM_TEMPERATURE`).
-   * Measured, not guessed — see Gemini's.
-   */
+  /** Body fields sent unless the environment says otherwise (`ANYDAG_LLM_REASONING`, `ANYDAG_LLM_TEMPERATURE`). */
   defaults?: Record<string, unknown>;
 }
 
 export const PROVIDERS: ProviderSpec[] = [
   {
     id: "claude",
-    label: "Claude (your subscription)",
+    label: PROVIDER_NAMES.claude,
+    description: "Uses your Claude plan, through the Claude Code signed in on this computer.",
     kind: "cli",
     keyEnv: [],
     /* Claude Code's aliases for the latest of each, so the row does not go stale with a release. */
@@ -57,38 +93,18 @@ export const PROVIDERS: ProviderSpec[] = [
     models: ["sonnet", "opus", "haiku", "fable"],
   },
   {
-    id: "gemini",
-    label: "Gemini",
-    kind: "http",
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-    keyEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-    defaultModel: "gemini-3.8-flash",
-    models: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview"],
-    /* Gemini 3.x Flash thinks by default, and on a diagram that thinking is nearly all of the wait:
-       one description took 42 s at the model's default, 14 s at `low` and 10 s at `none`, with the
-       same diagram each time. `minimal` is refused by 3.8 Flash. */
-    defaults: { reasoning_effort: "low" },
-  },
-  {
     id: "opencode",
-    label: "OpenCode (your login)",
+    label: PROVIDER_NAMES.opencode,
+    description: "Uses your OpenCode login and whatever it is signed in to. No key here.",
     kind: "cli",
     keyEnv: [],
     defaultModel: OPENCODE_DEFAULT_MODEL,
     models: ["opencode-go/glm-5.3-flash", "opencode-go/glm-5.3", "opencode-go/kimi-k3", "opencode-go/deepseek-v4.1-flash"],
   },
   {
-    id: "zai",
-    label: "Z.ai (GLM)",
-    kind: "http",
-    baseURL: "https://api.z.ai/api/paas/v4",
-    keyEnv: ["ZHIPU_API_KEY", "ZAI_API_KEY"],
-    defaultModel: "glm-5.3-flash",
-    models: ["glm-5.3-flash", "glm-5.3"],
-  },
-  {
     id: "custom",
-    label: "Custom (OpenAI-compatible)",
+    label: PROVIDER_NAMES.custom,
+    description: "Any endpoint that speaks the OpenAI chat-completions dialect.",
     kind: "http",
     keyEnv: ["ANYDAG_LLM_API_KEY"],
     defaultModel: "",
@@ -171,6 +187,12 @@ function findCli(
 /** Remember a yes for a minute and a no for three seconds, so somebody who has just signed in is
  *  not told otherwise for long. Keyed by whatever the answer depends on. */
 const seen = new Map<string, { at: number; value: unknown }>();
+
+/** Forget every remembered answer: Settings' *Check again*, after somebody signed in or installed
+ *  something and does not want to wait out a remembered no. */
+export function forgetReadiness(): void {
+  seen.clear();
+}
 function remembered<T>(key: string, ask: () => T, good: (v: T) => boolean): T {
   const was = seen.get(key);
   if (was && Date.now() - was.at < (good(was.value as T) ? 60_000 : 3_000)) return was.value as T;
@@ -182,7 +204,7 @@ function remembered<T>(key: string, ask: () => T, good: (v: T) => boolean): T {
 /* ---- Claude Code ---- */
 
 /** Where Claude Code is, or why it cannot be used. */
-export function findClaude(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
+export function findClaude(env: Env): { ok: true; bin: string } | Failure {
   const r = findCli(
     "claude",
     env.ANYDAG_CLAUDE_BIN,
@@ -190,9 +212,12 @@ export function findClaude(env: Env): { ok: true; bin: string } | { ok: false; e
     (home, exe) => [path.join(home, ".local", "bin", exe), path.join(home, ".claude", "local", exe)],
     env,
   );
-  return r.ok || r.error
-    ? r
-    : { ok: false, error: "Claude Code is not installed — install it and sign in, or set ANYDAG_CLAUDE_BIN" };
+  if (r.ok) return r;
+  return refusal(
+    r.error || "Claude Code is not installed — install it and sign in, or set ANYDAG_CLAUDE_BIN",
+    "not-installed",
+    "claude",
+  );
 }
 
 /**
@@ -238,18 +263,22 @@ export function claudeSignedIn(bin: string, env: Env): boolean {
 }
 
 /** Claude Code found and signed in, or why not. */
-export function claudeReady(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
+export function claudeReady(env: Env): { ok: true; bin: string } | Failure {
   const found = findClaude(env);
   if (!found.ok) return found;
   if (!claudeSignedIn(found.bin, env))
-    return { ok: false, error: "Claude Code is not signed in — run `claude` once and sign in with your Claude account" };
+    return refusal(
+      "Claude Code is not signed in — run `claude` once and sign in with your Claude account",
+      "not-signed-in",
+      "claude",
+    );
   return found;
 }
 
 /* ---- OpenCode ---- */
 
 /** Where OpenCode is, or why it cannot be used. `~/.opencode/bin` is where its install script puts it. */
-export function findOpencode(env: Env): { ok: true; bin: string } | { ok: false; error: string } {
+export function findOpencode(env: Env): { ok: true; bin: string } | Failure {
   const r = findCli(
     "opencode",
     env.ANYDAG_OPENCODE_BIN,
@@ -257,9 +286,12 @@ export function findOpencode(env: Env): { ok: true; bin: string } | { ok: false;
     (home, exe) => [path.join(home, ".opencode", "bin", exe)],
     env,
   );
-  return r.ok || r.error
-    ? r
-    : { ok: false, error: "OpenCode is not installed — install it and sign in, or set ANYDAG_OPENCODE_BIN" };
+  if (r.ok) return r;
+  return refusal(
+    r.error || "OpenCode is not installed — install it and sign in, or set ANYDAG_OPENCODE_BIN",
+    "not-installed",
+    "opencode",
+  );
 }
 
 /**
@@ -314,58 +346,86 @@ export function opencodeLogins(bin: string, env: Env): Set<string> | undefined {
  * is `--standalone`, and an agent's tools are a `permission` rather than a `tools` map. One shape is
  * supported, and a 1.x is told to upgrade rather than half-working.
  */
-export function opencodeReady(env: Env, model?: string): { ok: true; bin: string } | { ok: false; error: string } {
+export function opencodeReady(env: Env, model?: string): { ok: true; bin: string } | Failure {
   const found = findOpencode(env);
   if (!found.ok) return found;
   const major = opencodeMajor(found.bin, env);
   if (major !== undefined && major < 2)
-    return { ok: false, error: `OpenCode ${major}.x is too old — run \`opencode upgrade\` (2 or later is needed)` };
+    return refusal(`OpenCode ${major}.x is too old — run \`opencode upgrade\` (2 or later is needed)`, "too-old", "opencode");
   const logins = opencodeLogins(found.bin, env);
   const provider = model?.split("/")[0];
   if (logins && (logins.size === 0 || (provider && !logins.has(provider))))
-    return {
-      ok: false,
-      error: `OpenCode is not signed in${provider ? ` to ${provider}` : ""} — run \`opencode auth login\``,
-    };
+    return refusal(
+      `OpenCode is not signed in${provider ? ` to ${provider}` : ""} — run \`opencode auth login\``,
+      "not-signed-in",
+      "opencode",
+    );
   return found;
 }
 
 /**
- * The id the server uses when a request names none: `ANYDAG_LLM_PROVIDER`; else, in the desktop app
- * (`ANYDAG_DESKTOP=1`, set by the shell), the first coding agent's CLI that is there and signed in —
- * Claude Code, then OpenCode — because a plan the person already pays for needs no key; else Gemini.
+ * Which providers the default is looked for in, first to last. In the desktop app (`ANYDAG_DESKTOP=1`,
+ * set by the shell) the coding agents' CLIs come first, because a plan the person already pays for
+ * needs no key. A browser has nothing keyed ahead of them now that Gemini and Z.ai are reached through
+ * OpenAI-compatible, so the order is the same there. When none can answer, the first row is the one
+ * whose refusal the person is told.
+ */
+const DEFAULT_ORDER = {
+  desktop: ["claude", "opencode", "custom"],
+  elsewhere: ["claude", "opencode", "custom"],
+} as const;
+
+/** Ids this build no longer offers. They stay reachable through `custom`'s OpenAI-compatible row. */
+export const RETIRED_PROVIDERS: readonly string[] = ["gemini", "zai"];
+
+/** The provider a request names, or `undefined` when it names none — or one this build retired. */
+export function namedProvider(id: string | null | undefined): string | undefined {
+  const said = id?.trim();
+  if (!said || RETIRED_PROVIDERS.includes(said)) return undefined;
+  return said;
+}
+
+/**
+ * The id the server uses when a request names none: `ANYDAG_LLM_PROVIDER`; else the first provider in
+ * `DEFAULT_ORDER` that can answer now; else the first row of that order, whose refusal is then what the
+ * person is told. Every readiness check is remembered (`remembered`), so asking costs nothing after
+ * the first time.
  */
 export function defaultProvider(env: Env): string {
-  const named = env.ANYDAG_LLM_PROVIDER?.trim();
+  const named = namedProvider(env.ANYDAG_LLM_PROVIDER);
   if (named) return named;
-  if (env.ANYDAG_DESKTOP === "1") {
-    if (claudeReady(env).ok) return "claude";
-    if (opencodeReady(env, OPENCODE_DEFAULT_MODEL).ok) return "opencode";
-  }
-  return "gemini";
+  const order = env.ANYDAG_DESKTOP === "1" ? DEFAULT_ORDER.desktop : DEFAULT_ORDER.elsewhere;
+  return order.find((id) => resolveProvider(env, { provider: id }).ok) ?? order[0];
 }
 
 /**
  * Turn a request's `provider`/`model` into something callable, or say why not.
  *
- * `ANYDAG_LLM_MODEL` overrides the default model of the *default* provider only: a person who picked a
- * different provider in the settings card and left the model empty wants that provider's default,
- * not a Gemini model name sent to Z.ai.
+ * `ANYDAG_LLM_MODEL` belongs to the provider `ANYDAG_LLM_PROVIDER` names, and to the
+ * OpenAI-compatible row: a person who picked a different provider in the settings card and left the
+ * model empty wants that provider's default, not one provider's model name sent to another. A
+ * `gemini` or `zai` in a request or in the environment is read as if no provider were named, so the
+ * default answers rather than a request failing with `unknown-provider`.
  */
 export function resolveProvider(
   env: Env,
   want?: { provider?: string | null; model?: string | null },
-): { ok: true; value: Resolved } | { ok: false; error: string } {
-  const id = want?.provider?.trim() || defaultProvider(env);
+): { ok: true; value: Resolved } | Failure {
+  const id = namedProvider(want?.provider) ?? defaultProvider(env);
   const spec = PROVIDERS.find((p) => p.id === id);
-  if (!spec) return { ok: false, error: `no provider \`${id}\` — expected one of ${PROVIDERS.map((p) => p.id).join(", ")}` };
+  if (!spec)
+    return refusal(`no provider \`${id}\` — expected one of ${PROVIDERS.map((p) => p.id).join(", ")}`, "unknown-provider", id);
 
-  /* Read against the provider the environment named (or Gemini), never the desktop's implicit
-     Claude: a model set for Gemini in `.env.local` is not a model name Claude Code knows. */
-  const envModel = id === (env.ANYDAG_LLM_PROVIDER?.trim() || "gemini") ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
-  const model =
-    want?.model?.trim() || envModel || (spec.id === "custom" ? env.ANYDAG_LLM_MODEL?.trim() : "") || spec.defaultModel;
-  if (!model) return { ok: false, error: `provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings` };
+  /* Read against the provider the environment named, and `custom`: a model set for one provider is
+     not a model name Claude Code or OpenCode knows, so it is never sent to them unless one of them
+     is the provider the environment named. */
+  const named = namedProvider(env.ANYDAG_LLM_PROVIDER);
+  const envModel = id === "custom" || (named !== undefined && id === named) ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
+  /* A retired provider's model goes with it: `gemini-3.8-flash` means nothing to the default. */
+  const retired = Boolean(want?.provider?.trim()) && namedProvider(want?.provider) === undefined;
+  const model = (retired ? "" : want?.model?.trim()) || envModel || spec.defaultModel;
+  if (!model)
+    return refusal(`provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings`, "needs-model", id);
 
   if (spec.id === "claude") {
     const ready = claudeReady(env);
@@ -379,14 +439,11 @@ export function resolveProvider(
   }
 
   const baseURL = (spec.id === "custom" ? env.ANYDAG_LLM_BASE_URL?.trim() : spec.baseURL)?.replace(/\/+$/, "");
-  if (!baseURL) return { ok: false, error: "provider `custom` needs ANYDAG_LLM_BASE_URL" };
+  if (!baseURL) return refusal("provider `custom` needs ANYDAG_LLM_BASE_URL", "needs-base-url", "custom");
   const key = keyOf(spec, env);
   /* A local endpoint (Ollama, vLLM) may take no key at all; every hosted one here needs one. */
   if (!key && spec.id !== "custom")
-    return {
-      ok: false,
-      error: `provider \`${id}\` has no key — set ${spec.keyEnv.join(" or ")} in .env.local`,
-    };
+    return refusal(`provider \`${id}\` has no key — set ${spec.keyEnv.join(" or ")} in .env.local`, "no-key", id, spec.keyEnv);
   return { ok: true, value: { spec, model, baseURL, key } };
 }
 
@@ -394,12 +451,18 @@ export function resolveProvider(
 export interface PublicProvider {
   id: string;
   label: string;
+  /** What the name no longer explains, as one line under the provider's row in Settings. */
+  description: string;
   kind: ProviderKind;
+  /** The environment variables its key is read from, first one first. Names, never values. */
+  keyEnv: string[];
   defaultModel: string;
   models: string[];
   ready: boolean;
-  /** Why it is not ready, for the settings card to say. */
-  reason?: string;
+  /** Why it is not ready, in the server's own words. */
+  error?: string;
+  /** The same answer, for the page to turn into a sentence and a next step. */
+  reason?: LlmReason;
 }
 
 export function describeProviders(env: Env): { default: string; providers: PublicProvider[] } {
@@ -410,11 +473,14 @@ export function describeProviders(env: Env): { default: string; providers: Publi
       return {
         id: spec.id,
         label: spec.label,
+        description: spec.description,
         kind: spec.kind,
+        keyEnv: [...spec.keyEnv],
         defaultModel: r.ok ? r.value.model : spec.defaultModel,
         models: spec.models,
         ready: r.ok,
-        reason: r.ok ? undefined : r.error,
+        error: r.ok ? undefined : r.error,
+        reason: r.ok ? undefined : r.reason,
       };
     }),
   };

@@ -19,14 +19,17 @@ afterEach(async () => {
   sweepTemps();
 });
 
-async function generate(body: unknown): Promise<{ status: number; error?: string }> {
-  const app = createApp({ session: new Session(env.home, env.vault, "test"), token: "t", page: null });
+async function generate(
+  body: unknown,
+  environment: Record<string, string | undefined> = process.env,
+): Promise<{ status: number; error?: string; reason?: unknown }> {
+  const app = createApp({ session: new Session(env.home, env.vault, "test", environment), token: "t", page: null });
   const res = await app.request(`http://127.0.0.1/__board/generate?vault=${env.vault.id}`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-anydag-token": "t", host: "127.0.0.1" },
     body: JSON.stringify(body),
   });
-  return { status: res.status, ...((await res.json()) as { error?: string }) };
+  return { status: res.status, ...((await res.json()) as { error?: string; reason?: unknown }) };
 }
 
 describe("/__board/generate, kind flashcards", () => {
@@ -53,5 +56,19 @@ describe("/__board/generate, kind flashcards", () => {
 
   it("leaves a diagram's request as it was", async () => {
     expect(await generate({ prompt: "" })).toEqual({ status: 400, error: "describe the diagram first" });
+  });
+
+  it("puts the machine-readable reason beside the developer's error", async () => {
+    /* No PATH and an empty home: a Claude Code on the machine running the suite would otherwise answer. */
+    const said = await generate({ prompt: "a web app" }, { PATH: "", HOME: "/nonexistent-home" });
+    expect(said.status).toBe(400);
+    expect(said.error).toContain("Claude Code is not installed");
+    expect(said.reason).toEqual({ code: "not-installed", provider: "claude" });
+  });
+
+  it("names a provider it does not have", async () => {
+    const said = await generate({ prompt: "a web app", provider: "openai-direct" }, {});
+    expect(said.status).toBe(400);
+    expect(said.reason).toEqual({ code: "unknown-provider", provider: "openai-direct" });
   });
 });

@@ -53,8 +53,10 @@ Seven things are load-bearing:
   save that meets a moved text is merged with `merge3` against the text both started from, which
   succeeds whenever the two edited different lines; otherwise the page asks, *Keep mine* or *Use
   theirs*, and writes nothing until it is answered. **The read that opens a note is never left
-  blank**: a 5xx or no answer at all is not "there is no such note", so the page says it could not
-  read it (`data-dag-note-unread`) and reads again on the save's own backoff (#123).
+  blank**: a 5xx or no answer at all is not "there is no such note", so the page draws `FileProblem`
+  with the unreadable or unreachable reason and reads again on the save's own backoff (#123, #201).
+  A 404 is the one answer that says the note is missing, and that card offers to search for it,
+  look in the trash or go home.
 - **One namespace, a `kind` beside the name.** A vault is a folder, so a name is one file:
   `server/names.ts` classifies a path by its suffix (`.board.md`, `.quiz.md`, `.table.md`, `.md` or
   `.note.md` for a note) and refuses a second file that would give a name two kinds. The
@@ -74,7 +76,9 @@ Seven things are load-bearing:
   hands the component over synchronously once it has loaded — **not `React.lazy`**, whose first
   render suspends even for a loaded module and is then held back by React's 300 ms reveal throttle,
   which was the whole of a slow first open (#120; *Things that will bite*). `data-dag-ready` still
-  means the editor is up. Mantine is **8**, not 9: 9 wants React 19.
+  means the editor is up. The contenteditable carries the note's title as its `aria-label`, set on
+  ProseMirror's own element rather than on a wrapper that would name the wrapper and leave the
+  field unnamed. Mantine is **8**, not 9: 9 wants React 19.
   Beside it is `FieldEditor`, the one-field editor a quiz's form mounts (see *Quizzes*): the note's
   bridge, paste (`src/blocks/paste.ts`), references and equations, on a schema cut to
   `FIELD_BLOCKS`. It is still a `React.lazy`, so the throttle above applies to it.
@@ -117,7 +121,7 @@ The read-only note — `?view=1`, `?snapshot=1` — draws the title as the page'
 
 Names claimed, grepped first: `dag-note-view*` (`dag-note-view__first`, `dag-note-view__editor`), `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
 (a list row), `data-dag-note-view`, `data-dag-note-editor`, `data-dag-note-conflict`,
-`data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`, `data-dag-note-unread`,
+`data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`,
 `data-dag-new-note`, `data-dag-new-note-here`, `data-dag-welcome-note`, `dag-note-title`,
 `data-dag-note-title`, `data-dag-note-title-read`, `data-dag-note-first`, and the SSE event
 `dag:note`. `data-dag-note` is one letter from `data-dag-dock`; they are different attributes, and

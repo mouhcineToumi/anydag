@@ -23,13 +23,18 @@ vault when the one this tab names does not hold it, which is what lets such a ro
 working.
 
 The composer is one field and one row under it: the scope chip, the model — the provider's mark and
-the model's short name, the harness named only inside the open dropdown — the effort resolved to
-what it will be, `Auto` when the chat keeps the harness's own, an expand toggle for the field, and
-Send or Stop. **A chat that has none yet will live in this tab's vault**, so the scope menu matches
-the tab's vault (`currentVault()`), not the server's default — that moves when another vault opens,
-and a menu that reached for it once offered the tab's own vault under *Grant another vault…*, whose
-buttons were then refused with *a chat always reaches its own vault* and read as doing nothing
-(#118).
+the model's short name, the harness named only inside the open picker — the effort resolved to what
+it will be, `Automatic` when the chat keeps the harness's own, an expand toggle for the field, and
+Send or Stop. The model control is `src/ui/ModelPicker.tsx`, the same picker Settings uses: a search
+over a list grouped by provider, each group's readiness from `/__board/chat/models`, the five models
+last chosen in this browser, Automatic for that provider's default, and a custom id for a list that
+has gone stale. The effort control is the same `EffortPicker` as Settings' (Automatic · Low · Medium
+· High · Max); the chat keeps the scale's word and `effortFor` in `plugins/generate/llm.ts` maps it
+to Claude's `--effort` or OpenCode's `#variant` when the turn runs. **A chat that has none yet will
+live in this tab's vault**, so the scope menu matches the tab's vault (`currentVault()`), not the
+server's default — that moves when another vault opens, and a menu that reached for it once offered
+the tab's own vault under *Grant another vault…*, whose buttons were then refused with *a chat
+always reaches its own vault* and read as doing nothing (#118).
 
 | Where | Owns |
 |---|---|
@@ -41,7 +46,7 @@ buttons were then refused with *a chat always reaches its own vault* and read as
 | `plugins/generate/cli.ts` | what a prompt card's run and a chat's turn both do around a CLI child: its lines, ending it, and deleting a standalone OpenCode session |
 | `server/mcp/chat.ts` | chat mode for `anydag-server mcp --chat <id>`: the tool list, `change_block`, `vault_request` |
 | `server/routes/chat.ts` | the routes, the guard's registration, the SSE stream |
-| `src/assistant/` | the panel, the page, the composer and its picker, the steps, the approval, access and block cards |
+| `src/assistant/` | the panel, the page, the composer, the steps, the approval, access and block cards — its model and effort controls are `src/ui/ModelPicker` and `src/ui/EffortPicker`, shared with Settings |
 
 Ten things are load-bearing:
 
@@ -116,8 +121,7 @@ Ten things are load-bearing:
 Nothing here draws under `?snapshot=1`, and the canvas never learns a chat exists: a turn's writes
 reach an open board through the change feed like any other writer's. Deleting a chat emits a `gone`
 event on the chat stream, so every open history drops the row at once and a page on that chat goes to
-New chat; the panel's open state is not remembered across a reload, and Settings → AI and agents
-holds the default engine and model.
+New chat; the panel's open state is not remembered across a reload, and Settings → AI holds the default engine and model.
 
 Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`,
 the setting `assistant`, the leader binding `space A`, and the query key `chat`.

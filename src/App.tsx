@@ -16,11 +16,12 @@ import {
   everyFile,
   useBoardList,
   useSavedComponents,
+  FILE_KINDS,
   type BoardTree,
   type FileKind,
+  type LoadProblem,
 } from "@/board/useBoard";
 import { Viewport, type Tool, type ViewportHandle } from "@/canvas/Viewport";
-import { CODES } from "@/dsl/codes";
 import { BoardEdges } from "@/render/BoardEdges";
 import { growable } from "@/edit/build";
 import { Inspector } from "@/edit/Inspector";
@@ -37,13 +38,14 @@ import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
 import { FeedbackCard } from "@/feedback/FeedbackCard";
 import { Settings, useSettingsOpen } from "@/settings/Settings";
+import type { LlmReason } from "@/settings/llmReason";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
-import { ErrorItem } from "@/render/ErrorItem";
 import { Item } from "@/render/Item";
 import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
 import { BoardBrowser } from "@/ui/BoardBrowser";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
+import { FileProblem } from "@/ui/FileProblem";
 import { Shell, useSidebar } from "@/ui/Shell";
 import type { SettingsTab } from "@/settings/tabs";
 import type { ChromeAsk } from "@/ui/chrome";
@@ -52,14 +54,14 @@ import { NoteView, type NoteHandle } from "@/ui/NoteView";
 import type { ProjectMembers } from "@/ui/ProjectBar";
 import { nameWhenOpened } from "@/ui/NoteTitle";
 import { LayoutToggle, NO_PROJECT, TasksView, type ProjectFilter, type TasksLayout } from "@/ui/Tasks";
-import { EmptyBoard, Welcome } from "@/ui/Welcome";
+import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
+import { rememberOpened } from "@/ui/recents";
 import { CALENDAR_VIEW, LIBRARY, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
 import { MAX_DAYS, VIEWS, type CalView } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
 import { CalendarView } from "@/ui/Calendar";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
-import { BoardSettings } from "@/ui/BoardSettings";
 import { PageBar } from "@/ui/PageBar";
 import { ZoomBar } from "@/ui/ZoomBar";
 import { planRepair } from "@/edit/repair";
@@ -282,7 +284,7 @@ export function App() {
   const board = listing || quiz || table || file || note ? null : query.get("board");
   /* One subscription to the list for the whole window, not one per page — the sidebar lives above
      both pages and reads the same answer the search and the feedback card do. */
-  const list = useBoardList(useAccount()?.uid ?? null);
+  const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
   useFollowing(list, go);
   const open = useCallback((kind: FileKind, target: string | null) => setQuery(pageQuery(kind, target)), [setQuery]);
   const openTasks = useCallback(() => setQuery({ ...pageQuery("board", null), tasks: "1" }), [setQuery]);
@@ -308,6 +310,20 @@ export function App() {
     go(next);
   }, [go]);
   const ref = query.get("ref");
+
+  /* Home's recent list: the page that opened a file is what knows it did, and this is the one place
+     every way of opening one passes through — a sidebar row, a reference, a link, a cold load. The
+     name is written to this browser's storage for this vault and nowhere else; `recents.ts` owns the
+     key and the shape. Opening a page is read-only as far as the folder is concerned. */
+  const opened = useMemo<Readonly<Record<FileKind, string | null>>>(
+    () => ({ board, note, quiz, table, file }),
+    [board, note, quiz, table, file],
+  );
+  useEffect(() => {
+    const kind = FILE_KINDS.find((k) => opened[k] !== null);
+    const name = kind ? opened[kind] : null;
+    if (kind && name) rememberOpened(kind, name);
+  }, [opened]);
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
      the target being renamed or moved. It is resolved once and replaced by the name it stands for
@@ -348,15 +364,24 @@ export function App() {
   ) : assistant ? (
     <AssistantApp query={query} setQuery={setQuery} list={list} open={open} />
   ) : quiz ? (
-    <QuizApp name={quiz} query={query} setQuery={setQuery} list={list} open={open} openQuizzes={openQuizzes} />
+    <QuizApp
+      name={quiz}
+      query={query}
+      setQuery={setQuery}
+      list={list}
+      open={open}
+      openQuizzes={openQuizzes}
+      openTrash={openTrash}
+      goHome={goHome}
+    />
   ) : table ? (
-    <TableApp name={table} query={query} setQuery={setQuery} list={list} open={open} />
+    <TableApp name={table} query={query} setQuery={setQuery} list={list} open={open} openTrash={openTrash} goHome={goHome} />
   ) : file ? (
     <FileApp name={file} query={query} setQuery={setQuery} list={list} open={open} />
   ) : note ? (
-    <NoteApp name={note} query={query} setQuery={setQuery} list={list} />
+    <NoteApp name={note} query={query} setQuery={setQuery} list={list} openTrash={openTrash} goHome={goHome} />
   ) : (
-    <BoardApp query={query} setQuery={setQuery} list={list} />
+    <BoardApp query={query} setQuery={setQuery} list={list} openTrash={openTrash} goHome={goHome} />
   );
   /* A snapshot is a picture of a board, and a picture of a board is a fact about the file: no
      sidebar, and not even the shell around the page, so the 45 baselines see exactly the `.dag-app`
@@ -378,6 +403,8 @@ export function App() {
       attachments={list.files}
       sizes={list.sizes}
       loading={!list.loaded}
+      listFailed={listFailed}
+      onRetryList={retryList}
       board={board}
       note={note}
       quiz={quiz}
@@ -1050,6 +1077,8 @@ function QuizApp({
   list,
   open,
   openQuizzes,
+  openTrash,
+  goHome,
 }: {
   name: string;
   query: URLSearchParams;
@@ -1057,6 +1086,8 @@ function QuizApp({
   list: BoardTree;
   open(kind: FileKind, name: string | null): void;
   openQuizzes(run?: QuizzesRun): void;
+  openTrash(): void;
+  goHome(): void;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const running = !snapshot && query.get("run") === "1";
@@ -1105,16 +1136,20 @@ function QuizApp({
     [file, name, id],
   );
 
+  const problem = file.state.status === "problem" ? file.state.problem : null;
   let body: ReactNode;
   if (file.state.status === "loading") body = <div className="dag-quiz dag-quiz--loading" />;
-  else if (file.state.status === "missing")
+  else if (problem)
     body = (
-      <div className="dag-quiz" data-dag-quiz-missing="">
-        <p className="dag-quiz__empty">This quiz is not here any more.</p>
-        <button type="button" className="dag-quiz__add" onClick={() => openQuizzes()}>
-          Go to the quizzes
-        </button>
-      </div>
+      <FileProblem
+        kind="quiz"
+        name={name}
+        problem={problem}
+        onSearch={snapshot ? undefined : openBrowser}
+        onTrash={snapshot ? undefined : openTrash}
+        onHome={snapshot ? undefined : goHome}
+        onRetry={snapshot || problem.reason !== "unreachable" ? undefined : file.retry}
+      />
     );
   else if (snapshot)
     body = (
@@ -1167,11 +1202,11 @@ function QuizApp({
     <div className="dag-app dag-app--quiz" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
         <Toolbar
-          boardName={name}
-          title={title}
-          kind="quiz"
+          boardName={problem ? null : name}
+          title={problem ? undefined : title}
+          kind={problem ? undefined : "quiz"}
           onBoards={openBrowser}
-          more={id ? exportRows(QUIZ_EXPORTS, exportQuiz) : []}
+          more={!problem && id ? exportRows(QUIZ_EXPORTS, exportQuiz) : []}
         >
           <Backlinks id={id} />
           {file.state.status === "ready" ? (
@@ -1301,12 +1336,16 @@ function TableApp({
   setQuery,
   list,
   open,
+  openTrash,
+  goHome,
 }: {
   name: string;
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
   open(kind: FileKind, name: string | null): void;
+  openTrash(): void;
+  goHome(): void;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open, table: name });
@@ -1319,7 +1358,8 @@ function TableApp({
       tab={query.get("tab")}
       onTab={onTab}
       onBrowse={openBrowser}
-      onOpenTables={openBrowser}
+      onTrash={openTrash}
+      onHome={goHome}
       snapshot={snapshot}
     >
       {cards}
@@ -1334,8 +1374,24 @@ function TableApp({
  * It is the one chord a note page has, because it is the one thing a person on a note needs from
  * the board page's vocabulary: somewhere else to go.
  */
-function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSearchParams; setQuery: SetQuery; list: BoardTree }) {
+function NoteApp({
+  name,
+  query,
+  setQuery,
+  list,
+  openTrash,
+  goHome,
+}: {
+  name: string;
+  query: URLSearchParams;
+  setQuery: SetQuery;
+  list: BoardTree;
+  openTrash(): void;
+  goHome(): void;
+}) {
   const snapshot = query.get("snapshot") === "1";
+  /* Why the note has no page, when it has none — what the top bar stops naming. */
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
   const { boards, folders, notes } = list;
   const [title, setTitle] = useState<string | undefined>(undefined);
@@ -1494,15 +1550,15 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
     <div className="dag-app dag-app--note" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
         <Toolbar
-          boardName={name}
-          title={title}
-          kind="note"
+          boardName={problem ? null : name}
+          title={problem ? undefined : title}
+          kind={problem ? undefined : "note"}
           onBoards={openBrowser}
           more={
             /* Once the index has it, which is when it is known to exist. A plain note becomes a task
                or an event here — the `⋯`, where two labelled buttons would take the room the
                note's own title needs. */
-            noteId
+            !problem && noteId
               ? [
                   ...(!task && !project && !event
                     ? [
@@ -1583,6 +1639,10 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
         onEvent={setEventState}
         members={members}
         onRenamed={renamed}
+        onProblem={setProblem}
+        onSearch={openBrowser}
+        onTrash={openTrash}
+        onHome={goHome}
         handle={noteHandle}
       />
       {printing ? (
@@ -1633,7 +1693,19 @@ function NoteApp({ name, query, setQuery, list }: { name: string; query: URLSear
   );
 }
 
-function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery: SetQuery; list: BoardTree }) {
+function BoardApp({
+  query,
+  setQuery,
+  list,
+  openTrash,
+  goHome,
+}: {
+  query: URLSearchParams;
+  setQuery: SetQuery;
+  list: BoardTree;
+  openTrash(): void;
+  goHome(): void;
+}) {
   const { boards, folders, notes } = list;
   const sidebar = useSidebar();
   const saved = useSavedComponents();
@@ -1650,7 +1722,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
    */
   const boardName = query.get("board");
   const handle = useBoard(boardName);
-  const { board, error } = handle;
+  const { board, problem } = handle;
 
   /* A board opened, for the logs when somebody said yes: its size and how many of each diagram it
      holds — counts, never a name. Once per board per page load; `track` does nothing on a snapshot. */
@@ -1682,6 +1754,36 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   /* Read only: the selection, the keys that read and a pan stay; everything that writes is
      not drawn, and `useEditor` refuses it underneath. A snapshot is read-only already. */
   const locked = useLocked() && !snapshot;
+  /* Home's starting tiles: the sidebar's own flow when there is a shell (it makes, opens and names
+     the file where it is drawn), and the two this page can make by itself if a page is rendered
+     without one — which only a test or a snapshot does, and a snapshot draws no Home. */
+  const startFromHome = useCallback(
+    (kind: StartKind) => {
+      if (locked) return refuseLocked();
+      if (sidebar) return sidebar.create(kind);
+      switch (kind) {
+        case "board":
+          void createBoard("untitled", blankBoardText()).then((made) => "name" in made && openBoard(made.name));
+          return;
+        case "note":
+          void createNote("untitled", blankNoteText()).then((made) => {
+            if ("error" in made) return;
+            /* Named in its own title, as one made from the sidebar is. */
+            nameWhenOpened(made.name);
+            openNote(made.name);
+          });
+          return;
+        case "task":
+        case "event":
+        case "quiz":
+        case "table":
+          /* A task, an event, a quiz and a table are the sidebar's to make; without one there is no
+             page to make them on, and no path here in the app. */
+          return;
+      }
+    },
+    [locked, sidebar, openBoard, openNote],
+  );
   const { theme, name: themeName, setName: setTheme } = useTheme(query.get("theme") ?? undefined, snapshot);
 
   /* Whether the board browser is up. Plain state and nothing more: a dialog somebody opened for
@@ -1822,7 +1924,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
    */
   const [pending, setPending] = useState(false);
   const [preview, setPreview] = useState<{ id: string; draft: Draft; lost: string[]; unparsed: boolean } | null>(null);
-  const [refusal, setRefusal] = useState<{ message: string; detail?: DraftDiagnostic[] } | null>(null);
+  const [refusal, setRefusal] = useState<{ message: string; reason?: LlmReason; detail?: DraftDiagnostic[] } | null>(null);
   /* The item a request or a refusal is about, so the toolbar can stand beside it after the
      selection has moved on. */
   const [runFor, setRunFor] = useState<string | null>(null);
@@ -1830,8 +1932,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
      The text outlives the dialog so "Try again" reopens it as it was left; it belongs to one item,
      and opening the dialog on another starts empty. */
   const [asking, setAsking] = useState(false);
-  /* The card for what this board says about itself — its theme and its flow — opened from the top bar's `⋯`. */
-  const [boardSettings, setBoardSettings] = useState(false);
   const [askFor, setAskFor] = useState<string | null>(null);
   const [askText, setAskText] = useState("");
   const rewriteCtl = useRef<AbortController | null>(null);
@@ -1872,7 +1972,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         })
         .catch((e: Error) => {
           if (cancel.signal.aborted) return;
-          setRefusal({ message: e.message });
+          setRefusal({ message: e.message, reason: (e as { reason?: LlmReason }).reason });
         })
         .finally(() => {
           if (rewriteCtl.current === cancel) {
@@ -1931,6 +2031,14 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
     onRewrite([askFor], askText.trim());
   }, [askFor, askText, onRewrite]);
 
+  /* A reason's "Try again" (or another provider after switching to it): send the same change again
+     without reopening the dialog, so checking after a sign-in is one press and not a retype. */
+  const onRetry = useCallback(() => {
+    const target = runFor ?? askFor;
+    if (!target || !askText.trim()) return;
+    onRewrite([target], askText.trim());
+  }, [runFor, askFor, askText, onRewrite]);
+
   /* Escape lets go of the rewrite wherever focus is. The bar owns its own Escape — the settings
      card's idiom, and the one that works while a person is typing in the field, because the
      editor's key chain leaves a focused INPUT alone — but it only sees keys that pass through it.
@@ -1954,7 +2062,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   const barRun: RewriteRun = preview
     ? { phase: "preview", ...preview, failed: refusal?.message }
     : refusal
-      ? { phase: "refused", id: runFor ?? undefined, message: refusal.message, detail: refusal.detail }
+      ? { phase: "refused", id: runFor ?? undefined, message: refusal.message, reason: refusal.reason, detail: refusal.detail }
       : pending
         ? { phase: "running", id: runFor ?? undefined }
         : { phase: "idle" };
@@ -2023,7 +2131,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
     if (!target || snapshot) return;
     /* A board that is not there has no item to show, and a part left waiting would be found by
        whichever board is opened next. */
-    if (!boardName || error) return clearTarget();
+    if (!boardName || problem) return clearTarget();
     if (!board || board.name !== boardName) return;
     const it = board.items.find((x) => x.id === target);
     if (!it || it.hidden || isLinkType(it.type)) return clearTarget();
@@ -2033,7 +2141,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
     viewport.current?.show(box);
     selectItems([it.id]);
     clearTarget();
-  }, [target, snapshot, board, boardName, error, page, ready, places, selectItems, setQuery]);
+  }, [target, snapshot, board, boardName, problem, page, ready, places, selectItems, setQuery]);
 
   /*
    * The standing rewrite proposal is marked on the item it would replace — painted, not rendered.
@@ -2290,15 +2398,15 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
   }, [soloGroup, groups, selected]);
 
   return (
-    <div className="dag-app" data-snapshot={snapshot ? "1" : undefined}>
+    <main className="dag-app" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
         <Toolbar
-          boardName={boardName}
+          boardName={problem ? null : boardName}
           title={board?.title}
-          kind={boardName ? "board" : undefined}
+          kind={!problem && boardName ? "board" : undefined}
           onBoards={openBrowser}
           more={
-            boardName && board
+            !problem && boardName && board
               ? [
                   /* A one-page board draws no tab strip, so a second page is made from here; once
                      there are two, the strip's own `+` does it. */
@@ -2321,7 +2429,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
                     icon: SlidersHorizontal,
                     hook: "data-dag-board-settings-open",
                     disabled: !editor.enabled || locked,
-                    onSelect: () => setBoardSettings(true),
+                    onSelect: () => settings.show("board-layout"),
                   },
                   ...exportRows(boardExports(exportScale), async (kind) => {
                     await editor.exportAs(kind);
@@ -2359,12 +2467,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
           /* A double-click on the paper is how a note begins, so a locked one says why it did not. */
           onPaperDoubleClick={snapshot ? undefined : locked ? () => refuseLocked() : editor.onPaperDoubleClick}
         >
-          {error ? (
-            <div className="dag-item" style={{ transform: "translate(0px, 0px)", width: 520 }}>
-              <ErrorItem title={boardName ?? "board"} messages={[{ line: 0, code: CODES.EB_UNREADABLE, message: error }]} />
-            </div>
-          ) : null}
-
           {groupBoxes.map((g) => (
             <div
               key={g.id}
@@ -2511,6 +2613,22 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
           ) : null}
         </Viewport>
 
+        {/* The board's own failure, over a canvas with nothing on it. The same card a note, quiz or
+            table draws, so a file that cannot be opened reads the same wherever it is opened. */}
+        {problem ? (
+          <div className="dag-file-problem__layer" data-dag-file-problem-layer="">
+            <FileProblem
+              kind="board"
+              name={boardName ?? "board"}
+              problem={problem}
+              onSearch={snapshot ? undefined : openBrowser}
+              onTrash={snapshot ? undefined : openTrash}
+              onHome={snapshot ? undefined : goHome}
+              onRetry={snapshot || problem.reason !== "unreachable" ? undefined : handle.reload}
+            />
+          </div>
+        ) : null}
+
         {/* Locked, the bar is one item's Export: a count over several things it can do nothing to is noise. */}
         {!snapshot && ((locked ? selectedItems.length === 1 : selectedItems.length >= 1) || barRun.phase !== "idle") ? (
           <SelectionBar
@@ -2520,6 +2638,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             run={barRun}
             locked={locked}
             onAsk={onAsk}
+            onRetry={onRetry}
             onAccept={onAccept}
             onDiscard={onDiscard}
           />
@@ -2539,10 +2658,11 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             page tabs underneath it are cleared without either of them knowing PageBar exists. */}
         {!snapshot && (
           <Dock
+            locked={locked}
             edit={
-              /* Every tool on it makes or changes something, so a locked board has no dock; the
-                 select and hand tools are still `space V` and `space H`, and the zoom is its own bar. */
-              board && !locked
+              /* Locked, the dock stays and its writing controls are greyed; the select and hand
+                 tools still read, and its Locked chip unlocks in place. */
+              board
                 ? {
                     tool: editor.tool,
                     onTool,
@@ -2569,7 +2689,7 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             }
           />
         )}
-        {!snapshot && boardName && (
+        {!snapshot && boardName && !problem && (
           <ZoomBar
             onZoom={(d) => viewport.current?.zoomBy(d)}
             onFit={() => viewport.current?.fit()}
@@ -2589,16 +2709,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             onShow={locked ? () => refuseLocked() : showProblem}
             repairOf={(p) => (repairText === null ? null : planRepair(repairText, board, p))}
             onRepair={locked || !editor.enabled ? undefined : editor.repair}
-          />
-        ) : null}
-        {boardSettings && board && !snapshot && !locked ? (
-          <BoardSettings
-            board={board}
-            onMeta={editor.setMeta}
-            onClose={() => {
-              setBoardSettings(false);
-              focusBoard();
-            }}
           />
         ) : null}
         {help && !snapshot ? <Shortcuts onClose={closeHelp} /> : null}
@@ -2639,27 +2749,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
         {!snapshot && !boardName ? (
           <Welcome
             locked={locked}
-            /* The sidebar's own way to begin a file — made, opened, and named where it is drawn —
-               so the welcome card and New board are one gesture rather than two that drift. */
-            onCreate={() =>
-              locked
-                ? refuseLocked()
-                : sidebar
-                  ? sidebar.create("board")
-                  : void createBoard("untitled", blankBoardText()).then((made) => "name" in made && openBoard(made.name))
-            }
-            onWrite={() =>
-              locked
-                ? refuseLocked()
-                : sidebar
-                  ? sidebar.create("note")
-                  : void createNote("untitled", blankNoteText()).then((made) => {
-                      if ("error" in made) return;
-                      /* Named in its own title, as one made from the sidebar is. */
-                      nameWhenOpened(made.name);
-                      openNote(made.name);
-                    })
-            }
+            list={list}
+            onStart={startFromHome}
+            onOpenFile={(kind, name) => setQuery(pageQuery(kind, name))}
             onOpen={openBrowser}
           />
         ) : null}
@@ -2671,6 +2763,9 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
             themeName={themeName}
             onTheme={chooseTheme}
             boardName={board?.name ?? null}
+            board={board}
+            onMeta={editor.setMeta}
+            editable={!locked}
             list={list}
             tab={settings.open.tab}
             onClose={settings.close}
@@ -2709,6 +2804,6 @@ function BoardApp({ query, setQuery, list }: { query: URLSearchParams; setQuery:
           edit={editor.enabled && !locked ? editor.pages : undefined}
         />
       ) : null}
-    </div>
+    </main>
   );
 }

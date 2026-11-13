@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { CAL_KINDS, CAL_LABEL } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart, useZone } from "@/calendar/usePrefs";
 import { localZone } from "@/note/zone";
+import { CALENDAR_HIDE, TIME_ZONE, WEEK_START, resetPrefs } from "../prefs";
 
 import { Switch } from "@/ui/controls";
 
@@ -57,6 +58,7 @@ export function CalendarPane() {
         <Field
           label="Time zone"
           hint="Events keep the moment they name, so changing this moves where they show, not when they are."
+          save={TIME_ZONE}
         >
           <select
             className="dag-select dag-select--wide"
@@ -72,7 +74,7 @@ export function CalendarPane() {
             ))}
           </select>
         </Field>
-        <Field label="Weeks start on">
+        <Field label="Weeks start on" save={WEEK_START}>
           <select
             className="dag-select"
             data-dag-setting-week-start=""
@@ -90,7 +92,7 @@ export function CalendarPane() {
 
       <Group title="Show on the calendar">
         {CAL_KINDS.map((k) => (
-          <Field key={k} label={CAL_LABEL[k]}>
+          <Field key={k} label={CAL_LABEL[k]} save={`${CALENDAR_HIDE}:${k}`}>
             <Switch
               data-dag-setting-calendar-kind={k}
               checked={!hidden.has(k)}
@@ -100,14 +102,7 @@ export function CalendarPane() {
         ))}
       </Group>
 
-      <Reset
-        what="the calendar's settings"
-        onReset={() => {
-          setZoneChoice(null);
-          setWeekStart(1);
-          for (const k of CAL_KINDS) if (hidden.has(k)) setHidden(k, false);
-        }}
-      />
+      <Reset what="Calendar" onReset={() => resetPrefs([TIME_ZONE, WEEK_START, CALENDAR_HIDE])} />
     </>
   );
 }

@@ -105,7 +105,11 @@ on, and `scripts/check-skill.mjs` tolerates those names in a table that is drawn
 
 A **vault** is a folder — Obsidian's word and Obsidian's model. The sidebar's first row
 names the open one and opens the switcher: the recent vaults, *Open folder…*, *Create vault* and
-*Close vault*. Settings → Vault says where it is, where its attachments go, and closes it.
+*Close vault*. Settings → This vault → General says where it is and closes it; its attachments
+folder is on Files and images. The switcher draws each vault as a two-letter monogram on a tint of a
+hue hashed from its id, with its name above the shortened path — so *vault* and *vault-two* are not
+the same V, and a screen reader hears the name rather than the home directory first. *Close vault*
+says which one it closes.
 
 The first screen before there is a vault at all is `src/ui/Welcome.tsx`'s `NoVault`:
 the recent list, *Open folder…* and *Create vault*, each opening a form that names itself —
@@ -135,9 +139,10 @@ Eight things are load-bearing:
   `src/vault/current.ts` and carried on every request by a `fetch` wrapper, the `EventSource` and
   `<img src>`; a bare `/` resumes the vault opened last. **Switching is a page load**, so no
   subscription, cache or preference is left behind, and it happens once per page.
-- **A vault's own preferences are `<vault>/.anydag/settings.json`** — the theme, the favourites, the
-  attachments folder — so a vault opened on another machine looks the same; the person's own are the
-  app's home's. `WORKSPACE_PREF_KEYS` is still the name of the split in `src/settings/`.
+- **A vault's own preferences are `<vault>/.anydag/settings.json`** — the favourites, the
+  attachments folder, the links switch and the settings card's vault half — so a vault opened on
+  another machine works the same; the person's own are the app's home's, the theme and the AI choices
+  among them since #191 (`settings.md`). `WORKSPACE_PREF_KEYS` is still the name of the split in `src/settings/`.
 - **A file keeps its id across a transfer**, and a reference from a file left behind stops resolving
   there: an id resolves within its vault.
 

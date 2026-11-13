@@ -94,6 +94,7 @@ server is a bundle too (`server/dist/`): a change to any of them is not served u
 folder rather than a refactor. `scripts/check-theme.mjs` (every `--dag-*` read exists in every theme)
 and `scripts/check-literals.mjs` hold it in the gate. The app chrome is exempt and lives in
 `src/styles/chrome.css`. Do not edit the colours in `themes/*/theme.json` to make a check pass.
+**Which token, control and layer the chrome uses for what is in [`DESIGN.md`](DESIGN.md).**
 
 ## The bites to know before you start
 
@@ -168,7 +169,7 @@ card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/`
 
 The pre-commit hook first runs `scripts/secrets.sh` (gitleaks over the staged change; CI's `secrets`
 job and the nightly run it too). `npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
-`check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `test/parity.test.ts`,
+`check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `test/parity.test.ts`,
 vitest). It needs no browser and is the pre-commit hook; CI also runs `npm run lint:promises`. The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)
 and in CI (`e2e.yml`: `@smoke` on a pull request, everything on a push); pre-push runs only what the

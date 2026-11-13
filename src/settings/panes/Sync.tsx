@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Check, TextField } from "@/ui/controls";
 import { copyText } from "@/ui/clipboard";
 import { SyncError, syncDevices, syncLink, syncNow, syncPair, syncRemotes, syncRevoke, syncUnlink } from "@/sync/api";
-import { hrefForPath, passphraseProblem, plural, sameRecovery, statusWords } from "@/sync/status";
+import { hrefForPath, passphraseProblem, plural, sameRecovery, statusTone, statusWords } from "@/sync/status";
 import type { SyncDevices, SyncRemote, SyncStatus } from "@/sync/types";
 import { adoptSyncStatus, useSyncStatus } from "@/sync/useSyncStatus";
 import { withVault } from "@/vault/current";
 import { refuseLocked, useLocked } from "../lock";
 
-import { Field, Group, Hint, ICON } from "./common";
+import { Fact, Facts, Field, Group, Hint, ICON } from "./common";
 
 const say = (e: unknown): string => (e instanceof SyncError ? e.message : "It could not be done. Try again.");
 
@@ -124,11 +124,13 @@ function PairForm({
 
   if (paired && status.server) {
     return (
-      <Field label="Paired with" plain>
-        <span className="dag-settings__value" data-dag-sync-server="">
-          {status.server}
-        </span>
-      </Field>
+      <Facts title="Server">
+        <Fact label="Paired with">
+          <span className="dag-settings__value" data-dag-sync-server="">
+            {status.server}
+          </span>
+        </Fact>
+      </Facts>
     );
   }
   const go = async () => {
@@ -446,6 +448,11 @@ function Recovery({ code, onDone }: { code: string; onDone(): void }) {
 
 // -- linked --------------------------------------------------------------------------------------
 
+/** The State row's dot: the sidebar mark's three looks, and a grey one when nothing is linked. */
+function syncTone(s: SyncStatus): "ok" | "busy" | "warn" | "off" {
+  return s.linked ? statusTone(s) : "off";
+}
+
 function when(iso: string | null): string {
   if (!iso) return "never";
   const d = new Date(iso);
@@ -477,28 +484,32 @@ function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {
 
   return (
     <>
-      <Group title="Status">
-        <Field label="State" plain>
-          <span className="dag-settings__value" data-dag-sync-state={status.state}>
+      <Facts title="Status">
+        <Fact label="State">
+          <span
+            className="dag-settings__value dag-settings__state"
+            data-dag-sync-state={status.state}
+            data-dag-sync-tone={syncTone(status)}
+          >
             {statusWords(status)}
           </span>
-        </Field>
-        <Field label="Last synced" plain>
+        </Fact>
+        <Fact label="Last synced">
           <span className="dag-settings__value" data-dag-sync-last="">
             {when(status.last)}
           </span>
-        </Field>
-        <Field label="Waiting here" plain>
+        </Fact>
+        <Fact label="Waiting here">
           <span className="dag-settings__value" data-dag-sync-pending={status.pending}>
             {plural(status.pending, "change")}
           </span>
-        </Field>
-        <Field label="Server" plain>
+        </Fact>
+        <Fact label="Server">
           <span className="dag-settings__value" data-dag-sync-server="">
             {status.server}
           </span>
-        </Field>
-        <Field label="Sync now" plain>
+        </Fact>
+        <Fact label="Sync now">
           <button
             type="button"
             className="dag-button"
@@ -509,9 +520,9 @@ function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {
             <RefreshCw {...ICON} aria-hidden="true" />
             <span>{busy ? "Syncing…" : "Sync now"}</span>
           </button>
-        </Field>
-        <Problem text={problem} />
-      </Group>
+        </Fact>
+      </Facts>
+      <Problem text={problem} />
 
       {status.conflicts.length > 0 ? (
         <Group title="Conflict copies">

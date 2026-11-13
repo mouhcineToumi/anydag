@@ -2,7 +2,14 @@ import { LoaderCircle, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { readSettings } from "@/settings/store";
+import { assertNever } from "@/board/useBoard";
+import { explainLlmReason, type LlmAction, type LlmReason } from "@/settings/llmReason";
+import { ModelChip } from "@/settings/ModelChip";
+import { readSettings, writeSettings } from "@/settings/store";
+import { useProviders } from "@/settings/useProviders";
+import { askPage } from "@/ui/chrome";
+import { LlmSentence } from "@/ui/LlmSentence";
+import { desktop } from "@/vault/desktop";
 
 import {
   COUNT_DEFAULT,
@@ -20,7 +27,7 @@ const ICON = { size: 16, strokeWidth: 1.75, strokeLinecap: "round", strokeLinejo
 type From = "topic" | "note";
 
 type Step =
-  | { step: "ask"; error: string | null }
+  | { step: "ask"; error: string | null; reason?: LlmReason }
   | { step: "running" }
   | { step: "pick"; cards: GeneratedCard[]; keep: boolean[]; problems: CardProblem[]; error: string | null };
 
@@ -82,6 +89,7 @@ export function GenerateCards({
   const [step, setStep] = useState<Step>({ step: "ask", error: null });
   const running = useRef<AbortController | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const [providers] = useProviders(step.step === "ask" && Boolean(step.reason));
 
   useEffect(() => {
     input.current?.focus();
@@ -140,7 +148,7 @@ export function GenerateCards({
       setStep({ step: "pick", cards: got.cards, keep: got.cards.map(() => true), problems: got.problems, error: null });
     } catch (e) {
       if (stop.signal.aborted) return;
-      setStep({ step: "ask", error: (e as Error).message });
+      setStep({ step: "ask", error: (e as Error).message, reason: (e as { reason?: LlmReason }).reason });
     } finally {
       if (running.current === stop) running.current = null;
     }
@@ -150,6 +158,32 @@ export function GenerateCards({
     running.current?.abort();
     running.current = null;
     setStep({ step: "ask", error: null });
+  };
+
+  const explanation =
+    step.step === "ask" && step.reason
+      ? explainLlmReason(step.reason, {
+          host: desktop()?.keys ? "desktop" : "browser",
+          providers: providers?.providers,
+        })
+      : null;
+  const act = (a: LlmAction) => {
+    switch (a.kind) {
+      case "settings":
+        /* The dialog and Settings share a layer; the dialog goes first so the tab is the one on top. */
+        close();
+        askPage("settings", "ai");
+        return;
+      case "provider":
+        if (a.provider) writeSettings({ llm: { provider: a.provider, model: null } });
+        void generate();
+        return;
+      case "retry":
+        void generate();
+        return;
+      default:
+        return assertNever(a.kind);
+    }
   };
 
   const kept = step.step === "pick" ? step.cards.filter((_, i) => step.keep[i]) : [];
@@ -188,6 +222,14 @@ export function GenerateCards({
         <header className="dag-settings__head">
           <Sparkles {...ICON} className="dag-rewrite-dialog__mark" aria-hidden="true" />
           <h2>Generate flashcards</h2>
+          <ModelChip
+            where="flashcards"
+            onOpen={() => {
+              /* The dialog and Settings share a layer; the dialog goes first so the tab is the one on top. */
+              close();
+              askPage("settings", "ai");
+            }}
+          />
           <span className="dag-toolbar__spacer" />
           <button type="button" className="dag-icon" aria-label="Close" data-dag-flashcards-close="" onClick={close}>
             <X {...ICON} aria-hidden="true" />
@@ -325,9 +367,24 @@ export function GenerateCards({
               />
             </label>
             {step.step === "ask" && step.error ? (
-              <p className="dag-flashcards__error" role="alert" data-dag-flashcards-error="">
-                {step.error}
-              </p>
+              <div className="dag-flashcards__error" role="alert" data-dag-flashcards-error="">
+                <LlmSentence text={explanation?.sentence ?? step.error} />
+                {explanation ? (
+                  <div className="dag-flashcards__acts">
+                    {explanation.actions.map((a) => (
+                      <button
+                        key={`${a.kind}:${a.label}`}
+                        type="button"
+                        className="dag-icon dag-icon--wide"
+                        data-dag-flashcards-act={a.kind}
+                        onClick={() => act(a)}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
             <div className="dag-settings__foot dag-flashcards__foot">
               {step.step === "running" ? (

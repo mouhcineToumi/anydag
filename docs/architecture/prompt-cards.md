@@ -19,7 +19,7 @@ goes away. It is a fence all the same, so an unrun prompt survives a reload, is 
 like anything else, and is in the file Claude reads. `as=` asks for a type; an unknown one is
 `WB_BAD_AS` and dropped, so the card still runs and the model chooses.
 
-Eight things are load-bearing:
+Nine things are load-bearing:
 
 - **The server writes nothing; the client commits the answer.** Undo here is a version of the file,
   and an edit the history did not make drops the stack. So `/generate` returns a draft, and
@@ -51,31 +51,42 @@ Eight things are load-bearing:
   `subtitle`, `dir`, `aspect` and `frame`, plus `w`/`h` on a `chart` or `sketch`, whose size is a
   choice; anything else a model writes — `x=`, `#id`, `page=`, `hidden` — is dropped before the
   check, not after it.
-- **How hard the model thinks is the person's, not the machine's.** Settings → AI and agents offers
-  `none · low · medium · high` beside the provider, and the level rides with the request — so trying
-  `high` on a dense description is a select, not an edit to `.env.local` and a restart. It outranks
-  `ANYDAG_LLM_REASONING`, because the environment is how this machine is set up and the select is
-  somebody choosing now; `default` is a choice too, and means the model's own. **The level is passed
-  through rather than checked against a list**: which levels exist is the model's business — Gemini
-  3.8 Flash takes those four and refuses `minimal` in so many words, and that refusal is worth
-  showing on the card. The server checks only the shape, because it ends up in a request body. For
-  `opencode` it becomes a variant written `model#variant`, which is the *model's* vocabulary — GLM
-  5.3 Flash has `low`, `high` and `max`, Kimi K3 only `max` — so `variantFor()` maps none and low
-  onto `low`, high onto `high`, and the middle of the range is "say nothing".
+- **How hard the model thinks is the person's, not the machine's.** Settings → AI offers
+  the same scale everywhere — Automatic · Low · Medium · High · Max — beside the provider, and the
+  level rides with the request: trying `High` on a dense description is a select, not an edit to
+  `.env.local` and a restart. It outranks `ANYDAG_LLM_REASONING`, because the environment is how this
+  machine is set up and the select is somebody choosing now; `default` is a choice too, and means the
+  model's own. **One mapping decides what each provider calls the level** (`effortFor` in `llm.ts`):
+  Claude Code's `--effort` takes low through max, so the scale passes through and `none`, read from an
+  older preference, is Low; OpenCode's `#variant` has `low`, `high` and `max`, so none and low map to `low`
+  and the middle is "say nothing"; an HTTP provider's `reasoning_effort` takes none through high, so
+  Max is High there too. The server checks only the shape, because an unknown level ends up in a
+  request body and a model that refuses it says so in its own words on the card.
 - **A provider is a row in a table** (`providers.ts`), resolved per request from `.env.local` and
   the process environment, so a key added mid-session counts; in the desktop app the person's own key
   is kept in the OS keychain and never in a file anybody syncs.
-  `GET /__board/llm` reports which could answer and why not, and never a key; the page names a
-  provider by id. `ANYDAG_LLM_MODEL` is the default provider's model only — a Gemini name sent to Z.ai
-  because somebody picked Z.ai in the settings card is the bug that rule prevents.
+  `GET /__board/llm` reports which could answer and why not, each provider's key variables by name
+  (`keyEnv`), and never a key; the page names a provider by id. `?fresh=1` checks every provider
+  again instead of answering from what it remembered, and `POST /__board/llm/test` makes one short
+  call to one provider — Settings' *Save and test*, and the MCP `llm` tool's `test`. `ANYDAG_LLM_MODEL`
+  belongs to the provider `ANYDAG_LLM_PROVIDER` names, and to OpenAI-compatible: one provider's model
+  name sent to another because somebody picked it in the settings card is the bug that rule prevents.
+- **A failure is a sentence and a next step, not a developer's note.** The server keeps its
+  plain-text `error` — MCP tools and the CLI read it — and adds a machine-readable `reason`
+  (`{ code, provider?, keyEnv? }`) beside it on `/__board/generate` and per provider on
+  `/__board/llm`. `src/settings/llmReason.ts` is the one place the page turns a code into plain
+  words and at most two actions; the prompt card, Rewrite, Generate flashcards and Settings → AI
+  all use it. It knows whether this is the desktop app (a key in the keyring) or a
+  browser (the server's environment), and offers **Use Claude Code** or **Use OpenCode** only when
+  that other provider is ready. A missing or unknown reason falls back to the server's `error`, so
+  a newer server never leaves the page with nothing to say.
 - **Two adapters and one interface.** `complete(messages, signal) → text`. HTTP is a bare `fetch`
   to `{base}/chat/completions` — no SDK — and scrubs the key out of anything a provider says back.
-  **Gemini is sent `reasoning_effort: low`** (`ProviderSpec.defaults`): 3.x Flash thinks by default,
-  and on a diagram the thinking is nearly all of the wait — one description took 42 s at the model's
-  default, 14 s at `low`, 10 s at `none`, the same diagram each time, and round 2 came back ten for
-  ten at `low` in 1.5–7 s. `ANYDAG_LLM_REASONING` overrides it; `default` sends none.
-  The CLIs are `claude -p` and `opencode run --standalone`, each fenced off from the machine: see
-  below for Claude and *Things that will bite* for OpenCode.
+  An HTTP provider is sent `reasoning_effort` only when someone asked for a level — the Thinking
+  select or `ANYDAG_LLM_REASONING`; `default` sends none, which is the model's own. A provider spec
+  may carry measured `defaults`; OpenAI-compatible carries none, so an unasked HTTP request sends no
+  thinking field. The CLIs are `claude -p` and `opencode run --standalone`, each fenced off from the
+  machine: see below for Claude and *Things that will bite* for OpenCode.
 - **The route is the one here that spends money**, and the server's token and `Host` check are
   what keep a web page the person happens to have open from calling it. A description is at most 4000 characters, at most four run at once, each has a
   timeout (`ANYDAG_LLM_TIMEOUT`, 120 s), and the client going away cancels the call.
@@ -95,15 +106,33 @@ panel for one — the panel would take the focus straight back. `as` is in no ha
 `Item`'s memo comparison, because the select draws it. Under `?snapshot=1` the card draws its
 description read-only.
 
+**A model chip says who would answer, on all three surfaces that ask.** The prompt card, the Rewrite
+bar and the Generate flashcards dialog each draw `<provider name> · <model>` — the provider from
+`readSettings().llm` or `GET /__board/llm`'s default, the model from the setting or that provider's
+`defaultModel` — and the chip opens Settings → AI. It is text only for now; the
+provider's mark arrives with #182.
+
 **`scripts/generate.mjs`** is the card without the card — the same route, the answer printed with
 its attempts, time and every leftover diagnostic — and is how models are compared. The e2e spec mocks `/generate` in every check: what is under test is what the page does
 with an answer, and a real model would make the suite slow, paid for and different every run.
 
+**Gemini and Z.ai are reached through OpenAI-compatible.** Both serve the OpenAI chat-completions
+dialect, so neither needs a row of its own: Gemini answers at
+`https://generativelanguage.googleapis.com/v1beta/openai` and Z.ai at
+`https://api.z.ai/api/paas/v4`. Set `ANYDAG_LLM_BASE_URL` to one, `ANYDAG_LLM_API_KEY` to the key and
+`ANYDAG_LLM_MODEL` to the model (Settings' OpenAI-compatible row stores the same three). A request,
+a stored setting or `ANYDAG_LLM_PROVIDER` that still names `gemini` or `zai` is read as if no provider
+were named, so the default answers and nothing fails.
+
 **`claude` is the person's own Claude subscription**, through the Claude Code signed in on this
 machine — no key anywhere in AnyDag. `claudeComplete` runs `claude -p`
 in an empty directory with the system prompt as `--system-prompt-file` and the request on stdin, and
-reads `result` out of `--output-format json`. In the desktop app it is the default when it can answer
-(`ANYDAG_DESKTOP=1`, which the shell sets); elsewhere a person picks it. Five things bit:
+reads `result` out of `--output-format json`. **The default is the first provider that can answer
+now** (`defaultProvider`, #179): on the desktop app (`ANYDAG_DESKTOP=1`, which the shell sets) and in
+a browser alike, Claude Code, OpenCode, then OpenAI-compatible — the CLIs come first because a plan
+the person already pays for needs no key. Only when nothing can answer is it Claude Code, whose
+missing install or sign-in is then what the card says. A browser on a machine where Claude Code is
+signed in used to fail its first card on a Gemini key nobody had set. Five things bit:
 
 - **`--bare` is the wrong flag.** It reads like "answer and nothing else", and it reads only
   `ANTHROPIC_API_KEY` — never the subscription's login — so the one run that should work is the one it
@@ -123,15 +152,16 @@ reads `result` out of `--output-format json`. In the desktop app it is the defau
 - **The child's environment is cleaned** (`claudeEnv`): an `ANTHROPIC_API_KEY` in the server's would
   bill that key instead of the plan, and `CLAUDECODE` from a dev server started inside a Claude Code
   session makes the child think it is nested.
-- **`ANYDAG_LLM_MODEL` is read against the provider the environment named**, never the desktop's
-  implicit Claude: a Gemini model name is not one Claude Code knows. The models are its aliases
-  (`sonnet`, `opus`, …), so the row does not go stale with a release; Thinking maps onto `--effort`,
-  which has no `none`, so none is `low`. A diagram came back clean on the first attempt in about four
-  seconds at both.
+- **`ANYDAG_LLM_MODEL` is read against the provider `ANYDAG_LLM_PROVIDER` names**, and
+  OpenAI-compatible: a Gemini model name is not one Claude Code knows, so it is never sent to Claude
+  or OpenCode unless one of them is the provider named. The models are its aliases (`sonnet`, `opus`,
+  …), so the row does not go stale with a release; Thinking maps onto `--effort`, which has no
+  `none`, so none is `low`. A diagram came back clean on the first attempt in about four seconds at
+  both.
 
 **`opencode` is the person's own OpenCode login** the same way — OpenCode Go, or any provider they
-connected with `opencode auth login` — through `opencodeComplete`, and in the desktop app it is the
-default when Claude Code cannot answer and it can. OpenCode **2 or later**: the run is the five things
+connected with `opencode auth login` — through `opencodeComplete`, and it is the default after Claude
+Code when that cannot answer and it can. OpenCode **2 or later**: the run is the five things
 in *Things that will bite*, and four more are this row's.
 
 - **"Ready" is three questions, each answered by the CLI in well under a second**: found

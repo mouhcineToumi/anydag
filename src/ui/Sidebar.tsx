@@ -36,6 +36,7 @@ import {
   FolderPlus,
   GraduationCap,
   Grid2x2Plus,
+  Home,
   Link as LinkMark,
   ListTodo,
   MessageCircleWarning,
@@ -52,6 +53,7 @@ import {
   StarOff,
   Table2,
   Trash2,
+  TriangleAlert,
   Upload,
   Workflow,
   X,
@@ -97,6 +99,7 @@ import {
   type Picked,
   type Row,
 } from "./tree";
+import { IconButton } from "./controls";
 import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
@@ -191,7 +194,7 @@ function hintOf(
 
 /** The width somebody gets before they drag it, and the two ends of the drag. A drag is also held
     to half the window (`dragCap`), as the CSS holds it. */
-export const SIDEBAR_W = 248;
+export const SIDEBAR_W = 272;
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 640;
 
@@ -272,8 +275,11 @@ export interface SidebarFiles {
    * a status — or an event, a note that starts with a start. Resolves `null` once it was made and
    * opened, or the sentence saying why it was not — which the column says under the tree. A locked
    * app answers through the lock's own notice instead, so it resolves `null` too.
+   *
+   * **A `title` makes the file under that title instead of asking for one**: the search's way,
+   * where the words somebody typed are the name and opening it is the whole of the gesture.
    */
-  newFile(kind: TextKind | "task" | "event", folder: string): Promise<string | null>;
+  newFile(kind: TextKind | "task" | "event", folder: string, title?: string): Promise<string | null>;
   /**
    * Upload files from the computer into a folder: each becomes an attachment, listed here
    * like any other file. Resolves to the sentences for any the server — or its upload limits —
@@ -375,6 +381,8 @@ export function Sidebar({
   attachments = EMPTY,
   sizes = NO_SIZES,
   loading = false,
+  failed = false,
+  onRetry,
   board,
   note,
   quiz = null,
@@ -438,6 +446,13 @@ export function Sidebar({
    * list on its way, never a vault with nothing in it, so it is not said to be one.
    */
   loading?: boolean;
+  /**
+   * The last ask for the list did not answer — a 500 or no server. A third state beside loading
+   * and empty, and one that stays over the rows this browser already had, so they do not vanish.
+   */
+  failed?: boolean;
+  /** Ask for the list again now: the failed state's *Try again*. */
+  onRetry?(): void;
   board: string | null;
   note: string | null;
   quiz?: string | null;
@@ -1183,11 +1198,12 @@ export function Sidebar({
       {place === "docked" ? (
         <div className="dag-sidebar__head">
           <span className="dag-sidebar-toggle-slot" aria-hidden="true" />
+          {/* The wordmark, not a `Button`: it is drawn exactly where the toolbar draws its own. */}
           <button
             type="button"
             className="dag-sidebar__logo"
             data-dag-sidebar-home=""
-            aria-label="Home"
+            aria-label="AnyDag home"
             title="Home"
             onClick={onHome}
           >
@@ -1201,22 +1217,36 @@ export function Sidebar({
           phone it shares its row with the way out, as the sheet has no page beside it to press. */}
       {sheet ? (
         <div className="dag-sidebar__sheethead">
-          <VaultSwitcher onSettings={() => ask("settings", "vault")} />
-          <button
-            type="button"
-            className="dag-icon dag-sidebar__close"
-            data-dag-sidebar-close=""
-            aria-label="Close the sidebar"
-            onClick={onDismiss}
-          >
+          <VaultSwitcher onSettings={() => ask("settings", "vault-general")} />
+          <IconButton className="dag-sidebar__close" data-dag-sidebar-close="" aria-label="Close the sidebar" onClick={onDismiss}>
             <X size={22} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
       ) : (
-        <VaultSwitcher onSettings={() => ask("settings", "vault")} />
+        <VaultSwitcher onSettings={() => ask("settings", "vault-general")} />
       )}
 
+      {/* The column's own rows — these places, the tree's files and folders, the menus' items, the
+          account — stay `<button>`s drawn as rows rather than `Button`s: a row is full width, its
+          name runs out in an ellipsis and its hover is the column's, which a button is not. The
+          small square tools beside them are `IconButton`s. */}
       <div className="dag-sidebar__acts">
+        {/* A phone has no mark to press: the toolbar hides its logo there with the breadcrumbs, and
+            the sheet's head is the vault and the way out. So the way home is a row of its own, at
+            the top of the sheet, opening what the logo opens on a desktop. */}
+        {sheet ? (
+          <button
+            type="button"
+            className="dag-sidebar__act"
+            data-dag-sidebar-sheet-home=""
+            aria-label="Home"
+            title="Home"
+            onClick={onHome}
+          >
+            <Home {...ICON} aria-hidden="true" />
+            <span>Home</span>
+          </button>
+        ) : null}
         <button type="button" className="dag-sidebar__act" data-dag-sidebar-search="" onClick={() => ask("search")}>
           <Search {...ICON} aria-hidden="true" />
           <span>Search</span>
@@ -1338,20 +1368,22 @@ export function Sidebar({
                     {...pressed(ahead(e.kind, e.name, current))}
                   >
                     <FileIcon entry={e} task={tasks[e.name]} project={projects[e.name]} event={events[e.name]} />
-                    <span className="dag-sidebar__name">{labelOf(e)}</span>
+                    <span className="dag-sidebar__name" title={labelOf(e)}>
+                      {labelOf(e)}
+                    </span>
                   </button>
                   <span className="dag-sidebar__tools">
-                    <button
-                      type="button"
+                    <IconButton
                       tabIndex={-1}
+                      size="sm"
                       className="dag-sidebar__tool"
                       data-dag-sidebar-unfavourite={e.name}
                       aria-label={`Remove ${e.name} from favourites`}
-                      title="Remove from favourites"
+                      tip="Remove from favourites"
                       onClick={() => files.favourite(e.kind, e.name, false)}
                     >
                       <StarOff {...SMALL} aria-hidden="true" />
-                    </button>
+                    </IconButton>
                   </span>
                 </div>
               );
@@ -1368,8 +1400,8 @@ export function Sidebar({
             working in one wants the next file, with the top level one press away. The folder button
             that made a top-level folder at once looked like a second kind of New and is gone; Folder
             is the menu's row, made where the menu says. */}
-        <button
-          type="button"
+        <IconButton
+          size="sm"
           className="dag-sidebar__tool dag-sidebar__tool--shown dag-sidebar__plus"
           data-dag-sidebar-new=""
           aria-haspopup="menu"
@@ -1394,16 +1426,16 @@ export function Sidebar({
           }}
         >
           <Plus {...SMALL} aria-hidden="true" />
-        </button>
+        </IconButton>
       </div>
       <div
         className="dag-sidebar__tree"
-        role="tree"
-        aria-multiselectable="true"
-        aria-labelledby="dag-sidebar-files"
         ref={listRef}
         onKeyDown={onTreeKey}
         data-dag-sidebar-drop=""
+        /* The rows are from an answer before the one that failed; dimmed so they read as the list
+           this browser kept rather than as a list the server just confirmed. */
+        data-dag-sidebar-stale={failed && lines.length > 0 ? "" : undefined}
         /* Files dragged in from the computer: onto a folder, into it; onto a file, into the
            folder that file is in; onto the tree's own space, the top level — the same one
            `closest()` a row dragged inside the column reads. Native drag events, because these files
@@ -1430,283 +1462,324 @@ export function Sidebar({
         }}
         /* The browser's own menu is kept off the column, as a row's is: the tree answers right-clicks.
            A row — and whatever hangs off it, its `⋯` and its folder's *Empty* line — is that row's
-           menu's; the tree's own space, below the rows and around the nothing-here line, is the
-           **top level's**: the `+` menu, at the pointer, making into the folder the tree says is
-           nothing — where there is no row to be in. */
+           menu's; the tree's own space, below the rows, is the **top level's**: the `+` menu, at the
+           pointer, making into the folder the tree says is nothing — where there is no row to be in. */
         onContextMenu={(e) => {
           if ((e.target as Element).closest(".dag-sidebar__line")) return;
           e.preventDefault();
           setMaking({ x: e.clientX, y: e.clientY, below: e.clientY, left: e.clientX, here: "" });
         }}
       >
-        {lines.length === 0 && loading ? (
+        {failed ? (
+          /* The third state of the tree's empty slot. Not *Loading your files…* for ever: a server
+             that answers 500 or does not answer at all says so, and the way back is one press. */
+          <div className="dag-sidebar__failed" role="alert" data-dag-sidebar-failed="">
+            <TriangleAlert {...ICON} className="dag-sidebar__failed-mark" aria-hidden="true" />
+            <p className="dag-sidebar__failed-title">Can't reach your files</p>
+            <p className="dag-sidebar__failed-line">AnyDag's server isn't answering. Nothing you saved is lost.</p>
+            <button type="button" className="dag-sidebar__retry" data-dag-sidebar-retry="" onClick={() => onRetry?.()}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {lines.length === 0 && loading && !failed ? (
           <p className="dag-sidebar__none" role="status" data-dag-sidebar-loading="">
             Loading your files…
           </p>
-        ) : lines.length === 0 ? (
-          <p className="dag-sidebar__none">Nothing here yet. Make a board, a note, a quiz or a table above.</p>
         ) : null}
-        {lines.map((line) => {
-          const key = rowKey(line);
-          const depth = { "--depth": line.depth } as CSSProperties;
-          const name = line.type === "folder" ? line.name : labelOf(line.entry);
-          const where = whereOf(line);
+        {/* Only treeitems and their groups live in the tree. A status, an empty line or a
+            refused create is a sibling before it, so a screen reader hears a file tree rather
+            than a tree with a paragraph or an alert in it. */}
+        <div role="tree" aria-multiselectable="true" aria-labelledby="dag-sidebar-files">
+          {lines.map((line) => {
+            const key = rowKey(line);
+            const depth = { "--depth": line.depth } as CSSProperties;
+            const name = line.type === "folder" ? line.name : labelOf(line.entry);
+            const where = whereOf(line);
 
-          if (mode?.kind === "rename" && mode.key === key && line.type === "file") {
-            /* A file's box is its title: what the row says is what is typed over, and the
+            /* The treeitem is the line, not the row button inside it: the tools a row offers are
+               the row's, so they belong inside the treeitem rather than beside it in the tree.
+               The button stays the focusable, tab-roving row the keyboard code has always walked.
+               A row being renamed or moved is still that row's treeitem, holding its box. */
+            const treeItem = {
+              role: "treeitem" as const,
+              "aria-level": line.depth + 1,
+              "aria-setsize": line.size,
+              "aria-posinset": line.pos,
+              "aria-selected": sel.has(key),
+              "aria-label": name,
+            };
+
+            if (mode?.kind === "rename" && mode.key === key && line.type === "file") {
+              /* A file's box is its title: what the row says is what is typed over, and the
                name follows it in the background. A `/` is a character of a title, never a folder —
                moving is Move to… and a drag, which say so. */
-            return (
-              <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth}>
-                <NameBox
-                  value={name}
-                  label={`New title for ${name}`}
-                  check={() => null}
-                  onCancel={() => settle(key)}
-                  onDone={(v) => {
-                    settle(key);
-                    files.retitle(line.entry.kind, where, v);
-                  }}
-                />
-              </div>
-            );
-          }
+              return (
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                  <NameBox
+                    value={name}
+                    label={`New title for ${name}`}
+                    check={() => null}
+                    onCancel={() => settle(key)}
+                    onDone={(v) => {
+                      settle(key);
+                      files.retitle(line.entry.kind, where, v);
+                    }}
+                  />
+                </div>
+              );
+            }
 
-          if (mode?.kind === "rename" && mode.key === key && line.type === "folder") {
-            /* A folder has no title: its name is what it is called, so its box is still a path. */
-            const parent = parentOf(where);
-            const destOf = (v: string) => (v.includes("/") ? v : parent ? `${parent}/${v}` : v);
-            return (
-              <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth}>
-                <NameBox
-                  value={name}
-                  label={`New name for ${where}`}
-                  check={(v) => {
-                    const dest = destOf(v);
-                    if (dest.startsWith(`${where}/`)) return "A folder cannot go inside itself.";
-                    if (dest !== where && known.has(dest)) return `${dest} already exists.`;
-                    return null;
-                  }}
-                  onCancel={() => settle(key)}
-                  onDone={(v) => {
-                    /* A `/` typed says where; without one the folder it is in rides along, because
+            if (mode?.kind === "rename" && mode.key === key && line.type === "folder") {
+              /* A folder has no title: its name is what it is called, so its box is still a path. */
+              const parent = parentOf(where);
+              const destOf = (v: string) => (v.includes("/") ? v : parent ? `${parent}/${v}` : v);
+              return (
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                  <NameBox
+                    value={name}
+                    label={`New name for ${where}`}
+                    check={(v) => {
+                      const dest = destOf(v);
+                      if (dest.startsWith(`${where}/`)) return "A folder cannot go inside itself.";
+                      if (dest !== where && known.has(dest)) return `${dest} already exists.`;
+                      return null;
+                    }}
+                    onCancel={() => settle(key)}
+                    onDone={(v) => {
+                      /* A `/` typed says where; without one the folder it is in rides along, because
                        renaming is not moving. */
-                    const dest = destOf(v);
-                    settle(folderKey(dest));
-                    if (dest !== where) void moveOneFolder(where, dest);
-                  }}
-                />
-              </div>
-            );
-          }
+                      const dest = destOf(v);
+                      settle(folderKey(dest));
+                      if (dest !== where) void moveOneFolder(where, dest);
+                    }}
+                  />
+                </div>
+              );
+            }
 
-          if (mode?.kind === "transfer" && mode.key === key) {
-            /* Every vault but this one, as a real `<select>` — the move's own shape one level up. */
-            return (
-              <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth}>
-                <select
-                  className="dag-sidebar__move"
-                  data-dag-sidebar-transfer-to=""
-                  autoFocus
-                  aria-label={`Move ${where} to another vault`}
-                  defaultValue=""
-                  onBlur={() => setMode(null)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Escape") settle(key);
-                  }}
-                  onChange={(e) => {
-                    const picked = e.target.value;
-                    setMode(null);
-                    if (!picked.startsWith("vault:")) return;
-                    setMoveProblem(null);
-                    const what = line.type === "folder" ? { folder: where } : { kind: line.entry.kind, name: where };
-                    void files.transfer(what, picked.slice(6)).then(setMoveProblem);
-                  }}
-                >
-                  <option value="" disabled>
-                    Move to vault…
-                  </option>
-                  {elsewhere.map((v) => (
-                    <option key={v.id} value={`vault:${v.id}`}>
-                      {v.name}
+            if (mode?.kind === "transfer" && mode.key === key) {
+              /* Every vault but this one, as a real `<select>` — the move's own shape one level up. */
+              return (
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                  <select
+                    className="dag-sidebar__move"
+                    data-dag-sidebar-transfer-to=""
+                    autoFocus
+                    aria-label={`Move ${where} to another vault`}
+                    defaultValue=""
+                    onBlur={() => setMode(null)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Escape") settle(key);
+                    }}
+                    onChange={(e) => {
+                      const picked = e.target.value;
+                      setMode(null);
+                      if (!picked.startsWith("vault:")) return;
+                      setMoveProblem(null);
+                      const what = line.type === "folder" ? { folder: where } : { kind: line.entry.kind, name: where };
+                      void files.transfer(what, picked.slice(6)).then(setMoveProblem);
+                    }}
+                  >
+                    <option value="" disabled>
+                      Move to vault…
                     </option>
-                  ))}
-                </select>
-              </div>
-            );
-          }
+                    {elsewhere.map((v) => (
+                      <option key={v.id} value={`vault:${v.id}`}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
 
-          if (mode?.kind === "move" && mode.key === key) {
-            /* Every folder but this one and whatever is under it — a folder cannot go inside
+            if (mode?.kind === "move" && mode.key === key) {
+              /* Every folder but this one and whatever is under it — a folder cannot go inside
                itself — and the top level. A real `<select>`, which is the keyboard's way in and one
                Playwright can drive. */
-            const here = parentOf(where);
-            const choices = [...known]
-              .filter((f) => line.type !== "folder" || (f !== where && !f.startsWith(`${where}/`)))
-              .sort();
-            return (
-              <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth}>
-                <select
-                  className="dag-sidebar__move"
-                  data-dag-sidebar-move-to=""
-                  autoFocus
-                  aria-label={`Move ${where} to a folder`}
-                  defaultValue={here}
-                  onBlur={() => setMode(null)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Escape") settle(key);
-                  }}
-                  onChange={(e) => {
-                    const into = e.target.value;
-                    setMode(null);
-                    if (into === here) return;
-                    if (line.type === "folder") {
-                      if (!known.has(filedAt(where, into))) void moveOneFolder(where, filedAt(where, into));
-                    } else void files.move(line.entry.kind, where, into);
-                  }}
-                >
-                  <option value="">(top level)</option>
-                  {choices.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          }
+              const here = parentOf(where);
+              const choices = [...known]
+                .filter((f) => line.type !== "folder" || (f !== where && !f.startsWith(`${where}/`)))
+                .sort();
+              return (
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                  <select
+                    className="dag-sidebar__move"
+                    data-dag-sidebar-move-to=""
+                    autoFocus
+                    aria-label={`Move ${where} to a folder`}
+                    defaultValue={here}
+                    onBlur={() => setMode(null)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Escape") settle(key);
+                    }}
+                    onChange={(e) => {
+                      const into = e.target.value;
+                      setMode(null);
+                      if (into === here) return;
+                      if (line.type === "folder") {
+                        if (!known.has(filedAt(where, into))) void moveOneFolder(where, filedAt(where, into));
+                      } else void files.move(line.entry.kind, where, into);
+                    }}
+                  >
+                    <option value="">(top level)</option>
+                    {choices.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
 
-          const common = {
-            "data-dag-sidebar-row": "",
-            "data-dag-sidebar-key": key,
-            role: "treeitem",
-            "aria-level": line.depth + 1,
-            "aria-setsize": line.size,
-            "aria-posinset": line.pos,
-            tabIndex: key === stopKey ? 0 : -1,
-            "aria-selected": sel.has(key),
-            "data-dag-sidebar-picked": sel.has(key) ? "" : undefined,
-            onFocus: () => setStop(key),
-            onPointerDown: onRowPointerDown(line),
-            onContextMenu: (e: ReactMouseEvent<HTMLButtonElement>) => {
-              e.preventDefault();
-              /* A long press with a finger is a selection begun, never the row's menu: the `⋯` is that. */
-              if ((e.nativeEvent as PointerEvent).pointerType === "touch" || held.current) return hold(key);
-              openMenu(line, e.currentTarget, false, { x: e.clientX, y: e.clientY });
-            },
-            style: depth,
-          };
-          const tools = (
-            <span className="dag-sidebar__tools">
-              {line.type === "folder" && !locked ? (
-                <button
-                  type="button"
+            const common = {
+              "data-dag-sidebar-row": "",
+              "data-dag-sidebar-key": key,
+              tabIndex: key === stopKey ? 0 : -1,
+              "data-dag-sidebar-picked": sel.has(key) ? "" : undefined,
+              onFocus: () => setStop(key),
+              onPointerDown: onRowPointerDown(line),
+              onContextMenu: (e: ReactMouseEvent<HTMLButtonElement>) => {
+                e.preventDefault();
+                /* A long press with a finger is a selection begun, never the row's menu: the `⋯` is that. */
+                if ((e.nativeEvent as PointerEvent).pointerType === "touch" || held.current) return hold(key);
+                openMenu(line, e.currentTarget, false, { x: e.clientX, y: e.clientY });
+              },
+              style: depth,
+            };
+            const tools = (
+              <span className="dag-sidebar__tools">
+                {line.type === "folder" && !locked ? (
+                  <IconButton
+                    tabIndex={-1}
+                    size="sm"
+                    className="dag-sidebar__tool"
+                    data-dag-sidebar-add={line.path}
+                    aria-label={`New in ${line.path}`}
+                    tip="New board, note, task, quiz, table or folder here, or upload files"
+                    onClick={(e) => openMenu(line, e.currentTarget, true)}
+                  >
+                    <Plus {...SMALL} aria-hidden="true" />
+                  </IconButton>
+                ) : null}
+                {line.type === "file" && isFavourite(line.entry) ? (
+                  <IconButton
+                    tabIndex={-1}
+                    size="sm"
+                    className="dag-sidebar__tool"
+                    data-dag-sidebar-star={where}
+                    aria-label={`Remove ${where} from favourites`}
+                    tip="A favourite: click to remove it"
+                    onClick={() => files.favourite(line.entry.kind, where, false)}
+                  >
+                    {/* Filled: it says what the file is, where the favourites list's crossed-out star
+                        says what the click does. */}
+                    <Star {...SMALL} fill="currentColor" aria-hidden="true" />
+                  </IconButton>
+                ) : null}
+                <IconButton
                   tabIndex={-1}
+                  size="sm"
                   className="dag-sidebar__tool"
-                  data-dag-sidebar-add={line.path}
-                  aria-label={`New in ${line.path}`}
-                  title="New board, note, task, quiz, table or folder here, or upload files"
-                  onClick={(e) => openMenu(line, e.currentTarget, true)}
+                  data-dag-sidebar-more={where}
+                  aria-label={`More for ${where}`}
+                  aria-haspopup="menu"
+                  tip="Rename, move, delete (right-click, or shift+F10)"
+                  onClick={(e) => openMenu(line, e.currentTarget)}
                 >
-                  <Plus {...SMALL} aria-hidden="true" />
-                </button>
-              ) : null}
-              <button
-                type="button"
-                tabIndex={-1}
-                className="dag-sidebar__tool"
-                data-dag-sidebar-more={where}
-                aria-label={`More for ${where}`}
-                aria-haspopup="menu"
-                title="Rename, move, delete (right-click, or shift+F10)"
-                onClick={(e) => openMenu(line, e.currentTarget)}
-              >
-                <MoreHorizontal {...SMALL} aria-hidden="true" />
-              </button>
-            </span>
-          );
+                  <MoreHorizontal {...SMALL} aria-hidden="true" />
+                </IconButton>
+              </span>
+            );
 
-          if (line.type === "folder") {
-            /* A folder that is a project wears a kanban folder in its colour; its name is
+            if (line.type === "folder") {
+              /* A folder that is a project wears a kanban folder in its colour; its name is
                still the folder's, because that is what moving and renaming it change. */
-            const owner = owners.get(line.path);
-            const proj = owner ? projects[owner] : undefined;
+              const owner = owners.get(line.path);
+              const proj = owner ? projects[owner] : undefined;
+              return (
+                <div key={key} className="dag-sidebar__line" {...treeItem} aria-expanded={line.open}>
+                  <button
+                    type="button"
+                    className="dag-sidebar__row dag-sidebar__row--folder"
+                    data-dag-sidebar-folder={line.path}
+                    data-dag-sidebar-drop={line.path}
+                    data-dag-sidebar-shut={line.open ? undefined : line.path}
+                    data-dag-sidebar-project={proj?.status}
+                    data-dag-sidebar-store={line.path === store ? "" : undefined}
+                    aria-expanded={line.open}
+                    title={proj && owner ? `${line.path} — the project ${titles[owner] ?? leaf(owner)}` : line.path}
+                    onClick={(e) => {
+                      if (held.current) return void (held.current = false);
+                      if (dragged.current || select(e, key)) return;
+                      onFolder(line.path, !line.open);
+                    }}
+                    {...common}
+                  >
+                    <span className="dag-sidebar__indent" aria-hidden="true" />
+                    <ChevronRight {...SMALL} className="dag-sidebar__chev" aria-hidden="true" />
+                    {proj ? (
+                      <FolderKanban {...SMALL} className="dag-sidebar__project" style={hueVars(proj.hue)} aria-hidden="true" />
+                    ) : line.open ? (
+                      <FolderOpen {...SMALL} aria-hidden="true" />
+                    ) : (
+                      <FolderIcon {...SMALL} aria-hidden="true" />
+                    )}
+                    <span className="dag-sidebar__name" title={line.path}>
+                      {line.name}
+                    </span>
+                  </button>
+                  {tools}
+                  {line.open && line.empty ? (
+                    <p
+                      className="dag-sidebar__empty"
+                      data-dag-sidebar-drop={line.path}
+                      style={{ "--depth": line.depth + 1 } as CSSProperties}
+                    >
+                      Empty
+                    </p>
+                  ) : null}
+                </div>
+              );
+            }
+            const { kind } = line.entry;
+            const current = key === currentKey;
             return (
-              <div key={key} className="dag-sidebar__line">
+              <div key={key} className={current ? "dag-sidebar__line dag-sidebar__line--on" : "dag-sidebar__line"} {...treeItem}>
                 <button
                   type="button"
-                  className="dag-sidebar__row dag-sidebar__row--folder"
-                  data-dag-sidebar-folder={line.path}
-                  data-dag-sidebar-drop={line.path}
-                  data-dag-sidebar-shut={line.open ? undefined : line.path}
-                  data-dag-sidebar-project={proj?.status}
-                  data-dag-sidebar-store={line.path === store ? "" : undefined}
-                  aria-expanded={line.open}
-                  title={proj && owner ? `${line.path} — the project ${titles[owner] ?? leaf(owner)}` : line.path}
+                  className={current ? "dag-sidebar__row dag-sidebar__row--on" : "dag-sidebar__row"}
+                  data-dag-sidebar-file={where}
+                  data-dag-kind={kind}
+                  data-dag-sidebar-task={kind === "note" ? tasks[where]?.status : undefined}
+                  data-dag-sidebar-event={kind === "note" && events[where] ? events[where].start : undefined}
+                  data-dag-sidebar-drop={parentOf(where)}
+                  aria-current={current ? "page" : undefined}
+                  title={hintOf(line.entry, questions, sizes)}
                   onClick={(e) => {
                     if (held.current) return void (held.current = false);
                     if (dragged.current || select(e, key)) return;
-                    onFolder(line.path, !line.open);
+                    onOpen(kind, where);
                   }}
                   {...common}
+                  {...hover(ahead(kind, where, current))}
                 >
                   <span className="dag-sidebar__indent" aria-hidden="true" />
-                  <ChevronRight {...SMALL} className="dag-sidebar__chev" aria-hidden="true" />
-                  {proj ? (
-                    <FolderKanban {...SMALL} className="dag-sidebar__project" style={hueVars(proj.hue)} aria-hidden="true" />
-                  ) : line.open ? (
-                    <FolderOpen {...SMALL} aria-hidden="true" />
-                  ) : (
-                    <FolderIcon {...SMALL} aria-hidden="true" />
-                  )}
-                  <span className="dag-sidebar__name">{line.name}</span>
+                  <span className="dag-sidebar__chev" aria-hidden="true" />
+                  <FileIcon entry={line.entry} task={tasks[where]} project={projects[where]} event={events[where]} />
+                  <span className="dag-sidebar__name" title={name}>
+                    {name}
+                  </span>
                 </button>
                 {tools}
-                {line.open && line.empty ? (
-                  <p
-                    className="dag-sidebar__empty"
-                    data-dag-sidebar-drop={line.path}
-                    style={{ "--depth": line.depth + 1 } as CSSProperties}
-                  >
-                    Empty
-                  </p>
-                ) : null}
               </div>
             );
-          }
-          const { kind } = line.entry;
-          const current = key === currentKey;
-          return (
-            <div key={key} className={current ? "dag-sidebar__line dag-sidebar__line--on" : "dag-sidebar__line"}>
-              <button
-                type="button"
-                className={current ? "dag-sidebar__row dag-sidebar__row--on" : "dag-sidebar__row"}
-                data-dag-sidebar-file={where}
-                data-dag-kind={kind}
-                data-dag-sidebar-task={kind === "note" ? tasks[where]?.status : undefined}
-                data-dag-sidebar-event={kind === "note" && events[where] ? events[where].start : undefined}
-                data-dag-sidebar-drop={parentOf(where)}
-                aria-current={current ? "page" : undefined}
-                title={hintOf(line.entry, questions, sizes)}
-                onClick={(e) => {
-                  if (held.current) return void (held.current = false);
-                  if (dragged.current || select(e, key)) return;
-                  onOpen(kind, where);
-                }}
-                {...common}
-                {...hover(ahead(kind, where, current))}
-              >
-                <span className="dag-sidebar__indent" aria-hidden="true" />
-                <span className="dag-sidebar__chev" aria-hidden="true" />
-                <FileIcon entry={line.entry} task={tasks[where]} project={projects[where]} event={events[where]} />
-                <span className="dag-sidebar__name">{name}</span>
-              </button>
-              {tools}
-            </div>
-          );
-        })}
+          })}
+        </div>
       </div>
 
       {/* Under the tree, never above it: a bar appearing above the
@@ -1810,6 +1883,14 @@ export function Sidebar({
               return void refuseLocked();
             }
             const where = whereOf(menuLine);
+            /* A folder's menu opens the New menu scoped to it, where the folder's own `+` would
+               have — which a phone hides, and which a finger cannot hover. */
+            if (what === "new-in" && menuLine.type === "folder" && mode?.kind === "menu") {
+              const { at } = mode;
+              setMode(null);
+              setMaking({ x: at.x, y: at.y, below: at.y, left: at.x, here: where });
+              return;
+            }
             /* Into the trash at once, a folder with everything in it: nothing is asked,
                because the window offers to take it back — the three questions this asked went with
                the reason for them. */
@@ -2033,6 +2114,7 @@ function NewMenu({
             "New at the top level"
           )}
         </span>
+        {/* A word in the sentence it ends, not a `Button`. The menu's rows below are menu items. */}
         {here ? (
           <button
             type="button"
@@ -2115,6 +2197,7 @@ const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>([
 ]);
 
 type Pick =
+  | "new-in"
   | "rename"
   | "duplicate"
   | "move"
@@ -2220,6 +2303,7 @@ function RowMenu({
     }
   };
 
+  /* Menu items (`dag-more__item`), not `Button`s: full-width rows moved by the arrow keys. */
   const item = (what: Pick, label: string, icon: ReactNode, danger = false) =>
     locked && !READ_PICKS.has(what) ? null : (
       <button
@@ -2257,6 +2341,14 @@ function RowMenu({
         </>
       ) : (
         <>
+          {/* A folder's `+` is the same menu, but on a phone the plus is hidden and a finger has
+              no hover: this is the one way into the folder's New menu there. */}
+          {line.type === "folder" ? (
+            <>
+              {item("new-in", `New in “${leaf(line.path)}”…`, <FilePlus2 {...ICON} aria-hidden="true" />)}
+              <hr className="dag-vault__rule" />
+            </>
+          ) : null}
           {line.type === "file"
             ? favourite
               ? item("unfavourite", "Remove from favourites", <StarOff {...ICON} aria-hidden="true" />)
@@ -2412,53 +2504,55 @@ function SelectionBar({
   return (
     <div className="dag-sidebar__bulk" role="toolbar" aria-label={`${count} selected`} data-dag-sidebar-bulk={count}>
       <span className="dag-sidebar__bulk-count">{count} selected</span>
+      <IconButton
+        size="sm"
+        className="dag-sidebar__tool"
+        data-dag-sidebar-bulk-act="clear"
+        aria-label="Clear the selection"
+        tip="Clear the selection (Escape)"
+        onClick={onClear}
+      >
+        <X {...SMALL} aria-hidden="true" />
+      </IconButton>
+      {/* Words, not `IconButton`s: the bar labels what it does (#215), and the labels are what a
+          first-time reader needs. Each keeps the bar's own tool box, a finger's 44 on a phone. */}
       <span className="dag-sidebar__bulk-acts">
         {locked ? null : (
           <button
             type="button"
-            className="dag-sidebar__tool"
+            className="dag-sidebar__tool dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="move"
-            aria-label={`Move ${count} to a folder`}
             title="Move to…"
             onClick={() => onAsk("move")}
           >
             <FolderInput {...SMALL} aria-hidden="true" />
+            <span>Move</span>
           </button>
         )}
         {vaults.length && !locked ? (
           <button
             type="button"
-            className="dag-sidebar__tool"
+            className="dag-sidebar__tool dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="transfer"
-            aria-label={`Move ${count} to another vault`}
             title="Move to vault…"
             onClick={() => onAsk("transfer")}
           >
             <ArrowRightLeft {...SMALL} aria-hidden="true" />
+            <span>To vault</span>
           </button>
         ) : null}
         {locked ? null : (
           <button
             type="button"
-            className="dag-sidebar__tool dag-sidebar__tool--danger"
+            className="dag-sidebar__tool dag-sidebar__tool--danger dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="delete"
-            aria-label={`Delete ${count}`}
             title="Delete — they go to the trash"
             onClick={() => onAsk("delete")}
           >
             <Trash2 {...SMALL} aria-hidden="true" />
+            <span>Trash</span>
           </button>
         )}
-        <button
-          type="button"
-          className="dag-sidebar__tool"
-          data-dag-sidebar-bulk-act="clear"
-          aria-label="Clear the selection"
-          title="Clear the selection (Escape)"
-          onClick={onClear}
-        >
-          <X {...SMALL} aria-hidden="true" />
-        </button>
       </span>
     </div>
   );
@@ -2511,6 +2605,7 @@ function BulkMenu({
       onClose();
     }
   };
+  /* Menu items, as `RowMenu`'s are: rows of a menu, not `Button`s. */
   const item = (what: "move" | "transfer" | "delete" | "clear", label: string, icon: ReactNode, danger = false) => (
     <button
       type="button"
@@ -2610,6 +2705,8 @@ function NameBox({
  * Settings, at the foot: the one way to it with the pointer, opening where the last
  * visit left off, as `ctrl+,` does.
  */
+/* The foot's three rows — sync, feedback, Settings — are the column's rows, as its places at the
+   top are (`dag-sidebar__act`), not `Button`s. */
 /** A linked vault's sync status, one quiet row; nothing at all when it is not linked. */
 function SyncRow({ onOpen }: { onOpen(): void }) {
   const status = useSyncStatus();

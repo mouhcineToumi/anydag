@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**134 features, 0 gaps, 73 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
+**135 features, 0 gaps, 74 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
@@ -33,7 +33,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Stop serving a vault, or forget it — never its folder | `POST /api/vaults/close` | `vault close` | `vault_close` |
 | Run the MCP server over stdio for a vault — what Claude Code and Claude Desktop connect to | ✗ [4] | `mcp` | ✗ [5] |
 | Serve a vault and the page to a browser on this machine, behind a token printed once | ✗ [6] | `serve` | ✗ [7] |
-| A vault's preferences — the settings card, the theme, the favourites | `GET /api/vault/settings` `PUT /api/vault/settings` | `settings` | `settings` |
+| A vault's preferences — the settings card's vault half, the favourites, the attachments folder | `GET /api/vault/settings` `PUT /api/vault/settings` | `settings` | `settings` |
 | Move a file, or a folder whole, to another open vault | `POST /__board/transfer` | `vault transfer` | `board_transfer` |
 
 ## Files
@@ -221,6 +221,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | Which model providers could answer | `GET /__board/llm` | · | `llm` |
+| Make one short call to a provider, to see that it really answers | `POST /__board/llm/test` | · | `llm` |
 | Ask a model to draw a diagram | `POST /__board/generate` | · | `generate` |
 | Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [23] |
 | Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [24] |

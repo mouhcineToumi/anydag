@@ -4,7 +4,7 @@ AnyDag works without AI. When you want it, it uses **your own** AI: the Claude C
 are already signed in to on this computer, or an API key you provide. AnyDag has no AI service of its
 own and sends nothing anywhere unless you ask it to.
 
-Choose the provider and model in **Settings → AI and agents**.
+Choose the provider and model in **Settings → This vault → AI**.
 
 ## The Assistant
 
@@ -25,7 +25,9 @@ only works through AnyDag itself: it cannot run commands or read other files on 
 On a board, `space P` adds a **prompt card**. Describe the diagram you want ("a timeline of the
 French Revolution", "a flowchart of how a bill becomes law") and run it. The model writes the
 diagram, AnyDag checks it, and it replaces the card. One undo takes it back. Prompt cards work with
-Claude Code, OpenCode, or an API key for a model such as Gemini or any OpenAI-compatible service.
+Claude Code, OpenCode, or any OpenAI-compatible service with an API key. Gemini and Z.ai serve that
+dialect at `https://generativelanguage.googleapis.com/v1beta/openai` and
+`https://api.z.ai/api/paas/v4`.
 
 ## Let an AI agent work in your folder
 
@@ -34,7 +36,7 @@ quizzes in your vault, and the app shows each change as it happens.
 
 For a richer connection, AnyDag includes an **MCP server**, so an agent such as Claude Code can use
 every feature of the app: search, notes, boards, tables, quizzes, tasks, the trash. On first launch
-the desktop app installs an `anydag` command (Settings → AI and agents shows where). Then, for
+the desktop app installs an `anydag` command (Settings → This vault → Agent access shows where). Then, for
 Claude Code:
 
 ```bash

@@ -60,14 +60,16 @@ import { openVault, transferFile, transferFolder, vaultsNow } from "@/vault/api"
 import { GONE, switchVault } from "@/vault/current";
 
 import { isLocked, refuseLocked } from "@/settings/lock";
-import { LockNotice, useLockKey, useLockedRoot } from "./Lock";
+import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
+import { IconButton } from "@/ui/controls";
 import { usePanel } from "@/assistant/panelState";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
+import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
 import { ancestors, follow, keyOf, leaf, rebase, type Change } from "./tree";
 
@@ -85,8 +87,11 @@ export interface SidebarControl {
    * does, and what the welcome card's two buttons do, so there is one way a file begins.
    * A task is a note that starts with a status, an event one that starts with a start
    *; a quiz is a kind of its own.
+   *
+   * **A `title` makes it under those words instead**: what the search does from a miss, so the file
+   * opens already called what somebody typed and no second question is asked.
    */
-  create(kind: TextKind | "task" | "event", folder?: string): void;
+  create(kind: TextKind | "task" | "event", folder?: string, title?: string): void;
   /**
    * A page renamed the file it has open — a note's own title, written where it is drawn.
    * What the sidebar remembers by name follows it, as it follows a rename made in a row.
@@ -144,14 +149,18 @@ const clampWidth = (w: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Ma
    `(board|note)`, a favourite quiz was dropped the next time the page loaded. */
 const FAVOURITE_KEY = new RegExp(`^(${FILE_KINDS.join("|")}):.`);
 
-/** What a new file of each kind starts as. Keyed on the kind, so a sixth kind is a type error here. An
-    attachment is uploaded rather than made, so it has no blank. */
-const BLANK: Readonly<Record<TextKind, () => string>> = {
+/** What a new file of each kind starts as, under the title it is given. Keyed on the kind, so a
+    sixth kind is a type error here. An attachment is uploaded rather than made, so it has no blank. */
+const BLANK: Readonly<Record<TextKind, (title: string) => string>> = {
   board: blankBoardText,
   note: blankNoteText,
   quiz: blankQuizText,
   table: blankTableText,
 };
+
+/* The pages the logs toast waits for — a file somebody is working on. Home, the listing pages, an
+   attachment and an empty vault are not one. */
+const LOGS_PAGES = ["board", "note", "quiz", "table"] as const satisfies readonly FileKind[];
 
 function readFavourites(): string[] {
   try {
@@ -215,6 +224,8 @@ export function Shell({
   attachments,
   sizes,
   loading = false,
+  listFailed = false,
+  onRetryList,
   board,
   note,
   quiz,
@@ -258,6 +269,10 @@ export function Shell({
   sizes: Readonly<Record<string, number>>;
   /** The list has not answered and this browser kept none: the sidebar says it is loading. */
   loading?: boolean;
+  /** The last ask for the list failed: the sidebar says so, over the rows it already has. */
+  listFailed?: boolean;
+  /** Ask for the list again now, from the failed state's Try again. */
+  onRetryList?(): void;
   /** What is open, which the sidebar marks and reveals. At most one of the four is set. */
   board: string | null;
   note: string | null;
@@ -361,6 +376,10 @@ export function Shell({
   /* What is open is always visible: its folders are opened whenever it changes. Opened, never shut
      — the rest of the tree stays as the person left it. */
   const current = board ?? note ?? quiz ?? table ?? file;
+  /* The logs question asks once a file somebody is working on has been open for a moment — never on
+     Home, a listing page, an attachment or an empty vault. `kind:name` so moving between two files
+     of one name, or between kinds, starts the wait again. */
+  const asking = LOGS_PAGES.map((kind) => (opened[kind] ? `${kind}:${opened[kind]}` : null)).find((key) => key !== null) ?? null;
   useEffect(() => {
     if (!current) return;
     const up = ancestors(current);
@@ -497,31 +516,42 @@ export function Shell({
     /* The one file that is open, with its kind — or none. */
     const openKind = FILE_KINDS.find((k) => opened[k] !== null);
     const raw: SidebarFiles = {
-      newFile(kind, folder) {
+      newFile(kind, folder, title) {
+        /* What it is called. Usually `Untitled`, and named from the title that opens with it; a
+           search passes the words somebody typed, and those are the file's name as well as its title. */
+        const named = title?.trim() || undefined;
         /* The free name is found here, as a new folder's is, so the row can be drawn before the server
            answers; the server still numbers it if somebody took it meanwhile. One namespace
-           for every kind, and names are titles: `Untitled`, `Untitled 2`, case aside. */
+           for every kind, and names are titles: `Untitled`, `Untitled 2`, case aside. A `/` is a
+           character of a title and never a folder, which is the rule the server files by too. */
         const known = new Set(everyFile({ boards, notes, quizzes, tables, files: attachments }).map((f) => f.name.toLowerCase()));
-        const base = folder ? `${folder}/Untitled` : "Untitled";
+        const stem = named?.replace(/[\\/]+/g, "-") ?? UNTITLED;
+        const base = folder ? `${folder}/${stem}` : stem;
         let ask = base;
         for (let i = 2; known.has(ask.toLowerCase()); i++) ask = `${base} ${i}`;
         /* A task is a note that starts with a status, and an event one that starts at the next whole
            hour; every other kind starts as its own blank. */
         const as: TextKind = kind === "task" || kind === "event" ? "note" : kind;
         const next = nextHourEvent();
-        const done = guess({ op: "add", kind: as, name: ask, title: UNTITLED });
-        const making =
+        const done = guess({ op: "add", kind: as, name: ask, title: named ?? UNTITLED });
+        const text =
           kind === "task"
-            ? createNote(ask, blankTaskText())
+            ? blankTaskText(undefined, named)
             : kind === "event"
-              ? createNote(ask, blankEventText(next.start, next.end))
-              : createFile(kind, ask, BLANK[kind]());
+              ? blankEventText(next.start, next.end, named)
+              : BLANK[kind](named ?? UNTITLED);
+        const making = kind === "task" || kind === "event" ? createNote(ask, text) : createFile(kind, ask, text);
         return making.then((made) => {
           if ("error" in made) {
             done(false);
             return made.error;
           }
           done(true);
+          /* Given its title already, it opens as it is: there is no question left to ask. */
+          if (named) {
+            onOpen(as, made.name);
+            return null;
+          }
           if (as !== "note") {
             bring(as, made.name);
             return null;
@@ -795,7 +825,10 @@ export function Shell({
     saveFavourites,
   ]);
 
-  const create = useCallback((kind: TextKind | "task" | "event", folder = "") => void files.newFile(kind, folder), [files]);
+  const create = useCallback(
+    (kind: TextKind | "task" | "event", folder = "", title?: string) => void files.newFile(kind, folder, title),
+    [files],
+  );
 
   const renamed = useCallback(
     (kind: FileKind, from: string, to: string) => moved({ kind: "file", file: kind, from, to }),
@@ -843,119 +876,121 @@ export function Shell({
       data-sidebar-sized={width === SIDEBAR_W ? undefined : ""}
     >
       <SidebarContext.Provider value={ctl}>
-        {/* First in the DOM, so first in the tab order, which is where it is drawn. */}
-        <button
-          type="button"
-          className="dag-icon dag-sidebar-toggle"
-          data-dag-sidebar-toggle={mode ?? "away"}
-          aria-label={shut ? "Hide the sidebar" : "Show the sidebar"}
-          title={shut ? "Hide the sidebar (Ctrl+\\)" : "Show the sidebar (Ctrl+\\)"}
-          onClick={toggle}
-          /* A press does not take the focus, so it stays on the board: a focused button eats the
+        <ToastHost>
+          {/* First in the DOM, so first in the tab order, which is where it is drawn. */}
+          <IconButton
+            className="dag-sidebar-toggle"
+            data-dag-sidebar-toggle={mode ?? "away"}
+            aria-label={shut ? "Hide the sidebar" : "Show the sidebar"}
+            title={shut ? "Hide the sidebar (Ctrl+\\)" : "Show the sidebar (Ctrl+\\)"}
+            onClick={toggle}
+            /* A press does not take the focus, so it stays on the board: a focused button eats the
              canvas's keys — `typing()` counts one — and the `space` that opens a chord would press
              it again. The dock gives the focus back after a press; this has no board to give it
              to, so it never takes it. Tab and Enter still reach it, and keep it: it is one element,
              so the focus has nowhere to fall. */
-          onMouseDown={(e) => e.preventDefault()}
-          /* The peek is for a column that is away: over a docked one there is nothing to slide in. */
-          onPointerEnter={mode === "docked" || narrow ? undefined : peek}
-          onPointerLeave={mode === "docked" || narrow ? undefined : unpeek}
-        >
-          {/* One glyph for both states, as Claude.ai's is, and not only for the look. Swapping the
+            onMouseDown={(e) => e.preventDefault()}
+            /* The peek is for a column that is away: over a docked one there is nothing to slide in. */
+            onPointerEnter={mode === "docked" || narrow ? undefined : peek}
+            onPointerLeave={mode === "docked" || narrow ? undefined : unpeek}
+          >
+            {/* One glyph for both states, as Claude.ai's is, and not only for the look. Swapping the
               icon replaces the node under a pointer that has not moved, and React reads the new
               node's `pointerover` as the pointer *entering* the button: a click that put the column
               away peeked it straight back. The label and the tooltip say which way it goes. */}
-          <PanelLeft size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
-        </button>
-        {mode ? (
-          <Sidebar
-            mode={mode}
-            boards={boards}
-            notes={notes}
-            folders={folders}
-            titles={titles}
-            ids={ids}
-            tasks={tasks}
-            projects={projects}
-            events={events}
-            quizzes={quizzes}
-            questions={questions}
-            tables={tables}
-            attachments={attachments}
-            sizes={sizes}
-            loading={loading}
-            board={board}
-            note={note}
-            quiz={quiz}
-            table={table}
-            file={file}
-            tasksOpen={tasksOpen}
-            onTasks={() => {
-              openTasks();
-              dismiss();
-            }}
-            calendarOpen={calendarOpen}
-            onCalendar={() => {
-              openCalendar();
-              dismiss();
-            }}
-            quizzesOpen={quizzesOpen}
-            mistakes={mistakes}
-            onQuizzes={() => {
-              openQuizzes();
-              dismiss();
-            }}
-            onPracticeFolder={(folder) => {
-              openQuizzes(`folder:${folder}`);
-              dismiss();
-            }}
-            assistantOpen={assistantOpen}
-            onAssistant={() => {
-              openAssistant();
-              dismiss();
-            }}
-            trashOpen={trashOpen}
-            onTrash={() => {
-              openTrash();
-              dismiss();
-            }}
-            onHome={openHome}
-            openFolders={openFolders}
-            onFolder={(path, isOpen) =>
-              setFolders((had) => {
-                if (had.has(path) === isOpen) return had;
-                const next = new Set(had);
-                if (isOpen) next.add(path);
-                else next.delete(path);
-                return next;
-              })
-            }
-            shown={shown}
-            naming={naming}
-            favourites={favourites}
-            files={files}
-            onOpen={onOpen}
-            onWidth={onWidth}
-            onPointerEnter={mode === "overlay" && peeking ? cancelLeave : undefined}
-            onPointerLeave={mode === "overlay" && peeking && !pinned ? unpeek : undefined}
-            onDismiss={dismiss}
-            sheet={narrow}
-          />
-        ) : null}
-        {children}
-        {panel.open && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
-        {trashed ? (
-          <TrashNotice
-            key={trashed.n}
-            gone={trashed.gone}
-            titles={titles}
-            onRestored={restored}
-            onTrash={openTrash}
-            onClose={() => setTrashed(null)}
-          />
-        ) : null}
-        <LockNotice />
-        {cloud ? <TelemetryPrompt /> : null}
+            <PanelLeft size={16} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />
+          </IconButton>
+          {mode ? (
+            <Sidebar
+              mode={mode}
+              boards={boards}
+              notes={notes}
+              folders={folders}
+              titles={titles}
+              ids={ids}
+              tasks={tasks}
+              projects={projects}
+              events={events}
+              quizzes={quizzes}
+              questions={questions}
+              tables={tables}
+              attachments={attachments}
+              sizes={sizes}
+              loading={loading}
+              failed={listFailed}
+              onRetry={onRetryList}
+              board={board}
+              note={note}
+              quiz={quiz}
+              table={table}
+              file={file}
+              tasksOpen={tasksOpen}
+              onTasks={() => {
+                openTasks();
+                dismiss();
+              }}
+              calendarOpen={calendarOpen}
+              onCalendar={() => {
+                openCalendar();
+                dismiss();
+              }}
+              quizzesOpen={quizzesOpen}
+              mistakes={mistakes}
+              onQuizzes={() => {
+                openQuizzes();
+                dismiss();
+              }}
+              onPracticeFolder={(folder) => {
+                openQuizzes(`folder:${folder}`);
+                dismiss();
+              }}
+              assistantOpen={assistantOpen}
+              onAssistant={() => {
+                openAssistant();
+                dismiss();
+              }}
+              trashOpen={trashOpen}
+              onTrash={() => {
+                openTrash();
+                dismiss();
+              }}
+              onHome={openHome}
+              openFolders={openFolders}
+              onFolder={(path, isOpen) =>
+                setFolders((had) => {
+                  if (had.has(path) === isOpen) return had;
+                  const next = new Set(had);
+                  if (isOpen) next.add(path);
+                  else next.delete(path);
+                  return next;
+                })
+              }
+              shown={shown}
+              naming={naming}
+              favourites={favourites}
+              files={files}
+              onOpen={onOpen}
+              onWidth={onWidth}
+              onPointerEnter={mode === "overlay" && peeking ? cancelLeave : undefined}
+              onPointerLeave={mode === "overlay" && peeking && !pinned ? unpeek : undefined}
+              onDismiss={dismiss}
+              sheet={narrow}
+            />
+          ) : null}
+          {children}
+          {panel.open && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {trashed ? (
+            <TrashNotice
+              key={trashed.n}
+              gone={trashed.gone}
+              titles={titles}
+              onRestored={restored}
+              onTrash={openTrash}
+              onClose={() => setTrashed(null)}
+            />
+          ) : null}
+          {cloud ? <TelemetryPrompt page={asking} /> : null}
+        </ToastHost>
       </SidebarContext.Provider>
     </div>
   );

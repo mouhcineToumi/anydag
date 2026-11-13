@@ -21,7 +21,8 @@ companies named.
    https://github.com/gilbarbara/logos
    Licence: CC0-1.0 Universal
    Used for: the full-colour brand marks in data/icons.json ("brand" mode), including 63 individual
-   AWS service icons and the AI-provider marks.
+   AWS service icons and the AI-provider marks. data/providers.json repeats the mono AI-provider
+   marks from source 1 on their own, so Settings does not fetch the whole bundle.
    Obligation: none.
 
 3. AWS Architecture Icons

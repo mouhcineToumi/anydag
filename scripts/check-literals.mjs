@@ -98,6 +98,70 @@ for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))
   }
 }
 
+/* 4. The chrome's scale (#205). In `chrome.css`, a font size, a corner, a shadow, a layer or a
+      duration reads `--dag-ui-*`. The chrome had none of these and typed its own (26 font sizes,
+      28 shadows, 19 z-indexes) or borrowed the diagram's (`--dag-metric-radius-chip` as every
+      button's corner, which counts as a literal here: it is the diagram's number, not the
+      chrome's). The rules that still type one are counted per property against
+      `scripts/chrome-literals.json`, and the count may only go down: a new literal fails, and a
+      migration that removes some lowers the file in the same commit. */
+const CHROME = "src/styles/chrome.css";
+const CHROME_ALLOW = "scripts/chrome-literals.json";
+const STRUCTURAL = {
+  "font-size": /^(?:inherit|initial|unset|1em|100%)$/,
+  "border-radius": /^(?:0|inherit|initial|unset|50%)$/,
+  "box-shadow": /^(?:none|inherit|initial|unset)$/, // and see `isRing` below
+  "z-index": /^(?:auto|-?\d)$/,
+  transition: /^(?:none|inherit|initial|unset)$|^(?:(?!\d*\.?\d+m?s\b).)*$/,
+};
+/* A shadow part that is not elevation: the focus rings (`--focus-ring*` are built from `--dag-ui-focus-*`),
+   an inset shadow, and a ring or a bar, which has no blur (`0 0 0 2px accentSoft`, `0 2px 0 accent`). */
+const isRing = (v) => {
+  const parts = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i <= v.length; i++) {
+    const c = v[i];
+    if (c === "(") depth++;
+    else if (c === ")") depth--;
+    else if ((c === "," && depth === 0) || i === v.length) {
+      parts.push(v.slice(from, i).trim());
+      from = i + 1;
+    }
+  }
+  return parts.every(
+    (p) =>
+      /^inset\b/.test(p) ||
+      /^var\(--focus-ring(?:-inset)?\)$/.test(p) ||
+      /^-?[\d.]+(?:px)?\s+-?[\d.]+(?:px)?\s+0(?:px)?\s/.test(p),
+  );
+};
+const chromeCounts = Object.fromEntries(Object.keys(STRUCTURAL).map((k) => [k, 0]));
+const chromeText = strip(fs.readFileSync(path.join(root, CHROME), "utf8"), ".css");
+for (const m of chromeText.matchAll(
+  /(?<![\w-])(font-size|border-radius|box-shadow|z-index|transition|animation)\s*:\s*([^;{}]+)/g,
+)) {
+  const prop = m[1] === "animation" ? "transition" : m[1];
+  const value = m[2].trim().replace(/\s*!important$/, "");
+  if (value.includes("var(--dag-ui-")) continue;
+  if (STRUCTURAL[prop].test(value)) continue;
+  if (prop === "box-shadow" && isRing(value)) continue;
+  chromeCounts[prop] += 1;
+}
+const chromeAllowed = JSON.parse(fs.readFileSync(path.join(root, CHROME_ALLOW), "utf8"));
+const lowered = [];
+for (const [prop, count] of Object.entries(chromeCounts)) {
+  const allowed = chromeAllowed[prop] ?? 0;
+  if (count > allowed) {
+    findings.push({
+      file: CHROME,
+      line: 0,
+      what: `a ${prop} literal`,
+      text: `${count} rules type their own ${prop}; ${allowed} allowed — read a --dag-ui-* variable instead`,
+    });
+  } else if (count < allowed) lowered.push(`${prop} ${allowed} → ${count}`);
+}
+
 if (findings.length) {
   console.error(`${findings.length} hardcoded style value(s) — every one of these belongs in a theme:\n`);
   let last = "";
@@ -108,4 +172,79 @@ if (findings.length) {
   process.exit(1);
 }
 
+if (lowered.length) {
+  console.log(
+    `note: chrome.css types fewer literals than ${CHROME_ALLOW} allows (${lowered.join(", ")}); lower it in this commit`,
+  );
+}
+
+/* 5. Text in the app chrome never uses `muted`. It is 2.46:1 on Paper's page and 2.29:1 on its
+      sidebar, so a rule that colours words with it is text a person cannot read. `slate` is the
+      second text tone the themes already carry. What may keep `muted` is listed, selector by
+      selector and with its reason, in `chrome-muted-allowlist.json`: disabled controls,
+      separators and decorative glyphs, none of which is text. */
+const MUTED_CSS = "src/styles/chrome.css";
+const MUTED_ALLOWLIST = "scripts/chrome-muted-allowlist.json";
+
+/** The selector and declarations of every rule in a stylesheet, at-rules included. */
+function cssRules(text) {
+  const clean = strip(text, ".css");
+  const rules = [];
+  const stack = [];
+  const lineAt = (index) => clean.slice(0, index).split("\n").length;
+  let start = 0;
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
+    if (ch === "{") {
+      const raw = clean.slice(start, i);
+      const lead = raw.search(/\S/);
+      const selector = raw.trim().replace(/\s+/g, " ");
+      if (stack.length) stack[stack.length - 1].decls += clean.slice(stack[stack.length - 1].declStart, i);
+      stack.push({ selector, line: lineAt(lead < 0 ? start : start + lead), declStart: i + 1, decls: "" });
+      start = i + 1;
+    } else if (ch === "}") {
+      const block = stack.pop();
+      if (!block) continue;
+      block.decls += clean.slice(block.declStart, i);
+      rules.push(block);
+      if (stack.length) stack[stack.length - 1].declStart = i + 1;
+      start = i + 1;
+    } else if (ch === ";" && stack.length === 0) {
+      start = i + 1;
+    }
+  }
+  return rules;
+}
+
+const mutedAllow = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(root, MUTED_ALLOWLIST), "utf8"))));
+const muted = /color\s*:\s*var\(--dag-color-muted\)/;
+const mutedSeen = new Set();
+const mutedFindings = [];
+
+for (const rule of cssRules(fs.readFileSync(path.join(root, MUTED_CSS), "utf8"))) {
+  if (rule.selector.startsWith("@") || !muted.test(rule.decls)) continue;
+  if (mutedAllow.has(rule.selector)) mutedSeen.add(rule.selector);
+  else mutedFindings.push({ file: MUTED_CSS, line: rule.line, what: "muted text", text: rule.selector });
+}
+
+for (const [selector, reason] of mutedAllow) {
+  if (typeof reason !== "string" || !reason.trim()) {
+    mutedFindings.push({ file: MUTED_ALLOWLIST, line: 0, what: "no reason", text: selector });
+  } else if (!mutedSeen.has(selector)) {
+    mutedFindings.push({ file: MUTED_ALLOWLIST, line: 0, what: "stale entry", text: selector });
+  }
+}
+
+if (mutedFindings.length) {
+  console.error(`${mutedFindings.length} muted text finding(s) in the chrome:\n`);
+  let last = "";
+  for (const f of mutedFindings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
+    if (f.file !== last) console.error(`  ${f.file}`), (last = f.file);
+    console.error(`    ${String(f.line).padStart(4)}  ${f.what.padEnd(18)} ${f.text}`);
+  }
+  console.error("\nReadable text is `slate`; `muted` is only for disabled controls, separators and decorative glyphs.");
+  process.exit(1);
+}
+
 console.log("ok: no hardcoded colours, lengths or svg style values on the diagram surface");
+console.log("ok: no muted text in the chrome outside the allowlist");

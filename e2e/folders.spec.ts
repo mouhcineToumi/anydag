@@ -457,6 +457,23 @@ function more(): void {
 }
 
 test("ctrl and shift pick rows, and the bar moves them into a folder together", async ({ page }) => {
+  /* To vault is drawn only when another vault is open, and the suite has just its own. The real
+     answer is kept and one more vault added to it, purely so the bar's third action is on screen
+     to read. */
+  await page.route("**/api/vaults", async (route) => {
+    const answer = await route.fetch();
+    const body = (await answer.json()) as { vaults: Record<string, unknown>[] };
+    body.vaults.push({
+      id: "e2e-elsewhere",
+      name: "Elsewhere",
+      path: "/elsewhere",
+      opened: new Date().toISOString(),
+      open: true,
+      default: false,
+      missing: false,
+    });
+    await route.fulfill({ response: answer, json: body });
+  });
   more();
   await open(page);
   await expect(page.locator(fileRow(`${parent}/idea`))).toBeVisible();
@@ -467,6 +484,23 @@ test("ctrl and shift pick rows, and the bar moves them into a folder together", 
   await page.locator(fileRow(`${parent}/idea`)).click({ modifiers: [mod] });
   await expect(picked(page)).toHaveCount(2);
   await expect(bar(page)).toHaveAttribute("data-dag-sidebar-bulk", "2");
+  /* Each action says the name a screen reader hears, beside its mark — never a guess until hovered. */
+  for (const [act, label] of [
+    ["move", "Move"],
+    ["transfer", "To vault"],
+    ["delete", "Trash"],
+  ] as const) {
+    const action = page.locator(`[data-dag-sidebar-bulk-act="${act}"]`);
+    await expect(action).toHaveText(label);
+    await expect(action).toHaveAccessibleName(label);
+  }
+  /* The bar's × lets the selection go, as Escape does. */
+  await page.locator('[data-dag-sidebar-bulk-act="clear"]').click();
+  await expect(picked(page)).toHaveCount(0);
+  await expect(bar(page)).toHaveCount(0);
+  await page.locator(fileRow(`${parent}/plan`)).click({ modifiers: [mod] });
+  await page.locator(fileRow(`${parent}/idea`)).click({ modifiers: [mod] });
+  await expect(picked(page)).toHaveCount(2);
   await page.locator(fileRow(`${parent}/idea`)).click({ modifiers: [mod] });
   await expect(picked(page)).toHaveCount(1);
   expect(new URL(page.url()).searchParams.get("note")).toBeNull();
@@ -475,7 +509,7 @@ test("ctrl and shift pick rows, and the bar moves them into a folder together", 
      then the files by title, "Filed" before "Idea" — and replaces what was picked. */
   await page.locator(folderRow(`${parent}/b`)).click({ modifiers: ["Shift"] });
   await expect(picked(page)).toHaveCount(4);
-  await expect(page.locator(`${folderRow(`${parent}/c`)}[aria-selected="true"]`)).toHaveCount(1);
+  await expect(page.locator(folderRow(`${parent}/c`)).locator("xpath=..")).toHaveAttribute("aria-selected", "true");
   /* Escape lets the selection go. */
   await page.keyboard.press("Escape");
   await expect(picked(page)).toHaveCount(0);

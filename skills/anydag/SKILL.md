@@ -83,7 +83,7 @@ finish by giving the person that link, or the picture, and saying what you would
 untidy board is not an error a parser can raise; it is only visible.
 
 *Connecting one, if the user asks how:* `claude mcp add anydag -- anydag mcp --vault <folder>`, or the
-same command in Claude Desktop's config — Settings → AI and agents prints both. It runs over stdio
+same command in Claude Desktop's config — Settings → This vault → Agent access prints both. It runs over stdio
 against the running app, or opens the vault itself when the app is not running. No key, no consent
 card: it is their own machine.
 
@@ -529,7 +529,7 @@ what links to it. A vault's own `[[wikilinks]]` work too, as in Obsidian — `[[
 `[[Projects/Plan#Budget]]`, `[[Plan|the plan]]`, `![[diagram.png]]` — followed by name, counted as
 backlinks, and kept naming their document when it is retitled, renamed or moved — or its folder
 moved — through the app, the CLI or MCP, which rewrite them as Obsidian does (on unless the vault
-turned it off in Settings → Vault; the route's answer says `relinked`). A file moved on disk outside
+turned it off in Settings → This vault → Files and images; the route's answer says `relinked`). A file moved on disk outside
 the app takes its links nowhere. Write one when the folder is somebody's Obsidian vault, and a
 `dag:<id>` link when the target may be moved outside the app. A ` ```note ` fence on a board is something else — the tinted text card — and has
 nothing to do with this. A board and a note cannot share a name in one folder; the

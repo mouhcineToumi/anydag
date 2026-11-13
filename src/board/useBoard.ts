@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { CODES } from "../dsl/codes";
 import { concerns, onBoard, onBoards, onFile, onNote, onQuiz, onTable, type BoardChange } from "./events";
 import { GUESSED, guessed, shown, tick } from "./guess";
 import { refresher } from "./refresher";
@@ -45,9 +46,33 @@ interface Write {
   after: Version;
 }
 
+/**
+ * Why a page has no document to draw.
+ *
+ * **The reason is not the message.** `missing` is a 404 (or the change feed watching a file go),
+ * `unreachable` is a `fetch` that rejected with no answer, and `unreadable` is every other answer or
+ * failure — a 5xx, an error body, or text that did not become the kind's document. The page draws a
+ * different sentence and a different set of actions for each (`src/ui/FileProblem.tsx`), and the raw
+ * message and code stay under a disclosure.
+ */
+export interface LoadProblem {
+  reason: "missing" | "unreachable" | "unreadable";
+  /** The server's message or the exception's, for the bug-report disclosure. Never the sentence shown. */
+  message?: string;
+  /** A diagnostic code, where one exists — `EB_UNREADABLE` for a board. */
+  code?: string;
+  /** The file's text, when the bytes arrived and reading them as this kind failed. */
+  text?: string;
+}
+
 export interface BoardHandle {
   board: Board | null;
+  /** The sentence a board page used to draw. Kept for the read-only view's plain `Missing` card. */
   error: string | null;
+  /** Why the board could not be loaded, for a page that offers what to do about it. */
+  problem: LoadProblem | null;
+  /** Ask for the board again — the unreachable state's *Try again*. */
+  reload(): void;
   /** Change items. Resolves to what was written, or `null` when the edit could not be applied. */
   patch(ops: PatchOp[]): Promise<Write | null>;
   /** Replace the whole file — the undo path. Same contract as `patch`. */
@@ -63,46 +88,86 @@ export interface BoardHandle {
 
 export function useBoard(name: string | null): BoardHandle {
   const [board, setBoard] = useState<Board | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [docId, setDocId] = useState<string | null>(null);
+  /* A version of the load, so *Try again* asks the same question again rather than waiting for a
+     change on the feed that a dead server will never send. */
+  const [attempt, setAttempt] = useState(0);
   /* A ref, not state: a write must read the version as of the moment it is called, and a value
      captured in a render closure is one HMR push out of date exactly when it matters. */
   const held = useRef<Version | null>(null);
 
   const adopt = useCallback((boardName: string, v: Version) => {
-    held.current = v;
-    setBoard(parseBoard(boardName, v.text));
+    try {
+      const parsed = parseBoard(boardName, v.text);
+      held.current = v;
+      setBoard(parsed);
+      setProblem(null);
+    } catch (e) {
+      /* The bytes arrived and the board could not become one: unreadable, and *Open as text* has
+         something to show. A defect in the parser must not be reported as a dead server. */
+      held.current = v;
+      setBoard(null);
+      setProblem({
+        reason: "unreadable",
+        message: e instanceof Error ? e.message : String(e),
+        code: CODES.EB_UNREADABLE,
+        text: v.text,
+      });
+    }
   }, []);
 
   useEffect(() => {
     setDocId(null);
     if (!name) {
       setBoard(null);
+      setProblem(null);
       held.current = null;
       return;
     }
     let live = true;
-    setError(null);
+    setProblem(null);
 
     /* Opening is the one read a prefetch may answer; the feed's refetch below never is. */
     openDoc("board", name)
       .then(async (r) => {
-        const data = (await r.json()) as { text?: string; base?: string; error?: string; id?: string };
+        let data: { text?: string; base?: string; error?: string; id?: string };
+        try {
+          data = (await r.json()) as typeof data;
+        } catch (e) {
+          if (live)
+            setProblem({
+              reason: "unreadable",
+              message: e instanceof Error ? e.message : String(e),
+              code: CODES.EB_UNREADABLE,
+            });
+          return;
+        }
         if (!live) return;
         setDocId(data.id ?? null);
         if (!r.ok) {
-          setError(data.error ?? `could not load \`${name}\``);
+          /* A 404 is the page's one honest "there is no such file"; every other answer is the
+             server failing to read it. `!r.ok` without a 404 used to be drawn as the same
+             `EB_UNREADABLE` card as a dead server, which is how a network error and a missing file
+             came to say the same thing. */
+          setProblem({
+            reason: r.status === 404 ? "missing" : "unreadable",
+            message: data.error ?? `the server answered ${r.status}`,
+            ...(r.status === 404 ? {} : { code: CODES.EB_UNREADABLE }),
+          });
           setBoard(null);
           return;
         }
         adopt(name, { text: data.text ?? "", base: data.base ?? "" });
       })
-      .catch((e: Error) => live && setError(e.message));
+      .catch((e: Error) =>
+        live ? setProblem({ reason: "unreachable", message: e.message, code: CODES.EB_UNREADABLE }) : undefined,
+      );
 
     return () => {
       live = false;
     };
-  }, [name, adopt]);
+  }, [name, adopt, attempt]);
 
   useEffect(() => {
     if (!name) return;
@@ -110,7 +175,7 @@ export function useBoard(name: string | null): BoardHandle {
     const off = onBoard((change) => {
       if (!concerns(change, name)) return;
       if (change.sha1 === null) {
-        setError(`\`${name}\` was deleted`);
+        setProblem({ reason: "missing", message: `\`${name}\` was deleted` });
         held.current = null;
         return;
       }
@@ -125,7 +190,7 @@ export function useBoard(name: string | null): BoardHandle {
         .then(async (r) => {
           const data = (await r.json()) as { text?: string; base?: string };
           if (!live || !r.ok) return;
-          setError(null);
+          setProblem(null);
           adopt(name, { text: data.text ?? "", base: data.base ?? "" });
         })
         .catch(() => undefined);
@@ -200,8 +265,18 @@ export function useBoard(name: string | null): BoardHandle {
   );
   const put = useCallback((text: string): Promise<Write | null> => write("put", { text }, false), [write]);
   const current = useCallback(() => held.current, []);
+  const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { board, error, patch, put, current, docId };
+  return {
+    board,
+    error: problem ? (problem.message ?? "the file could not be loaded") : null,
+    problem,
+    reload,
+    patch,
+    put,
+    current,
+    docId,
+  };
 }
 
 /** What the list draws: every board, every note, and every folder — the empty ones included. */
@@ -365,11 +440,30 @@ function keepTree(who: string, tree: BoardTree): void {
 }
 
 /**
+ * The listing, and how the last ask for it went. `failed` is a third state beside the tree's own
+ * *loaded* and *empty*: the server could not be asked, so what is drawn is either a list from before
+ * or nothing at all — never "Nothing here yet".
+ */
+export interface BoardList {
+  tree: BoardTree;
+  /** The last ask for the listing did not answer — a 500, or no server at all. */
+  failed: boolean;
+  /** Ask again now, without waiting for the retry timer: the failed state's *Try again*. */
+  retry(): void;
+}
+
+/**
  * Every file and folder in this tab's workspace, kept in step with the change feed. `who` is the
  * signed-in account's uid: what a kept list must have been fetched for to be drawn.
  */
-export function useBoardList(who: string | null = null): BoardTree {
+export function useBoardList(who: string | null = null): BoardList {
   const [tree, setTree] = useState<BoardTree>(() => keptTree(who) ?? NO_BOARDS);
+  /* Whether the most recent ask did not answer. Cleared by the first answer that does, so a retry
+     that succeeds takes the message away with the tree it brought back. */
+  const [failed, setFailed] = useState(false);
+  /* The live `load`, so *Try again* reaches the `refresher` this effect made rather than starting a
+     second one. A ref because the effect runs once and the button outlives nothing. */
+  const askNow = useRef<() => void>(() => undefined);
   const held = useRef(tree);
   held.current = tree;
   /* When the list held was asked for, on `guess.ts`'s clock, and a count that moves whenever a guess
@@ -411,16 +505,30 @@ export function useBoardList(who: string | null = null): BoardTree {
        the next change, which after the Assistant's last write never came (#123). */
     const lister = refresher(async () => {
       const asked = tick();
-      const r = await fetch("/__board/list");
-      if (!r.ok) return false;
-      const d = (await r.json()) as BoardTree;
+      let d: BoardTree;
+      try {
+        const r = await fetch("/__board/list");
+        if (!r.ok) {
+          if (live) setFailed(true);
+          return false;
+        }
+        d = (await r.json()) as BoardTree;
+      } catch {
+        /* A server that is not there rejects rather than answering; both are the same to a person
+           waiting for rows, and both are retried by the refresher under this. Only the ask is
+           guarded, so a bug in `treeOf` is not worded as a dead server. */
+        if (live) setFailed(true);
+        return false;
+      }
       if (!live) return true;
       setTree(treeOf(d, true));
       setStamp(asked);
       shown(asked);
+      setFailed(false);
       return true;
     });
     const load = (): void => void lister.ask();
+    askNow.current = load;
     load();
     /* A file appearing or going away is a change to the list, and so is one whose title moved
  — a title is in the text, so an agent's edit or the sidebar's rename changes what a
@@ -497,7 +605,9 @@ export function useBoardList(who: string | null = null): BoardTree {
     };
   }, []);
   /* `guesses` is not read: it is what makes a guess made or let go redraw the list. */
-  return useMemo(() => guessed(tree, stamp), [tree, stamp, guesses]);
+  const drawn = useMemo(() => guessed(tree, stamp), [tree, stamp, guesses]);
+  const retry = useCallback(() => askNow.current(), []);
+  return useMemo(() => ({ tree: drawn, failed, retry }), [drawn, failed, retry]);
 }
 
 /**
@@ -619,6 +729,9 @@ const newBoardText = (title: string): string =>
  */
 export { UNTITLED };
 
+/** A title as a frontmatter scalar: *Untitled* plain, anything else quoted for YAML. */
+const titleScalar = (title: string): string => (title === UNTITLED ? UNTITLED : JSON.stringify(title));
+
 /**
  * What a board made from the sidebar starts as: **titled `Untitled`, and empty.**
  *
@@ -627,18 +740,22 @@ export { UNTITLED };
  * which the page then drew at 205%, the fit of one small card, and which the first thing anybody did
  * was delete. The page says it now, in a card that is not in the file (`EmptyBoard`); an
  * empty page is ready the moment it is parsed, so nothing waits on an item that is not there.
+ *
+ * A title is passed by the search, which makes what somebody typed: the server files the text
+ * under that title, the way `/create` files every text that carries one.
  */
-export const blankBoardText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
+export const blankBoardText = (title: string = UNTITLED): string => `---\ntitle: ${titleScalar(title)}\n---\n`;
 
 /** What a note made from the sidebar starts as: its title, and an empty page under it. */
-export const blankNoteText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
+export const blankNoteText = (title: string = UNTITLED): string => `---\ntitle: ${titleScalar(title)}\n---\n`;
 
 /**
  * What a task made from the sidebar or the Tasks page starts as: a note, titled *Untitled*
  * like any other, with a status — which is the whole of what makes it a task. A column's own `+`
  * starts it in that column.
  */
-export const blankTaskText = (status: TaskStatus = "todo"): string => `---\ntitle: ${UNTITLED}\nstatus: ${status}\n---\n`;
+export const blankTaskText = (status: TaskStatus = "todo", title: string = UNTITLED): string =>
+  `---\ntitle: ${titleScalar(title)}\nstatus: ${status}\n---\n`;
 
 /**
  * What an event made from the sidebar or the calendar starts as: a note titled as asked —
@@ -647,7 +764,7 @@ export const blankTaskText = (status: TaskStatus = "todo"): string => `---\ntitl
  * is all day.
  */
 export const blankEventText = (start: string, end?: string, title: string = UNTITLED): string =>
-  `---\ntitle: ${title === UNTITLED ? UNTITLED : JSON.stringify(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
+  `---\ntitle: ${titleScalar(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
 
 export const createBoard = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? newBoardText(name) });
@@ -684,7 +801,7 @@ export const createNote = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? newNoteText(name), kind: "note" });
 
 /** What a quiz made from the sidebar or the Quizzes page starts as: a title and no questions yet. */
-export const blankQuizText = (): string => `---\ntitle: ${UNTITLED}\n---\n`;
+export const blankQuizText = (title: string = UNTITLED): string => `---\ntitle: ${titleScalar(title)}\n---\n`;
 
 export const createQuiz = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? blankQuizText(), kind: "quiz" });
@@ -694,7 +811,7 @@ export const createQuiz = async (name: string, text?: string): Promise<Made> =>
  * columns and three empty rows — somewhere to click and type. `src/table/write.ts` says so, where
  * every other writer of the format is.
  */
-export const blankTableText = (): string => blankTable(UNTITLED);
+export const blankTableText = (title: string = UNTITLED): string => blankTable(titleScalar(title));
 
 const createTable = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? blankTableText(), kind: "table" });
