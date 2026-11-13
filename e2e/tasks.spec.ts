@@ -202,7 +202,7 @@ test("the New task row is one control: it focuses the box, Enter makes the task,
   expect(fs.existsSync(path.join(BOARDS, `${escaped}.md`))).toBe(false);
 });
 
-test("a refused create says why and keeps the title: the lock's notice and the server's own words", async ({ page }) => {
+test("a refused create keeps the title, and the lock's pill is what says why", async ({ page }) => {
   const anchor = write("anchor", "Something to wait for", ["status: todo"]);
   const leaf = `locked-${Date.now()}`;
   const file = path.join(BOARDS, `${leaf}.md`);
@@ -212,17 +212,16 @@ test("a refused create says why and keeps the title: the lock's notice and the s
   await box.fill(leaf);
   await box.press("Enter");
 
-  /* The existing lock notice, with its Unlock, is what a locked create says. */
-  const notice = page.locator("[data-dag-readonly-notice]");
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "refused");
-  await expect(notice).toContainText("Read only");
-  await expect(notice.locator("[data-dag-readonly-unlock]")).toBeVisible();
+  /* The top bar's pill shakes — its Unlock is beside it — and no second notice opens. */
+  const pill = page.locator("[data-dag-readonly-pill]");
+  await expect(pill).toHaveAttribute("data-dag-readonly-shake", "");
+  await expect(page.locator("[data-dag-readonly-unlock]")).toBeVisible();
   await expect(box).toHaveValue(leaf);
   expect(fs.existsSync(file)).toBe(false);
 
-  /* Unlocking from the notice makes the title that was kept. */
-  await notice.locator("[data-dag-readonly-unlock]").click();
-  await expect(notice).toHaveAttribute("data-dag-readonly-notice", "unlocked");
+  /* Unlocking from the pill makes the title that was kept. */
+  await page.locator("[data-dag-readonly-unlock]").click();
+  await expect(page.locator("[data-dag-readonly]")).toHaveCount(0);
   made.push(file);
   await box.focus();
   await box.press("Enter");
