@@ -106,7 +106,10 @@ on, and `scripts/check-skill.mjs` tolerates those names in a table that is drawn
 A **vault** is a folder — Obsidian's word and Obsidian's model. The sidebar's first row
 names the open one and opens the switcher: the recent vaults, *Open folder…*, *Create vault* and
 *Close vault*. Settings → This vault → General says where it is and closes it; its attachments
-folder is on Files and images.
+folder is on Files and images. The switcher draws each vault as a two-letter monogram on a tint of a
+hue hashed from its id, with its name above the shortened path — so *vault* and *vault-two* are not
+the same V, and a screen reader hears the name rather than the home directory first. *Close vault*
+says which one it closes.
 
 The first screen before there is a vault at all is `src/ui/Welcome.tsx`'s `NoVault`:
 the recent list, *Open folder…* and *Create vault*, each opening a form that names itself —
