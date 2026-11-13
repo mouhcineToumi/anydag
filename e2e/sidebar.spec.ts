@@ -841,9 +841,10 @@ test.describe("the tree's empty space", () => {
     await expect(menu.locator("[data-dag-sidebar-menu-locked]")).toHaveText("Read only: unlock to make anything.");
 
     /* The press is kept — `aria-disabled`, never the attribute that deadens a button — so the
-     notice answers it. Playwright refuses an `aria-disabled` target of its own accord, hence `force`. */
+     top bar's pill shakes. Playwright refuses an `aria-disabled` target of its own accord, hence
+     `force`. */
     await menu.locator('[data-dag-sidebar-new-kind="note"]').click({ force: true });
-    await expect(page.locator("[data-dag-readonly-notice]")).toHaveAttribute("data-dag-readonly-notice", "refused");
+    await expect(page.locator("[data-dag-readonly-pill]")).toHaveAttribute("data-dag-readonly-shake", "");
     await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(null);
     await page.waitForTimeout(200);
     expect(topNotes()).toBe(was);

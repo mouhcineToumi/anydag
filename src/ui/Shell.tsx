@@ -60,7 +60,7 @@ import { openVault, transferFile, transferFolder, vaultsNow } from "@/vault/api"
 import { GONE, switchVault } from "@/vault/current";
 
 import { isLocked, refuseLocked } from "@/settings/lock";
-import { LockNotice, useLockKey, useLockedRoot } from "./Lock";
+import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
@@ -962,7 +962,6 @@ export function Shell({
             onClose={() => setTrashed(null)}
           />
         ) : null}
-        <LockNotice />
         {cloud ? <TelemetryPrompt /> : null}
       </SidebarContext.Provider>
     </div>

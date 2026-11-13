@@ -4,6 +4,7 @@ import {
   Keyboard,
   LayoutGrid,
   LibraryBig,
+  Lock,
   MoreHorizontal,
   MousePointer2,
   PackagePlus,
@@ -17,6 +18,7 @@ import {
 
 import type { Tool } from "@/canvas/Viewport";
 import { chordFor, type Command } from "@/edit/bindings";
+import { LOCK_KEYS, lockedAffordance, refuseLocked, setLocked } from "@/settings/lock";
 import { Tooltip } from "@/ui/Tooltip";
 
 /**
@@ -82,17 +84,22 @@ export interface DockActions {
 }
 
 /**
- * `edit` is absent on a board that cannot be written, and then **the dock draws nothing**.
+ * `edit` is absent only where there is nothing to edit at all: a snapshot draws no dock.
  *
- * It used to draw the `⋯` alone, because Settings lived there and had to be
- * reachable on the one board you cannot fix by editing it. Both moved to the sidebar's
- * foot — the dock is *this board* and the sidebar is *the app* — so on a board with
- * nothing to edit the dock has nothing left to offer, and a menu of nothing is not a control.
+ * **A locked board keeps the dock.** Its writing controls wear the shared disabled look while
+ * keeping their press — which shakes the top bar's *Read only* pill — and its *Locked* chip is the
+ * same switch as that pill's Unlock, for a hand already on the board. The select and hand tools
+ * still read. The dock used to disappear whole while locked, which took away a person's tools
+ * without telling them why.
  */
-export function Dock({ edit }: { edit?: DockActions }) {
+export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: boolean }) {
   const [more, setMore] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setMore(false), []);
+  /* The dock's writing controls are wrapped in a drawn `Tooltip`, so they cannot take
+     `lockedAffordance`'s native `title` — it would draw as well (`dock.spec.ts`). */
+  const blocked = locked ? { "aria-disabled": true as const, "data-dag-readonly-blocked": "" as const } : {};
+  const act = (write: () => void) => (locked ? () => refuseLocked() : write);
 
   /*
    * Shut it by pressing somewhere else, or by Escape.
@@ -125,7 +132,22 @@ export function Dock({ edit }: { edit?: DockActions }) {
 
   if (!edit) return null;
   return (
-    <div className="dag-dock" data-dag-dock="" role="toolbar" aria-label="Tools">
+    <div className="dag-dock" data-dag-dock="" role="toolbar" aria-label={locked ? "Tools (read only)" : "Tools"}>
+      {locked ? (
+        <>
+          <button
+            type="button"
+            className="dag-dock__locked"
+            data-dag-dock-locked=""
+            title={`Unlock (${LOCK_KEYS})`}
+            onClick={() => setLocked(false)}
+          >
+            <Lock {...ICON} aria-hidden="true" />
+            <span>Locked</span>
+          </button>
+          <span className="dag-dock__rule" />
+        </>
+      ) : null}
       {edit ? (
         <>
           <div className="dag-dock__group dag-dock__group--tools" role="radiogroup" aria-label="Tool">
@@ -159,7 +181,8 @@ export function Dock({ edit }: { edit?: DockActions }) {
                 role="radio"
                 aria-checked={edit.tool === "pen"}
                 aria-label={`Pen${hint("pen")}`}
-                onClick={() => edit.onTool("pen")}
+                {...blocked}
+                onClick={act(() => edit.onTool("pen"))}
               >
                 <Pencil {...ICON} aria-hidden="true" />
               </button>
@@ -177,7 +200,8 @@ export function Dock({ edit }: { edit?: DockActions }) {
                 className="dag-icon dag-icon--accent"
                 data-dag-dock-prompt=""
                 aria-label={`Prompt card${hint("prompt")}`}
-                onClick={edit.onPrompt}
+                {...blocked}
+                onClick={act(edit.onPrompt)}
               >
                 <Sparkles {...ICON} aria-hidden="true" />
               </button>
@@ -188,7 +212,8 @@ export function Dock({ edit }: { edit?: DockActions }) {
                 data-dag-library-toggle=""
                 aria-pressed={edit.library}
                 aria-label={`Library${hint("library")}`}
-                onClick={() => edit.onLibrary(!edit.library)}
+                {...blocked}
+                onClick={act(() => edit.onLibrary(!edit.library))}
               >
                 <LibraryBig {...ICON} aria-hidden="true" />
               </button>
@@ -197,7 +222,13 @@ export function Dock({ edit }: { edit?: DockActions }) {
               name="Tidy up: line every item up in rows, columns and grids with even gaps; with a selection, just those"
               shortcut={chordFor("tidy")}
             >
-              <button className="dag-icon" data-dag-tidy="" aria-label={`Tidy up${hint("tidy")}`} onClick={edit.onTidy}>
+              <button
+                className="dag-icon"
+                data-dag-tidy=""
+                aria-label={`Tidy up${hint("tidy")}`}
+                {...blocked}
+                onClick={act(edit.onTidy)}
+              >
                 <LayoutGrid {...ICON} aria-hidden="true" />
               </button>
             </Tooltip>
@@ -210,9 +241,10 @@ export function Dock({ edit }: { edit?: DockActions }) {
               <button
                 className="dag-icon"
                 data-dag-undo=""
-                disabled={!edit.canUndo}
+                disabled={!locked && !edit.canUndo}
                 aria-label="Undo (Ctrl+Z)"
-                onClick={edit.onUndo}
+                {...blocked}
+                onClick={act(edit.onUndo)}
               >
                 <Undo2 {...ICON} aria-hidden="true" />
               </button>
@@ -221,9 +253,10 @@ export function Dock({ edit }: { edit?: DockActions }) {
               <button
                 className="dag-icon"
                 data-dag-redo=""
-                disabled={!edit.canRedo}
+                disabled={!locked && !edit.canRedo}
                 aria-label="Redo (Ctrl+Shift+Z)"
-                onClick={edit.onRedo}
+                {...blocked}
+                onClick={act(edit.onRedo)}
               >
                 <Redo2 {...ICON} aria-hidden="true" />
               </button>
@@ -247,7 +280,7 @@ export function Dock({ edit }: { edit?: DockActions }) {
             <MoreHorizontal {...ICON} aria-hidden="true" />
           </button>
         </Tooltip>
-        {more ? <MoreMenu edit={edit} onDone={close} /> : null}
+        {more ? <MoreMenu edit={edit} locked={locked} onDone={close} /> : null}
       </div>
     </div>
   );
@@ -264,7 +297,11 @@ export function Dock({ edit }: { edit?: DockActions }) {
  * note — which has no dock — could have one too. Import stays: bringing a file *onto this board* is
  * this board's, and the dock is this board.
  */
-function MoreMenu({ edit, onDone }: { edit?: DockActions; onDone(): void }) {
+function MoreMenu({ edit, locked = false, onDone }: { edit?: DockActions; locked?: boolean; onDone(): void }) {
+  /* The menu's writing rows wear the shared lock affordance and keep their press, which shakes the
+     top bar's pill. Shortcuts still reads. */
+  const blocked = lockedAffordance(locked);
+  const act = (write: () => void) => (locked ? () => refuseLocked() : write);
   return (
     <div className="dag-more__menu" data-dag-more-menu="" role="menu">
       {edit ? (
@@ -273,11 +310,12 @@ function MoreMenu({ edit, onDone }: { edit?: DockActions; onDone(): void }) {
             className="dag-more__item"
             data-dag-links=""
             role="menuitem"
+            {...blocked}
             title={`Links: the lines between items on this board, as text${hint("links")}`}
-            onClick={() => {
+            onClick={act(() => {
               onDone();
               edit.onLinks();
-            }}
+            })}
           >
             <Spline {...ICON} aria-hidden="true" />
             <span>Links</span>
@@ -287,11 +325,12 @@ function MoreMenu({ edit, onDone }: { edit?: DockActions; onDone(): void }) {
             className="dag-more__item"
             data-dag-keep=""
             role="menuitem"
+            {...blocked}
             title="Keep as a component: the selection, or the whole page, joins the library for any board (Ctrl+Shift+K)"
-            onClick={() => {
+            onClick={act(() => {
               onDone();
               edit.onKeep();
-            }}
+            })}
           >
             <PackagePlus {...ICON} aria-hidden="true" />
             <span>Keep as component</span>
@@ -302,7 +341,16 @@ function MoreMenu({ edit, onDone }: { edit?: DockActions; onDone(): void }) {
 
           {/* This stays exactly the control it was — a file input, worn by its own row. A menu item that
           only *looked* like one would need a second route to the file dialog. */}
-          <label className="dag-more__item" title="Bring in files: images, text, a whole board">
+          <label
+            className="dag-more__item"
+            title="Bring in files: images, text, a whole board"
+            {...blocked}
+            onClick={(e) => {
+              if (!locked) return;
+              e.preventDefault();
+              refuseLocked();
+            }}
+          >
             <Upload {...ICON} aria-hidden="true" />
             <span>Import…</span>
             <input
@@ -310,6 +358,7 @@ function MoreMenu({ edit, onDone }: { edit?: DockActions; onDone(): void }) {
               data-dag-import=""
               type="file"
               multiple
+              disabled={locked}
               accept="image/*,.md,.txt,.markdown,.csv,.tsv,text/*"
               aria-label="Import files"
               onChange={(e) => {
