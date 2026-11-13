@@ -366,9 +366,11 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
 
       {open ? (
         <div ref={menu} className="dag-sidebar__menu dag-vault__menu" role="menu" aria-label="Vaults" data-dag-vault-menu="">
-          <p className="dag-sidebar__menu-who">Vaults</p>
+          <p className="dag-sidebar__menu-who" aria-hidden="true">
+            Vaults
+          </p>
           {(all ?? [here]).map((v: Vault) => (
-            <div key={v.id} className="dag-vault__line">
+            <div key={v.id} className="dag-vault__line" role="none">
               <button
                 type="button"
                 role="menuitemradio"
@@ -390,6 +392,7 @@ export function VaultSwitcher({ onSettings }: { onSettings(): void }) {
               {!v.open ? (
                 <button
                   type="button"
+                  role="menuitem"
                   className="dag-icon dag-vault__forget"
                   data-dag-vault-forget={v.id}
                   aria-label={`Remove ${v.name} from the list`}

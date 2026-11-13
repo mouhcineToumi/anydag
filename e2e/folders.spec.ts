@@ -475,7 +475,7 @@ test("ctrl and shift pick rows, and the bar moves them into a folder together", 
      then the files by title, "Filed" before "Idea" — and replaces what was picked. */
   await page.locator(folderRow(`${parent}/b`)).click({ modifiers: ["Shift"] });
   await expect(picked(page)).toHaveCount(4);
-  await expect(page.locator(`${folderRow(`${parent}/c`)}[aria-selected="true"]`)).toHaveCount(1);
+  await expect(page.locator(folderRow(`${parent}/c`)).locator("xpath=..")).toHaveAttribute("aria-selected", "true");
   /* Escape lets the selection go. */
   await page.keyboard.press("Escape");
   await expect(picked(page)).toHaveCount(0);

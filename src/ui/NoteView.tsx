@@ -842,6 +842,7 @@ export function NoteView({
                 attach={locked ? refuseFiles : attach}
                 resolve={resolve}
                 scheme={scheme}
+                label={title || name}
                 self={self}
                 editable={!locked && status.kind !== "conflict"}
               />

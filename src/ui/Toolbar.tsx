@@ -162,7 +162,7 @@ export function Toolbar({
           type="button"
           className="dag-toolbar__logo"
           data-dag-toolbar-home=""
-          aria-label="Home"
+          aria-label="AnyDag home"
           title="Home"
           onClick={() => sidebar?.home()}
         >

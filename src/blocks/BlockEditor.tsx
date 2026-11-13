@@ -114,6 +114,8 @@ export interface BlockEditorProps {
   resolve(src: string): string;
   scheme: "light" | "dark";
   editable?: boolean;
+  /** What the editing surface is called: the note's title, so it is not an unnamed field. */
+  label: string;
   /** This note's permanent id, left out of the reference picker: a note does not link to itself. */
   self?: string | null;
   /**
@@ -247,6 +249,19 @@ function markFound(el: Element): void {
 export default function BlockEditor(props: BlockEditorProps) {
   const editor = useNoteEditor(props);
   const { onReady, onChange } = props;
+
+  /*
+   * The contenteditable itself has no name: BlockNote gives it `aria-autocomplete` and
+   * `aria-haspopup` for its suggestion menus, and the note's title is what it edits. The
+   * attribute has to go on ProseMirror's own element, which is not a React child here; setting
+   * it on a wrapper would name the wrapper and leave the field unnamed.
+   */
+  useEffect(() => {
+    const el = editor.domElement;
+    if (!el) return;
+    el.setAttribute("aria-label", props.label);
+    return () => el.removeAttribute("aria-label");
+  }, [editor, props.label]);
 
   /*
    * The pickers read the index at the moment they are asked, and never subscribe to it. Every write
