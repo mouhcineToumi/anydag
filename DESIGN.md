@@ -28,7 +28,7 @@ and repository path named here in backticks has to exist, or the check fails.
   `scripts/check-literals.mjs` counts the rules in `chrome.css` that still type their own
   `font-size`, `border-radius`, `box-shadow`, `z-index` or `transition`, checks the count against
   `scripts/chrome-literals.json`, and fails if any count goes up. When this file was written (#218)
-  the counts were 431, 223, 52, 22 and 20; the JSON has the current ones. **A new rule reads a
+  the counts were 431, 223, 52, 22 and 20; the JSON has the current ones (the font sizes have since moved: what is left types the diagram's own `--dag-type-*`, a `calc` or an `em`, each with a comment). **A new rule reads a
   token.** An old rule that is touched should move onto one, and the commit that moves it lowers
   the count.
 

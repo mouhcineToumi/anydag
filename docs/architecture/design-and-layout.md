@@ -57,6 +57,11 @@ layers and shadows.
 by role: `control` (9) for buttons, fields, rows and tabs, `surface` (12) for cards, menus, popovers
 and docks, `dialog` (16), `pill` (999). What stays literal is a box too small for 9px (a checkbox, a key,
 swatch, inline code, a progress bar), the diagram's selection ring, and the `50%` circles.
+**Type moved last** (#206): every font size reads `--dag-ui-text-*` (11, 12, 13, 14, 16, 20, 26 px; 12.5 became 13,
+11.5 became 12, 10.5 became 11, 15 is 14 or, on a title, 16), a leading that goes with one reads `-leading-*`, and a weight is
+`regular` or `strong` (500 and 700 became 600). `button { font: inherit }` is in `base.css` once. What stays typed is
+not chrome type: the diagram's `--dag-type-*` on the pending, error and broken cards and a card's markdown, the lockup's
+`calc`, an `em`. `e2e/type.spec.ts` reads one size for `.dag-more__item` in three menus.
 Which of these a screen should use for what — colour roles with their measured contrast, the type
 scale, the controls, the layers, focus, motion, icons and the voice — is [`DESIGN.md`](../../DESIGN.md)
 at the root, held to the code by `check:design`.
