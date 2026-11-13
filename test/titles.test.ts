@@ -39,6 +39,14 @@ describe("a document's title", () => {
     expect(splitNote(blankNoteText()).body).toBe("");
     expect(parseBoard("untitled", blankBoardText()).errors).toEqual([]);
   });
+
+  it("a board or a note made from a search carries the words as its title", () => {
+    /* What a miss makes: `/create` files the text under the title, and the row and the link read
+       it back through `titleOf`. The title is quoted when YAML needs it. */
+    expect(titleOf(blankBoardText("API spec"))).toBe("API spec");
+    expect(titleOf(blankNoteText('Q3: "plan"?'))).toBe('Q3: "plan"?');
+    expect(parseBoard("api-spec", blankBoardText("API spec")).errors).toEqual([]);
+  });
 });
 
 /*

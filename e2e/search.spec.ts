@@ -98,6 +98,82 @@ test("one list holds matches from boards and notes, each where the words are", {
   await expect(page.locator(".dag-panel__count")).toContainText("3 in the text");
 });
 
+test("a file that matched by name and in its text is listed once", async ({ page }) => {
+  const spec = `${folder}/api-spec`;
+  fs.writeFileSync(
+    path.join(BOARDS, `${spec}.board.md`),
+    `---
+title: API spec
+---
+
+\`\`\`md {#body x=0 y=0 w=320}
+The API spec lives here.
+\`\`\`
+`,
+  );
+
+  await page.goto(`/?board=${board()}`);
+  await ready(page);
+  await searchFor(page, "API spec");
+
+  /* One row, and it says both things. Its block matches are not a second entry under the words. */
+  const row = page.locator(`[data-dag-board="${spec}"]`);
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("and in the text");
+  await expect(page.locator(`[data-dag-hit="${spec}"]`)).toHaveCount(0);
+});
+
+test("a name that matches nothing is made from the search, in the open folder, and opens", async ({ page }) => {
+  const made = `e2e-made-${id.slice(-8)}`;
+  await page.goto(`/?board=${board()}`);
+  await ready(page);
+  await searchFor(page, made);
+
+  /* What a miss offers, in the order Enter presses: the board first. */
+  const offer = page.locator("[data-dag-hits-new-board]");
+  await expect(offer).toBeVisible();
+  await expect(offer).toContainText(made);
+
+  await page.press(".dag-panel__input", "Enter");
+  await expect(page.locator("[data-dag-boards]")).toHaveCount(0);
+  await expect.poll(() => new URL(page.url()).searchParams.get("board")).toBe(`${folder}/${made}`);
+  await expect(page.locator("[data-dag-empty-board]")).toBeVisible();
+  await expect(page.locator("[data-dag-open-boards]")).toContainText(made);
+  expect(fs.existsSync(path.join(BOARDS, folder, `${made}.board.md`))).toBe(true);
+});
+
+test("the note offer makes a note in the open folder, with the words as its title", async ({ page }) => {
+  const made = `e2e-note-${id.slice(-8)}`;
+  await page.goto(`/?note=${note()}`);
+  await ready(page);
+  await searchFor(page, made);
+
+  await page.locator("[data-dag-hits-new-note]").click();
+  await expect(page.locator("[data-dag-boards]")).toHaveCount(0);
+  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(`${folder}/${made}`);
+  await expect(page.locator(".dag-toolbar__title")).toHaveText(made);
+  /* A note is stored as `.md`; `.note.md` is the other suffix it is read under. */
+  expect(fs.existsSync(path.join(BOARDS, folder, `${made}.md`))).toBe(true);
+});
+
+test("the card is as tall as its results, up to its maximum", async ({ page }) => {
+  await page.goto("/?board=demo");
+  await ready(page);
+  await searchFor(page, "zzz-no-such-board-anywhere");
+
+  const offer = page.locator("[data-dag-hits-new-board]");
+  await expect(offer).toBeVisible();
+  const short = (await page.locator(".dag-browser").boundingBox())!.height;
+
+  /* The whole list: more rows than the card may show, so it stops at its ceiling. */
+  await page.fill(".dag-panel__input", "");
+  await expect(page.locator(".dag-board").first()).toBeVisible();
+  const tall = (await page.locator(".dag-browser").boundingBox())!.height;
+
+  expect(short).toBeLessThan(tall);
+  expect(tall).toBeLessThanOrEqual(561);
+});
+
 test("a board result opens the board centred on the matching item, selected", { tag: "@smoke" }, async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await ready(page);
