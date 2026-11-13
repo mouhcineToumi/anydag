@@ -16,7 +16,7 @@
  *
  * Each page asks {@link useLocked} and draws its read-only half; each place that writes asks
  * {@link isLocked} as well, as a floor under the drawing, and says so with {@link refuseLocked} —
- * which `LockNotice` turns into a word on the screen rather than a press that silently did nothing.
+ * which shakes the top bar's *Read only* pill rather than letting a press do nothing silently.
  */
 
 import { useSyncExternalStore } from "react";
@@ -30,36 +30,12 @@ export const LOCK_CHANGED = "dag:lock";
 /** Dispatched on `window` when something that writes was refused because the app is locked. */
 export const LOCK_REFUSED = "dag:lock-refused";
 
-/** The chord, for the button's tooltip, the notice and the shortcut sheet: Obsidian's ctrl+E is the
-    note editor's inline code, so it is L, for lock. */
+/** The chord, for the pill's Unlock, the dock's Locked chip and the shortcut sheet: Obsidian's
+    ctrl+E is the note editor's inline code, so it is L, for lock. */
 export const LOCK_KEYS = "Ctrl+Shift+L";
 
 /** What a control that writes says while the app is locked, before it is pressed and on hover. */
 export const LOCK_HINT = `Read only — unlock (${LOCK_KEYS})`;
-
-/** What the lock's notice has to say: the switch, a refusal, or the word that unlocking worked. */
-export type LockSaid = "locked" | "unlocked" | "refused";
-
-export function lockNoticeText(said: LockSaid): string {
-  switch (said) {
-    case "unlocked":
-      return "Unlocked: you can edit again.";
-    case "locked":
-      return "Read only: nothing here changes until you unlock.";
-    case "refused":
-      return "Read only: unlock to change this.";
-  }
-}
-
-/**
- * Which lines leave on the notice's timer. *Locked* and *unlocked* are announcements and go; a
- * *refused* line stays until it is dismissed or the app is unlocked, because a press that was
- * stopped is the thing the person is looking for an answer to. The notice handles the timer and the
- * dismiss; this is the rule, kept beside the words.
- */
-export function lockNoticeLeaves(said: LockSaid): boolean {
-  return said !== "refused";
-}
 
 /**
  * What a control that writes wears while the app is locked: `aria-disabled`, the class hook the

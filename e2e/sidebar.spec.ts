@@ -403,18 +403,31 @@ test("its width is dragged, remembered, and put back by a double-click", async (
   await fresh(page);
   const nav = docked(page);
   const grip = page.locator("[data-dag-sidebar-grip]");
+  /* The grip draws the edge it moves on hover, rather than staying a transparent 7px strip. */
+  const edge = () => grip.evaluate((el) => getComputedStyle(el, "::after").backgroundColor);
+  const idle = await edge();
+  await grip.hover();
+  await expect.poll(edge).not.toBe(idle);
   const box = (await grip.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 200);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 80, box.y + 200, { steps: 4 });
   await page.mouse.up();
-  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(328);
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(352);
 
   await page.reload();
   await ready(page);
-  await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(328);
+  await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(352);
 
   await page.locator("[data-dag-sidebar-grip]").dblclick();
+  await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(272);
+});
+
+test("a width saved before the default grew is respected — only the default changed", async ({ page }) => {
+  await fresh(page);
+  await page.evaluate(() => localStorage.setItem("dag:sidebar-w", "248"));
+  await page.reload();
+  await ready(page);
   await expect.poll(async () => Math.round((await docked(page).boundingBox())!.width)).toBe(248);
 });
 
@@ -481,6 +494,51 @@ test("a favourite is kept above the files, opens, follows a rename, and comes ou
 
   await more(`${folder}/other-renamed`, "unfavourite");
   await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(0);
+});
+
+test("the open file's row keeps its actions, and a favourite its star, without a hover", async ({ page }) => {
+  await fresh(page);
+  const more = (name: string) => page.locator(`[data-dag-sidebar-more="${name}"]`);
+  const star = (name: string) => page.locator(`[data-dag-sidebar-star="${name}"]`);
+
+  /* No pointer has crossed the column: the open board's `⋯` is up anyway. */
+  await page.mouse.move(900, 600);
+  await expect(more(board())).toBeVisible();
+  await expect(more(board())).toHaveAttribute("tabindex", "-1");
+
+  /* Another row keeps the hover reveal. */
+  await expect(more(other())).toBeHidden();
+  await expect(async () => {
+    await fileRow(page, other()).scrollIntoViewIfNeeded({ timeout: 1_000 });
+    const box = (await fileRow(page, other()).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(more(other())).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+
+  /* Favourited, the open row also keeps the star that takes it out again. */
+  await clickOnHover(page, `[data-dag-sidebar-file="${board()}"]`, `[data-dag-sidebar-more="${board()}"]`);
+  await page.locator('[data-dag-sidebar-menu-item="favourite"]').click();
+  await expect(star(board())).toBeVisible();
+  await expect(star(board())).toHaveAttribute("tabindex", "-1");
+  await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(1);
+  await star(board()).click();
+  await expect(star(board())).toHaveCount(0);
+  await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(0);
+
+  /* One tab stop for the whole tree, whatever its rows are wearing. */
+  await expect(page.locator('[data-dag-sidebar-row][tabindex="0"]')).toHaveCount(1);
+});
+
+test("a name too long for the column is whole in its tooltip", async ({ page }) => {
+  const long = "A board whose name is much longer than the sidebar is wide";
+  fs.writeFileSync(path.join(BOARDS, `${folder}/long-titled.board.md`), BOARD(long));
+  await fresh(page);
+  const name = fileRow(page, `${folder}/long-titled`).locator(".dag-sidebar__name");
+  await expect(name).toHaveText(long);
+  /* Cut short by the column... */
+  expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  /* ... and whole in the tooltip. The row's own title names the file; this one names what is drawn. */
+  await expect(name).toHaveAttribute("title", long);
 });
 
 test("a file is called its title — Untitled until somebody names it — and its name follows out of sight", async ({ page }) => {
@@ -635,6 +693,68 @@ test("a list not heard yet is said to be loading, and the next page draws the on
 });
 
 /*
+ * The tree's empty slot has three states, and this is the third: a listing that could not be
+ * asked for says so, with the way back, rather than waiting for ever on *Loading your files…*.
+ */
+test("a listing that fails says so at once, and Try again brings the list back", async ({ page }) => {
+  /* The route stays broken until the check lets it answer, so the state the assertion sees is the
+     failure and not a retry that happened to land first. */
+  let broken = true;
+  await page.route("**/__board/list*", async (route) => {
+    if (!broken) return route.continue();
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "The server is not answering." }),
+    });
+  });
+  /* Not `fresh`, which waits for the board: the point is what the column says while the list is
+     failing. The column first, so the two seconds below are about the failure and not about Vite
+     having to compile the page on a cold dev server. */
+  await page.goto(`/?board=${board()}`);
+  await expect(page.locator("[data-dag-sidebar]")).toBeVisible({ timeout: 15_000 });
+  const failed = page.locator("[data-dag-sidebar-failed]");
+  await expect(failed).toBeVisible({ timeout: 2_000 });
+  await expect(failed).toContainText("Can't reach your files");
+  await expect(failed).toContainText("AnyDag's server isn't answering. Nothing you saved is lost.");
+  await expect(page.locator("[data-dag-sidebar-retry]")).toHaveText("Try again");
+  await expect(page.locator("[data-dag-sidebar-loading]")).toHaveCount(0);
+  await expect(page.getByText("Nothing here yet")).toHaveCount(0);
+  await ready(page);
+
+  /* Unrouting and pressing Try again is the way back — and the tree's own retry may get there
+     first, which is the same answer arriving without a reload. */
+  broken = false;
+  await expect(async () => {
+    const again = page.locator("[data-dag-sidebar-retry]");
+    if (await again.count()) await again.click({ timeout: 1_000 });
+    await expect(failed).toHaveCount(0);
+    await expect(fileRow(page, board())).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+});
+
+test("a failure after the list loaded keeps the rows, dimmed", async ({ page }) => {
+  await fresh(page);
+  await expect(fileRow(page, board())).toBeVisible();
+
+  await page.route("**/__board/list*", (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "The server is not answering." }),
+    }),
+  );
+  /* Something changed in the vault, which asks the list again — a folder an agent made, said here
+     as the event that carries it. */
+  await page.evaluate(() => dispatchEvent(new Event("dag:boards")));
+
+  await expect(page.locator("[data-dag-sidebar-failed]")).toBeVisible({ timeout: 2_000 });
+  /* The rows this browser had are still there, and dimmed to say they are the kept list. */
+  await expect(fileRow(page, board())).toBeVisible();
+  await expect(fileRow(page, board()).locator("..")).toHaveCSS("opacity", "0.55");
+});
+
+/*
  * The two checks for the tree's own space run one after the other, never beside each other: both
  * make — or refuse to make — a file **at the top level of the vault**, which every worker's vault is
  * one directory of, and a compare of what is at the top level would read the other's make.
@@ -721,9 +841,10 @@ test.describe("the tree's empty space", () => {
     await expect(menu.locator("[data-dag-sidebar-menu-locked]")).toHaveText("Read only: unlock to make anything.");
 
     /* The press is kept — `aria-disabled`, never the attribute that deadens a button — so the
-     notice answers it. Playwright refuses an `aria-disabled` target of its own accord, hence `force`. */
+     top bar's pill shakes. Playwright refuses an `aria-disabled` target of its own accord, hence
+     `force`. */
     await menu.locator('[data-dag-sidebar-new-kind="note"]').click({ force: true });
-    await expect(page.locator("[data-dag-readonly-notice]")).toHaveAttribute("data-dag-readonly-notice", "refused");
+    await expect(page.locator("[data-dag-readonly-pill]")).toHaveAttribute("data-dag-readonly-shake", "");
     await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(null);
     await page.waitForTimeout(200);
     expect(topNotes()).toBe(was);

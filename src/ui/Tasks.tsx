@@ -331,8 +331,8 @@ export type QuickAddAnswer = { name: string } | { error: string } | { locked: tr
 
 /**
  * One attempt's effect on the box: a success empties it, and a refusal keeps what was typed so it
- * can be tried again. The lock's own notice carries its reason (`LockNotice`), so nothing is
- * repeated here; a server's refusal is said in the box.
+ * can be tried again. The lock's refusal is answered by the top bar's *Read only* pill shaking, so
+ * nothing is repeated here; a server's refusal is said in the box.
  */
 export function afterQuickAdd(state: QuickAddState, answer: QuickAddAnswer): QuickAddState {
   if ("name" in answer) return { title: "", problem: null };
@@ -347,7 +347,7 @@ export function afterQuickAdd(state: QuickAddState, answer: QuickAddAnswer): Qui
  *
  * The whole row is a `<label>`, so the `+` and the space around the box focus it; the placeholder
  * says what Enter does. A create that did not land keeps the title and says why — the server's own
- * words, or the lock's notice with Unlock when the app is read only.
+ * words, or the top bar's *Read only* pill shaking when the app is locked.
  */
 export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: string; locked: boolean }) {
   const [state, setState] = useState<QuickAddState>({ title: "", problem: null });
@@ -373,7 +373,7 @@ export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: s
         className="dag-tasks__add-row"
         data-dag-task-add-row={status}
         /* Read only: the row looks unavailable and says why on hover, but the box still takes a
-           title, and Enter answers with the lock's notice and Unlock rather than nothing. */
+           title, and Enter shakes the top bar's pill rather than doing nothing. */
         data-dag-readonly-blocked={locked ? "" : undefined}
         title={locked ? LOCK_HINT : undefined}
       >

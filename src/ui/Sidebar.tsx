@@ -52,6 +52,7 @@ import {
   StarOff,
   Table2,
   Trash2,
+  TriangleAlert,
   Upload,
   Workflow,
   X,
@@ -191,7 +192,7 @@ function hintOf(
 
 /** The width somebody gets before they drag it, and the two ends of the drag. A drag is also held
     to half the window (`dragCap`), as the CSS holds it. */
-export const SIDEBAR_W = 248;
+export const SIDEBAR_W = 272;
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 640;
 
@@ -375,6 +376,8 @@ export function Sidebar({
   attachments = EMPTY,
   sizes = NO_SIZES,
   loading = false,
+  failed = false,
+  onRetry,
   board,
   note,
   quiz = null,
@@ -438,6 +441,13 @@ export function Sidebar({
    * list on its way, never a vault with nothing in it, so it is not said to be one.
    */
   loading?: boolean;
+  /**
+   * The last ask for the list did not answer — a 500 or no server. A third state beside loading
+   * and empty, and one that stays over the rows this browser already had, so they do not vanish.
+   */
+  failed?: boolean;
+  /** Ask for the list again now: the failed state's *Try again*. */
+  onRetry?(): void;
   board: string | null;
   note: string | null;
   quiz?: string | null;
@@ -1338,7 +1348,9 @@ export function Sidebar({
                     {...pressed(ahead(e.kind, e.name, current))}
                   >
                     <FileIcon entry={e} task={tasks[e.name]} project={projects[e.name]} event={events[e.name]} />
-                    <span className="dag-sidebar__name">{labelOf(e)}</span>
+                    <span className="dag-sidebar__name" title={labelOf(e)}>
+                      {labelOf(e)}
+                    </span>
                   </button>
                   <span className="dag-sidebar__tools">
                     <button
@@ -1401,6 +1413,9 @@ export function Sidebar({
         ref={listRef}
         onKeyDown={onTreeKey}
         data-dag-sidebar-drop=""
+        /* The rows are from an answer before the one that failed; dimmed so they read as the list
+           this browser kept rather than as a list the server just confirmed. */
+        data-dag-sidebar-stale={failed && lines.length > 0 ? "" : undefined}
         /* Files dragged in from the computer: onto a folder, into it; onto a file, into the
            folder that file is in; onto the tree's own space, the top level — the same one
            `closest()` a row dragged inside the column reads. Native drag events, because these files
@@ -1436,11 +1451,23 @@ export function Sidebar({
           setMaking({ x: e.clientX, y: e.clientY, below: e.clientY, left: e.clientX, here: "" });
         }}
       >
-        {lines.length === 0 && loading ? (
+        {failed ? (
+          /* The third state of the tree's empty slot. Not *Loading your files…* for ever: a server
+             that answers 500 or does not answer at all says so, and the way back is one press. */
+          <div className="dag-sidebar__failed" role="alert" data-dag-sidebar-failed="">
+            <TriangleAlert {...ICON} className="dag-sidebar__failed-mark" aria-hidden="true" />
+            <p className="dag-sidebar__failed-title">Can't reach your files</p>
+            <p className="dag-sidebar__failed-line">AnyDag's server isn't answering. Nothing you saved is lost.</p>
+            <button type="button" className="dag-sidebar__retry" data-dag-sidebar-retry="" onClick={() => onRetry?.()}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {lines.length === 0 && loading && !failed ? (
           <p className="dag-sidebar__none" role="status" data-dag-sidebar-loading="">
             Loading your files…
           </p>
-        ) : lines.length === 0 ? (
+        ) : lines.length === 0 && !failed ? (
           <p className="dag-sidebar__none">Nothing here yet. Make a board, a note, a quiz or a table above.</p>
         ) : null}
         {/* Only treeitems and their groups live in the tree. A status, an empty line or a
@@ -1622,6 +1649,21 @@ export function Sidebar({
                     <Plus {...SMALL} aria-hidden="true" />
                   </button>
                 ) : null}
+                {line.type === "file" && isFavourite(line.entry) ? (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="dag-sidebar__tool"
+                    data-dag-sidebar-star={where}
+                    aria-label={`Remove ${where} from favourites`}
+                    title="A favourite: click to remove it"
+                    onClick={() => files.favourite(line.entry.kind, where, false)}
+                  >
+                    {/* Filled: it says what the file is, where the favourites list's crossed-out star
+                        says what the click does. */}
+                    <Star {...SMALL} fill="currentColor" aria-hidden="true" />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   tabIndex={-1}
@@ -1670,7 +1712,9 @@ export function Sidebar({
                     ) : (
                       <FolderIcon {...SMALL} aria-hidden="true" />
                     )}
-                    <span className="dag-sidebar__name">{line.name}</span>
+                    <span className="dag-sidebar__name" title={line.path}>
+                      {line.name}
+                    </span>
                   </button>
                   {tools}
                   {line.open && line.empty ? (
@@ -1710,7 +1754,9 @@ export function Sidebar({
                   <span className="dag-sidebar__indent" aria-hidden="true" />
                   <span className="dag-sidebar__chev" aria-hidden="true" />
                   <FileIcon entry={line.entry} task={tasks[where]} project={projects[where]} event={events[where]} />
-                  <span className="dag-sidebar__name">{name}</span>
+                  <span className="dag-sidebar__name" title={name}>
+                    {name}
+                  </span>
                 </button>
                 {tools}
               </div>
@@ -2422,53 +2468,53 @@ function SelectionBar({
   return (
     <div className="dag-sidebar__bulk" role="toolbar" aria-label={`${count} selected`} data-dag-sidebar-bulk={count}>
       <span className="dag-sidebar__bulk-count">{count} selected</span>
+      <button
+        type="button"
+        className="dag-sidebar__tool"
+        data-dag-sidebar-bulk-act="clear"
+        aria-label="Clear the selection"
+        title="Clear the selection (Escape)"
+        onClick={onClear}
+      >
+        <X {...SMALL} aria-hidden="true" />
+      </button>
       <span className="dag-sidebar__bulk-acts">
         {locked ? null : (
           <button
             type="button"
-            className="dag-sidebar__tool"
+            className="dag-sidebar__tool dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="move"
-            aria-label={`Move ${count} to a folder`}
             title="Move to…"
             onClick={() => onAsk("move")}
           >
             <FolderInput {...SMALL} aria-hidden="true" />
+            <span>Move</span>
           </button>
         )}
         {vaults.length && !locked ? (
           <button
             type="button"
-            className="dag-sidebar__tool"
+            className="dag-sidebar__tool dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="transfer"
-            aria-label={`Move ${count} to another vault`}
             title="Move to vault…"
             onClick={() => onAsk("transfer")}
           >
             <ArrowRightLeft {...SMALL} aria-hidden="true" />
+            <span>To vault</span>
           </button>
         ) : null}
         {locked ? null : (
           <button
             type="button"
-            className="dag-sidebar__tool dag-sidebar__tool--danger"
+            className="dag-sidebar__tool dag-sidebar__tool--danger dag-sidebar__bulk-act"
             data-dag-sidebar-bulk-act="delete"
-            aria-label={`Delete ${count}`}
             title="Delete — they go to the trash"
             onClick={() => onAsk("delete")}
           >
             <Trash2 {...SMALL} aria-hidden="true" />
+            <span>Trash</span>
           </button>
         )}
-        <button
-          type="button"
-          className="dag-sidebar__tool"
-          data-dag-sidebar-bulk-act="clear"
-          aria-label="Clear the selection"
-          title="Clear the selection (Escape)"
-          onClick={onClear}
-        >
-          <X {...SMALL} aria-hidden="true" />
-        </button>
       </span>
     </div>
   );

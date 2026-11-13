@@ -7,8 +7,6 @@ import {
   LOCK_KEYS,
   LOCK_REFUSED,
   isLocked,
-  lockNoticeLeaves,
-  lockNoticeText,
   lockedAffordance,
   mayEdit,
   refuseLocked,
@@ -99,17 +97,5 @@ describe("the lock", () => {
       "data-dag-readonly-blocked": "",
       title: "Read only — unlock (Ctrl+Shift+L)",
     });
-  });
-
-  it("says why a write was refused, and that unlocking worked, with the wording the notice uses", () => {
-    expect(lockNoticeText("refused")).toBe("Read only: unlock to change this.");
-    expect(lockNoticeText("locked")).toMatch(/^Read only:/);
-    expect(lockNoticeText("unlocked")).toMatch(/^Unlocked:/);
-  });
-
-  it("lets the two announcements leave on the timer, and holds a refusal until it is dismissed", () => {
-    expect(lockNoticeLeaves("locked")).toBe(true);
-    expect(lockNoticeLeaves("unlocked")).toBe(true);
-    expect(lockNoticeLeaves("refused")).toBe(false);
   });
 });

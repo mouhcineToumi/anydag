@@ -660,7 +660,7 @@
      a quarter of the window, and never under 232px — which at 929px is exactly 232, the width a
      laptop window has room for. A width somebody dragged is theirs up to half the window:
      under the quarter rule the grip on that same window moved nothing at all. */
-  width: min(var(--sidebar-w, 248px), var(--sidebar-cap));
+  width: min(var(--sidebar-w, 272px), var(--sidebar-cap));
   --sidebar-cap: max(232px, 25vw);
   height: 100%;
   min-height: 0;
@@ -817,10 +817,12 @@
 .dag-sidebar__favs { flex: none; max-height: 30%; overflow-y: auto; padding: 0 8px; scrollbar-width: thin; }
 
 /*
- * A row's own tools — the folder's `+` and everybody's `⋯` — on the hovered, focused or open row,
- * over the end of the name on the row's own ground so the ellipsis reads as the name running under
- * them. `tabIndex=-1` on each: the keyboard reaches the same menu with `shift+F10`, and a Tab stop
- * per row per tool would make the tree a hundred stops long.
+ * A row's own tools — the folder's `+`, a favourite's star and everybody's `⋯` — on the hovered,
+ * focused or open row, over the end of the name on the row's own ground so the ellipsis reads as
+ * the name running under them. The open row is the one that keeps them up without a pointer, so
+ * the first thing somebody sees is a file with actions. `tabIndex=-1` on each: the keyboard
+ * reaches the same menu with `shift+F10`, and a Tab stop per row per tool would make the tree a
+ * hundred stops long.
  */
 .dag-sidebar__tools {
   position: absolute;
@@ -848,7 +850,9 @@
   cursor: pointer;
 }
 .dag-sidebar__tool:hover { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
-.dag-sidebar__tool--danger:hover { color: var(--dag-color-danger); }
+.dag-sidebar__tool--danger { color: var(--dag-color-dangerText); }
+/* The hover keeps `dangerText`: `danger` on `dangerSoft` is under 4.5:1, and this one carries a word. */
+.dag-sidebar__tool--danger:hover { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
 .dag-sidebar__tool:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 /* A question asked in the row — a name, a folder to move to, whether to delete — never through a
@@ -913,6 +917,7 @@
 .dag-sidebar__bulk {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-height: 34px;
@@ -925,8 +930,19 @@
 }
 .dag-sidebar__bulk > .dag-sidebar__move { margin-left: -6px; }
 .dag-sidebar__bulk-count { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--dag-color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dag-sidebar__bulk-acts { display: flex; gap: 2px; }
+.dag-sidebar__bulk-acts { display: flex; flex-wrap: wrap; gap: 2px; }
 .dag-sidebar__bulk-head { margin: 2px 8px 4px; font-size: 12px; font-weight: 600; color: var(--dag-color-slate); }
+/* An action says its name beside its mark, so what it does is read rather than hovered for; the
+   bar wraps in a narrow column, which puts them on a line of their own under the count. */
+.dag-sidebar__bulk-act {
+  width: auto;
+  gap: 4px;
+  padding: 0 6px;
+  font-family: var(--dag-font-sans);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.dag-sidebar__bulk-act > span { line-height: 1; }
 
 /*
  * A row lets the list scroll under a finger: a swipe is a scroll, and only a row held
@@ -1009,8 +1025,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
    Ink rather than accent text, because accent on its own tint is the pair DESIGN.md forbids. */
 .dag-sidebar__row--on { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); font-weight: 600; }
 .dag-sidebar__row--on:hover { background: var(--dag-color-accentSoft); }
-/* The open file's ⋯ is always shown, so its title ends in an ellipsis before it rather than under it. */
+/* The open file's ⋯ is always shown, so its title ends in an ellipsis before it rather than under it.
+   A favourite's star sits beside it, and the open row keeps room for both. */
 .dag-sidebar__line--on > .dag-sidebar__row { padding-right: 32px; }
+.dag-sidebar__line--on:has(> .dag-sidebar__tools > [data-dag-sidebar-star]) > .dag-sidebar__row { padding-right: 60px; }
 /* The vault's attachments folder: last, and a step quieter, since nobody files work there. */
 .dag-sidebar__row[data-dag-sidebar-store] { color: var(--dag-color-slate); }
 /* One guide rule per level, under the middle of the chevron above it, the way the search draws its
@@ -1051,6 +1069,48 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-top: 1px solid var(--dag-color-outline);
   color: var(--dag-color-ink);
 }
+/*
+ * The list could not be asked for. A card rather than a line because it is the tree's whole state,
+ * and the rows this browser already had stay below it dimmed — a server that went quiet is not a
+ * reason to take the files away too. Names grepped first: `dag-sidebar__failed*`,
+ * `dag-sidebar__retry`, `data-dag-sidebar-failed` and `data-dag-sidebar-stale` were nobody's.
+ */
+.dag-sidebar__failed {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
+  margin: 4px 0 10px;
+  padding: 10px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-warningSoft);
+  border: 1px solid var(--dag-color-warning);
+  border-radius: var(--dag-metric-radius-chip);
+}
+.dag-sidebar__failed-mark {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  margin-top: 1px;
+  color: var(--dag-color-warningText);
+}
+.dag-sidebar__failed-title { grid-column: 2; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; }
+.dag-sidebar__failed-line { grid-column: 2; margin: 0; font-size: 12px; line-height: 1.4; color: var(--dag-color-slate); }
+.dag-sidebar__retry {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-small);
+  cursor: pointer;
+}
+.dag-sidebar__retry:hover { background: var(--dag-color-paper200); }
+.dag-sidebar__retry:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__tree[data-dag-sidebar-stale] > [role="tree"] > .dag-sidebar__line { opacity: 0.55; }
 
 .dag-sidebar__account-wrap { position: relative; margin-top: 4px; }
 .dag-sidebar__account {
@@ -1179,7 +1239,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-vault__button:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-vault__name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-vault__chev { flex: none; color: var(--dag-color-slate); }
-/* A square where the account's avatar is round: a workspace is a place, the account a person. */
+/* A square where the account's avatar is round: a workspace is a place, the account a person.
+   The tile's two colours are the mark's own custom properties, bound by `Vaults.tsx` from the hue
+   its id hashes to; ink on a tint keeps the letters legible in every theme. */
 .dag-vault__mark {
   flex: none;
   display: inline-flex;
@@ -1188,29 +1250,38 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   width: 22px;
   height: 22px;
   border-radius: var(--dag-metric-radius-chip);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--dag-color-ink);
-  background: var(--dag-color-accentSoft);
+  background: var(--vault-t);
+  box-shadow: inset 0 0 0 1px var(--vault-h);
 }
 .dag-vault__menu { top: calc(100% + 4px); bottom: auto; left: 8px; right: 8px; z-index: 30; max-height: 70vh; overflow-y: auto; }
 /* Two classes deep: a menu item's every `span` is `flex: 1`, and the mark is a span. */
 .dag-vault__item > .dag-vault__mark { flex: none; }
+.dag-vault__item { height: auto; min-height: 38px; padding: 4px 8px; }
 .dag-vault__item[aria-checked="true"] { color: var(--dag-color-ink); font-weight: 600; }
+.dag-vault__item[aria-checked="true"] .dag-vault__title { font-weight: 600; }
 .dag-vault__item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-vault__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dag-vault__item .dag-vault__text > span { flex: none; }
+.dag-vault__title { font-size: 13px; font-weight: 500; color: var(--dag-color-ink); }
 .dag-vault__tick { flex: none; color: var(--dag-color-accent); }
 .dag-vault__rule { margin: 4px 0; border: none; border-top: 1px solid var(--dag-color-outlineSoft); }
 .dag-vault__namebox { padding: 2px 0; }
 .dag-vault__namebox .dag-sidebar__name-input { height: 30px; font-family: var(--dag-font-sans); font-size: 13px; }
-.dag-vault__problem { margin: 4px 8px; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); }
+.dag-vault__problem { margin: 4px 8px; font-size: 12px; line-height: 1.4; color: var(--dag-color-dangerText); overflow-wrap: anywhere; }
+.dag-vault__problem code { font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-ink); }
 .dag-vault__line { display: flex; align-items: center; gap: 2px; }
 .dag-vault__line > .dag-vault__item { flex: 1; min-width: 0; }
 .dag-vault__item:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-vault__item:disabled .dag-vault__title,
+.dag-vault__item:disabled .dag-vault__path { color: var(--dag-color-muted); }
 .dag-vault__note { flex: none; margin-left: auto; font-size: 11.5px; color: var(--dag-color-slate); }
 .dag-vault__forget { flex: none; opacity: 0; }
 .dag-vault__line:hover .dag-vault__forget,
 .dag-vault__line:focus-within .dag-vault__forget { opacity: 1; }
-.dag-vault__path { margin-left: auto; padding-left: 8px; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); }
+.dag-vault__path { font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); }
 /*
  * The two first-run forms. The card centres its prose, but a label is not prose: it starts at its
  * field's left edge and sits directly above the control it names, so the two fields read as a form
@@ -1261,8 +1332,18 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   cursor: ew-resize;
   touch-action: none;
 }
-.dag-sidebar__grip:hover,
-.dag-sidebar__grip:active { background: var(--dag-color-accentSoft); }
+/* The edge it moves, drawn on the line the column's border already occupies. */
+.dag-sidebar__grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: transparent;
+}
+.dag-sidebar__grip:hover::after,
+.dag-sidebar__grip:active::after { background: var(--dag-color-accent); }
 
 /* New, the + beside Files since the UI review. */
 .dag-sidebar__tool[aria-expanded="true"] { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
@@ -1346,7 +1427,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
 /* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
 .dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: 15px; }
-.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: 44px; height: 44px; }
+/* Labelled now (#215), so as wide as the word, and still a finger's 44 each way (#209). */
+.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: auto; min-width: 44px; height: 44px; padding: 0 8px; }
+.dag-sidebar[data-sheet] .dag-sidebar__bulk-act { font-size: 14px; }
 .dag-sidebar[data-sheet] .dag-sidebar__bulk-count { font-size: 14px; }
 
 /* The folders above the open file, in the toolbar. Each shows its folder in the sidebar. */
@@ -1456,11 +1539,23 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-toolbar .dag-tasks__layout { height: 44px; }
   .dag-toolbar .dag-tasks__layout-choice { height: 38px; }
   .dag-backlinks__word,
-  .dag-export__word,
-  .dag-readonly__word { display: none; }
-  .dag-readonly--on { justify-content: center; min-width: 40px; height: 36px; margin: 0 2px; padding: 0 8px; }
-  .dag-readonly.dag-icon { width: 44px; height: 44px; }
-  .dag-readonly-notice { top: 58px; right: 8px; }
+  .dag-export__word { display: none; }
+  /* The pill drops its word to keep the bar's width for the title, but a reader still needs the
+     word: the `Unlock` beside it would otherwise be the whole of what the lock says. */
+  .dag-readonly__word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .dag-readonly__pill { justify-content: center; min-width: 40px; height: 36px; padding: 0 8px; }
+  /* The pill is a word, not a control; Unlock is the control, and a finger's 44 like the bar's others (#209). */
+  .dag-readonly__unlock { height: 44px; }
   .dag-toolbar .dag-backlinks__toggle,
   .dag-pagemore__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
   .dag-pagemore--narrow { display: flex; }
@@ -1818,6 +1913,118 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   .dag-welcome__act--tile kbd { display: none; }
   .dag-welcome__acts { flex-direction: column; align-self: stretch; }
 }
+
+/* ---- the file that is not there ---- */
+
+/*
+ * The one card a board, note, quiz or table draws when the file could not be loaded
+ * (`src/ui/FileProblem.tsx`). It takes the place of the DSL error card a board used to be drawn
+ * with and the one-line notice a note used to say: both named the failure and neither named a next
+ * step. Names grepped first: `dag-file-problem*` and `data-dag-file-problem*` were unclaimed.
+ *
+ * Over a canvas it sits in a layer of its own — the paper underneath is empty, but the dock and the
+ * zoom cluster still exist, and the card is the page until the file is back. On a page without a
+ * canvas it is the body, and `flex: 1` is what fills it.
+ */
+.dag-file-problem__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  z-index: 6;
+  background: var(--dag-color-paper);
+}
+.dag-file-problem {
+  flex: 1;
+  min-width: 0;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  overflow: auto;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-note-view--problem { display: flex; }
+.dag-file-problem__card {
+  width: min(480px, 100%);
+  padding: 24px 28px 22px;
+  text-align: center;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-card);
+  box-shadow: var(--elevation);
+}
+.dag-file-problem__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  color: var(--dag-color-ink);
+}
+.dag-file-problem__body {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dag-color-slate);
+}
+.dag-file-problem__acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dag-file-problem__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-file-problem__act:hover { background: var(--dag-color-paper100); }
+.dag-file-problem__act:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-file-problem__act > svg { flex: none; color: var(--dag-color-slate); }
+.dag-file-problem__text {
+  max-height: 320px;
+  margin: 16px 0 0;
+  padding: 12px;
+  overflow: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--dag-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-metric-radius-small);
+}
+.dag-file-problem__details {
+  margin-top: 16px;
+  font-size: 12px;
+  text-align: left;
+  color: var(--dag-color-slate);
+}
+.dag-file-problem__details summary { cursor: pointer; }
+.dag-file-problem__details summary:focus-visible { box-shadow: var(--focus-ring); }
+.dag-file-problem__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 10px 0 0;
+}
+.dag-file-problem__facts dt { font-weight: 600; color: var(--dag-color-slate); }
+.dag-file-problem__facts dd { margin: 0; overflow-wrap: anywhere; }
 
 [data-snapshot="1"] .dag-toolbar,
 [data-snapshot="1"] .dag-pagebar { display: none; }
@@ -4262,6 +4469,26 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 
 .dag-dock__group { display: flex; align-items: center; gap: 2px; }
 .dag-dock__rule { width: 1px; height: 20px; margin: 0 4px; background: var(--dag-color-outlineSoft); }
+/* The dock's own way out of a locked board: the same switch as the top bar's Unlock, where a hand
+   already on the tools will look for it. */
+.dag-dock__locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-dock__locked:hover { background: var(--dag-color-paper200); }
+.dag-dock__locked:focus-visible { box-shadow: var(--focus-ring); }
+.dag-dock__locked > svg { flex: none; color: var(--dag-color-slate); }
 
 /* The one promoted thing, which is what both references do with exactly one control. */
 .dag-icon--accent { color: var(--dag-color-accent); }
@@ -4300,6 +4527,7 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
   .dag-dock { left: calc(var(--canvas-x, 0px) + 12px); transform: none; }
   .dag-dock .dag-icon,
   .dag-zoombar .dag-icon { width: 44px; height: 44px; }
+  .dag-dock__locked { height: 44px; }
   .dag-zoombar__pct { height: 44px; }
 }
 @media (pointer: coarse) {
@@ -4756,80 +4984,66 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 .dag-backlinks__path { grid-column: 2; font-family: var(--dag-font-mono); font-size: 11px; color: var(--dag-color-slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /*
- * The lock. Unlocked, one glyph beside the `⋯`; locked, a pill that says *Read only* in the
- * accent, Share's "Shared" treatment, because a page that refuses edits has to say so before anybody
- * tries one. `dag-readonly`, not `dag-lock`: the logo owns `dag-lockup`. Names grepped first.
+ * The lock. Locked, one *Read only* pill in ink on paper with **Unlock** beside it — the one place
+ * the lock is shown, so a refused write shakes the pill for a moment rather than opening a second
+ * notice under the bar. `dag-readonly`, not `dag-lock`: the logo owns `dag-lockup`. Names grepped
+ * first.
  */
-.dag-readonly { flex: none; }
-.dag-readonly--on {
+.dag-readonly { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.dag-readonly__pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 30px;
   padding: 0 10px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dag-color-accent);
-  background: var(--dag-color-accentSoft);
-  border: 1px solid color-mix(in srgb, var(--dag-color-accent) 45%, transparent);
-  border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
-}
-.dag-readonly--on:hover { border-color: var(--dag-color-accent); }
-.dag-readonly:focus-visible { box-shadow: var(--focus-ring); }
-/* Under the bar's right end, where the switch is: told, never asked, so it takes no focus and stays
-   clear of the page's own cards (Share's and Export's are 40, the Settings modal 50). */
-.dag-readonly-notice {
-  position: fixed;
-  top: 54px;
-  right: 12px;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100vw - 24px);
-  padding: 7px 8px 7px 12px;
-  font-size: 12.5px;
-  color: var(--dag-color-ink);
-  background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outline);
-  border-radius: var(--dag-metric-radius-card);
-  box-shadow: 0 4px 16px var(--dag-color-shadow);
-  pointer-events: auto;
-}
-.dag-readonly-notice > svg { flex: none; color: var(--dag-color-accent); }
-.dag-readonly-notice__unlock {
-  flex: none;
-  height: 26px;
-  padding: 0 10px;
-  font: inherit;
   font-size: 12px;
   font-weight: 600;
   color: var(--dag-color-ink);
   background: var(--dag-color-paper100);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
-  cursor: pointer;
+  white-space: nowrap;
 }
-.dag-readonly-notice__unlock:hover { background: var(--dag-color-paper200); }
-.dag-readonly-notice__dismiss {
+.dag-readonly__pill > svg { flex: none; color: var(--dag-color-slate); }
+.dag-readonly__pill--shake { animation: dag-readonly-shake 0.32s ease; }
+@keyframes dag-readonly-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dag-readonly__pill--shake { animation: none; }
+}
+.dag-readonly__unlock {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--dag-color-slate);
-  background: transparent;
-  border: 1px solid transparent;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-chip);
   cursor: pointer;
 }
-.dag-readonly-notice__dismiss:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
-.dag-readonly-notice__dismiss:focus-visible { box-shadow: var(--focus-ring); }
-/* A control that writes while the app is locked. It keeps its press — which the notice answers, so
+.dag-readonly__unlock:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-accent); }
+.dag-readonly__unlock:focus-visible { box-shadow: var(--focus-ring); }
+/* The refusal, said to a reader; the shake is its visual half. */
+.dag-readonly__said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* A control that writes while the app is locked. It keeps its press — which shakes the pill, so
    the page is never silently dead — but reads as unavailable before one, and its `title` names the
    word and the chord (`LOCK_HINT`). The opacity is the whole of the treatment: a disabled control
    that moves under the pointer is one more thing that looks broken. */
@@ -7334,8 +7548,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   border-radius: var(--dag-metric-radius-small);
   box-shadow: 0 4px 16px var(--dag-color-shadow);
 }
-.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 25vw)); }
-.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 248px), max(232px, 50vw)); }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-trash-notice { --trash-notice-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
 .dag-trash-notice__mark { flex: none; color: var(--dag-color-muted); }
 .dag-trash-notice__text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .dag-trash-notice__act {

@@ -19,11 +19,13 @@ canvas only for somebody who chose to keep it: `ctrl+\` (Notion's chord) or the 
 and `dag:sidebar` remembers, with the person's preferences; while it is away a hover on the toggle floats it over
 the page; and a window under 720px never docks it — a phone, where it is a sheet over the whole
 window, and the home screen when nothing is open. From 720px it docks, and its
-default width gives way to a quarter of the window, never under 232px, which is what a 929px laptop
-window had room for and could not keep. A width somebody dragged is theirs up to half the window and
-640px: under the quarter rule the grip on that same window moved nothing at all.
+default width of 272px gives way to a quarter of the window, never under 232px, which is what a
+929px laptop window had room for and could not keep. A width somebody dragged is theirs up to half
+the window and 640px: under the quarter rule the grip on that same window moved nothing at all, and
+raising the default moves nobody's column — a width already saved is read as it was.
 `data-sidebar-sized` on `.dag-shell` (React's) and `data-sidebar-dragging` (the grip's, for the length
-of a drag) are what switch `--sidebar-cap`. It is open by default,
+of a drag) are what switch `--sidebar-cap`. The grip is a 7px strip that stays invisible until the
+pointer reaches it, and then draws the edge it moves as an accent hairline. It is open by default,
 because a new person has not learned the key yet. **The toggle is one button in the window's
 top-left corner that never moves** (Claude.ai's arrangement): `Shell` draws it above the
 column and the page, and the docked header or the toolbar keeps a slot for it.
@@ -55,7 +57,10 @@ Fourteen things are load-bearing:
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
   one menu; a folder's `+` makes things in it; and the tree's own empty space — below the last row,
   down to the foot — right-clicked opens the `+` menu at the pointer, which is the only control beside
-  Files and the only way a top-level file was made before #121. That menu's `here` is carried in the
+  Files and the only way a top-level file was made before #121. The open file's row keeps its `⋯` up
+  without a hover, and a favourite keeps its star beside it, so a first-time reader sees that a file
+  has actions; every other row keeps the hover reveal and every tool is `tabIndex=-1`, so the tree is
+  still one tab stop and `shift+F10` is the keyboard's way to the menu. That menu's `here` is carried in the
   state that opens it: the `+` says the open file's folder, the tree's space says the top level, and
   where there is no file to be in the head says *New at the top level* and offers no toggle. The menu
   opens when the vault is locked — as a row's does — with every entry `aria-disabled` and in the
@@ -78,7 +83,8 @@ Fourteen things are load-bearing:
   `server/names.ts`), in the same step, so what
   an agent or Obsidian reads on disk says exactly what the person typed. A `/` in a title is a character,
   never a folder — moving is Move to… and a drag. A row says its title, or its name's last part for
-  a file nobody titled, and the rows sort by what they say. With the column put away, it floats
+  a file nobody titled, and the rows sort by what they say; a name the column cuts short is whole in
+  the row's tooltip. With the column put away, it floats
   over the page to ask. **The menu is the only control beside Files**, with its title naming every
   kind it makes; the folder-with-plus that made a top-level folder at once is gone, because beside
   the `+` it read as a second kind of New. **Folder** is the menu's own row, made where the menu says
@@ -119,6 +125,13 @@ Fourteen things are load-bearing:
   replaces it. `BoardTree.loaded` says there is an answer at all, which is what tells *Loading your
   files…* from *Nothing here yet*; `fresh` says the server has answered on this page load, and only a
   fresh list resolves an id to a name, because a kept one may name a file that has moved since.
+  **A listing that cannot be asked for is a third state, not a longer wait.** `useBoardList` returns
+  `{ tree, failed, retry }`: a 500 or a refused connection sets `failed`, the column draws
+  *Can't reach your files*, one line saying nothing saved is lost, and **Try again** — and the
+  `refresher` under it keeps asking by itself on a growing delay (1 s doubling to 30 s). A list this
+  browser already had stays below the message, dimmed (`data-dag-sidebar-stale`), so a server that
+  went quiet does not take the rows away; the first answer clears `failed` and the message goes
+  without a reload.
 - **A drag carries a chip, and the tree scrolls under it**. On the first move a
   `.dag-sidebar-ghost` — the row's mark and name, or *N items* — is put on `<body>` and moved by a
   painted transform, `pointer-events: none` so `elementFromPoint` still finds the row; the rows it
@@ -146,7 +159,8 @@ Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, 
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
-`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, the storage key `dag:file-list` and the event
+`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, `dag-sidebar__failed*`, `dag-sidebar__retry`,
+`data-dag-sidebar-failed`, `data-dag-sidebar-stale`, the storage key `dag:file-list` and the event
 `dag:follow`. The retired `dag-sidebar__*` of the old board-list column
 survives only in a comment in `chrome.css`. The sidebar's rows are deliberately **not**
 `data-dag-board` or `.dag-board`: the search keeps those, and `boards.spec.ts` counts `.dag-board`.
@@ -198,6 +212,10 @@ folder. Six things about it:
   row under a pointer in the middle of picking them. A selection is kept by whether its rows exist,
   not by whether they are drawn, so a picked row in a folder somebody shut stays picked; one deleted
   elsewhere is let go.
+- **The bar says what its actions do.** Each action is its mark and its word — *Move*, *To vault*,
+  *Trash* — so none of them is a guess until hovered; a narrow column wraps them onto the line under
+  the count, the trash wears the danger colour, and the `×` beside the count lets the selection go as
+  Escape does.
 
 Names claimed, grepped first: `dag-sidebar__bulk*`, `data-dag-sidebar-bulk*`, `data-dag-sidebar-picked`
 (and `data-dag-bulk-delete*`, gone with its modal).

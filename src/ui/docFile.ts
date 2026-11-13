@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { concerns, onQuiz, onTable } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
+import type { LoadProblem } from "@/board/useBoard";
 import { merge3 } from "@/note/merge";
 
 /**
@@ -31,7 +32,7 @@ export type DocFileKind = "quiz" | "table";
 
 type DocFileState =
   | { status: "loading" }
-  | { status: "missing" }
+  | { status: "problem"; problem: LoadProblem }
   | { status: "ready"; text: string; saving: boolean; failed: boolean }
   | { status: "conflict"; text: string; theirs: string };
 
@@ -87,21 +88,43 @@ class DocFileController {
 
   /** `opening` is the read that opens the file, which a prefetch may answer; the feed's never is. */
   async load(opening = false): Promise<void> {
+    const fail = (problem: LoadProblem) => {
+      if (this.live && !this.pending) this.set({ status: "problem", problem });
+    };
     try {
       const r = await (opening ? openDoc(this.kind, this.name) : fetch(`/__board/get?${q(this.kind, this.name)}`));
-      if (r.status === 404) {
-        if (this.live && !this.pending) this.set({ status: "missing" });
-        return;
+      if (r.status === 404) return fail({ reason: "missing" });
+      if (!r.ok) {
+        /* Every other answer is the server failing to read the file. The body's sentence, when
+           there is one, is for the Details disclosure; the page owns the words a person reads. */
+        let message = `the server answered ${r.status}`;
+        try {
+          const body = (await r.json()) as { error?: string };
+          if (typeof body.error === "string" && body.error) message = body.error;
+        } catch {
+          /* A non-JSON refusal is still an answer; the status is the fact that was learned. */
+        }
+        return fail({ reason: "unreadable", message });
       }
-      if (!r.ok) return;
-      const got = (await r.json()) as { text: string; base: string };
+      let got: { text: string; base: string };
+      try {
+        got = (await r.json()) as { text: string; base: string };
+      } catch (e) {
+        return fail({ reason: "unreadable", message: e instanceof Error ? e.message : String(e) });
+      }
       if (!this.live || this.pending) return;
       this.mine = this.saved = got.text;
       this.base = got.base;
       this.show();
-    } catch {
-      /* Not reachable now; the change feed asks again when anything moves. */
+    } catch (e) {
+      /* A fetch that rejected is a server that did not answer, not a file that is missing. */
+      fail({ reason: "unreachable", message: e instanceof Error ? e.message : String(e) });
     }
+  }
+
+  /** Ask again for a file whose read got no answer — *Try again*. */
+  retry(): void {
+    if (this.live) void this.load(false);
   }
 
   change(next: string): void {
@@ -199,7 +222,7 @@ class DocFileController {
   /** An outside write reached the feed: adopt it when nothing of ours is waiting. */
   outside(sha1: string | null): void {
     if (sha1 === null) {
-      if (!this.pending && this.live) this.set({ status: "missing" });
+      if (!this.pending && this.live) this.set({ status: "problem", problem: { reason: "missing" } });
       return;
     }
     if (sha1 === this.base || this.pending || this.timer) return;
@@ -225,6 +248,8 @@ export interface DocFile {
   flush(): Promise<boolean>;
   keepMine(): void;
   useTheirs(): void;
+  /** Ask for the file again after a read that got no answer. */
+  retry(): void;
 }
 
 export function useDocFile(kind: DocFileKind, name: string): DocFile {
@@ -256,6 +281,7 @@ export function useDocFile(kind: DocFileKind, name: string): DocFile {
       flush: () => file.flush(),
       keepMine: () => file.keepMine(),
       useTheirs: () => file.useTheirs(),
+      retry: () => file.retry(),
     }),
     [state, file],
   );

@@ -60,7 +60,7 @@ import { openVault, transferFile, transferFolder, vaultsNow } from "@/vault/api"
 import { GONE, switchVault } from "@/vault/current";
 
 import { isLocked, refuseLocked } from "@/settings/lock";
-import { LockNotice, useLockKey, useLockedRoot } from "./Lock";
+import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
@@ -215,6 +215,8 @@ export function Shell({
   attachments,
   sizes,
   loading = false,
+  listFailed = false,
+  onRetryList,
   board,
   note,
   quiz,
@@ -258,6 +260,10 @@ export function Shell({
   sizes: Readonly<Record<string, number>>;
   /** The list has not answered and this browser kept none: the sidebar says it is loading. */
   loading?: boolean;
+  /** The last ask for the list failed: the sidebar says so, over the rows it already has. */
+  listFailed?: boolean;
+  /** Ask for the list again now, from the failed state's Try again. */
+  onRetryList?(): void;
   /** What is open, which the sidebar marks and reveals. At most one of the four is set. */
   board: string | null;
   note: string | null;
@@ -884,6 +890,8 @@ export function Shell({
             attachments={attachments}
             sizes={sizes}
             loading={loading}
+            failed={listFailed}
+            onRetry={onRetryList}
             board={board}
             note={note}
             quiz={quiz}
@@ -954,7 +962,6 @@ export function Shell({
             onClose={() => setTrashed(null)}
           />
         ) : null}
-        <LockNotice />
         {cloud ? <TelemetryPrompt /> : null}
       </SidebarContext.Provider>
     </div>

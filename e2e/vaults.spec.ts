@@ -161,6 +161,28 @@ test("a tab names its vault in the address and in every request, and each vault 
   expect(heard).toEqual([]);
 });
 
+test("two vaults whose names start alike wear different monograms, and each is found by its name", async ({ page }) => {
+  const one = await vault(page, `Terra one ${id}`);
+  const two = await vault(page, `Terra two ${id}`);
+  await page.goto(`/?vault=${one.id}&tasks=1`);
+  await openSwitcher(page);
+
+  const rowOne = page.locator(`[data-dag-vault="${one.id}"]`);
+  const rowTwo = page.locator(`[data-dag-vault="${two.id}"]`);
+  await expect(rowOne.locator(".dag-vault__mark")).toHaveText("TO");
+  await expect(rowTwo.locator(".dag-vault__mark")).toHaveText("TT");
+
+  /* The name is the accessible name; the shortened path is only its description. */
+  await expect(page.getByRole("menuitemradio", { name: `Terra one ${id}`, exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: `Terra two ${id}`, exact: true })).toBeVisible();
+  await expect(rowOne.locator(".dag-vault__title")).toHaveText(`Terra one ${id}`);
+  await expect(rowOne.locator(".dag-vault__path")).toContainText("…");
+  await expect(rowOne.locator(".dag-vault__path")).toContainText(`Terra one ${id}`);
+
+  /* The close item says which vault it closes. */
+  await expect(page.getByRole("menuitem", { name: /Close vault/ })).toContainText(`Terra one ${id}`);
+});
+
 test("a folder opened from the switcher is the vault the tab goes to, and the typed path is refused when it is no folder", async ({
   page,
 }) => {
@@ -175,9 +197,14 @@ test("a folder opened from the switcher is the vault the tab goes to, and the ty
   await openSwitcher(page);
   await page.locator("[data-dag-vault-open]").click();
   const field = page.locator("[data-dag-vault-open-path]");
-  await field.fill(path.join(parent, "no-such-folder"));
+  const bad = path.join(parent, "no-such-folder");
+  await field.fill(bad);
   await field.press("Enter");
-  await expect(page.locator("[data-dag-vault-problem]")).toContainText("not a folder");
+  const problem = page.locator("[data-dag-vault-problem]");
+  await expect(problem).toContainText("not a folder");
+  /* The server names the path between backticks; the page draws code, not punctuation. */
+  await expect(problem.locator("code")).toHaveText(bad);
+  await expect(problem).not.toContainText("`");
 
   await field.fill(folder);
   await field.press("Enter");
@@ -365,6 +392,7 @@ test("with no vault open the page is the picker: open a folder, create a vault, 
 
   await expect(page.locator("[data-dag-novault]")).toBeVisible();
   await expect(page.locator("[data-dag-welcome-open-folder]")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recent one", exact: true })).toBeEnabled();
   await expect(page.locator(`[data-dag-vault="r1"]`)).toBeEnabled();
   await expect(page.locator(`[data-dag-vault="r2"]`)).toBeDisabled();
   await expect(page.locator(`[data-dag-vault="r2"]`)).toContainText("not found");
