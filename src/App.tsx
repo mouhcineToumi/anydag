@@ -282,7 +282,7 @@ export function App() {
   const board = listing || quiz || table || file || note ? null : query.get("board");
   /* One subscription to the list for the whole window, not one per page — the sidebar lives above
      both pages and reads the same answer the search and the feedback card do. */
-  const list = useBoardList(useAccount()?.uid ?? null);
+  const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
   useFollowing(list, go);
   const open = useCallback((kind: FileKind, target: string | null) => setQuery(pageQuery(kind, target)), [setQuery]);
   const openTasks = useCallback(() => setQuery({ ...pageQuery("board", null), tasks: "1" }), [setQuery]);
@@ -378,6 +378,8 @@ export function App() {
       attachments={list.files}
       sizes={list.sizes}
       loading={!list.loaded}
+      listFailed={listFailed}
+      onRetryList={retryList}
       board={board}
       note={note}
       quiz={quiz}

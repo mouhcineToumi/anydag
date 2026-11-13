@@ -119,6 +119,13 @@ Fourteen things are load-bearing:
   replaces it. `BoardTree.loaded` says there is an answer at all, which is what tells *Loading your
   files…* from *Nothing here yet*; `fresh` says the server has answered on this page load, and only a
   fresh list resolves an id to a name, because a kept one may name a file that has moved since.
+  **A listing that cannot be asked for is a third state, not a longer wait.** `useBoardList` returns
+  `{ tree, failed, retry }`: a 500 or a refused connection sets `failed`, the column draws
+  *Can't reach your files*, one line saying nothing saved is lost, and **Try again** — and the
+  `refresher` under it keeps asking by itself on a growing delay (1 s doubling to 30 s). A list this
+  browser already had stays below the message, dimmed (`data-dag-sidebar-stale`), so a server that
+  went quiet does not take the rows away; the first answer clears `failed` and the message goes
+  without a reload.
 - **A drag carries a chip, and the tree scrolls under it**. On the first move a
   `.dag-sidebar-ghost` — the row's mark and name, or *N items* — is put on `<body>` and moved by a
   painted transform, `pointer-events: none` so `elementFromPoint` still finds the row; the rows it
@@ -146,7 +153,8 @@ Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, 
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, the storage keys `dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
-`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, the storage key `dag:file-list` and the event
+`data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, `dag-sidebar__failed*`, `dag-sidebar__retry`,
+`data-dag-sidebar-failed`, `data-dag-sidebar-stale`, the storage key `dag:file-list` and the event
 `dag:follow`. The retired `dag-sidebar__*` of the old board-list column
 survives only in a comment in `chrome.css`. The sidebar's rows are deliberately **not**
 `data-dag-board` or `.dag-board`: the search keeps those, and `boards.spec.ts` counts `.dag-board`.

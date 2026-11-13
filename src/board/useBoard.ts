@@ -365,11 +365,30 @@ function keepTree(who: string, tree: BoardTree): void {
 }
 
 /**
+ * The listing, and how the last ask for it went. `failed` is a third state beside the tree's own
+ * *loaded* and *empty*: the server could not be asked, so what is drawn is either a list from before
+ * or nothing at all — never "Nothing here yet".
+ */
+export interface BoardList {
+  tree: BoardTree;
+  /** The last ask for the listing did not answer — a 500, or no server at all. */
+  failed: boolean;
+  /** Ask again now, without waiting for the retry timer: the failed state's *Try again*. */
+  retry(): void;
+}
+
+/**
  * Every file and folder in this tab's workspace, kept in step with the change feed. `who` is the
  * signed-in account's uid: what a kept list must have been fetched for to be drawn.
  */
-export function useBoardList(who: string | null = null): BoardTree {
+export function useBoardList(who: string | null = null): BoardList {
   const [tree, setTree] = useState<BoardTree>(() => keptTree(who) ?? NO_BOARDS);
+  /* Whether the most recent ask did not answer. Cleared by the first answer that does, so a retry
+     that succeeds takes the message away with the tree it brought back. */
+  const [failed, setFailed] = useState(false);
+  /* The live `load`, so *Try again* reaches the `refresher` this effect made rather than starting a
+     second one. A ref because the effect runs once and the button outlives nothing. */
+  const askNow = useRef<() => void>(() => undefined);
   const held = useRef(tree);
   held.current = tree;
   /* When the list held was asked for, on `guess.ts`'s clock, and a count that moves whenever a guess
@@ -411,16 +430,30 @@ export function useBoardList(who: string | null = null): BoardTree {
        the next change, which after the Assistant's last write never came (#123). */
     const lister = refresher(async () => {
       const asked = tick();
-      const r = await fetch("/__board/list");
-      if (!r.ok) return false;
-      const d = (await r.json()) as BoardTree;
+      let d: BoardTree;
+      try {
+        const r = await fetch("/__board/list");
+        if (!r.ok) {
+          if (live) setFailed(true);
+          return false;
+        }
+        d = (await r.json()) as BoardTree;
+      } catch {
+        /* A server that is not there rejects rather than answering; both are the same to a person
+           waiting for rows, and both are retried by the refresher under this. Only the ask is
+           guarded, so a bug in `treeOf` is not worded as a dead server. */
+        if (live) setFailed(true);
+        return false;
+      }
       if (!live) return true;
       setTree(treeOf(d, true));
       setStamp(asked);
       shown(asked);
+      setFailed(false);
       return true;
     });
     const load = (): void => void lister.ask();
+    askNow.current = load;
     load();
     /* A file appearing or going away is a change to the list, and so is one whose title moved
  — a title is in the text, so an agent's edit or the sidebar's rename changes what a
@@ -497,7 +530,9 @@ export function useBoardList(who: string | null = null): BoardTree {
     };
   }, []);
   /* `guesses` is not read: it is what makes a guess made or let go redraw the list. */
-  return useMemo(() => guessed(tree, stamp), [tree, stamp, guesses]);
+  const drawn = useMemo(() => guessed(tree, stamp), [tree, stamp, guesses]);
+  const retry = useCallback(() => askNow.current(), []);
+  return useMemo(() => ({ tree: drawn, failed, retry }), [drawn, failed, retry]);
 }
 
 /**

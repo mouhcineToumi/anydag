@@ -1051,6 +1051,48 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-top: 1px solid var(--dag-color-outline);
   color: var(--dag-color-ink);
 }
+/*
+ * The list could not be asked for. A card rather than a line because it is the tree's whole state,
+ * and the rows this browser already had stay below it dimmed — a server that went quiet is not a
+ * reason to take the files away too. Names grepped first: `dag-sidebar__failed*`,
+ * `dag-sidebar__retry`, `data-dag-sidebar-failed` and `data-dag-sidebar-stale` were nobody's.
+ */
+.dag-sidebar__failed {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
+  margin: 4px 0 10px;
+  padding: 10px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-warningSoft);
+  border: 1px solid var(--dag-color-warning);
+  border-radius: var(--dag-metric-radius-chip);
+}
+.dag-sidebar__failed-mark {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  margin-top: 1px;
+  color: var(--dag-color-warningText);
+}
+.dag-sidebar__failed-title { grid-column: 2; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; }
+.dag-sidebar__failed-line { grid-column: 2; margin: 0; font-size: 12px; line-height: 1.4; color: var(--dag-color-slate); }
+.dag-sidebar__retry {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-metric-radius-small);
+  cursor: pointer;
+}
+.dag-sidebar__retry:hover { background: var(--dag-color-paper200); }
+.dag-sidebar__retry:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__tree[data-dag-sidebar-stale] > [role="tree"] > .dag-sidebar__line { opacity: 0.55; }
 
 .dag-sidebar__account-wrap { position: relative; margin-top: 4px; }
 .dag-sidebar__account {

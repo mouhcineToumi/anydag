@@ -52,6 +52,7 @@ import {
   StarOff,
   Table2,
   Trash2,
+  TriangleAlert,
   Upload,
   Workflow,
   X,
@@ -375,6 +376,8 @@ export function Sidebar({
   attachments = EMPTY,
   sizes = NO_SIZES,
   loading = false,
+  failed = false,
+  onRetry,
   board,
   note,
   quiz = null,
@@ -438,6 +441,13 @@ export function Sidebar({
    * list on its way, never a vault with nothing in it, so it is not said to be one.
    */
   loading?: boolean;
+  /**
+   * The last ask for the list did not answer — a 500 or no server. A third state beside loading
+   * and empty, and one that stays over the rows this browser already had, so they do not vanish.
+   */
+  failed?: boolean;
+  /** Ask for the list again now: the failed state's *Try again*. */
+  onRetry?(): void;
   board: string | null;
   note: string | null;
   quiz?: string | null;
@@ -1401,6 +1411,9 @@ export function Sidebar({
         ref={listRef}
         onKeyDown={onTreeKey}
         data-dag-sidebar-drop=""
+        /* The rows are from an answer before the one that failed; dimmed so they read as the list
+           this browser kept rather than as a list the server just confirmed. */
+        data-dag-sidebar-stale={failed && lines.length > 0 ? "" : undefined}
         /* Files dragged in from the computer: onto a folder, into it; onto a file, into the
            folder that file is in; onto the tree's own space, the top level — the same one
            `closest()` a row dragged inside the column reads. Native drag events, because these files
@@ -1436,11 +1449,23 @@ export function Sidebar({
           setMaking({ x: e.clientX, y: e.clientY, below: e.clientY, left: e.clientX, here: "" });
         }}
       >
-        {lines.length === 0 && loading ? (
+        {failed ? (
+          /* The third state of the tree's empty slot. Not *Loading your files…* for ever: a server
+             that answers 500 or does not answer at all says so, and the way back is one press. */
+          <div className="dag-sidebar__failed" role="alert" data-dag-sidebar-failed="">
+            <TriangleAlert {...ICON} className="dag-sidebar__failed-mark" aria-hidden="true" />
+            <p className="dag-sidebar__failed-title">Can't reach your files</p>
+            <p className="dag-sidebar__failed-line">AnyDag's server isn't answering. Nothing you saved is lost.</p>
+            <button type="button" className="dag-sidebar__retry" data-dag-sidebar-retry="" onClick={() => onRetry?.()}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {lines.length === 0 && loading && !failed ? (
           <p className="dag-sidebar__none" role="status" data-dag-sidebar-loading="">
             Loading your files…
           </p>
-        ) : lines.length === 0 ? (
+        ) : lines.length === 0 && !failed ? (
           <p className="dag-sidebar__none">Nothing here yet. Make a board, a note, a quiz or a table above.</p>
         ) : null}
         {/* Only treeitems and their groups live in the tree. A status, an empty line or a
