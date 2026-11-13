@@ -11,6 +11,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { IconButton } from "@/ui/controls";
+
 /**
  * The app's one toast, and the one stack they all go in (#208).
  *
@@ -70,7 +72,7 @@ export interface ToastProps extends DataAttrs {
   children: ReactNode;
   /** The whole message as text, for the hover title when the line is cut short. */
   title?: string;
-  /** Buttons after the message; `toastAct` is their class. */
+  /** Buttons after the message: `Button`s (`src/ui/controls.tsx`), `primary` for the one that answers yes. */
   actions?: ReactNode;
   /** Draw a × that calls this. */
   onDismiss?(): void;
@@ -87,11 +89,6 @@ export interface ToastProps extends DataAttrs {
   /** Drawn where it is rendered rather than in the stack: Settings' reset, inside its modal. */
   inline?: boolean;
   onKeyDown?(e: KeyboardEvent<HTMLDivElement>): void;
-}
-
-/** The class an action button in a toast wears; `primary` for the one that answers yes. */
-export function toastAct(primary = false): string {
-  return primary ? "dag-toast__act dag-toast__act--primary" : "dag-toast__act";
 }
 
 export function Toast({
@@ -143,17 +140,13 @@ export function Toast({
       </p>
       {actions ? <div className="dag-toast__acts">{actions}</div> : null}
       {onDismiss ? (
-        <button
-          type="button"
-          className="dag-icon dag-toast__close"
-          data-dag-toast-dismiss=""
-          {...dismissData}
-          aria-label="Dismiss"
-          title="Dismiss"
-          onClick={onDismiss}
-        >
-          <X size={14} strokeWidth={2} aria-hidden="true" />
-        </button>
+        /* A span around it, because the drawn tooltip wraps the button in one of its own: the phone
+           layout's grid places this, whatever is inside. */
+        <span className="dag-toast__close">
+          <IconButton data-dag-toast-dismiss="" {...dismissData} aria-label="Dismiss" onClick={onDismiss}>
+            <X size={14} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
+        </span>
       ) : null}
     </div>
   );

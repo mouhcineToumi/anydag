@@ -2,8 +2,9 @@ import { Trash2, Undo2 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 
 import type { FileKind, TrashEntry } from "@/board/useBoard";
+import { Button } from "@/ui/controls";
 
-import { Toast, ToastName, ToastWords, toastAct } from "./Toast";
+import { Toast, ToastName, ToastWords } from "./Toast";
 import { restoreFromTrash } from "./trashApi";
 import { counted, leaf } from "./tree";
 
@@ -115,14 +116,13 @@ export function TrashNotice({
       actions={
         <>
           {state === "shown" ? (
-            <button type="button" className={toastAct()} data-dag-trash-undo="" onClick={() => void undo()}>
+            <Button data-dag-trash-undo="" onClick={() => void undo()}>
               <Undo2 size={14} strokeWidth={2} aria-hidden="true" />
               Undo
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className={toastAct()}
+          <Button
+            variant="quiet"
             data-dag-trash-view=""
             disabled={busy}
             onClick={() => {
@@ -131,7 +131,7 @@ export function TrashNotice({
             }}
           >
             View trash
-          </button>
+          </Button>
         </>
       }
     >

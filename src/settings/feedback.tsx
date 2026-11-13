@@ -1,7 +1,8 @@
 import { Check } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Toast, toastAct } from "@/ui/Toast";
+import { Button } from "@/ui/controls";
+import { Toast } from "@/ui/Toast";
 
 import { SAVED, type SavedDetail } from "./saved";
 
@@ -138,9 +139,7 @@ export function SettingsFeedback({ children }: { children: ReactNode }) {
           renew={toast}
           onTimeout={() => setToast(null)}
           actions={
-            <button
-              type="button"
-              className={toastAct()}
+            <Button
               data-dag-setting-reset-undo=""
               onClick={() => {
                 const undo = toast.undo;
@@ -149,7 +148,7 @@ export function SettingsFeedback({ children }: { children: ReactNode }) {
               }}
             >
               Undo
-            </button>
+            </Button>
           }
         >
           {toast.scope} reset

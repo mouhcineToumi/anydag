@@ -2,7 +2,8 @@ import { Activity, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Dialog } from "@/ui/Dialog";
-import { Toast, toastAct } from "@/ui/Toast";
+import { Button, IconButton } from "@/ui/controls";
+import { Toast } from "@/ui/Toast";
 
 import { setConsent, useTelemetry } from "./client";
 import { NEVER, SENT } from "./what";
@@ -68,16 +69,9 @@ export function TelemetryPrompt({ page }: { page: string | null }) {
           <Activity size={14} strokeWidth={2} aria-hidden="true" className="dag-telemetry-dialog__mark" />
           <h2 id="dag-telemetry-ask-title">Send anonymous logs?</h2>
           <span className="dag-toolbar__spacer" />
-          <button
-            type="button"
-            className="dag-icon"
-            aria-label="Back"
-            title="Back (Escape)"
-            disabled={busy}
-            onClick={() => setWhat(false)}
-          >
+          <IconButton aria-label="Back" tip="Back" shortcut="Escape" disabled={busy} onClick={() => setWhat(false)}>
             <X size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
+          </IconButton>
         </header>
         <div id="dag-telemetry-ask-what">
           <p className="dag-telemetry-dialog__label">What is sent</p>
@@ -100,18 +94,12 @@ export function TelemetryPrompt({ page }: { page: string | null }) {
           </p>
         ) : null}
         <div className="dag-settings__foot">
-          <button type="button" className="dag-button" data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
+          <Button data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
             No
-          </button>
-          <button
-            type="button"
-            className="dag-button dag-button--primary"
-            data-dag-telemetry-yes=""
-            disabled={busy}
-            onClick={() => answer(true)}
-          >
+          </Button>
+          <Button variant="primary" data-dag-telemetry-yes="" disabled={busy} onClick={() => answer(true)}>
             Send
-          </button>
+          </Button>
         </div>
       </Dialog>
     );
@@ -131,21 +119,15 @@ export function TelemetryPrompt({ page }: { page: string | null }) {
       }}
       actions={
         <>
-          <button
-            type="button"
-            className={toastAct()}
-            data-dag-telemetry-what=""
-            aria-haspopup="dialog"
-            onClick={() => setWhat(true)}
-          >
+          <Button variant="quiet" data-dag-telemetry-what="" aria-haspopup="dialog" onClick={() => setWhat(true)}>
             What's sent
-          </button>
-          <button type="button" className={toastAct()} data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
+          </Button>
+          <Button data-dag-telemetry-no="" disabled={busy} onClick={() => answer(false)}>
             No
-          </button>
-          <button type="button" className={toastAct(true)} data-dag-telemetry-yes="" disabled={busy} onClick={() => answer(true)}>
+          </Button>
+          <Button variant="primary" data-dag-telemetry-yes="" disabled={busy} onClick={() => answer(true)}>
             Send
-          </button>
+          </Button>
         </>
       }
     >

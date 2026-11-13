@@ -4,9 +4,10 @@ import { AlertCircle, ChevronDown } from "lucide-react";
 import { itemName } from "@/board/types";
 import type { Fix, Repair } from "@/edit/repair";
 import type { ProblemsShow } from "@/settings/store";
+import { Button } from "@/ui/controls";
 
 import { count, freshErrors, type Problem } from "./problemList";
-import { Toast, toastAct } from "./Toast";
+import { Toast } from "./Toast";
 
 /** Lucide at one size and weight, stated once. */
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -145,9 +146,9 @@ export function Problems({ problems, show, editing, pageName, onShow, repairOf, 
           dismissData={{ "data-dag-problems-dismiss": "" }}
           actions={
             first.item ? (
-              <button type="button" className={toastAct()} data-dag-problems-show="" onClick={() => go(first)}>
+              <Button data-dag-problems-show="" onClick={() => go(first)}>
                 Show
-              </button>
+              </Button>
             ) : null
           }
         >

@@ -8,6 +8,7 @@ import {
   type FeedbackKind,
   type FeedbackSent,
 } from "../../api/protocol/feedback";
+import { Button, IconButton } from "@/ui/controls";
 import { Dialog } from "@/ui/Dialog";
 
 const ICON = { size: 16, strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -193,16 +194,9 @@ export function FeedbackCard({ document: doc, onClose }: { document: FeedbackDoc
         <MessageCircleWarning {...ICON} className="dag-feedback__mark" aria-hidden="true" />
         <h2 id="dag-feedback-title">Send feedback</h2>
         <span className="dag-toolbar__spacer" />
-        <button
-          type="button"
-          className="dag-icon"
-          aria-label="Close"
-          data-dag-feedback-close=""
-          disabled={busy}
-          onClick={onClose}
-        >
+        <IconButton aria-label="Close" shortcut="Escape" data-dag-feedback-close="" disabled={busy} onClick={onClose}>
           <X {...ICON} aria-hidden="true" />
-        </button>
+        </IconButton>
       </header>
 
       {sending.state === "sent" ? (
@@ -337,23 +331,15 @@ export function FeedbackCard({ document: doc, onClose }: { document: FeedbackDoc
 
       <footer className="dag-settings__foot dag-feedback__foot">
         {sending.state === "sent" ? (
-          <button type="button" className="dag-button" onClick={onClose}>
-            Close
-          </button>
+          <Button onClick={onClose}>Close</Button>
         ) : (
           <>
             <span className="dag-rewrite-dialog__hint">
               <kbd>ctrl</kbd> <kbd>Enter</kbd> to send
             </span>
-            <button
-              type="button"
-              className="dag-button dag-button--primary"
-              data-dag-feedback-send=""
-              disabled={!canSend}
-              onClick={() => void send()}
-            >
+            <Button variant="primary" data-dag-feedback-send="" disabled={!canSend} onClick={() => void send()}>
               {busy ? "Sending…" : "Send"}
-            </button>
+            </Button>
           </>
         )}
       </footer>

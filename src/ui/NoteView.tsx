@@ -21,12 +21,13 @@ import { Said } from "@/files/Said";
 import { uploadFiles } from "@/files/upload";
 import { refuseLocked } from "@/settings/lock";
 import { typing } from "@/edit/useEditor";
+import { Button } from "@/ui/controls";
 
 import { EventBar, EventLine } from "./EventBar";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { TaskGlyph, TaskLine } from "./TaskGlyph";
-import { Toast, ToastName, ToastWords, toastAct } from "./Toast";
+import { Toast, ToastName, ToastWords } from "./Toast";
 
 /**
  * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
@@ -807,12 +808,12 @@ export function NoteView({
           title={CONFLICT}
           actions={
             <>
-              <button type="button" className={toastAct()} data-dag-note-keep="" onClick={() => void keepMine()}>
+              <Button data-dag-note-keep="" onClick={() => void keepMine()}>
                 Keep mine
-              </button>
-              <button type="button" className={toastAct()} data-dag-note-theirs="" onClick={takeTheirs}>
+              </Button>
+              <Button data-dag-note-theirs="" onClick={takeTheirs}>
                 Use theirs
-              </button>
+              </Button>
             </>
           }
         >
