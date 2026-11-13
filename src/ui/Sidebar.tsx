@@ -274,8 +274,11 @@ export interface SidebarFiles {
    * a status — or an event, a note that starts with a start. Resolves `null` once it was made and
    * opened, or the sentence saying why it was not — which the column says under the tree. A locked
    * app answers through the lock's own notice instead, so it resolves `null` too.
+   *
+   * **A `title` makes the file under that title instead of asking for one**: the search's way,
+   * where the words somebody typed are the name and opening it is the whole of the gesture.
    */
-  newFile(kind: TextKind | "task" | "event", folder: string): Promise<string | null>;
+  newFile(kind: TextKind | "task" | "event", folder: string, title?: string): Promise<string | null>;
   /**
    * Upload files from the computer into a folder: each becomes an attachment, listed here
    * like any other file. Resolves to the sentences for any the server — or its upload limits —

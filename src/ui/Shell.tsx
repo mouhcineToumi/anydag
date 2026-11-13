@@ -85,8 +85,11 @@ export interface SidebarControl {
    * does, and what the welcome card's two buttons do, so there is one way a file begins.
    * A task is a note that starts with a status, an event one that starts with a start
    *; a quiz is a kind of its own.
+   *
+   * **A `title` makes it under those words instead**: what the search does from a miss, so the file
+   * opens already called what somebody typed and no second question is asked.
    */
-  create(kind: TextKind | "task" | "event", folder?: string): void;
+  create(kind: TextKind | "task" | "event", folder?: string, title?: string): void;
   /**
    * A page renamed the file it has open — a note's own title, written where it is drawn.
    * What the sidebar remembers by name follows it, as it follows a rename made in a row.
@@ -144,9 +147,9 @@ const clampWidth = (w: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Ma
    `(board|note)`, a favourite quiz was dropped the next time the page loaded. */
 const FAVOURITE_KEY = new RegExp(`^(${FILE_KINDS.join("|")}):.`);
 
-/** What a new file of each kind starts as. Keyed on the kind, so a sixth kind is a type error here. An
-    attachment is uploaded rather than made, so it has no blank. */
-const BLANK: Readonly<Record<TextKind, () => string>> = {
+/** What a new file of each kind starts as, under the title it is given. Keyed on the kind, so a
+    sixth kind is a type error here. An attachment is uploaded rather than made, so it has no blank. */
+const BLANK: Readonly<Record<TextKind, (title: string) => string>> = {
   board: blankBoardText,
   note: blankNoteText,
   quiz: blankQuizText,
@@ -503,31 +506,42 @@ export function Shell({
     /* The one file that is open, with its kind — or none. */
     const openKind = FILE_KINDS.find((k) => opened[k] !== null);
     const raw: SidebarFiles = {
-      newFile(kind, folder) {
+      newFile(kind, folder, title) {
+        /* What it is called. Usually `Untitled`, and named from the title that opens with it; a
+           search passes the words somebody typed, and those are the file's name as well as its title. */
+        const named = title?.trim() || undefined;
         /* The free name is found here, as a new folder's is, so the row can be drawn before the server
            answers; the server still numbers it if somebody took it meanwhile. One namespace
-           for every kind, and names are titles: `Untitled`, `Untitled 2`, case aside. */
+           for every kind, and names are titles: `Untitled`, `Untitled 2`, case aside. A `/` is a
+           character of a title and never a folder, which is the rule the server files by too. */
         const known = new Set(everyFile({ boards, notes, quizzes, tables, files: attachments }).map((f) => f.name.toLowerCase()));
-        const base = folder ? `${folder}/Untitled` : "Untitled";
+        const stem = named?.replace(/[\\/]+/g, "-") ?? UNTITLED;
+        const base = folder ? `${folder}/${stem}` : stem;
         let ask = base;
         for (let i = 2; known.has(ask.toLowerCase()); i++) ask = `${base} ${i}`;
         /* A task is a note that starts with a status, and an event one that starts at the next whole
            hour; every other kind starts as its own blank. */
         const as: TextKind = kind === "task" || kind === "event" ? "note" : kind;
         const next = nextHourEvent();
-        const done = guess({ op: "add", kind: as, name: ask, title: UNTITLED });
-        const making =
+        const done = guess({ op: "add", kind: as, name: ask, title: named ?? UNTITLED });
+        const text =
           kind === "task"
-            ? createNote(ask, blankTaskText())
+            ? blankTaskText(undefined, named)
             : kind === "event"
-              ? createNote(ask, blankEventText(next.start, next.end))
-              : createFile(kind, ask, BLANK[kind]());
+              ? blankEventText(next.start, next.end, named)
+              : BLANK[kind](named ?? UNTITLED);
+        const making = kind === "task" || kind === "event" ? createNote(ask, text) : createFile(kind, ask, text);
         return making.then((made) => {
           if ("error" in made) {
             done(false);
             return made.error;
           }
           done(true);
+          /* Given its title already, it opens as it is: there is no question left to ask. */
+          if (named) {
+            onOpen(as, made.name);
+            return null;
+          }
           if (as !== "note") {
             bring(as, made.name);
             return null;
@@ -801,7 +815,10 @@ export function Shell({
     saveFavourites,
   ]);
 
-  const create = useCallback((kind: TextKind | "task" | "event", folder = "") => void files.newFile(kind, folder), [files]);
+  const create = useCallback(
+    (kind: TextKind | "task" | "event", folder = "", title?: string) => void files.newFile(kind, folder, title),
+    [files],
+  );
 
   const renamed = useCallback(
     (kind: FileKind, from: string, to: string) => moved({ kind: "file", file: kind, from, to }),

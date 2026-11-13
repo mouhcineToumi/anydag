@@ -1595,9 +1595,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   flex-direction: column;
   width: 420px;
   max-width: calc(100% - 48px);
-  /* A tall window should show more boards, not more empty card — so it grows to a share of the
-     viewport rather than to a fixed number of rows, and stops before it becomes a second column. */
-  height: min(560px, calc(100% - 64px));
+  /* **As tall as its results, up to the same ceiling.** It used to be the ceiling on every search,
+     so one board and none were both a 560px card with two empty thirds — and a miss, which now has
+     something to offer, would have had the most empty space of all. The list is what grows. */
+  max-height: min(560px, calc(100% - 64px));
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-metric-radius-card);
@@ -1644,7 +1645,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-panel__clear:hover { color: var(--dag-color-ink); }
 
 .dag-panel__list {
-  flex: 1;
+  /* `auto` rather than `0`: the card has no height of its own, so the list's content is what makes
+     it tall, and it shrinks — and scrolls — only once the card reaches its maximum. */
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 8px;
@@ -1669,6 +1672,35 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* An empty folder says so, and the line is also what a board can be dropped onto: a heading alone
    is four pixels of target. */
 .dag-panel__empty--folder { padding: 4px 8px 6px; font-style: italic; }
+
+/*
+ * What a miss offers: the words somebody typed, as a board or a note.
+ *
+ * Rows of the same height and radius as the board rows, with the mark's column kept, so the card
+ * does not change shape between "found it" and "make it". The board comes first because Enter
+ * presses it; the words are the title, so they are the text, not a second field to fill in.
+ */
+.dag-hits__make { margin-top: 4px; }
+.dag-hits__new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: 13px;
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-metric-radius-chip);
+  cursor: pointer;
+}
+.dag-hits__new:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-hits__new:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-hits__new > svg { flex: none; color: var(--dag-color-muted); }
+.dag-hits__make-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- folders, as a tree ---- */
 
@@ -1749,6 +1781,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-board { touch-action: none; }
 .dag-board:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-board--on { color: var(--dag-color-ink); background: var(--dag-color-paper200); font-weight: 600; }
+/* A file found by name and in its text: the row is its one entry, and this says the second half. */
+.dag-board__also { font-weight: 400; font-style: italic; }
 
 /* Matches in the text of every board and note, under the names in the search card. Two
    lines a row, because a match is two facts: where it is, and the words around it. The words are
