@@ -28,7 +28,7 @@ long enough to read as hung, or that is refused.
 | **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 2.2 s; first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 0.5 s, re-run after every change; a 1,000-file folder takes 1.6 s to draw; server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder 6.7 s and 90k DOM elements; startup 6.4 s, with every request held behind the first listing |
 | **Board size** (items, one in ten a 6-node diagram) | **500** — 0.95 s to `data-dag-ready`, its renderer 285 MB | **2,000** — 5.7 s, its renderer 643 MB, 30k DOM elements | not reached at 2,000 |
 | **Diagram size** (`arch` nodes, ELK) | **200** — 0.9 s | **500** — 2.9 s | **1,000** — 8.3 s with nothing drawn until it is done |
-| **Attachment size** | **100 MB** — upload 0.26 s, read 0.17 s; the server peaks at 540 MB | **500 MB** — the server peaks at 1.6 GB and keeps it (#278) | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 5 ms |
+| **Attachment size** | **512 MB**, the limit — streamed both ways (#278): a 500 MB upload 1.1 s, read 0.8 s, a 1 KB range of it 5 ms; the server peaks about 80 MB over its resting size, the same at 100 MB as at 500 | not reached at the limit | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 6 ms |
 | **Note size** (words) | **1,000** — 0.5 s | **100,000** (≈ 600 KB) — 2.0 s | not reached at 100,000 |
 
 The vault limit is set by three things that scale with the vault rather than with what changed —
@@ -185,7 +185,7 @@ back. Raise a ceiling only with a run that says why.
 the rest moved by up to 2x between runs on this laptop (a board timed straight after the 50k vault,
 with the browser still giving back gigabytes, was twice as slow, which is why boards now run first), and
 a guard that fails on noise is one nobody reads; and fixing what was found, which is one issue each:
-#278 (attachments held whole in memory), #279 (the server's memory grows with the vault), #280 (the
+#278 (attachments held whole in memory; fixed, streamed now), #279 (the server's memory grows with the vault), #280 (the
 listing and the references index re-read the vault per call), #281 (the sidebar is not virtualised),
 #282 (the search card loads the vault's text into the page), #283 (the first listing holds the
 server's thread, so startup grows with the vault).
@@ -194,7 +194,9 @@ server's thread, so startup grows with the vault).
 
 `node scripts/bench.mjs --json bench.json`, 2026-11-14, the machine above. The `desktop.startup.*`
 lines at the end are from `node scripts/bench.mjs --only desktop` the same day, run after startup was
-added to the script.
+added to the script. The `attach.*` lines are from `node scripts/bench.mjs --only attach` the same day,
+after attachments were streamed (#278); before it, the server peaked at 1,130 MB on the 500 MB upload
+and 1,630 MB on its read, and a 1 KB range of it took 180–190 ms.
 
 ```text
 # AnyDag bench · 2026-11-14T08:27:37.344Z
@@ -240,28 +242,28 @@ note.1k.ready                            488 ms            # a note of 1,000 wor
 note.100k.ready                          2041 ms           # a note of 100,000 words; median of 3, max 2573
 note.100k.heap                           58.4 MB
 diagram.1000.parse                       58.7 ms           # server: GET /__board/diagnostics
-attach.server.rss.start                  99.9 MB
-attach.1.upload                          23.6 ms
-attach.1.rss.peak.upload                 101 MB            # server peak RSS so far
-attach.1.read                            6.6 ms            # GET the whole file
-attach.1.rss.peak.read                   103 MB            # server peak RSS so far; RSS now 103 MB
-attach.1.range                           2.9 ms            # the first KB, as a PDF viewer asks
-attach.10.upload                         40.4 ms
-attach.10.rss.peak.upload                127 MB            # server peak RSS so far
-attach.10.read                           22.8 ms           # GET the whole file
-attach.10.rss.peak.read                  147 MB            # server peak RSS so far; RSS now 147 MB
-attach.10.range                          9 ms              # the first KB, as a PDF viewer asks
-attach.100.upload                        257 ms
-attach.100.rss.peak.upload               341 MB            # server peak RSS so far
-attach.100.read                          174 ms            # GET the whole file
-attach.100.rss.peak.read                 540 MB            # server peak RSS so far; RSS now 386 MB
-attach.100.range                         39.9 ms           # the first KB, as a PDF viewer asks
-attach.500.upload                        1326 ms
-attach.500.rss.peak.upload               1132 MB           # server peak RSS so far
-attach.500.read                          1054 ms           # GET the whole file
-attach.500.rss.peak.read                 1632 MB           # server peak RSS so far; RSS now 1632 MB
-attach.500.range                         192 ms            # the first KB, as a PDF viewer asks
-attach.over-limit.ms                     5.5 ms            # answered 413 to 600 MB declared, against the 512 MB default
+attach.server.rss.start                  100 MB
+attach.1.upload                          39.2 ms
+attach.1.rss.peak.upload                 102 MB            # server peak RSS so far
+attach.1.read                            7 ms              # GET the whole file
+attach.1.rss.peak.read                   102 MB            # server peak RSS so far; RSS now 102 MB
+attach.1.range                           2.8 ms            # the first KB, as a PDF viewer asks
+attach.10.upload                         37.3 ms
+attach.10.rss.peak.upload                115 MB            # server peak RSS so far
+attach.10.read                           23.5 ms           # GET the whole file
+attach.10.rss.peak.read                  135 MB            # server peak RSS so far; RSS now 135 MB
+attach.10.range                          3.8 ms            # the first KB, as a PDF viewer asks
+attach.100.upload                        220 ms
+attach.100.rss.peak.upload               169 MB            # server peak RSS so far
+attach.100.read                          144 ms            # GET the whole file
+attach.100.rss.peak.read                 168 MB            # server peak RSS so far; RSS now 162 MB
+attach.100.range                         5.1 ms            # the first KB, as a PDF viewer asks
+attach.500.upload                        1061 ms
+attach.500.rss.peak.upload               177 MB            # server peak RSS so far
+attach.500.read                          763 ms            # GET the whole file
+attach.500.rss.peak.read                 182 MB            # server peak RSS so far; RSS now 160 MB
+attach.500.range                         4.9 ms            # the first KB, as a PDF viewer asks
+attach.over-limit.ms                     6 ms              # answered 413 to 600 MB declared, against the 512 MB default
 attach.vault.size                        611 MB
 vault.100.generate                       6.4 ms            # 0.2 MB on disk
 vault.100.server.start                   193 ms            # spawn to listening, the vault opened

@@ -41,8 +41,15 @@ Nine things are load-bearing:
   here is a download and never a page on the app's origin; an `.svg` is drawn only as an `<img>`.
 - **The bytes are the request body**, `POST /__board/file?name=&folder=&title=`: twenty-five
   megabytes are thirty-three as base64, and a multipart form wants a dependency the server does not
-  need. The size is checked as it streams in, so an oversized file is refused at its first megabyte
-  over. The page checks the same two limits before it sends anything (`refusal` in
+  need. **The bytes are streamed, never held whole** (#278): the body goes to a temp file beside its
+  target (`.<leaf>.<pid>.<random>.tmp`, which the watcher ignores), hashed — the index's sha1 and the
+  answer's `sha256` — and checked against the limit as it passes, and is renamed into place once the
+  last byte is down; the name is settled only then, so two uploads of one name at once are two
+  files. An oversized file is refused at its first chunk over; one that stops half-way — the
+  connection dropped, or fewer bytes than its `Content-Length` — is a `400` and leaves no file, temp
+  or otherwise (`putFile` in `server/vault.ts`, which a move between vaults streams through too). A
+  500 MB upload raises the server's memory by about 80 MB, the same as a 100 MB one
+  (`limits.md`). The page checks the same two limits before it sends anything (`refusal` in
   `src/files/upload.ts`, the server's sentences word for word), and a board says a refused drop in
   `UploadNotice` — a toast a refusal, in the app's one stack (#208) — off the `dag:upload-problem` document event, which a board write the server never
   received raises as well (`useBoard`, *Editing*).
@@ -62,7 +69,11 @@ Nine things are load-bearing:
 whatever `ANYDAG_UPLOAD_TYPES` adds), so a page or a script somebody
 left in a folder is not listed or served. Both file routes answer a
 `Range` with a 206 (`byteRange` in `server/uploads.ts`): a `<video>` will not seek without one, and
-Safari will not play one at all. The size limit is `ANYDAG_UPLOAD_MAX_MB`, 512 by default.
+Safari will not play one at all. **A read is a file stream** (`fileStream`), and a range reads only its
+range — a PDF viewer asks for one per page, and a 1 KB range of a 500 MB file answers in 5 ms rather
+than the 180 it took to read the whole file each time. The watcher's sha1 of an attachment changed on
+disk is read as a stream too, once per burst of events rather than once per event, and said on the
+feed when it is done. The size limit is `ANYDAG_UPLOAD_MAX_MB`, 512 by default.
 
 **The PDF viewer is a chunk of its own**, with pdf.js behind it, imported the first time a PDF is
 drawn (`preloadPdfViewer` in `src/files/Preview.tsx`) and kept once it has come — **not

@@ -9,12 +9,13 @@
  */
 
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 
 import type { Hono } from "hono";
 
 import { cleanTitle } from "../../src/note/format";
 import type { Session } from "../context";
-import { bodyOf, err, mustRead, textKind } from "../http";
+import { bodyOf, err, Http, mustRead, textKind } from "../http";
 import { extOf, fileNameFrom, folderFrom, leafOf } from "../names";
 import { byteRange, fileHeaders, megabytes, mimeOf } from "../uploads";
 import { Refused, sha1 } from "../vault";
@@ -61,31 +62,57 @@ function pastedName(ext: string, at = new Date()): string {
 /**
  * Keep one uploaded file as an attachment, checked against the limits, named from what it was called
  * inside `folder`, numbered when taken. `store_upload`, ported; the refusals are word for word.
+ *
+ * The bytes are the request body, **streamed into the vault and never held whole**: checked against
+ * the limit and hashed as they pass, so an oversized one is refused at its first chunk over, and one
+ * that stops half-way — the connection dropped, or fewer bytes than its `Content-Length` said —
+ * leaves no file behind (`putFile` removes its temp file).
  */
-async function storeUpload(s: Session, filename: string, folder: string, data: Uint8Array, title?: string | null) {
+async function storeUpload(
+  s: Session,
+  filename: string,
+  folder: string,
+  body: AsyncIterable<Uint8Array>,
+  declared: number | null,
+  title?: string | null,
+) {
   const limits = s.limits();
   const leaf = leafOf(String(filename ?? "").replace(/\\/g, "/")).trim();
   const ext = extOf(leaf);
   if (!ext) throw err(415, `\`${leaf || "this file"}\` has no extension, so there is no telling what it is`);
   if (!s.vault.types.has(ext)) throw err(415, `\`.${ext}\` files cannot be uploaded here`);
-  if (data.byteLength > limits.maxBytes)
-    throw err(413, `\`${leaf}\` is ${megabytes(data.byteLength)}; the limit is ${megabytes(limits.maxBytes)}`);
   const where = folderFrom(folder ?? "");
   if (where === null) throw err(400, `\`${folder}\` is not a folder name`);
   if (where === "components" || where.startsWith("components/")) throw err(400, "a file cannot live in components/");
   const name = fileNameFrom(where ? `${where}/${leaf}` : leaf, s.vault.types);
   if (!name) throw err(415, `\`${leaf}\` is not a name a file can have`);
   const said = (title ? cleanTitle(title) : null) ?? null;
+  /* And a checksum, so whoever sent the bytes can prove they arrived as sent. */
+  const sum = createHash("sha256");
+  let size = 0;
+  async function* checked(): AsyncGenerator<Uint8Array> {
+    try {
+      for await (const chunk of body) {
+        size += chunk.byteLength;
+        if (size > limits.maxBytes) throw err(413, `\`${filename}\` is over the limit of ${megabytes(limits.maxBytes)}`);
+        sum.update(chunk);
+        yield chunk;
+      }
+    } catch (e) {
+      if (e instanceof Http) throw e;
+      throw err(400, `\`${leaf}\` did not arrive whole`);
+    }
+    if (declared !== null && size !== declared) throw err(400, `\`${leaf}\` did not arrive whole`);
+  }
   let settled: string;
   try {
-    settled = await s.vault.putFile(name, data, said);
+    settled = await s.vault.putFile(name, checked(), said);
   } catch (e) {
     if (e instanceof Refused) throw err(400, e.message);
     throw e;
   }
-  const answer = fileAnswer(settled, await s.vault.peekId(settled, "file"), said ?? leafOf(settled), data.byteLength);
-  /* And a checksum, so whoever sent the bytes can prove they arrived as sent. */
-  return { ...answer, sha256: createHash("sha256").update(data).digest("hex") };
+  const answer = fileAnswer(settled, await s.vault.peekId(settled, "file"), said ?? leafOf(settled), size);
+  return { ...answer, sha256: sum.digest("hex") };
 }
 
 /** A pasted picture, kept as an attachment in the vault's attachments folder. */
@@ -103,29 +130,17 @@ async function storePasted(s: Session, dataUrl: unknown): Promise<{ id: string; 
 export function fileRoutes(app: Hono, s: Session): void {
   app.post("/__board/file", async (c) => {
     const name = c.req.query("name") ?? "";
+    const length = c.req.header("content-length");
+    const declared = length !== undefined && length.trim() !== "" && Number.isFinite(Number(length)) ? Number(length) : null;
     const limits = s.limits();
-    const declared = Number(c.req.header("content-length"));
-    if (Number.isFinite(declared) && declared > limits.maxBytes) {
+    if (declared !== null && declared > limits.maxBytes) {
       throw err(413, `\`${name}\` is ${megabytes(declared)}; the limit is ${megabytes(limits.maxBytes)}`);
     }
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    const reader = c.req.raw.body?.getReader();
-    if (reader) {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > limits.maxBytes) {
-          await reader.cancel();
-          throw err(413, `\`${name}\` is over the limit of ${megabytes(limits.maxBytes)}`);
-        }
-        chunks.push(value);
-      }
-    }
-    return c.json(await storeUpload(s, name, c.req.query("folder") ?? "", Buffer.concat(chunks), c.req.query("title") ?? null));
+    const body: AsyncIterable<Uint8Array> = c.req.raw.body ?? (async function* () {})();
+    return c.json(await storeUpload(s, name, c.req.query("folder") ?? "", body, declared, c.req.query("title") ?? null));
   });
 
+  /** An attachment, read from disk as it is sent; a `Range` reads only its range. */
   app.get("/__board/file", async (c) => {
     const id = c.req.query("id") ?? "";
     const asked = c.req.query("name") ?? "";
@@ -137,22 +152,21 @@ export function fileRoutes(app: Hono, s: Session): void {
     const missing = () => err(404, `no file \`${id || asked}\``);
     if (!name) throw missing();
     const info = await s.vault.fileInfo(name);
-    const data = info ? await s.vault.getFile(name) : null;
-    if (!info || !data) throw missing();
+    if (!info) throw missing();
+    const size = info.bytes;
     const ext = extOf(name);
     const download = ["1", "true", "yes"].includes(c.req.query("download") ?? "");
     const head: Record<string, string> = { ...fileHeaders(ext, info.title ?? leafOf(name), download), "accept-ranges": "bytes" };
-    const want = byteRange(c.req.header("range"), data.length);
-    if (want === false) return c.body(null, 416, { ...head, "content-range": `bytes */${data.length}` });
-    if (want) {
-      const [first, last] = want;
-      return c.body(new Uint8Array(data.subarray(first, last + 1)), 206, {
-        ...head,
-        "content-type": mimeOf(ext),
-        "content-range": `bytes ${first}-${last}/${data.length}`,
-      });
-    }
-    return c.body(new Uint8Array(data), 200, { ...head, "content-type": mimeOf(ext) });
+    const want = byteRange(c.req.header("range"), size);
+    if (want === false) return c.body(null, 416, { ...head, "content-range": `bytes */${size}` });
+    if (size === 0) return c.body(new Uint8Array(0), 200, { ...head, "content-type": mimeOf(ext) });
+    const [first, last] = want ?? [0, size - 1];
+    const stream = s.vault.fileStream(name, want ? { start: first, end: last } : undefined);
+    if (!stream) throw missing();
+    const sent = Readable.toWeb(stream) as unknown as ReadableStream<Uint8Array>;
+    const type = { "content-type": mimeOf(ext), "content-length": String(last - first + 1) };
+    if (want) return c.body(sent, 206, { ...head, ...type, "content-range": `bytes ${first}-${last}/${size}` });
+    return c.body(sent, 200, { ...head, ...type });
   });
 
   app.get("/__board/files", async (c) => {
