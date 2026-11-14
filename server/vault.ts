@@ -24,9 +24,11 @@
  * - **Names are the person's** (`names.ts`): verbatim, portable, and case-insensitively unique.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import watcher from "@parcel/watcher";
 
@@ -223,6 +225,8 @@ export class Vault {
    */
   private present: Set<string> | null = null;
   private stopping: Promise<() => Promise<void>> | null = null;
+  /** Attachments whose sha1 the watcher is reading, and whether another event came in meanwhile. */
+  private hashing = new Map<string, boolean>();
   /** Created instants sync adopted for documents it is about to write, keyed by lowercased path. */
   private adopted = new Map<string, string>();
   /** The same, by the id sync wrote it under: a document renamed here before the index walked it. */
@@ -625,7 +629,7 @@ export class Vault {
         if (!want.length) continue;
         let digest: string;
         try {
-          digest = digestOf(fs.readFileSync(this.abs(d.file)));
+          digest = digestFileSync(this.abs(d.file));
         } catch {
           continue;
         }
@@ -1449,21 +1453,37 @@ export class Vault {
   /**
    * Store an attachment under `name` — a file's name, extension and all — returning the name the vault
    * settled on, numbered before its extension when taken. Its id record is written as it is made.
+   *
+   * **The bytes may be a stream**, and are then never held whole: they go to a temp file beside the
+   * target, hashed as they pass, and are renamed into place once the last one is down. A stream that
+   * fails half-way leaves nothing but its error — the temp file is removed. The name is settled
+   * after the bytes are down, with nothing awaited between choosing a free name and taking it, so
+   * two uploads of one name at once are two files.
    */
   async putFile(
     name: string,
-    data: Uint8Array,
+    data: FileBytes,
     title: string | null,
     opts: { id?: string; created?: string } = {},
   ): Promise<string> {
     const asked = fileNameFrom(name, this.types);
     if (!asked) throw new Refused(`not a file name \`${name}\``);
-    const settled = uniqueFile(asked, (n) => this.taken(n));
-    const abs = this.writeAt(settled);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.${process.pid}.tmp`);
-    fs.writeFileSync(tmp, data);
-    moveFile(tmp, abs);
+    const dir = path.dirname(this.writeAt(asked));
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = path.join(dir, `.${path.basename(asked)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+    let settled: string;
+    let digest: string;
+    try {
+      if (data instanceof Uint8Array) {
+        fs.writeFileSync(tmp, data);
+        digest = digestOf(data);
+      } else digest = await streamInto(tmp, data);
+      settled = uniqueFile(asked, (n) => this.taken(n));
+      moveFile(tmp, this.writeAt(settled));
+    } catch (e) {
+      fs.rmSync(tmp, { force: true });
+      throw e;
+    }
     const taken = (x: string): boolean => !!this.home.docById(this.id, x);
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : mint(taken);
     const clean = title?.trim() || null;
@@ -1477,16 +1497,32 @@ export class Vault {
       minted: 1,
       title: clean,
     });
-    this.home.set(this.digestKey(id), digestOf(data));
+    this.home.set(this.digestKey(id), digest);
     return settled;
   }
 
+  /** An attachment's bytes, whole. For a test or a small file: a route streams, with `fileStream`. */
   async getFile(name: string): Promise<Buffer | null> {
     try {
       return fs.readFileSync(this.abs(this.fileOf(name, "file")));
     } catch {
       return null;
     }
+  }
+
+  /**
+   * An attachment's bytes as a stream, from `start` to `end` inclusive (the whole file without them),
+   * read as they are sent — so a range of a large PDF reads only that range. `null` when it is not there.
+   */
+  fileStream(name: string, range?: { start: number; end: number }): Readable | null {
+    let abs: string;
+    try {
+      abs = this.abs(this.fileOf(name, "file"));
+    } catch {
+      return null;
+    }
+    if (!isFile(abs)) return null;
+    return fs.createReadStream(abs, range ? { start: range.start, end: range.end } : {});
   }
 
   async fileInfo(name: string): Promise<FileInfo | null> {
@@ -1510,8 +1546,8 @@ export class Vault {
     const next = { ...row, title, minted: 1 };
     this.writeFileId(row.id, row.path, title);
     this.home.putDoc(next);
-    const bytes = await this.getFile(name);
-    this.emit({ type: "doc", kind: "file", name, sha1: bytes ? sha1(bytes) : null, title });
+    const sum = await sha1File(this.abs(row.path)).catch(() => null);
+    this.emit({ type: "doc", kind: "file", name, sha1: sum, title });
   }
 
   // -- legacy pictures -------------------------------------------------------
@@ -1718,6 +1754,39 @@ export class Vault {
     if (stop) await (await stop.catch(() => async () => undefined))();
   }
 
+  /**
+   * An attachment changed on disk: say so on the feed with the sha1 of its bytes, **read as a stream**
+   * — a large file copied in by hand is never held whole. The events a copy raises while it is being
+   * written are one read, done again once if another came in during it, and the change is said after
+   * the read rather than in the watcher's batch.
+   */
+  private hashThenSay(abs: string, rel: string, name: string): void {
+    if (this.hashing.has(abs)) {
+      this.hashing.set(abs, true);
+      return;
+    }
+    this.hashing.set(abs, false);
+    void (async () => {
+      for (;;) {
+        const sum = await sha1File(abs).catch(() => null);
+        if (this.hashing.get(abs)) {
+          this.hashing.set(abs, false);
+          continue;
+        }
+        this.hashing.delete(abs);
+        /* Gone meanwhile (its delete is its own event), or the vault was closed. */
+        if (sum === null || !this.stopping) return;
+        try {
+          const row = this.home.docByPath(this.id, rel);
+          this.emit({ type: "doc", kind: "file", name, sha1: sum, title: row?.title ?? null });
+        } catch {
+          /* the index closed under the read */
+        }
+        return;
+      }
+    })();
+  }
+
   private async startWatch(): Promise<() => Promise<void>> {
     if (!this.present) this.walk();
     const sub = await watcher.subscribe(
@@ -1771,14 +1840,7 @@ export class Vault {
             continue;
           }
           if (found.kind === "file") {
-            let bytes: Buffer;
-            try {
-              bytes = fs.readFileSync(ev.path);
-            } catch {
-              continue;
-            }
-            const row = this.home.docByPath(this.id, rel);
-            this.emit({ type: "doc", kind: "file", name: found.name, sha1: sha1(bytes), title: row?.title ?? null });
+            this.hashThenSay(ev.path, rel, found.name);
             continue;
           }
           let text: string;
@@ -1932,4 +1994,51 @@ export function writeAtomic(file: string, text: string | Uint8Array): void {
 /** `${size}:${sha1}` of an attachment's bytes. */
 function digestOf(data: Uint8Array): string {
   return `${data.byteLength}:${sha1(data)}`;
+}
+
+/** Bytes to keep as an attachment: whole, or as they arrive. */
+export type FileBytes = Uint8Array | AsyncIterable<Uint8Array>;
+
+/** Write a stream of bytes to `file` (which must not exist), returning their `digestOf`. */
+async function streamInto(file: string, source: AsyncIterable<Uint8Array>): Promise<string> {
+  const hash = createHash("sha1");
+  let size = 0;
+  await pipeline(
+    source,
+    async function* (chunks: AsyncIterable<Uint8Array>) {
+      for await (const chunk of chunks) {
+        hash.update(chunk);
+        size += chunk.byteLength;
+        yield chunk;
+      }
+    },
+    fs.createWriteStream(file, { flags: "wx" }),
+  );
+  return `${size}:${hash.digest("hex")}`;
+}
+
+/** The sha1 of a file's bytes, read a chunk at a time and never held whole. */
+async function sha1File(file: string): Promise<string> {
+  const hash = createHash("sha1");
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+/** `digestOf` a file on disk, a megabyte at a time: the walk is synchronous, and a file may be large. */
+function digestFileSync(file: string): string {
+  const hash = createHash("sha1");
+  const buf = Buffer.allocUnsafe(1 << 20);
+  const fd = fs.openSync(file, "r");
+  let size = 0;
+  try {
+    for (;;) {
+      const n = fs.readSync(fd, buf, 0, buf.length, null);
+      if (!n) break;
+      hash.update(buf.subarray(0, n));
+      size += n;
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  return `${size}:${hash.digest("hex")}`;
 }
