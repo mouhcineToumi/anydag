@@ -56,7 +56,7 @@ import { withVault } from "@/vault/current";
 
 import { startDrag } from "./pointerDrag";
 import { TaskGlyph } from "./TaskGlyph";
-import { NO_PROJECT, type ProjectFilter } from "./Tasks";
+import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { collation } from "@/locale";
 
 /**

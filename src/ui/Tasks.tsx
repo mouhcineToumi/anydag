@@ -15,6 +15,7 @@ import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskCh
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
 import { startDrag } from "./pointerDrag";
+import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
 import { DueLabel, StatusButton, TaskGlyph } from "./TaskGlyph";
 import { collation } from "@/locale";
@@ -46,15 +47,6 @@ interface Row {
   /** The project it is in, innermost first: its note's name, status and title. */
   project?: { name: string; project: Project; title: string };
 }
-
-/**
- * What the Tasks page shows: every task, the tasks under one project's folder — its note's
- * name — or the tasks in no project at all.
- */
-export type ProjectFilter = { kind: "all" } | { kind: "none" } | { kind: "project"; name: string };
-
-/** The URL's word for "in no project": not an id, which is ten characters of Crockford base32. */
-export const NO_PROJECT = "none";
 
 const leaf = (name: string) => name.slice(name.lastIndexOf("/") + 1);
 const same = (a: Task | undefined, b: Task | undefined) => a?.status === b?.status && a?.due === b?.due;

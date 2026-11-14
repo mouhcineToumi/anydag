@@ -78,25 +78,6 @@ const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   about: Info,
 };
 
-/** Whether Settings is up, and on which tab it was asked to open — the state each page keeps. */
-export interface SettingsOpen {
-  /** The tab a request named; absent is "where the last one left off". */
-  tab?: SettingsTab;
-}
-
-/**
- * The state a page holds for the modal, and the three ways it is changed: a request that names a tab
- * (the switcher's *Vault settings…*, the account menu), `ctrl+,` which toggles it, and a close.
- * One hook for the three pages that draw it, so the rule is written once.
- */
-export function useSettingsOpen() {
-  const [open, setOpen] = useState<SettingsOpen | null>(null);
-  const show = useCallback((tab?: SettingsTab) => setOpen({ tab }), []);
-  const toggle = useCallback(() => setOpen((v) => (v ? null : {})), []);
-  const close = useCallback(() => setOpen(null), []);
-  return { open, show, toggle, close };
-}
-
 /**
  * What the *app* does, as opposed to what a board says — a modal whose tabs are grouped by **where
  * each setting is kept**: the person's (*You*), this machine's (*This computer*), the vault's

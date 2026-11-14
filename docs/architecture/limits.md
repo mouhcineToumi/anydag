@@ -180,6 +180,47 @@ package carries for a build from source, and the CLI's `meta.json`.
   at every size since #283 (6.4 s on 50k before it; *Startup*). The update check runs after the
   window in a packaged build and is off in a dev run, so it is not in the number; deferring work past
   the first paint (#267 item 6) is not where the time went — the first listing was (#283).
+- **The first load** (#267 item 5): the entry was 1.07 MB and every page waited out React's 300 ms
+  lazy throttle. That wait was the time, not the bytes (*The first load*, #303).
+
+### The first load
+
+What a page downloads before it draws, and how long it takes, before and after #303 split the
+read-only view, the canvas and the pages a board never draws into chunks of their own
+(`references.md`; `src/ui/chunk.ts`). Bytes are from `npm run build`: the entry chunk and every chunk
+it imports statically, then with the chunks each page draws through. Gzip is level 9.
+
+| What is fetched | Before | After |
+|---|---|---|
+| the entry and its static imports | 1,066 kB · 335 kB gzip | **415 kB · 135 kB gzip** |
+| a board page (the entry and `App`) | 1,902 kB · 592 kB gzip | **1,626 kB · 512 kB gzip** |
+| a note page (and the block editor) | 2,977 kB · 925 kB gzip | **2,701 kB · 845 kB gzip** |
+| a `?view=1` page (the entry and `ViewApp`) | 1,066 kB · 335 kB gzip | 1,069 kB · 339 kB gzip |
+
+The entry held the whole read-only view, because `Gate` imported `ViewApp` statically, and `App`
+held every page: the Calendar, Tasks, quizzes, tables, the Trash, the Assistant and its panel,
+Settings, the search card, the feedback card and the export zip (`fflate`). Each of these is now a
+chunk that is fetched once the first page reports `data-dag-ready`.
+
+**The time came from somewhere else.** `App` was behind `React.lazy`, and React held every page back
+until 300 ms after the empty fallback went up (*`React.lazy` costs 300 ms the first time it renders*).
+A drawn board, three builds served by one server and loaded cold in turn, 15 rounds, medians:
+
+| Page, to `data-dag-ready` | Before | Smaller chunks, `App` still lazy | After |
+|---|---|---|---|
+| a one-card board | 515 ms | 502 ms | **215 ms** |
+| a 20-node `arch` | 569 ms | 557 ms | **270 ms** |
+| a note | 614 ms | 605 ms | **323 ms** |
+| `?view=1` of the `arch` | 236 ms | 206 ms | 208 ms |
+| the Calendar, to its grid | 920 ms | 874 ms | **174 ms** |
+
+So the fewer bytes are worth about 10 ms on a local server, and the throttle was worth about 300.
+The Calendar gained more than one throttle; where the rest went was not isolated.
+`node scripts/bench.mjs --only board --quick`, run twice on each build: `board.empty.first` 494 → 257–301 ms,
+`board.empty.ready` 395 → 155–166 ms, `board.100.ready` 577 → 337–358 ms, `note.1k.ready` 481–537 →
+185–226 ms. `--only desktop --quick`: launch to a drawn 20-item board 1.01–1.21 s → 0.75–0.95 s,
+and the board's own window 682 → 410 ms from navigation to `data-dag-ready`. The first window is
+unchanged, because it comes before any of the page's script runs.
 
 ### Not measured
 
