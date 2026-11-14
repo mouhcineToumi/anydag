@@ -16,6 +16,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
 
+import { cleanFolder } from "../src/note/template";
 import { Parsed, grammar } from "./grammar";
 import type { Home } from "./home";
 import { err } from "./http";
@@ -58,7 +59,12 @@ function vaultOptions(root: string, base: VaultOptions = {}): VaultOptions {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(root, ".anydag", "settings.json"), "utf8")) as Record<string, unknown>;
     const at = raw["dag:attachments"];
-    if (typeof at === "string") return { ...base, attachments: at.replace(/^\/+|\/+$/g, "") };
+    const tpl = raw["dag:templates"];
+    return {
+      ...base,
+      ...(typeof at === "string" ? { attachments: at.replace(/^\/+|\/+$/g, "") } : {}),
+      ...(typeof tpl === "string" ? { templates: tpl } : {}),
+    };
   } catch {
     /* no settings yet */
   }
@@ -257,6 +263,7 @@ export class Session {
     const root = at.vault.root;
     const types = [...at.vault.types];
     const attachments = at.vault.attachments;
+    const templates = at.vault.templates;
     const wasDefault = this.defaultId === oldId;
     this.open.delete(oldId);
     await this.sync.closed(oldId);
@@ -264,7 +271,7 @@ export class Session {
     this.home.rekeyVault(oldId, newId);
     this.sync.moved(oldId, newId);
     writeVaultId(root, newId);
-    const vault = new Vault(root, this.home, vaultOptions(root, { ...this.options, types, attachments }));
+    const vault = new Vault(root, this.home, vaultOptions(root, { ...this.options, types, attachments, templates }));
     const next = this.adopt(vault);
     if (!wasDefault) this.defaultId = [...this.open.keys()].find((k) => k !== newId) ?? newId;
     return next.vault;
@@ -294,6 +301,10 @@ export class Session {
   reconfigure(vault: Vault): void {
     const opts = vaultOptions(vault.root);
     vault.attachments = opts.attachments ?? "attachments";
+    const was = vault.templatesFolder();
+    vault.templates = cleanFolder(opts.templates ?? "");
+    /* Every page reads which notes are tasks off the list, and a folder named templates changes that. */
+    if (vault.templatesFolder() !== was) vault.emit({ type: "tree" });
   }
 
   async closeAll(): Promise<void> {

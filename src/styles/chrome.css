@@ -1850,6 +1850,19 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   color: var(--dag-color-slate);
 }
 
+/*
+ * New note from template: the board browser's card (`dag-browser`), its field and its rows. What is
+ * its own is the folder a nested template sits in, said quietly after its title, and the empty
+ * state's line over its one button. Names claimed, grepped first: `dag-templates`,
+ * `dag-templates__where`, `dag-templates__none`, `dag-templates__problem`, `data-dag-templates*`,
+ * `data-dag-template`, `data-dag-template-makes`, `data-dag-sidebar-new-template`,
+ * `data-dag-hits-new-from-template`, `data-dag-setting-templates*`.
+ */
+.dag-templates__where { color: var(--dag-color-slate); }
+.dag-templates__none { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 8px 8px; }
+.dag-templates__none .dag-panel__empty { padding-left: 0; }
+.dag-templates__problem { color: var(--dag-color-dangerText); }
+
 /* The search on a phone: the field, its clear button and every row are a finger's height. */
 @media (max-width: 719px) {
   .dag-browser { max-width: calc(100% - 24px); height: min(640px, calc(100% - 32px)); }

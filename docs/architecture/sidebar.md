@@ -73,6 +73,10 @@ Fourteen things are load-bearing:
   hover icons, and a control in two places is two places to keep in step, so it lost them.
   `Delete` is deliberately not a key: undo is a version of a board's *text* and never reaches the
   file.
+- **New note from template is a row of the New menu, and of a folder's menu** — *Note from template…* /
+  *New note from template…* — which makes nothing itself: it opens the dialog that asks for a title and a
+  template (`openTemplates({ folder })`, a store like the Assistant's, drawn by `Shell`). See *Note
+  templates* in [`notes.md`](notes.md).
 - **Make, then name — and the name is the title**. The New menu, a folder's `+`, a
   duplicate and the welcome card all make a file under `untitled` (numbered if taken) carrying
   `title: Untitled` (`blankBoardText`, `blankNoteText`), open it, and name it **where its title is

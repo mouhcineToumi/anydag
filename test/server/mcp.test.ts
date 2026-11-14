@@ -157,6 +157,34 @@ describe("documents", () => {
   });
 });
 
+describe("templates", () => {
+  it("template_list, template_starters and note_from_template go through the routes", async () => {
+    const c = await connect();
+    expect((await call(c, "template_list")).data).toEqual({ folder: null, configured: false, templates: [] });
+    expect(fs.existsSync(path.join(env.root, "Templates"))).toBe(false);
+
+    const starters = (await call(c, "template_starters")).data;
+    expect(starters.created).toHaveLength(3);
+    const list = (await call(c, "template_list")).data;
+    expect(list.templates.map((t: any) => t.name)).toEqual(["Templates/ADR", "Templates/Daily", "Templates/Meeting"]);
+
+    const made = (await call(c, "note_from_template", { template: "Templates/ADR", title: "Use SQLite" })).data;
+    expect(made.name).toBe("Use SQLite");
+    const text = (await call(c, "note_read", { name: made.name })).data.text as string;
+    expect(text).toContain("# Use SQLite");
+    expect(text).not.toContain("{{");
+
+    expect((await call(c, "note_from_template", { template: "Notes/none" })).error).toContain("no template");
+  });
+
+  it("makes nothing when the server is read only", async () => {
+    const c = await connect(true);
+    expect((await call(c, "template_starters")).error).toBeDefined();
+    expect((await call(c, "note_from_template", { template: "Templates/ADR" })).error).toBeDefined();
+    expect(fs.existsSync(path.join(env.root, "Templates"))).toBe(false);
+  });
+});
+
 describe("feedback", () => {
   it("says so when this app has nowhere to send it", async () => {
     session = new Session(env.home, env.vault, "test", {});

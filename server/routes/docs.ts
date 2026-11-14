@@ -17,6 +17,7 @@ import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
 import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
+import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
 import type { WikiCandidate } from "../../src/refs/wikilinks";
 import type { Session } from "../context";
@@ -101,17 +102,20 @@ async function indexDocs(s: Session): Promise<IndexDoc[]> {
     })),
     ...files,
   ];
+  const templates = s.vault.templatesFolder();
   return [
     ...docs.map((d) => {
       const f = found[d.key] ?? {};
+      /* A template is no task, project or event, here as in the list. */
+      const own = !inTemplates(d.name, templates);
       return {
         id: d.id,
         name: d.name,
         kind: d.kind,
         title: (f.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
-        task: f.task ?? null,
-        project: f.project ?? null,
-        event: f.event ?? null,
+        task: (own && f.task) || null,
+        project: (own && f.project) || null,
+        event: (own && f.event) || null,
         questions: f.questions ?? null,
         refs: resolveWikiRefs((f.refs as Ref[] | undefined) ?? [], named),
       };
@@ -165,7 +169,7 @@ async function corpusOf(s: Session): Promise<{ version: string; docs: Record<str
 }
 
 /** The zone a time with no offset is read in: the vault's settings, else the app's, else this machine's. */
-function zoneOf(s: Session): string {
+export function zoneOf(s: Session): string {
   return (
     zoneIn(readPrefs(s, "vault")) ?? zoneIn(readPrefs(s, "app")) ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC"
   );
@@ -175,7 +179,7 @@ function zoneOf(s: Session): string {
  * The name a text made with a title is filed under, and the text it is written with (decision 14):
  * the title verbatim in the asked folder, and the `title:` line dropped when the name says it exactly.
  */
-function titled(asked: string, text: string): { name: string; text: string } {
+export function titled(asked: string, text: string): { name: string; text: string } {
   const title = titleOf(text);
   if (!title || asked.startsWith("components/")) return { name: asked, text };
   const name = titleName(title, folderOf(asked));
@@ -198,6 +202,7 @@ export function docRoutes(app: Hono, s: Session): void {
       tasks: t.tasks,
       projects: t.projects,
       events: t.events,
+      templates: s.vault.templatesFolder(),
       created: t.created,
       quizzes: t.quizzes,
       questions: Object.fromEntries(Object.entries(t.questions).map(([n, q]) => [n, q.length])),

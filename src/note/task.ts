@@ -12,6 +12,8 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { QUIET } from "./quiet";
+
 /** The three a task can be, in the order work moves through them — the Tasks page's columns. */
 export const STATUSES = ["todo", "in-progress", "done"] as const;
 export type TaskStatus = (typeof STATUSES)[number];
@@ -80,7 +82,7 @@ export function taskOf(text: string): Task | undefined {
   if (!m) return undefined;
   let data: unknown;
   try {
-    data = parseYaml(m[1]!);
+    data = parseYaml(m[1]!, QUIET);
   } catch {
     return undefined;
   }

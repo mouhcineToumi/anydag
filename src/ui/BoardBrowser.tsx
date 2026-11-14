@@ -4,6 +4,7 @@ import {
   FileText,
   Folder as FolderIcon,
   GraduationCap,
+  LayoutTemplate,
   Plus,
   Search,
   Table2,
@@ -21,6 +22,7 @@ import { useCorpus } from "@/search/useCorpus";
 
 import { Dialog } from "./Dialog";
 import { useSidebar } from "./Shell";
+import { openTemplates } from "./templates";
 import { flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type Entry, type Tree } from "./tree";
 
 interface Props {
@@ -458,6 +460,19 @@ export function BoardBrowser({
                 <button type="button" className="dag-hits__new" data-dag-hits-new-note="" onClick={() => create("note")}>
                   <Plus {...ICON} aria-hidden="true" />
                   <span className="dag-hits__make-name">New note “{query.trim()}”</span>
+                </button>
+                {/* The words typed are the title, and the template is chosen next. */}
+                <button
+                  type="button"
+                  className="dag-hits__new"
+                  data-dag-hits-new-from-template=""
+                  onClick={() => {
+                    openTemplates({ folder: here, title: query.trim() });
+                    onClose();
+                  }}
+                >
+                  <LayoutTemplate {...ICON} aria-hidden="true" />
+                  <span className="dag-hits__make-name">New note “{query.trim()}” from template…</span>
                 </button>
               </div>
             ) : null}

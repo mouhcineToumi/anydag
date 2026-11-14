@@ -32,6 +32,7 @@ export type Command =
   | "hand"
   | "pen"
   | "note"
+  | "template"
   | "prompt"
   | "library"
   | "links"
@@ -74,6 +75,10 @@ export const WHICHKEY_MS = 400;
 /** In the order a person meets them, which is also the order the sheet prints. */
 export const BINDINGS: Binding[] = [
   { key: "n", command: "note", label: "A note under the pointer" },
+  /* `m` for a *model* note: not `t`, which is tidy's, and the one making binding that is not a card on
+     the board — it opens the dialog that asks for a title and a template, and the note it makes is
+     a file of its own. */
+  { key: "m", command: "template", label: "A new note from a template" },
   { key: "p", command: "prompt", label: "A prompt card: describe a diagram, and a model draws it" },
   { key: "l", command: "library", label: "The component library" },
   { key: "k", command: "links", label: "The links between items, as text" },

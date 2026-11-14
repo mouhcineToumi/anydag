@@ -34,6 +34,7 @@ import { parseQuiz } from "../src/quiz/parse";
 import { eventOf, type NoteEvent } from "../src/note/event";
 import { projectOf, type Project } from "../src/note/project";
 import { taskOf, type Task } from "../src/note/task";
+import { TEMPLATES_DEFAULT, cleanFolder, inTemplates } from "../src/note/template";
 import { titleOf } from "../src/refs/extract";
 import type { DocRow, Home } from "./home";
 import { derivedId, frontId, instant, mint, validId, validInstant, withId } from "./ids";
@@ -203,6 +204,8 @@ export interface VaultOptions {
   types?: readonly string[];
   /** The folder new attachments go into. */
   attachments?: string;
+  /** The folder the vault's note templates are in, as Settings names it; unset is `Templates`, when that exists. */
+  templates?: string;
   /** When a file was born, for a test that needs two devices' clocks apart; `null` asks the disk. */
   born?: (abs: string) => Date | null;
 }
@@ -213,6 +216,8 @@ export class Vault {
   readonly home: Home;
   readonly types: ReadonlySet<string>;
   attachments: string;
+  /** The templates folder Settings names, or `""` for none named — see {@link templatesFolder}. */
+  templates: string;
   private readonly born: (abs: string) => Date | null;
   private fronts = new Map<string, Front>();
   private listeners = new Set<(c: Change) => void>();
@@ -246,6 +251,7 @@ export class Vault {
     this.home = home;
     this.types = new Set((opts.types ?? DEFAULT_TYPES).map((t) => t.toLowerCase()));
     this.attachments = opts.attachments ?? "attachments";
+    this.templates = cleanFolder(opts.templates ?? "");
     this.born = opts.born ?? (() => null);
     this.id = vaultId(this.root);
   }
@@ -372,6 +378,21 @@ export class Vault {
     return { docs, folders };
   }
 
+  /**
+   * The folder this vault's note templates are in: the one Settings names, else `Templates` **when
+   * that folder exists**, else none. Asked of the disk each time, so a folder made in a file manager
+   * is a templates folder at once and nothing is ever created to make it one — opening a vault writes
+   * nothing.
+   */
+  templatesFolder(): string | null {
+    if (this.templates) return this.templates;
+    try {
+      return fs.statSync(this.abs(TEMPLATES_DEFAULT)).isDirectory() ? TEMPLATES_DEFAULT : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** What a text's frontmatter says, read only when its stat moved. */
   private front(listed: Listed): Front | null {
     const abs = this.abs(listed.file);
@@ -416,6 +437,7 @@ export class Vault {
     const lists = byKind(t);
     const fronts = new Map<string, Front>();
     const kept = new Map<string, Front>();
+    const templates = this.templatesFolder();
     for (const d of docs) {
       lists[d.kind].push(d.name);
       if (d.kind === "file") {
@@ -427,14 +449,19 @@ export class Vault {
         continue;
       }
       const f = this.front(d);
-      // A document nobody titled is called by its file's name.
-      t.titles[d.name] = f?.title || leafOf(d.name);
+      // A document nobody titled is called by its file's name — and so is a template, whose `title:` is
+      // the new note's and may well say `{{date}}`.
+      t.titles[d.name] = (!inTemplates(d.name, templates) && f?.title) || leafOf(d.name);
       if (!f) continue;
       fronts.set(d.file, f);
       kept.set(d.file, f);
-      if (f.task) t.tasks[d.name] = f.task;
-      if (f.project) t.projects[d.name] = f.project;
-      if (f.event) t.events[d.name] = f.event;
+      /* A template that carries a `status:`, a `project:` or a `start:` is a note to copy, not a task
+         to do: it is left out of the maps every page that draws them reads. */
+      if (!inTemplates(d.name, templates)) {
+        if (f.task) t.tasks[d.name] = f.task;
+        if (f.project) t.projects[d.name] = f.project;
+        if (f.event) t.events[d.name] = f.event;
+      }
       if (f.asks) t.questions[d.name] = f.asks;
     }
     this.fronts = kept;
@@ -1788,13 +1815,17 @@ export class Vault {
             continue;
           }
           const f = frontOf(found.kind, text, "");
+          /* A template says nothing about being a task: the feed agrees with the list. */
+          const own = !inTemplates(found.name, this.templatesFolder());
           this.emit({
             type: "doc",
             kind: found.kind,
             name: found.name,
             sha1: sha1(text),
-            title: f.title ?? null,
-            ...(found.kind === "note" ? { task: f.task ?? null, project: f.project ?? null, event: f.event ?? null } : {}),
+            title: (own && f.title) || null,
+            ...(found.kind === "note"
+              ? { task: (own && f.task) || null, project: (own && f.project) || null, event: (own && f.event) || null }
+              : {}),
             ...(found.kind === "quiz" ? { questions: f.asks?.length ?? 0 } : {}),
           });
         }

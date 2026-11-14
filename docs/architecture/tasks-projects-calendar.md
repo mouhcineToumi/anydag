@@ -65,6 +65,13 @@ Which layout the Tasks page shows is `dag:tasks-view`, this browser's and not th
 state, like which folders are open — written with `writeLocal`. The list reads what is being worked
 on first and the board's columns run the way work moves, so the three statuses come in two orders.
 
+**A template is not a task.** A note in the vault's templates folder (*Note templates*, [`notes.md`](notes.md))
+that carries a `status:`, a `project:` or a `start:` is a note to copy, not work to do, and is left out of
+`tasks`, `projects` and `events` in `/__board/list`, the feed and the index — so the Tasks page, the
+sidebar's count, Due soon, the Calendar and `task_list`/`event_list` never show it. The calendar's *note*
+dots are left out by `itemsOf`, off `templates` in the list. The note made from the template is a task
+as soon as it exists.
+
 Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-embed--task`,
 `dag-embed__task*`, `dag-toolbar__make-task`, `dag-sidebar__badge`, `data-dag-task*`,
 `data-dag-tasks*`, `data-dag-taskbar*`, `data-dag-taskline`, `data-dag-task-add`,
