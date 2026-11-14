@@ -21,7 +21,7 @@ import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
 import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
-import { type WikiCandidate, wikiIndexer } from "../../src/refs/wikilinks";
+import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/wikilinks";
 import type { Session } from "../context";
 import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../frontmatter";
 import { OPS_SHAPE } from "../handle";
@@ -52,25 +52,56 @@ interface Listed {
   id: string;
 }
 
-/**
- * Every listed text with an id, keyed the way `Vault.texts` keys them, and what `parsed` made of
- * each that could be read — read where the grammar runs, so no text is read on this thread (#287).
- * Components are not listed.
- */
-async function listed(tree: Tree, parsed: Parsed): Promise<{ docs: Listed[]; found: ReadonlyMap<string, Doc | null> }> {
-  const all: Listed[] = [];
-  for (const kind of ["board", "note", "quiz", "table"] as const) {
-    for (const name of byKind(tree)[kind]) {
-      const id = tree.ids[name];
-      if (id) all.push({ key: textKey(name, kind), name, kind, id });
+/* Per tree, which a kept listing hands out again while nothing moved: sorting 50,000 names is not free. */
+const listedOf = new WeakMap<Tree, Listed[]>();
+
+/** Every listed text with an id, keyed the way `Vault.texts` keys them. Components are not listed. */
+function listed(tree: Tree): Listed[] {
+  let had = listedOf.get(tree);
+  if (!had) {
+    const docs: Listed[] = [];
+    for (const kind of ["board", "note", "quiz", "table"] as const) {
+      for (const name of byKind(tree)[kind]) {
+        const id = tree.ids[name];
+        if (id) docs.push({ key: textKey(name, kind), name, kind, id });
+      }
     }
+    docs.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    listedOf.set(tree, (had = docs));
   }
-  all.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  const found = await parsed.of(all.map((d): Entry => [d.key, d.name, d.kind]));
+  return had;
+}
+
+/* The texts an answer holds, per answer: `Parsed` hands the same one back while nothing moved. */
+const presentOf = new WeakMap<ReadonlyMap<string, Doc | null>, { all: Listed[]; docs: Listed[] }>();
+
+/**
+ * What `parsed` made of every listed text that could be read, and those texts — read where the
+ * grammar runs, so no text is read on this thread (#287), and not read at all while the kept listing
+ * says it has not moved (#280). The stamps are read now, not with the tree: a text written in place
+ * whose frontmatter did not move leaves the tree as it was, and only its stamp says so.
+ */
+async function parsedOf(
+  s: Session,
+  parsed: Parsed,
+  tree: Tree,
+): Promise<{ docs: Listed[]; found: ReadonlyMap<string, Doc | null> }> {
+  const all = listed(tree);
+  const stamps = s.vault.textStamps(tree);
+  const entries: Entry[] = [];
+  await paced(all, (d) => {
+    const stamp = stamps?.get(d.key);
+    entries.push(stamp === undefined ? [d.key, d.name, d.kind] : [d.key, d.name, d.kind, stamp]);
+  });
+  const found = await parsed.of(entries);
+  // A text gone between the listing and its reading is not in the answer.
+  const had = presentOf.get(found);
+  if (had?.all === all) return { docs: had.docs, found };
   const docs: Listed[] = [];
   await paced(all, (d) => {
     if (found.has(d.key)) docs.push(d);
   });
+  presentOf.set(found, { all, docs });
   return { docs, found };
 }
 
@@ -96,38 +127,105 @@ interface IndexDoc {
   [more: string]: unknown;
 }
 
+/* The last index each vault answered, the listing and parse it was made from, and its JSON once
+   asked for: the same answer while neither moved, which is most of the time a page asks (#280). */
+const indexes = new WeakMap<
+  Parsed,
+  { tree: Tree; found: ReadonlyMap<string, Doc | null>; docs: IndexDoc[]; json: Promise<string> | null }
+>();
+
 /** Every document with what it says about itself and its references, each `[[wikilink]]` resolved. */
 async function indexDocs(s: Session): Promise<IndexDoc[]> {
+  return (await indexOf(s)).docs;
+}
+
+async function indexOf(s: Session): Promise<{ docs: IndexDoc[]; json: Promise<string> | null }> {
   const tree = await s.vault.tree();
-  const { docs, found } = await listed(tree, s.index);
+  const parsed = s.index;
+  const { docs, found } = await parsedOf(s, parsed, tree);
+  const had = indexes.get(parsed);
+  if (had && had.tree === tree && had.found === found) return had;
+  const now = { tree, found, docs: await indexAnswer(parsed, tree, docs, found), json: null };
+  indexes.set(parsed, now);
+  return now;
+}
+
+/** The index's answer as the JSON it is sent as, made once per answer. */
+async function indexJson(s: Session): Promise<string> {
+  const at = await indexOf(s);
+  return (at.json ??= jsonListPaced(at.docs).then((list) => `{"docs":${list}}`));
+}
+
+/* What each vault's index last answered for each text, with the parse and the names it resolved its
+   links against: a document whose parse did not move, in a vault whose names did not, answers as it
+   did — so a burst of saves resolves the links of what was saved, not of all 50,000 (#280). */
+const answered = new WeakMap<
+  Parsed,
+  { named: WikiCandidate[]; ix: WikiIndex<WikiCandidate>; docs: Map<string, { f: Doc | null | undefined; out: IndexDoc }> }
+>();
+
+const sameCandidates = (a: readonly WikiCandidate[], b: readonly WikiCandidate[]): boolean =>
+  a.length === b.length &&
+  a.every((x, i) => {
+    const y = b[i]!;
+    return x.id === y.id && x.name === y.name && x.kind === y.kind && x.title === y.title;
+  });
+
+async function indexAnswer(
+  parsed: Parsed,
+  tree: Tree,
+  docs: Listed[],
+  found: ReadonlyMap<string, Doc | null>,
+): Promise<IndexDoc[]> {
   const files = fileDocs(tree);
   // A `[[wikilink]]` names a document by name (decision 7): which one is the vault's answer now.
   // Every document, then every attachment: built in slices, as is everything below (#287).
-  const named = wikiIndexer<WikiCandidate>();
+  const fresh: WikiCandidate[] = [];
   await paced(docs, (d) =>
-    named.add({
+    fresh.push({
       id: d.id,
       name: d.name,
       kind: d.kind,
       title: (found.get(d.key)?.title as string | undefined) ?? tree.titles[d.name] ?? null,
     }),
   );
-  await paced(files, (f) => named.add(f));
+  for (const f of files) fresh.push(f);
+  const prev = answered.get(parsed);
+  // The names did not move: the index built over them last time, and every answer it resolved.
+  const unmoved = !!prev && sameCandidates(prev.named, fresh);
+  let ix: WikiIndex<WikiCandidate>;
+  if (unmoved) ix = prev.ix;
+  else {
+    const building = wikiIndexer<WikiCandidate>();
+    await paced(fresh, (c) => building.add(c));
+    ix = building;
+  }
+  const now = new Map<string, { f: Doc | null | undefined; out: IndexDoc }>();
   const out: IndexDoc[] = [];
   await paced(docs, (d) => {
-    const f = found.get(d.key) ?? {};
-    out.push({
+    const f = found.get(d.key);
+    const title = (f?.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name);
+    const had = unmoved ? prev.docs.get(d.key) : undefined;
+    if (had && had.f === f && had.out.id === d.id && had.out.name === d.name && had.out.title === title) {
+      now.set(d.key, had);
+      out.push(had.out);
+      return;
+    }
+    const doc: IndexDoc = {
       id: d.id,
       name: d.name,
       kind: d.kind,
-      title: (f.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
-      task: f.task ?? null,
-      project: f.project ?? null,
-      event: f.event ?? null,
-      questions: f.questions ?? null,
-      refs: resolveWikiRefs((f.refs as Ref[] | undefined) ?? [], named),
-    });
+      title,
+      task: f?.task ?? null,
+      project: f?.project ?? null,
+      event: f?.event ?? null,
+      questions: f?.questions ?? null,
+      refs: resolveWikiRefs((f?.refs as Ref[] | undefined) ?? [], ix),
+    };
+    now.set(d.key, { f, out: doc });
+    out.push(doc);
   });
+  answered.set(parsed, { named: unmoved ? prev.named : fresh, ix, docs: now });
   for (const f of files) out.push(f);
   return out;
 }
@@ -144,7 +242,7 @@ const corpora = new WeakMap<Parsed, { key: string; version: string; docs: Record
 async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
   const tree = await s.vault.tree();
   const parsed = s.corpus;
-  const { docs, found } = await listed(tree, parsed);
+  const { docs, found } = await parsedOf(s, parsed, tree);
   const out: Record<string, unknown>[] = [];
   await paced(docs, (d) =>
     out.push({
@@ -205,14 +303,14 @@ function titled(asked: string, text: string): { name: string; text: string } {
  * is 9 MB of JSON, and in one `JSON.stringify` that is 50 ms every other request waits (#283). The
  * text is the same.
  */
-async function jsonPaced(c: Context, body: Record<string, unknown>): Promise<Response> {
+async function jsonPaced(body: Record<string, unknown>): Promise<string> {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(body)) {
     if (value === undefined) continue;
     parts.push(`${JSON.stringify(key)}:${JSON.stringify(value)}`);
     await yieldNow();
   }
-  return c.body(`{${parts.join(",")}}`, 200, { "content-type": "application/json" });
+  return `{${parts.join(",")}}`;
 }
 
 /** About how much text an answer is written in at a time. */
@@ -247,13 +345,53 @@ function jsonDocs(c: Context, docs: readonly unknown[]): Response {
   return c.body(stream, 200, { "content-type": "application/json" });
 }
 
-/** The largest draft `POST /__board/diagnostics` will read. */
-const DRAFT_MAX = 4 * 1024 * 1024;
+/**
+ * A JSON text made already, streamed a slice at a time with the thread handed back between: one
+ * encoding of the index's 12 MB on 50,000 files is a pause every other request waits through (#287).
+ */
+function jsonText(c: Context, text: string): Response {
+  const enc = new TextEncoder();
+  let i = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(ctl) {
+      await yieldNow();
+      ctl.enqueue(enc.encode(text.slice(i, (i += CHUNK))));
+      if (i >= text.length) ctl.close();
+    },
+  });
+  return c.body(stream, 200, { "content-type": "application/json" });
+}
 
-export function docRoutes(app: Hono, s: Session): void {
-  app.get("/__board/list", async (c) => {
-    const t = await s.vault.tree();
-    return jsonPaced(c, {
+/* Each object's JSON once: an index answer keeps the object of every document that did not move. */
+const itemJson = new WeakMap<object, string>();
+
+/** A long array of objects as JSON, a few hundred at a time with the thread handed back between. */
+async function jsonListPaced(items: readonly object[]): Promise<string> {
+  const parts: string[] = [];
+  for (let i = 0; i < items.length; i += 500) {
+    parts.push(
+      items
+        .slice(i, i + 500)
+        .map((x) => {
+          let json = itemJson.get(x);
+          if (json === undefined) itemJson.set(x, (json = JSON.stringify(x)));
+          return json;
+        })
+        .join(","),
+    );
+    await yieldNow();
+  }
+  return `[${parts.join(",")}]`;
+}
+
+/* The listing's JSON, made once per tree: a kept listing answers the same tree while nothing moved,
+   and its 9 MB of JSON was most of what a warm `/__board/list` on 50,000 files cost (#280). */
+const listJson = new WeakMap<Tree, Promise<string>>();
+
+function listOf(t: Tree): Promise<string> {
+  let json = listJson.get(t);
+  if (!json) {
+    json = jsonPaced({
       boards: t.boards,
       folders: t.folders,
       notes: t.notes,
@@ -270,7 +408,16 @@ export function docRoutes(app: Hono, s: Session): void {
       files: t.files,
       sizes: t.sizes,
     });
-  });
+    listJson.set(t, json);
+  }
+  return json;
+}
+
+/** The largest draft `POST /__board/diagnostics` will read. */
+const DRAFT_MAX = 4 * 1024 * 1024;
+
+export function docRoutes(app: Hono, s: Session): void {
+  app.get("/__board/list", async (c) => c.body(await listOf(await s.vault.tree()), 200, { "content-type": "application/json" }));
 
   app.get("/__board/get", async (c) => {
     const kind = textKind(c.req.query("kind"));
@@ -279,7 +426,7 @@ export function docRoutes(app: Hono, s: Session): void {
     return c.json({ name, id: await s.vault.peekId(name, kind), text: v.text, base: v.base });
   });
 
-  app.get("/__board/index", async (c) => jsonDocs(c, await indexDocs(s)));
+  app.get("/__board/index", async (c) => jsonText(c, await indexJson(s)));
 
   /* One document's references out, each with what it names, and its backlinks — the index read for
      one name, so a client asking about one document is not sent every document's. */

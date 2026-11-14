@@ -28,6 +28,19 @@
   answer carries a `turn`, the server's thread sends back the last one it received in full (and which
   reader counted it), and a `Reader` that did not give that turn answers every doc (`whole`).
   `test/server/index-off-thread.test.ts` restarts the worker between two asks.
+- **A row written outside a listing must say so: `putRow`, `dropRow`.** A watched vault keeps its last
+  listing (#280), rows included, and the next listing looks only at what it is told moved — the
+  folders whose mtime did and the paths the watcher or this process named. A `home.putDoc` left in
+  a method (an attachment retitled, a created adopted from sync) changes the index under a kept row
+  nobody reads again, so the list answers the old title or created for as long as the server runs.
+  Only the walk's own reconcile writes rows directly; `reconcileAll`, which writes them on the thread,
+  drops the kept listing. `ANYDAG_TEST_WATCH=1 npx vitest run test/server` holds every contract to it.
+- **A text written in place is in a listing once the watcher says so, and not before.** The kept
+  listing reads every folder's mtime on every answer, so a document made, renamed or deleted is in the
+  next one; but a write into an existing file moves no folder, and is read again when the watcher
+  reports it, about 75 ms later. The page never sees the gap — it asks after the feed tells it, and the
+  watcher marks the path before it emits — but a test that writes a file in place and lists at once
+  does: wait for the title (`until`), as `test/server/kept.test.ts` does.
 - **`elk.bundled.js` is the wrong import.** On the main thread its "fake worker" runs the algorithm
   synchronously and blocks the canvas; inside a worker of ours it throws, because
   `elk-worker.min.js` stops exporting the fake `Worker` class once it detects it *is* the worker.

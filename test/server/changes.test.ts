@@ -6,7 +6,21 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { Change } from "../../server/vault";
-import { BOARD, NOTE, PDF, QUIZ, TABLE, listen, makeEnv, sleep, sweepTemps, until, write, type Env } from "./helpers";
+import {
+  BOARD,
+  NOTE,
+  PDF,
+  QUIZ,
+  TABLE,
+  listen,
+  makeEnv,
+  sleep,
+  sweepTemps,
+  until,
+  write,
+  type Env,
+  watchedFromTheStart,
+} from "./helpers";
 
 let env: Env;
 let stops: (() => void)[] = [];
@@ -110,7 +124,8 @@ describe("the change feed", () => {
     await doc(f, "New name", (d) => d.sha1 !== null);
   });
 
-  it("the state at subscription is not replayed as changes", async () => {
+  // Watched from the start (`ANYDAG_TEST_WATCH`), the files written before subscribing are changes.
+  it.skipIf(watchedFromTheStart)("the state at subscription is not replayed as changes", async () => {
     for (let n = 0; n < 3; n++) await env.vault.create(`existing-${n}`, "board", BOARD);
     const f = await feed();
     await sleep(600);

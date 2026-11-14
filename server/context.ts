@@ -71,6 +71,7 @@ export class Session {
   private defaultId: string | null = null;
   private links: SyncLinks | null = null;
   private logs: Telemetry | null = null;
+  private watches = false;
 
   constructor(
     readonly home: Home,
@@ -81,6 +82,20 @@ export class Session {
     readonly options: VaultOptions = {},
   ) {
     if (first) this.adopt(first);
+  }
+
+  /**
+   * Watch each vault this session serves from the moment it opens, not only while a page listens:
+   * what lets a listing be kept and answer from what changed (#280). `anydag serve` does; the CLI's
+   * one-off session and the unit suite's do not, and list as they always did.
+   */
+  watchVaults(): void {
+    this.watches = true;
+    for (const o of this.open.values()) this.watchOne(o.vault);
+  }
+
+  private watchOne(vault: Vault): void {
+    vault.watch().catch((e) => console.warn(`anydag: not watching ${vault.root}: ${(e as Error)?.message ?? e}`));
   }
 
   /** Which open vaults sync, and their loops (`server/sync/link.ts`). Nothing for a vault not linked. */
@@ -159,6 +174,7 @@ export class Session {
     this.defaultId = vault.id;
     this.remember(vault);
     this.sync.opened(vault);
+    if (this.watches) this.watchOne(vault);
     return at;
   }
 

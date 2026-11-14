@@ -26,8 +26,12 @@ export type Question = "index" | "corpus";
 /** What the grammar made of one text. */
 export type Doc = Record<string, unknown>;
 
-/** One text to answer for: its key (`textKey`), its name and its kind. */
-export type Entry = [key: string, name: string, kind: TextKind];
+/**
+ * One text to answer for: its key (`textKey`), its name and its kind — and, while a kept listing
+ * knows it (#280), the stamp it last read the text at, which says the text has not moved without
+ * a look at the disk.
+ */
+export type Entry = [key: string, name: string, kind: TextKind, listed?: string];
 
 /** The texts parsed, by key, into what the question asks of each. */
 export type Parse = (texts: Record<string, string>) => Record<string, Doc>;
@@ -54,6 +58,8 @@ export interface Read {
 interface Kept {
   /** The file's stat when it was last read. */
   stat: string;
+  /** The kept listing's stamp for it then, when the entry carried one. */
+  listed: string | null;
   sha: string;
   doc: Doc | null;
   /** The text's length, so the answer can be sent in parts of about the same size. */
@@ -65,7 +71,8 @@ const sha1 = (text: string): string => createHash("sha1").update(text).digest("h
 /**
  * One cache of one question over one vault folder, on whichever thread parses. A text is read when
  * its stat moved — modified time, change time, size and inode, so a save that kept the size is
- * still seen — and parsed when its sha1 did.
+ * still seen — and parsed when its sha1 did. An entry that carries the kept listing's stamp, the
+ * same as when the text was last read, is not looked at at all (#280).
  */
 export class Reader {
   private kept = new Map<string, Kept>();
@@ -90,17 +97,22 @@ export class Reader {
     const stale: Record<string, string> = {};
     const stats = new Map<string, [string, string, number]>();
     const missing: string[] = [];
-    for (const [key, name, kind] of entries) {
-      const got = this.load(name, kind, this.kept.get(key));
+    const listedAt = new Map<string, string | null>();
+    for (const [key, name, kind, listed] of entries) {
+      const had = this.kept.get(key);
+      if (listed !== undefined && had?.listed === listed) {
+        now.set(key, had);
+        continue;
+      }
+      const got = this.load(name, kind, had);
       if (got === null) missing.push(key);
-      else if ("kept" in got) now.set(key, got.kept);
+      else if ("kept" in got)
+        now.set(key, got.kept.listed === (listed ?? null) ? got.kept : { ...got.kept, listed: listed ?? null });
+      else if (had?.sha === got.sha) now.set(key, { ...had, stat: got.stat, listed: listed ?? null, bytes: got.text.length });
       else {
-        const had = this.kept.get(key);
-        if (had?.sha === got.sha) now.set(key, { ...had, stat: got.stat, bytes: got.text.length });
-        else {
-          stale[key] = got.text;
-          stats.set(key, [got.stat, got.sha, got.text.length]);
-        }
+        stale[key] = got.text;
+        stats.set(key, [got.stat, got.sha, got.text.length]);
+        listedAt.set(key, listed ?? null);
       }
     }
     const keys = Object.keys(stale);
@@ -109,7 +121,7 @@ export class Reader {
     for (const key of keys) {
       const [stat, sha, bytes] = stats.get(key)!;
       const doc = docs[key] ?? null;
-      now.set(key, { stat, sha, doc, bytes });
+      now.set(key, { stat, listed: listedAt.get(key) ?? null, sha, doc, bytes });
       fresh.push([key, doc]);
     }
     const whole = since !== this.turn;
