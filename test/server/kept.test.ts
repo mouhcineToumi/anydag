@@ -101,8 +101,29 @@ describe("the kept listing", () => {
   });
 
   it("a text written in place is in the answer once the watcher has said so", async () => {
+    const heard: string[] = [];
+    const v = env.vault as unknown as Record<string, unknown>;
+    await env.vault.subscribeRaw((rels) => heard.push(...rels));
+    const before = fs.statSync(at("work/Onboarding.md"));
     fs.writeFileSync(at("work/Onboarding.md"), "---\ntitle: Renamed in place\n---\n");
-    await until(async () => (await env.vault.tree()).titles["work/Onboarding"] === "Renamed in place", 5000, "the new title");
+    try {
+      await until(async () => (await env.vault.tree()).titles["work/Onboarding"] === "Renamed in place", 3500, "the new title");
+    } catch (e) {
+      const after = fs.statSync(at("work/Onboarding.md"));
+      console.log("DEBUG kept", JSON.stringify({
+        heard,
+        watching: v.watching,
+        kept: !!v.kept,
+        dirty: [...((v.dirty as Map<string, unknown>) ?? new Map()).entries()],
+        walks: env.vault.walks,
+        title: (await env.vault.tree()).titles["work/Onboarding"],
+        before: [before.mtimeMs, before.size, before.ino],
+        after: [after.mtimeMs, after.size, after.ino],
+        root: env.root,
+        real: fs.realpathSync(env.root),
+      }));
+      throw e;
+    }
     await same();
   });
 
