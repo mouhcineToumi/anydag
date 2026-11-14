@@ -23,6 +23,17 @@ directories:
 # rebuild for Electron, and a rebuild from its `binding.gyp` fails outright when one machine packages
 # a second architecture (the macOS job builds x64 on arm64).
 npmRebuild: false
+# Chromium's own strings — spelling suggestions, form validation, the date picker — come from one
+# locale pack per language, and Electron ships 55 of them (7.6 MiB unpacked). The app keeps the
+# languages it speaks: English, French, and Arabic for #265. A system language without its pack
+# runs in `en-US`: the page sees `en-US` as `navigator.language` and as `Intl`'s default locale,
+# so a date it formats with no locale named is a US date on a German system (#304). The system's
+# own choice is `app.getSystemLocale()`, which no pack affects. `en-US` also keeps macOS's
+# `en.lproj`; electron-builder matches a bare `fr` to `fr.pak` and `fr.lproj`.
+electronLanguages:
+  - en-US
+  - fr
+  - ar
 files:
   - desktop/dist
   - dist
@@ -40,6 +51,14 @@ files:
   - node_modules/is-glob/**/*
   - node_modules/is-extglob/**/*
   - node_modules/detect-libc/**/*
+  # What the watcher's package carries for a build from source, which `npmRebuild: false` never
+  # runs: its C++ headers, its install script, and its Flow types. Its `index.js` requires only
+  # `wrapper.js`, `detect-libc` and the prebuilt package.
+  - "!node_modules/@parcel/watcher/{src,scripts}/**/*"
+  - "!node_modules/@parcel/watcher/index.js.flow"
+  # The CLI's list of its own sources, which only `cli/anydag.mjs` reads to rebuild a stale bundle
+  # in a checkout; the packed app runs `cli/dist/anydag.mjs` directly.
+  - "!cli/dist/meta.json"
   - "!boards"
   - "!e2e"
   - "!src"
