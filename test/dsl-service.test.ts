@@ -433,18 +433,12 @@ describe("search", () => {
     expect((await post("/search", { docs })).status).toBe(400);
   });
 
-  it("keeps the engine a version names, and asks for the docs when it holds none", async () => {
+  it("keeps no engine: a question without its docs is refused, never answered from an old one", async () => {
     const docs = await docsOf();
-    const version = `test:${Math.random()}`;
-    const first = await post("/search", { docs, q: "pay sett", version });
-    expect(first.status).toBe(200);
-    // Named alone, the version answers from the engine built a moment ago — the same hits.
-    const again = await post("/search", { q: "pay sett", version });
-    expect(again.body).toEqual(first.body);
-    // A version nothing was built for is a 412 asking for the docs, never an empty answer.
-    const unknown = await post("/search", { q: "pay sett", version: `${version}-other` });
-    expect(unknown.status).toBe(412);
-    expect((unknown.body as { code: string }).code).toBe("docs");
+    expect((await post("/search", { docs, q: "pay sett" })).status).toBe(200);
+    // A vault's search keeps its engine where its docs are (`server/searching.ts`), not here.
+    const alone = await post("/search", { q: "pay sett", version: "any" });
+    expect(alone.status).toBe(400);
   });
 
   it("finds nothing for an empty query rather than everything", async () => {

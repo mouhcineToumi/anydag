@@ -288,9 +288,11 @@ describe("the references index over a kept listing", () => {
 describe("Parsed over stamps", () => {
   it("reads only the texts whose stamp moved, and parses only those whose bytes did", async () => {
     const parsed: string[][] = [];
-    const cache = new Parsed("index", env.root, (texts) => {
-      parsed.push(Object.keys(texts).sort());
-      return Object.fromEntries(Object.entries(texts).map(([k, t]) => [k, { t }]));
+    const cache = new Parsed("index", env.root, {
+      parse: (texts) => {
+        parsed.push(Object.keys(texts).sort());
+        return Object.fromEntries(Object.entries(texts).map(([k, t]) => [k, { t }]));
+      },
     });
     write(env.root, "a.board.md", "one");
     write(env.root, "b.board.md", "two");

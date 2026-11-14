@@ -15,7 +15,8 @@ import { indexTexts, resolveWikiRefs, type Ref } from "../../src/refs/extract";
 import { leafOf } from "../../server/names";
 import { createApp } from "../../server/app";
 import { Session } from "../../server/context";
-import { useGrammarWorker } from "../../server/grammar";
+import { useGrammarWorker, WorkerProcess } from "../../server/grammar";
+import type { Entry, Meta } from "../../server/parsing";
 import { byKind, textKey } from "../../server/vault";
 import { BOARD, NOTE, PDF, QUIZ, TABLE, makeEnv, sweepTemps, write, type Env } from "./helpers";
 
@@ -212,7 +213,7 @@ describe("the index and the corpus on the grammar's worker", () => {
     expect((await ask(app, "/__board/corpus")).docs).toEqual(want.corpus);
   }, 30_000);
 
-  it("answer whole after the worker restarts, which kept nothing", async () => {
+  it("answer whole after the worker restarts, from what it kept on disk", async () => {
     await fill();
     const app = appOf();
     await ask(app, "/__board/index");
@@ -224,6 +225,58 @@ describe("the index and the corpus on the grammar's worker", () => {
     expect((await ask(app, "/__board/index")).docs).toEqual(want.index);
     expect((await ask(app, "/__board/corpus")).docs).toEqual(want.corpus);
   }, 30_000);
+
+  /** Every listed text with an id, as the routes name them to the worker. */
+  async function entriesOf(): Promise<{ entries: Entry[]; meta: Meta[] }> {
+    const tree = await env.vault.tree();
+    const entries: Entry[] = [];
+    const meta: Meta[] = [];
+    for (const kind of ["board", "note", "quiz", "table"] as const)
+      for (const name of byKind(tree)[kind]) {
+        if (!tree.ids[name]) continue;
+        entries.push([textKey(name, kind), name, kind]);
+        meta.push([tree.ids[name], tree.titles[name] ?? null]);
+      }
+    return { entries, meta };
+  }
+
+  it("started again after it ended, answers a warm /index parsing nothing, from what it kept in the home (#279)", async () => {
+    await fill();
+    const { entries } = await entriesOf();
+    const first = new WorkerProcess(path.join(dir, "grammar-worker.mjs"));
+    const cold = await first.read(1, env.homeDir, env.root, "index", null, entries);
+    expect(cold.parsed).toBe(true);
+    await first.close();
+    const second = new WorkerProcess(path.join(dir, "grammar-worker.mjs"));
+    try {
+      const warm = await second.read(1, env.homeDir, env.root, "index", cold.turn, entries);
+      expect(warm).toMatchObject({ parsed: false, whole: false, fresh: [], turn: cold.turn });
+    } finally {
+      await second.close();
+    }
+  }, 30_000);
+
+  it("asks to be replaced after parsing many texts, and a fresh worker answers the search from the rows", async () => {
+    for (let i = 0; i < 520; i++)
+      write(
+        env.root,
+        `many/n${i}.md`,
+        `---\nid: ${(1000000000 + i).toString(36).padStart(10, "0").slice(-10)}\n---\n# N${i}\n\nharbour ${i}\n`,
+      );
+    const { entries, meta } = await entriesOf();
+    const t = new WorkerProcess(path.join(dir, "grammar-worker.mjs"));
+    try {
+      const first = await t.search(1, env.homeDir, env.root, entries, meta, [], "harbour", undefined, true);
+      expect(first.body).toEqual({ again: true });
+      const pid = t.pid;
+      t.retire();
+      const second = await t.search(1, env.homeDir, env.root, entries, meta, [], "harbour 7", undefined, true);
+      expect(t.pid).not.toBe(pid);
+      expect((second.body as { hits: { name: string }[] }).hits.map((h) => h.name)).toContain("many/n7");
+    } finally {
+      await t.close();
+    }
+  }, 60_000);
 
   it("send an answer bigger than one part in parts, and all of it arrives", async () => {
     for (let i = 0; i < 1500; i++)

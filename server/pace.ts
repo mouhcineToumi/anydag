@@ -7,7 +7,7 @@
 import { setImmediate as yieldNow } from "node:timers/promises";
 
 /** How long a loop holds the thread before it hands it back. */
-export const SLICE_MS = 8;
+const SLICE_MS = 8;
 
 /** `each` over every item in order, the thread handed back whenever a slice has run `SLICE_MS`. */
 export async function paced<T>(items: Iterable<T>, each: (item: T) => void): Promise<void> {
