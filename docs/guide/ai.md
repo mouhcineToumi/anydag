@@ -1,6 +1,6 @@
 # AI and agents
 
-AnyDag works without AI. When you want it, it uses **your own** AI: the Claude Code or OpenCode you
+AnyDag works without AI. When you want it, it uses **your own** AI: the Claude Code, OpenCode or Codex you
 are already signed in to on this computer, or an API key you provide. AnyDag has no AI service of its
 own and sends nothing anywhere unless you ask it to.
 
@@ -8,7 +8,7 @@ Choose the provider and model in **Settings → This vault → AI**.
 
 ## The Assistant
 
-The Assistant is a chat about your vault, run on your Claude Code or OpenCode sign-in. Open it beside any page with `space A` (or the sparkle
+The Assistant is a chat about your vault, run on your Claude Code, OpenCode or Codex sign-in. Open it beside any page with `space A` (or the sparkle
 icon in the top bar), or full-window from **Assistant** in the sidebar.
 
 It answers questions from your notes and cites the documents it used, as links you can click. It can
@@ -25,7 +25,7 @@ only works through AnyDag itself: it cannot run commands or read other files on 
 On a board, `space P` adds a **prompt card**. Describe the diagram you want ("a timeline of the
 French Revolution", "a flowchart of how a bill becomes law") and run it. The model writes the
 diagram, AnyDag checks it, and it replaces the card. One undo takes it back. Prompt cards work with
-Claude Code, OpenCode, or any OpenAI-compatible service with an API key. Gemini and Z.ai serve that
+Claude Code, OpenCode, Codex, or any OpenAI-compatible service with an API key. Gemini and Z.ai serve that
 dialect at `https://generativelanguage.googleapis.com/v1beta/openai` and
 `https://api.z.ai/api/paas/v4`.
 

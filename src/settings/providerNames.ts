@@ -9,6 +9,7 @@
 export const PROVIDER_NAMES = {
   claude: "Claude Code",
   opencode: "OpenCode",
+  codex: "Codex",
   custom: "OpenAI-compatible",
 } as const;
 

@@ -31,7 +31,7 @@ the file for that area, not to a new place.
 | [`charts.md`](charts.md) | The `chart` dialect: its model, scales, colour, and the pointer's relationship to it. |
 | [`getting-around.md`](getting-around.md) | Pan, zoom and the pan modifier. |
 | [`settings.md`](settings.md) | Preferences, the Settings modal, and why a snapshot reads none of them. |
-| [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz. |
+| [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, Codex, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz. |
 | [`sidebar.md`](sidebar.md) | The shell, the file tree and its operations, selection, the search dialog, folders and the page tabs. |
 | [`icons.md`](icons.md) | Four vocabularies behind one `icon=` attribute, and where the art lives. |
 | [`editing.md`](editing.md) | Every gesture is a write to the board file: the table of gestures, the leader key, picking inside a diagram, the controls and text emphasis. |
@@ -43,11 +43,12 @@ the file for that area, not to a new place.
 | [`server.md`](server.md) | The one Node process, the token and `Host` gate, the store, and several vaults in one server. |
 | [`desktop.md`](desktop.md) | The Electron shell: the server child, the scheme, the token, signing, and the shim. |
 | [`sync.md`](sync.md) | The end-to-end-encrypted sync client and its server half (`api/`), and the convergence harness. |
-| [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code or OpenCode. |
+| [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code, OpenCode or Codex. |
 | [`logs.md`](logs.md) | Opt-in anonymous logs: what a batch may hold and every hop that cleans it. |
 | [`api.md`](api.md) | The api server: its features, config, what it stores and never stores, and running and deploying it. |
 | [`feedback.md`](feedback.md) | Send feedback: the card, what leaves the machine, the stateless relay that makes a GitHub issue, and how to run it. |
 | [`gate-and-releases.md`](gate-and-releases.md) | Versions, how a release is cut, and what `npm run gate`, `checks` and CI run. |
+| [`limits.md`](limits.md) | What the app costs to run and where it slows down and stops, measured; the bench and the nightly guards. |
 
 ## Find a section by name
 
@@ -99,6 +100,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Quotas and history | [`sync.md`](sync.md) |
 | Reaching what the file can say | [`editing-drag.md`](editing-drag.md) |
 | Reading it as a tree | [`sidebar.md`](sidebar.md) |
+| Resource use and limits | [`limits.md`](limits.md) |
 | References, ids and the read-only view | [`references.md`](references.md) |
 | Running the relay | [`feedback.md`](feedback.md) |
 | Search | [`search.md`](search.md) |
@@ -108,6 +110,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Sync | [`sync.md`](sync.md) |
 | The api server | [`api.md`](api.md) |
+| The bench | [`limits.md`](limits.md) |
 | Tables | [`tables.md`](tables.md) |
 | Tasks | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Text emphasis | [`editing.md`](editing.md) |
@@ -129,6 +132,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The trash | [`trash.md`](trash.md) |
 | Things that will bite | [`things-that-will-bite.md`](things-that-will-bite.md) |
 | Tidy up | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
+| Turning AI off | [`settings.md`](settings.md) |
 | Vaults | [`server.md`](server.md) |
 | What the server cannot forge | [`sync.md`](sync.md) |
 | Versions and releases | [`gate-and-releases.md`](gate-and-releases.md) |

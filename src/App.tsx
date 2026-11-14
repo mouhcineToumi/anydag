@@ -36,30 +36,42 @@ import { proposedItem } from "@/edit/rewrite";
 import { SelectionBar, type RewriteRun } from "@/edit/SelectionBar";
 import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
-import { FeedbackCard } from "@/feedback/FeedbackCard";
-import { Settings, useSettingsOpen } from "@/settings/Settings";
+import { useSettingsOpen } from "@/settings/open";
 import type { LlmReason } from "@/settings/llmReason";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
 import { Item } from "@/render/Item";
 import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
-import { BoardBrowser } from "@/ui/BoardBrowser";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
 import { FileProblem } from "@/ui/FileProblem";
 import { Shell, useSidebar } from "@/ui/Shell";
+import {
+  AssistantView,
+  BoardBrowser,
+  CalendarView,
+  FeedbackCard,
+  LayoutToggle,
+  QuizEditor,
+  QuizzesView,
+  Settings,
+  TablePage,
+  TasksView,
+  TrashView,
+} from "@/ui/chunks";
+import { preloadChunks } from "@/ui/chunk";
 import type { SettingsTab } from "@/settings/tabs";
 import type { ChromeAsk } from "@/ui/chrome";
 import type { PlaceFile } from "@/ui/Sidebar";
 import { NoteView, type NoteHandle } from "@/ui/NoteView";
 import type { ProjectMembers } from "@/ui/ProjectBar";
 import { nameWhenOpened } from "@/ui/NoteTitle";
-import { LayoutToggle, NO_PROJECT, TasksView, type ProjectFilter, type TasksLayout } from "@/ui/Tasks";
+import type { TasksLayout } from "@/ui/Tasks";
+import { NO_PROJECT, type ProjectFilter } from "@/ui/projectFilter";
 import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
 import { rememberOpened } from "@/ui/recents";
 import { CALENDAR_VIEW, LIBRARY, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
 import { MAX_DAYS, VIEWS, type CalView } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
-import { CalendarView } from "@/ui/Calendar";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
 import { PageBar } from "@/ui/PageBar";
@@ -81,15 +93,11 @@ import { folderLabel, folderOfRun, folderQuizzes } from "@/quiz/folder";
 import { askable, parseQuiz, type Question } from "@/quiz/parse";
 import { stampIds } from "@/quiz/write";
 import { sealId } from "@/board/envelope";
-import { QuizEditor } from "@/ui/quiz/Editor";
-import { QuizzesView, type QuizzesRun } from "@/ui/quiz/Gallery";
-import { TrashView } from "@/ui/Trash";
-import { AssistantView } from "@/assistant/Page";
+import type { QuizzesRun } from "@/ui/quiz/Gallery";
 import { toggleAssistant } from "@/assistant/panelState";
 import { answer, flush as flushAnswers, readPractice, usePractice } from "@/ui/quiz/practice";
 import { Runner, Sheet, type RunQuestion } from "@/ui/quiz/Runner";
 import { useQuizFile } from "@/ui/quiz/useQuizFile";
-import { TablePage } from "@/ui/table/TablePage";
 import { NotePrint } from "@/view/NotePrint";
 import { leaf } from "@/ui/tree";
 import { useIndex } from "@/refs/useIndex";
@@ -104,6 +112,8 @@ import { UploadNotice } from "@/files/UploadNotice";
 import { saveWithFiles } from "@/files/exportBundle";
 import { placedWidth } from "@/edit/image";
 import { readSettings } from "@/settings/store";
+import { aiOn } from "@/settings/aiSwitch";
+import { useAi } from "@/settings/useAi";
 import { isLocked, refuseLocked, useLocked } from "@/settings/lock";
 import { openTemplates } from "@/ui/templates";
 import { track } from "@/telemetry/client";
@@ -224,7 +234,7 @@ type SetQuery = ReturnType<typeof useQuery>[1];
  * kind sent through any of them would have opened a quiz as a board. The keys it clears
  * are every page this app has: a board, a note, a quiz, and the two pages that list them.
  */
-export function pageQuery(kind: FileKind, target: string | null): Record<string, string | null> {
+function pageQuery(kind: FileKind, target: string | null): Record<string, string | null> {
   return {
     board: null,
     note: null,
@@ -273,8 +283,10 @@ export function App() {
   /* `?trash=1` is the Trash page, exclusive with the rest. */
   const trash = !tasks && !calendar && !quizzes && query.get("trash") === "1";
   /* `?chat=` is the Assistant page: a chat's id, `new`, or `1` for the newest —
-     a page with no canvas, exclusive with the rest as they are with each other. */
-  const assistant = !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
+     a page with no canvas, exclusive with the rest as they are with each other. With the Assistant
+     turned off (#296) the address names no page, and home is drawn. */
+  const ai = useAi();
+  const assistant = ai.assistant && !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
   const listing = tasks || calendar || quizzes || trash || assistant;
   const quiz = listing ? null : query.get("quiz");
   /* `?table=` is a table's page, `&tab=` the tab it shows. */
@@ -287,6 +299,10 @@ export function App() {
      both pages and reads the same answer the search and the feedback card do. */
   const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
   useFollowing(list, go);
+  /* The pages and cards this one did not need (`ui/chunks.tsx`), fetched once it is drawn. */
+  useEffect(() => {
+    preloadChunks();
+  }, []);
   const open = useCallback((kind: FileKind, target: string | null) => setQuery(pageQuery(kind, target)), [setQuery]);
   const openTasks = useCallback(() => setQuery({ ...pageQuery("board", null), tasks: "1" }), [setQuery]);
   const openCalendar = useCallback(() => setQuery({ ...pageQuery("board", null), calendar: "1" }), [setQuery]);
@@ -495,7 +511,8 @@ function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }
       if (leader && e.key.toLowerCase() === "o") {
         e.preventDefault();
         ref.current.search();
-      } else if (leader && e.key.toLowerCase() === "a") {
+      } else if (leader && e.key.toLowerCase() === "a" && aiOn(readSettings(), "assistant")) {
+        /* `space A` is the Assistant's, and goes with it when it is turned off (#296). */
         e.preventDefault();
         toggleAssistant();
       } else if (leader && e.key.toLowerCase() === "m") {
@@ -1938,6 +1955,8 @@ function BoardApp({
      The text outlives the dialog so "Try again" reopens it as it was left; it belongs to one item,
      and opening the dialog on another starts empty. */
   const [asking, setAsking] = useState(false);
+  /* Which AI features this board draws (#296): one that is off leaves no control behind. */
+  const ai = useAi();
   const [askFor, setAskFor] = useState<string | null>(null);
   const [askText, setAskText] = useState("");
   const rewriteCtl = useRef<AbortController | null>(null);
@@ -2044,6 +2063,14 @@ function BoardApp({
     if (!target || !askText.trim()) return;
     onRewrite([target], askText.trim());
   }, [runFor, askFor, askText, onRewrite]);
+
+  /* *Change with AI* turned off (#296) takes a rewrite with it: the request is cancelled, a
+     proposal is thrown away unwritten, and the dialog shuts — nothing of it was in the file yet. */
+  useEffect(() => {
+    if (ai.rewrite) return;
+    onDiscard();
+    setAsking(false);
+  }, [ai.rewrite, onDiscard]);
 
   /* Escape lets go of the rewrite wherever focus is. The bar owns its own Escape — the settings
      card's idiom, and the one that works while a person is typing in the field, because the
@@ -2229,7 +2256,7 @@ function BoardApp({
      puts its centre in the middle of the view. Not `focusBoard()` after: a fresh prompt card takes
      the caret, and pulling focus back to the board would take it straight off the thing the press
      just made. */
-  const onPrompt = () => editor.add("prompt");
+  const onPrompt = ai.prompts ? () => editor.add("prompt") : undefined;
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
@@ -2643,13 +2670,13 @@ function BoardApp({
             boardName={board?.name ?? ""}
             run={barRun}
             locked={locked}
-            onAsk={onAsk}
+            onAsk={ai.rewrite ? onAsk : undefined}
             onRetry={onRetry}
             onAccept={onAccept}
             onDiscard={onDiscard}
           />
         ) : null}
-        {asking && askFor && !snapshot && !locked ? (
+        {asking && askFor && ai.rewrite && !snapshot && !locked ? (
           <RewriteDialog
             subject={board?.items.find((it) => it.id === askFor)?.title}
             text={askText}

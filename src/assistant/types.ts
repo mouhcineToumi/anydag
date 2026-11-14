@@ -18,9 +18,11 @@ export type {
   UndoRecord,
 } from "../../server/chat/types";
 
+import type { Provider } from "../../server/chat/types";
+
 /** What `GET /__board/chat/models` answers, per provider (`server/chat/models.ts`). */
 export interface ProviderModels {
-  provider: "claude" | "opencode";
+  provider: Provider;
   label: string;
   available: boolean;
   why?: string;

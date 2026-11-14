@@ -45,7 +45,7 @@ AnyDag keeps it in one place, and every piece links to every other:
   what you got wrong.
 - **Organise** reading lists and trackers in tables, and plans in tasks, projects and a calendar.
 - **Bring your own AI**, if you want it: ask questions about your notes, or have it draft a quiz or
-  a diagram, using your own Claude Code, OpenCode or API key.
+  a diagram, using your own Claude Code, OpenCode, Codex or API key.
 
 It is for students, self-learners, researchers, writers, and anyone who keeps notes and wants them to
 add up to something.

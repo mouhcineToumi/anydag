@@ -198,6 +198,11 @@ Eight things are load-bearing:
   A template stays in the file list, in search and in backlinks like any note, and its own page shows
   its real frontmatter. What a template *makes* (`makes` in the list, and the mark on its row) is read
   off the text **as it would be filled**, since `start: {{date}}` is no date until it is.
+  **The kept listing (#280) holds the same rule** (`KeptListing.wanted`, given the folder it was made
+  with), and a templates folder that moves — renamed in Settings, or a `Templates` folder made or
+  removed by hand — drops it, so the next listing walks: which notes are tasks changed for every note in
+  the folder at once. The index's per-document answers and the list's JSON are cached with the folder
+  too (`routes/docs.ts`). `test/server/kept.test.ts` holds both.
 - **The starters are written only when asked.** `src/note/starters.ts` is *Meeting*, *Daily* and *ADR*,
   written by `POST /__board/templates/starters` into the templates folder (`Templates` when none is named),
   making the folder, and **never over a name that is taken**, in any kind. None carries a `status:` or a

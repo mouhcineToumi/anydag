@@ -6,7 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ALPHABET, frontId, mint, validId, withId } from "../../server/ids";
-import { BOARD, NOTE, PDF, makeEnv, readText, sleep, sweepTemps, write, type Env } from "./helpers";
+import { BOARD, NOTE, PDF, makeEnv, readText, sleep, sweepTemps, until, write, type Env, watchedFromTheStart } from "./helpers";
 
 let env: Env;
 beforeEach(() => {
@@ -278,6 +278,8 @@ describe("the index and the files disagree", () => {
     write(env.root, "a.md", "# a\n");
     await env.vault.tree();
     write(env.root, "a.md", "---\nid: abcdefghjk\n---\n# a\n");
+    // Watched (`ANYDAG_TEST_WATCH`), a text written in place is listed once the watcher says so (#280).
+    if (watchedFromTheStart) await until(async () => (await env.vault.tree()).ids.a === "abcdefghjk", 5000, "the id");
     expect((await env.vault.tree()).ids.a).toBe("abcdefghjk");
     expect(env.home.docs(env.vault.id)).toHaveLength(1);
   });
@@ -359,7 +361,8 @@ describe("an attachment", () => {
     expect(tree.titles["work/q3.pdf"]).toBe("Q3");
   });
 
-  it("a record that is not JSON is skipped and read again next time", async () => {
+  // Watched (`ANYDAG_TEST_WATCH`), a record written in place is read once the watcher says so — `kept.test.ts`.
+  it.skipIf(watchedFromTheStart)("a record that is not JSON is skipped and read again next time", async () => {
     write(env.root, "scan.pdf", "%PDF");
     write(env.root, ".anydag/files/abcdefghjk.json", "{ half");
     const tree = await env.vault.tree();

@@ -1,4 +1,5 @@
-import { BINDINGS, LEADER_LABEL } from "@/edit/bindings";
+import { BINDINGS, bindingOn, LEADER_LABEL } from "@/edit/bindings";
+import { useAi } from "@/settings/useAi";
 
 /**
  * What the leader can reach, shown once somebody has held it long enough to be asking.
@@ -14,11 +15,13 @@ import { BINDINGS, LEADER_LABEL } from "@/edit/bindings";
  * could be clicked would be a second way to do what the letter under it already does.
  */
 export function WhichKey() {
+  /* An AI feature that is off takes its chord with it (#296). */
+  const ai = useAi();
   return (
     <div className="dag-whichkey" data-dag-whichkey="" role="status" aria-label="Leader key">
       <kbd className="dag-whichkey__leader">{LEADER_LABEL}</kbd>
       <ul className="dag-whichkey__list">
-        {BINDINGS.map((b) => (
+        {BINDINGS.filter((b) => bindingOn(b, (f) => ai[f])).map((b) => (
           <li key={b.key} className="dag-whichkey__item" data-dag-whichkey-key={b.key}>
             <kbd>{b.key}</kbd>
             <span>{b.label}</span>

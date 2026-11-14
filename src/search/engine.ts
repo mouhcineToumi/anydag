@@ -1,13 +1,13 @@
 /**
- * Matching a query against the corpus, in the browser.
+ * Matching a query against the corpus, on the server.
  *
- * **Local-first, and MiniSearch**, taken for what this
- * stack already is: there is no database with a text index behind it — the vault is a folder of
- * plain files — and the page already keeps a copy of the references index current off
- * the change feed. So the server cuts the texts into units once per change (`/__board/corpus`, where
- * the grammar is), and every keystroke is matched here, with no round trip. MiniSearch rather than
- * FlexSearch because it ranks (BM25), does prefixes and typos, is one small MIT file with no
- * dependencies, and states its behaviour in options this file can read.
+ * **MiniSearch**, taken for what this stack already is: there is no database with a text index
+ * behind it — the vault is a folder of plain files. The server cuts the texts into units
+ * (`/__board/corpus`, where the grammar is), builds this over them once per corpus version, and
+ * answers every query with `GET /__board/search`; the search card asks per query (`useSearch`) and
+ * never holds the units. MiniSearch rather than FlexSearch because it ranks (BM25), does prefixes and
+ * typos, is one small MIT file with no dependencies, and states its behaviour in options this file
+ * can read. The page does not import this file, so none of it is in the page's bundle.
  *
  * No DOM and no React, so the ranking and the snippet are unit tests rather than a browser.
  */
@@ -17,7 +17,7 @@ import type { FileKind } from "@/board/useBoard";
 
 import type { Unit } from "./corpus";
 
-/** One document as `/__board/corpus` answers it. */
+/** One document as `/__board/corpus` answers it, and as the engine holds it. */
 export interface SearchDoc {
   id: string;
   name: string;

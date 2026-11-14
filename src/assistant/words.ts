@@ -4,6 +4,7 @@
  */
 
 import type { Block, Step, UndoRecord } from "./types";
+import { locale } from "../locale";
 
 /** `mcp__anydag__note_create` (Claude Code), `anydag_note_create` (OpenCode) and `note_create` are one tool. */
 const toolName = (name: string): string => name.replace(/^mcp__anydag__/, "").replace(/^anydag_/, "");
@@ -151,7 +152,7 @@ export function dayLabel(iso: string, now = new Date()): string {
   const diff = Math.round((day(now) - day(d)) / 86_400_000);
   if (diff <= 0) return "Today";
   if (diff === 1) return "Yesterday";
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(locale(), {
     weekday: diff < 7 ? "long" : undefined,
     month: "short",
     day: "numeric",
@@ -162,5 +163,5 @@ export function dayLabel(iso: string, now = new Date()): string {
 /** The time of day a turn was said, for its header. */
 export function clock(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
 }
