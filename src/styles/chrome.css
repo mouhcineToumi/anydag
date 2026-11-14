@@ -5124,7 +5124,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   html[data-dag-printing] body > :not(.dag-print) { display: none !important; }
   .dag-print { position: static; z-index: auto; margin: 0 auto; visibility: visible; }
   .dag-print h1, .dag-print h2, .dag-print h3, .dag-print h4 { break-after: avoid; }
-  .dag-print pre, .dag-print .dag-code, .dag-print blockquote, .dag-print table, .dag-print img, .dag-print .dag-embed { break-inside: avoid; }
+  .dag-print pre, .dag-print .dag-code, .dag-print blockquote, .dag-print .dag-callout, .dag-print table, .dag-print img, .dag-print .dag-embed { break-inside: avoid; }
   /* A table's rounded corners are an `overflow: hidden`, and on a paged medium Chromium clips the
      last row's bottom half with it. Square, and nothing clipped. */
   .dag-print .dag-md table { overflow: visible; border-radius: 0; }

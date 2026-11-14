@@ -35,7 +35,7 @@ Seven things are load-bearing:
   group whose JSON changed is turned back into Markdown — 4 ms a save on a 118 KB note, where
   serialising every group was 65 ms of main thread every quarter-second while somebody typed.
   Opening is dominated by remark's own parse, about 0.3 MB/s, the same parser `MarkdownItem` pays.
-- **The schema is the Markdown's.** Twelve blocks and four marks, `NOTE_BLOCKS`/`NOTE_STYLES`, and
+- **The schema is the Markdown's.** Thirteen blocks and four marks, `NOTE_BLOCKS`/`NOTE_STYLES`, and
   beside text two inline kinds of content, a reference and an equation; no
   underline, no toggle, no file, no colour (a colour the theme does not own — the *A custom colour*
   refusal). Leaving a block out of the schema is what takes it out of the menus; the slash menu is
@@ -133,6 +133,82 @@ refusal the boards make); a diagram inside a note (a fenced
 packages; a note's saved version history (undo is the editor's, for the session). A board's own `md` cards
 are edited in the same block editor, on the card, under the same rule — see *An md card's text, in
 place* in `editing.md`.
+
+## Callouts
+
+A quote whose first line names a kind is a **callout**, as GitHub and Obsidian write one, and it is
+drawn as one everywhere Markdown is drawn — the note editor, `?view=1`, a snapshot, the PDF, an
+embedded note, a board's text card, a quiz, the Assistant's words.
+
+    > [!warning] Breaking change
+    > The `/api/boards` route is gone in 0.6.
+
+| Written | Is |
+|---|---|
+| `> [!tip]` on the quote's first line | a callout of that kind, headed with its word (`Tip`) |
+| `> [!tip] Title` | the same, headed with the title |
+| `> [!tip]- Title`, `> [!tip]+ Title` | one that folds: drawn shut, or open |
+| GitHub's `note` `tip` `important` `warning` `caution`; Obsidian's `abstract` `info` `todo` `success` `question` `failure` `danger` `bug` `example` `quote` | each drawn in its own hue and icon |
+| Obsidian's aliases — `summary` `tldr` `hint` `check` `done` `help` `faq` `attention` `fail` `missing` `error` `cite` | drawn as the kind they name, kept as written |
+| any other word, `> [!aside]` | drawn as a `note`, headed with its own word, kept as written |
+| `> [!two words]`, `> **[!note]**`, `> [!note]text`, a first line ending in a hard break | a plain quote, as before |
+
+| Where | It |
+|---|---|
+| `src/note/callout.ts` | the grammar: the kinds and aliases, `splitCallout`, the house form's first line, and `remarkCallouts` for every read-only renderer |
+| `src/note/markdown.ts` | `calloutBlock` (a quote → a `callout` block) and `calloutMd` (back) |
+| `src/note/schema.ts` | `CALLOUT_CONFIG`, its keyboard, and the HTML a paste goes through |
+| `src/render/Callout.tsx` | each kind's hue and icon, and `CalloutAside`, the `aside` `remarkCallouts` makes |
+| `src/blocks/callout.tsx` | the editor's frame and head, `/Callout`, and `[!tip]` typed in a quote |
+
+Six things are load-bearing:
+
+- **One decision, on the tree.** `splitCallout` decides what a callout is from the parsed quote, and
+  the bridge and `remarkCallouts` both ask it, so the editor and every page agree on which quotes
+  are callouts — `test/note-callout.test.ts` holds them to each other on the cases where Markdown
+  is close: a first line is everything before the first soft break, and a first line that does not
+  end inside text — a hard break, a link or code span running onto the next line — is not a
+  callout.
+- **The file keeps its words.** `kind` is the word as written (`NOTE` stays upper case, `hint` stays
+  `hint`, an unknown word stays itself) and `title` is the rest of the first line *as bytes*, so a
+  title with Markdown in it is written back exactly; the editor shows it as the text it is, and the
+  pages draw its Markdown. Changing the kind in the editor keeps the file's case: `[!NOTE]` becomes
+  `[!WARNING]`.
+- **The house form is GitHub's.** An edited callout is written `> [!kind]fold title`, then its text
+  and blocks as a quote under that line. Where the body would run into the first line — a title
+  ending in a backslash makes its line end a hard break — a blank `>` line goes between them, which
+  is the same callout; which of the two is decided by reading both back, not by guessing at
+  Markdown's rules. Its text is the body's first paragraph, and the body's other blocks are its
+  children; a first line standing alone with the body after a blank line reads as the same block, so
+  it is written the short way once somebody edits it. The callout is a raw node in the writer's tree,
+  so it is indented in a list or a quote like anything else, and its equations are found by parsing
+  it, for the dollar check.
+- **The box is the block's frame.** The editor's callout draws its box in `renderFrame`, and
+  BlockNote puts the block's text and its child blocks in the frame's slot, so a callout of three
+  paragraphs is one tinted box, as on a page. The head — the icon with the kind's `<select>` laid
+  over it, the title's `<input>`, the chevron — is chrome outside the slot, whose events and DOM
+  BlockNote leaves alone; the kind and title are props written with `updateBlock`, the title on Enter
+  or blur. Enter in its text starts its body, Enter on an empty last line of the body leaves it, and
+  Backspace at its start makes it a quote again (`CALLOUT_KEYBOARD`).
+- **The colours are the theme's ten hues.** Each kind maps onto one (`CALLOUT_LOOK`), and `quote`
+  onto none — the theme's quiet greys. They are bound on the box as `--callout-h` and `--callout-t`,
+  never `--dag-h`, which a callout in a hued card would otherwise inherit. In `neutral`, whose hues
+  are greys on purpose, the icon tells the kinds apart. The box takes a code block's padding and the
+  quote's bar; nothing in `markdown.css` names a length.
+- **Folding writes nothing.** A page draws a folding callout as `<details>`, so opening one is the
+  browser's; the editor's chevron is the frame's own state. `-` and `+` only say how it is drawn when
+  the note opens.
+
+Names claimed, grepped first: `dag-callout*` (`dag-callout__head`, `__icon`, `__title`, `__body`,
+`__chevron`, `__slot`, `__text`, `__pick`, `__kind`, `__fold`, `dag-callout--editor`),
+`data-dag-callout`, `data-dag-callout-word`, `data-dag-callout-title`, `data-dag-callout-fold`,
+`data-dag-callout-open`, `data-dag-callout-kind`, `data-dag-callout-title-field`,
+`data-dag-callout-fold-button`, `data-dag-callout-text`, `data-dag-callout-children`, and the custom
+properties `--callout-h` and `--callout-t`.
+
+**Out, and why:** a person's own kinds (Obsidian's CSS snippets — a colour the theme does not own);
+a callout inside a callout beyond what a quote already holds; and a search result naming a callout
+rather than a quote, which is what it still is to the index.
 
 ## Equations
 

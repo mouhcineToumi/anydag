@@ -38,6 +38,8 @@ export const OWN_SLASH: Record<string, NoteBlockType> = {
   file_upload: "embed",
   /* An equation on lines of its own, its field open for the TeX. */
   equation: "equation",
+  /* A `note` callout, `> [!note]`; the kind is changed in its head. */
+  callout: "callout",
 };
 
 /**

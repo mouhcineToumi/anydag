@@ -3,6 +3,7 @@ import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { remarkCallouts } from "@/note/callout";
 import { refComponents, urlTransform } from "@/refs/Ref";
 import { providerName } from "@/settings/providerNames";
 
@@ -12,7 +13,7 @@ import { clock, conflictLines, oneLine, openable, targetOf, touched, undoable, v
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-const PLUGINS = [remarkGfm];
+const PLUGINS = [remarkGfm, remarkCallouts];
 /* One object for the page's life: these are component types to React, and a fresh set on every
    render would unmount every reference under them (`refComponents` says why). */
 const MD = refComponents({ boards: false, placed: true });

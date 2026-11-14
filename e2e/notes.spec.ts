@@ -176,6 +176,8 @@ test("the slash menu offers only what a Markdown file can say", async ({ page })
     "Divider",
     /* Ours: an equation on lines of its own, `$$` in the file — among the basic blocks. */
     "Equation",
+    /* Ours: a callout, `> [!note]` in the file — its kind changed in its head. */
+    "Callout",
     "Table",
     "Image",
     /* Ours, not BlockNote's: it opens the embed picker, and an embed is Markdown too. */
