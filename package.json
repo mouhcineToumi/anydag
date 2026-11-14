@@ -105,7 +105,7 @@
     "fflate": "^0.8.3",
     "hono": "^4.13.16",
     "katex": "^0.19.1",
-    "lucide-react": "^0.469.0",
+    "lucide-react": "^1.71.0",
     "mdast-util-math": "^3.0.0",
     "micromark-extension-math": "^3.1.0",
     "minisearch": "^7.2.0",
