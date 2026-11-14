@@ -5,10 +5,11 @@ import { describe, expect, it } from "vitest";
 /**
  * "Renders any note or board without loading the editor" — held to the import graph.
  *
- * A viewer's browser fetches exactly what the entry reaches through **static** imports; a dynamic
- * `import()` is a chunk fetched only when that line runs, and `import type` is erased. So walking
- * the static graph from `main.tsx` answers what a `?view=1` page downloads before anything is drawn,
- * and the canvas has to be behind a dynamic import for none of it to be the editor.
+ * A browser fetches exactly what a chunk reaches through **static** imports; a dynamic `import()` is
+ * a chunk fetched only when that line runs, and `import type` is erased. The entry (`main.tsx`)
+ * imports the page the address asks for — the read-only view (`ViewApp`) for `?view=1`, the canvas
+ * (`App`) otherwise — dynamically, so walking the static graph from the entry and from `ViewApp`
+ * answers what a `?view=1` page downloads before anything is drawn, and none of it may be the editor.
  *
  * A regex over the source rather than a bundler: the question is only which specifiers a file
  * names, and this answers it in milliseconds without a build.
@@ -69,9 +70,26 @@ function reach(entry: string): { files: Set<string>; packages: Set<string> } {
 
 const rel = (f: string) => path.relative(ROOT, f);
 
+/** The specifiers a file asks for with a dynamic `import()`. */
+function dynamicImports(file: string): string[] {
+  return [...fs.readFileSync(file, "utf8").matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g)].map((m) => m[1]!);
+}
+
 describe("the read-only view's import graph", () => {
-  const { files, packages } = reach(path.join(SRC, "main.tsx"));
+  const main = path.join(SRC, "main.tsx");
+  const entry = reach(main);
+  const view = reach(path.join(SRC, "view/ViewApp.tsx"));
+  const files = new Set([...entry.files, ...view.files]);
+  const packages = new Set([...entry.packages, ...view.packages]);
   const reached = [...files].map(rel);
+
+  it("loads the view and the canvas as chunks of their own, so the entry carries neither", () => {
+    expect(dynamicImports(main)).toEqual(expect.arrayContaining(["./view/ViewApp", "./App"]));
+    const first = [...entry.files].map(rel);
+    expect(first).not.toContain("src/view/ViewApp.tsx");
+    expect(first).not.toContain("src/view/BoardView.tsx");
+    expect(first).not.toContain("src/App.tsx");
+  });
 
   it("reaches the view", () => {
     expect(reached).toContain("src/view/ViewApp.tsx");
@@ -88,5 +106,9 @@ describe("the read-only view's import graph", () => {
   it("finds the editor when it is asked from the canvas, so the walk itself is not blind", () => {
     const canvas = reach(path.join(SRC, "App.tsx")).files;
     expect([...canvas].map(rel)).toContain("src/edit/useEditor.ts");
+  });
+
+  it("does not fetch the view from the canvas", () => {
+    expect([...reach(path.join(SRC, "App.tsx")).files].map(rel)).not.toContain("src/view/ViewApp.tsx");
   });
 });

@@ -14,9 +14,11 @@ import { LlmSentence } from "@/ui/LlmSentence";
 import { ModelPicker } from "@/ui/ModelPicker";
 import { pickerProvidersFromChat, pickerProvidersFromLlm } from "@/ui/modelList";
 import { askPage } from "@/ui/chrome";
+import { Switch } from "@/ui/controls";
 import { ProviderMark } from "@/ui/ProviderMark";
 
 import { AI_FEATURE_LABEL, featureSummary, type AiFeature } from "../aiFeature";
+import { aiOn, AI_SWITCH_HINT, AI_SWITCH_LABEL, AI_SWITCHES } from "../aiSwitch";
 import { modelChoice, type ModelChoice } from "../modelChoice";
 import { useNarrow } from "../narrow";
 import { providerName } from "../providerNames";
@@ -26,7 +28,8 @@ import { useSettings } from "../useSettings";
 import { Field, Group, Hint, ICON, Reset } from "./common";
 
 /**
- * Which model draws diagrams and flashcards, and what a new Assistant chat starts on.
+ * Which AI features are drawn at all (#296), which model draws diagrams and flashcards, and what a
+ * new Assistant chat starts on.
  *
  * The model half is the old card's *Prompt cards* section, now named after everything it drives —
  * prompt cards, Rewrite and Generate flashcards share it. The Assistant half is the chat's own
@@ -46,6 +49,14 @@ export function AiPane() {
   const models = useChatModels();
   const diagrams = modelChoice(s.llm, llm);
   const assistant = assistantChoice(models, s.assistant);
+  /* The model groups are drawn for the features that use them (#296): the diagrams' model for
+     prompt cards, Change with AI and Generate flashcards, the Assistant's for the Assistant. With
+     every feature off the tab is the switches alone. */
+  const drawn: Readonly<Record<AiFeature, boolean>> = {
+    diagrams: aiOn(s, "prompts") || aiOn(s, "rewrite") || aiOn(s, "flashcards"),
+    assistant: aiOn(s, "assistant"),
+  };
+  const reset = () => resetSettingsWithUndo(["features", "llm", "assistant"]);
 
   /* A switch with a default, so a feature added to `AiFeature` fails to compile until it has a page. */
   const featurePane = (which: AiFeature) => {
@@ -80,13 +91,14 @@ export function AiPane() {
   if (!narrow)
     return (
       <>
-        <DiagramsGroup llm={llm} refresh={refresh} />
-        <AssistantGroup models={models} />
-        <Reset what="AI" onReset={() => resetSettingsWithUndo(["llm", "assistant"])} />
+        <SwitchesGroup />
+        {drawn.diagrams ? <DiagramsGroup llm={llm} refresh={refresh} /> : null}
+        {drawn.assistant ? <AssistantGroup models={models} /> : null}
+        <Reset what="AI" onReset={reset} />
       </>
     );
 
-  if (feature !== null)
+  if (feature !== null && drawn[feature])
     return (
       <>
         <button type="button" className="dag-settings__featureBack" data-dag-setting-ai-back="" onClick={closeFeature}>
@@ -99,22 +111,66 @@ export function AiPane() {
 
   return (
     <>
-      <Group prompt>
-        <FeatureRow
-          feature="diagrams"
-          provider={diagrams?.provider ?? null}
-          summary={featureSummary(diagrams, s.llm.reasoning)}
-          onOpen={() => openFeature("diagrams")}
-        />
-        <FeatureRow
-          feature="assistant"
-          provider={assistant?.provider ?? null}
-          summary={featureSummary(assistant, null)}
-          onOpen={() => openFeature("assistant")}
-        />
-      </Group>
-      <Reset what="AI" onReset={() => resetSettingsWithUndo(["llm", "assistant"])} />
+      <SwitchesGroup />
+      {drawn.diagrams || drawn.assistant ? (
+        <Group prompt>
+          {drawn.diagrams ? (
+            <FeatureRow
+              feature="diagrams"
+              provider={diagrams?.provider ?? null}
+              summary={featureSummary(diagrams, s.llm.reasoning)}
+              onOpen={() => openFeature("diagrams")}
+            />
+          ) : null}
+          {drawn.assistant ? (
+            <FeatureRow
+              feature="assistant"
+              provider={assistant?.provider ?? null}
+              summary={featureSummary(assistant, null)}
+              onOpen={() => openFeature("assistant")}
+            />
+          ) : null}
+        </Group>
+      ) : null}
+      <Reset what="AI" onReset={reset} />
     </>
+  );
+}
+
+/**
+ * Which AI features are drawn at all (#296): the master switch, then one per feature.
+ *
+ * With the master off each feature's switch keeps its value and is shown disabled, so a person sees
+ * what turning the master back on will bring back. Off hides a feature everywhere — its buttons,
+ * shortcuts and pages — and writes nothing to any file: a prompt card already on a board is drawn
+ * read-only until prompt cards are back.
+ */
+function SwitchesGroup() {
+  const s = useSettings();
+  const master = s.features.ai;
+  return (
+    <Group
+      title="AI features"
+      footer={<Hint data-dag-setting-features-hint="">Off hides a feature everywhere. Nothing in your files changes.</Hint>}
+    >
+      <Field label="Use AI features" hint="Off hides every AI button, shortcut and page." save="features.ai">
+        <Switch
+          data-dag-setting-feature="ai"
+          checked={master}
+          onChange={(e) => writeSettings({ features: { ai: e.target.checked } })}
+        />
+      </Field>
+      {AI_SWITCHES.map((f) => (
+        <Field key={f} label={AI_SWITCH_LABEL[f]} hint={AI_SWITCH_HINT[f]} save={`features.${f}`}>
+          <Switch
+            data-dag-setting-feature={f}
+            checked={s.features[f]}
+            disabled={!master}
+            onChange={(e) => writeSettings({ features: { [f]: e.target.checked } })}
+          />
+        </Field>
+      ))}
+    </Group>
   );
 }
 

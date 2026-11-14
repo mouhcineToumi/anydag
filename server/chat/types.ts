@@ -17,10 +17,13 @@ export type Mode = "ask" | "edit";
 type Grant = { mode: Mode; at: string } | null;
 
 /**
- * `chat.json`, the one chat file written more than once. Sync merges it **by key**, shallowly, so
- * every value a second machine could change on its own is its own key: a grant is `grant:<vaultId>`,
- * never an entry in a nested object, and a grant taken back is `null`, never a key removed — or the
- * merge would bring it back from the machine that had not heard.
+ * `chat.json`, the one chat file written more than once, as the server answers it. Sync merges the
+ * file **by key**, shallowly, so every value a second machine could change on its own is its own key.
+ *
+ * Two fields are this machine's word, never the file's (#9): `home` is the vault the chat was found
+ * in, whatever the file says, and the `grant:<vaultId>` keys are what the person granted *here*,
+ * kept in the app's home (`ChatStore.grants`) — a grant taken back is `null`, so undo still knows it
+ * was given. A `grant:` key written into the file is not read.
  */
 export interface ChatMeta {
   v: 1;

@@ -71,8 +71,11 @@ interface Props {
   run: RewriteRun;
   /** The app is locked: the bar is the one item's Export and nothing that changes it. */
   locked?: boolean;
-  /** Open the dialog a change is described in — `App` holds it, and the text typed into it. */
-  onAsk(): void;
+  /**
+   * Open the dialog a change is described in — `App` holds it, and the text typed into it. Absent
+   * with *Change with AI* turned off (#296), and the sparkle and its model chip with it.
+   */
+  onAsk?(): void;
   /** Send the same change again, with the text already in the dialog — a reason's Try again. */
   onRetry(): void;
   /** Write the standing proposal into the board — one `SetOp`, one undo entry. */
@@ -132,7 +135,7 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
   const one = items.length === 1 ? items[0]! : null;
   const many = items.length > 1;
   const grouped = items.some((it) => it.group);
-  const busy = run.phase !== "idle";
+  const busy = onAsk !== undefined && run.phase !== "idle";
   const anchor = busy && "id" in run && run.id ? [run.id] : items.map((it) => it.id);
   /* Delete and Duplicate do what their keys do, and the keys act on a pick before the selection. */
   const seq = one?.type === "sequence";
@@ -289,7 +292,7 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      {busy ? (
+      {busy && onAsk ? (
         <Run run={run} onAccept={onAccept} onDiscard={onDiscard} onAsk={onAsk} onRetry={onRetry} />
       ) : (
         <div className="dag-selbar__row">
@@ -311,7 +314,7 @@ export function SelectionBar({ editor, items, boardName, run, locked = false, on
               >
                 <PanelRightOpen {...ICON} aria-hidden="true" />
               </Tool>
-              {isDiagramType(one.type) ? (
+              {onAsk && isDiagramType(one.type) ? (
                 <>
                   <button
                     type="button"

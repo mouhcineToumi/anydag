@@ -34,7 +34,9 @@ load-bearing:
 - **The manifest is untrusted.** `entry.json` travels with a synced or shared folder, so restore
   puts `name` through the vault's own naming rules, requires the `docs` key to be the file that name
   stores, and keeps the source under the entry's `files/` with no link on the way. Anything else is
-  a damaged entry: a 404, and nothing moves.
+  a damaged entry: a 404, and nothing moves. A manifest that is not an object at all — `null`
+  parses — is no entry, and the listing skips any entry that cannot be read rather than failing
+  with it: one such file once broke every trash route in the vault (#9).
 - **One entry is one thing a person deleted**: a file, or a folder with what it held at that moment
   (`holds`, by kind, the folder itself among the folders). Several rows deleted at once are several
   entries, and the notice's Undo restores all of them, last first.

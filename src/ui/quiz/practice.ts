@@ -18,6 +18,8 @@
  */
 import { useEffect, useState } from "react";
 
+import { registerPendingWrites } from "@/ui/pendingWrites";
+
 type Run = "quiz" | "mistakes";
 
 export interface Answer {
@@ -144,6 +146,16 @@ export async function flush(leaving = false): Promise<void> {
   }
   if (queue.length && !leaving && !timer) schedule(0);
 }
+
+/* Before the app restarts into an update: send every batch, not only the one in flight. Stops when a
+   round sends nothing, so a server that is not answering cannot hold the restart for ever. */
+registerPendingWrites(async () => {
+  for (let rounds = 0; queue.length > 0 && rounds < 20; rounds++) {
+    const before = queue.length;
+    await flush();
+    if (queue.length >= before) break;
+  }
+});
 
 if (typeof window !== "undefined") addEventListener("pagehide", () => void flush(true));
 

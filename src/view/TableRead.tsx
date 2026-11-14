@@ -33,6 +33,7 @@ import { parseTable, type Column, type ColumnType, type Tab } from "@/table/pars
 import { optionsOf, readCell, readLink, viewRows } from "@/table/values";
 import { useTheme } from "@/theme/useTheme";
 import { PageBar } from "@/ui/PageBar";
+import { locale } from "@/locale";
 
 /** Each type's mark, on a column's header and in the type menu. */
 export const COLUMN_ICON: Readonly<Record<ColumnType, LucideIcon>> = {
@@ -74,7 +75,16 @@ export const optionHue = (options: readonly string[], value: string): Hue | unde
 };
 
 /** A date cell's words — in UTC, because a written day is a calendar square, not an instant. */
-const DAY = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+let day: { locale: string | undefined; format: Intl.DateTimeFormat } | undefined;
+/** Made on first use, not at load: the page names its locale after this module is loaded (`src/locale.ts`). */
+const dayFormat = (): Intl.DateTimeFormat => {
+  if (!day || day.locale !== locale())
+    day = {
+      locale: locale(),
+      format: new Intl.DateTimeFormat(locale(), { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }),
+    };
+  return day.format;
+};
 
 /** One cell's value, drawn by its column's type. A value the type cannot read is drawn as written, marked. */
 export function CellView({ type, text, options }: { type: ColumnType; text: string; options: readonly string[] }) {
@@ -123,7 +133,7 @@ export function CellView({ type, text, options }: { type: ColumnType; text: stri
       const day = String(read.value);
       return (
         <time className="dag-grid__value" dateTime={day} title={day}>
-          {DAY.format(new Date(`${day}T12:00:00Z`))}
+          {dayFormat().format(new Date(`${day}T12:00:00Z`))}
         </time>
       );
     }

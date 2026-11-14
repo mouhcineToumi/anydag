@@ -47,9 +47,14 @@ export async function build() {
   const { build: esbuild } = await import("esbuild");
   await esbuild({
     absWorkingDir: root,
-    /* The grammar's worker beside the server (`server/grammar-worker.ts`): `server/grammar.ts` looks
-       for it next to whichever bundle it is in. */
-    entryPoints: { "anydag-server": "server/main.ts", "grammar-worker": "server/grammar-worker.ts" },
+    /* The grammar's worker and the listing's beside the server (`server/grammar-worker.ts`,
+       `server/list-worker.ts`): `server/grammar.ts` and `server/listing.ts` look for each next to
+       whichever bundle they are in. */
+    entryPoints: {
+      "anydag-server": "server/main.ts",
+      "grammar-worker": "server/grammar-worker.ts",
+      "list-worker": "server/list-worker.ts",
+    },
     bundle: true,
     platform: "node",
     format: "esm",

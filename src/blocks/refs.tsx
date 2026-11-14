@@ -22,6 +22,7 @@ import { EMBED_CONFIG, REF_CONFIG } from "@/note/schema";
 import { dagUrl } from "@/refs/extract";
 import { RefBlock, RefChip } from "@/refs/Ref";
 import { titleOf, type IndexDoc } from "@/refs/useIndex";
+import { collation } from "@/locale";
 
 export const refInline = createReactInlineContentSpec(REF_CONFIG, {
   render: ({ inlineContent }) => <RefChip href={inlineContent.props.href} title={inlineContent.props.title} />,
@@ -70,7 +71,7 @@ export function refItems(
     .filter((d) => d.id !== self && (!only || d.kind === only))
     .map((d) => ({ d, r: rank(d, query) }))
     .filter((x): x is { d: IndexDoc; r: number } => x.r !== null)
-    .sort((a, b) => a.r - b.r || titleOf(a.d).localeCompare(titleOf(b.d)) || a.d.name.localeCompare(b.d.name))
+    .sort((a, b) => a.r - b.r || collation().compare(titleOf(a.d), titleOf(b.d)) || collation().compare(a.d.name, b.d.name))
     .slice(0, 20)
     .map((x) => x.d);
   /* Two documents with one title are told apart in the title itself, because BlockNote keys its
