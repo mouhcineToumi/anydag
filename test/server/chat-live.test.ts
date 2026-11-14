@@ -412,6 +412,70 @@ describe("the guard", () => {
     const gone = await say(chat.id, `note@${v2} gone hi`);
     expect(said(gone)).toMatch(/does not reach vault/);
   });
+
+  /* `chat.json` is vault content: sync carries it, and anyone who writes the folder writes it. What a
+     chat reaches is the person's word on this machine, never the file's (#9). */
+  describe("never takes its reach from chat.json", () => {
+    const plant = (chat: string, keys: Record<string, unknown>) => {
+      const file = path.join(env.root, ".anydag", "chats", chat, "chat.json");
+      fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf8")), ...keys }));
+    };
+    const otherVault = () => {
+      const other = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-other-"));
+      temps.push(other);
+      return { root: other, id: session.openFolder(other).id };
+    };
+
+    it("ignores a grant planted in the file", async () => {
+      const b = otherVault();
+      const chat = await newChat();
+      plant(chat.id, { [`grant:${b.id}`]: { mode: "edit", at: "2026-01-01T00:00:00.000Z" } });
+
+      const turn = await say(chat.id, `note@${b.id} far1 hi`);
+      expect(said(turn)).toMatch(/does not reach vault/);
+      expect(exists(b.root, "far1.md")).toBe(false);
+      expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat[`grant:${b.id}`]).toBeUndefined();
+      // Nor is the vault in what the model is told it reaches: it is one of the others.
+      const system = runs.at(-1)!.system;
+      expect(system.slice(0, system.indexOf("not in reach"))).not.toContain(b.id);
+      expect(system).toMatch(new RegExp(`not in reach: .*${b.id}`));
+    });
+
+    it("keeps a grant the person took back taken back, whatever the file says", async () => {
+      const b = otherVault();
+      const chat = await newChat();
+      await api("POST", "/__board/chat/grant", { id: chat.id, vault: b.id, mode: "edit" });
+      await api("POST", "/__board/chat/grant", { id: chat.id, vault: b.id, mode: null });
+      plant(chat.id, { [`grant:${b.id}`]: { mode: "edit", at: "2026-01-01T00:00:00.000Z" } });
+
+      expect(said(await say(chat.id, `note@${b.id} far2 hi`))).toMatch(/does not reach vault/);
+      expect(exists(b.root, "far2.md")).toBe(false);
+      // Taken back is still a key, so undo knows the vault was granted once.
+      expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat).toHaveProperty(`grant:${b.id}`, null);
+    });
+
+    it("pins its own vault to the one it was found in, whatever `home` says", async () => {
+      const b = otherVault();
+      const chat = await newChat();
+      plant(chat.id, { home: b.id });
+
+      await say(chat.id, "note far3 hi");
+      expect(exists(env.root, "far3.md")).toBe(true);
+      expect(exists(b.root, "far3.md")).toBe(false);
+      expect(said(await say(chat.id, `note@${b.id} far4 hi`))).toMatch(/does not reach vault/);
+      expect(exists(b.root, "far4.md")).toBe(false);
+      expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat.home).toBe(env.vault.id);
+    });
+
+    it("keeps the person's grant out of the file, which a second machine would otherwise obey", async () => {
+      const b = otherVault();
+      const chat = await newChat();
+      await api("POST", "/__board/chat/grant", { id: chat.id, vault: b.id, mode: "ask" });
+      const file = JSON.parse(fs.readFileSync(path.join(env.root, ".anydag", "chats", chat.id, "chat.json"), "utf8"));
+      expect(Object.keys(file).filter((k) => k.startsWith("grant:"))).toEqual([]);
+      expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat[`grant:${b.id}`].mode).toBe("ask");
+    });
+  });
 });
 
 describe("undo", () => {

@@ -71,6 +71,12 @@ A value is a word `Number()` accepts — `120`, `3.5`, `-4`. **`-` is a gap**: a
 line, no bar in that slot. A word that is neither is `E_CHART_VALUE` and is *kept* as a gap, so one
 unreadable number costs one diagnostic rather than two.
 
+**A number is at most `1e15` either way of zero.** A larger value is `E_CHART_RANGE` and a gap; a
+larger `min` or `max` is `E_CHART_RANGE` and no pin. Scale the data and say so with `unit "bn"`. A
+`min` and `max` closer together than their size can tell apart — `min 100000000000000`,
+`max 100000000000000.01` — is `E_CHART_RANGE` too, and both pins are dropped: subtract a baseline
+from the values instead.
+
 **Both statements parse in every form, with a meaning of their own**, which is what makes changing
 the form safe:
 
@@ -181,6 +187,7 @@ bare, like anything else on the paper.
 | `E_UNKNOWN_KIND` | the first word of a line is not one of the twelve — the message lists them and suggests one |
 | `E_CHART_FORM` | a second form line; the first one stands |
 | `E_CHART_VALUE` | a word where a number or a `-` belongs — also a `min`/`max` that is not a number |
+| `E_CHART_RANGE` | a value, `min` or `max` past `1e15` either way (a gap, or no pin), or a `min`–`max` too narrow for its size (both pins dropped) |
 | `E_EXPECTED_ID` | a `series` or `slice` with no id |
 | `E_DUPLICATE_ID` | two series or slices with one id; they share a namespace |
 | `E_BAD_LEGEND` | `legend` followed by neither a placement nor a glyph and a label |

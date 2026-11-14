@@ -32,12 +32,23 @@ function workerFile(): string | null {
   }
 }
 
-class Thread {
+/**
+ * How long one question may take before the worker is ended and the next question starts another.
+ * A whole vault's index is seconds; a minute is a grammar stuck on something it was handed — a
+ * pattern gone quadratic on somebody else's file — and a worker that is never answering holds every
+ * index, backlink and search question behind it for as long as the server runs (#9).
+ */
+const DEADLINE_MS = 60_000;
+
+export class Thread {
   private worker: Worker | null = null;
   private next = 1;
-  private waiting = new Map<number, { ok: (a: DslResponse) => void; no: (e: Error) => void }>();
+  private waiting = new Map<number, { ok: (a: DslResponse) => void; no: (e: Error) => void; timer: NodeJS.Timeout }>();
 
-  constructor(private readonly file: string) {}
+  constructor(
+    private readonly file: string,
+    private readonly deadlineMs = DEADLINE_MS,
+  ) {}
 
   private start(): Worker {
     const w = new Worker(this.file);
@@ -45,6 +56,7 @@ class Thread {
       const at = this.waiting.get(m.id);
       if (!at) return;
       this.waiting.delete(m.id);
+      clearTimeout(at.timer);
       if (!this.waiting.size) w.unref();
       if (m.error !== undefined) at.no(new Error(m.error));
       else at.ok(m.answer!);
@@ -53,7 +65,10 @@ class Thread {
     const gone = (e: Error) => {
       if (this.worker !== w) return;
       this.worker = null;
-      for (const at of this.waiting.values()) at.no(e);
+      for (const at of this.waiting.values()) {
+        clearTimeout(at.timer);
+        at.no(e);
+      }
       this.waiting.clear();
     };
     w.on("error", gone);
@@ -62,11 +77,41 @@ class Thread {
     return w;
   }
 
+  /** End the worker, and every question still out with it. The next question starts another. */
+  async close(): Promise<void> {
+    const w = this.worker;
+    if (!w) return;
+    this.worker = null;
+    for (const at of this.waiting.values()) {
+      clearTimeout(at.timer);
+      at.no(new Error("the grammar's worker was closed"));
+    }
+    this.waiting.clear();
+    await w.terminate();
+  }
+
   ask(method: "GET" | "POST", route: string, query: URLSearchParams, body: unknown): Promise<DslResponse> {
     const w = (this.worker ??= this.start());
     const id = this.next++;
     return new Promise((ok, no) => {
-      this.waiting.set(id, { ok, no });
+      /* Past the deadline the worker is ended, not waited on: a thread stuck in a loop never reads
+         another message, so the only way to get the grammar back is a new one. */
+      const timer = setTimeout(() => {
+        const stuck = new Error(
+          `the grammar took longer than ${Math.round(this.deadlineMs / 1000)} s on ${route}, and was restarted`,
+        );
+        if (this.worker === w) {
+          this.worker = null;
+          for (const at of this.waiting.values()) {
+            clearTimeout(at.timer);
+            at.no(stuck);
+          }
+          this.waiting.clear();
+        }
+        void w.terminate();
+      }, this.deadlineMs);
+      timer.unref();
+      this.waiting.set(id, { ok, no, timer });
       // An idle worker does not hold the process open; one with a question out does.
       w.ref();
       w.postMessage({ id, method, route, query: [...query], body });

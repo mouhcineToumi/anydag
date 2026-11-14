@@ -31,6 +31,9 @@ Nine things are load-bearing:
   (`cleanSegment` in `server/names.ts`), then an extension of `[a-z0-9]{1,12}` the vault lists —
   `md` and `assets` refused, so no attachment is ever a document or a picture folder. A move keeps
   the extension whatever `to` says (`fileTarget`): renaming a PDF does not change what it is.
+- **A `.anydag/files/<id>.json` is read as untrusted.** It syncs, and a record whose `path` no vault
+  name can be (`../../x.pdf`, refused by `refusal()`) is dropped like one that does not parse, and a
+  path `abs()` refuses is never an orphan: such a record once made the whole listing a 400 (#9).
 - **The title is the index's**, because a PDF has no frontmatter: its `.anydag/files/<id>.json`.
   It starts as what the file was called on the uploader's disk, and
   `/retitle` with `follow` moves the name to the title's stem, extension kept.

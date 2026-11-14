@@ -78,6 +78,9 @@ export interface ChartScale {
  * fixed-point loop is because widening the range can call for a bigger step, which widens it again.
  */
 export function niceScale(lo: number, hi: number, maxTicks: number, pinLo: boolean, pinHi: boolean): ChartScale {
+  /* The parser keeps every number within `CHART_LARGEST`, so a span that is not finite never comes
+     from a board; were one handed in, the scale is a unit rather than a loop over `Infinity`. */
+  if (!Number.isFinite(hi - lo)) [lo, hi] = [0, 1];
   if (!(hi > lo)) hi = lo + 1;
   const budget = Math.max(2, Math.floor(maxTicks));
 
@@ -100,7 +103,12 @@ export function niceScale(lo: number, hi: number, maxTicks: number, pinLo: boole
   for (let guard = 0; guard < 8; guard++) {
     ticks = [];
     const first = Math.ceil(start / step - 1e-9) * step;
-    for (let v = first; v <= end + step * 1e-9; v += step) ticks.push(clean(v));
+    /* Never more than one tick past the budget, which is enough to know to widen; and never a step
+       too small to move a number this large, which leaves `v` where it was for ever (#9). */
+    for (let v = first; v <= end + step * 1e-9 && ticks.length <= budget; v += step) {
+      ticks.push(clean(v));
+      if (v + step === v) break;
+    }
     if (ticks.length <= budget) break;
     step = niceStep(step * 1.5);
   }

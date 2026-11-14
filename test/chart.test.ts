@@ -789,6 +789,70 @@ describe("layoutChart · the plane", () => {
   });
 });
 
+describe("a chart the scale cannot be drawn with (#9)", () => {
+  /* Each of these once hung the page: past one unit in the last place, `v += step` gave `v` back,
+     and the loop laying out the ticks never ended. */
+  it("refuses a value, a min or a max past CHART_LARGEST, and keeps the value as a gap", () => {
+    const model = parseChart(`bar\nx A B\nseries a "A" 1e308 -1e308\nseries b "B" 5 1e16`);
+    // One per word, as `E_CHART_VALUE` is.
+    expect(codes(`bar\nx A B\nseries a "A" 1e308 -1e308\nseries b "B" 5 1e16`)).toEqual([
+      "3:E_CHART_RANGE",
+      "3:E_CHART_RANGE",
+      "4:E_CHART_RANGE",
+    ]);
+    expect(model.series.map((s) => s.values)).toEqual([
+      [null, null],
+      [5, null],
+    ]);
+    const pinned = parseChart(`line\nseries a "A" 1 2\nmin -1e300\nmax 1e300`);
+    expect(pinned.diagnostics.map((d) => [d.line, d.code])).toEqual([
+      [3, "E_CHART_RANGE"],
+      [4, "E_CHART_RANGE"],
+    ]);
+    expect([pinned.min, pinned.max]).toEqual([undefined, undefined]);
+    // The edge itself is a number like any other.
+    expect(codes(`bar\nseries a "A" 1e15 -1e15`)).toEqual([]);
+  });
+
+  it("refuses a pinned span too narrow for its magnitude, and drops the pins", () => {
+    const model = parseChart(
+      `line\nx A B\nseries a "A" 100000000000000 100000000000000.01\nmin 100000000000000\nmax 100000000000000.01`,
+    );
+    expect(model.diagnostics.map((d) => [d.line, d.code])).toEqual([[4, "E_CHART_RANGE"]]);
+    expect([model.min, model.max]).toEqual([undefined, undefined]);
+    // A min alone is narrow against the values it leaves to set the top.
+    expect(codes(`line\nseries a "A" 100000000000000.01\nmin 100000000000000`)).toEqual(["3:E_CHART_RANGE"]);
+    // Narrow by the same amount at an ordinary magnitude is an ordinary chart.
+    expect(codes(`line\nseries a "A" 1 1.01\nmin 1\nmax 1.01`)).toEqual([]);
+  });
+
+  it("draws what is left of such a chart, and draws it at once", () => {
+    for (const src of [
+      `line\nx A B\nseries a "A" 10000000000000000 10000000000000002\nmin 10000000000000000\nmax 10000000000000002`,
+      `bar\nx A B\nseries a "A" 1e308 -1e308`,
+      `line\nx A B\nseries a "A" 100000000000000 100000000000000.01\nmin 100000000000000\nmax 100000000000000.01`,
+    ]) {
+      const t = performance.now();
+      const placed = run(src);
+      expect(performance.now() - t).toBeLessThan(1000);
+      expect(placed.yAxis!.ticks.length).toBeLessThanOrEqual(T.metric.chart.maxTicks);
+    }
+  });
+
+  it("never lays out more ticks than the budget, whatever it is handed", () => {
+    for (const [lo, hi, pinLo, pinHi] of [
+      [1e16, 1e16 + 2, true, true],
+      [-1e308, 1e308, false, false],
+      [1e14, 1e14 + 0.01, true, true],
+      [0, Number.POSITIVE_INFINITY, false, false],
+    ] as const) {
+      const s = niceScale(lo, hi, T.metric.chart.maxTicks, pinLo, pinHi);
+      expect(s.ticks.length).toBeLessThanOrEqual(T.metric.chart.maxTicks);
+      for (const v of [s.lo, s.hi, ...s.ticks]) expect(Number.isFinite(v)).toBe(true);
+    }
+  });
+});
+
 describe("layoutChart · the scale", () => {
   it("counts in ones, twos and fives and stops at maxTicks", () => {
     for (const [lo, hi] of [

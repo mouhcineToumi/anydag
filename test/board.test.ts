@@ -87,6 +87,42 @@ describe("rewriting one fence", () => {
   });
 });
 
+describe("a hostile line in a board (#9)", () => {
+  /* The opener's pattern once had three `[ \t]*` side by side: an opener, a run of blanks and one
+     stray character took cubic time — about ten seconds at this length, and hours at a few times it. */
+  const hostile = [
+    `\`\`\`${" ".repeat(4000)}!`,
+    `\`\`\`md${" \t".repeat(2000)}!`,
+    `\`\`\`md {${"} ".repeat(2000)}!`,
+    `${"`".repeat(4000)}!`,
+  ];
+
+  it("scans an opener followed by thousands of blanks in linear time", () => {
+    const text = ["```md", "hello", "```", ...hostile, "```md", "after", "```"].join("\n");
+    const t = performance.now();
+    const fences = scanFences(text);
+    expect(performance.now() - t).toBeLessThan(250);
+    expect(fences.map((f) => f.body)).toEqual(["hello", "after"]);
+  });
+
+  it("still reads every opener it read before", () => {
+    const opener = (line: string) => scanFences(`${line}\nx\n\`\`\``).find((f) => f.line === 1);
+    expect(opener("```")).toMatchObject({ type: "", attrText: "" });
+    expect(opener("  ```md  ")).toMatchObject({ type: "md", attrText: "" });
+    expect(opener("```md{#a}")).toMatchObject({ type: "md", attrText: "#a" });
+    expect(opener('````arch \t {#a title="}"}\t')).toMatchObject({ type: "arch", attrText: '#a title="}"' });
+    expect(opener("``` {#a} ")).toMatchObject({ type: "", attrText: "#a" });
+    expect(opener("```md x")).toBeUndefined();
+    expect(opener("```md {#a} b")).toBeUndefined();
+  });
+
+  it("does not hand a line longer than any opener to the pattern", () => {
+    const long = `\`\`\`md {#a title="${"x".repeat(20_000)}"}`;
+    expect(scanFences(`${long}\nbody\n\`\`\``).filter((f) => f.line === 1)).toEqual([]);
+    expect(rewriteFenceAttrs(long, { openStart: 0, openEnd: long.length } as never, "#b")).toBeNull();
+  });
+});
+
 describe("applyPatch", () => {
   it("pins an item that had no position", () => {
     const out = applyPatch(BOARD, [{ id: "intro", attrs: { x: 100, y: 200 } }]);

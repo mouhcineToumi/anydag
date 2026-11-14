@@ -189,9 +189,23 @@ export class Assistant {
     const tried = named ? [named, ...this.s.served().filter((v) => v.id !== named.id)] : this.s.served();
     for (const v of tried) {
       const meta = this.store.meta(v.root, chat);
-      if (meta) return { root: v.root, vault: v.id, meta };
+      if (meta) return { root: v.root, vault: v.id, meta: this.reachOf(meta, v.id) };
     }
     throw err(404, `no chat \`${chat}\``, { code: "chat" });
+  }
+
+  /**
+   * `chat.json` with what it reaches put in by this machine (#9). The file is vault content — sync
+   * carries it, and so does anyone who writes the folder — so its `home` and `grant:` keys are not
+   * read: the chat's own vault is the one it was found in, and its grants are the person's, from
+   * the app's home. Everything that decides reach — the guard, the prompt, `vault_request`, undo —
+   * reads a meta that came through here.
+   */
+  private reachOf(file: ChatMeta, home: string): ChatMeta {
+    const meta = Object.fromEntries(Object.entries(file).filter(([k]) => !k.startsWith("grant:"))) as unknown as ChatMeta;
+    meta.home = home;
+    for (const [vault, g] of Object.entries(this.store.grants(file.id))) if (vault !== home) meta[`grant:${vault}`] = g;
+    return meta;
   }
 
   list(vault?: string | null): ChatRow[] {
@@ -229,13 +243,18 @@ export class Assistant {
       model: o.model,
       ...(o.effort ? { effort: o.effort } : {}),
     });
-    this.emit(meta.id, { type: "chat", chat: meta });
-    return meta;
+    const answered = this.reachOf(meta, v.id);
+    this.emit(meta.id, { type: "chat", chat: answered });
+    return answered;
   }
 
   private change(chat: string, vault: string | null | undefined, fn: (m: ChatMeta) => void): ChatMeta {
-    const { root } = this.locate(chat, vault);
-    const meta = this.store.update(root, chat, fn);
+    const { root, vault: home } = this.locate(chat, vault);
+    return this.told(chat, this.reachOf(this.store.update(root, chat, fn), home));
+  }
+
+  /** The chat as it now is, to a turn running in it and to everyone listening. */
+  private told(chat: string, meta: ChatMeta): ChatMeta {
     const live = this.live.get(chat);
     if (live) live.meta = meta;
     this.emit(chat, { type: "chat", chat: meta });
@@ -248,12 +267,18 @@ export class Assistant {
     return this.change(chat, vault, (m) => (m.title = clean.slice(0, 200)));
   }
 
-  /** Grant a vault, or take it back (`mode: null`). */
+  /**
+   * Grant a vault, or take it back (`mode: null`): the person's answer, on this machine, and the only
+   * thing that writes a grant. It is kept in the app's home and never in `chat.json` (#9).
+   */
   grant(chat: string, target: string, mode: Mode | null, vault?: string | null): ChatMeta {
-    const { meta } = this.locate(chat, vault);
+    const { root, vault: home, meta } = this.locate(chat, vault);
     if (target === meta.home) throw err(400, "a chat always reaches its own vault");
     if (mode) this.s.pick(target);
-    return this.change(chat, vault, (m) => (m[`grant:${target}`] = mode ? { mode, at: new Date().toISOString() } : null));
+    this.store.setGrant(chat, target, mode ? { mode, at: new Date().toISOString() } : null);
+    const file = this.store.meta(root, chat);
+    if (!file) throw err(404, `no chat \`${chat}\``, { code: "chat" });
+    return this.told(chat, this.reachOf(file, home));
   }
 
   async remove(chat: string, vault?: string | null): Promise<void> {
@@ -282,8 +307,8 @@ export class Assistant {
       throw err(409, "the Assistant answers in the app's own server; start it (`anydag serve`) and ask there", {
         code: "no-server",
       });
-    const { root } = this.locate(chat, o.vault);
-    const meta = this.store.update(root, chat, (m) => {
+    const { root, vault: home } = this.locate(chat, o.vault);
+    const file = this.store.update(root, chat, (m) => {
       if (o.provider) m.provider = o.provider;
       if (o.model) m.model = o.model;
       if (o.effort !== undefined) {
@@ -292,6 +317,7 @@ export class Assistant {
       }
       if (isUntitled(m)) m.title = titleFrom(words);
     });
+    const meta = this.reachOf(file, home);
     const harness = this.opts.harnesses[meta.provider];
     if (!harness) throw err(400, `\`${meta.provider}\` is not available here`, { code: "provider" });
     this.emit(chat, { type: "chat", chat: meta });

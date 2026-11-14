@@ -15,7 +15,7 @@ parse, server-side, through the same `diagnoseBoard` the page's dock calls, and 
 prints it. The
 three `EB_LINK_*` codes ride in `board.errors` and reach that endpoint with no change to it — an
 unresolved end with a `target` naming the link it left hanging (#173) — and the
-five `*_CHART_*` codes are the only family named for a dialect — everything else `parseChart` raises
+six `*_CHART_*` codes are the only family named for a dialect — everything else `parseChart` raises
 is one of the shared ones, which is what says the statement shape really was inherited.
 
 **A diagnostic is only as good as the mistake it names**, and for a long time these named symptoms.
