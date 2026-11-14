@@ -833,6 +833,11 @@
 .dag-sidebar__section h2 { flex: 1; margin: 0; font-size: var(--dag-ui-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
 
 .dag-sidebar__tree {
+  /* A row's height and an open empty folder's *Empty* line, said once: the tree draws only the rows in
+     view (`virtual.ts`) and places each by its offset, so `Sidebar.tsx` reads these to know where a row
+     it has not drawn would be. The phone's taller row is the sheet's rule below. */
+  --sidebar-row: 30px;
+  --sidebar-empty: 26px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1023,7 +1028,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   align-items: center;
   gap: 6px;
   width: 100%;
-  height: 30px;
+  height: var(--sidebar-row);
   padding: 0 8px 0 calc(8px + var(--depth, 0) * 16px);
   /* Inter: a row says a file's *title*, and a title is words somebody
      wrote, not a string they would type — DESIGN.md keeps mono for the second. */
@@ -1068,8 +1073,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-sidebar__empty {
   margin: 0;
-  height: 26px;
-  line-height: 26px;
+  height: var(--sidebar-empty);
+  line-height: var(--sidebar-empty);
   padding-left: calc(8px + var(--depth, 0) * 16px + 20px);
   font-size: var(--dag-ui-text-sm);
   font-style: italic;
@@ -1420,11 +1425,13 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] .dag-sidebar__tool[data-dag-sidebar-add] { display: none; }
 .dag-sidebar[data-sheet] .dag-sidebar__name-input,
 .dag-sidebar[data-sheet] .dag-sidebar__move { height: 44px; font-size: var(--dag-ui-text-lg); }
+/* A row with its box open is as tall as a row — the tree places the rows after it as if it were. */
+.dag-sidebar[data-sheet] .dag-sidebar__line--ask { padding-block: 0; }
 .dag-sidebar[data-sheet] .dag-sidebar__menu-switch { min-height: 44px; }
 /* Settings shares the foot with Trash and the two cloud rows; it was the one 28px row left. */
 .dag-sidebar[data-sheet] .dag-sidebar__account { min-height: 44px; }
 .dag-sidebar[data-sheet] .dag-sidebar__foot { padding: 8px 12px 16px; }
-.dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
+.dag-sidebar[data-sheet] .dag-sidebar__tree { --sidebar-row: 44px; padding-bottom: 12px; }
 /* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
 .dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: var(--dag-ui-text-lg); }
 /* Labelled now (#215), so as wide as the word, and still a finger's 44 each way (#209). */
