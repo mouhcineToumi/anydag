@@ -26,6 +26,7 @@ import { Button } from "@/ui/controls";
 import { EventBar, EventLine } from "./EventBar";
 import { FileProblem } from "./FileProblem";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
+import { registerPendingWrites } from "./pendingWrites";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { TaskGlyph, TaskLine } from "./TaskGlyph";
 import { Toast } from "./Toast";
@@ -657,6 +658,9 @@ export function NoteView({
       void flush(true);
     };
   }, [flush]);
+
+  /* And when the app is about to restart into an update (`src/ui/pendingWrites.ts`). */
+  useEffect(() => registerPendingWrites(() => flush(false)), [flush]);
 
   /* The other writer. Its own echo is dropped by sha1, as `useBoard` drops a board's. */
   useEffect(() => {

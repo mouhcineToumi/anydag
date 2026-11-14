@@ -37,7 +37,7 @@ below.
 | This board | Layout | the open board's row width and spacing, written to its frontmatter's `flow:` — drawn only while a board is open and editable |
 | *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) |
 | | Keyboard shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
-| | About | the build's `VERSION` and the server's |
+| | About | the build's `VERSION` and the server's; in the desktop app, also **Updates**: what the check found, when it last got an answer, *Check for updates*, and, when a check failed, a sentence about what to do (`desktop/updates.ts`; [`desktop.md`](desktop.md)). Not drawn in a browser, or in a desktop run with nothing packaged |
 
 **The theme and the AI choices are the person's (#191).** Both used to be the vault's, so opening a
 second vault changed how the app looked, and the Assistant could start on another provider. Now:

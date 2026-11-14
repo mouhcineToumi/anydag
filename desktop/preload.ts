@@ -11,6 +11,8 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
+import type { UpdateState } from "./updates";
+
 declare const __ANYDAG_VERSION__: string;
 const VERSION: string = typeof __ANYDAG_VERSION__ === "string" ? __ANYDAG_VERSION__ : "dev";
 
@@ -33,6 +35,21 @@ export interface AnyDagDesktopProviderEnv {
   set(name: string, value: string): Promise<boolean>;
 }
 
+/** The app's own updates (`desktop/updates.ts`). The page draws the state and asks; the shell checks,
+ *  downloads and installs. */
+export interface AnyDagDesktopUpdates {
+  /** What is known now. */
+  state(): Promise<UpdateState>;
+  /** Called with every change of state. Returns the unsubscribe. */
+  onChange(listener: (state: UpdateState) => void): () => void;
+  /** Ask whether a newer version exists; resolves with the answer's state. A no-op while a check, a
+   *  download or a waiting update is already there. */
+  check(): Promise<UpdateState>;
+  /** The Update button: restart into the new version (the server is stopped first), or, on a build
+   *  that cannot install it, open the release page. The page writes what it holds before calling. */
+  install(): Promise<void>;
+}
+
 export interface AnyDagDesktop {
   /** What the page puts on a write so the shell knows the page sent it (`desktop/main.ts`,
    *  `trusted`). Absent in a subframe and on any document that is not the page. */
@@ -43,6 +60,7 @@ export interface AnyDagDesktop {
   revealInFolder(target: string): Promise<void>;
   keys: AnyDagDesktopKeys;
   providerEnv: AnyDagDesktopProviderEnv;
+  updates: AnyDagDesktopUpdates;
   readonly version: string;
   readonly platform: string;
   /** Whether the window is in full screen now. */
@@ -72,6 +90,22 @@ const api: AnyDagDesktop = {
     },
     set(name: string, value: string): Promise<boolean> {
       return ipcRenderer.invoke("providerEnv:set", name, value);
+    },
+  },
+  updates: {
+    state(): Promise<UpdateState> {
+      return ipcRenderer.invoke("update:state");
+    },
+    onChange(listener: (state: UpdateState) => void): () => void {
+      const on = (_event: Electron.IpcRendererEvent, state: UpdateState) => listener(state);
+      ipcRenderer.on("update:state", on);
+      return () => ipcRenderer.removeListener("update:state", on);
+    },
+    check(): Promise<UpdateState> {
+      return ipcRenderer.invoke("update:check");
+    },
+    install(): Promise<void> {
+      return ipcRenderer.invoke("update:install");
     },
   },
   keys: {

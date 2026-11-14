@@ -23,6 +23,7 @@ import { autoUpdater } from "electron-updater";
 import { homeDir } from "../server/home";
 import { forward } from "./forward";
 import { serverHasStarted } from "./launch";
+import { createUpdates, type Updates } from "./updates";
 
 /* -- what the app ships, and where it finds it --------------------------------------------- */
 
@@ -839,13 +840,82 @@ async function quit(): Promise<void> {
   }
 }
 
+/** Whether an IPC call came from the top frame of a window showing the page — the only sender that
+ *  may ask for the write key or restart the app into an update. */
+function fromPage(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): boolean {
+  const frame = event.senderFrame;
+  const top = frame !== null && frame === event.sender.mainFrame;
+  return top && frame.url.startsWith(`${SCHEME}://${APP_HOST}/`) && !isApiUrl(frame.url);
+}
+
+/** Where a release's files and notes are, for a build that cannot install the update itself. */
+const releaseUrl = (version: string): string =>
+  `https://github.com/mouhcineToumi/anydag/releases/tag/v${encodeURIComponent(version)}`;
+
+/** Whether this build can put an update in place itself. An unsigned macOS build cannot (see
+ *  `SIGNED`), and an AppImage replaces its own file, so it needs the folder it sits in to be
+ *  writable — a root-owned `/opt` copy is not, and a download that cannot land is a download wasted. */
+function canInstallUpdates(): boolean {
+  if (process.platform === "darwin" && !SIGNED) return false;
+  const appImage = process.env.APPIMAGE;
+  if (appImage) {
+    try {
+      fs.accessSync(path.dirname(appImage), fs.constants.W_OK);
+      fs.accessSync(appImage, fs.constants.W_OK);
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** The app's updates: what is known, asked for, and installed (`desktop/updates.ts`). */
+let updates: Updates;
+
+function makeUpdates(): void {
+  autoUpdater.allowPrerelease = UPDATE_CHANNEL !== "latest";
+  updates = createUpdates({
+    updater: autoUpdater,
+    enabled: app.isPackaged && !SMOKE,
+    current: VERSION,
+    canInstall: canInstallUpdates(),
+    releaseUrl,
+    openExternal: (url) => void shell.openExternal(url),
+    /* The same order a normal quit has: say it is a quit (so the child's exit is not "the server
+       went"), close the channel the server was spawned with, and wait for it to leave — only then
+       may the installer run, because on Windows it starts at once and the server holds the vault. */
+    prepareToQuit: async () => {
+      quitting = true;
+      await stopServer();
+    },
+    recoverFromQuit: async () => {
+      quitting = false;
+      await restartServer();
+    },
+    log: say,
+  });
+  updates.subscribe((state) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send("update:state", state);
+    }
+  });
+}
+
 async function whenReady(): Promise<void> {
   app.setAppUserModelId("io.github.mouhcinetoumi.anydag");
   /* The page's write key, to the top frame of a window showing the page and to nothing else. */
   ipcMain.on("page:key", (event) => {
-    const frame = event.senderFrame;
-    const top = frame !== null && frame === event.sender.mainFrame;
-    event.returnValue = top && frame.url.startsWith(`${SCHEME}://${APP_HOST}/`) && !isApiUrl(frame.url) ? pageKey : null;
+    event.returnValue = fromPage(event) ? pageKey : null;
+  });
+  /* The updates the page may ask about, and the one thing it may start: the page sends `install`
+     only after it has written what it holds (`src/ui/pendingWrites.ts`). */
+  ipcMain.handle("update:state", () => updates.state());
+  ipcMain.handle("update:check", async (event) => {
+    if (fromPage(event)) await updates.check();
+    return updates.state();
+  });
+  ipcMain.handle("update:install", async (event) => {
+    if (fromPage(event)) await updates.install();
   });
   /* Whether the page's window is in full screen as it loads; the change after is pushed. */
   ipcMain.on("window:full-screen?", (event) => {
@@ -907,6 +977,8 @@ async function whenReady(): Promise<void> {
      secret merely encoded, on every first launch. Windows and the scheme's handler need it too. */
   await app.whenReady();
   await startServer(launchFolder);
+  /* Before any window: the page asks for the state as it loads. */
+  makeUpdates();
 
   protocol.handle(SCHEME, handleProtocol);
 
@@ -942,11 +1014,9 @@ async function whenReady(): Promise<void> {
 
   say(`${VERSION} ready — ${serverPort}`);
 
-  if (app.isPackaged && (process.platform !== "darwin" || SIGNED)) {
-    autoUpdater.allowPrerelease = UPDATE_CHANNEL !== "latest";
-    say(`updates: channel ${UPDATE_CHANNEL}`);
-    autoUpdater.checkForUpdatesAndNotify().catch((e) => say(`update check failed: ${(e as Error).message ?? e}`));
-  }
+  /* After the window, so a check's first answer has somewhere to go. */
+  if (updates.state().enabled) say(`updates: channel ${UPDATE_CHANNEL}${canInstallUpdates() ? "" : ", by hand"}`);
+  updates.start();
 }
 
 void whenReady().catch((e) => {

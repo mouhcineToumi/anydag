@@ -19,12 +19,14 @@ import {
   CalendarPlus,
   CalendarX2,
   ChevronRight,
+  CircleArrowUp,
   CircleCheck,
   CircleSlash,
   Cloud,
   CloudAlert,
   Copy,
   Download,
+  ExternalLink,
   File as FileGlyph,
   FilePlus2,
   FileQuestion,
@@ -99,10 +101,11 @@ import {
   type Picked,
   type Row,
 } from "./tree";
-import { IconButton } from "./controls";
+import { Button, IconButton } from "./controls";
 import { VaultSwitcher } from "./Vaults";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
+import { installUpdate, updateWaiting, useUpdates } from "./updates";
 import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
 import { useFeatures } from "@/features";
 import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref } from "@/settings/prefs";
@@ -1986,7 +1989,10 @@ export function Sidebar({
         ) : null}
         {cloud ? <SyncRow onOpen={() => ask("settings", "sync")} /> : null}
         {cloud ? <FeedbackRow onFeedback={() => ask("feedback")} /> : null}
-        <SettingsRow onSettings={() => ask("settings")} sheet={sheet} />
+        <div className="dag-sidebar__setrow">
+          <SettingsRow onSettings={() => ask("settings")} sheet={sheet} />
+          <UpdateButton sheet={sheet} />
+        </div>
       </div>
 
       {place === "docked" ? <Grip onWidth={onWidth} /> : null}
@@ -2741,6 +2747,43 @@ function FeedbackRow({ onFeedback }: { onFeedback(): void }) {
       <MessageCircleWarning {...ICON} aria-hidden="true" />
       <span>Send feedback</span>
     </button>
+  );
+}
+
+/**
+ * **Update**, beside Settings: there only when a new version is waiting — downloaded and ready to
+ * restart into (`ready`), or found on a build that cannot install it (`manual`, an unsigned Mac), where
+ * it opens the release page and says so. No desktop bridge, no update, a check still running or a
+ * download still coming: nothing drawn, so `anydag serve` and `npm run dev` never show it. The
+ * restart writes what the page holds first (`installUpdate`); the person's tabs come back with it,
+ * because they are the page's own `localStorage`.
+ */
+function UpdateButton({ sheet }: { sheet: boolean }) {
+  const state = useUpdates();
+  const [busy, setBusy] = useState(false);
+  if (!updateWaiting(state)) return null;
+  const manual = state.status === "manual";
+  const Mark = manual ? ExternalLink : CircleArrowUp;
+  return (
+    <Button
+      size={sheet ? "md" : "sm"}
+      className="dag-sidebar__update"
+      data-dag-update={state.status}
+      disabled={busy}
+      title={
+        manual
+          ? `Version ${state.version} is out. This build cannot install it itself: open the release page to download it.`
+          : `Restart to update to version ${state.version}`
+      }
+      onClick={() => {
+        setBusy(true);
+        /* A restart ends this page; the release page leaves it, so the button is there again. */
+        void installUpdate().finally(() => setTimeout(() => setBusy(false), manual ? 0 : 10_000));
+      }}
+    >
+      <Mark {...ICON} size={14} aria-hidden="true" />
+      <span>{busy && !manual ? "Restarting…" : manual ? "Download update" : "Update"}</span>
+    </Button>
   );
 }
 
