@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { forgetOpencode } from "./cli";
-import { claudeEnv, opencodeEnv, type Env, type Resolved } from "./providers";
+import { claudeEnv, codexEnv, codexModels, opencodeEnv, type CodexCatalog, type Env, type Resolved } from "./providers";
 
 /**
  * One way to ask a model something: a transcript in, the text of its answer out.
@@ -401,6 +401,231 @@ export function claudeComplete(o: ClaudeOptions): Complete {
   };
 }
 
+/* ---- `codex exec` ---- */
+
+/**
+ * The catalog a Codex run is handed: Codex's own (`codex debug models`) with what gives a model
+ * built-in tools taken out. The catalog, not the feature flags, is where Codex decides this, and the
+ * flags lose: a model whose entry says `tool_mode: "code_mode_only"` gets a JavaScript `exec` tool —
+ * which nests a shell, `apply_patch` and `view_image` — whatever `features.*` says, and one with a
+ * `multi_agent_version` gets the sub-agent tools. So each model loses:
+ *
+ * - `tool_mode` and `multi_agent_version` — code mode and sub-agents;
+ * - `apply_patch_tool_type` and `web_search_tool_type` — file edits and the web;
+ * - `supports_search_tool`, set false — otherwise MCP tools are deferred behind a `tool_search`
+ *   that, with the rest gone, fails, and the model says it has no tools;
+ * - `experimental_supported_tools`, emptied.
+ *
+ * Everything else — its instructions, its context window, its effort levels — is left as Codex
+ * wrote it. Pure, for the tests.
+ */
+export function codexCatalog(raw: CodexCatalog["raw"]): CodexCatalog["raw"] {
+  return {
+    ...raw,
+    models: raw.models.map((m) => {
+      const out: Record<string, unknown> = { ...m, supports_search_tool: false, experimental_supported_tools: [] };
+      for (const k of ["tool_mode", "multi_agent_version", "apply_patch_tool_type", "web_search_tool_type"]) delete out[k];
+      return out;
+    }),
+  };
+}
+
+/** A `-c key=value` pair, the value written as TOML. A JSON string is a valid TOML basic string. */
+export const codexSet = (key: string, value: string | number | boolean | string[]): string[] => [
+  "-c",
+  `${key}=${Array.isArray(value) ? `[${value.map((v) => JSON.stringify(v)).join(",")}]` : JSON.stringify(value)}`,
+];
+
+/**
+ * What every Codex run is fenced off with, a prompt card's and a chat's turn alike, each checked
+ * against `codex exec --help` (0.169) and `codex debug prompt-input`, which prints what the model is
+ * actually sent:
+ *
+ * - **`--ignore-user-config`** skips `~/.codex/config.toml` — the person's MCP servers, model,
+ *   effort, hooks and project trust. The login is untouched: it lives beside the config, not in it.
+ *   `--ignore-rules` skips their command rules, which with no shell mean nothing, and say so.
+ * - **`model_instructions_file`** replaces Codex's own instructions with ours.
+ * - **`model_catalog_json`** is the edited catalog (`codexCatalog`): the one switch that takes the
+ *   shell away.
+ * - **The features and the `include_*` sections** turn off the rest — skills, apps, plugins, hooks,
+ *   goals, memories, images, the environment and permissions preamble. With all of it, a one-word
+ *   answer is about 550 input tokens; Codex's defaults sent 13,600.
+ * - **Read-only and never ask**: `sandbox_mode` and `approval_policy` as `-c`, because `exec resume`
+ *   has no `--sandbox`. There is no shell for them to govern; they are what holds if one came back.
+ * - **`history.persistence = "none"`** keeps the request out of the person's prompt history.
+ *
+ * The person's global `~/.codex/AGENTS.md` still reaches the model: only another `CODEX_HOME` turns it
+ * off, and that is where the login is.
+ */
+export function codexIsolation(files: { system: string; catalog: string }): string[] {
+  return [
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    ...codexSet("model_instructions_file", files.system),
+    ...codexSet("model_catalog_json", files.catalog),
+    ...codexSet("sandbox_mode", "read-only"),
+    ...codexSet("approval_policy", "never"),
+    ...codexSet("project_doc_max_bytes", 0),
+    ...codexSet("history.persistence", "none"),
+    ...codexSet("web_search", "disabled"),
+    ...codexSet("check_for_update_on_startup", false),
+    ...codexSet("include_environment_context", false),
+    ...codexSet("include_permissions_instructions", false),
+    ...codexSet("include_apps_instructions", false),
+    ...codexSet("skills.include_instructions", false),
+    ...[
+      "shell_tool",
+      "unified_exec",
+      "code_mode_host",
+      "multi_agent",
+      "apps",
+      "plugins",
+      "hooks",
+      "goals",
+      "memories",
+      "view_image",
+      "image_generation",
+    ].flatMap((f) => codexSet(`features.${f}`, false)),
+  ];
+}
+
+/** `-m` and the effort, each only when there is one: no model is Codex's default, no effort the model's. */
+export const codexModelArgs = (model: string, effort?: string): string[] => [
+  ...(model ? ["-m", model] : []),
+  ...(effort ? codexSet("model_reasoning_effort", effort) : []),
+];
+
+/** The flags of one prompt card's run: answer, keep no session, read the request from stdin. */
+export function codexArgs(model: string, files: { system: string; catalog: string }, effort?: string): string[] {
+  return ["exec", ...codexIsolation(files), "--ephemeral", ...codexModelArgs(model, effort), "-"];
+}
+
+/**
+ * A message Codex reported, as words. A refusal from the API arrives as the API's whole error body,
+ * JSON in a string — `{"type":"error","error":{"message":"… Invalid value: 'bogus' …"}}` — so the
+ * message inside it is what is said.
+ */
+export function codexMessage(said: unknown): string {
+  const text = typeof said === "string" ? said.trim() : "";
+  if (!text.startsWith("{")) return text;
+  try {
+    const j = JSON.parse(text) as { error?: { message?: unknown }; message?: unknown };
+    const inner = j.error?.message ?? j.message;
+    return typeof inner === "string" && inner ? inner : text;
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * What a `codex exec --json` stream says: the last `agent_message`, or why the turn failed.
+ *
+ * One JSON object per line — `thread.started`, `turn.started`, `item.started`/`item.completed`,
+ * `turn.completed` — and a refusal is an `error` line and `turn.failed`, with an exit of 1. So the
+ * events are read before the exit code. An `error` *item* is a warning ("Model metadata … not
+ * found"), not a failure: the turn goes on and its `turn.failed` is what says it did not.
+ */
+export function parseCodexEvents(jsonl: string): { text: string; error?: string } {
+  let text = "";
+  let error: string | undefined;
+  for (const line of jsonl.split("\n")) {
+    if (!line.trim()) continue;
+    let e: { type?: string; message?: unknown; error?: { message?: unknown }; item?: { type?: string; text?: unknown } };
+    try {
+      e = JSON.parse(line) as typeof e;
+    } catch {
+      continue;
+    }
+    if (e.type === "turn.failed") error = codexMessage(e.error?.message) || error || "the turn failed";
+    else if (e.type === "error" && !error) error = codexMessage(e.message) || undefined;
+    else if (e.type === "item.completed" && e.item?.type === "agent_message" && typeof e.item.text === "string")
+      text = e.item.text;
+  }
+  return error !== undefined ? { text, error } : { text };
+}
+
+interface CodexOptions {
+  /** Empty for Codex's own default. */
+  model: string;
+  /** `model_reasoning_effort`, when the card asked for one. */
+  effort?: string;
+  env: Env;
+  bin?: string;
+  /** Codex's catalog as `codex debug models` printed it; `codexModels` asks when it is not given. */
+  catalog?: CodexCatalog["raw"];
+  timeout?: number;
+  spawnImpl?: typeof nodeSpawn;
+  tmpRoot?: string;
+}
+
+/**
+ * Codex in `exec` mode, on whatever it is signed into — a ChatGPT plan, or the API key Codex holds —
+ * with no key anywhere in AnyDag. One call is one `codex exec --ephemeral` in an empty directory made
+ * for it and removed after, the way `claudeComplete` runs Claude Code, fenced off by
+ * `codexIsolation`. **No catalog, no run**: without it the model would be handed a shell, so a Codex
+ * that will not print its catalog is a refusal, not a run with tools.
+ */
+export function codexComplete(o: CodexOptions): Complete {
+  const spawn = o.spawnImpl ?? nodeSpawn;
+  const bin = o.bin ?? "codex";
+  return async (messages, signal) => {
+    const raw = o.catalog ?? codexModels(bin, o.env)?.raw;
+    if (!raw) throw new LlmError("Codex did not list its models (`codex debug models`), so it was not run");
+    const dir = fs.mkdtempSync(path.join(o.tmpRoot ?? os.tmpdir(), "dag-codex-"));
+    try {
+      const files = { system: path.join(dir, "system.md"), catalog: path.join(dir, "catalog.json") };
+      fs.writeFileSync(
+        files.system,
+        /* Codex refuses an empty instructions file, and its own instructions are what this replaces. */
+        messages
+          .filter((m) => m.role === "system")
+          .map((m) => m.content)
+          .join("\n\n") || "Answer the request.",
+      );
+      fs.writeFileSync(files.catalog, JSON.stringify(codexCatalog(raw)));
+      return await new Promise<string>((resolve, reject) => {
+        const child = spawn(bin, codexArgs(o.model, files, o.effort), {
+          cwd: dir,
+          env: codexEnv(o.env),
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        let out = "";
+        let err = "";
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        child.stdout?.on("data", (b: Buffer) => (out += b.toString("utf8")));
+        child.stderr?.on("data", (b: Buffer) => (err += b.toString("utf8")));
+        /* Settled before the kill, so the `close` it causes cannot answer first with an exit code. */
+        const stop = (why: string) => {
+          reject(new LlmError(why));
+          child.kill("SIGTERM");
+        };
+        const abort = () => stop("cancelled");
+        if (signal?.aborted) return abort();
+        signal?.addEventListener("abort", abort, { once: true });
+        if (o.timeout) timer = setTimeout(() => stop(`Codex did not answer in ${Math.round(o.timeout! / 1000)} s`), o.timeout);
+        child.on("error", (e) => reject(new LlmError(`could not start Codex: ${e.message}`)));
+        child.stdin?.on("error", () => undefined);
+        child.stdin?.end(flatten(messages));
+        child.on("close", (code) => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", abort);
+          if (signal?.aborted) return;
+          const said = parseCodexEvents(out);
+          if (said.error) return reject(new LlmError(`Codex: ${said.error}`));
+          if (code !== 0)
+            return reject(new LlmError(`codex exited ${code}: ${(err || out).trim().split("\n").slice(-3).join(" ")}`));
+          if (!said.text) return reject(new LlmError("Codex answered with no text"));
+          resolve(said.text);
+        });
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+}
+
 /**
  * What a provider's own vocabulary calls each level of the one effort scale.
  *
@@ -448,6 +673,27 @@ function opencodeEffort(level: string): string | undefined {
 }
 
 /**
+ * Codex's `model_reasoning_effort`, which takes none through max — but a model lists its own, and
+ * every model Codex lists takes low through max. None, from an older preference, is the lowest
+ * listed: low, as it is for Claude Code.
+ */
+function codexEffort(level: string): string | undefined {
+  switch (level) {
+    case "none":
+    case "low":
+      return "low";
+    case "medium":
+      return "medium";
+    case "high":
+      return "high";
+    case "max":
+      return "max";
+    default:
+      return undefined;
+  }
+}
+
+/**
  * The body field an OpenAI-compatible provider reads. It takes none, low, medium and high; the
  * app's Max is that highest, high.
  */
@@ -471,8 +717,8 @@ function httpEffort(level: string): string | undefined {
  * The one mapping from the app's effort scale to what a provider accepts. `undefined` is the
  * provider's own setting — Automatic, or OpenCode's `medium`, which asks for nothing.
  *
- * It lives beside the three adapters that spell the values: Claude's `--effort`, OpenCode's
- * `#variant`, and the HTTP `reasoning_effort`. The Assistant's turn uses it too, so a Max chosen in
+ * It lives beside the four adapters that spell the values: Claude's `--effort`, OpenCode's
+ * `#variant`, Codex's `model_reasoning_effort`, and the HTTP `reasoning_effort`. The Assistant's turn uses it too, so a Max chosen in
  * the composer cannot be sent to a harness that has no word for it.
  */
 export function effortFor(provider: string, want?: Want): string | undefined {
@@ -483,6 +729,8 @@ export function effortFor(provider: string, want?: Want): string | undefined {
       return claudeEffort(level);
     case "opencode":
       return opencodeEffort(level);
+    case "codex":
+      return codexEffort(level);
     default:
       return httpEffort(level);
   }
@@ -521,6 +769,14 @@ export function completeFor(r: Resolved, env: Env, want?: Want): Complete {
     return opencodeComplete({
       model: r.model,
       variant: variantFor(env, want),
+      env,
+      bin: r.bin,
+      timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000,
+    });
+  if (r.spec.id === "codex")
+    return codexComplete({
+      model: r.model,
+      effort: effortFor("codex", want),
       env,
       bin: r.bin,
       timeout: Number(env.ANYDAG_LLM_TIMEOUT) || 120_000,

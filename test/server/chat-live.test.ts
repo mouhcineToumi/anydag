@@ -19,7 +19,7 @@ import { fakeHarness } from "../../server/chat/fake";
 import type { Harness, HarnessEvent, RunOptions } from "../../server/chat/harness";
 import { Assistant } from "../../server/chat/live";
 import { newId } from "../../server/chat/store";
-import type { ChatEvent, ChatMeta, Op, Step, Turn, UndoRecord } from "../../server/chat/types";
+import type { ChatEvent, ChatMeta, Op, Provider, Step, Turn, UndoRecord } from "../../server/chat/types";
 import { Session } from "../../server/context";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -39,13 +39,13 @@ let runs: RunOptions[];
 const temps: string[] = [];
 
 /** The fake, with every run's options kept so a test can read what the harness was asked. */
-function watched(provider: "claude" | "opencode"): Harness {
+function watched(provider: Provider): Harness {
   const fake = fakeHarness(provider);
   return { ...fake, run: (o, on) => (runs.push(o), fake.run(o, on)) };
 }
 
 /** A harness that says exactly the events a test hands it, then finishes successfully. */
-function scripted(provider: "claude" | "opencode", events: HarnessEvent[]): Harness {
+function scripted(provider: Provider, events: HarnessEvent[]): Harness {
   return {
     provider,
     run(_o, on) {
@@ -120,7 +120,7 @@ beforeEach(async () => {
   assistant = new Assistant({
     session,
     token: TOKEN,
-    harnesses: { claude: watched("claude"), opencode: watched("opencode") },
+    harnesses: { claude: watched("claude"), opencode: watched("opencode"), codex: watched("codex") },
     scratch: os.tmpdir(),
   });
   const app = createApp({ session, token: TOKEN, page: null, assistant });
@@ -719,7 +719,7 @@ describe("the chat's MCP server", () => {
 });
 
 describe("the models route", () => {
-  it("says the server is the fake, and offers both providers whatever is installed", async () => {
+  it("says the server is the fake, and offers every provider whatever is installed", async () => {
     const r = await api("GET", "/__board/chat/models");
     expect(r.json.fake).toBe(true);
     expect(r.json.providers.every((p: { available: boolean }) => p.available)).toBe(true);

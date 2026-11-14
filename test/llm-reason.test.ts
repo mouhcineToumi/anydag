@@ -16,7 +16,7 @@ import {
  */
 
 const providers = (ready: string[]): ProviderStatus[] =>
-  ["claude", "opencode", "custom"].map((id) => ({ id, ready: ready.includes(id) }));
+  ["claude", "opencode", "codex", "custom"].map((id) => ({ id, ready: ready.includes(id) }));
 
 const explain = (reason: LlmReason, host: "desktop" | "browser" = "desktop", ready: string[] = []) =>
   explainLlmReason(reason, { host, providers: providers(ready) })!;
@@ -56,6 +56,17 @@ describe("explainLlmReason", () => {
       { kind: "retry", label: "Check again" },
       { kind: "provider", label: "Use OpenCode", provider: "opencode" },
     ]);
+  });
+
+  it("tells Codex how to sign in, and offers it as the other agent when it is the one ready", () => {
+    expect(explain({ code: "not-signed-in", provider: "codex" }, "desktop").sentence).toBe(
+      "Codex is installed but not signed in. Run codex login in a terminal to sign in.",
+    );
+    expect(explain({ code: "not-installed", provider: "claude" }, "desktop", ["codex"]).actions).toContainEqual({
+      kind: "provider",
+      label: "Use Codex",
+      provider: "codex",
+    });
   });
 
   it("has a next step for every reason, and at most two actions", () => {

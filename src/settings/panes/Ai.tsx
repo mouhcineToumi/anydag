@@ -20,7 +20,7 @@ import { AI_FEATURE_LABEL, featureSummary, type AiFeature } from "../aiFeature";
 import { modelChoice, type ModelChoice } from "../modelChoice";
 import { useNarrow } from "../narrow";
 import { providerName } from "../providerNames";
-import { resetSettingsWithUndo, writeSettings } from "../store";
+import { resetSettingsWithUndo, writeSettings, type AssistantProvider } from "../store";
 import { useSettings } from "../useSettings";
 
 import { Field, Group, Hint, ICON, Reset } from "./common";
@@ -303,7 +303,7 @@ function AssistantGroup({ models }: { models: ProviderModels[] | null }) {
       footer={
         <Hint data-dag-setting-assistant-hint="">
           {note ??
-            "The chat in the panel and on the Assistant page runs on your own Claude Code or OpenCode, signed in on this computer. Each message can pick another."}
+            "The chat in the panel and on the Assistant page runs on your own Claude Code, OpenCode or Codex, signed in on this computer. Each message can pick another."}
         </Hint>
       }
     >
@@ -315,7 +315,7 @@ function AssistantGroup({ models }: { models: ProviderModels[] | null }) {
           /* A model name belongs to its provider, so choosing another provider clears it back to
              that provider's own default. */
           onChange={(e) =>
-            writeSettings({ assistant: { provider: (e.target.value || null) as "claude" | "opencode" | null, model: null } })
+            writeSettings({ assistant: { provider: (e.target.value || null) as AssistantProvider | null, model: null } })
           }
         >
           <option value="">{automaticLabel ? `Automatic · ${automaticLabel}` : "Automatic"}</option>
@@ -337,7 +337,7 @@ function AssistantGroup({ models }: { models: ProviderModels[] | null }) {
           disabled={!providers}
           onChange={(choice) =>
             writeSettings({
-              assistant: { provider: (choice.provider ?? null) as "claude" | "opencode" | null, model: choice.model },
+              assistant: { provider: (choice.provider ?? null) as AssistantProvider | null, model: choice.model },
             })
           }
         />
@@ -352,7 +352,7 @@ function AssistantGroup({ models }: { models: ProviderModels[] | null }) {
  */
 function assistantChoice(
   models: readonly ProviderModels[] | null,
-  pref: { provider: "claude" | "opencode" | null; model: string | null },
+  pref: { provider: AssistantProvider | null; model: string | null },
 ): ModelChoice | null {
   if (!models?.length) return null;
   const at = models.find((p) => p.provider === pref.provider) ?? models.find((p) => p.available) ?? models[0]!;

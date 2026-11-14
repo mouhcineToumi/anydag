@@ -19,7 +19,7 @@ import type { Home } from "../home";
 import { ALPHABET } from "../ids";
 import { writeAtomic } from "../vault";
 import { isOp } from "./record";
-import type { ChatMeta, ChatRow, Provider, Turn, UndoRecord } from "./types";
+import { PROVIDERS, type ChatMeta, type ChatRow, type Provider, type Turn, type UndoRecord } from "./types";
 
 const CHATS = ".anydag/chats";
 
@@ -216,7 +216,7 @@ export class ChatStore {
 
   remove(root: string, chat: string): void {
     fs.rmSync(dirOf(root, chat), { recursive: true, force: true });
-    for (const p of ["claude", "opencode"] as const) this.home.set(sessionKey(chat, p), null);
+    for (const p of PROVIDERS) this.home.set(sessionKey(chat, p), null);
   }
 
   /** The provider session this machine can resume, and the model it was made on. */

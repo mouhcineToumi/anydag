@@ -268,6 +268,14 @@ describe("the model a prompt card asks", () => {
     });
   });
 
+  it("keeps Codex as the Assistant's provider, and drops one that is not a harness", () => {
+    expect(normalise({ assistant: { provider: "codex", model: "gpt-6-luna" } }).assistant).toEqual({
+      provider: "codex",
+      model: "gpt-6-luna",
+    });
+    expect(normalise({ assistant: { provider: "custom", model: "m" } }).assistant.provider).toBeNull();
+  });
+
   it("writes one field of it without touching the others", () => {
     writeSettings({ llm: { provider: "opencode" } });
     writeSettings({ llm: { reasoning: "low" } });

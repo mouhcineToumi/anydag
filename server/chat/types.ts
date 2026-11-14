@@ -7,8 +7,8 @@ import type { Conflict, Op } from "./record";
 
 export type { Op } from "./record";
 
-export type Provider = "claude" | "opencode";
-export const PROVIDERS: readonly Provider[] = ["claude", "opencode"];
+export type Provider = "claude" | "opencode" | "codex";
+export const PROVIDERS: readonly Provider[] = ["claude", "opencode", "codex"];
 
 /** What a vault was granted: read it, or change it too. */
 export type Mode = "ask" | "edit";
@@ -32,7 +32,7 @@ export interface ChatMeta {
   /** What the next turn is sent to, until somebody picks another. */
   provider: Provider;
   model: string;
-  /** Claude's `--effort`, OpenCode's `#variant`; absent for the model's own. */
+  /** The app's effort word, mapped per harness by `effortFor`; absent for the model's own. */
   effort?: string;
   [grant: `grant:${string}`]: Grant;
 }

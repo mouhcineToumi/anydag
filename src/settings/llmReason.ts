@@ -76,15 +76,16 @@ const nameOf = (id?: string): string => providerName(id) ?? "The model provider"
 const SIGN_IN: Readonly<Record<string, string>> = {
   claude: "Run claude once in a terminal to sign in.",
   opencode: "Run opencode auth login in a terminal to sign in.",
+  codex: "Run codex login in a terminal to sign in.",
 };
 
 /**
- * The other coding agent that could answer now, if one can. Only the two CLIs are offered: an
- * OpenAI-compatible key is a different arrangement, while Claude Code and OpenCode are logins the
- * person already has, and switching to one is a single press.
+ * The other coding agent that could answer now, if one can. Only the CLIs are offered: an
+ * OpenAI-compatible key is a different arrangement, while Claude Code, OpenCode and Codex are logins
+ * the person already has, and switching to one is a single press.
  */
 function otherReady(reason: LlmReason, providers?: readonly ProviderStatus[]): string | undefined {
-  for (const id of ["claude", "opencode"]) {
+  for (const id of ["claude", "opencode", "codex"]) {
     if (id === reason.provider) continue;
     if (providers?.some((p) => p.id === id && p.ready)) return id;
   }

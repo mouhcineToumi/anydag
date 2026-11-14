@@ -1,11 +1,11 @@
 # The Assistant
 
-> The chat about the vault, run on the person's own Claude Code or OpenCode.
+> The chat about the vault, run on the person's own Claude Code, OpenCode or Codex.
 
 ## The Assistant
 
-A chat about the vault, run on the person's **own** Claude Code or
-OpenCode — their subscription, signed in on this machine — that answers with `dag:` citations and
+A chat about the vault, run on the person's **own** Claude Code,
+OpenCode or Codex — their subscription, signed in on this machine — that answers with `dag:` citations and
 makes and reorganises documents. There is no Ask/Edit switch: the chat's own vault is always read and
 change, every change can be undone, and the scope menu grants another vault Read or Read and change
 (#75). A panel down the right of any page (`space A`, the top
@@ -30,7 +30,7 @@ over a list grouped by provider, each group's readiness from `/__board/chat/mode
 last chosen in this browser, Automatic for that provider's default, and a custom id for a list that
 has gone stale. The effort control is the same `EffortPicker` as Settings' (Automatic · Low · Medium
 · High · Max); the chat keeps the scale's word and `effortFor` in `plugins/generate/llm.ts` maps it
-to Claude's `--effort` or OpenCode's `#variant` when the turn runs. **A chat that has none yet will
+to Claude's `--effort`, OpenCode's `#variant` or Codex's `model_reasoning_effort` when the turn runs. **A chat that has none yet will
 live in this tab's vault**, so the scope menu matches the tab's vault (`currentVault()`), not the
 server's default — that moves when another vault opens, and a menu that reached for it once offered
 the tab's own vault under *Grant another vault…*, whose buttons were then refused with *a chat
@@ -41,14 +41,14 @@ always reaches its own vault* and read as doing nothing (#118).
 | `server/chat/store.ts` | `<vault>/.anydag/chats/<id>/`: `chat.json`, one write-once file per turn, one per undo |
 | `server/chat/record.ts` | a write's before-image, and undoing a block back to it |
 | `server/chat/live.ts` | the `Assistant`: turns, the guard every chat request passes, approvals, grants, blocks, undo |
-| `server/chat/claude.ts` · `opencode.ts` · `fake.ts` | one harness each: argv, environment, its event stream parsed into steps, resume, stop |
-| `server/chat/models.ts` | what the picker offers, per provider, and why one is unavailable — `claudeReady` and `opencodeReady`'s own sentence |
-| `plugins/generate/cli.ts` | what a prompt card's run and a chat's turn both do around a CLI child: its lines, ending it, and deleting a standalone OpenCode session |
+| `server/chat/claude.ts` · `opencode.ts` · `codex.ts` · `fake.ts` | one harness each: argv, environment, its event stream parsed into steps, resume, stop |
+| `server/chat/models.ts` | what the picker offers, per provider, and why one is unavailable — `claudeReady`, `opencodeReady` and `codexReady`'s own sentence |
+| `plugins/generate/cli.ts` | what a prompt card's run and a chat's turn both do around a CLI child: its lines, ending it, and deleting an OpenCode or Codex session |
 | `server/mcp/chat.ts` | chat mode for `anydag-server mcp --chat <id>`: the tool list, `change_block`, `vault_request` |
 | `server/routes/chat.ts` | the routes, the guard's registration, the SSE stream |
 | `src/assistant/` | the panel, the page, the composer, the steps, the approval, access and block cards — its model and effort controls are `src/ui/ModelPicker` and `src/ui/EffortPicker`, shared with Settings |
 
-Ten things are load-bearing:
+Eleven things are load-bearing:
 
 - **The app owns the conversation; the harness owns one turn.** A turn is one process (or, for
   OpenCode, one request to a `serve` the chat keeps), parsed into steps and written to disk when it
@@ -57,7 +57,8 @@ Ten things are load-bearing:
   with the transcript**. That one rule is what makes a mid-chat switch of provider work, and a chat
   continued on another device after sync.
 - **The agent's only tools are ours.** Claude Code runs with its built-in tools off and a strict MCP
-  config naming one server; OpenCode with every permission denied but `anydag_*`. That server reaches
+  config naming one server; OpenCode with every permission denied but `anydag_*`; Codex with its
+  catalog edited so the model is offered no tool of its own (see *Codex* below). That server reaches
   this one over loopback with the launch token and `x-anydag-chat: <id>` on every call, so every
   write goes through the route the page uses — the base sha1, the 409 and `merge3` included.
 - **The MCP child is this process as Node, and in the desktop app that means keeping
@@ -65,11 +66,12 @@ Ten things are load-bearing:
   `mcp --chat`, with the port, token and home in its environment, and the switch too when the parent
   has it. The desktop app runs the server as Electron-as-Node, so `process.execPath` is Electron;
   without the switch the child starts as an Electron app, cannot open a window (its env has no
-  display) and dies before it answers MCP — which Claude Code records as `CONNECTION_CLOSED` and
-  OpenCode as a server that never attached.
+  display) and dies before it answers MCP — which Claude Code records as `CONNECTION_CLOSED`,
+  OpenCode as a server that never attached, and Codex as a required server that failed to initialize.
 - **A turn that cannot use its tools fails, and nothing it guessed survives.** Claude Code's
   `system/init` is read for the `anydag` server's status and the `mcp__anydag__*` tools; OpenCode's
-  `GET /api/mcp` is waited on for the same. Missing, failed or toolless fails the turn with one clear
+  `GET /api/mcp` is waited on for the same; Codex is told the server is `required`, so it refuses
+  to start the turn without it. Missing, failed or toolless fails the turn with one clear
   error. A reply holding `<invoke name=` or `<parameter name=` while no tool ran is logged (raw text
   only) and shown as that error, never stored as the answer. A failed turn keeps the person's
   message and the chat; one that ran no tool is not seeded as an assistant answer and drops its
@@ -112,11 +114,32 @@ Ten things are load-bearing:
 - **OpenCode's `serve` is keyed per system prompt and MCP command**, because `{file:system.md}` is
   read once when it starts: a chat whose prompt changed (a new grant) needs another. The prompt goes
   in on stdin, and a turn is cancelled with `POST /api/session/<id>/interrupt`.
+- **Codex runs one `codex exec --json` per turn**, as Claude Code runs one `claude -p`, and a later
+  turn is `codex exec resume <id>`, which reads the system prompt file again, so a new grant reaches
+  a resumed session. Codex mints the session id (`thread.started`). The prompt goes in on stdin; a
+  turn is stopped by SIGTERM; deleting the chat runs `codex delete --force <id>`.
 - **`ANYDAG_CHAT_FAKE=1` is a scripted harness** (`server/chat/fake.ts`) that reaches the vault the
   way a real one does — over HTTP, with the header, through the guard and the recorder — so a test of
   it is a test of everything but the model. `GET /__board/chat/models` answers `fake: true` under
   it, and `e2e/assistant.spec.ts` refuses to run against a server that would reach a real model:
   Playwright reuses a dev server it finds on its port.
+
+**Codex.** `server/chat/codex.ts` runs the prompt card's isolation (`codexIsolation`, see *Prompt
+cards*) plus the one MCP server, each as a `-c` pair. Three things are this harness's own:
+
+- **`required = true`** makes Codex refuse the turn, exit 1 and "required MCP servers failed to
+  initialize", when `anydag` does not come up. Codex has no init line to read, and this stands in
+  for one. `startup_timeout_sec` is 60, because Codex's 10 s default is too short for the desktop
+  app's Electron-as-Node child.
+- **The token goes by name.** The server's environment rides in Codex's own, and `env_vars` names
+  the variables Codex passes on. `env` would put their values on the command line, where any process
+  on the machine can read them.
+- **`default_tools_approval_mode = "approve"`**, or an MCP call waits on an approval that a run with
+  no terminal cannot give. The approval card is ours; Codex reports a call when it *starts*
+  (`item.started`), so a call blocked on the person is drawn running, as Claude's is.
+
+The picker lists the models Codex's catalog lists for this login (`codexModels`), the first being
+Codex's own default. A Codex whose catalog cannot be read is unavailable rather than run with tools.
 
 Nothing here draws under `?snapshot=1`, and the canvas never learns a chat exists: a turn's writes
 reach an open board through the change feed like any other writer's. Deleting a chat emits a `gone`

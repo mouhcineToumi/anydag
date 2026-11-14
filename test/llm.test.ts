@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   claudeComplete,
+  codexArgs,
+  codexCatalog,
+  codexComplete,
+  codexMessage,
   effortFor,
   extraFor,
   flatten,
@@ -16,15 +20,19 @@ import {
   opencodeModel,
   opencodeSession,
   parseClaudeResult,
+  parseCodexEvents,
   parseOpencodeEvents,
   variantFor,
   type Message,
 } from "../plugins/generate/llm";
 import {
   claudeEnv,
+  codexEnv,
+  codexListed,
   defaultProvider,
   describeProviders,
   findClaude,
+  findCodex,
   findOpencode,
   namedProvider,
   opencodeEnv,
@@ -374,6 +382,7 @@ describe("describeProviders", () => {
     expect(Object.fromEntries(d.providers.map((p) => [p.id, p.label]))).toEqual({
       claude: "Claude Code",
       opencode: "OpenCode",
+      codex: "Codex",
       custom: "OpenAI-compatible",
     });
     for (const p of d.providers) {
@@ -554,6 +563,13 @@ describe("effortFor", () => {
     expect(effortFor("opencode", { reasoning: "high" })).toBe("high");
     expect(effortFor("opencode", { reasoning: "max" })).toBe("max");
 
+    /* Codex's model_reasoning_effort has max too, and every model it lists starts at low. */
+    expect(effortFor("codex", { reasoning: "none" })).toBe("low");
+    expect(effortFor("codex", { reasoning: "low" })).toBe("low");
+    expect(effortFor("codex", { reasoning: "medium" })).toBe("medium");
+    expect(effortFor("codex", { reasoning: "high" })).toBe("high");
+    expect(effortFor("codex", { reasoning: "max" })).toBe("max");
+
     /* The HTTP provider carries reasoning_effort; max is its highest accepted level. */
     expect(effortFor("custom", { reasoning: "none" })).toBe("none");
     expect(effortFor("custom", { reasoning: "low" })).toBe("low");
@@ -563,7 +579,7 @@ describe("effortFor", () => {
   });
 
   it("says nothing for Automatic and for an old `default`", () => {
-    for (const provider of ["claude", "opencode", "custom"]) {
+    for (const provider of ["claude", "opencode", "codex", "custom"]) {
       expect(effortFor(provider, { reasoning: "default" })).toBeUndefined();
       expect(effortFor(provider, {})).toBeUndefined();
       expect(effortFor(provider, { reasoning: null })).toBeUndefined();
@@ -755,5 +771,279 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
     expect(opencodeEnv({ OPENCODE_CONFIG: "/c.json", OPENCODE_CONFIG_DIR: "/d", ANYDAG_TOKEN: "t", HOME: "/h" })).toEqual({
       HOME: "/h",
     });
+  });
+});
+
+/*
+ * Codex. The lines are real `codex exec --json` output from Codex 0.169 with the isolation
+ * `codexIsolation` applies — an answer, a model the login does not have, and an effort the API
+ * refused, which arrives as the API's whole error body in a string.
+ */
+const CODEX_ANSWER = [
+  '{"type":"thread.started","thread_id":"01a1da0d-1139-7dc2-84b6-194857807243"}',
+  '{"type":"turn.started"}',
+  '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"pong"}}',
+  '{"type":"turn.completed","usage":{"input_tokens":546,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0}}',
+].join("\n");
+const CODEX_NO_MODEL = [
+  '{"type":"thread.started","thread_id":"01a1da0d-3a6c-78a2-89c3-0a34a86e526e"}',
+  '{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `no-such-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}',
+  '{"type":"turn.started"}',
+  '{"type":"error","message":"The \'no-such-model\' model is not supported when using Codex with a ChatGPT account."}',
+  '{"type":"turn.failed","error":{"message":"The \'no-such-model\' model is not supported when using Codex with a ChatGPT account."}}',
+].join("\n");
+const BOGUS_BODY = JSON.stringify(
+  {
+    type: "error",
+    error: {
+      type: "invalid_request_error",
+      code: null,
+      message:
+        "[ReasoningEffortParam] [reasoning.effort] [invalid_enum_value] Invalid value: 'bogus'. Supported values are: 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', and 'max'.",
+      param: null,
+    },
+    status: 400,
+  },
+  null,
+  2,
+);
+const CODEX_BAD_EFFORT = [
+  '{"type":"thread.started","thread_id":"01a1da0d-4313-7c40-b5a0-a22e1ba4ccf4"}',
+  '{"type":"turn.started"}',
+  JSON.stringify({ type: "error", message: BOGUS_BODY }),
+  JSON.stringify({ type: "turn.failed", error: { message: BOGUS_BODY } }),
+].join("\n");
+
+/** A catalog as `codex debug models` prints it, trimmed to what anything here reads. */
+const CATALOG = {
+  models: [
+    { slug: "gpt-reserve", display_name: "GPT-Reserve", visibility: "hide", priority: 1 },
+    {
+      slug: "gpt-5.6-terra",
+      display_name: "GPT-5.6-Terra",
+      visibility: "list",
+      priority: 3,
+      tool_mode: "code_mode_only",
+      multi_agent_version: "v2",
+      apply_patch_tool_type: "freeform",
+      web_search_tool_type: "text_and_image",
+      supports_search_tool: true,
+      experimental_supported_tools: ["x"],
+      context_window: 272000,
+    },
+    { slug: "gpt-6-luna", display_name: "GPT-6-Luna", visibility: "list", priority: 2 },
+  ],
+};
+
+describe("Codex's catalog", () => {
+  it("lists what a person may pick, by Codex's own priority, the first being its default", () => {
+    expect(codexListed(CATALOG)).toEqual([
+      { id: "gpt-6-luna", label: "GPT-6-Luna" },
+      { id: "gpt-5.6-terra", label: "GPT-5.6-Terra" },
+    ]);
+    expect(codexListed({})).toEqual([]);
+  });
+
+  it("takes out everything that hands a model a tool of its own, and leaves the rest", () => {
+    const terra = codexCatalog(CATALOG).models[1]!;
+    for (const k of ["tool_mode", "multi_agent_version", "apply_patch_tool_type", "web_search_tool_type"])
+      expect(terra).not.toHaveProperty(k);
+    expect(terra).toMatchObject({
+      slug: "gpt-5.6-terra",
+      supports_search_tool: false,
+      experimental_supported_tools: [],
+      context_window: 272000,
+    });
+    /* The original is the remembered one: it must not change under the next run. */
+    expect(CATALOG.models[1]).toHaveProperty("tool_mode", "code_mode_only");
+  });
+});
+
+describe("parseCodexEvents", () => {
+  it("reads the answer out of a recorded run", () => {
+    expect(parseCodexEvents(CODEX_ANSWER)).toEqual({ text: "pong" });
+  });
+
+  it("says why the turn failed, and takes a warning item for a warning", () => {
+    expect(parseCodexEvents(CODEX_NO_MODEL)).toEqual({
+      text: "",
+      error: "The 'no-such-model' model is not supported when using Codex with a ChatGPT account.",
+    });
+  });
+
+  it("unwraps the API's error body that a refusal carries as a string", () => {
+    expect(parseCodexEvents(CODEX_BAD_EFFORT).error).toMatch(/^\[ReasoningEffortParam\].*Invalid value: 'bogus'/);
+    expect(codexMessage("plain words")).toBe("plain words");
+    expect(codexMessage("{not json")).toBe("{not json");
+    expect(codexMessage(undefined)).toBe("");
+  });
+});
+
+describe("codexComplete", () => {
+  const files = { system: "/s/system.md", catalog: "/s/catalog.json" };
+
+  it("fences the run off: no config, no shell, no session kept, the request on stdin", () => {
+    const args = codexArgs("gpt-6-luna", files, "high");
+    expect(args.slice(0, 6)).toEqual(["exec", "--json", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "-c"]);
+    const set = (k: string) => args[args.indexOf(args.find((a) => a.startsWith(`${k}=`))!)];
+    expect(set("model_instructions_file")).toBe('model_instructions_file="/s/system.md"');
+    expect(set("model_catalog_json")).toBe('model_catalog_json="/s/catalog.json"');
+    expect(set("sandbox_mode")).toBe('sandbox_mode="read-only"');
+    expect(set("approval_policy")).toBe('approval_policy="never"');
+    expect(set("history.persistence")).toBe('history.persistence="none"');
+    for (const f of ["shell_tool", "unified_exec", "code_mode_host", "multi_agent", "apps", "plugins", "hooks"])
+      expect(args).toContain(`features.${f}=false`);
+    expect(args).toContain("--ephemeral");
+    expect(args.slice(-4)).toEqual(["gpt-6-luna", "-c", 'model_reasoning_effort="high"', "-"]);
+    /* Every `-c` is followed by its pair. */
+    args.forEach((a, i) => a === "-c" && expect(args[i + 1]).toMatch(/^[\w.]+=/));
+  });
+
+  it("names no model and no effort when there is none, which is Codex's own default", () => {
+    const args = codexArgs("", files);
+    expect(args).not.toContain("-m");
+    expect(args.join(" ")).not.toContain("model_reasoning_effort");
+    expect(args.at(-1)).toBe("-");
+  });
+
+  it("writes the system prompt and the edited catalog, and keeps a key off the login it runs on", async () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dag-codex-test-"));
+    try {
+      const fake = fakeSpawn(CODEX_ANSWER);
+      let written: { system: string; catalog: { models: Record<string, unknown>[] } } | undefined;
+      const spawnImpl = ((bin: string, args: string[], opts: never) => {
+        const at = (k: string) => JSON.parse(args.find((a) => a.startsWith(`${k}=`))!.slice(k.length + 1)) as string;
+        written = {
+          system: fs.readFileSync(at("model_instructions_file"), "utf8"),
+          catalog: JSON.parse(fs.readFileSync(at("model_catalog_json"), "utf8")),
+        };
+        return fake.spawnImpl(bin, args, opts);
+      }) as typeof fake.spawnImpl;
+      const env = { PATH: "/bin", CODEX_API_KEY: KEY, OPENAI_API_KEY: KEY, ANYDAG_TOKEN: "t", CODEX_HOME: "/h/.codex" };
+      const text = await codexComplete({ model: "gpt-6-luna", env, bin: "/x/codex", catalog: CATALOG, spawnImpl, tmpRoot })(TALK);
+      expect(text).toBe("pong");
+
+      const { bin, opts, stdin } = fake.started[0]!;
+      expect(bin).toBe("/x/codex");
+      expect(stdin()).toBe("Draw this:\n\na web app");
+      expect(opts.env).toEqual({ PATH: "/bin", CODEX_HOME: "/h/.codex" });
+      expect(written!.system).toBe("S");
+      expect(written!.catalog.models[1]).not.toHaveProperty("tool_mode");
+      expect(fs.readdirSync(tmpRoot)).toEqual([]);
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("says what Codex said when it refuses, ahead of the exit code", async () => {
+    const fake = fakeSpawn(CODEX_NO_MODEL, 1);
+    await expect(
+      codexComplete({ model: "no-such-model", env: {}, catalog: CATALOG, spawnImpl: fake.spawnImpl })(TALK),
+    ).rejects.toThrow("Codex: The 'no-such-model' model is not supported");
+  });
+
+  it("does not run at all without a catalog, which is what takes the shell away", async () => {
+    const fake = fakeSpawn(CODEX_ANSWER);
+    await expect(
+      codexComplete({ model: "m", env: { PATH: "" }, bin: "/nonexistent/codex", spawnImpl: fake.spawnImpl })(TALK),
+    ).rejects.toThrow("did not list its models");
+    expect(fake.started).toEqual([]);
+  });
+
+  it("kills the child when the request is cancelled", async () => {
+    const fake = fakeSpawn("", 0, true);
+    const ac = new AbortController();
+    const run = codexComplete({ model: "m", env: {}, catalog: CATALOG, spawnImpl: fake.spawnImpl })(TALK, ac.signal);
+    setTimeout(() => ac.abort(), 5);
+    await expect(run).rejects.toThrow("cancelled");
+    expect(fake.killed()).toBe(true);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("finding Codex", () => {
+  const roots: string[] = [];
+  afterEach(() => {
+    for (const r of roots.splice(0)) fs.rmSync(r, { recursive: true, force: true });
+  });
+  /** A home with a `codex` at `rel` that answers `--version`, `login status` and `debug models`. */
+  const home = (rel: string | null, version = "0.169.0", loggedIn = true): string => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dag-codex-home-"));
+    roots.push(root);
+    if (rel) {
+      const bin = path.join(root, rel);
+      fs.mkdirSync(path.dirname(bin), { recursive: true });
+      fs.writeFileSync(
+        bin,
+        [
+          "#!/bin/sh",
+          `case "$1" in`,
+          `  --version) echo "codex-cli ${version}" ;;`,
+          `  login) ${loggedIn ? 'echo "Logged in using ChatGPT"' : 'echo "Not logged in"; exit 1'} ;;`,
+          /* A builtin: these run with an empty PATH, as from a desktop launcher. */
+          `  debug) echo '${JSON.stringify(CATALOG)}' ;;`,
+          "esac",
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      );
+    }
+    return root;
+  };
+
+  it("looks where the installers put it, and takes the catalog's first listed model as the default", () => {
+    const h = home(".local/bin/codex");
+    expect(findCodex({ PATH: "/usr/bin-nothing", HOME: h })).toEqual({ ok: true, bin: path.join(h, ".local/bin/codex") });
+    const r = resolveProvider({ PATH: "", HOME: h }, { provider: "codex" });
+    expect(r.ok && r.value).toMatchObject({ model: "gpt-6-luna", bin: path.join(h, ".local/bin/codex") });
+    const picked = resolveProvider({ PATH: "", HOME: h }, { provider: "codex", model: "gpt-5.6-terra" });
+    expect(picked.ok && picked.value.model).toBe("gpt-5.6-terra");
+    const listed = describeProviders({ PATH: "", HOME: h }).providers.find((p) => p.id === "codex")!;
+    expect(listed).toMatchObject({
+      label: "Codex",
+      ready: true,
+      defaultModel: "gpt-6-luna",
+      models: ["gpt-6-luna", "gpt-5.6-terra"],
+    });
+  });
+
+  it("says why not: not installed, too old, or not signed in", () => {
+    expect(resolveProvider({ PATH: "", HOME: home(null) }, { provider: "codex" })).toMatchObject({
+      ok: false,
+      reason: { code: "not-installed", provider: "codex" },
+    });
+    expect(resolveProvider({ PATH: "", HOME: home(".codex/bin/codex", "0.168.4") }, { provider: "codex" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("0.169 or later"),
+      reason: { code: "too-old", provider: "codex" },
+    });
+    expect(resolveProvider({ PATH: "", HOME: home(".codex/bin/codex", "0.169.0", false) }, { provider: "codex" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("codex login"),
+      reason: { code: "not-signed-in", provider: "codex" },
+    });
+    expect(resolveProvider({ PATH: "", HOME: home(".codex/bin/codex", "1.2.0") }, { provider: "codex" }).ok).toBe(true);
+  });
+
+  it("is the default after Claude Code and OpenCode, and only when it can answer", () => {
+    expect(describeProviders({ PATH: "", HOME: home(".codex/bin/codex") }).default).toBe("codex");
+    expect(describeProviders({ PATH: "", HOME: home(".codex/bin/codex", "0.169.0", false) }).default).toBe("claude");
+    const both = home(".codex/bin/codex");
+    fs.mkdirSync(path.join(both, ".local/bin"), { recursive: true });
+    fs.writeFileSync(path.join(both, ".local/bin/claude"), `#!/bin/sh\necho '{"loggedIn": true}'\n`, { mode: 0o755 });
+    expect(describeProviders({ PATH: "", HOME: both, ANYDAG_DESKTOP: "1" }).default).toBe("claude");
+  });
+
+  it("strips what would make a key answer instead of the login, or the child think it is nested", () => {
+    expect(
+      codexEnv({
+        CODEX_API_KEY: KEY,
+        OPENAI_API_KEY: KEY,
+        ANYDAG_TOKEN: "t",
+        CODEX_THREAD_ID: "x",
+        CODEX_SANDBOX: "seatbelt",
+        CODEX_HOME: "/h/.codex",
+        HOME: "/h",
+      }),
+    ).toEqual({ CODEX_HOME: "/h/.codex", HOME: "/h" });
   });
 });
