@@ -110,18 +110,21 @@ describe("the kept listing", () => {
       await until(async () => (await env.vault.tree()).titles["work/Onboarding"] === "Renamed in place", 3500, "the new title");
     } catch (e) {
       const after = fs.statSync(at("work/Onboarding.md"));
-      console.log("DEBUG kept", JSON.stringify({
-        heard,
-        watching: v.watching,
-        kept: !!v.kept,
-        dirty: [...((v.dirty as Map<string, unknown>) ?? new Map()).entries()],
-        walks: env.vault.walks,
-        title: (await env.vault.tree()).titles["work/Onboarding"],
-        before: [before.mtimeMs, before.size, before.ino],
-        after: [after.mtimeMs, after.size, after.ino],
-        root: env.root,
-        real: fs.realpathSync(env.root),
-      }));
+      console.log(
+        "DEBUG kept",
+        JSON.stringify({
+          heard,
+          watching: v.watching,
+          kept: !!v.kept,
+          dirty: [...((v.dirty as Map<string, unknown>) ?? new Map()).entries()],
+          walks: env.vault.walks,
+          title: (await env.vault.tree()).titles["work/Onboarding"],
+          before: [before.mtimeMs, before.size, before.ino],
+          after: [after.mtimeMs, after.size, after.ino],
+          root: env.root,
+          real: fs.realpathSync(env.root),
+        }),
+      );
       throw e;
     }
     await same();
