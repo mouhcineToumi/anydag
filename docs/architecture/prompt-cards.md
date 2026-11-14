@@ -1,6 +1,6 @@
 # Prompt cards and prompt to edit
 
-> A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz.
+> A model writes the DSL: the card, the providers (Claude Code, OpenCode, Codex, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz.
 
 ## Prompt cards
 
@@ -63,7 +63,8 @@ Nine things are load-bearing:
   model's own. **One mapping decides what each provider calls the level** (`effortFor` in `llm.ts`):
   Claude Code's `--effort` takes low through max, so the scale passes through and `none`, read from an
   older preference, is Low; OpenCode's `#variant` has `low`, `high` and `max`, so none and low map to `low`
-  and the middle is "say nothing"; an HTTP provider's `reasoning_effort` takes none through high, so
+  and the middle is "say nothing"; Codex's `model_reasoning_effort` takes low through max on every
+  model it lists, so it maps as Claude's does; an HTTP provider's `reasoning_effort` takes none through high, so
   Max is High there too. The server checks only the shape, because an unknown level ends up in a
   request body and a model that refuses it says so in its own words on the card.
 - **A provider is a row in a table** (`providers.ts`), resolved per request from `.env.local` and
@@ -81,7 +82,7 @@ Nine things are load-bearing:
   `/__board/llm`. `src/settings/llmReason.ts` is the one place the page turns a code into plain
   words and at most two actions; the prompt card, Rewrite, Generate flashcards and Settings → AI
   all use it. It knows whether this is the desktop app (a key in the keyring) or a
-  browser (the server's environment), and offers **Use Claude Code** or **Use OpenCode** only when
+  browser (the server's environment), and offers **Use Claude Code**, **Use OpenCode** or **Use Codex** only when
   that other provider is ready. A missing or unknown reason falls back to the server's `error`, so
   a newer server never leaves the page with nothing to say.
 - **Two adapters and one interface.** `complete(messages, signal) → text`. HTTP is a bare `fetch`
@@ -89,8 +90,9 @@ Nine things are load-bearing:
   An HTTP provider is sent `reasoning_effort` only when someone asked for a level — the Thinking
   select or `ANYDAG_LLM_REASONING`; `default` sends none, which is the model's own. A provider spec
   may carry measured `defaults`; OpenAI-compatible carries none, so an unasked HTTP request sends no
-  thinking field. The CLIs are `claude -p` and `opencode run --standalone`, each fenced off from the
-  machine: see below for Claude and *Things that will bite* for OpenCode.
+  thinking field. The CLIs are `claude -p`, `opencode run --standalone` and `codex exec`, each
+  fenced off from the machine: see below for Claude and Codex, and *Things that will bite* for
+  OpenCode.
 - **The route is the one here that spends money**, and the server's token and `Host` check are
   what keep a web page the person happens to have open from calling it. A description is at most 4000 characters, at most four run at once, each has a
   timeout (`ANYDAG_LLM_TIMEOUT`, 120 s), and the client going away cancels the call.
@@ -133,7 +135,7 @@ machine — no key anywhere in AnyDag. `claudeComplete` runs `claude -p`
 in an empty directory with the system prompt as `--system-prompt-file` and the request on stdin, and
 reads `result` out of `--output-format json`. **The default is the first provider that can answer
 now** (`defaultProvider`, #179): on the desktop app (`ANYDAG_DESKTOP=1`, which the shell sets) and in
-a browser alike, Claude Code, OpenCode, then OpenAI-compatible — the CLIs come first because a plan
+a browser alike, Claude Code, OpenCode, Codex, then OpenAI-compatible — the CLIs come first because a plan
 the person already pays for needs no key. Only when nothing can answer is it Claude Code, whose
 missing install or sign-in is then what the card says. A browser on a machine where Claude Code is
 signed in used to fail its first card on a Gemini key nobody had set. Five things bit:
@@ -180,6 +182,39 @@ in *Things that will bite*, and four more are this row's.
   as the last argument and had neither.
 - **The environment is cleaned** (`opencodeEnv`): the server's token, and `OPENCODE_CONFIG` or
   `OPENCODE_CONFIG_DIR`, which would load a config beside the one handed to it.
+
+**`codex` is the person's own Codex login** — a ChatGPT plan, or the API key Codex was signed in
+with — through `codexComplete`, the default after OpenCode. Codex **0.169 or later**, and five
+things are this row's, each found by running it:
+
+- **"Ready" is three questions**: found (`ANYDAG_CODEX_BIN`, `PATH`, then `~/.codex/bin`,
+  `~/.local/bin` and the shared installers' places); new enough (`codex --version`); and signed in
+  (`codex login status`, exit 0 or 1).
+- **The models are Codex's catalog** (`codexModels`: `codex debug models`, about 0.6 s, remembered
+  a minute). The row's default is the catalog's first listed model, so it is not a name that goes
+  stale with a release. Without a catalog, no model is named and Codex picks.
+- **The catalog is what takes the shell away**, not the feature flags. A model whose entry says
+  `tool_mode: "code_mode_only"` gets a JavaScript `exec` tool, which nests a shell, `apply_patch` and
+  `view_image`, whatever `features.shell_tool` says; a `multi_agent_version` brings the sub-agent
+  tools. So every run is handed an edited copy as `model_catalog_json` (`codexCatalog`), and **a Codex
+  whose catalog cannot be read is not run at all**: it would answer with tools. With the edit and
+  `codexIsolation`'s other switches (`--ignore-user-config`, `model_instructions_file`, the
+  features and `include_*` sections off, read-only, never ask), a one-word answer is about 550 input
+  tokens; Codex's defaults sent 13,600. `codex debug prompt-input` prints what the model is sent,
+  and is how each switch was checked.
+- **A refusal is an `error` line, then `turn.failed`, then an exit of 1**, so the events are read
+  before the exit code. An API refusal carries the API's whole error body as a string, and
+  `codexMessage` takes the message out of it. An `error` *item* ("Model metadata … not found") is a
+  warning, and the turn goes on.
+- **The environment is cleaned** (`codexEnv`): the server's token; `CODEX_API_KEY` and
+  `OPENAI_API_KEY`, which `codex exec` would bill instead of the login; and `CODEX_THREAD_ID` and the
+  sandbox's variables, from a dev server started inside a Codex session. `--ephemeral` keeps no
+  session, and `history.persistence = "none"` keeps the request out of the person's prompt history.
+
+**What is not fenced off**: the person's global `~/.codex/AGENTS.md` still reaches the model. Only
+another `CODEX_HOME` turns it off, and the login lives there: a run would need a copy of the
+person's credentials, which is not ours to make. Since `--ignore-user-config` skips the person's
+model too, Automatic is the catalog's default rather than the model they chose in Codex.
 
 **Deliberately out**: more than one item per card; streaming the answer into the card (a
 half-written fence is nothing the parser can show); and OpenCode Go over HTTP, for the reason in

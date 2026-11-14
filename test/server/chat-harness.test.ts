@@ -14,6 +14,7 @@ import {
   parseClaudeLine,
   resultText,
 } from "../../server/chat/claude";
+import { codexHarness, codexMcpArgs, codexRunArgs, newCodexState, NO_TOOLS_ERROR, parseCodexLine } from "../../server/chat/codex";
 import type { HarnessEvent, RunOptions } from "../../server/chat/harness";
 import {
   newOpencodeState,
@@ -909,5 +910,243 @@ describe("the OpenCode harness", () => {
     expect(w.runs[0]!.opts.env!.XDG_CONFIG_HOME).toContain("dag-opencode-forget-");
     await h.forget("not a session; rm -rf");
     expect(w.runs).toHaveLength(1);
+  });
+});
+
+/*
+ * Codex 0.169's `codex exec --json`, recorded against a two-tool MCP server with `codexIsolation`
+ * and `codexMcpArgs` applied, trimmed of nothing: a read, a write, an answer, and the usage.
+ */
+const CX_THREAD = { type: "thread.started", thread_id: "01a1da0e-1fbe-7f83-8729-b3804f157fb3" };
+const CX_CALL = {
+  type: "item.started",
+  item: {
+    id: "item_0",
+    type: "mcp_tool_call",
+    server: "anydag",
+    tool: "note_read",
+    arguments: { name: "shopping" },
+    result: null,
+    error: null,
+    status: "in_progress",
+  },
+};
+const CX_CALLED = {
+  type: "item.completed",
+  item: {
+    id: "item_0",
+    type: "mcp_tool_call",
+    server: "anydag",
+    tool: "note_read",
+    arguments: { name: "shopping" },
+    result: { content: [{ type: "text", text: "The note shopping says: BANANA" }], structured_content: null },
+    error: null,
+    status: "completed",
+  },
+};
+/* Made up: a call the server refused. The shape is the completed one's with `error` set. */
+const CX_REFUSED = {
+  type: "item.completed",
+  item: {
+    id: "item_1",
+    type: "mcp_tool_call",
+    server: "anydag",
+    tool: "note_delete",
+    arguments: {},
+    result: null,
+    error: { message: "403 declined" },
+    status: "failed",
+  },
+};
+const CX_TEXT = { type: "item.completed", item: { id: "item_2", type: "agent_message", text: "BANANA" } };
+const CX_DONE = {
+  type: "turn.completed",
+  usage: {
+    input_tokens: 2936,
+    cached_input_tokens: 1000,
+    cache_write_input_tokens: 0,
+    output_tokens: 53,
+    reasoning_output_tokens: 0,
+  },
+};
+const CX_FAILED = [
+  { type: "error", message: "The 'no-such-model' model is not supported when using Codex with a ChatGPT account." },
+  {
+    type: "turn.failed",
+    error: { message: "The 'no-such-model' model is not supported when using Codex with a ChatGPT account." },
+  },
+];
+const CX_CATALOG = { models: [{ slug: "gpt-6-luna", visibility: "list", priority: 1, tool_mode: "code_mode_only" }] };
+
+describe("Codex's stream", () => {
+  it("opens the session on thread.started", () => {
+    expect(parseCodexLine(line(CX_THREAD), newCodexState())).toEqual([{ kind: "session", id: CX_THREAD.thread_id }]);
+  });
+
+  it("names a tool call when it starts, once, and answers it when it completes", () => {
+    const st = newCodexState();
+    expect(parseCodexLine(line(CX_CALL), st)).toEqual([
+      { kind: "tool", id: "item_0", name: "note_read", input: { name: "shopping" } },
+    ]);
+    expect(parseCodexLine(line(CX_CALLED), st)).toEqual([
+      { kind: "result", id: "item_0", output: "The note shopping says: BANANA", error: false },
+    ]);
+  });
+
+  it("makes a failed call an error result with its message, announcing it if its start was missed", () => {
+    expect(parseCodexLine(line(CX_REFUSED), newCodexState())).toEqual([
+      { kind: "tool", id: "item_1", name: "note_delete", input: {} },
+      { kind: "result", id: "item_1", output: "403 declined", error: true },
+    ]);
+  });
+
+  it("reads the answer and the usage, new input apart from cached", () => {
+    const st = newCodexState();
+    expect(parseCodexLine(line(CX_TEXT), st)).toEqual([{ kind: "text", text: "BANANA" }]);
+    expect(parseCodexLine(line(CX_DONE), st)).toEqual([]);
+    expect(st).toMatchObject({ done: true, usage: { input: 1936, output: 53, cached: 1000 } });
+  });
+
+  it("says a failure once, though Codex says it twice", () => {
+    const st = newCodexState();
+    const out = CX_FAILED.flatMap((l) => parseCodexLine(line(l), st));
+    expect(out).toEqual([{ kind: "error", text: CX_FAILED[0]!.message }]);
+    expect(st.error).toBe(CX_FAILED[0]!.message);
+  });
+
+  it("takes a warning item, a line that is not JSON and an unknown type for nothing", () => {
+    const st = newCodexState();
+    expect(
+      parseCodexLine(line({ type: "item.completed", item: { id: "item_0", type: "error", message: "Model metadata …" } }), st),
+    ).toEqual([]);
+    expect(parseCodexLine("not json", st)).toEqual([]);
+    expect(parseCodexLine(line({ type: "turn.started" }), st)).toEqual([]);
+  });
+});
+
+describe("Codex's flags", () => {
+  const files = { system: "/s/system.md", catalog: "/s/catalog.json" };
+
+  it("names the token by its variable and never writes it into the command line", () => {
+    const o = runOptions({
+      mcp: {
+        command: "node",
+        args: ["cli.mjs", "mcp", "--chat", "c1"],
+        env: { ANYDAG_TOKEN: "s3cret", ANYDAG_CHAT_PORT: "4100" },
+      },
+    });
+    const args = codexRunArgs({ ...o, model: "gpt-6-luna" }, files);
+    expect(args.join(" ")).not.toContain("s3cret");
+    expect(args).toContain('mcp_servers.anydag.env_vars=["ANYDAG_TOKEN","ANYDAG_CHAT_PORT"]');
+    expect(args).toContain('mcp_servers.anydag.args=["cli.mjs","mcp","--chat","c1"]');
+    expect(args).toContain("mcp_servers.anydag.required=true");
+    expect(args).toContain('mcp_servers.anydag.default_tools_approval_mode="approve"');
+    expect(codexMcpArgs(o.mcp)).toContain("mcp_servers.anydag.tool_timeout_sec=600");
+  });
+
+  it("starts a new session, or resumes the chat's, with the same isolation either way", () => {
+    const fresh = codexRunArgs(runOptions({ model: "gpt-6-luna", effort: "max" }), files);
+    expect(fresh.slice(0, 2)).toEqual(["exec", "--json"]);
+    expect(fresh).not.toContain("--ephemeral");
+    expect(fresh.slice(-4)).toEqual(["gpt-6-luna", "-c", 'model_reasoning_effort="max"', "-"]);
+    const resumed = codexRunArgs(runOptions({ model: "gpt-6-luna", resume: CX_THREAD.thread_id }), files);
+    expect(resumed.slice(0, 4)).toEqual(["exec", "resume", CX_THREAD.thread_id, "--json"]);
+    expect(resumed.filter((a) => a.startsWith("features.")).sort()).toEqual(
+      fresh.filter((a) => a.startsWith("features.")).sort(),
+    );
+    /* `exec resume` has no --sandbox, so the sandbox is a -c on both. */
+    expect(resumed).toContain('sandbox_mode="read-only"');
+    expect(resumed).not.toContain("-s");
+  });
+});
+
+describe("the Codex harness", () => {
+  const catalog = () => CX_CATALOG;
+
+  it("writes the system prompt and the edited catalog, gives the server its environment, and reads the stream", async () => {
+    const sp = fakeSpawn(({ child }) => {
+      emit(child, CX_THREAD, CX_CALL, CX_CALLED, CX_TEXT, CX_DONE);
+      child.end(0);
+    });
+    const h = codexHarness({
+      bin: "/x/codex",
+      env: { HOME: "/h", CODEX_API_KEY: "k", ANYDAG_TOKEN: "server" },
+      spawnImpl: sp.impl,
+      catalog,
+    });
+    const events: HarnessEvent[] = [];
+    const o = runOptions({
+      model: "gpt-6-luna",
+      mcp: { command: "node", args: ["cli.mjs"], env: { ANYDAG_TOKEN: "chat-token" } },
+    });
+    const end = await h.run(o, (e) => events.push(e)).done;
+
+    expect(end).toEqual({ usage: { input: 1936, output: 53, cached: 1000 } });
+    expect(events.map((e) => e.kind)).toEqual(["session", "tool", "result", "text"]);
+    const { bin, opts, child } = sp.calls[0]!;
+    expect(bin).toBe("/x/codex");
+    expect(opts.cwd).toBe(o.scratch);
+    /* The key is gone; the token is the chat's, for `env_vars` to pass on. */
+    expect(opts.env).toEqual({ HOME: "/h", ANYDAG_TOKEN: "chat-token" });
+    expect(child.stdinText).toBe(o.prompt);
+    expect(fs.readFileSync(path.join(o.scratch, "system.md"), "utf8")).toBe(o.system);
+    expect(JSON.parse(fs.readFileSync(path.join(o.scratch, "catalog.json"), "utf8")).models[0]).not.toHaveProperty("tool_mode");
+  });
+
+  it("says the MCP server did not start, in the person's words, when Codex refused the turn for it", async () => {
+    const sp = fakeSpawn(({ child }) => {
+      child.stderr.write(
+        "Error: thread/start: thread/start failed: error creating thread: Fatal error: Failed to initialize session: required MCP servers failed to initialize: anydag: handshaking with MCP server failed\n",
+      );
+      child.end(1);
+    });
+    const events: HarnessEvent[] = [];
+    const end = await codexHarness({ bin: "/x/codex", env: {}, spawnImpl: sp.impl, catalog }).run(runOptions(), (e) =>
+      events.push(e),
+    ).done;
+    expect(end).toEqual({ error: NO_TOOLS_ERROR });
+    expect(events).toEqual([{ kind: "error", text: NO_TOOLS_ERROR }]);
+  });
+
+  it("reports a failed turn as the turn's error", async () => {
+    const sp = fakeSpawn(({ child }) => {
+      emit(child, CX_THREAD, ...CX_FAILED);
+      child.end(1);
+    });
+    const end = await codexHarness({ bin: "/x/codex", env: {}, spawnImpl: sp.impl, catalog }).run(runOptions(), () => undefined)
+      .done;
+    expect(end.error).toContain("not supported");
+  });
+
+  it("does not start Codex without a catalog, which is what takes its shell away", async () => {
+    const sp = fakeSpawn(() => undefined);
+    const events: HarnessEvent[] = [];
+    const end = await codexHarness({ bin: "/x/codex", env: {}, spawnImpl: sp.impl, catalog: () => undefined }).run(
+      runOptions(),
+      (e) => events.push(e),
+    ).done;
+    expect(end.error).toContain("did not list its models");
+    expect(events[0]?.kind).toBe("error");
+    expect(sp.calls).toEqual([]);
+  });
+
+  it("stops with SIGTERM and settles done with no error", async () => {
+    const sp = fakeSpawn(({ child }) => emit(child, CX_THREAD, CX_CALL));
+    const run = codexHarness({ bin: "/x/codex", env: {}, spawnImpl: sp.impl, catalog }).run(runOptions(), () => undefined);
+    await new Promise((r) => setTimeout(r, 10));
+    await run.stop();
+    expect(await run.done).toEqual({});
+    expect(sp.calls[0]!.child.signals).toEqual(["SIGTERM"]);
+  });
+
+  it("forgets a session with `codex delete --force`, and only a session id", async () => {
+    const sp = fakeSpawn(({ child }) => child.end(0));
+    const h = codexHarness({ bin: "/x/codex", env: { CODEX_API_KEY: "k" }, spawnImpl: sp.impl, catalog });
+    await h.forget("../../etc");
+    await h.forget("my-named-session");
+    expect(sp.calls).toEqual([]);
+    await h.forget(CX_THREAD.thread_id);
+    expect(sp.calls[0]!.args).toEqual(["delete", "--force", CX_THREAD.thread_id]);
+    expect(sp.calls[0]!.opts.env).toEqual({});
   });
 });

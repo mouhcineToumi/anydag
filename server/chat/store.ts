@@ -26,7 +26,7 @@ import type { Home } from "../home";
 import { ALPHABET } from "../ids";
 import { writeAtomic } from "../vault";
 import { isOp } from "./record";
-import type { ChatMeta, ChatRow, Mode, Provider, Turn, UndoRecord } from "./types";
+import { PROVIDERS, type ChatMeta, type ChatRow, type Mode, type Provider, type Turn, type UndoRecord } from "./types";
 
 /** What this machine let a chat reach: `null` is a grant taken back, kept so undo knows it was given once. */
 export type Grants = Record<string, { mode: Mode; at: string } | null>;
@@ -226,7 +226,7 @@ export class ChatStore {
 
   remove(root: string, chat: string): void {
     fs.rmSync(dirOf(root, chat), { recursive: true, force: true });
-    for (const p of ["claude", "opencode"] as const) this.home.set(sessionKey(chat, p), null);
+    for (const p of PROVIDERS) this.home.set(sessionKey(chat, p), null);
     this.home.set(grantsKey(chat), null);
   }
 

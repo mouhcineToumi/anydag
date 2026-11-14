@@ -31,7 +31,7 @@ the file for that area, not to a new place.
 | [`charts.md`](charts.md) | The `chart` dialect: its model, scales, colour, and the pointer's relationship to it. |
 | [`getting-around.md`](getting-around.md) | Pan, zoom and the pan modifier. |
 | [`settings.md`](settings.md) | Preferences, the Settings modal, and why a snapshot reads none of them. |
-| [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz. |
+| [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, Codex, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz. |
 | [`sidebar.md`](sidebar.md) | The shell, the file tree and its operations, selection, the search dialog, folders and the page tabs. |
 | [`icons.md`](icons.md) | Four vocabularies behind one `icon=` attribute, and where the art lives. |
 | [`editing.md`](editing.md) | Every gesture is a write to the board file: the table of gestures, the leader key, picking inside a diagram, the controls and text emphasis. |
@@ -43,7 +43,7 @@ the file for that area, not to a new place.
 | [`server.md`](server.md) | The one Node process, the token and `Host` gate, the store, and several vaults in one server. |
 | [`desktop.md`](desktop.md) | The Electron shell: the server child, the scheme, the token, signing, and the shim. |
 | [`sync.md`](sync.md) | The end-to-end-encrypted sync client and its server half (`api/`), and the convergence harness. |
-| [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code or OpenCode. |
+| [`assistant.md`](assistant.md) | The chat about the vault, run on the person's own Claude Code, OpenCode or Codex. |
 | [`logs.md`](logs.md) | Opt-in anonymous logs: what a batch may hold and every hop that cleans it. |
 | [`api.md`](api.md) | The api server: its features, config, what it stores and never stores, and running and deploying it. |
 | [`feedback.md`](feedback.md) | Send feedback: the card, what leaves the machine, the stateless relay that makes a GitHub issue, and how to run it. |

@@ -349,5 +349,5 @@ the list in `src/settings/providerNames.ts` because `src/` may not import `plugi
 - **The logos** come from `icons/data/providers.json`, generated beside the brand bundle so opening
   Settings does not fetch 2.5 MB of diagram icons (`src/ui/ProviderMark.tsx`). A provider with no
   mark in either source keeps an empty column. Anthropic's, OpenCode's and OpenAI's marks come from
-  the mono set and draw in `currentColor`: their colour art is black, and a dark theme hid it.
+  the mono set (Codex draws OpenAI's) and draw in `currentColor`: their colour art is black, and a dark theme hid it.
 

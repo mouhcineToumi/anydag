@@ -24,7 +24,7 @@ workflow (issues, branches, PRs) is in [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTI
   **events** (a note with `status:`, `project:` or `start:`), **attachments**, a **calendar**, a
   **trash** (nothing is deleted at once), several **vaults** in one server, an end-to-end-encrypted
   **sync** server, a read-only **lock**, **opt-in anonymous logs**.
-- **Prompt cards** and the **Assistant** run a model through the person's own Claude Code, OpenCode
+- **Prompt cards** and the **Assistant** run a model through the person's own Claude Code, OpenCode, Codex
   login or API key; the real parser checks what comes back before it lands.
 - **Everything the page can do, an agent can do through the MCP server** (`anydag mcp`), held in step
   by `docs/parity.json`. The `anydag` CLI is an admin tool — vaults, whole files, sync, trash,

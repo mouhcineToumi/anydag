@@ -1,8 +1,8 @@
 /**
  * What every run of a coding agent's CLI needs, whoever runs it: a prompt card's one answer
- * (`llm.ts`) or a chat's turn (`server/chat/claude.ts`, `server/chat/opencode.ts`). Finding the
+ * (`llm.ts`) or a chat's turn (`server/chat/claude.ts`, `server/chat/opencode.ts`, `server/chat/codex.ts`). Finding the
  * binary, the environment it runs in and whether it is signed in are `providers.ts`'s; this is the
- * part around the child — reading its lines, ending it, and taking a standalone OpenCode session out
+ * part around the child — reading its lines, ending it, and taking an OpenCode or Codex session out
  * of the person's history afterwards. Plain Node, no `@/` aliases: the server bundles it.
  */
 
@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
-import { opencodeEnv, type Env } from "./providers";
+import { codexEnv, opencodeEnv, type Env } from "./providers";
 
 /** How long a SIGTERM may take before it is a SIGKILL. A Claude Code run took three seconds. */
 export const KILL_AFTER_MS = 5_000;
@@ -86,5 +86,36 @@ export async function forgetOpencode(
     /* best effort */
   } finally {
     if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * `codex delete --force <id>`, best effort: a chat's turns are Codex sessions under `~/.codex/sessions`,
+ * listed in the person's `codex resume`, and a deleted chat takes them with it. `--force` because
+ * without a terminal Codex refuses to ask; only a UUID is passed, because `delete` also takes a
+ * session's *name* and a name is not ours to guess at.
+ */
+export async function forgetCodex(
+  bin: string,
+  session: string,
+  env: Env,
+  o: { spawnImpl?: typeof nodeSpawn; timeout?: number } = {},
+): Promise<void> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session)) return;
+  const spawn = o.spawnImpl ?? nodeSpawn;
+  try {
+    const child = spawn(bin, ["delete", "--force", session], {
+      cwd: os.tmpdir(),
+      env: codexEnv(env) as NodeJS.ProcessEnv,
+      stdio: "ignore",
+    });
+    const timer = setTimeout(() => child.kill("SIGKILL"), o.timeout ?? 15_000);
+    await new Promise<void>((resolve) => {
+      child.once("close", () => resolve());
+      child.once("error", () => resolve());
+    });
+    clearTimeout(timer);
+  } catch {
+    /* best effort: a session left behind is the person's, and harmless */
   }
 }

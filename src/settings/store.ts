@@ -88,7 +88,7 @@ export type Settings = {
    * answer here, with that provider's own default model.
    */
   assistant: {
-    provider: "claude" | "opencode" | null;
+    provider: AssistantProvider | null;
     model: string | null;
   };
   /**
@@ -106,6 +106,10 @@ export type Settings = {
     assistant: boolean;
   };
 };
+
+/** The harnesses a chat can run on: the coding agents' CLIs, never an HTTP provider. */
+const ASSISTANT_PROVIDERS = ["claude", "opencode", "codex"] as const;
+export type AssistantProvider = (typeof ASSISTANT_PROVIDERS)[number];
 
 export const DEFAULTS: Settings = {
   problems: { show: "notify" },
@@ -152,7 +156,7 @@ const SHOWS: readonly ProblemsShow[] = ["notify", "badge", "off"];
  * The effort scale every AI surface shows, low to high.
  *
  * Not a contract with any provider: the server maps each level to what that provider accepts —
- * Claude's `--effort`, OpenCode's `#variant`, an HTTP provider's `reasoning_effort` — and a model
+ * Claude's `--effort`, OpenCode's `#variant`, Codex's `model_reasoning_effort`, an HTTP provider's `reasoning_effort` — and a model
  * with no Max (an HTTP provider) takes High instead (`effortFor` in `plugins/generate/llm.ts`).
  */
 export const EFFORTS = ["low", "medium", "high", "max"] as const;
@@ -216,7 +220,7 @@ export function normalise(raw: unknown): Settings {
       reasoning: (REASONING as readonly string[]).includes(String(l.reasoning)) ? String(l.reasoning) : null,
     },
     assistant: {
-      provider: ast.provider === "claude" || ast.provider === "opencode" ? ast.provider : null,
+      provider: (ASSISTANT_PROVIDERS as readonly unknown[]).includes(ast.provider) ? (ast.provider as AssistantProvider) : null,
       model: ident(ast.model),
     },
     features: {
