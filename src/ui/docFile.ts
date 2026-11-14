@@ -4,6 +4,7 @@ import { concerns, onQuiz, onTable } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
 import type { LoadProblem } from "@/board/useBoard";
 import { merge3 } from "@/note/merge";
+import { registerPendingWrites } from "./pendingWrites";
 
 /**
  * A quiz's or a table's text as its page holds it, and the writes that keep the file in step
@@ -265,7 +266,9 @@ export function useDocFile(kind: DocFileKind, name: string): DocFile {
     });
     const leave = () => file.leave();
     addEventListener("pagehide", leave);
+    const unregister = registerPendingWrites(() => file.flush());
     return () => {
+      unregister();
       off();
       removeEventListener("pagehide", leave);
       file.leave();

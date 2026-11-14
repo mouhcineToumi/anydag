@@ -120,8 +120,9 @@ and `dag-embed--placed`, `dag-embed__mark`, `dag-embed__text`, `dag-embed__name`
 `data-dag-embed-missing`, `data-dag-embed-failed`.
 
 **Out, and why:** a references table stored beside the texts (a second copy of what the files say;
-the scan is right for tens of documents and is the thing to replace, with an index kept on write,
-once a vault holds thousands); hiding a block's `^id` inside the editor (it wants a schema prop
+since #280 the index is kept on write in the server's memory instead — the kept listing says which
+texts moved, only those are parsed again, and only their links resolved again while no name moved —
+and rebuilt from the files when the server starts); hiding a block's `^id` inside the editor (it wants a schema prop
 on every block type, and nothing yet points at a block from the UI); a board embedded in a board; and
 mobile viewing, which the view is built for. Sharing a vault stays the folder's: it is shared the
 way any folder is.

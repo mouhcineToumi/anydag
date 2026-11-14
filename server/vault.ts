@@ -24,9 +24,11 @@
  * - **Names are the person's** (`names.ts`): verbatim, portable, and case-insensitively unique.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { setImmediate as yieldNow } from "node:timers/promises";
 
 import watcher from "@parcel/watcher";
@@ -37,10 +39,28 @@ import type { Task } from "../src/note/task";
 import { titleOf } from "../src/refs/extract";
 import type { DocRow, Home } from "./home";
 import { derivedId, frontId, instant, mint, validId, validInstant, withId } from "./ids";
-import { forgetVault, type Front, frontOf, type Listed, type Listing, Lister, listVault, walk } from "./listing";
+import { dirOf, type Entry, KeptListing } from "./kept";
+import {
+  forgetVault,
+  type Found,
+  type Front,
+  frontOf,
+  insideOf,
+  type Listed,
+  type Listing,
+  Lister,
+  listVault,
+  readFound,
+  type Scanned,
+  scanDir,
+  type Walked,
+  walk,
+} from "./listing";
 import {
   assetsPrefix,
   classify,
+  COMPONENT_PREFIX,
+  COMPONENTS,
   extOf,
   fileNameFrom,
   fileTarget,
@@ -51,12 +71,12 @@ import {
   KINDS,
   leafOf,
   nameFrom,
-  NOTE_SUFFIXES,
   refusal,
   same,
   SUFFIX,
   type TextKind,
   TEXT_KINDS,
+  textFile,
   unique,
   uniqueFile,
 } from "./names";
@@ -183,11 +203,6 @@ interface Kept {
 /** Where the trash is kept: in the vault, so it travels with it, and out of every listing (a dot-folder). */
 const TRASH = ".anydag/trash";
 
-/** Where the person's saved components live: in the vault, out of its listing. */
-const COMPONENTS = ".anydag/components";
-/** The wire's name for one: `components/<name>` (`useEditor`'s Keep). */
-const COMPONENT_PREFIX = "components/";
-
 export interface VaultOptions {
   /** The extensions this vault lists as attachments. */
   types?: readonly string[];
@@ -224,6 +239,36 @@ export class Vault {
    */
   private given = new Map<string, number>();
   private givenAt = 0;
+  /**
+   * The last listing, kept and changed from what moved since rather than walked again (#280) —
+   * only while the watcher runs, which is what says a text changed in place. `null` makes the next
+   * listing walk.
+   */
+  private kept: KeptListing | null = null;
+  /** How many listings walked the folder rather than answering from the kept one: what the tests hold it to. */
+  walks = 0;
+  /** Whether the watcher is subscribed and hearing every change: what lets a listing be kept. */
+  private watching = false;
+  /** Settles once a watcher being started is subscribed, or has failed to be. */
+  private hearing: Promise<void> | null = null;
+  /**
+   * Every path said to have moved since the kept listing was made — by the watcher, or by a row
+   * this process wrote — lowercased, with the order it was said in (`dirtyAt`).
+   */
+  private dirty = new Map<string, { rel: string; at: number }>();
+  private dirtyAt = 0;
+  /** When `dirty` was last emptied without a walk: a listing begun before then is not kept. */
+  private clearedAt = 0;
+  /**
+   * The attachment records' folder's mtime when the kept listing last read them, the records this
+   * process wrote since, and whether somebody else wrote one: a record names the id of a file it may
+   * have been moved from, and only a walk matches the two, so another writer's record makes the next
+   * listing walk.
+   */
+  private recordsMark: number | null = null;
+  private ownRecords = new Map<string, string | null>();
+  private recordsMoved = false;
+
   private listeners = new Set<(c: Change) => void>();
   /**
    * The documents on disk at the last walk, lowercased, kept up to date by the watcher. A save is a
@@ -232,6 +277,8 @@ export class Vault {
    */
   private present: Set<string> | null = null;
   private stopping: Promise<() => Promise<void>> | null = null;
+  /** Attachments whose sha1 the watcher is reading, and whether another event came in meanwhile. */
+  private hashing = new Map<string, boolean>();
   /** Created instants sync adopted for documents it is about to write, keyed by lowercased path. */
   private adopted = new Map<string, string>();
   /** The same, by the id sync wrote it under: a document renamed here before the index walked it. */
@@ -314,14 +361,11 @@ export class Vault {
     const comp = kind === "board" ? this.component(name) : null;
     const why = refusal(comp ?? name);
     if (why) throw new Refused(why);
-    if (comp !== null) return `${COMPONENTS}/${comp}${SUFFIX.board}`;
     if (kind === "file") {
       if (!this.isAttachment(name)) throw new Refused(`not a file name \`${name}\``);
       return name;
     }
-    if (kind !== "note") return name + SUFFIX[kind];
-    for (const ext of NOTE_SUFFIXES) if (exists(this.abs(name + ext))) return name + ext;
-    return name + NOTE_SUFFIXES[0];
+    return textFile(name, kind, (rel) => exists(this.abs(rel)));
   }
 
   isAttachment(name: string): boolean {
@@ -407,15 +451,328 @@ export class Vault {
    * done again. Three times, and then on this thread, where nothing can land in between.
    */
   private async listNow(): Promise<Tree> {
-    for (let tries = 0; tries < 3; tries++) {
-      const moves = this.moves;
-      const from = this.givenAt;
-      const listing = await listVault(this.lister, this.types);
-      const t = await this.treeOf(listing, from, () => this.moves === moves);
+    // A watcher being started: list once it hears, so the listing can be kept.
+    if (this.hearing && !this.watching) await this.hearing;
+    if (this.kept && this.watching) {
+      const t = await this.refresh(this.kept);
       if (t) return t;
+      this.kept = null;
     }
-    const from = this.givenAt;
-    return (await this.treeOf(this.lister.list(this.types), from, null))!;
+    this.walks++;
+    for (let tries = 0; tries < 4; tries++) {
+      const moves = this.moves;
+      const from = this.dirtyAt;
+      const given = this.givenAt;
+      const heard = this.watching;
+      const records = mtimeOf(this.folderAbs(RECORDS));
+      const listing = tries < 3 ? await listVault(this.lister, this.types) : this.lister.list(this.types);
+      const t = await this.treeOf(listing, given, tries < 3 ? () => this.moves === moves : null);
+      if (!t) continue;
+      if (heard && this.watching && this.clearedAt <= from) this.keep(listing, t.rows, t.tree, from, records);
+      return t.tree;
+    }
+    throw new Error("unreachable: the last listing runs in one go");
+  }
+
+  /**
+   * Keep a listing: what it found, its rows and its tree. Every path said to have moved before it
+   * began is in it; one said since stays, for the next listing to look at again.
+   */
+  private keep(listing: Listing, rows: Map<string, DocRow>, tree: Tree, from: number, records: number | null): void {
+    const entries = listing.docs.map((d, i): Entry => ({ listed: d, found: listing.found[i]!, row: rows.get(d.file) ?? null }));
+    this.kept = new KeptListing(entries, listing.marks, tree, (d) => textKey(d.name, d.kind as TextKind));
+    this.recordsMark = records;
+    this.recordsMoved = false;
+    for (const [low, d] of this.dirty) if (d.at <= from) this.dirty.delete(low);
+  }
+
+  /**
+   * The kept listing brought up to date with what moved since it was made, or `null` when only a walk
+   * can say. Two things say what moved: **every folder's mtime**, read here on every listing — a
+   * document made, renamed or deleted, by this process or anybody, moves its folder's, so what a
+   * folder holds is never older than the question (a thousand folders are a millisecond) — and **the
+   * watcher**, for a text written in place, which moves no folder. A folder that moved is read again,
+   * each document in it `stat`ed; a path the watcher named is read again; nothing else is touched.
+   *
+   * Only a walk can say when more moved than is worth reading here (`REFRESH_MAX`, a folder copied in
+   * whole), when a document takes an id another listed one still holds (which the walk's tie-break
+   * settles), and when an attachment appears with no row (the walk matches it to a record by its
+   * bytes). A move made here while it reads starts it again, as it does a listing.
+   */
+  private async refresh(k: KeptListing): Promise<Tree | null> {
+    for (let tries = 0; tries < 3; tries++) {
+      // An attachment record somebody else wrote: only the walk matches a record to a moved file.
+      if (this.recordsMoved || mtimeOf(this.folderAbs(RECORDS)) !== this.recordsMark) return null;
+      const moves = this.moves;
+      const upTo = this.dirtyAt;
+      const look = this.looked(k);
+      if (!look) return k.tree;
+      const read = await this.reread(k, look);
+      if (!read) return null;
+      if (this.moves !== moves) continue;
+      // `settle` reads the index as it is now, so every row `rowNow` gave until here is in it.
+      const seen = this.givenAt;
+      const t = this.home.tx(() => this.settle(k, look, read));
+      if (!t) return null;
+      for (const [low, d] of this.dirty) if (d.at <= upTo) this.dirty.delete(low);
+      for (const [file, at] of this.given) if (at <= seen) this.given.delete(file);
+      return t;
+    }
+    return null;
+  }
+
+  /** The folders to read again — each whose mtime moved — and the listed documents the watcher named. */
+  private looked(k: KeptListing): { dirs: string[]; files: Set<string> } | null {
+    const dirs = new Set<string>();
+    for (const [dir, mark] of k.folders) if (mtimeOf(this.folderAbs(dir)) !== mark) dirs.add(dir);
+    const files = new Set<string>();
+    for (const [low, d] of this.dirty) {
+      if (k.entries.has(low)) files.add(low);
+      else {
+        if (k.folders.has(d.rel)) dirs.add(d.rel);
+        dirs.add(k.nearest(d.rel));
+      }
+    }
+    if (!dirs.size && !files.size) return null;
+    // Shallowest first: a folder its parent no longer lists is not read through.
+    return { dirs: [...dirs].sort((a, b) => depthOf(a) - depthOf(b)), files };
+  }
+
+  private folderAbs(dir: string): string {
+    return dir ? path.join(this.root, ...dir.split("/")) : this.root;
+  }
+
+  /**
+   * What the folders and documents `refresh` looks at hold now — read, nothing changed. In slices, the
+   * thread handed back between, since a folder of thousands is that many `stat`s; `null` when more
+   * than `REFRESH_MAX` documents are new or changed, which a walk off this thread reads instead.
+   */
+  private async reread(k: KeptListing, look: { dirs: string[]; files: Set<string> }): Promise<Reread | null> {
+    const out: Reread = { scanned: new Map(), walked: new Map(), found: new Map() };
+    // A folder its parent no longer lists, or under one gone, is not read: it is gone too.
+    const gone = (dir: string): boolean => {
+      if (dir === "") return false;
+      const up = dirOf(dir);
+      const s = out.scanned.get(up);
+      if (s && (s.mark === null || !s.folders.includes(dir))) return true;
+      return gone(up);
+    };
+    const toRead: { d: Listed; had: Front | undefined }[] = [];
+    for (const dir of look.dirs) {
+      if (gone(dir)) continue;
+      // A folder swapped for a link is gone, and its parent — whose mtime the swap moved — says so.
+      const real = dir === "" || fs.lstatSync(this.folderAbs(dir), { throwIfNoEntry: false })?.isDirectory();
+      const s: Scanned = real ? scanDir(this.root, dir, this.types) : { docs: [], folders: [], order: [], mark: null };
+      out.scanned.set(dir, s);
+      if (s.mark === null) continue;
+      for (const d of s.docs) {
+        const e = k.entries.get(d.file.toLowerCase());
+        toRead.push({ d, had: e?.listed.file === d.file ? (e.found.front ?? undefined) : undefined });
+      }
+      for (const sub of s.folders) {
+        if (k.folders.has(sub)) continue;
+        const w = walk(this.root, this.types, sub);
+        out.walked.set(sub, w);
+        for (const d of w.docs) toRead.push({ d, had: undefined });
+      }
+    }
+    for (const low of look.files) {
+      const e = k.entries.get(low)!;
+      if (!out.scanned.has(dirOf(e.listed.file))) toRead.push({ d: e.listed, had: e.found.front ?? undefined });
+    }
+    let fresh = 0;
+    for (const { d, had } of toRead) if (d.kind !== "file" && !had) fresh++;
+    if (fresh > REFRESH_MAX) return null;
+    const inside = insideOf(this.root);
+    let read = 0;
+    const ok = await sliced(
+      toRead,
+      ({ d, had }) => {
+        const f = readFound(this.root, d, had, inside);
+        if (d.kind !== "file" && f.front && f.front !== had) read++;
+        out.found.set(d.file.toLowerCase(), f);
+      },
+      { paced: true, still: () => read <= REFRESH_MAX },
+    );
+    return ok ? out : null;
+  }
+
+  /**
+   * What `reread` found, made the kept listing: documents come and gone, folders come and gone, each
+   * changed document's frontmatter and row — and the tree, new only where it moved. Runs in one go,
+   * in one transaction; `null` when it meets what only a walk can settle.
+   */
+  private settle(k: KeptListing, look: { dirs: string[]; files: Set<string> }, r: Reread): Tree | null {
+    const goneOnes: Entry[] = [];
+    const settled: Entry[] = [];
+    const add = (d: Listed): void => {
+      const f = r.found.get(d.file.toLowerCase());
+      if (f) settled.push({ listed: d, found: f, row: null });
+    };
+    for (const dir of look.dirs) {
+      const s = r.scanned.get(dir);
+      if (!s || (dir !== "" && !k.folders.has(dir))) continue;
+      if (s.mark === null) {
+        if (dir === "") return null; // the vault's own folder is gone
+        goneOnes.push(...k.dropFolder(dir));
+        continue;
+      }
+      k.folder(dir, s.mark);
+      const now = new Map(s.docs.map((d) => [d.file.toLowerCase(), d]));
+      for (const low of [...(k.byDir.get(dir) ?? [])]) {
+        const e = k.entries.get(low)!;
+        const d = now.get(low);
+        if (d && d.file === e.listed.file && d.kind === e.listed.kind) continue;
+        k.drop(low);
+        goneOnes.push(e);
+      }
+      for (const d of s.docs) {
+        const e = k.entries.get(d.file.toLowerCase());
+        const f = r.found.get(d.file.toLowerCase());
+        if (!e) add(d);
+        else if (f && !sameFound(e.found, f)) settled.push({ ...e, found: f });
+      }
+      const subs = new Set(s.folders);
+      for (const sub of k.subfolders(dir)) if (!subs.has(sub)) goneOnes.push(...k.dropFolder(sub));
+      for (const sub of s.folders) {
+        const w = r.walked.get(sub);
+        if (!w) continue;
+        for (const [f, mark] of Object.entries(w.marks)) k.folder(f, mark);
+        for (const d of w.docs) add(d);
+      }
+    }
+    // What the watcher named, or a row written here touched: its frontmatter and its row, again.
+    const again = new Set(settled.map((e) => e.listed.file.toLowerCase()));
+    for (const low of look.files) {
+      const e = k.entries.get(low);
+      if (!e || again.has(low)) continue;
+      settled.push({ ...e, found: r.found.get(low) ?? e.found });
+    }
+    // Every document that is here now before any row of one that went is dropped: a document moved
+    // outside the app takes its row, and its created, with it.
+    for (const e of settled) {
+      const row = this.rowOf(k, e.listed, e.found);
+      if (row === undefined) return null;
+      k.put({ ...e, row });
+    }
+    for (const e of goneOnes) {
+      const low = e.listed.file.toLowerCase();
+      if (k.entries.has(low)) continue;
+      const row = this.home.docByPath(this.id, e.listed.file);
+      if (row && row.path.toLowerCase() === low) this.home.dropDoc(this.id, row.id);
+    }
+    return k.commit();
+  }
+
+  /**
+   * One document's row, settled the way the walk's reconcile settles it (`reconciler`'s `step`), for
+   * the cases one document can settle alone; `undefined` for the rest, which the walk settles.
+   */
+  private rowOf(k: KeptListing, d: Listed, f: Found): DocRow | undefined {
+    const vault = this.id;
+    const row = this.home.docByPath(vault, d.file);
+    const put = (next: DocRow): DocRow => {
+      if (
+        !row ||
+        row.id !== next.id ||
+        row.path !== next.path ||
+        row.kind !== next.kind ||
+        row.minted !== next.minted ||
+        row.title !== next.title ||
+        row.created !== next.created
+      )
+        this.home.putDoc(next);
+      return next;
+    };
+    if (d.kind === "file") {
+      // An attachment's id is a record in `.anydag/files/`, which may name the path it was moved from.
+      if (!row) return undefined;
+      if (!row.minted) return put({ ...row, path: d.file, kind: d.kind });
+      const rec = this.fileRecord(row.id);
+      if (!rec || rec.path.toLowerCase() !== d.file.toLowerCase()) return undefined;
+      return put({ ...row, path: d.file, kind: d.kind, title: rec.title });
+    }
+    const own = f.front?.id || null;
+    if (own) {
+      if (row?.id === own) return put({ ...row, path: d.file, kind: d.kind, minted: 1 });
+      const was = this.home.docById(vault, own);
+      // Two files, one id: which keeps it is the walk's tie-break.
+      if (was && was.path.toLowerCase() !== d.file.toLowerCase() && k.entries.has(was.path.toLowerCase())) return undefined;
+      return put({
+        vault,
+        id: own,
+        path: d.file,
+        kind: d.kind,
+        created: was?.created ?? row?.created ?? this.createdOfId(own, d.file, was) ?? this.bornAt(d.file, f.born ?? undefined),
+        minted: 1,
+        title: null,
+      });
+    }
+    if (row) return put({ ...row, path: d.file, kind: d.kind, minted: 0 });
+    return put({
+      vault,
+      id: mint((x) => !!this.home.docById(vault, x)),
+      path: d.file,
+      kind: d.kind,
+      created: this.bornAt(d.file, f.born ?? undefined),
+      minted: 0,
+      title: null,
+    });
+  }
+
+  /** An attachment's record, `.anydag/files/<id>.json`, or `null` when there is none to read. */
+  private fileRecord(id: string): { path: string; title: string | null } | null {
+    try {
+      const data = JSON.parse(fs.readFileSync(this.abs(`.anydag/files/${id}.json`), "utf8")) as {
+        path?: unknown;
+        title?: unknown;
+      };
+      if (typeof data.path !== "string") return null;
+      return { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Say that `rel` moved, for the kept listing to look at again. Only while a watcher runs: nothing is kept otherwise. */
+  private mark(rel: string): void {
+    if (!this.watching || !rel) return;
+    this.dirty.set(rel.toLowerCase(), { rel, at: ++this.dirtyAt });
+    // So much moved that a walk is cheaper than looking at each: drop the kept listing.
+    if (this.dirty.size > DIRTY_MAX) {
+      this.kept = null;
+      this.dirty.clear();
+      this.clearedAt = this.dirtyAt;
+    }
+  }
+
+  /** A row written outside a listing, and the path it is at: the kept listing reads it again. */
+  private putRow(row: DocRow): void {
+    this.home.putDoc(row);
+    this.mark(row.path);
+  }
+
+  private dropRow(row: DocRow): void {
+    this.home.dropDoc(this.id, row.id);
+    this.mark(row.path);
+  }
+
+  /** What the watcher said moved: a document or folder, or an attachment's record and so its file. */
+  private heard(rel: string): void {
+    if (!rel) return;
+    const rec = /^\.anydag\/files\/([^/]+)\.json$/.exec(rel);
+    if (rec) {
+      let text: string | null = null;
+      try {
+        text = fs.readFileSync(this.folderAbs(rel), "utf8");
+      } catch {
+        /* removed */
+      }
+      if (!this.ownRecords.has(rec[1]!) || this.ownRecords.get(rec[1]!) !== text) this.recordsMoved = true;
+      return;
+    }
+    if (rel.split("/").some(ignored)) return;
+    this.mark(rel);
   }
 
   /**
@@ -423,7 +780,11 @@ export class Vault {
    * `still` is asked before every slice and stops it with `null` once it says no; without one, it runs
    * in one go.
    */
-  private async treeOf({ docs, folders, found }: Listing, from: number, still: (() => boolean) | null): Promise<Tree | null> {
+  private async treeOf(
+    { docs, folders, found }: Listing,
+    from: number,
+    still: (() => boolean) | null,
+  ): Promise<{ tree: Tree; rows: Map<string, DocRow> } | null> {
     if (still && !still()) return null;
     // Only when there is none: a running watcher has kept it since this walk, which is older.
     this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
@@ -480,7 +841,7 @@ export class Vault {
       l.sort(byName);
       if (pace.paced) await yieldNow();
     }
-    return t;
+    return { tree: t, rows };
   }
 
   // -- ids -------------------------------------------------------------------
@@ -500,8 +861,11 @@ export class Vault {
       const id = e.slice(0, -5);
       if (!validId(id)) continue;
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown };
-        if (typeof data.path === "string")
+        const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown } | null;
+        /* The record syncs, and anybody who writes the folder writes it: a `path` no vault name can
+           be — `../../x.pdf` — is a record of nothing, dropped like one that does not parse. Kept, it
+           reached `abs()`, which refused it, and that refusal failed the whole listing (#9). */
+        if (data && typeof data.path === "string" && refusal(data.path) === null)
           out.set(id, { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null });
       } catch {
         /* a half-synced file: read again next time */
@@ -513,12 +877,29 @@ export class Vault {
   private writeFileId(id: string, file: string, title: string | null): void {
     const target = this.writeAt(`.anydag/files/${id}.json`);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    writeAtomic(target, `${JSON.stringify({ path: file, ...(title ? { title } : {}) }, null, 1)}\n`);
+    const text = `${JSON.stringify({ path: file, ...(title ? { title } : {}) }, null, 1)}\n`;
+    writeAtomic(target, text);
+    this.wroteRecord(id, text);
   }
 
   private dropFileId(id: string): void {
-    fs.rmSync(this.abs(`.anydag/files/${id}.json`), { force: true });
+    this.rmFileId(id);
     this.home.set(this.digestKey(id), null);
+  }
+
+  private rmFileId(id: string): void {
+    fs.rmSync(this.abs(`.anydag/files/${id}.json`), { force: true });
+    this.wroteRecord(id, null);
+  }
+
+  /**
+   * A record this process wrote (`null`: removed), so neither the watcher's report of it nor the
+   * folder's mtime it moved reads as somebody else's — which the kept listing would walk for.
+   */
+  private wroteRecord(id: string, text: string | null): void {
+    if (!this.watching) return;
+    this.ownRecords.set(id, text);
+    this.recordsMark = mtimeOf(this.folderAbs(RECORDS));
   }
 
   /** Where the index keeps an attachment's size and sha1, which find it again after a move by hand. */
@@ -534,7 +915,7 @@ export class Vault {
     this.markSynced();
     this.adopted.set(rel.toLowerCase(), at);
     const row = this.home.docByPath(this.id, rel);
-    if (row && row.created !== at) this.home.putDoc({ ...row, created: at });
+    if (row && row.created !== at) this.putRow({ ...row, created: at });
   }
 
   /**
@@ -613,6 +994,9 @@ export class Vault {
 
   /** While sync's first download runs, a duplicate id's fix stays in the index and out of the file. */
   holdFixes(on: boolean): void {
+    // Released: the fixes held are written by the walk that finds them again, which a kept listing
+    // would not do — it never looks at a document that did not move.
+    if (this.held && !on) this.kept = null;
     this.held = on;
   }
 
@@ -723,7 +1107,18 @@ export class Vault {
     const filePaths = new Map([...fileIds].map(([id, v]) => [v.path.toLowerCase(), id]));
     // A record whose file is gone, and a file with no record: moved outside the app with the record
     // left behind. The bytes the app last saw it holding say whether they are one file.
-    const orphans = [...fileIds].filter(([, v]) => !exists(this.abs(v.path)));
+    // A path the vault refuses is no file of its own to lose: not an orphan, and never a throw.
+    const at = (rel: string): string | null => {
+      try {
+        return this.abs(rel);
+      } catch {
+        return null;
+      }
+    };
+    const orphans = [...fileIds].filter(([, v]) => {
+      const abs = at(v.path);
+      return abs !== null && !exists(abs);
+    });
     if (orphans.length) {
       for (const d of docs) {
         if (d.kind !== "file" || filePaths.has(d.file.toLowerCase())) continue;
@@ -737,7 +1132,7 @@ export class Vault {
         if (!want.length) continue;
         let digest: string;
         try {
-          digest = digestOf(fs.readFileSync(this.abs(d.file)));
+          digest = digestFileSync(this.abs(d.file));
         } catch {
           continue;
         }
@@ -899,7 +1294,7 @@ export class Vault {
       minted: own ? 1 : 0,
       title: null,
     };
-    this.home.putDoc(r);
+    this.putRow(r);
     this.given.set(file.toLowerCase(), ++this.givenAt);
     return r;
   }
@@ -927,6 +1322,8 @@ export class Vault {
 
   private reconcileAll(file: string): DocRow | null {
     this.moves++;
+    // Rows written by a walk here, which the kept listing did not see written: the next listing walks.
+    this.kept = null;
     const { docs } = this.walk();
     const fronts = new Map<string, Front>();
     for (const d of docs) {
@@ -958,7 +1355,7 @@ export class Vault {
       if (had === false && !force) return false;
       if (had !== row.id) writeAtomic(abs, withId(text, row.id));
     }
-    this.home.putDoc({ ...row, minted: 1 });
+    this.putRow({ ...row, minted: 1 });
     return true;
   }
 
@@ -1058,7 +1455,7 @@ export class Vault {
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : own && !taken(own) ? own : mint(taken);
     const body = own === false ? text : withId(text, id);
     writeAtomic(abs, body);
-    this.home.putDoc({
+    this.putRow({
       vault: this.id,
       id,
       path: file,
@@ -1112,12 +1509,12 @@ export class Vault {
       if (copy) {
         fs.copyFileSync(fromAbs, toAbs);
         const id = mint((x) => !!this.home.docById(this.id, x));
-        this.home.putDoc({ vault: this.id, id, path: target, kind, created: instant(), minted: 0, title: row?.title ?? null });
+        this.putRow({ vault: this.id, id, path: target, kind, created: instant(), minted: 0, title: row?.title ?? null });
       } else {
         moveFile(fromAbs, toAbs);
         if (row) {
           const next = { ...row, path: target };
-          this.home.putDoc(next);
+          this.putRow(next);
           if (row.minted) this.writeFileId(row.id, target, row.title);
         }
       }
@@ -1129,7 +1526,7 @@ export class Vault {
       const own = frontId(text);
       const id = mint((x) => !!this.home.docById(this.id, x));
       writeAtomic(toAbs, own === false ? text : own ? withId(text, id) : text);
-      this.home.putDoc({ vault: this.id, id, path: target, kind, created: instant(), minted: own ? 1 : 0, title: null });
+      this.putRow({ vault: this.id, id, path: target, kind, created: instant(), minted: own ? 1 : 0, title: null });
       const assets = this.abs(assetsPrefix(name));
       if (isDir(assets)) fs.cpSync(assets, this.abs(assetsPrefix(settled)), { recursive: true });
       return settled;
@@ -1141,7 +1538,7 @@ export class Vault {
     } else moveFile(fromAbs, toAbs);
     const assets = this.abs(assetsPrefix(name));
     if (isDir(assets)) moveFile(assets, this.abs(assetsPrefix(settled)));
-    if (row) this.home.putDoc({ ...row, path: target });
+    if (row) this.putRow({ ...row, path: target });
     if (next !== text) this.mintTargets(next, text);
     return settled;
   }
@@ -1159,7 +1556,7 @@ export class Vault {
       return;
     }
     if (row) {
-      this.home.dropDoc(this.id, row.id);
+      this.dropRow(row);
       if (row.kind === "file") this.dropFileId(row.id);
     }
     if (kind !== "file") fs.rmSync(this.abs(assetsPrefix(name)), { recursive: true, force: true });
@@ -1204,7 +1601,7 @@ export class Vault {
       gone[pluralOf(d.kind)].push(d.name);
       const row = this.home.docByPath(this.id, d.file);
       if (row) {
-        this.home.dropDoc(this.id, row.id);
+        this.dropRow(row);
         if (row.kind === "file") this.dropFileId(row.id);
       }
     }
@@ -1234,7 +1631,7 @@ export class Vault {
       for (const r of this.home.docs(this.id)) {
         if (!r.path.toLowerCase().startsWith(prefix)) continue;
         const moved = `${dst}/${r.path.slice(prefix.length)}`;
-        this.home.putDoc({ ...r, path: moved });
+        this.putRow({ ...r, path: moved });
         if (r.kind === "file" && r.minted) this.writeFileId(r.id, moved, r.title);
       }
     });
@@ -1335,7 +1732,10 @@ export class Vault {
   private manifest(id: string): (Trashed & { docs: Record<string, Kept> }) | null {
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(fs.readFileSync(path.join(this.trashDir(id), "entry.json"), "utf8")) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(fs.readFileSync(path.join(this.trashDir(id), "entry.json"), "utf8"));
+      // `null` parses, and reading `.id` off it threw out of every trash route (#9).
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      data = parsed as Record<string, unknown>;
     } catch {
       return null;
     }
@@ -1401,8 +1801,8 @@ export class Vault {
       moveFile(assets, dst);
     }
     if (row) {
-      this.home.dropDoc(this.id, row.id);
-      if (row.kind === "file") fs.rmSync(this.abs(`.anydag/files/${row.id}.json`), { force: true });
+      this.dropRow(row);
+      if (row.kind === "file") this.rmFileId(row.id);
     }
     this.toldTrash();
     return entry;
@@ -1459,8 +1859,8 @@ export class Vault {
     moveFile(abs, target); // one `rename(2)`: every file, every `.assets/` and every empty folder
     this.home.tx(() => {
       for (const row of under) {
-        this.home.dropDoc(this.id, row.id);
-        if (row.kind === "file") fs.rmSync(this.abs(`.anydag/files/${row.id}.json`), { force: true });
+        this.dropRow(row);
+        if (row.kind === "file") this.rmFileId(row.id);
       }
     });
     this.toldTrash();
@@ -1478,7 +1878,14 @@ export class Vault {
     const out: Trashed[] = [];
     for (const n of names) {
       if (!validId(n)) continue;
-      const m = this.manifest(n);
+      /* One entry is one thing deleted, and one that cannot be read is skipped: a manifest is written
+         by whoever wrote the folder, and one that threw used to take the whole trash with it (#9). */
+      let m: (Trashed & { docs: Record<string, Kept> }) | null;
+      try {
+        m = this.manifest(n);
+      } catch {
+        continue;
+      }
       if (!m) continue;
       const { docs: _docs, ...entry } = m;
       out.push(entry);
@@ -1501,7 +1908,7 @@ export class Vault {
         }
       }
     }
-    this.home.putDoc({
+    this.putRow({
       vault: this.id,
       id,
       path: file,
@@ -1616,27 +2023,43 @@ export class Vault {
   /**
    * Store an attachment under `name` — a file's name, extension and all — returning the name the vault
    * settled on, numbered before its extension when taken. Its id record is written as it is made.
+   *
+   * **The bytes may be a stream**, and are then never held whole: they go to a temp file beside the
+   * target, hashed as they pass, and are renamed into place once the last one is down. A stream that
+   * fails half-way leaves nothing but its error — the temp file is removed. The name is settled
+   * after the bytes are down, with nothing awaited between choosing a free name and taking it, so
+   * two uploads of one name at once are two files.
    */
   async putFile(
     name: string,
-    data: Uint8Array,
+    data: FileBytes,
     title: string | null,
     opts: { id?: string; created?: string } = {},
   ): Promise<string> {
     this.moves++;
     const asked = fileNameFrom(name, this.types);
     if (!asked) throw new Refused(`not a file name \`${name}\``);
-    const settled = uniqueFile(asked, (n) => this.taken(n));
-    const abs = this.writeAt(settled);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.${process.pid}.tmp`);
-    fs.writeFileSync(tmp, data);
-    moveFile(tmp, abs);
+    const dir = path.dirname(this.writeAt(asked));
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = path.join(dir, `.${path.basename(asked)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+    let settled: string;
+    let digest: string;
+    try {
+      if (data instanceof Uint8Array) {
+        fs.writeFileSync(tmp, data);
+        digest = digestOf(data);
+      } else digest = await streamInto(tmp, data);
+      settled = uniqueFile(asked, (n) => this.taken(n));
+      moveFile(tmp, this.writeAt(settled));
+    } catch (e) {
+      fs.rmSync(tmp, { force: true });
+      throw e;
+    }
     const taken = (x: string): boolean => !!this.home.docById(this.id, x);
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : mint(taken);
     const clean = title?.trim() || null;
     this.writeFileId(id, settled, clean);
-    this.home.putDoc({
+    this.putRow({
       vault: this.id,
       id,
       path: settled,
@@ -1645,16 +2068,32 @@ export class Vault {
       minted: 1,
       title: clean,
     });
-    this.home.set(this.digestKey(id), digestOf(data));
+    this.home.set(this.digestKey(id), digest);
     return settled;
   }
 
+  /** An attachment's bytes, whole. For a test or a small file: a route streams, with `fileStream`. */
   async getFile(name: string): Promise<Buffer | null> {
     try {
       return fs.readFileSync(this.abs(this.fileOf(name, "file")));
     } catch {
       return null;
     }
+  }
+
+  /**
+   * An attachment's bytes as a stream, from `start` to `end` inclusive (the whole file without them),
+   * read as they are sent — so a range of a large PDF reads only that range. `null` when it is not there.
+   */
+  fileStream(name: string, range?: { start: number; end: number }): Readable | null {
+    let abs: string;
+    try {
+      abs = this.abs(this.fileOf(name, "file"));
+    } catch {
+      return null;
+    }
+    if (!isFile(abs)) return null;
+    return fs.createReadStream(abs, range ? { start: range.start, end: range.end } : {});
   }
 
   async fileInfo(name: string): Promise<FileInfo | null> {
@@ -1677,9 +2116,9 @@ export class Vault {
     if (row.title === title) return;
     const next = { ...row, title, minted: 1 };
     this.writeFileId(row.id, row.path, title);
-    this.home.putDoc(next);
-    const bytes = await this.getFile(name);
-    this.emit({ type: "doc", kind: "file", name, sha1: bytes ? sha1(bytes) : null, title });
+    this.putRow(next);
+    const sum = await sha1File(this.abs(row.path)).catch(() => null);
+    this.emit({ type: "doc", kind: "file", name, sha1: sum, title });
   }
 
   // -- legacy pictures -------------------------------------------------------
@@ -1717,7 +2156,18 @@ export class Vault {
   // -- reading many ----------------------------------------------------------
 
   /**
-   * Every text, for the index, the corpus and the sweep: a board under its name, any other kind
+   * Each listed text's stamp — mtime, size, inode — as the kept listing last read it, by the key
+   * `texts` gives it: what lets `/__board/index` parse again only what changed without reading every
+   * text to find out (#280). `null` when nothing is kept (no watcher) or `tree` is not the kept one.
+   */
+  textStamps(tree: Tree): ReadonlyMap<string, string> | null {
+    const k = this.kept;
+    return k && k.tree === tree ? k.stamps : null;
+  }
+
+  /**
+   * Every text, for the sweep and relinking — `/index` and `/corpus` read theirs on the grammar's
+   * worker (`server/parsing.ts`, #287): a board under its name, any other kind
    * under `<name>.<kind>.md` so nothing mistakes one for a board, and the saved components under
    * `components/<name>`.
    */
@@ -1877,8 +2327,27 @@ export class Vault {
     }
   }
 
+  /**
+   * Start the watcher now rather than with the first listener, so the first listing can be kept and
+   * every one after it costs what changed (#280). `anydag serve` watches each vault it opens; the
+   * CLI's one-off server does not, and lists as it always did.
+   */
+  watch(): Promise<void> {
+    if (!this.stopping) this.stopping = this.startWatch();
+    return this.stopping.then(
+      () => undefined,
+      (e) => {
+        this.stopping = null;
+        throw e;
+      },
+    );
+  }
+
   /** End every feed on this vault — it is being closed. */
   async close(): Promise<void> {
+    this.watching = false;
+    this.kept = null;
+    this.dirty.clear();
     forgetVault(this.root);
     this.emit({ type: "gone" });
     this.listeners.clear();
@@ -1888,16 +2357,53 @@ export class Vault {
     if (stop) await (await stop.catch(() => async () => undefined))();
   }
 
-  private async startWatch(): Promise<() => Promise<void>> {
-    // Off this thread: on a big vault the walk alone is a pause every request would wait behind.
-    if (!this.present) {
-      const { docs } = await listVault(this.lister, this.types, true);
-      this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+  /**
+   * An attachment changed on disk: say so on the feed with the sha1 of its bytes, **read as a stream**
+   * — a large file copied in by hand is never held whole. The events a copy raises while it is being
+   * written are one read, done again once if another came in during it, and the change is said after
+   * the read rather than in the watcher's batch.
+   */
+  private hashThenSay(abs: string, rel: string, name: string): void {
+    if (this.hashing.has(abs)) {
+      this.hashing.set(abs, true);
+      return;
     }
-    const sub = await watcher.subscribe(
+    this.hashing.set(abs, false);
+    void (async () => {
+      for (;;) {
+        const sum = await sha1File(abs).catch(() => null);
+        if (this.hashing.get(abs)) {
+          this.hashing.set(abs, false);
+          continue;
+        }
+        this.hashing.delete(abs);
+        /* Gone meanwhile (its delete is its own event), or the vault was closed. */
+        if (sum === null || !this.stopping) return;
+        try {
+          const row = this.home.docByPath(this.id, rel);
+          this.emit({ type: "doc", kind: "file", name, sha1: sum, title: row?.title ?? null });
+        } catch {
+          /* the index closed under the read */
+        }
+        return;
+      }
+    })();
+  }
+
+  private async startWatch(): Promise<() => Promise<void>> {
+    let heard!: () => void;
+    this.hearing = new Promise((ok) => {
+      heard = ok;
+    });
+    const subscribing = watcher.subscribe(
       this.root,
       (err, events) => {
-        if (err) return;
+        // Events were dropped (a queue overflowed): what is kept may be missing some, so walk.
+        if (err) {
+          this.kept = null;
+          return;
+        }
+        if (this.watching) for (const ev of events) this.heard(this.rel(ev.path));
         if (this.rawListeners.size) {
           const rels = [...new Set(events.map((ev) => this.rel(ev.path)).filter(Boolean))];
           if (rels.length) {
@@ -1945,14 +2451,7 @@ export class Vault {
             continue;
           }
           if (found.kind === "file") {
-            let bytes: Buffer;
-            try {
-              bytes = fs.readFileSync(ev.path);
-            } catch {
-              continue;
-            }
-            const row = this.home.docByPath(this.id, rel);
-            this.emit({ type: "doc", kind: "file", name: found.name, sha1: sha1(bytes), title: row?.title ?? null });
+            this.hashThenSay(ev.path, rel, found.name);
             continue;
           }
           let text: string;
@@ -1976,6 +2475,19 @@ export class Vault {
       },
       { ignore: [".git", ".obsidian", ".trash", ".stversions", "node_modules", ".anydag/vault.json"] },
     );
+    let sub: Awaited<typeof subscribing>;
+    try {
+      sub = await subscribing;
+      this.watching = true;
+    } finally {
+      heard();
+    }
+    // Off this thread: on a big vault the walk alone is a pause every request would wait behind. A
+    // listing running or kept already says what is present.
+    if (!this.present && !this.listing && !this.kept) {
+      const { docs } = await listVault(this.lister, this.types, true);
+      this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+    }
     return async () => {
       try {
         await sub.unsubscribe();
@@ -1993,6 +2505,33 @@ const DAG_ID = /dag:([0-9a-z]{10})(?![0-9a-z])/g;
 const idsIn = (text: string): string[] => [...new Set([...text.matchAll(DAG_ID)].map((m) => m[1]!))];
 
 const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * How many new or changed texts the kept listing reads on this thread before it would rather walk
+ * off it: a folder of thousands copied in is a walk's work, a burst of saves is not.
+ */
+const REFRESH_MAX = 2000;
+/** Where attachments' records are: `.anydag/files/<id>.json`. */
+const RECORDS = ".anydag/files";
+/** How many moved paths may wait for the next listing before the kept one is dropped for a walk. */
+const DIRTY_MAX = 20_000;
+
+/** What `refresh` read of the folders and documents it looked at. */
+interface Reread {
+  /** Each folder looked at, as it is now. */
+  scanned: Map<string, Scanned>;
+  /** Each folder new since, walked whole. */
+  walked: Map<string, Walked>;
+  /** Each document looked at, by its file lowercased. */
+  found: Map<string, Found>;
+}
+
+const depthOf = (dir: string): number => (dir ? dir.split("/").length : 0);
+
+const mtimeOf = (abs: string): number | null => fs.statSync(abs, { throwIfNoEntry: false })?.mtimeMs ?? null;
+
+/** Whether two reads of one document say the same. */
+const sameFound = (a: Found, b: Found): boolean => a.front === b.front && a.size === b.size;
 
 /** How long a listing holds the thread before it hands it back — well under what a request notices. */
 const SLICE_MS = 8;
@@ -2116,4 +2655,51 @@ export function writeAtomic(file: string, text: string | Uint8Array): void {
 /** `${size}:${sha1}` of an attachment's bytes. */
 function digestOf(data: Uint8Array): string {
   return `${data.byteLength}:${sha1(data)}`;
+}
+
+/** Bytes to keep as an attachment: whole, or as they arrive. */
+export type FileBytes = Uint8Array | AsyncIterable<Uint8Array>;
+
+/** Write a stream of bytes to `file` (which must not exist), returning their `digestOf`. */
+async function streamInto(file: string, source: AsyncIterable<Uint8Array>): Promise<string> {
+  const hash = createHash("sha1");
+  let size = 0;
+  await pipeline(
+    source,
+    async function* (chunks: AsyncIterable<Uint8Array>) {
+      for await (const chunk of chunks) {
+        hash.update(chunk);
+        size += chunk.byteLength;
+        yield chunk;
+      }
+    },
+    fs.createWriteStream(file, { flags: "wx" }),
+  );
+  return `${size}:${hash.digest("hex")}`;
+}
+
+/** The sha1 of a file's bytes, read a chunk at a time and never held whole. */
+async function sha1File(file: string): Promise<string> {
+  const hash = createHash("sha1");
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+/** `digestOf` a file on disk, a megabyte at a time: the walk is synchronous, and a file may be large. */
+function digestFileSync(file: string): string {
+  const hash = createHash("sha1");
+  const buf = Buffer.allocUnsafe(1 << 20);
+  const fd = fs.openSync(file, "r");
+  let size = 0;
+  try {
+    for (;;) {
+      const n = fs.readSync(fd, buf, 0, buf.length, null);
+      if (!n) break;
+      hash.update(buf.subarray(0, n));
+      size += n;
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  return `${size}:${hash.digest("hex")}`;
 }
