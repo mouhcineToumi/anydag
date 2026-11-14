@@ -1,4 +1,5 @@
 import type { FileKind } from "@/board/useBoard";
+import { collation } from "@/locale";
 
 /**
  * What the board list and the sidebar know about a set of files, with no DOM in it.
@@ -65,7 +66,7 @@ export interface Tree {
 /* Numerically, so `round-2` comes before `round-10` rather than after `round-15`. Board names here
    are as often numbered as worded — `1-today`, `201-notes` — and a
    plain string sort scatters exactly the sets somebody made a folder for. */
-const by = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+const by = (a: string, b: string) => collation({ numeric: true }).compare(a, b);
 
 /**
  * The folders as they actually are: nested.

@@ -21,6 +21,7 @@ import {
   type GeneratedCard,
 } from "./generate";
 import { QuizMarkdown } from "./QuizMarkdown";
+import { collation } from "@/locale";
 
 const ICON = { size: 16, strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -43,7 +44,7 @@ async function listNotes(): Promise<NoteChoice[]> {
   const d = (await r.json()) as { notes?: string[]; titles?: Record<string, string> };
   return (d.notes ?? [])
     .map((name) => ({ name, label: d.titles?.[name] ? `${d.titles[name]} — ${name}` : name }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => collation().compare(a.label, b.label));
 }
 
 async function readNote(name: string): Promise<string> {

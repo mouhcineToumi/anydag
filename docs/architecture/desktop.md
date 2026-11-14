@@ -21,7 +21,7 @@ failed on both.
 |---|---|
 | `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, updates |
 | `desktop/forward.ts` | a page request sent on to the server over `node:http`, and let go of when the page lets go |
-| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key |
+| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the system's locale |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
 | `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
@@ -133,6 +133,15 @@ Sixteen things are load-bearing:
   Linux and Windows keep the system frame, and the browser has no bridge, so none of it applies.
   **Electron's drag region ignores what is drawn over it**: a scrim or a menu over the top 48px
   drags the window rather than taking the press, unless it is itself `no-drag`.
+- **Dates, times and sorting follow the system, not `navigator.language`** (#304). Chromium takes
+  the page's default locale from the locale pack it loads, and the app ships only the packs of the
+  languages it speaks (#302), so on a German system the page's default is `en-US`: a 12-hour clock,
+  month-first dates, English collation. The main process reads the system's own
+  (`app.getSystemLocale()`, which needs no pack), the preload hands it over as `locale`, and
+  `src/main.tsx` sets it in `src/locale.ts` before the first render. **A site that formats a date or
+  sorts words for a person passes `locale()` (or sorts with `collation()`) where it would pass
+  `undefined`**; one that names `"en"` does so because the words around it are English. The server
+  and the CLI never set it and keep Node's own.
 - **A load always names `index.html`.** `anydag://app/?x` canonicalises to a pathname of `//`, and
   the page's own `history.replaceState` then resolves to an address with no host, which Chromium
   refuses as another origin — the smoke run's `ready=never` before it was found.

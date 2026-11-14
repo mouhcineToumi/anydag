@@ -14,7 +14,7 @@ import { Session } from "../../server/context";
 import { Parsed } from "../../server/grammar";
 import type { Entry } from "../../server/parsing";
 import { type Tree, Vault } from "../../server/vault";
-import { BOARD, NOTE, PDF, makeEnv, sleep, sweepTemps, until, write, type Env } from "./helpers";
+import { BOARD, NOTE, PDF, makeEnv, sleep, sweepTemps, until, write, type Env, watchedFromTheStart } from "./helpers";
 
 let env: Env;
 beforeEach(async () => {
@@ -26,6 +26,14 @@ beforeEach(async () => {
   write(env.root, "work/deep/task.md", "---\ntitle: Ship\nstatus: todo\ndue: 2026-01-02\n---\n# Ship\n");
   write(env.root, "attachments/spec.pdf", PDF);
   write(env.root, "untitled.md", "no frontmatter at all\n");
+  /* Watched from the start (`ANYDAG_TEST_WATCH`), the vault began subscribing before these were
+     written, and a folder made while the watcher subscribes may never be watched: `work/` went unheard
+     on CI. Open the vault again over the files as they now are — once the first has let go of the
+     folder, since the watcher is one per folder and an unsubscribe still in flight takes it away. */
+  if (watchedFromTheStart) {
+    await env.vault.close();
+    env = env.reopen();
+  }
   await env.vault.watch();
   await env.vault.tree();
 });

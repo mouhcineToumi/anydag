@@ -39,6 +39,9 @@ export interface AnyDagDesktop {
   readonly pageKey: string | null;
   /** The `anydag` command the app wrote, by its absolute path; `null` when it wrote none. */
   readonly cli: string | null;
+  /** The system's locale (`de-DE`), which the page formats dates and sorts by; `null` when the
+   *  shell could not tell. Not `navigator.language`, which is the locale pack Chromium loaded. */
+  readonly locale: string | null;
   pickFolder(): Promise<string | null>;
   revealInFolder(target: string): Promise<void>;
   keys: AnyDagDesktopKeys;
@@ -57,9 +60,12 @@ const pageKey: string | null = ipcRenderer.sendSync("page:key") ?? null;
 
 const cli: string | null = ipcRenderer.sendSync("cli:path") ?? null;
 
+const locale: string | null = ipcRenderer.sendSync("system:locale") ?? null;
+
 const api: AnyDagDesktop = {
   pageKey,
   cli,
+  locale,
   pickFolder(): Promise<string | null> {
     return ipcRenderer.invoke("folders:pick");
   },
