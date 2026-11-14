@@ -25,7 +25,7 @@ long enough to read as hung, or that is refused.
 
 | Dimension | Works well up to | Degrades at | Breaks at |
 |---|---|---|---|
-| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 2.2 s; first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 0.5 s, re-run after every change; a 1,000-file folder takes 1.6 s to draw; server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder 6.7 s and 90k DOM elements; startup 6.4 s, with every request held behind the first listing |
+| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 1.2 s (2.2 s before #283); first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 0.5 s, re-run after every change; a 1,000-file folder takes 1.6 s to draw; server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder 6.7 s and 90k DOM elements; a cold `/index` holds every other request for 1.7 s |
 | **Board size** (items, one in ten a 6-node diagram) | **500** — 0.95 s to `data-dag-ready`, its renderer 285 MB | **2,000** — 5.7 s, its renderer 643 MB, 30k DOM elements | not reached at 2,000 |
 | **Diagram size** (`arch` nodes, ELK) | **200** — 0.9 s | **500** — 2.9 s | **1,000** — 8.3 s with nothing drawn until it is done |
 | **Attachment size** | **100 MB** — upload 0.26 s, read 0.17 s; the server peaks at 540 MB | **500 MB** — the server peaks at 1.6 GB and keeps it (#278) | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 5 ms |
@@ -33,8 +33,9 @@ long enough to read as hung, or that is refused.
 
 The vault limit is set by three things that scale with the vault rather than with what changed —
 search (#282, and #267's index), the listing and references index (#280), and the server's memory
-(#279) — the sidebar's tree (#281), and the first listing holding the server's thread at launch
-(#283). None of them is the disk.
+(#279) — and the sidebar's tree (#281). None of them is the disk. Startup no longer is one: since
+#283 the listing runs off the server's thread and a board is drawn in about the same time at every
+vault size (*Startup*).
 
 ### Memory, per process
 
@@ -90,22 +91,36 @@ change feed in 62–68 ms and costs the server 0.03–0.4 s of CPU at any vault 
 
 The desktop app (Electron on `desktop/dist/main.cjs`), from launch to its first window and to a
 20-item board drawn, on a fresh app home and then a second launch on the same one
-(`desktop.startup.*`):
+(`desktop.startup.*`), before #283 and after it:
 
 | Vault | First window | Board drawn, first launch | Board drawn, second launch |
 |---|---|---|---|
-| 100 files | 0.37 s | 0.97 s | 0.96 s |
-| 1,000 files | 0.36 s | 1.13 s | 1.12 s |
-| 10,000 files | 0.36 s | 2.15 s | 2.00 s |
-| 50,000 files | 0.36 s | **6.42 s** | **5.59 s** |
+| 100 files | 0.37 s | 0.97 s → 1.19 s † | 0.96 s → 1.08 s † |
+| 1,000 files | 0.36 s | 1.13 s → 1.02 s | 1.12 s → 1.27 s † |
+| 10,000 files | 0.36 s | 2.15 s → 1.25 s † | 2.00 s → 1.31 s † |
+| 50,000 files | 0.36 s | **6.42 s → 1.22 s** | **5.59 s → 1.08 s** |
 
-The window is the same at every size; what grows is after it. Each launch starts a new server, and
-its first `/__board/list` walks the whole vault **on the server's one thread**: on 50k files that is
-about 4 s in which every request waits — `/api/health` answered in 4.0 s and the board's own
-`/__board/get` in 4.0 s while it ran, against 3 ms and 1 ms alone (#283). The second launch is barely
-faster because nothing of the walk survives the process. In a browser on `anydag serve` the first
-page load, chunks and fonts included, is 0.54 s (`board.empty.first`), and the server is listening
-165 ms after it is spawned at every vault size.
+† measured with other benches running on the machine (a load average of 3 to 6): the first window,
+which nothing in #283 touches, took 0.41–0.62 s in those launches against 0.36 s, so these are up to
+0.25 s slow. The 1k and 50k first launches were run back to back with the commit before #283, which
+measured 1.16 s and 6.62 s in the same conditions.
+
+The window is the same at every size, and since #283 so is the board. Each launch starts a new
+server, and its first `/__board/list` walks the whole vault — 5.2 s on 50k files. **Before #283 it did
+so on the server's one thread**: every request waited, `/api/health` and the board's own `/__board/get`
+4–5.7 s against 3 ms and 1 ms alone, and the second launch was barely faster because nothing of the
+walk survives the process. Now the walk and the frontmatter reads are on a worker and the index is
+reconciled in 8 ms slices (`server.md`), and while the cold listing runs the slowest `/api/health` is
+17 ms and the slowest `/__board/get` 37 ms on 50k files (`desktop.startup.*.list.*`, asked back to
+back for as long as it runs — over 10,000 of each). The listing itself takes as long as it did; the
+sidebar fills in when it arrives. In a browser on `anydag serve` the first page load, chunks and fonts
+included, is 0.54 s (`board.empty.first`), and the server is listening 165 ms after it is spawned at
+every vault size.
+
+What still holds the thread at launch, measured on 50k files: a cold `/__board/index` 1.7 s (it reads
+every text on the server's thread to send to the grammar's worker; #280's ground), and a document with
+no `id:` opened by name on an app home that has never listed the vault, 5.7 s (its id is found by a
+walk on the thread). Neither is on the path the bench measures; each is its own issue.
 
 ### Disk
 
@@ -132,10 +147,10 @@ The Linux installer: the AppImage is 132 MiB; unpacked it is 314 MB, of which th
   figure `search.md` already records. #282 and #267's index are the fix.
 - **Lists at 10k files:** a 1,000-row folder is 18k DOM elements and 1.6 s to draw, a 5,000-row one
   90k and 6.7 s — #281.
-- **Time to first paint:** 0.36 s to a window at every vault size, and 1.1 s to a drawn board on 1k
-  files but 6.4 s on 50k (*Startup*). The update check runs after the window in a packaged build and
-  is off in a dev run, so it is not in the number; deferring work past the first paint (#267 item 6)
-  is not where the time goes — the first listing is (#283).
+- **Time to first paint:** 0.36 s to a window at every vault size, and about 1.1 s to a drawn board
+  at every size since #283 (6.4 s on 50k before it; *Startup*). The update check runs after the
+  window in a packaged build and is off in a dev run, so it is not in the number; deferring work past
+  the first paint (#267 item 6) is not where the time went — the first listing was (#283).
 
 ### Not measured
 
@@ -435,4 +450,39 @@ desktop.startup.50000.cold.first-window  358 ms            # first launch, fresh
 desktop.startup.50000.cold.ready         6417 ms           # launch to a 20-item board drawn, 50000-file vault
 desktop.startup.50000.warm.first-window  354 ms            # second launch, same app home
 desktop.startup.50000.warm.ready         5587 ms           # launch to a 20-item board drawn, 50000-file vault
+```
+
+After #283, `node scripts/bench.mjs --only desktop --sizes 1000,50000` and then `--sizes 100,10000`,
+2026-11-14, the machine above with other benches running on it (see *Startup*); the startup lines and
+the listing probe:
+
+```text
+desktop.startup.100.list.cold            139 ms            # anydag serve, fresh app home: the first /__board/list
+desktop.startup.100.list.health          38.1 ms           # the slowest /api/health of 35 asked while it ran
+desktop.startup.100.list.get             15.6 ms           # the slowest /__board/get of the board, of 35
+desktop.startup.100.cold.first-window    487 ms            # first launch, fresh app home
+desktop.startup.100.cold.ready           1194 ms           # launch to a 20-item board drawn, 100-file vault
+desktop.startup.100.warm.first-window    405 ms            # second launch, same app home
+desktop.startup.100.warm.ready           1078 ms           # launch to a 20-item board drawn, 100-file vault
+desktop.startup.1000.list.cold           254 ms            # anydag serve, fresh app home: the first /__board/list
+desktop.startup.1000.list.health         23.1 ms           # the slowest /api/health of 140 asked while it ran
+desktop.startup.1000.list.get            16 ms             # the slowest /__board/get of the board, of 140
+desktop.startup.1000.cold.first-window   376 ms            # first launch, fresh app home
+desktop.startup.1000.cold.ready          1019 ms           # launch to a 20-item board drawn, 1000-file vault
+desktop.startup.1000.warm.first-window   563 ms            # second launch, same app home
+desktop.startup.1000.warm.ready          1272 ms           # launch to a 20-item board drawn, 1000-file vault
+desktop.startup.10000.list.cold          1205 ms           # anydag serve, fresh app home: the first /__board/list
+desktop.startup.10000.list.health        11.4 ms           # the slowest /api/health of 1800 asked while it ran
+desktop.startup.10000.list.get           27.5 ms           # the slowest /__board/get of the board, of 1800
+desktop.startup.10000.cold.first-window  568 ms            # first launch, fresh app home
+desktop.startup.10000.cold.ready         1248 ms           # launch to a 20-item board drawn, 10000-file vault
+desktop.startup.10000.warm.first-window  621 ms            # second launch, same app home
+desktop.startup.10000.warm.ready         1310 ms           # launch to a 20-item board drawn, 10000-file vault
+desktop.startup.50000.list.cold          5555 ms           # anydag serve, fresh app home: the first /__board/list
+desktop.startup.50000.list.health        17.1 ms           # the slowest /api/health of 10215 asked while it ran
+desktop.startup.50000.list.get           37.1 ms           # the slowest /__board/get of the board, of 10215
+desktop.startup.50000.cold.first-window  539 ms            # first launch, fresh app home
+desktop.startup.50000.cold.ready         1217 ms           # launch to a 20-item board drawn, 50000-file vault
+desktop.startup.50000.warm.first-window  412 ms            # second launch, same app home
+desktop.startup.50000.warm.ready         1080 ms           # launch to a 20-item board drawn, 50000-file vault
 ```

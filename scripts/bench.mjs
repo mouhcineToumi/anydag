@@ -58,7 +58,10 @@
  *   idle CPU per process, and a request's cost through `anydag://` (`desktop/forward.ts`) against
  *   the same request straight to the server; then startup at every vault size, a first launch on a
  *   fresh app home and a second on the same one, to the first window and to a board drawn. Runs
- *   with a temp `HOME`, so the shim it writes on launch lands in the temp folder.
+ *   with a temp `HOME`, so the shim it writes on launch lands in the temp folder. Before each size's
+ *   launches, what waits behind the first listing (#283): `anydag serve` on the same vault and a
+ *   fresh app home, the slowest `/api/health` and `/__board/get` of the board asked back to back while
+ *   its cold `/__board/list` runs.
  *
  * **The guards** (`--guard`) are two cheap numbers the nightly holds: the server's idle CPU with the
  * change feed open on a 1k-file vault, and the time to `data-dag-ready` of a 200-node `arch`
@@ -1063,12 +1066,47 @@ async function launchDesktop(dir, id, appHome) {
   return { app, stop, win, firstWindow, ready: ready ?? "timeout", inPage };
 }
 
+/**
+ * What waits behind the first listing (#283): on `anydag serve` with a fresh app home, `/api/health`
+ * and the board's `/__board/get` asked back to back for as long as the cold `/__board/list` runs, and
+ * the slowest of each. Alone they take a millisecond or two; a listing that holds the server's thread
+ * holds them for as long as it runs.
+ */
+async function listProbe(dir, n) {
+  const home = path.join(work, `probe-home-${n}`);
+  const s = await startServer(dir, home, { page: false });
+  try {
+    let done = false;
+    const list = timedReq(s, "/__board/list").finally(() => {
+      done = true;
+    });
+    const health = [];
+    const get = [];
+    while (!done) {
+      const h = await timedReq(s, "/api/health");
+      if (typeof h.ms === "number") health.push(h.ms);
+      const g = await timedReq(s, "/__board/get?name=Bench");
+      if (typeof g.ms === "number") get.push(g.ms);
+    }
+    const l = await list;
+    const worst = (xs) => (xs.length ? Math.max(...xs) : null);
+    const p = `desktop.startup.${n}.list`;
+    record(`${p}.cold`, l.ms, "ms", "anydag serve, fresh app home: the first /__board/list");
+    record(`${p}.health`, worst(health), "ms", `the slowest /api/health of ${health.length} asked while it ran`);
+    record(`${p}.get`, worst(get), "ms", `the slowest /__board/get of the board, of ${get.length}`);
+  } finally {
+    await s.stop();
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+}
+
 /** Startup at each vault size: a first launch on a fresh app home, then a second on the same one. */
 async function desktopStartup() {
   for (const n of SIZES) {
     const dir = path.join(work, `vault-startup-${n}`);
     const v = makeVault(dir, n, 13);
     fs.writeFileSync(path.join(dir, "Bench.board.md"), boardText(rng(13), 20, "Bench"));
+    await listProbe(dir, n);
     const appHome = path.join(work, `startup-home-${n}`);
     for (const run of ["cold", "warm"]) {
       const d = await launchDesktop(dir, v.id, appHome);

@@ -6,6 +6,7 @@
   "entry": [
     "server/main.ts",
     "server/grammar-worker.ts",
+    "server/list-worker.ts",
     "cli/main.ts",
     "desktop/main.ts",
     "desktop/preload.ts",
