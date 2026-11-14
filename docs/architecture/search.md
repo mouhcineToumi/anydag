@@ -63,13 +63,15 @@ Seven things are load-bearing:
   debounce — at most one wait after the *first* change — so the index is kept updated
   on edit. Both routes read the vault through one listing, so they cannot
   disagree about what it holds.
-- **Only a text that changed is parsed again.** The `Parsed` cache in `server/grammar.ts` keeps each
-  document's units against the sha1 of the text they came from and parses the rest. `/patch` runs in
-  the server's own process too, so an uncached whole-vault parse after every change is a pause every
-  drag then queues behind (measured: a 5 ms `/diagnostics` took 390 ms while
-  four of them ran, and 5 ms again with the cache). The reading of every text on each call is still
-  `/index`'s cost and limit: right for tens of documents, the thing to replace with an index kept
-  on write at thousands.
+- **Only a text that changed is parsed again, and only a file whose stat moved is read again.** The
+  `Parsed` cache in `server/grammar.ts` keeps each document's units against the sha1 of the text they
+  came from and parses the rest. `/patch` runs in the server's own process too, so an uncached
+  whole-vault parse after every change is a pause every drag then queues behind (measured: a 5 ms
+  `/diagnostics` took 390 ms while four of them ran, and 5 ms again with the cache). The texts are
+  read where they are parsed (`server/parsing.ts`): a `Reader` stats each file and reads one only when
+  its modified time, change time, size or inode moved. A warm `/index` still stats every file and
+  answers every document, 3 s on 50,000 files — off the server's thread, but the thing to replace
+  with an index kept on write (#280).
 - **A whole-vault parse is on a thread of its own** (`server/grammar-worker.ts`). `/index`,
   `/corpus` and `/search` go to a worker; everything else stays inline, being quick. Measured on
   5,000 notes, a cold `/index` is 14 s of parsing, and on the server's one thread it was every
@@ -77,6 +79,15 @@ Seven things are load-bearing:
   worker is built beside each bundle (`server/build.mjs`, `cli/build.mjs`), and where there is none
   (the unit suite, or `ANYDAG_GRAMMAR_INLINE=1`) the calls run inline. `Parsed.of` runs one call at
   a time, so two cold asks parse once, and its `generation` moves only when its answer does.
+- **No text crosses to the server's thread, and nothing on it takes long** (#287). The server
+  reading every text with `readFileSync` and posting the map to the worker held every request for
+  1.9 s on 50,000 files; now the server's thread sends the worker the names (in parts of 2,000), the
+  worker reads, parses and keeps what it made of each, and sends back only what changed, in parts
+  each asked for once the last was read. The route's own loops — the wiki index (`wikiIndexer`), the
+  answer, the corpus's version hash — run in 8 ms slices (`server/pace.ts`), and the answer is
+  streamed a doc at a time rather than `JSON.stringify`d whole: the corpus of 50,000 notes is 140 MB
+  of JSON. While a cold or warm `/index` runs on 50,000 files the slowest `/api/health` is 35 ms
+  (`vault.*.index.*.health` in `scripts/bench.mjs`).
 - **A search keeps its engine.** Building MiniSearch is the cost, 3 s over 5,000 notes, and the
   query is not. `corpusOf` names the corpus with a `version` (the vault, the parse's `generation` and
   the names and titles), and `/search` sends the docs to the grammar once per version. After that it

@@ -37,8 +37,9 @@
  * **What is measured, and how.**
  * - *vault.<n>*: the server started on a vault of n files (90% notes, 4% tasks among them, boards,
  *   tables, quizzes and small attachments, in folders of 50 plus a flat `inbox/` holding a tenth):
- *   time to listen, the first and a warm `GET /__board/list`, `/index`, a cold and a warm
- *   `/search`, the server's RSS, the app home's size, idle CPU with the change feed open, and a burst
+ *   time to listen, the first and a warm `GET /__board/list`, a cold and a warm `/index` with the
+ *   slowest `/api/health` asked back to back while each ran (#287), a cold and a warm `/search`, a
+ *   warm `/corpus` with the same probe, the server's RSS, the app home's size, idle CPU with the change feed open, and a burst
  *   of 200 external writes (CPU, events heard, time to quiet). And that opening wrote nothing: every
  *   file's size and mtime before and after, `.anydag/` included (the vault is generated with its id).
  * - *page.<n>*: the built page in Chromium on the same vault: a note in `inbox/` opened to
@@ -542,6 +543,27 @@ async function timedReq(s, p, init) {
 }
 
 /**
+ * A request, with `/api/health` asked back to back for as long as it runs (#287): `health` is the
+ * slowest of those. Alone one takes a millisecond or two; a request that holds the server's thread
+ * holds them for as long as it does.
+ */
+async function beside(s, p) {
+  let done = false;
+  const r = timedReq(s, p).finally(() => {
+    done = true;
+  });
+  let worst = null;
+  let asked = 0;
+  do {
+    const h = await timedReq(s, "/api/health");
+    if (typeof h.ms !== "number") continue;
+    asked++;
+    worst = Math.max(worst ?? 0, h.ms);
+  } while (!done);
+  return { ...(await r), health: worst, asked };
+}
+
+/**
  * The change feed, held open the way a page holds it, so the watcher runs. Resolves once the stream
  * has said it is open; `events` counts what it has said since.
  */
@@ -662,12 +684,17 @@ async function vaultGroup(n, b) {
   record(`${p}.list.cold`, list1.ms, "ms", `${mb(list1.bytes)?.toFixed(1)} MB answer; walks the vault and fills the index`);
   const list2 = await timedReq(s, "/__board/list");
   record(`${p}.list.warm`, list2.ms, "ms");
-  const idx1 = await timedReq(s, "/__board/index");
+  const idx1 = await beside(s, "/__board/index");
   record(`${p}.index.cold`, idx1.ms, "ms", "every text parsed in the grammar worker");
-  const idx2 = await timedReq(s, "/__board/index");
+  record(`${p}.index.cold.health`, idx1.health, "ms", `the slowest /api/health of ${idx1.asked} asked while it ran`);
+  const idx2 = await beside(s, "/__board/index");
   record(`${p}.index.warm`, idx2.ms, "ms");
+  record(`${p}.index.warm.health`, idx2.health, "ms", `the slowest /api/health of ${idx2.asked} asked while it ran`);
   const s1 = await timedReq(s, "/__board/search?q=ledger");
   record(`${p}.search.cold`, s1.ms, "ms", "corpus parsed, engine built");
+  const corpus = await beside(s, "/__board/corpus");
+  record(`${p}.corpus.warm`, corpus.ms, "ms", `${mb(corpus.bytes)?.toFixed(1)} MB answer`);
+  record(`${p}.corpus.warm.health`, corpus.health, "ms", `the slowest /api/health of ${corpus.asked} asked while it ran`);
   const warm = [];
   for (const q of ["harbour sett", "milestone", "queue worker", "zzzz"]) {
     const r = await timedReq(s, `/__board/search?q=${encodeURIComponent(q)}`);

@@ -10,6 +10,7 @@
  * - **Ids are in the files** (decision 5); `vault.ident` mints one lazily when somebody asks.
  */
 
+import { createHash } from "node:crypto";
 import { setImmediate as yieldNow } from "node:timers/promises";
 
 import type { Context, Hono } from "hono";
@@ -20,15 +21,17 @@ import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
 import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
-import type { WikiCandidate } from "../../src/refs/wikilinks";
+import { type WikiCandidate, wikiIndexer } from "../../src/refs/wikilinks";
 import type { Session } from "../context";
 import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../frontmatter";
 import { OPS_SHAPE } from "../handle";
-import { grammar, type Parsed } from "../grammar";
+import { type Doc, grammar, type Parsed } from "../grammar";
+import type { Entry } from "../parsing";
 import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
+import { paced, SLICE_MS } from "../pace";
 import { mimeOf } from "../uploads";
-import { Conflict, NotFound, Refused, byKind, sha1, textKey, type Tree } from "../vault";
+import { Conflict, NotFound, Refused, byKind, textKey, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
 import { readPrefs } from "./prefs";
 import { relinking } from "../relink";
@@ -47,22 +50,28 @@ interface Listed {
   name: string;
   kind: TextKind;
   id: string;
-  text: string;
 }
 
-/** Every listed text with its text, keyed the way `Vault.texts` keys them. Components are not listed. */
-async function listed(s: Session, tree: Tree): Promise<Listed[]> {
-  const texts = await s.vault.texts(tree);
-  const out: Listed[] = [];
+/**
+ * Every listed text with an id, keyed the way `Vault.texts` keys them, and what `parsed` made of
+ * each that could be read — read where the grammar runs, so no text is read on this thread (#287).
+ * Components are not listed.
+ */
+async function listed(tree: Tree, parsed: Parsed): Promise<{ docs: Listed[]; found: ReadonlyMap<string, Doc | null> }> {
+  const all: Listed[] = [];
   for (const kind of ["board", "note", "quiz", "table"] as const) {
     for (const name of byKind(tree)[kind]) {
-      const key = textKey(name, kind);
-      const text = texts[key];
       const id = tree.ids[name];
-      if (text !== undefined && id) out.push({ key, name, kind, id, text });
+      if (id) all.push({ key: textKey(name, kind), name, kind, id });
     }
   }
-  return out.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  all.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const found = await parsed.of(all.map((d): Entry => [d.key, d.name, d.kind]));
+  const docs: Listed[] = [];
+  await paced(all, (d) => {
+    if (found.has(d.key)) docs.push(d);
+  });
+  return { docs, found };
 }
 
 function fileDocs(tree: Tree) {
@@ -90,36 +99,37 @@ interface IndexDoc {
 /** Every document with what it says about itself and its references, each `[[wikilink]]` resolved. */
 async function indexDocs(s: Session): Promise<IndexDoc[]> {
   const tree = await s.vault.tree();
-  const docs = await listed(s, tree);
-  const found = await s.index.of(Object.fromEntries(docs.map((d) => [d.key, d.text])));
+  const { docs, found } = await listed(tree, s.index);
   const files = fileDocs(tree);
   // A `[[wikilink]]` names a document by name (decision 7): which one is the vault's answer now.
-  const named: WikiCandidate[] = [
-    ...docs.map((d) => ({
+  // Every document, then every attachment: built in slices, as is everything below (#287).
+  const named = wikiIndexer<WikiCandidate>();
+  await paced(docs, (d) =>
+    named.add({
       id: d.id,
       name: d.name,
       kind: d.kind,
-      title: (found[d.key]?.title as string | undefined) ?? tree.titles[d.name] ?? null,
-    })),
-    ...files,
-  ];
-  return [
-    ...docs.map((d) => {
-      const f = found[d.key] ?? {};
-      return {
-        id: d.id,
-        name: d.name,
-        kind: d.kind,
-        title: (f.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
-        task: f.task ?? null,
-        project: f.project ?? null,
-        event: f.event ?? null,
-        questions: f.questions ?? null,
-        refs: resolveWikiRefs((f.refs as Ref[] | undefined) ?? [], named),
-      };
+      title: (found.get(d.key)?.title as string | undefined) ?? tree.titles[d.name] ?? null,
     }),
-    ...files,
-  ];
+  );
+  await paced(files, (f) => named.add(f));
+  const out: IndexDoc[] = [];
+  await paced(docs, (d) => {
+    const f = found.get(d.key) ?? {};
+    out.push({
+      id: d.id,
+      name: d.name,
+      kind: d.kind,
+      title: (f.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
+      task: f.task ?? null,
+      project: f.project ?? null,
+      event: f.event ?? null,
+      questions: f.questions ?? null,
+      refs: resolveWikiRefs((f.refs as Ref[] | undefined) ?? [], named),
+    });
+  });
+  for (const f of files) out.push(f);
+  return out;
 }
 
 /** The corpus: every text cut into the units a search opens onto, and every attachment by its names. */
@@ -133,32 +143,38 @@ const corpora = new WeakMap<Parsed, { key: string; version: string; docs: Record
 
 async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
   const tree = await s.vault.tree();
-  const docs = await listed(s, tree);
   const parsed = s.corpus;
-  const found = await parsed.of(Object.fromEntries(docs.map((d) => [d.key, d.text])));
-  const out = [
-    ...docs.map((d) => ({
+  const { docs, found } = await listed(tree, parsed);
+  const out: Record<string, unknown>[] = [];
+  await paced(docs, (d) =>
+    out.push({
       id: d.id,
       name: d.name,
       kind: d.kind,
-      title: (found[d.key]?.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
-      units: (found[d.key]?.units as unknown[] | undefined) ?? [],
-    })),
-    ...tree.files
-      .filter((n) => tree.ids[n])
-      .map((n) => {
-        const title = tree.titles[n] ?? null;
-        return {
-          id: tree.ids[n],
-          name: n,
-          kind: "file",
-          title,
-          units: [...(title ? [{ what: "title", text: title }] : []), { what: "file", text: leafOf(n) }],
-        };
-      }),
-  ];
-  // The units are the parse's, and `generation` says when those moved; the rest is names and titles.
-  const key = `${parsed.generation}:${sha1(JSON.stringify(out.map((d) => [d.id, d.name, d.kind, d.title])))}`;
+      title: (found.get(d.key)?.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
+      units: (found.get(d.key)?.units as unknown[] | undefined) ?? [],
+    }),
+  );
+  for (const n of tree.files) {
+    if (!tree.ids[n]) continue;
+    const title = tree.titles[n] ?? null;
+    out.push({
+      id: tree.ids[n],
+      name: n,
+      kind: "file",
+      title,
+      units: [...(title ? [{ what: "title", text: title }] : []), { what: "file", text: leafOf(n) }],
+    });
+  }
+  /* The units are the parse's, and `generation` says when those moved; the rest is names and titles —
+     the sha1 of `[[id, name, kind, title], …]` as JSON, hashed a doc at a time. */
+  const hash = createHash("sha1").update("[");
+  let first = true;
+  await paced(out, (d) => {
+    hash.update(`${first ? "" : ","}${JSON.stringify([d.id, d.name, d.kind, d.title])}`);
+    first = false;
+  });
+  const key = `${parsed.generation}:${hash.update("]").digest("hex")}`;
   const had = corpora.get(parsed);
   if (had?.key === key) return had;
   const now = { key, version: `${s.vault.id}:${key}`, docs: out };
@@ -199,6 +215,38 @@ async function jsonPaced(c: Context, body: Record<string, unknown>): Promise<Res
   return c.body(`{${parts.join(",")}}`, 200, { "content-type": "application/json" });
 }
 
+/** About how much text an answer is written in at a time. */
+const CHUNK = 256 * 1024;
+
+/**
+ * `c.json({ docs })`, written a doc at a time and streamed, the thread handed back between slices:
+ * on 50,000 files the index is 12 MB of JSON and the corpus 140 MB, and as one `JSON.stringify` and
+ * one encoding of it that was every other request waiting for seconds (#287). The text is the same.
+ */
+function jsonDocs(c: Context, docs: readonly unknown[]): Response {
+  const enc = new TextEncoder();
+  let i = 0;
+  let opened = false;
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(ctl) {
+      // A turn for whatever else is waiting on the thread, the requests that would have waited.
+      await yieldNow();
+      const until = performance.now() + SLICE_MS;
+      let out = opened ? "" : '{"docs":[';
+      opened = true;
+      while (i < docs.length && out.length < CHUNK && performance.now() < until)
+        out += (i ? "," : "") + JSON.stringify(docs[i++]);
+      if (i < docs.length) {
+        ctl.enqueue(enc.encode(out));
+        return;
+      }
+      ctl.enqueue(enc.encode(`${out}]}`));
+      ctl.close();
+    },
+  });
+  return c.body(stream, 200, { "content-type": "application/json" });
+}
+
 /** The largest draft `POST /__board/diagnostics` will read. */
 const DRAFT_MAX = 4 * 1024 * 1024;
 
@@ -231,7 +279,7 @@ export function docRoutes(app: Hono, s: Session): void {
     return c.json({ name, id: await s.vault.peekId(name, kind), text: v.text, base: v.base });
   });
 
-  app.get("/__board/index", async (c) => c.json({ docs: await indexDocs(s) }));
+  app.get("/__board/index", async (c) => jsonDocs(c, await indexDocs(s)));
 
   /* One document's references out, each with what it names, and its backlinks — the index read for
      one name, so a client asking about one document is not sent every document's. */
@@ -253,7 +301,7 @@ export function docRoutes(app: Hono, s: Session): void {
     });
   });
 
-  app.get("/__board/corpus", async (c) => c.json({ docs: await corpusDocs(s) }));
+  app.get("/__board/corpus", async (c) => jsonDocs(c, await corpusDocs(s)));
 
   app.get("/__board/search", async (c) => {
     const q = c.req.query("q") ?? "";

@@ -16,7 +16,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
 
-import { Parsed, grammar } from "./grammar";
+import { Parsed } from "./grammar";
 import type { Home } from "./home";
 import { err } from "./http";
 import { Practice } from "./practice";
@@ -151,8 +151,8 @@ export class Session {
     }
     const at: Open = {
       vault,
-      index: new Parsed(grammar.index),
-      corpus: new Parsed(grammar.corpus),
+      index: new Parsed("index", vault.root),
+      corpus: new Parsed("corpus", vault.root),
       practice: new Practice(this.home, vault.id),
     };
     this.open.set(vault.id, at);
@@ -241,6 +241,8 @@ export class Session {
       this.defaultId = last?.id ?? null;
     }
     await this.sync.closed(id);
+    at.index.forget();
+    at.corpus.forget();
     await at.vault.close();
   }
 
@@ -260,6 +262,8 @@ export class Session {
     const wasDefault = this.defaultId === oldId;
     this.open.delete(oldId);
     await this.sync.closed(oldId);
+    at.index.forget();
+    at.corpus.forget();
     await at.vault.close();
     this.home.rekeyVault(oldId, newId);
     this.sync.moved(oldId, newId);
