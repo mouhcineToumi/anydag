@@ -11,6 +11,7 @@
  * No browser, no React, no `@/` aliases: the local server imports this through `src/refs/extract.ts`.
  */
 import { parse as parseYaml } from "yaml";
+import { collation } from "../locale";
 
 /** The three a task can be, in the order work moves through them — the Tasks page's columns. */
 export const STATUSES = ["todo", "in-progress", "done"] as const;
@@ -105,7 +106,7 @@ export function compareTasks(a: { task: Task; title: string }, b: { task: Task; 
   return (
     RANK[a.task.status] - RANK[b.task.status] ||
     (a.task.due ?? "9999-99-99").localeCompare(b.task.due ?? "9999-99-99") ||
-    a.title.localeCompare(b.title, undefined, { numeric: true })
+    collation({ numeric: true }).compare(a.title, b.title)
   );
 }
 

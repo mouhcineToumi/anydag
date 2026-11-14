@@ -17,6 +17,7 @@ import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 import { startDrag } from "./pointerDrag";
 import { ProjectChip } from "./ProjectBar";
 import { DueLabel, StatusButton, TaskGlyph } from "./TaskGlyph";
+import { collation } from "@/locale";
 
 /**
  * The Tasks page: every note that is a task, as a list or as a board.
@@ -125,7 +126,7 @@ export function TasksView({
         .sort(
           (a, b) =>
             Number(a.project.status === "done") - Number(b.project.status === "done") ||
-            a.title.localeCompare(b.title, undefined, { numeric: true }),
+            collation({ numeric: true }).compare(a.title, b.title),
         ),
     [owners, list.projects, list.titles],
   );
