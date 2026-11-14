@@ -11,6 +11,7 @@ import { withVault } from "@/vault/current";
 import { refuseLocked, useLocked } from "../lock";
 
 import { Fact, Facts, Field, Group, Hint, ICON } from "./common";
+import { locale } from "@/locale";
 
 const say = (e: unknown): string => (e instanceof SyncError ? e.message : "It could not be done. Try again.");
 
@@ -456,7 +457,7 @@ function syncTone(s: SyncStatus): "ok" | "busy" | "warn" | "off" {
 function when(iso: string | null): string {
   if (!iso) return "never";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(locale());
 }
 
 function Linked({ status, locked }: { status: SyncStatus; locked: boolean }) {

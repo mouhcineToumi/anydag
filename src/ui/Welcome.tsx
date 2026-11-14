@@ -28,6 +28,7 @@ import { Logo } from "./Logo";
 import { readRecent } from "./recents";
 import { leaf } from "./tree";
 import { CreateVaultForm, OpenFolderForm, RecentVaults, pickFolder, enterPath } from "./Vaults";
+import { collation } from "@/locale";
 
 /** Lucide at one size and weight, stated once. */
 const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -142,8 +143,7 @@ export function Welcome({
       .filter(([, task]) => task.status !== "done" && task.due !== undefined && task.due <= end)
       .map(([name, task]) => ({ name, task, title: list.titles[name] ?? leaf(name) }))
       .sort(
-        (a, b) =>
-          (a.task.due ?? "").localeCompare(b.task.due ?? "") || a.title.localeCompare(b.title, undefined, { numeric: true }),
+        (a, b) => (a.task.due ?? "").localeCompare(b.task.due ?? "") || collation({ numeric: true }).compare(a.title, b.title),
       );
   }, [list]);
 

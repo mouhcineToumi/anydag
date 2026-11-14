@@ -20,6 +20,7 @@
 import { dayOf, isDay, momentOf, timeOf, type NoteEvent } from "../note/event";
 import type { Task } from "../note/task";
 import { currentZone, instantOf, utc, wallOf } from "../note/zone";
+import { collation } from "../locale";
 
 /** The three things a calendar holds, in the order the toggles read. */
 export const CAL_KINDS = ["task", "event", "note"] as const;
@@ -212,7 +213,7 @@ export function itemsOf(
       daysBetween(b.first, b.last) - daysBetween(a.first, a.last) ||
       RANK[a.kind] - RANK[b.kind] ||
       (a.at?.start ?? 0) - (b.at?.start ?? 0) ||
-      a.title.localeCompare(b.title, undefined, { numeric: true }),
+      collation({ numeric: true }).compare(a.title, b.title),
   );
 }
 
