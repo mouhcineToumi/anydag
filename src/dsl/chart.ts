@@ -50,6 +50,23 @@ import { Cursor, tokenize, type LexError, type Token } from "./tokenizer";
  * only `parseWith` and `parseSequence` do.
  */
 
+/**
+ * The largest number a chart draws, either way of zero. Below 2⁵³ every whole number is exact, and
+ * a stack of a thousand of these still adds up to a finite one; past it, `1e308 + 1e308` is
+ * `Infinity` and a scale over it is not a scale. A larger number is `E_CHART_RANGE` and a gap.
+ */
+const CHART_LARGEST = 1e15;
+
+/**
+ * The narrowest a pinned scale may be, as a fraction of its own magnitude. A step a thousandth of
+ * this is still many units in the last place of the numbers it is added to, so every tick is a new
+ * number; `min 1e14` and `max 100000000000000.01` is narrower, and was a loop that never ended.
+ */
+const FINEST_SPAN = 1e-12;
+
+/** Whether `n` is a number a chart can draw. */
+const drawable = (n: number): boolean => Math.abs(n) <= CHART_LARGEST;
+
 /** The four shapes, and the closed set `E_UNKNOWN_KIND` and the panel's Form select both read. */
 export const FORMS = ["bar", "line", "pie", "donut"] as const;
 export type ChartForm = (typeof FORMS)[number];
@@ -225,6 +242,8 @@ export function parseChart(src: string): ChartModel {
   let formLine = 0;
   /** Series and slices share one id namespace: both are things a board link can end on. */
   const seen = new Map<string, number>();
+  /** The line each pin was written on, for a diagnostic about the pair. */
+  const pinnedAt: { min?: number; max?: number } = {};
 
   /** Consume the rest of the statement, saying so if there was any of it left. */
   const endStatement = (): void => {
@@ -357,6 +376,17 @@ export function parseChart(src: string): ChartModel {
           continue;
         }
         const n = Number(w.value);
+        if (Number.isFinite(n) && !drawable(n)) {
+          values.push(null);
+          push({
+            line: w.line,
+            col: w.col,
+            code: CODES.E_CHART_RANGE,
+            message: `\`${w.value}\` is too large to draw: a chart takes numbers up to ${CHART_LARGEST} either way. Scale it and say so with \`unit\``,
+            severity: "error",
+          });
+          continue;
+        }
         if (Number.isFinite(n)) {
           values.push(n);
           continue;
@@ -462,8 +492,17 @@ export function parseChart(src: string): ChartModel {
       cur.next();
       const v = cur.eat("word");
       const n = v ? Number(v.value) : Number.NaN;
-      if (v && Number.isFinite(n)) model[head] = n;
-      else {
+      if (v && Number.isFinite(n) && !drawable(n)) {
+        push({
+          line: t.line,
+          code: CODES.E_CHART_RANGE,
+          message: `\`${head} ${v.value}\` is too large to draw: a chart takes numbers up to ${CHART_LARGEST} either way`,
+          severity: "error",
+        });
+      } else if (v && Number.isFinite(n)) {
+        model[head] = n;
+        pinnedAt[head] = t.line;
+      } else {
         push({
           line: t.line,
           code: CODES.E_CHART_VALUE,
@@ -515,6 +554,36 @@ export function parseChart(src: string): ChartModel {
     });
     if (short) while (s.values.length < n) s.values.push(null);
     else s.values.length = n;
+  }
+
+  /*
+   * A pinned scale narrower than its numbers can resolve. The domain is the one `layoutChart` draws
+   * a bar or line over — the values, zero unless a line pinned its `min`, and the pins over both —
+   * read without stacking, whose totals only ever widen it. Both pins go: either one alone may be
+   * fine, and which of them the author meant is not this layer's guess.
+   */
+  if (model.min !== undefined || model.max !== undefined) {
+    let lo = Number.POSITIVE_INFINITY;
+    let hi = Number.NEGATIVE_INFINITY;
+    for (const v of [...model.series.flatMap((s) => s.values), ...model.slices.map((s) => s.value)]) {
+      if (v === null) continue;
+      lo = Math.min(lo, v);
+      hi = Math.max(hi, v);
+    }
+    if (lo > hi) [lo, hi] = [0, 1];
+    if (model.form === "bar" || model.stacked || model.min === undefined) [lo, hi] = [Math.min(lo, 0), Math.max(hi, 0)];
+    if (model.min !== undefined) lo = model.min;
+    if (model.max !== undefined) hi = model.max;
+    if (hi > lo && hi - lo < Math.max(Math.abs(lo), Math.abs(hi)) * FINEST_SPAN) {
+      push({
+        line: pinnedAt.min ?? pinnedAt.max ?? 1,
+        code: CODES.E_CHART_RANGE,
+        message: `the scale from ${lo} to ${hi} is too narrow to draw at that size: widen \`min\` and \`max\`, or subtract a baseline from the values`,
+        severity: "error",
+      });
+      delete model.min;
+      delete model.max;
+    }
   }
 
   if (model.series.length === 0 && model.slices.length === 0) {
