@@ -83,9 +83,56 @@ export interface HttpOptions {
   retries?: number;
   /** Milliseconds before the first retry; doubled each time. */
   backoff?: number;
+  /** The most of an answer read, in bytes; `REPLY_MAX` unless a test says less. */
+  replyMax?: { json: number; blob: number };
 }
 
 const enc = encodeURIComponent;
+
+/**
+ * The most this client reads of an answer (#9). A page of `changes` or `heads` is a thousand rows of
+ * a few hundred bytes; a blob is one file, sealed. A server that answers more — or keeps a body
+ * open — is refused at the bound rather than read into memory until the process runs out.
+ */
+const REPLY_MAX = { json: 64 * 1024 * 1024, blob: 1024 * 1024 * 1024 };
+
+/** The body of `res`, at most `max` bytes of it: past that the read stops and the request fails. */
+async function bounded(res: Response, max: number, what: string): Promise<Uint8Array> {
+  const said = Number(res.headers.get("content-length"));
+  const over = () =>
+    new SyncError(
+      res.status,
+      "ES_TOO_LARGE",
+      `${what}: the sync server answered more than ${max} bytes, which this AnyDag will not read`,
+    );
+  if (Number.isFinite(said) && said > max) {
+    await res.body?.cancel().catch(() => undefined);
+    throw over();
+  }
+  if (!res.body) return new Uint8Array();
+  const reader = res.body.getReader();
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => undefined);
+      throw over();
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return out;
+}
+
+const decoder = new TextDecoder();
 
 export class HttpSyncApi implements SyncApi {
   private readonly base: string;
@@ -93,6 +140,7 @@ export class HttpSyncApi implements SyncApi {
   private readonly fetcher: typeof fetch;
   private readonly retries: number;
   private readonly backoff: number;
+  private readonly replyMax: { json: number; blob: number };
 
   constructor(opts: HttpOptions) {
     this.base = opts.url.replace(/\/+$/, "");
@@ -100,6 +148,7 @@ export class HttpSyncApi implements SyncApi {
     this.fetcher = opts.fetch ?? fetch;
     this.retries = opts.retries ?? 2;
     this.backoff = opts.backoff ?? 250;
+    this.replyMax = opts.replyMax ?? REPLY_MAX;
   }
 
   /** One request, retried while it gets no answer; an answer that is not 2xx throws its code. */
@@ -132,7 +181,10 @@ export class HttpSyncApi implements SyncApi {
         this.sameProtocol(res, method, route);
         return res;
       }
-      const text = await res.text().catch(() => "");
+      // A refusal is a sentence: what passes the bound of one is not one.
+      const text = await bounded(res, this.replyMax.json, `${method} ${route}`)
+        .then((b) => decoder.decode(b))
+        .catch(() => "");
       let parsed: ErrorBody | undefined;
       try {
         const j = JSON.parse(text) as Partial<ErrorBody>;
@@ -175,7 +227,7 @@ export class HttpSyncApi implements SyncApi {
 
   private async json<T>(method: string, route: string, body?: unknown): Promise<T> {
     const res = await this.send(method, route, body);
-    return (await res.json()) as T;
+    return JSON.parse(decoder.decode(await bounded(res, this.replyMax.json, `${method} ${route}`))) as T;
   }
 
   health(): Promise<Health> {
@@ -223,14 +275,16 @@ export class HttpSyncApi implements SyncApi {
   }
 
   async putBlob(vault: string, id: string, bytes: Uint8Array): Promise<number> {
-    const res = await this.send("PUT", `/v1/vaults/${enc(vault)}/blobs/${enc(id)}`, undefined, bytes);
-    const j = (await res.json()) as { size?: number };
+    const route = `/v1/vaults/${enc(vault)}/blobs/${enc(id)}`;
+    const res = await this.send("PUT", route, undefined, bytes);
+    const j = JSON.parse(decoder.decode(await bounded(res, this.replyMax.json, `PUT ${route}`))) as { size?: number };
     return typeof j.size === "number" ? j.size : bytes.byteLength;
   }
 
   async getBlob(vault: string, id: string): Promise<Uint8Array> {
-    const res = await this.send("GET", `/v1/vaults/${enc(vault)}/blobs/${enc(id)}`);
-    return new Uint8Array(await res.arrayBuffer());
+    const route = `/v1/vaults/${enc(vault)}/blobs/${enc(id)}`;
+    const res = await this.send("GET", route);
+    return bounded(res, this.replyMax.blob, `GET ${route}`);
   }
 
   commit(vault: string, changes: Change[]): Promise<CommitResponse> {

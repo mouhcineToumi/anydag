@@ -46,9 +46,11 @@ import { SyncLoop, TUNE, type First, type Pairing, type Tune } from "./loop";
 import { SyncState } from "./state";
 import type { SyncDevices, SyncLinked, SyncLinkRequest, SyncPaired, SyncPairRequest, SyncRemotes, SyncStatus } from "./types";
 
-/** What linking needs of the session: re-keying a vault onto a remote's id. */
+/** What linking needs of the session: re-keying a vault onto a remote's id, and the ids it knows. */
 export interface Rekeys {
   rekeyVault(oldId: string, newId: string): Promise<Vault>;
+  /** Whether `id` is a vault this machine has: open, or on the recent list. */
+  knows(id: string): boolean;
 }
 
 const MIN_PASSPHRASE = 8;
@@ -193,14 +195,23 @@ export class SyncLinks {
     if (loop) await loop.stop();
   }
 
-  /** A vault took another id: its sync folder follows it. */
+  /**
+   * A vault took another id: its sync folder follows it. One already there is another vault's link —
+   * its token, its sealed key, its state — and is refused, never replaced (#9). `Session.rekeyVault`
+   * asks `claimed` before it changes anything, so this refusal is the last line, not the first.
+   */
   moved(oldId: string, newId: string): void {
     if (oldId === newId) return;
     const from = this.dir(oldId);
     if (!fs.existsSync(from)) return;
     const to = this.dir(newId);
-    fs.rmSync(to, { recursive: true, force: true });
+    if (fs.existsSync(to)) throw new Error(`sync state for vault \`${newId}\` is already on this machine`);
     fs.renameSync(from, to);
+  }
+
+  /** Whether `id` has sync state on this machine — a pairing, a link, or a loop. */
+  claimed(id: string): boolean {
+    return this.loops.has(id) || this.starting.has(id) || fs.existsSync(this.dir(id));
   }
 
   /** Stop the loop and forget the token, the key at rest and the state. The vault and the remote stay. */
@@ -429,7 +440,15 @@ export async function link(
     } catch (e) {
       refusal(e, pairing.server);
     }
-    // The server keeps the vault's id when it is free; when it is not, the vault takes the server's.
+    /* The server keeps the vault's id when it is free; when it is not, the vault takes the server's
+       — unless that id is one this machine already has. Taken, it wiped the other vault's link,
+       practice and recent row, and left two folders with one id; and the server chose it (#9). */
+    if (remote !== vault.id && (s.knows(remote) || links.claimed(remote)))
+      throw err(
+        409,
+        `The sync server answered with vault \`${remote}\`, which is another vault on this machine. Nothing was linked; the server at ${pairing.server} made a remote vault that this one is not linked to.`,
+        { code: "linked" },
+      );
     const v = remote === vault.id ? vault : await s.rekeyVault(vault.id, remote);
     keep(links, v, pairing, remote, vk);
     const loop = await links.start(v);

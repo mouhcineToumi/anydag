@@ -254,6 +254,9 @@ export class Session {
     if (this.open.has(newId)) throw new Refused(`vault \`${newId}\` is already open`);
     const at = this.open.get(oldId);
     if (!at) throw err(404, `vault \`${oldId}\` is not open`, { code: "vault" });
+    // Another vault's sync link is never moved over: asked before anything changes (#9).
+    if (oldId !== newId && this.sync.claimed(newId))
+      throw new Refused(`vault \`${newId}\` already has sync state on this machine`);
     const root = at.vault.root;
     const types = [...at.vault.types];
     const attachments = at.vault.attachments;
@@ -268,6 +271,11 @@ export class Session {
     const next = this.adopt(vault);
     if (!wasDefault) this.defaultId = [...this.open.keys()].find((k) => k !== newId) ?? newId;
     return next.vault;
+  }
+
+  /** Whether `id` is a vault this machine has: open, or on the recent list. */
+  knows(id: string): boolean {
+    return this.open.has(id) || this.home.sql("select 1 from vaults where id = ?").get(id) !== undefined;
   }
 
   /** Take a vault off the recent list — closing it first. The folder stays. */
