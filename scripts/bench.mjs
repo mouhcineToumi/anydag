@@ -545,11 +545,24 @@ async function timedReq(s, p, init) {
 /**
  * A request, with `/api/health` asked back to back for as long as it runs (#287): `health` is the
  * slowest of those. Alone one takes a millisecond or two; a request that holds the server's thread
- * holds them for as long as it does.
+ * holds them for as long as it does. The request's body is counted as it comes and dropped: kept
+ * whole, the corpus of 50k files is 135 MB put together on this thread, which added 15–20 ms to the
+ * health check it delayed — the bench's own time, not the server's.
  */
 async function beside(s, p) {
   let done = false;
-  const r = timedReq(s, p).finally(() => {
+  const r = (async () => {
+    const t = now();
+    try {
+      const res = await fetch(s.origin + p, { headers: { "x-anydag-token": s.token }, signal: AbortSignal.timeout(STEP_MS) });
+      let bytes = 0;
+      for await (const chunk of res.body) bytes += chunk.length;
+      return res.status >= 400 ? { ms: null, status: res.status, bytes } : { ms: now() - t, status: res.status, bytes };
+    } catch (e) {
+      if (e?.name === "TimeoutError" || e?.name === "AbortError") return { ms: "timeout" };
+      throw e;
+    }
+  })().finally(() => {
     done = true;
   });
   let worst = null;

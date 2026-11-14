@@ -81,13 +81,14 @@ Seven things are load-bearing:
   a time, so two cold asks parse once, and its `generation` moves only when its answer does.
 - **No text crosses to the server's thread, and nothing on it takes long** (#287). The server
   reading every text with `readFileSync` and posting the map to the worker held every request for
-  1.9 s on 50,000 files; now the server's thread sends the worker the names (in parts of 2,000), the
+  about 2 s on 50,000 files; now the server's thread sends the worker the names (in parts of 2,000), the
   worker reads, parses and keeps what it made of each, and sends back only what changed, in parts
   each asked for once the last was read. The route's own loops — the wiki index (`wikiIndexer`), the
   answer, the corpus's version hash — run in 8 ms slices (`server/pace.ts`), and the answer is
   streamed a doc at a time rather than `JSON.stringify`d whole: the corpus of 50,000 notes is 140 MB
-  of JSON. While a cold or warm `/index` runs on 50,000 files the slowest `/api/health` is 35 ms
-  (`vault.*.index.*.health` in `scripts/bench.mjs`).
+  of JSON. While a cold or a warm `/index`, or a warm `/corpus`, runs on 50,000 files the slowest
+  `/api/health` is 31, 21 and 22 ms, against 1.8, 2.0 and 2.2 s before (`vault.*.index.*.health`
+  and `vault.*.corpus.warm.health` in `scripts/bench.mjs`).
 - **A search keeps its engine.** Building MiniSearch is the cost, 3 s over 5,000 notes, and the
   query is not. `corpusOf` names the corpus with a `version` (the vault, the parse's `generation` and
   the names and titles), and `/search` sends the docs to the grammar once per version. After that it
