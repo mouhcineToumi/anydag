@@ -4,6 +4,43 @@
 
 ## Things that will bite
 
+- **A method that moves a document must say so: `this.moves++`.** `Vault.tree()` walks off the
+  server's thread and reconciles the index in slices (#283), so other requests run in between. A
+  document made, renamed, deleted, trashed or restored in that gap was out of the walk, and the
+  reconcile that followed dropped its row — losing a transferred document's created date — or gave a
+  deleted one its row back. Every method that changes which path holds a document bumps `moves`, and a
+  listing that sees it moved starts again; `test/server/listing.test.ts` makes and deletes one mid-listing
+  and fails without it. A save in place (`write`) and minting an id need not: the next listing reads them.
+- **A row given without a walk must be told to the listing: `given`.** Opening a document the index
+  has not seen gives it its row on the spot (`rowNow`, #286) rather than walking the vault, and no
+  listing restarts for it — one would, on every first open during the 5 s first listing. But a listing
+  that read the index before that row was written finds no row at the path and mints the file a second
+  id, which replaces the first (one path, one row), so the id the page was answered with was not the
+  one the list gave; and one that walked before the file was made drops the row as gone. So `rowNow`
+  records each path it gives a row with a count, a listing that misses a path recorded there reads the
+  index for it again, and it does not drop a row recorded after its walk began.
+  `test/server/listing.test.ts` opens one in each window and fails with either check removed.
+- **A `Parsed` cache holds a copy of what its `Reader` kept, and they agree only through `since`.**
+  The texts of `/index` and `/corpus` are read and parsed on the grammar's worker, which sends back
+  only the docs that changed since the answer the server's thread names (#287). A worker that
+  restarted, an answer lost on the way, or a fallback to inline leaves the two holding different
+  things, and an answer of only what changed would then silently drop or keep the wrong docs. So each
+  answer carries a `turn`, the server's thread sends back the last one it received in full (and which
+  reader counted it), and a `Reader` that did not give that turn answers every doc (`whole`).
+  `test/server/index-off-thread.test.ts` restarts the worker between two asks.
+- **A row written outside a listing must say so: `putRow`, `dropRow`.** A watched vault keeps its last
+  listing (#280), rows included, and the next listing looks only at what it is told moved — the
+  folders whose mtime did and the paths the watcher or this process named. A `home.putDoc` left in
+  a method (an attachment retitled, a created adopted from sync) changes the index under a kept row
+  nobody reads again, so the list answers the old title or created for as long as the server runs.
+  Only the walk's own reconcile writes rows directly; `reconcileAll`, which writes them on the thread,
+  drops the kept listing. `ANYDAG_TEST_WATCH=1 npx vitest run test/server` holds every contract to it.
+- **A text written in place is in a listing once the watcher says so, and not before.** The kept
+  listing reads every folder's mtime on every answer, so a document made, renamed or deleted is in the
+  next one; but a write into an existing file moves no folder, and is read again when the watcher
+  reports it, about 75 ms later. The page never sees the gap — it asks after the feed tells it, and the
+  watcher marks the path before it emits — but a test that writes a file in place and lists at once
+  does: wait for the title (`until`), as `test/server/kept.test.ts` does.
 - **`elk.bundled.js` is the wrong import.** On the main thread its "fake worker" runs the algorithm
   synchronously and blocks the canvas; inside a worker of ours it throws, because
   `elk-worker.min.js` stops exporting the fake `Worker` class once it detects it *is* the worker.
@@ -851,3 +888,14 @@
   file list and the reference index used to wait for the feed's next change, which after an agent's
   last write never comes (`src/board/refresher.ts`). To see the first half again, open six
   `EventSource`s through a `protocol.handle` that forwards with `net.fetch` and try a seventh request.
+- **The sidebar's tree draws a window of its rows, so a row is not a thing to ask the page for** (#281). The
+  keyboard, a selection, the reveal and a rename all work from `lines` and `rowIndex` in `Sidebar.tsx`; the
+  first version of `onTreeKey` walked `querySelectorAll("[data-dag-sidebar-row]")`, which on a folder of
+  five thousand files was the rows in view and a margin, so ArrowDown stopped at the edge of the window
+  and Home and End went to the window's ends. Anything new that needs *the next row* or *the row for
+  this key* asks the list and then `focusRow` / `reveal`; anything that must keep a node (a rename box,
+  the roving tab stop) is a **pinned** row in `pins`, or it is unmounted with its half-typed text when
+  the list scrolls away. **A spec must not assume a row exists**: `locator.scrollIntoViewIfNeeded()`
+  waits for a node that is not there, and **`locator.boundingBox()` auto-waits too**, so an
+  `expect.poll` over it for a row that has gone out of the window times out instead of answering
+  *out of view* — count it first. `e2e/sidebar-virtual.spec.ts` is the pattern.

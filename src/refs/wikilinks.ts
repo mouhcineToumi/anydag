@@ -166,7 +166,7 @@ interface Entry<D> {
  * passes over every document per link, and a 5,000-note vault with 150,000 links took five minutes
  * of the server's only thread to answer `/__board/index`.
  */
-interface WikiIndex<D extends WikiCandidate> {
+export interface WikiIndex<D extends WikiCandidate> {
   resolve(target: string): D | undefined;
 }
 
@@ -177,16 +177,27 @@ const push = <D>(m: Map<string, Entry<D>[]>, k: string, e: Entry<D>) => {
 };
 
 function wikiIndex<D extends WikiCandidate>(docs: readonly D[]): WikiIndex<D> {
+  const ix = wikiIndexer<D>();
+  for (const doc of docs) ix.add(doc);
+  return ix;
+}
+
+/**
+ * A `WikiIndex` filled a document at a time, in the list's order — for the server, which builds one
+ * over 50,000 documents in slices rather than hold its one thread for the whole of it (#287).
+ */
+export function wikiIndexer<D extends WikiCandidate>(): WikiIndex<D> & { add(doc: D): void } {
   const names = new Map<string, Entry<D>[]>();
   const tails = new Map<string, Entry<D>[]>();
   const titles = new Map<string, Entry<D>[]>();
-  docs.forEach((doc, at) => {
-    const e = { doc, at };
+  let count = 0;
+  const add = (doc: D) => {
+    const e = { doc, at: count++ };
     const n = fold(doc.name);
     push(names, n, e);
     for (let i = n.indexOf("/"); i >= 0; i = n.indexOf("/", i + 1)) push(tails, n.slice(i + 1), e);
     if (doc.title) push(titles, fold(doc.title), e);
-  });
+  };
   /* The shortest path wins a tie, then the first by name, then the first in the list. */
   const pick = (m: Map<string, Entry<D>[]>, wants: Set<string>): D | undefined => {
     let best: Entry<D> | undefined;
@@ -203,6 +214,7 @@ function wikiIndex<D extends WikiCandidate>(docs: readonly D[]): WikiIndex<D> {
     return best?.doc;
   };
   return {
+    add,
     resolve(target) {
       const t = fold(target.trim());
       if (!t) return undefined;

@@ -94,7 +94,12 @@ Seventeen things are load-bearing:
   `anydag sync now`.
 - **Linking adopts the remote's id.** Upload creates the remote under the vault's own id; download
   (into an empty vault) and merge call `Session.rekeyVault`, which moves the home's rows and the
-  sync folder, and the page reloads onto `?vault=<new id>`.
+  sync folder, and the page reloads onto `?vault=<new id>`. **The server never names a vault this
+  machine already has** (#9): an upload answered with an id other than its own that is open, on the
+  recent list or has sync state (`Session.knows`, `SyncLinks.claimed`) is a 409 `linked` before
+  anything is re-keyed; `rekeyVault` refuses an id with sync state up front, and `SyncLinks.moved`
+  throws rather than replace another vault's folder. Taken, it once overwrote the other vault's
+  link, practice and recent row, and left two folders with one id.
 - **A link is bound to its folder.** `pair.json` records the root it was made for; a vault whose id
   another folder claims pauses with a sentence instead of starting that link's loop.
 - **Nothing about sync is in the vault.** `<home>/sync/<vault>/` holds `pair.json` (the device token,
@@ -108,6 +113,11 @@ Seventeen things are load-bearing:
 - **The passphrase and the recovery code never leave the call that uses them.** The recovery code is
   answered once by an upload and kept nowhere; an agent cannot link — MCP has `sync_status` and
   `sync_now` only, and `docs/parity.json` says why.
+- **The server is answered within a bound** (#9). A JSON answer or an error body is at most 64 MiB,
+  a blob 1 GiB — told by `content-length` or counted while it streams, and past it the call is
+  `ES_TOO_LARGE` (`bounded` in `client.ts`). A poke event is at most 64 KiB (`PokeEvents`), and the
+  poke stream's backoff is taken back by an event heard whole, not by a 200: a server that answers
+  200 and says nothing, or one endless event, was asked again every `backoffMs` for ever.
 - **A failure is the vault's.** `ES_NETWORK` is `offline` with a backoff; `ES_AUTH` (a revoked
   device) and a quota are `paused` with a reason; a version refused as not belonging where it
   arrived (*What the server cannot forge*) and a server of another protocol (`ES_PROTOCOL`) are
@@ -170,6 +180,10 @@ so a file could be swapped, rolled back or deleted everywhere. Protocol 2 closes
 - **The path is the key's, and the bytes are the size the `meta` says.** Neither can be forged without
   the vault key, which is why they are checks beyond the seal: they catch a writer that has the key
   and a bug.
+- **A pull writes only what syncs** (#9). The path a `meta` names passes the same `syncs()` /
+  `dirSyncs()` a push does before anything is written: one outside it (`.anydag/sync…`, a temp name,
+  what a device would never send) is skipped with no state row, and a rename onto such a path is the
+  old path's delete alone. A device holding the key could otherwise write into `.anydag/`.
 - **A refusal stops the pull before it writes or moves the cursor.** The next pull meets it again: a
   forged entry is the vault's `error` until somebody looks, never a file silently replaced. A device
   that has never synced cannot tell a version the operator withheld from one that never existed; no

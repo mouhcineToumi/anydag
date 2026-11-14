@@ -22,13 +22,13 @@ failed on both.
 | `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, the updater's wiring |
 | `desktop/updates.ts` | the update state machine: `idle · checking · downloading · ready · manual · error`, the six-hour re-check, the install; no Electron import |
 | `desktop/forward.ts` | a page request sent on to the server over `node:http`, and let go of when the page lets go |
-| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the updates (`state`, `onChange`, `check`, `install`) |
+| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the system's locale, the updates (`state`, `onChange`, `check`, `install`) |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
 | `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Thirteen things are load-bearing:
+Eighteen things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
@@ -42,7 +42,18 @@ Thirteen things are load-bearing:
   watcher's own package was packed rather than unpacked — it resolved only because a from-source
   rebuild happened to mark it native. `!node_modules/**/*` and then the five runtime modules by name
   is the list now (19 MB), and `npmRebuild: false`: the watcher is N-API and prebuilt, and a
-  rebuild from its `binding.gyp` cannot cross-compile, which is what the macOS job does.
+  rebuild from its `binding.gyp` cannot cross-compile, which is what the macOS job does. The
+  watcher's C++ headers, install script and Flow types are excluded too, as is the CLI's
+  `meta.json`, which only `cli/anydag.mjs` in a checkout reads (#302).
+- **Only three of Chromium's 55 locale packs ship**: `en-US`, `fr` and `ar` (`electronLanguages`,
+  #302), which took the AppImage from 132.2 to 130.1 MiB and the unpacked app from 314.0 to
+  306.7 MiB (the table is in `limits.md`, *Disk*). A pack holds Chromium's own strings — spelling
+  suggestions, form validation, the date picker — but it is also **the page's default locale**: on a
+  system whose language has no pack, Chromium runs in `en-US`, so `navigator.language` and `Intl`'s
+  default are `en-US` there (measured: `de` before, `en-US` after, on `LANG=de_DE.UTF-8`; French and
+  Arabic unchanged). A date the page formats with no locale named is a US date on a German system
+  until the page asks the main process for `app.getSystemLocale()` (#304). A language #265 adds
+  needs its pack added here, or its own speakers get `en-US`.
 - **Each macOS architecture is its own build, from one job.** Not universal: that is both Electrons
   in one bundle for everybody. One job, so there is one `latest-mac.yml` naming both zips, and
   `electron-updater` picks the one whose name says its arch. `npm ci` installs only the runner's
@@ -159,6 +170,15 @@ Thirteen things are load-bearing:
   Linux and Windows keep the system frame, and the browser has no bridge, so none of it applies.
   **Electron's drag region ignores what is drawn over it**: a scrim or a menu over the top 48px
   drags the window rather than taking the press, unless it is itself `no-drag`.
+- **Dates, times and sorting follow the system, not `navigator.language`** (#304). Chromium takes
+  the page's default locale from the locale pack it loads, and the app ships only the packs of the
+  languages it speaks (#302), so on a German system the page's default is `en-US`: a 12-hour clock,
+  month-first dates, English collation. The main process reads the system's own
+  (`app.getSystemLocale()`, which needs no pack), the preload hands it over as `locale`, and
+  `src/main.tsx` sets it in `src/locale.ts` before the first render. **A site that formats a date or
+  sorts words for a person passes `locale()` (or sorts with `collation()`) where it would pass
+  `undefined`**; one that names `"en"` does so because the words around it are English. The server
+  and the CLI never set it and keep Node's own.
 - **A load always names `index.html`.** `anydag://app/?x` canonicalises to a pathname of `//`, and
   the page's own `history.replaceState` then resolves to an address with no host, which Chromium
   refuses as another origin — the smoke run's `ready=never` before it was found.

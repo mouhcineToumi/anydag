@@ -27,7 +27,20 @@ export interface RawFence {
   closed: boolean;
 }
 
-const OPEN = /^([ \t]*)(`{3,})[ \t]*([A-Za-z][A-Za-z0-9-]*)?[ \t]*(\{[^\n]*\})?[ \t]*$/;
+/*
+ * Each run of blanks is matched by exactly one `[ \t]*`: the one after the type and the one after the
+ * braces belong to their groups. Three of them side by side, as this once was, let a line of a fence
+ * opener, thousands of spaces and one stray character try every way of splitting the spaces between
+ * them — cubic time, and seconds of the grammar's thread on a line of 3 KB (#9).
+ */
+const OPEN = /^([ \t]*)(`{3,})[ \t]*(?:([A-Za-z][A-Za-z0-9-]*)[ \t]*)?(?:(\{[^\n]*\})[ \t]*)?$/;
+
+/**
+ * The longest line read as an opening fence. An opener is three backticks, a word and its attributes;
+ * a longer line is prose, and is not handed to the pattern at all — whatever the pattern costs, a
+ * line from somebody else's vault costs no more than this.
+ */
+const LONGEST_OPEN = 16 * 1024;
 
 export function scanFences(text: string): RawFence[] {
   const out: RawFence[] = [];
@@ -44,7 +57,7 @@ export function scanFences(text: string): RawFence[] {
 
   let i = 0;
   while (i < lines.length) {
-    const m = OPEN.exec(lines[i]!);
+    const m = lines[i]!.length > LONGEST_OPEN ? null : OPEN.exec(lines[i]!);
     if (!m) {
       i++;
       continue;
@@ -81,7 +94,7 @@ export function scanFences(text: string): RawFence[] {
  */
 export function rewriteFenceAttrs(text: string, fence: RawFence, attrText: string): string | null {
   const line = text.slice(fence.openStart, fence.openEnd);
-  const m = OPEN.exec(line);
+  const m = line.length > LONGEST_OPEN ? null : OPEN.exec(line);
   if (!m) return null;
   const indent = m[1] ?? "";
   const ticks = m[2]!;

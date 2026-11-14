@@ -24,6 +24,9 @@ export interface DesktopBridge {
   pageKey?: string | null;
   /** The `anydag` command the app wrote, by its absolute path, for an MCP client's config. */
   cli?: string | null;
+  /** The system's locale, which dates, times and sorting follow (`src/locale.ts`); `navigator.language`
+   *  is only the locale pack the shell shipped. */
+  locale?: string | null;
   /** The system's folder dialog; `null` when it was cancelled. */
   pickFolder?(): Promise<string | null>;
   /** Show a folder in the file manager. */
