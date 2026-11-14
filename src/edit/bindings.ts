@@ -26,6 +26,8 @@
  * none. That is the drift `check:skill` exists to catch one layer out, applied to a key table.
  */
 
+import type { AiSwitch } from "@/settings/aiSwitch";
+
 /** What a leader chord can ask for. `useEditor` maps each onto the callback that does it. */
 export type Command =
   | "select"
@@ -93,10 +95,26 @@ export const BINDINGS: Binding[] = [
   { key: "?", command: "help", label: "Every shortcut, on one sheet" },
 ];
 
-/** The binding a key press asks for, or nothing. */
-export function bindingFor(key: string): Binding | undefined {
+/**
+ * The commands that belong to an AI feature, and which one (#296). A feature that is off takes its
+ * chord with it: the key does nothing, and the overlay and the sheet do not list it.
+ */
+export const AI_COMMAND: Readonly<Partial<Record<Command, AiSwitch>>> = {
+  prompt: "prompts",
+  assistant: "assistant",
+};
+
+/** Whether a binding is live, given which AI features are on. */
+export function bindingOn(b: Binding, on: (feature: AiSwitch) => boolean): boolean {
+  const feature = AI_COMMAND[b.command];
+  return feature === undefined || on(feature);
+}
+
+/** The binding a key press asks for, or nothing — and nothing for a feature that is off. */
+export function bindingFor(key: string, on: (feature: AiSwitch) => boolean = () => true): Binding | undefined {
   const k = key.toLowerCase();
-  return BINDINGS.find((b) => b.key === k);
+  const b = BINDINGS.find((x) => x.key === k);
+  return b && bindingOn(b, on) ? b : undefined;
 }
 
 /**

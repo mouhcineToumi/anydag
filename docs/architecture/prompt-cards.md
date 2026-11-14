@@ -9,6 +9,10 @@ A person describes a diagram and a model draws it where the description was. The
 `src/edit/generate.ts`, and everything that talks to a model is `plugins/generate/` — server-side,
 plain Node, no `@/` aliases, called in-process by `server/routes/meta.ts`.
 
+All three features here can be turned off, together or one by one, from Settings → AI (#296): off,
+a feature's controls and chords are gone rather than greyed, and a prompt card already on a board
+is drawn read-only. See *Turning AI off* in [`settings.md`](settings.md).
+
     ```prompt {#ask x=80 y=240 w=420 as=arch}
     A browser talking to an API that stores orders in Postgres.
     ```

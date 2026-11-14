@@ -10,6 +10,7 @@ import { ModelChip } from "@/settings/ModelChip";
 import { modelChoice, modelChoiceText } from "@/settings/modelChoice";
 import { writeSettings } from "@/settings/store";
 import { useProviders } from "@/settings/useProviders";
+import { useAi } from "@/settings/useAi";
 import { useSettings } from "@/settings/useSettings";
 import { askPage } from "@/ui/chrome";
 import { LlmSentence } from "@/ui/LlmSentence";
@@ -43,6 +44,28 @@ const WRITE_AFTER_MS = 250;
 const mine = (e: SyntheticEvent) => e.stopPropagation();
 
 export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: EditorCtl | null; selected: boolean }) {
+  /* With prompt cards turned off (#296) a card already in the file is still drawn, as what was
+     asked and nothing to run: no model chip, no Generate, no request for the providers. Nothing
+     about the card is written, so turning the feature back on finds it as it was. */
+  const on = useAi().prompts;
+  if (!ctl || !on) return <StillPrompt item={item} />;
+  return <LivePrompt item={item} ctl={ctl} selected={selected} />;
+}
+
+/** The card read-only: a snapshot's, a view's, and every card's with prompt cards turned off. */
+function StillPrompt({ item }: { item: BoardItem }) {
+  return (
+    <div className="dag-prompt dag-prompt--still" style={item.h !== undefined ? { minHeight: item.h } : undefined}>
+      <div className="dag-prompt__head">
+        <Sparkles {...ICON} aria-hidden="true" />
+        <span>Prompt{item.as ? ` · ${item.as}` : ""}</span>
+      </div>
+      <p className="dag-prompt__still">{item.body || "An empty prompt."}</p>
+    </div>
+  );
+}
+
+function LivePrompt({ item, ctl, selected }: { item: BoardItem; ctl: EditorCtl; selected: boolean }) {
   const [text, setText] = useState(item.body);
   const [run, setRun] = useState<Run>({ state: "idle" });
   const [now, setNow] = useState(() => Date.now());
@@ -65,7 +88,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   const flush = useCallback((): Promise<void> => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    if (pending.current !== null && ctl) writing.current = ctl.write(item.id, { body: pending.current });
+    if (pending.current !== null) writing.current = ctl.write(item.id, { body: pending.current });
     pending.current = null;
     return writing.current;
   }, [ctl, item.id]);
@@ -75,10 +98,10 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
      the caret, not a second click. */
   const focused = useRef(false);
   useEffect(() => {
-    if (!ctl || !selected || focused.current || item.body.trim()) return;
+    if (!selected || focused.current || item.body.trim()) return;
     focused.current = true;
     area.current?.focus();
-  }, [ctl, selected, item.body]);
+  }, [selected, item.body]);
 
   const running = run.state === "running";
   useEffect(() => {
@@ -91,7 +114,7 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   useEffect(() => () => live.current?.abort(), []);
 
   const go = useCallback(async () => {
-    if (!ctl || running) return;
+    if (running) return;
     const prompt = text.trim();
     if (!prompt) {
       area.current?.focus();
@@ -128,18 +151,6 @@ export function PromptItem({ item, ctl, selected }: { item: BoardItem; ctl: Edit
   };
 
   const who = modelChoiceText(modelChoice(settings.llm, providers));
-
-  if (!ctl) {
-    return (
-      <div className="dag-prompt dag-prompt--still" style={item.h !== undefined ? { minHeight: item.h } : undefined}>
-        <div className="dag-prompt__head">
-          <Sparkles {...ICON} aria-hidden="true" />
-          <span>Prompt{item.as ? ` · ${item.as}` : ""}</span>
-        </div>
-        <p className="dag-prompt__still">{item.body || "An empty prompt."}</p>
-      </div>
-    );
-  }
 
   const failed = run.state === "failed" ? run : null;
   const draft = failed?.result?.draft;

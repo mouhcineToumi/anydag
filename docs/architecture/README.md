@@ -128,6 +128,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The trash | [`trash.md`](trash.md) |
 | Things that will bite | [`things-that-will-bite.md`](things-that-will-bite.md) |
 | Tidy up | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
+| Turning AI off | [`settings.md`](settings.md) |
 | Vaults | [`server.md`](server.md) |
 | What the server cannot forge | [`sync.md`](sync.md) |
 | Versions and releases | [`gate-and-releases.md`](gate-and-releases.md) |

@@ -104,6 +104,8 @@ import { UploadNotice } from "@/files/UploadNotice";
 import { saveWithFiles } from "@/files/exportBundle";
 import { placedWidth } from "@/edit/image";
 import { readSettings } from "@/settings/store";
+import { aiOn } from "@/settings/aiSwitch";
+import { useAi } from "@/settings/useAi";
 import { refuseLocked, useLocked } from "@/settings/lock";
 import { track } from "@/telemetry/client";
 
@@ -272,8 +274,10 @@ export function App() {
   /* `?trash=1` is the Trash page, exclusive with the rest. */
   const trash = !tasks && !calendar && !quizzes && query.get("trash") === "1";
   /* `?chat=` is the Assistant page: a chat's id, `new`, or `1` for the newest —
-     a page with no canvas, exclusive with the rest as they are with each other. */
-  const assistant = !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
+     a page with no canvas, exclusive with the rest as they are with each other. With the Assistant
+     turned off (#296) the address names no page, and home is drawn. */
+  const ai = useAi();
+  const assistant = ai.assistant && !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
   const listing = tasks || calendar || quizzes || trash || assistant;
   const quiz = listing ? null : query.get("quiz");
   /* `?table=` is a table's page, `&tab=` the tab it shows. */
@@ -494,7 +498,8 @@ function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }
       if (leader && e.key.toLowerCase() === "o") {
         e.preventDefault();
         ref.current.search();
-      } else if (leader && e.key.toLowerCase() === "a") {
+      } else if (leader && e.key.toLowerCase() === "a" && aiOn(readSettings(), "assistant")) {
+        /* `space A` is the Assistant's, and goes with it when it is turned off (#296). */
         e.preventDefault();
         toggleAssistant();
       }
@@ -1932,6 +1937,8 @@ function BoardApp({
      The text outlives the dialog so "Try again" reopens it as it was left; it belongs to one item,
      and opening the dialog on another starts empty. */
   const [asking, setAsking] = useState(false);
+  /* Which AI features this board draws (#296): one that is off leaves no control behind. */
+  const ai = useAi();
   const [askFor, setAskFor] = useState<string | null>(null);
   const [askText, setAskText] = useState("");
   const rewriteCtl = useRef<AbortController | null>(null);
@@ -2038,6 +2045,14 @@ function BoardApp({
     if (!target || !askText.trim()) return;
     onRewrite([target], askText.trim());
   }, [runFor, askFor, askText, onRewrite]);
+
+  /* *Change with AI* turned off (#296) takes a rewrite with it: the request is cancelled, a
+     proposal is thrown away unwritten, and the dialog shuts — nothing of it was in the file yet. */
+  useEffect(() => {
+    if (ai.rewrite) return;
+    onDiscard();
+    setAsking(false);
+  }, [ai.rewrite, onDiscard]);
 
   /* Escape lets go of the rewrite wherever focus is. The bar owns its own Escape — the settings
      card's idiom, and the one that works while a person is typing in the field, because the
@@ -2223,7 +2238,7 @@ function BoardApp({
      puts its centre in the middle of the view. Not `focusBoard()` after: a fresh prompt card takes
      the caret, and pulling focus back to the board would take it straight off the thing the press
      just made. */
-  const onPrompt = () => editor.add("prompt");
+  const onPrompt = ai.prompts ? () => editor.add("prompt") : undefined;
 
   /* The panel is an editor, so the lock takes it with everything else that writes. */
   const editingItem = editing && !snapshot && !locked ? (board?.items.find((it) => it.id === editing) ?? null) : null;
@@ -2637,13 +2652,13 @@ function BoardApp({
             boardName={board?.name ?? ""}
             run={barRun}
             locked={locked}
-            onAsk={onAsk}
+            onAsk={ai.rewrite ? onAsk : undefined}
             onRetry={onRetry}
             onAccept={onAccept}
             onDiscard={onDiscard}
           />
         ) : null}
-        {asking && askFor && !snapshot && !locked ? (
+        {asking && askFor && ai.rewrite && !snapshot && !locked ? (
           <RewriteDialog
             subject={board?.items.find((it) => it.id === askFor)?.title}
             text={askText}

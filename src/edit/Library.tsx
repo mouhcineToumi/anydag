@@ -91,6 +91,7 @@ import { isItemType, itemName } from "@/board/types";
 import type { Theme } from "@/theme/contract";
 import { Icon, iconFor } from "@/render/Icon";
 import { useIndex } from "@/refs/useIndex";
+import { useAi } from "@/settings/useAi";
 import { DRAG_SLOP } from "@/canvas/geometry";
 
 import { Parallelogram, Trapezoid } from "./glyphs";
@@ -331,13 +332,16 @@ export function Library({ editor, saved, onClose }: { editor: Editor; saved: Com
   /* The account's notes, as cards to place. Read here rather than in `App`, so the index
      refreshing re-renders an open library and never the canvas. */
   const docs = useIndex().docs;
+  /* With prompt cards turned off (#296), the *Generate* section and any kept prompt go with them. */
+  const prompts = useAi().prompts;
   const all = useMemo(
-    () => [
-      ...saved,
-      ...docs.filter((d) => d.kind === "note" || d.kind === "quiz" || d.kind === "table").map(noteCard),
-      ...BROWSABLE,
-    ],
-    [saved, docs],
+    () =>
+      [
+        ...saved,
+        ...docs.filter((d) => d.kind === "note" || d.kind === "quiz" || d.kind === "table").map(noteCard),
+        ...BROWSABLE,
+      ].filter((c) => prompts || c.type !== "prompt"),
+    [saved, docs, prompts],
   );
 
   const shown = useMemo(() => {
