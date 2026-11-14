@@ -127,12 +127,26 @@ export function withoutBoardTab<G extends string>(sections: readonly TabGroup<G>
     .filter((g) => g.tabs.length > 0);
 }
 
-/** Both filters, in the order a page meets them. */
+/**
+ * The tabs that only set up AI features, drawn while at least one of them is on (#296). The AI tab
+ * itself is not one: it holds the switches, so it stays to turn them back on.
+ */
+const AI_TABS: readonly SettingsTab[] = ["providers"];
+
+/** The groups, with the AI providers tab out when every AI feature is off. */
+function withoutAiTabs<G extends string>(sections: readonly TabGroup<G>[], ai: boolean): readonly TabGroup<G>[] {
+  if (ai) return sections;
+  return sections
+    .map((g) => ({ group: g.group, tabs: g.tabs.filter((t) => !AI_TABS.includes(t)) }))
+    .filter((g) => g.tabs.length > 0);
+}
+
+/** Every filter, in the order a page meets them. `ai` defaults to on, which is the default. */
 export function drawnSections<G extends string>(
   sections: readonly TabGroup<G>[],
-  { cloud, board }: { cloud: boolean; board: boolean },
+  { cloud, board, ai = true }: { cloud: boolean; board: boolean; ai?: boolean },
 ): readonly TabGroup<G>[] {
-  return withoutBoardTab(withoutCloudTabs(sections, cloud), board);
+  return withoutAiTabs(withoutBoardTab(withoutCloudTabs(sections, cloud), board), ai);
 }
 
 export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {

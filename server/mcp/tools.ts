@@ -1570,7 +1570,7 @@ const appTools: Tool[] = [
     name: "settings",
     description:
       "The person's preferences — or, with `set`, a change to them. **Only when they asked.**\n\n" +
-      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`) and `dag:favourites`; travels with the vault's folder. `app` level: the person's, the same in every vault — `dag:theme`, `dag:ai` (a JSON string: `{llm: {provider, model, reasoning}, assistant: {provider, model}}` — which model a prompt card and a new Assistant chat use), how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
+      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`) and `dag:favourites`; travels with the vault's folder. `app` level: the person's, the same in every vault — `dag:theme`, `dag:ai` (a JSON string: `{llm: {provider, model, reasoning}, assistant: {provider, model}, features: {ai, prompts, rewrite, flashcards, assistant}}` — which model a prompt card and a new Assistant chat use, and which AI features the page draws, `ai` being the master switch), how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
       NOTE_VAULT,
     // Only a `set` writes; reading is allowed under --read-only.
     write: false,

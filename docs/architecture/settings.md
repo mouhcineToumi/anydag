@@ -25,7 +25,7 @@ below.
 | Group | Tab | Holds |
 |---|---|---|
 | You | Appearance | the theme — the person's, in every vault (#191) |
-| | AI | one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on — the person's, in every vault (#191) |
+| | AI | the AI features switches — a master switch and one per feature (#296, *Turning AI off* below) — then one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on — the person's, in every vault (#191) |
 | | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
 | This computer | AI providers | every provider in its own row, with its logo, a status pill (Ready, Needs a key, Not signed in, Not installed, Needs an address…) and what it takes to set it up: in the desktop app a key field, and for OpenAI-compatible its address and model too; in a browser, the variable the server reads. *Save and test* stores, waits for the server, then makes one short call. *Check again* asks afresh. The tab carries a dot when a provider in use cannot answer |
@@ -285,6 +285,44 @@ above); un-embedding the fonts from an export (the layout was measured against t
 theme's face, so a file without it is a different diagram); and the window keys — the library and
 the inspector's mode and width — which each have a control where they act. (There were five; the
 board list's went with the column.)
+
+### *Turning AI off*
+
+The AI tab opens with **AI features**: a master switch, *Use AI features*, and one switch per
+feature under it — *Prompt cards*, *Change with AI*, *Generate flashcards* and *Assistant* (#296).
+They are the settings object's `features` section, `{ai, prompts, rewrite, flashcards, assistant}`,
+kept in `dag:ai` beside `llm` and `assistant`: the person's, the same in every vault, synced with
+them. Every one defaults to on, so an install that never opens the tab sees nothing change, and a
+missing or junk value reads as on.
+
+- **One rule, one place.** `aiOn(settings, feature)` in `src/settings/aiSwitch.ts` is the master
+  *and* the feature's own switch; `useAi()` is the hook over it, and a gesture that is not React — a
+  leader chord — reads `aiOn(readSettings(), …)` at the press. The master off leaves each feature's
+  switch as it was, drawn disabled, so turning it back on restores each one.
+- **Off is gone, not greyed.** A feature that is off draws no button, no shortcut, no model chip and
+  no page, and the layout closes up: the dock's prompt card button and *Describe a diagram* on an
+  empty board; the library's *Generate* entry; the selection bar's sparkle and its model chip, and a
+  rewrite in flight is cancelled and its dialog shut; the quiz editor's *Generate flashcards* and its
+  panel; the sidebar's Assistant row, the top bar's sparkle and the side panel, which is shut, not
+  only hidden. `?chat=` with the Assistant off names no page, and home is drawn.
+- **The chords go with their feature.** `AI_COMMAND` in `src/edit/bindings.ts` names the commands
+  that belong to one (`prompt`, `assistant`); `bindingFor` answers nothing for them while it is off,
+  and the which-key overlay and the shortcut sheet drop their rows.
+- **Nothing in a vault is written.** A prompt card already in a board is drawn read-only, as a
+  snapshot draws it — what was asked, with no model chip and no Generate — and asks the server for
+  nothing. Turning a feature off or on changes the person's preference and no file.
+- **The model groups follow the features that use them.** *Diagrams and flashcards* is drawn while
+  prompt cards, Change with AI or Generate flashcards is on; *Assistant* while the Assistant is. With
+  every feature off the tab is the switches alone, and **AI providers** is not drawn
+  (`drawnSections`' `ai`), the way the cloud switch hides Sync. The AI tab itself always stays, since
+  it is where the switches are. Reset AI puts the switches back to on with the model choices.
+- **A snapshot reads none of it**, as it reads no preference: `?snapshot=1` draws every feature on,
+  so a picture of a board with a prompt card is the same on every machine.
+
+**Deliberately out**: the server refusing model calls when a feature is off — the switches are the
+page's, and the MCP `generate` tool and the CLI are the person's own agent's (`docs/parity.json`);
+Agent access, which connects that agent and runs no model of AnyDag's; and leaving the AI code out
+of the bundle.
 
 ### *The provider list*
 

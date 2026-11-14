@@ -60,12 +60,13 @@ import { openVault, transferFile, transferFolder, vaultsNow } from "@/vault/api"
 import { GONE, switchVault } from "@/vault/current";
 
 import { isLocked, refuseLocked } from "@/settings/lock";
+import { useAi } from "@/settings/useAi";
 import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
 import { AssistantPanel } from "@/assistant/Panel";
 import { IconButton } from "@/ui/controls";
-import { usePanel } from "@/assistant/panelState";
+import { closeAssistant, usePanel } from "@/assistant/panelState";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
@@ -300,8 +301,14 @@ export function Shell({
   open(kind: FileKind, name: string | null): void;
   children: ReactNode;
 }) {
-  /* The Assistant's panel, down the right of whatever page is open (`space A`). */
+  /* The Assistant's panel, down the right of whatever page is open (`space A`). Turning the
+     Assistant off (#296) shuts it as well as hiding it, so turning it back on does not bring back
+     a panel nobody asked for. */
   const panel = usePanel();
+  const assistantOn = useAi().assistant;
+  useEffect(() => {
+    if (!assistantOn) closeAssistant();
+  }, [assistantOn]);
   const [docked, setDocked] = useState(() => readFlag(SIDEBAR, true));
   const narrow = useNarrow();
   /* Over the page, for a hover or for a narrow window's click. Two flags rather than one, because
@@ -945,10 +952,14 @@ export function Shell({
                 dismiss();
               }}
               assistantOpen={assistantOpen}
-              onAssistant={() => {
-                openAssistant();
-                dismiss();
-              }}
+              onAssistant={
+                assistantOn
+                  ? () => {
+                      openAssistant();
+                      dismiss();
+                    }
+                  : undefined
+              }
               trashOpen={trashOpen}
               onTrash={() => {
                 openTrash();
@@ -978,7 +989,7 @@ export function Shell({
             />
           ) : null}
           {children}
-          {panel.open && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {panel.open && assistantOn && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
           {trashed ? (
             <TrashNotice
               key={trashed.n}

@@ -1,6 +1,7 @@
 import { Keyboard, X } from "lucide-react";
 
-import { BINDINGS, LEADER_LABEL } from "@/edit/bindings";
+import { BINDINGS, bindingOn, LEADER_LABEL } from "@/edit/bindings";
+import { useAi } from "@/settings/useAi";
 
 /** Lucide at one size and weight, stated once. */
 const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -113,9 +114,13 @@ const SECTIONS: { title: string; rows: [string, string[]][] }[] = [
  * modal's Shortcuts tab — one list in two places, so the two cannot disagree about a key.
  */
 export function ShortcutList() {
+  const ai = useAi();
+  /* A row is a binding's when its label is one: an AI feature that is off takes its row with it. */
+  const hidden = new Set(BINDINGS.filter((b) => !bindingOn(b, (f) => ai[f])).map((b) => b.label));
+  const sections = hidden.size ? SECTIONS.map((s) => ({ ...s, rows: s.rows.filter(([what]) => !hidden.has(what)) })) : SECTIONS;
   return (
     <div className="dag-shortcuts__grid">
-      {SECTIONS.map((s) => (
+      {sections.map((s) => (
         <section key={s.title} className="dag-shortcuts__group">
           <h3 className="dag-shortcuts__section">{s.title}</h3>
           <div className="dag-shortcuts__list">
