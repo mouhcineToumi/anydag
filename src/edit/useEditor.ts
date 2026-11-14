@@ -33,6 +33,7 @@ import type { Tool, ViewportHandle } from "@/canvas/Viewport";
 import { boardToSvg, itemToSvg } from "@/export/svg";
 import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
+import { openTemplates } from "@/ui/templates";
 import { bindingFor, CHORD_MS, LEADER_CODE, topicKeyFor, WHICHKEY_MS, type Command } from "@/edit/bindings";
 
 import { renameItemId, renameNodeLinks } from "@/board/rename";
@@ -4119,6 +4120,8 @@ export function useEditor({
           return setTool("pen");
         case "note":
           return add("md", at());
+        case "template":
+          return openTemplates();
         case "prompt":
           return add("prompt");
         case "library":

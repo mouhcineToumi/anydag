@@ -853,6 +853,48 @@ const tableTools: Tool[] = [
   }),
 ];
 
+const templateTools: Tool[] = [
+  tool({
+    name: "template_list",
+    description: withNote(
+      "The vault's note templates — the notes in its templates folder, which Settings names and which is `Templates` when that folder exists — each with its `name`, `title` and what it `makes`: a `note`, or a `task` or an `event` when its frontmatter carries a `status:` or a `start:`. `folder` is null when the vault has none, and then there are no templates; `template_starters` writes three (a meeting, a day, an ADR).\n\n" +
+        "A template is an ordinary note: read it with `note_read`, change it with `note_write`. It is left out of `task_list`, `event_list` and the calendar even when it carries those lines.",
+    ),
+    write: false,
+    input: { vault },
+    run: ({ vault: v }, kit) => kit.api("GET", "/__board/templates", { vault: v }),
+  }),
+  tool({
+    name: "note_from_template",
+    description: withNote(
+      "Make a note from a template: its frontmatter and text, with the variables filled in once — `{{title}}`, `{{date}}` (`YYYY-MM-DD`), `{{time}}` (`HH:mm`) and `{{date:FORMAT}}` (Moment's tokens: `YYYY MM DD dddd MMMM HH mm`, `[text]` kept as is) — in the person's time zone. Any other `{{…}}` is left as written. The note is a plain note afterwards: it does not remember the template.\n\n" +
+        "`template` is a name from `template_list`. With a `title` the file is named after it, in `folder` if given; without one it starts *Untitled* (or takes the title its template's frontmatter fills in), and `{{title}}` reads *Untitled*. A template with a `status:` makes a task, one with a `start:` an event.",
+    ),
+    write: true,
+    input: { template: z.string(), title: z.string().optional(), folder: z.string().optional(), vault },
+    run: async ({ template, title, folder, vault: v }, kit) => {
+      kit.needWrite("make a note from a template");
+      const got = await kit.api("POST", "/__board/from-template", {
+        vault: v,
+        body: { template, ...(title !== undefined ? { title } : {}), ...(folder !== undefined ? { folder } : {}) },
+      });
+      return { name: got.name, id: got.id, base: got.base, url: await kit.url(got.name, "note", v) };
+    },
+  }),
+  tool({
+    name: "template_starters",
+    description: withNote(
+      "Write the three starter templates — Meeting, Daily and ADR — into the templates folder (`Templates` when the vault names none), making it if it is not there. **Only when the person asked for them**: opening a vault never makes the folder. A file that is already there is left as it is, and comes back under `skipped`.",
+    ),
+    write: true,
+    input: { vault },
+    run: ({ vault: v }, kit) => {
+      kit.needWrite("add the starter templates");
+      return kit.api("POST", "/__board/templates/starters", { vault: v, body: {} });
+    },
+  }),
+];
+
 const taskTools: Tool[] = [
   tool({
     name: "task_list",
@@ -1734,6 +1776,7 @@ const syncTools: Tool[] = [
 export const TOOLS: Tool[] = [
   ...boardTools,
   ...noteTools,
+  ...templateTools,
   ...quizTools,
   ...quizMore,
   ...tableTools,

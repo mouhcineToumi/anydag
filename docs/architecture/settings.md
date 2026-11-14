@@ -30,7 +30,7 @@ below.
 | | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
 | This computer | AI providers | every provider in its own row, with its logo, a status pill (Ready, Needs a key, Not signed in, Not installed, Needs an address…) and what it takes to set it up: in the desktop app a key field, and for OpenAI-compatible its address and model too; in a browser, the variable the server reads. *Save and test* stores, waits for the server, then makes one short call. *Check again* asks afresh. The tab carries a dot when a provider in use cannot answer |
 | This vault | General | the vault's name, location and facts, "When a board has an error", the trash's retention, and Close vault — never deleting the folder |
-| | Files and images | the attachments folder, whether a rename updates the `[[wikilinks]]` to it, how a pasted image lands, and the open board's unused images |
+| | Files and images | the attachments folder, the **templates folder** (`dag:templates`, empty is `Templates` when that exists — see *Note templates* in [`notes.md`](notes.md)), whether a rename updates the `[[wikilinks]]` to it, how a pasted image lands, and the open board's unused images |
 | | Export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 | | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on |
 | | Agent access | the command that connects Claude Code, Claude Desktop or another MCP client to this vault, with a **Read only** switch that adds the server's own `--read-only` |
@@ -100,7 +100,7 @@ Four things about the modal are load-bearing:
   tab's Reset names its scope in its own text ("Reset Export to defaults") and resets what that tab
   shows and nothing else. A tab that now holds part of an old section splits the reset with it:
   General's covers the settings object's `problems`, Appearance's the person's `THEME`, Files and
-  images' covers `paste`, `ATTACHMENTS` and `UPDATE_LINKS`, and Quizzes' writes the practice
+  images' covers `paste`, `ATTACHMENTS`, `TEMPLATES` and `UPDATE_LINKS`, and Quizzes' writes the practice
   threshold back to its default through `setGraduate`. Before it resets it snapshots the values it
   will change, then raises the modal's toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes
   the snapshot back through the same setters. The attachments folder, the one text field that saves

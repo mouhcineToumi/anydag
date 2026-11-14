@@ -29,6 +29,8 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { QUIET } from "./quiet";
+
 import { dueOf, statusOf, withKeys } from "./task";
 import { instantOf, offsetOf, wallOf } from "./zone";
 
@@ -93,7 +95,7 @@ export function eventOf(text: string): NoteEvent | undefined {
   if (!m) return undefined;
   let data: unknown;
   try {
-    data = parseYaml(m[1]!);
+    data = parseYaml(m[1]!, QUIET);
   } catch {
     return undefined;
   }

@@ -851,3 +851,12 @@
   file list and the reference index used to wait for the feed's next change, which after an agent's
   last write never comes (`src/board/refresher.ts`). To see the first half again, open six
   `EventSource`s through a `protocol.handle` that forwards with `net.fetch` and try a seventh request.
+- **A template's `{{…}}` is not YAML, and `yaml` says so on every parse.** `due: {{date}}` is a flow map
+  inside a flow map: it parses, and warns ("Keys with collection values will be stringified") through
+  `process.emitWarning` — to the server's stderr each time a template's stat moved, and to the page's
+  console, where a warning fails every browser spec. Nothing is wrong with the file. Every parser that
+  reads a note's frontmatter (`taskOf`, `eventOf`, `projectOf`, `splitNote`, `titleOf`) passes
+  `src/note/quiet.ts`'s `QUIET`, which keeps errors and drops warnings; a new one must too. **And a
+  template's own title is the new note's**, so `{{date}}` is what the sidebar would show for it: a
+  template is called by its file's name (`Vault.tree`), and `makes` is read off the text *as it would be
+  filled*, because `start: {{date}}` is no event until it is. See *Note templates* in `notes.md`.

@@ -187,6 +187,24 @@ describe("items", () => {
   });
 });
 
+describe("itemsOf and the templates folder", () => {
+  const made = new Date(2026, 9, 2, 12).toISOString();
+  const listing = {
+    notes: ["Templates/Daily", "Templates/Meeting/standup", "Templates 2/idea", "idea"],
+    created: { "Templates/Daily": made, "Templates/Meeting/standup": made, "Templates 2/idea": made, idea: made },
+    templates: "Templates",
+  };
+
+  it("leaves a template off the calendar, however deep in the folder, and nothing else", () => {
+    expect(itemsOf(listing, ALL, "2026-09-28", "2026-10-04").map((i) => i.name)).toEqual(["Templates 2/idea", "idea"]);
+  });
+
+  it("is what it always was with no templates folder", () => {
+    expect(itemsOf({ ...listing, templates: null }, ALL, "2026-09-28", "2026-10-04")).toHaveLength(4);
+    expect(itemsOf({ ...listing, templates: undefined }, ALL, "2026-09-28", "2026-10-04")).toHaveLength(4);
+  });
+});
+
 describe("lanes", () => {
   const item = (name: string, first: string, last: string): CalItem => ({
     kind: "event",

@@ -11,6 +11,8 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { QUIET } from "./quiet";
+
 export interface NoteFile {
   /** The frontmatter block including both `---` lines and the newline after them, or `""`. */
   front: string;
@@ -34,7 +36,7 @@ export function splitNote(text: string): NoteFile {
   const front = m[0];
   let title: string | undefined;
   try {
-    const data = parseYaml(front.replace(/^---\r?\n/, "").replace(/\r?\n---[ \t]*(?:\r?\n)?$/, ""));
+    const data = parseYaml(front.replace(/^---\r?\n/, "").replace(/\r?\n---[ \t]*(?:\r?\n)?$/, ""), QUIET);
     if (data && typeof data === "object" && typeof (data as { title?: unknown }).title === "string") {
       const t = (data as { title: string }).title.trim();
       if (t) title = t;

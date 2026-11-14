@@ -14,6 +14,8 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { QUIET } from "./quiet";
+
 import { HUE_ORDER, type Hue } from "../dsl/ir";
 import { withKeys } from "./task";
 
@@ -61,7 +63,7 @@ export function projectOf(text: string): Project | undefined {
   if (!m) return undefined;
   let data: unknown;
   try {
-    data = parseYaml(m[1]!);
+    data = parseYaml(m[1]!, QUIET);
   } catch {
     return undefined;
   }

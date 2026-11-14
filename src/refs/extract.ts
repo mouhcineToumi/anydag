@@ -15,6 +15,8 @@
  */
 import type { Nodes, Root } from "mdast";
 import { parse as parseYaml } from "yaml";
+
+import { QUIET } from "../note/quiet";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
@@ -118,7 +120,7 @@ export function titleOf(text: string): string | undefined {
   const m = FRONT.exec(text);
   if (!m) return undefined;
   try {
-    const data = parseYaml(m[1]!) as { title?: unknown } | null;
+    const data = parseYaml(m[1]!, QUIET) as { title?: unknown } | null;
     return typeof data?.title === "string" && data.title.trim() ? data.title.trim() : undefined;
   } catch {
     return undefined;

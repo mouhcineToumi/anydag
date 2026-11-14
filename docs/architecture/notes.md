@@ -134,6 +134,91 @@ packages; a note's saved version history (undo is the editor's, for the session)
 are edited in the same block editor, on the card, under the same rule — see *An md card's text, in
 place* in `editing.md`.
 
+## Note templates
+
+A **template** is an ordinary note in the vault's **templates folder**; *New note from template* makes
+a new note from one, with a few variables filled in, and the new note is a plain note from then on.
+The template's frontmatter is carried over as it is, so a template with a `status:` makes a task and
+one with a `start:` an event — those are notes with a line — and nothing else about it is special.
+
+    ---
+    title: "Meeting {{date}}"          Choosing it with the title "Q4 planning" makes
+    tags: [meeting]                    <folder>/Q4 planning.md:
+    ---                                  # Q4 planning
+    # {{title}}                          On 2026-11-14 at 09:30.
+    On {{date}} at {{time}}.
+
+| Where | What it does |
+|---|---|
+| Settings → This vault → Files and images → *Templates folder* | the vault's `dag:templates`, relative to its root; empty is `Templates`, **used only when that folder exists** |
+| the sidebar | **New note from template…** in the New menu and in a folder's menu, which makes in that folder |
+| the search card | a miss offers *New note “…” from template…*, the words typed being the title |
+| the leader key | `space m`, on a board and on every other page — refused while the app is locked, as every chord that makes something is |
+| the dialog (`src/ui/TemplatePicker.tsx`) | a **title** field first, with the caret in it, then the templates; Enter in the field makes the note when there is one template, and focuses the list when there are several; with none it says where templates live and offers **Add starter templates** |
+| `GET /__board/templates` · `POST /__board/from-template` · `POST /__board/templates/starters` | the list, the note made, and the three starters — over MCP `template_list`, `note_from_template`, `template_starters` |
+
+Eight things are load-bearing:
+
+- **The folder is a vault setting, and the server reads it.** `Vault.templatesFolder()` is the setting,
+  else `Templates` *if the folder exists on disk*, else none — asked of the disk each time, so a folder
+  made in a file manager is the templates folder at once and **nothing here ever creates it**: opening a
+  vault writes nothing, the dialog writes nothing, and a setting that names a folder that is not there
+  holds no templates. It is a vault preference like `dag:attachments` (`VAULT_PREF_KEYS`, in the vault's
+  bundle, `Session.reconfigure` re-reading it when the bundle is written, and a `tree` event when the
+  folder it names changes so every page reads the list again), because the server must know it to leave
+  templates out of what it answers.
+- **Variables are filled once, by one pure module.** `src/note/template.ts` — no browser, no `@/` — reads
+  `{{title}}`, `{{date}}` (`YYYY-MM-DD`), `{{time}}` (`HH:mm`) and `{{date:FORMAT}}`, with blanks allowed
+  inside the braces. **Anything else between braces is left exactly as written** (`{{note}}`, `{{date:}}`,
+  a Handlebars snippet), and a single pass fills the text, so a title that itself says `{{date}}` is not
+  filled again. `FORMAT` is Moment's tokens — `YYYY YY MMMM MMM MM M DD D dddd ddd HH H hh h mm m ss s A
+  a`, `[text]` copied as it is, any other character itself — in **English, fixed**, so one template makes
+  one text on every machine. There is no escape for a literal `{{date}}`, and no logic: Templater-style
+  scripting and applying a template to a note that exists are out.
+- **"Today" is the reader's zone.** The moment is read with `wallOf(at, zone)` in the zone Settings →
+  Calendar names (`zoneOf` in `server/routes/docs.ts`, the vault's, then the app's, then the machine's),
+  never `Date`'s local getters: a note made at 23:30 UTC is the 15th in Tokyo.
+  `test/template.test.ts` holds it, a zone's clock change included.
+- **A value in the frontmatter stays YAML.** Inside the block each line is filled by its quoting: a
+  `"…"` value has `\` and `"` escaped, a `'…'` value has `'` doubled, and a plain one is quoted (JSON) when
+  what was put in no longer reads back as the string it is — `title: {{title}}` with "Plan: Q4 #1" — a
+  title always a string even when it is `2026`, while `due: {{date}}` and `year: {{date:YYYY}}` stay a
+  date and a number. The body is text and takes a value as it is.
+- **The note is filed the way `/create` files any text**: a typed title is the name (verbatim, numbered if
+  taken, in the folder asked for) and wins over a `title:` the template fills in; with none, the template's
+  own title names it, else it starts *Untitled* — `{{title}}` reading *Untitled* — and its page asks for the
+  title first, as New note's does. **The template's `id:` is taken off**: a note made from one is its own
+  document, and a copy of the id would be two documents answering to one.
+- **A template is no task, project or event — and is still a note.** `Vault.tree()`, the change feed and
+  `/__board/index` leave a template out of `tasks`, `projects` and `events` (so the Tasks page, the
+  sidebar's count and glyphs, Due soon, `task_list` and `event_list` all agree without a line of their
+  own), and out of the sidebar's title: **a template is called by its file's name**, because its
+  `title:` is the new note's and may say `{{date}}`. `/__board/list` carries `templates`, the folder, so
+  the calendar — which draws a *note* on the day it was made — leaves the folder out (`itemsOf`).
+  A template stays in the file list, in search and in backlinks like any note, and its own page shows
+  its real frontmatter. What a template *makes* (`makes` in the list, and the mark on its row) is read
+  off the text **as it would be filled**, since `start: {{date}}` is no date until it is.
+- **The starters are written only when asked.** `src/note/starters.ts` is *Meeting*, *Daily* and *ADR*,
+  written by `POST /__board/templates/starters` into the templates folder (`Templates` when none is named),
+  making the folder, and **never over a name that is taken**, in any kind. None carries a `status:` or a
+  `start:` (an ADR's status is a word in its text: `status: accepted` would be no task's), and the person
+  edits, renames and deletes them like any note.
+- **A template's braces are not YAML, and the parsers do not complain about it.** `due: {{date}}` is a flow
+  map holding a flow map, which `yaml` warns about on every parse — to the server's stderr and the page's
+  console, where a warning fails a browser spec. `src/note/quiet.ts`'s `QUIET` (`logLevel: "error"`) is
+  passed by every parser that reads a note's frontmatter: errors still throw, warnings are not printed.
+
+Names claimed, grepped first: `dag-templates`, `dag-templates__where`, `dag-templates__none`,
+`dag-templates__problem`, `data-dag-templates`, `data-dag-templates-title`, `data-dag-templates-close`,
+`data-dag-templates-empty`, `data-dag-templates-starters`, `data-dag-templates-problem`,
+`data-dag-templates-failed`, `data-dag-template`, `data-dag-template-makes`,
+`data-dag-sidebar-new-template`, `data-dag-hits-new-from-template`, `data-dag-setting-templates`,
+`data-dag-setting-templates-problem`, the preference `dag:templates`, and the leader chord `space m`.
+
+**Out, and why:** templates for boards, quizzes and tables (a board already has `src/board/templates.ts`
+for items — a later issue); logic or scripting; applying a template to a note that exists; and a
+templates folder the app makes unasked.
+
 ## Equations
 
 TeX between dollars, everywhere Markdown is drawn — a note read-only and in

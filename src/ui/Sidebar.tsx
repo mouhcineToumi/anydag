@@ -37,6 +37,7 @@ import {
   GraduationCap,
   Grid2x2Plus,
   Home,
+  LayoutTemplate,
   Link as LinkMark,
   ListTodo,
   MessageCircleWarning,
@@ -82,6 +83,7 @@ import { holdStill, startDrag } from "./pointerDrag";
 import { copyText } from "./clipboard";
 import { appLink } from "@/refs/link";
 import { TaskGlyph } from "./TaskGlyph";
+import { openTemplates } from "./templates";
 import {
   ancestors,
   between,
@@ -1849,6 +1851,8 @@ export function Sidebar({
             setMaking(null);
             if (what === "upload") return pickFiles(folder);
             if (what === "folder") return reportMake(files.newFolder(folder));
+            /* Not a file yet: the picker asks for a title and a template first. */
+            if (what === "template") return openTemplates({ folder });
             reportMake(files.newFile(what, folder));
           }}
         />
@@ -1924,6 +1928,7 @@ export function Sidebar({
             else if (what === "duplicate" && menuLine.type === "file") files.duplicate(menuLine.entry.kind, where);
             else if (what === "new-board") reportMake(files.newFile("board", where));
             else if (what === "new-note") reportMake(files.newFile("note", where));
+            else if (what === "new-template") openTemplates({ folder: where });
             else if (what === "new-task") reportMake(files.newFile("task", where));
             else if (what === "new-event") reportMake(files.newFile("event", where));
             else if (what === "new-quiz") reportMake(files.newFile("quiz", where));
@@ -1995,12 +2000,13 @@ export function Sidebar({
 }
 
 /** What the New menu makes: the five kinds with a text, the two notes that start as more, and the two that are not files. */
-type Making = TextKind | "task" | "event" | "folder" | "upload";
+type Making = TextKind | "task" | "event" | "template" | "folder" | "upload";
 
 /** The New menu's rows, in the order a person reaches for them — a board first, as the app is a canvas. */
 const MAKES: { what: Making; label: string; icon: LucideIcon; hook?: string }[] = [
   { what: "board", label: "Board", icon: Workflow, hook: "data-dag-sidebar-new-board" },
   { what: "note", label: "Note", icon: FileText, hook: "data-dag-sidebar-new-note" },
+  { what: "template", label: "Note from template…", icon: LayoutTemplate, hook: "data-dag-sidebar-new-template" },
   { what: "task", label: "Task", icon: SquareCheckBig, hook: "data-dag-sidebar-new-task" },
   { what: "event", label: "Event", icon: CalendarPlus, hook: "data-dag-sidebar-new-event" },
   { what: "quiz", label: "Quiz", icon: GraduationCap, hook: "data-dag-sidebar-new-quiz" },
@@ -2204,6 +2210,7 @@ type Pick =
   | "delete"
   | "new-board"
   | "new-note"
+  | "new-template"
   | "new-task"
   | "new-event"
   | "new-quiz"
@@ -2332,6 +2339,7 @@ function RowMenu({
         <>
           {item("new-board", "New board", <FilePlus2 {...ICON} aria-hidden="true" />)}
           {item("new-note", "New note", <NotebookPen {...ICON} aria-hidden="true" />)}
+          {item("new-template", "New note from template…", <LayoutTemplate {...ICON} aria-hidden="true" />)}
           {item("new-task", "New task", <SquareCheckBig {...ICON} aria-hidden="true" />)}
           {item("new-event", "New event", <CalendarPlus {...ICON} aria-hidden="true" />)}
           {item("new-quiz", "New quiz", <FileQuestion {...ICON} aria-hidden="true" />)}

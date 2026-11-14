@@ -301,6 +301,30 @@
       "mcp": ["note_title"]
     },
     {
+      "id": "template.list",
+      "area": "Notes",
+      "what": "The note templates in the vault's templates folder, and what each makes",
+      "rest": ["GET /__board/templates"],
+      "cli": {"admin": false},
+      "mcp": ["template_list"]
+    },
+    {
+      "id": "template.create",
+      "area": "Notes",
+      "what": "Make a note from a template, its variables filled in once",
+      "rest": ["POST /__board/from-template"],
+      "cli": {"admin": false},
+      "mcp": ["note_from_template"]
+    },
+    {
+      "id": "template.starters",
+      "area": "Notes",
+      "what": "Write the starter templates (a meeting, a day, an ADR) into the templates folder, when asked",
+      "rest": ["POST /__board/templates/starters"],
+      "cli": {"admin": false},
+      "mcp": ["template_starters"]
+    },
+    {
       "id": "task.list",
       "area": "Tasks",
       "what": "Every task, with its status, due date and project",

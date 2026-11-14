@@ -84,6 +84,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Layout, per diagram type | [`design-and-layout.md`](design-and-layout.md) |
 | Links, and drawing bare | [`links.md`](links.md) |
 | Logs | [`logs.md`](logs.md) |
+| Note templates | [`notes.md`](notes.md) |
 | Notes | [`notes.md`](notes.md) |
 | Home | [`sidebar.md`](sidebar.md) |
 | Parity | [`cli.md`](cli.md) |
