@@ -2,6 +2,7 @@ import {
   CALENDAR_HIDE,
   FAVOURITES,
   ATTACHMENTS,
+  TEMPLATES,
   LIBRARY,
   SIDEBAR,
   THEME,
@@ -53,6 +54,8 @@ const PREFS: Record<string, string> = {
   favourites: FAVOURITES,
   /* The vault's attachments folder, relative to its root. */
   attachments: ATTACHMENTS,
+  /* The vault's templates folder, relative to its root; `Templates` when unset and present. */
+  templates: TEMPLATES,
   /* The calendar's two, the account's in every vault — what Settings' Calendar tab shows. */
   "calendar.weekStart": WEEK_START,
   "calendar.hide": CALENDAR_HIDE,

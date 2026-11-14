@@ -156,7 +156,7 @@ chord cannot be mistaken for typing.
 
     space n  a note        space p  a prompt card    space l  the library
     space k  the links     space t  tidy up          space v  select · space h  hand
-    space ?  the sheet
+    space m  a note from a template      space ?  the sheet
 
 Seven things are load-bearing:
 

@@ -5,7 +5,8 @@ import { Switch, TextField } from "@/ui/controls";
 
 import { SETTLE } from "../feedback";
 import { refuseLocked, useLocked } from "../lock";
-import { ATTACHMENTS, UPDATE_LINKS, readFlag, readPref, resetPrefs, writeFlag, writePref } from "../prefs";
+import { ATTACHMENTS, TEMPLATES, UPDATE_LINKS, readFlag, readPref, resetPrefs, writeFlag, writePref } from "../prefs";
+import { usePref } from "../usePref";
 import { resetSettingsWithUndo, writeSettings, type PasteSize } from "../store";
 import { useSettings } from "../useSettings";
 
@@ -87,6 +88,10 @@ export function FilesPane({ boardName }: { boardName: string | null }) {
         ) : null}
       </Group>
 
+      <Group title="Templates">
+        <TemplatesFolder />
+      </Group>
+
       <Group title="Links">
         <Field
           label="Update links when a file moves"
@@ -161,7 +166,7 @@ export function FilesPane({ boardName }: { boardName: string | null }) {
         what="Files and images"
         onReset={() => {
           const undoPaste = resetSettingsWithUndo(["paste"]);
-          const undoPrefs = resetPrefs([ATTACHMENTS, UPDATE_LINKS]);
+          const undoPrefs = resetPrefs([ATTACHMENTS, TEMPLATES, UPDATE_LINKS]);
           setDraft("");
           setLinks(true);
           setProblem(null);
@@ -173,6 +178,70 @@ export function FilesPane({ boardName }: { boardName: string | null }) {
           };
         }}
       />
+    </>
+  );
+}
+
+/**
+ * The folder note templates are kept in. Empty is the default, `Templates` — used when that folder
+ * exists, and never made by the app: **opening a vault writes nothing**, and a setting that named a
+ * folder would be no reason to start. A folder that is not there yet simply holds no templates.
+ *
+ * Saved on Enter or when the field is left, as the attachments folder is, and Escape takes the
+ * change back. The draft follows the stored value, so a reset and its Undo are drawn.
+ */
+function TemplatesFolder() {
+  const stored = usePref(TEMPLATES) ?? "";
+  const [draft, setDraft] = useState(stored);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => setDraft(stored), [stored]);
+
+  const commit = () => {
+    const v = draft.trim().replace(/^\/+|\/+$/g, "");
+    if (v.split("/").some((part) => part === ".." || part === ".") || v.includes("\\")) {
+      setProblem("That has to be a folder inside the vault.");
+      return;
+    }
+    setProblem(null);
+    setDraft(v);
+    if (v !== stored) writePref(TEMPLATES, v || null);
+  };
+
+  return (
+    <>
+      <Field
+        label="Templates folder"
+        hint="Notes in this folder are offered by New note from template. Empty uses Templates, when the vault has one."
+        save={TEMPLATES}
+      >
+        <TextField
+          wide
+          data-dag-setting-templates=""
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="Templates"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            } else if (e.key === "Escape" && draft !== stored) {
+              /* The first Escape takes the draft back; the next one closes Settings. */
+              e.preventDefault();
+              e.stopPropagation();
+              setDraft(stored);
+              setProblem(null);
+            }
+          }}
+        />
+      </Field>
+      {problem ? (
+        <p className="dag-settings__problem" role="alert" data-dag-setting-templates-problem="">
+          {problem}
+        </p>
+      ) : null}
     </>
   );
 }

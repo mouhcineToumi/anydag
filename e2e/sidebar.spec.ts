@@ -658,6 +658,7 @@ test("one New control names every kind, and a refused create says why under the 
   await expect(menu.locator("[role=menuitem]")).toHaveText([
     "Board",
     "Note",
+    "Note from template…",
     "Task",
     "Event",
     "Quiz",
@@ -665,7 +666,7 @@ test("one New control names every kind, and a refused create says why under the 
     "Folder",
     "Upload files…",
   ]);
-  for (const kind of ["board", "note", "task", "event", "quiz", "table", "folder", "upload"])
+  for (const kind of ["board", "note", "template", "task", "event", "quiz", "table", "folder", "upload"])
     await expect(menu.locator(`[data-dag-sidebar-new-kind="${kind}"] svg`)).toHaveCount(1);
 
   /* Folder makes `Untitled` in the open file's folder and starts the inline rename, from the one

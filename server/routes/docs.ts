@@ -20,6 +20,7 @@ import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
 import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
+import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
 import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/wikilinks";
 import type { Session } from "../context";
@@ -145,7 +146,7 @@ async function indexOf(s: Session): Promise<{ docs: IndexDoc[]; json: Promise<st
   const { docs, found } = await parsedOf(s, parsed, tree);
   const had = indexes.get(parsed);
   if (had && had.tree === tree && had.found === found) return had;
-  const now = { tree, found, docs: await indexAnswer(parsed, tree, docs, found), json: null };
+  const now = { tree, found, docs: await indexAnswer(parsed, tree, docs, found, s.vault.templatesFolder()), json: null };
   indexes.set(parsed, now);
   return now;
 }
@@ -161,7 +162,11 @@ async function indexJson(s: Session): Promise<string> {
    did — so a burst of saves resolves the links of what was saved, not of all 50,000 (#280). */
 const answered = new WeakMap<
   Parsed,
-  { named: WikiCandidate[]; ix: WikiIndex<WikiCandidate>; docs: Map<string, { f: Doc | null | undefined; out: IndexDoc }> }
+  {
+    named: WikiCandidate[];
+    ix: WikiIndex<WikiCandidate>;
+    docs: Map<string, { f: Doc | null | undefined; own: boolean; out: IndexDoc }>;
+  }
 >();
 
 const sameCandidates = (a: readonly WikiCandidate[], b: readonly WikiCandidate[]): boolean =>
@@ -176,6 +181,7 @@ async function indexAnswer(
   tree: Tree,
   docs: Listed[],
   found: ReadonlyMap<string, Doc | null>,
+  templates: string | null,
 ): Promise<IndexDoc[]> {
   const files = fileDocs(tree);
   // A `[[wikilink]]` names a document by name (decision 7): which one is the vault's answer now.
@@ -200,13 +206,15 @@ async function indexAnswer(
     await paced(fresh, (c) => building.add(c));
     ix = building;
   }
-  const now = new Map<string, { f: Doc | null | undefined; out: IndexDoc }>();
+  const now = new Map<string, { f: Doc | null | undefined; own: boolean; out: IndexDoc }>();
   const out: IndexDoc[] = [];
   await paced(docs, (d) => {
     const f = found.get(d.key);
     const title = (f?.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name);
+    /* A template is no task, project or event, here as in the list. */
+    const own = !inTemplates(d.name, templates);
     const had = unmoved ? prev.docs.get(d.key) : undefined;
-    if (had && had.f === f && had.out.id === d.id && had.out.name === d.name && had.out.title === title) {
+    if (had && had.f === f && had.own === own && had.out.id === d.id && had.out.name === d.name && had.out.title === title) {
       now.set(d.key, had);
       out.push(had.out);
       return;
@@ -216,13 +224,13 @@ async function indexAnswer(
       name: d.name,
       kind: d.kind,
       title,
-      task: f?.task ?? null,
-      project: f?.project ?? null,
-      event: f?.event ?? null,
+      task: (own && f?.task) || null,
+      project: (own && f?.project) || null,
+      event: (own && f?.event) || null,
       questions: f?.questions ?? null,
       refs: resolveWikiRefs((f?.refs as Ref[] | undefined) ?? [], ix),
     };
-    now.set(d.key, { f, out: doc });
+    now.set(d.key, { f, own, out: doc });
     out.push(doc);
   });
   answered.set(parsed, { named: unmoved ? prev.named : fresh, ix, docs: now });
@@ -281,7 +289,7 @@ async function corpusOf(s: Session): Promise<{ version: string; docs: Record<str
 }
 
 /** The zone a time with no offset is read in: the vault's settings, else the app's, else this machine's. */
-function zoneOf(s: Session): string {
+export function zoneOf(s: Session): string {
   return (
     zoneIn(readPrefs(s, "vault")) ?? zoneIn(readPrefs(s, "app")) ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC"
   );
@@ -291,7 +299,7 @@ function zoneOf(s: Session): string {
  * The name a text made with a title is filed under, and the text it is written with (decision 14):
  * the title verbatim in the asked folder, and the `title:` line dropped when the name says it exactly.
  */
-function titled(asked: string, text: string): { name: string; text: string } {
+export function titled(asked: string, text: string): { name: string; text: string } {
   const title = titleOf(text);
   if (!title || asked.startsWith("components/")) return { name: asked, text };
   const name = titleName(title, folderOf(asked));
@@ -386,30 +394,30 @@ async function jsonListPaced(items: readonly object[]): Promise<string> {
 
 /* The listing's JSON, made once per tree: a kept listing answers the same tree while nothing moved,
    and its 9 MB of JSON was most of what a warm `/__board/list` on 50,000 files cost (#280). */
-const listJson = new WeakMap<Tree, Promise<string>>();
+const listJson = new WeakMap<Tree, { templates: string | null; json: Promise<string> }>();
 
-function listOf(t: Tree): Promise<string> {
-  let json = listJson.get(t);
-  if (!json) {
-    json = jsonPaced({
-      boards: t.boards,
-      folders: t.folders,
-      notes: t.notes,
-      ids: t.ids,
-      shared: [],
-      titles: t.titles,
-      tasks: t.tasks,
-      projects: t.projects,
-      events: t.events,
-      created: t.created,
-      quizzes: t.quizzes,
-      questions: Object.fromEntries(Object.entries(t.questions).map(([n, q]) => [n, q.length])),
-      tables: t.tables,
-      files: t.files,
-      sizes: t.sizes,
-    });
-    listJson.set(t, json);
-  }
+function listOf(t: Tree, templates: string | null): Promise<string> {
+  const had = listJson.get(t);
+  if (had && had.templates === templates) return had.json;
+  const json = jsonPaced({
+    boards: t.boards,
+    folders: t.folders,
+    notes: t.notes,
+    ids: t.ids,
+    shared: [],
+    titles: t.titles,
+    tasks: t.tasks,
+    projects: t.projects,
+    events: t.events,
+    templates,
+    created: t.created,
+    quizzes: t.quizzes,
+    questions: Object.fromEntries(Object.entries(t.questions).map(([n, q]) => [n, q.length])),
+    tables: t.tables,
+    files: t.files,
+    sizes: t.sizes,
+  });
+  listJson.set(t, { templates, json });
   return json;
 }
 
@@ -417,7 +425,9 @@ function listOf(t: Tree): Promise<string> {
 const DRAFT_MAX = 4 * 1024 * 1024;
 
 export function docRoutes(app: Hono, s: Session): void {
-  app.get("/__board/list", async (c) => c.body(await listOf(await s.vault.tree()), 200, { "content-type": "application/json" }));
+  app.get("/__board/list", async (c) =>
+    c.body(await listOf(await s.vault.tree(), s.vault.templatesFolder()), 200, { "content-type": "application/json" }),
+  );
 
   app.get("/__board/get", async (c) => {
     const kind = textKind(c.req.query("kind"));

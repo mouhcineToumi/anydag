@@ -139,6 +139,13 @@ export const CALENDAR_VIEW = "dag:calendar-view";
  */
 export const ATTACHMENTS = "dag:attachments";
 /**
+ * The folder a vault's note templates are in, relative to its root. Unset, it is `Templates` **when
+ * that folder exists** — nothing here ever creates it. The vault's, for `ATTACHMENTS`'s reason: the
+ * server reads it out of the vault's bundle, because a template that carries a `status:` must be left
+ * out of the task and calendar lists the server answers, and an agent reads the same file.
+ */
+export const TEMPLATES = "dag:templates";
+/**
  * Whether renaming or moving a document rewrites the `[[wikilinks]]` that name it, Obsidian's
  * *Automatically update internal links*: `"0"` for off, anything else — absent included — on. The
  * vault's, for `ATTACHMENTS`'s reason: the server reads it out of the vault's bundle on every rename
@@ -172,6 +179,7 @@ export const PREF_KEYS = [
   TIME_ZONE,
   TIME_ZONE_SEEN,
   ATTACHMENTS,
+  TEMPLATES,
   UPDATE_LINKS,
 ] as const;
 
@@ -181,7 +189,7 @@ export const PREF_KEYS = [
  * out of the vault's bundle. Everything else in `PREF_KEYS` is the person's, the same in every vault:
  * how the window is laid out, the theme and the AI choices (#191).
  */
-export const VAULT_PREF_KEYS = [FAVOURITES, ATTACHMENTS, UPDATE_LINKS] as const;
+export const VAULT_PREF_KEYS = [FAVOURITES, ATTACHMENTS, TEMPLATES, UPDATE_LINKS] as const;
 export const ACCOUNT_PREF_KEYS = PREF_KEYS.filter((k) => !(VAULT_PREF_KEYS as readonly string[]).includes(k));
 
 /**

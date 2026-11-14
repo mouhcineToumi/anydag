@@ -114,7 +114,8 @@ import { placedWidth } from "@/edit/image";
 import { readSettings } from "@/settings/store";
 import { aiOn } from "@/settings/aiSwitch";
 import { useAi } from "@/settings/useAi";
-import { refuseLocked, useLocked } from "@/settings/lock";
+import { isLocked, refuseLocked, useLocked } from "@/settings/lock";
+import { openTemplates } from "@/ui/templates";
 import { track } from "@/telemetry/client";
 
 /* The library's open state lives in `settings/prefs.ts`, which is the one place that knows what
@@ -514,6 +515,11 @@ function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }
         /* `space A` is the Assistant's, and goes with it when it is turned off (#296). */
         e.preventDefault();
         toggleAssistant();
+      } else if (leader && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        /* It makes a file, which a locked app refuses, as the board's chord does. */
+        if (isLocked()) refuseLocked();
+        else openTemplates();
       }
       leader = false;
     };

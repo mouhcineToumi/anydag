@@ -36,6 +36,7 @@ import watcher from "@parcel/watcher";
 import type { NoteEvent } from "../src/note/event";
 import type { Project } from "../src/note/project";
 import type { Task } from "../src/note/task";
+import { TEMPLATES_DEFAULT, cleanFolder, inTemplates } from "../src/note/template";
 import { titleOf } from "../src/refs/extract";
 import type { DocRow, Home } from "./home";
 import { derivedId, frontId, instant, mint, validId, validInstant, withId } from "./ids";
@@ -208,6 +209,8 @@ export interface VaultOptions {
   types?: readonly string[];
   /** The folder new attachments go into. */
   attachments?: string;
+  /** The folder the vault's note templates are in, as Settings names it; unset is `Templates`, when that exists. */
+  templates?: string;
   /** When a file was born, for a test that needs two devices' clocks apart; `null` asks the disk. */
   born?: (abs: string) => Date | null;
 }
@@ -218,6 +221,8 @@ export class Vault {
   readonly home: Home;
   readonly types: ReadonlySet<string>;
   attachments: string;
+  /** The templates folder Settings names, or `""` for none named — see {@link templatesFolder}. */
+  templates: string;
   private readonly born: ((abs: string) => Date | null) | null;
   private fronts = new Map<string, Front>();
   /** The listing's own reads, kept between listings — used when there is no worker to list on. */
@@ -302,6 +307,7 @@ export class Vault {
     this.home = home;
     this.types = new Set((opts.types ?? DEFAULT_TYPES).map((t) => t.toLowerCase()));
     this.attachments = opts.attachments ?? "attachments";
+    this.templates = cleanFolder(opts.templates ?? "");
     this.born = opts.born ?? null;
     this.id = vaultId(this.root);
     this.lister = new Lister(this.root);
@@ -396,6 +402,21 @@ export class Vault {
     return out;
   }
 
+  /**
+   * The folder this vault's note templates are in: the one Settings names, else `Templates` **when
+   * that folder exists**, else none. Asked of the disk each time, so a folder made in a file manager
+   * is a templates folder at once and nothing is ever created to make it one — opening a vault writes
+   * nothing.
+   */
+  templatesFolder(): string | null {
+    if (this.templates) return this.templates;
+    try {
+      return fs.statSync(this.abs(TEMPLATES_DEFAULT)).isDirectory() ? TEMPLATES_DEFAULT : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** What a text's frontmatter says, read only when its stat moved. */
   private front(listed: Listed): Front | null {
     const abs = this.abs(listed.file);
@@ -468,7 +489,7 @@ export class Vault {
       const listing = tries < 3 ? await listVault(this.lister, this.types) : this.lister.list(this.types);
       const t = await this.treeOf(listing, given, tries < 3 ? () => this.moves === moves : null);
       if (!t) continue;
-      if (heard && this.watching && this.clearedAt <= from) this.keep(listing, t.rows, t.tree, from, records);
+      if (heard && this.watching && this.clearedAt <= from) this.keep(listing, t.rows, t.tree, t.templates, from, records);
       return t.tree;
     }
     throw new Error("unreachable: the last listing runs in one go");
@@ -478,9 +499,23 @@ export class Vault {
    * Keep a listing: what it found, its rows and its tree. Every path said to have moved before it
    * began is in it; one said since stays, for the next listing to look at again.
    */
-  private keep(listing: Listing, rows: Map<string, DocRow>, tree: Tree, from: number, records: number | null): void {
+  private keep(
+    listing: Listing,
+    rows: Map<string, DocRow>,
+    tree: Tree,
+    templates: string | null,
+    from: number,
+    records: number | null,
+  ): void {
     const entries = listing.docs.map((d, i): Entry => ({ listed: d, found: listing.found[i]!, row: rows.get(d.file) ?? null }));
-    this.kept = new KeptListing(entries, listing.marks, tree, (d) => textKey(d.name, d.kind as TextKind));
+    this.kept = new KeptListing(
+      entries,
+      listing.marks,
+      tree,
+      (d) => textKey(d.name, d.kind as TextKind),
+      templates,
+      (name) => inTemplates(name, templates),
+    );
     this.recordsMark = records;
     this.recordsMoved = false;
     for (const [low, d] of this.dirty) if (d.at <= from) this.dirty.delete(low);
@@ -503,6 +538,9 @@ export class Vault {
     for (let tries = 0; tries < 3; tries++) {
       // An attachment record somebody else wrote: only the walk matches a record to a moved file.
       if (this.recordsMoved || mtimeOf(this.folderAbs(RECORDS)) !== this.recordsMark) return null;
+      /* The templates folder moved — renamed in Settings, or a `Templates` folder made or removed by
+         hand: which notes are tasks changed for every one in it, so the next listing walks. */
+      if (this.templatesFolder() !== k.templates) return null;
       const moves = this.moves;
       const upTo = this.dirtyAt;
       const look = this.looked(k);
@@ -784,7 +822,7 @@ export class Vault {
     { docs, folders, found }: Listing,
     from: number,
     still: (() => boolean) | null,
-  ): Promise<{ tree: Tree; rows: Map<string, DocRow> } | null> {
+  ): Promise<{ tree: Tree; rows: Map<string, DocRow>; templates: string | null } | null> {
     if (still && !still()) return null;
     // Only when there is none: a running watcher has kept it since this walk, which is older.
     this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
@@ -806,6 +844,7 @@ export class Vault {
     };
     const lists = byKind(t);
     const fronts = new Map<string, Front>();
+    const templates = this.templatesFolder();
     const births = new Map<string, number>();
     const pace = { still, paced: !!still };
     let at = 0;
@@ -817,13 +856,19 @@ export class Vault {
         if (f.size !== null) t.sizes[d.name] = f.size;
         return;
       }
-      // A document nobody titled is called by its file's name.
-      t.titles[d.name] = f.front?.title || leafOf(d.name);
+      // A document nobody titled is called by its file's name — and so is a template, whose `title:` is
+      // the new note's and may well say `{{date}}`.
+      const template = inTemplates(d.name, templates);
+      t.titles[d.name] = (!template && f.front?.title) || leafOf(d.name);
       if (!f.front) return;
       fronts.set(d.file, f.front);
-      if (f.front.task) t.tasks[d.name] = f.front.task;
-      if (f.front.project) t.projects[d.name] = f.front.project;
-      if (f.front.event) t.events[d.name] = f.front.event;
+      /* A template that carries a `status:`, a `project:` or a `start:` is a note to copy, not a task
+         to do: it is left out of the maps every page that draws them reads. */
+      if (!template) {
+        if (f.front.task) t.tasks[d.name] = f.front.task;
+        if (f.front.project) t.projects[d.name] = f.front.project;
+        if (f.front.event) t.events[d.name] = f.front.event;
+      }
       if (f.front.asks) t.questions[d.name] = f.front.asks;
     };
     if (!(await sliced(docs, read, pace))) return null;
@@ -841,7 +886,7 @@ export class Vault {
       l.sort(byName);
       if (pace.paced) await yieldNow();
     }
-    return { tree: t, rows };
+    return { tree: t, rows, templates };
   }
 
   // -- ids -------------------------------------------------------------------
@@ -2461,13 +2506,17 @@ export class Vault {
             continue;
           }
           const f = frontOf(found.kind, text, "");
+          /* A template says nothing about being a task: the feed agrees with the list. */
+          const own = !inTemplates(found.name, this.templatesFolder());
           this.emit({
             type: "doc",
             kind: found.kind,
             name: found.name,
             sha1: sha1(text),
-            title: f.title ?? null,
-            ...(found.kind === "note" ? { task: f.task ?? null, project: f.project ?? null, event: f.event ?? null } : {}),
+            title: (own && f.title) || null,
+            ...(found.kind === "note"
+              ? { task: (own && f.task) || null, project: (own && f.project) || null, event: (own && f.event) || null }
+              : {}),
             ...(found.kind === "quiz" ? { questions: f.asks?.length ?? 0 } : {}),
           });
         }

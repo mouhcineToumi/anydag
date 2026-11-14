@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**135 features, 0 gaps, 74 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
+**138 features, 0 gaps, 77 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
@@ -73,6 +73,9 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Copy a note | `POST /__board/duplicate` | · | `note_duplicate` |
 | Move a note to the trash | `POST /__board/delete` | `note rm` | `note_delete` |
 | Call a note something, and let its name follow | `POST /__board/retitle` | · | `note_title` |
+| The note templates in the vault's templates folder, and what each makes | `GET /__board/templates` | · | `template_list` |
+| Make a note from a template, its variables filled in once | `POST /__board/from-template` | · | `note_from_template` |
+| Write the starter templates (a meeting, a day, an ADR) into the templates folder, when asked | `POST /__board/templates/starters` | · | `template_starters` |
 
 ## Tasks
 

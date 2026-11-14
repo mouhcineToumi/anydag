@@ -64,6 +64,8 @@ import { useAi } from "@/settings/useAi";
 import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
+import { TemplatePicker } from "./TemplatePicker";
+import { closeTemplates, createFromTemplate, useTemplatePicker } from "./templates";
 import { IconButton } from "@/ui/controls";
 import { closeAssistant, usePanel } from "@/assistant/panelState";
 import { AssistantPanel } from "./chunks";
@@ -72,7 +74,7 @@ import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFi
 import { TrashNotice, type Gone } from "./TrashNotice";
 import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
-import { ancestors, follow, keyOf, leaf, rebase, type Change } from "./tree";
+import { ancestors, follow, keyOf, leaf, parentOf, rebase, type Change } from "./tree";
 
 /**
  * What the sidebar is doing, for the one other place that has to know: the toolbar, which keeps
@@ -844,6 +846,22 @@ export function Shell({
 
   const retitle = useCallback((kind: FileKind, name: string, title: string) => files.retitle(kind, name, title), [files]);
 
+  /* A note made from a template, by the title typed over it — opened the way every New opens its note. A
+     note asked for with no title starts *Untitled* and is named on its own page, as New note is; one the
+     template titled itself, or the person did, is open as it is, with no question left to ask. */
+  const picker = useTemplatePicker();
+  const makeFromTemplate = useCallback(
+    async (template: string, folder: string, title: string) => {
+      const made = await createFromTemplate(template, folder, title);
+      if ("error" in made) return made.error;
+      closeTemplates();
+      if (!title && /^Untitled( \d+)?$/.test(leaf(made.name))) nameWhenOpened(made.name);
+      onOpen("note", made.name);
+      return null;
+    },
+    [onOpen],
+  );
+
   const idOf = useCallback((name: string) => ids[name], [ids]);
   const ctl = useMemo<SidebarControl>(
     () => ({ docked: mode === "docked", reveal, create, renamed, retitle, idOf, home: openHome }),
@@ -990,6 +1008,14 @@ export function Shell({
           ) : null}
           {children}
           {panel.open && assistantOn && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {picker.open ? (
+            <TemplatePicker
+              folder={picker.folder ?? parentOf(board ?? note ?? quiz ?? table ?? file ?? "")}
+              title={picker.title}
+              onMake={makeFromTemplate}
+              onClose={closeTemplates}
+            />
+          ) : null}
           {trashed ? (
             <TrashNotice
               key={trashed.n}

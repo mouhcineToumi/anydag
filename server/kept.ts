@@ -93,6 +93,10 @@ export class KeptListing {
     marks: Record<string, number>,
     tree: Tree,
     private readonly keyOf: (d: Listed) => string,
+    /** The templates folder the tree was made with: a change to it is a walk, not a refresh. */
+    readonly templates: string | null = null,
+    /** Whether a name is a template, which is no task, project or event and is called by its file's name. */
+    private readonly template: (name: string) => boolean = () => false,
   ) {
     for (const e of entries) this.put(e);
     for (const [dir, mark] of Object.entries(marks)) this.folders.set(dir, mark);
@@ -220,11 +224,14 @@ export class KeptListing {
         if (f.size !== null) keys.sizes = f.size;
         continue;
       }
-      keys.titles = f.front?.title || leafOf(d.name);
+      const template = this.template(d.name);
+      keys.titles = (!template && f.front?.title) || leafOf(d.name);
       if (!f.front) continue;
-      if (f.front.task) keys.tasks = f.front.task;
-      if (f.front.project) keys.projects = f.front.project;
-      if (f.front.event) keys.events = f.front.event;
+      if (!template) {
+        if (f.front.task) keys.tasks = f.front.task;
+        if (f.front.project) keys.projects = f.front.project;
+        if (f.front.event) keys.events = f.front.event;
+      }
       if (f.front.asks) keys.questions = f.front.asks;
     }
     for (const { listed: d, row } of es) {

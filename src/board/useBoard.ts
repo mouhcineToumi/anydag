@@ -320,6 +320,12 @@ export interface BoardTree {
    */
   events: Readonly<Record<string, NoteEvent>>;
   /**
+   * The folder the vault's note templates are in — the setting, or `Templates` when that exists — or
+   * `null` for none. What the calendar leaves out: a template is a note to copy, not one written on
+   * the day it was made. The server already leaves a template out of `tasks`, `projects` and `events`.
+   */
+  templates?: string | null;
+  /**
    * When each file was made, by name — an instant in UTC, the store's record beside the id and never a
    * line in the file. The day the calendar puts a note on.
    */
@@ -351,6 +357,7 @@ const NO_BOARDS: BoardTree = {
   tasks: {},
   projects: {},
   events: {},
+  templates: null,
   created: {},
   ids: {},
   quizzes: [],
@@ -402,6 +409,7 @@ function treeOf(d: Partial<BoardTree>, fresh: boolean): BoardTree {
     tasks: d.tasks ?? {},
     projects: d.projects ?? {},
     events: d.events ?? {},
+    templates: d.templates ?? null,
     created: d.created ?? {},
     ids: d.ids ?? {},
     quizzes: d.quizzes ?? [],

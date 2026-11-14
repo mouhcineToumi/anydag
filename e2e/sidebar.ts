@@ -62,7 +62,7 @@ export async function settingsTab(page: Page, tab: SettingsTab): Promise<void> {
  */
 export async function newFile(
   page: Page,
-  kind: "board" | "note" | "task" | "event" | "quiz" | "table",
+  kind: "board" | "note" | "template" | "task" | "event" | "quiz" | "table",
   { top = false } = {},
 ): Promise<void> {
   await openSidebar(page);

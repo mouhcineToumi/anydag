@@ -188,7 +188,7 @@ describe("the preference list", () => {
     expect(ACCOUNT_PREF_KEYS.filter((k) => (VAULT_PREF_KEYS as readonly string[]).includes(k))).toEqual([]);
     /* The favourites, the attachments folder and the links switch go with the vault; how the window
        is laid out, the theme and the AI choices are the person's (#191). */
-    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:update-links"]);
+    expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:templates", "dag:update-links"]);
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:theme");
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:ai");
   });

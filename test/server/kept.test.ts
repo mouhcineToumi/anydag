@@ -224,6 +224,39 @@ describe("the kept listing", () => {
     expect(after.filter((f) => !f.startsWith("outside.md"))).toEqual(before);
     env = again;
   });
+
+  /* A note in the templates folder is a note to copy (#263): called by its file's name and no task,
+     project or event — in the kept listing as in the walk, and again when the folder itself moves. */
+  it("a template is no task in the kept listing, and a templates folder made by hand is a walk", async () => {
+    fs.mkdirSync(at("Templates"));
+    write(env.root, "Templates/daily.md", "---\ntitle: {{date}}\nstatus: todo\n---\n");
+    const t = await same(true);
+    expect(t.notes).toContain("Templates/daily");
+    expect(t.titles["Templates/daily"]).toBe("daily");
+    expect(t.tasks["Templates/daily"]).toBeUndefined();
+    let heard!: () => void;
+    const said = new Promise<void>((ok) => {
+      heard = ok;
+    });
+    await env.vault.subscribeRaw((rels) => {
+      if (rels.includes("Templates/daily.md")) heard();
+    });
+    fs.writeFileSync(at("Templates/daily.md"), "---\ntitle: Day {{date}}\nproject: planning\nstatus: doing\n---\n");
+    await said;
+    const after = await same();
+    expect(after.tasks["Templates/daily"]).toBeUndefined();
+    expect(after.projects["Templates/daily"]).toBeUndefined();
+  });
+
+  it("a templates folder renamed in Settings is a walk, and its notes stop being tasks", async () => {
+    expect((await same()).tasks["work/deep/task"]).toBeTruthy();
+    env.vault.templates = "work";
+    const t = await env.vault.tree();
+    expect(t.tasks["work/deep/task"]).toBeUndefined();
+    expect(t.titles["work/Onboarding"]).toBe("Onboarding");
+    env.vault.templates = "";
+    expect((await env.vault.tree()).tasks["work/deep/task"]).toBeTruthy();
+  });
 });
 
 describe("the references index over a kept listing", () => {
