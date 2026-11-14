@@ -50,7 +50,7 @@ const SPLIT = /[\p{Z}\p{P}\p{S}\s]+/u;
 /** Accents off and lower case, so `café` finds `cafe` and `Cafe` alike. */
 export const fold = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
-interface Row {
+export interface Row {
   k: number;
   text: string;
 }
@@ -60,14 +60,22 @@ export interface Engine {
   units: { doc: SearchDoc; unit: Unit }[];
 }
 
-export function buildEngine(docs: SearchDoc[]): Engine {
-  const units = docs.flatMap((doc) => doc.units.map((unit) => ({ doc, unit })));
-  const mini = new MiniSearch<Row>({
+/**
+ * An empty index, configured the one way every engine is: a unit is added as `{ k, text }`, `k` its
+ * place in whatever list the caller keeps beside it.
+ */
+export function newIndex(): MiniSearch<Row> {
+  return new MiniSearch<Row>({
     idField: "k",
     fields: ["text"],
     tokenize: (s) => s.split(SPLIT).filter(Boolean),
     processTerm: (t) => fold(t) || null,
   });
+}
+
+export function buildEngine(docs: SearchDoc[]): Engine {
+  const units = docs.flatMap((doc) => doc.units.map((unit) => ({ doc, unit })));
+  const mini = newIndex();
   mini.addAll(units.map((u, k) => ({ k, text: u.unit.text })));
   return { mini, units };
 }
@@ -75,7 +83,7 @@ export function buildEngine(docs: SearchDoc[]): Engine {
 /** At most this many hits in one document, so a long note that says a word forty times leaves room for the rest. */
 const PER_DOC = 3;
 /** And this many in all: a result list is read, not scrolled. */
-const LIMIT = 40;
+export const LIMIT = 40;
 
 /**
  * The units that hold every word of the query, best first.
@@ -87,21 +95,35 @@ const LIMIT = 40;
  * with a typo in it matches half the corpus.
  */
 export function search(engine: Engine, query: string, limit = LIMIT): Hit[] {
+  return rank(engine.mini, query, limit, (k) => engine.units[k]);
+}
+
+/**
+ * `search` over an index whose units the caller keeps: `at(k)` is the unit added as `k`, holding
+ * at least the document it is in. The server keeps a unit's place and not its words, and reads the
+ * words of the few it answers with (`server/search-store.ts`); the ranking is this one either way.
+ */
+export function rank<T extends { doc: { id: string } }>(
+  mini: MiniSearch<Row>,
+  query: string,
+  limit: number,
+  at: (k: number) => T | undefined,
+): (T & { score: number; terms: string[] })[] {
   if (!query.trim()) return [];
-  const found = engine.mini.search(query, {
+  const found = mini.search(query, {
     combineWith: "AND",
     prefix: true,
     fuzzy: (term) => (term.length >= 5 ? 0.2 : false),
   });
   const perDoc = new Map<string, number>();
-  const out: Hit[] = [];
+  const out: (T & { score: number; terms: string[] })[] = [];
   for (const r of found) {
-    const at = engine.units[r.id as number];
-    if (!at) continue;
-    const n = perDoc.get(at.doc.id) ?? 0;
+    const got = at(r.id as number);
+    if (!got) continue;
+    const n = perDoc.get(got.doc.id) ?? 0;
     if (n >= PER_DOC) continue;
-    perDoc.set(at.doc.id, n + 1);
-    out.push({ ...at, score: r.score, terms: r.terms });
+    perDoc.set(got.doc.id, n + 1);
+    out.push({ ...got, score: r.score, terms: r.terms });
     if (out.length >= limit) break;
   }
   return out;

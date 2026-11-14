@@ -172,8 +172,8 @@ export class Session {
     }
     const at: Open = {
       vault,
-      index: new Parsed("index", vault.root),
-      corpus: new Parsed("corpus", vault.root),
+      index: new Parsed("index", vault.root, { home: this.home.dir }),
+      corpus: new Parsed("corpus", vault.root, { home: this.home.dir }),
       practice: new Practice(this.home, vault.id),
     };
     this.open.set(vault.id, at);

@@ -17,8 +17,9 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/listing.ts` · `list-worker.ts` | the listing as the disk gives it — the walk, every stat and frontmatter read — and the worker it runs on |
 | `server/kept.ts` | the listing kept between answers while the vault is watched, and the tree it makes, changed only where something moved |
 | `server/home.ts` | the app's home — `ANYDAG_HOME`, else the platform's data folder — and its `node:sqlite` index |
-| `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on |
+| `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on: a process, ended when idle |
 | `server/parsing.ts` · `pace.ts` | the texts of `/index` and `/corpus` read, parsed and kept where the grammar runs · a whole-vault loop in slices |
+| `server/parse-store.ts` · `searching.ts` | what the grammar parsed, kept in `<home>/parse.sqlite` · a vault's corpus and search, answered in the worker |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
@@ -29,8 +30,10 @@ Nine things are load-bearing:
   its frontmatter; an attachment's is `<vault>/.anydag/files/<id>.json`; a vault's own id and
   settings are in `<vault>/.anydag/`. The SQLite file in the app's home maps id → path, created,
   title and kind so the app, the CLI and MCP agree without walking the vault, and it is an index:
-  delete it and the next open rebuilds it, losing practice records and nothing else. **SQLite is
-  never in the vault**, because a sync tool copies a database while it is written.
+  delete it and the next open rebuilds it, losing practice records and nothing else. Beside it,
+  `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1: delete it and the
+  next question parses the vault again. **SQLite is never in the vault**, because a sync tool copies
+  a database while it is written.
 - **Frontmatter wins.** Two files with one id — a copy made in a file manager — keep it for the
   older by created date, and the copy is given a new id, written into it. A file moved outside the
   app keeps its id and the index learns the new path from the watcher.

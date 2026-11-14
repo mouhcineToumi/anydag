@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Parsed, Thread } from "../../server/grammar";
+import { Parsed, WorkerProcess } from "../../server/grammar";
 import type { Entry } from "../../server/parsing";
 
 let root: string;
@@ -28,18 +28,18 @@ describe("the grammar's worker (#9)", () => {
   const file = path.join(dir, "worker.mjs");
   fs.writeFileSync(
     file,
-    `import { parentPort } from "node:worker_threads";
-parentPort.on("message", (m) => {
+    `process.on("message", (m) => {
   if (m.route === "/stuck") for (;;) {}
-  parentPort.postMessage({ id: m.id, answer: { status: 200, body: m.route } });
+  process.send({ id: m.id, answer: { status: 200, body: m.route } });
 });
+process.on("disconnect", () => process.exit(0));
 `,
   );
   /* The suite shares a process between files (`isolate: false`): a worker left running is another
      file's problem, so every one is ended here. */
-  const threads: Thread[] = [];
-  const made = (deadlineMs: number): Thread => {
-    const t = new Thread(file, deadlineMs);
+  const threads: WorkerProcess[] = [];
+  const made = (deadlineMs: number): WorkerProcess => {
+    const t = new WorkerProcess(file, deadlineMs);
     threads.push(t);
     return t;
   };
@@ -68,9 +68,11 @@ parentPort.on("message", (m) => {
 describe("Parsed", () => {
   it("parses only what changed, and moves its generation only then", async () => {
     const asked: string[][] = [];
-    const parsed = new Parsed("index", root, (texts) => {
-      asked.push(Object.keys(texts).sort());
-      return Object.fromEntries(Object.entries(texts).map(([k, t]) => [k, { length: t.length }]));
+    const parsed = new Parsed("index", root, {
+      parse: (texts) => {
+        asked.push(Object.keys(texts).sort());
+        return Object.fromEntries(Object.entries(texts).map(([k, t]) => [k, { length: t.length }]));
+      },
     });
     await parsed.of(put({ a: "one", b: "two" }));
     const g = parsed.generation;
@@ -91,7 +93,9 @@ describe("Parsed", () => {
   });
 
   it("reads a text again only when its stat moved, so a save of the same size is still seen", async () => {
-    const parsed = new Parsed("index", root, (texts) => Object.fromEntries(Object.entries(texts).map(([k, t]) => [k, { t }])));
+    const parsed = new Parsed("index", root, {
+      parse: (texts) => Object.fromEntries(Object.entries(texts).map(([k, t]) => [k, { t }])),
+    });
     const entries = put({ a: "abc" });
     expect((await parsed.of(entries)).get("a")).toEqual({ t: "abc" });
     const file = path.join(root, "a.board.md");
@@ -104,9 +108,11 @@ describe("Parsed", () => {
 
   it("takes two cold asks one after the other, so the second parses nothing", async () => {
     let calls = 0;
-    const parsed = new Parsed("index", root, (texts) => {
-      calls++;
-      return Object.fromEntries(Object.keys(texts).map((k) => [k, {}]));
+    const parsed = new Parsed("index", root, {
+      parse: (texts) => {
+        calls++;
+        return Object.fromEntries(Object.keys(texts).map((k) => [k, {}]));
+      },
     });
     const entries = put({ a: "x", b: "y" });
     await Promise.all([parsed.of(entries), parsed.of(entries)]);
@@ -119,7 +125,7 @@ describe("Parsed", () => {
       fs.writeFileSync(path.join(elsewhere, "secret.board.md"), "secret");
       fs.symlinkSync(path.join(elsewhere, "secret.board.md"), path.join(root, "link.board.md"));
       fs.symlinkSync(elsewhere, path.join(root, "out"));
-      const parsed = new Parsed("index", root, (texts) => Object.fromEntries(Object.keys(texts).map((k) => [k, {}])));
+      const parsed = new Parsed("index", root, { parse: (texts) => Object.fromEntries(Object.keys(texts).map((k) => [k, {}])) });
       const got = await parsed.of([
         ...put({ here: "here" }),
         ["link", "link", "board"],

@@ -39,7 +39,9 @@
  *   tables, quizzes and small attachments, in folders of 50 plus a flat `inbox/` holding a tenth):
  *   time to listen, the first and a warm `GET /__board/list`, a cold and a warm `/index` with the
  *   slowest `/api/health` asked back to back while each ran (#287), a cold and a warm `/search`, a
- *   warm `/corpus` with the same probe, the server's RSS, the app home's size, idle CPU with the change feed open, and a burst
+ *   warm `/corpus` with the same probe, the server's RSS (with its grammar worker, a process of its
+ *   own) after them and at rest once that worker has ended, a warm `/index` and a search after it
+ *   ended, the app home's size, idle CPU with the change feed open, and a burst
  *   of 200 external writes (CPU, events heard, time to quiet). And that opening wrote nothing: every
  *   file's size and mtime before and after, `.anydag/` included (the vault is generated with its id).
  * - *page.<n>*: the built page in Chromium on the same vault: a note in `inbox/` opened to
@@ -104,6 +106,8 @@ const QUICK = argv.includes("--quick");
 const GUARD = argv.includes("--guard");
 const KEEP = argv.includes("--keep");
 const JSON_OUT = opt("--json", null);
+/** How long the vault group's server lets its grammar worker idle before ending it, in ms. */
+const REST_MS = 10_000;
 const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
   .split(",")
   .map(Number)
@@ -237,6 +241,20 @@ function memOf(pid) {
     }
   }
   return { rss: null, peak: null };
+}
+
+/**
+ * The server's memory: its own and its children's — its grammar worker is a process of its own
+ * (#279) — `{ rss, peak, worker }`, `peak` the server's alone, `worker` whether one is up. Where
+ * `treeOf` cannot see children, the server's.
+ */
+function serverMem(pid) {
+  const own = memOf(pid);
+  const tree = treeOf(pid);
+  const worker = tree.some((p) => p.cmd.includes("grammar-worker"));
+  if (own.rss === null) return { ...own, worker };
+  const rss = tree.reduce((a, p) => a + (p.pid === pid ? own.rss : (memOf(p.pid).rss ?? 0)), 0);
+  return { rss, peak: own.peak, worker };
 }
 
 /** CPU seconds the process has used, user and system, or null. */
@@ -480,12 +498,12 @@ function changed(a, b) {
 
 /* -- the server --------------------------------------------------------------------------------- */
 
-async function startServer(vault, home, { page = true } = {}) {
+async function startServer(vault, home, { page = true, env: more = {} } = {}) {
   fs.mkdirSync(home, { recursive: true });
   const token = randomBytes(24).toString("base64url");
   const args = [SERVER, vault, "--port", "0"];
   if (!page) args.push("--no-page");
-  const env = { ...process.env, ANYDAG_HOME: home, ANYDAG_TOKEN: token, ANYDAG_CLOUD: "off" };
+  const env = { ...process.env, ANYDAG_HOME: home, ANYDAG_TOKEN: token, ANYDAG_CLOUD: "off", ...more };
   delete env.ANYDAG_VAULT;
   const t0 = now();
   const child = spawn(process.execPath, args, { env, stdio: ["ignore", "pipe", "pipe"] });
@@ -688,7 +706,11 @@ async function vaultGroup(n, b) {
   const v = makeVault(dir, n);
   record(`vault.${n}.generate`, now() - t, "ms", `${(duBytes(dir) / 1024 / 1024).toFixed(1)} MB on disk`);
   const before = fingerprint(dir);
-  const s = await startServer(dir, home);
+  /* The grammar's worker ends when idle — 30 s after its last answer, 5 min after its last search
+     (`server/grammar.ts`). Here both are 10 s, so `server.rss.rest` is measured inside the group. */
+  const s = await startServer(dir, home, {
+    env: { ANYDAG_GRAMMAR_IDLE_MS: String(REST_MS), ANYDAG_SEARCH_IDLE_MS: String(REST_MS) },
+  });
   const p = `vault.${n}`;
   record(`${p}.server.start`, s.startMs, "ms", "spawn to listening, the vault opened");
   record(`${p}.server.rss.start`, mb(memOf(s.pid).rss), "MB");
@@ -719,15 +741,41 @@ async function vaultGroup(n, b) {
     "ms",
     "median of 4 queries",
   );
-  const m = memOf(s.pid);
-  record(`${p}.server.rss.used`, mb(m.rss), "MB", "after list, index and search");
-  record(`${p}.server.rss.peak`, mb(m.peak), "MB");
+  const m = serverMem(s.pid);
+  record(
+    `${p}.server.rss.used`,
+    mb(m.rss),
+    "MB",
+    m.worker ? "after list, index and search: the server and its grammar worker" : "after list, index and search",
+  );
+  record(`${p}.server.rss.peak`, mb(m.peak), "MB", "the server process alone");
   const homeBytes = duBytes(home);
   record(`${p}.home.size`, mb(homeBytes), "MB", "the app home: SQLite index and its WAL");
 
   const feed = await openFeed(s);
   await sleep(2_000);
   record(`${p}.idle.cpu`, await cpuOver([s.pid], 15_000), "%", "server, change feed open, 15 s");
+
+  /* At rest: the worker has ended, giving back the search's engine and the parse's garbage. */
+  const resting = now();
+  while (serverMem(s.pid).worker && now() - resting < REST_MS * 3) await sleep(500);
+  const rest = serverMem(s.pid);
+  record(
+    `${p}.server.rss.rest`,
+    mb(rest.rss),
+    "MB",
+    rest.worker
+      ? "the worker had not ended"
+      : `the worker ended (idle ${REST_MS / 1000} s here, 30 s / 5 min after a search in use)`,
+  );
+  /* What the worker's ending costs the next question: a warm `/index` and a search, asked of a worker
+     started again, which reads what it kept from the app home (#279). */
+  const idx4 = await beside(s, "/__board/index");
+  record(`${p}.index.after-idle`, idx4.ms, "ms", "a warm /index asked of a worker started again");
+  record(`${p}.index.after-idle.health`, idx4.health, "ms", `the slowest /api/health of ${idx4.asked} asked while it ran`);
+  const s4 = await beside(s, "/__board/search?q=harbour");
+  record(`${p}.search.after-idle`, s4.ms, "ms", "a search asked of a worker started again: its engine built again");
+  record(`${p}.search.after-idle.health`, s4.health, "ms", `the slowest /api/health of ${s4.asked} asked while it ran`);
 
   const after = fingerprint(dir);
   const wrote = changed(before, after);
@@ -753,7 +801,7 @@ async function vaultGroup(n, b) {
   record(`${p}.burst.settle`, quiet, "ms", "first write to the last event the feed said");
   record(`${p}.burst.cpu`, cpu0 === null ? null : cpu1 - cpu0, "s", "server CPU for the burst");
   const idx3 = await timedReq(s, "/__board/index");
-  record(`${p}.index.after-burst`, idx3.ms, "ms", "only what changed is parsed again");
+  record(`${p}.index.after-burst`, idx3.ms, "ms", "only what changed is parsed again, by a worker started again");
   record(`${p}.home.size.after-burst`, mb(duBytes(home)), "MB");
   feed.close();
 
@@ -1049,7 +1097,7 @@ async function leakGroup() {
       await s.req("/__board/list");
       await s.req("/__board/index");
       await s.req(`/__board/search?q=${WORDS[round % WORDS.length]}`);
-      if (round % 10 === 0) rss.push(mb(memOf(s.pid).rss));
+      if (round % 10 === 0) rss.push(mb(serverMem(s.pid).rss));
     }
     record(
       `leak.${n}.rounds.rss`,
@@ -1057,7 +1105,7 @@ async function leakGroup() {
       "MB",
       `RSS after rounds 10/20/30: ${rss.map((x) => x?.toFixed(0)).join(" / ")}`,
     );
-    const before = mb(memOf(s.pid).rss);
+    const before = mb(serverMem(s.pid).rss);
     for (let i = 0; i < 100; i++) {
       const f = await openFeed(s);
       f.close();
@@ -1068,7 +1116,7 @@ async function leakGroup() {
     fs.appendFileSync(path.join(dir, "inbox", "item-000000.md"), "\nleak check\n");
     await sleep(1_500);
     opened.close();
-    record(`leak.feeds.rss`, mb(memOf(s.pid).rss), "MB", `100 feeds opened and dropped; before ${before?.toFixed(0)} MB`);
+    record(`leak.feeds.rss`, mb(serverMem(s.pid).rss), "MB", `100 feeds opened and dropped; before ${before?.toFixed(0)} MB`);
     record("leak.feeds.cpu-after", await cpuOver([s.pid], 5_000), "%", "server, after the feeds were dropped, 5 s");
   } finally {
     await s.stop();
@@ -1247,9 +1295,11 @@ async function desktopGroup() {
     }
     for (const [type, bytes] of Object.entries(byType))
       record(`desktop.rss.${type.toLowerCase()}`, mb(bytes), "MB", "app.getAppMetrics() working set");
-    if (server) record("desktop.rss.server", mb(memOf(server.pid).rss), "MB", "the server child (/proc)");
+    if (server)
+      record("desktop.rss.server", mb(serverMem(server.pid).rss), "MB", "the server child and its grammar worker (/proc)");
     const pids = before.map((m) => m.pid).concat(server ? [server.pid] : []);
-    const total = (byType ? Object.values(byType).reduce((a, x) => a + x, 0) : 0) + (server ? (memOf(server.pid).rss ?? 0) : 0);
+    const total =
+      (byType ? Object.values(byType).reduce((a, x) => a + x, 0) : 0) + (server ? (serverMem(server.pid).rss ?? 0) : 0);
     record("desktop.rss.total", mb(total), "MB", "every process the app runs");
     const perProc = pids.map(cpuOf);
     await sleep(15_000);

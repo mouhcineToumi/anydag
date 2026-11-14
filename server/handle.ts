@@ -9,8 +9,8 @@ import { readInserts } from "../src/board/clipboard";
 import { applyPatch, type PatchOp } from "../src/board/patch";
 import { stampItems } from "../src/board/stamp";
 import { indexTexts } from "../src/refs/extract";
-import { corpusTexts } from "../src/search/corpus";
-import { buildEngine, search, snippet, type Engine, type SearchDoc } from "../src/search/engine";
+import { corpusTexts, type Unit } from "../src/search/corpus";
+import { buildEngine, search, snippet, type SearchDoc } from "../src/search/engine";
 import type { Found } from "../src/search/wire";
 import { parseQuiz, pinned } from "../src/quiz/parse";
 import { applyQuizOps } from "../src/quiz/ops";
@@ -151,9 +151,26 @@ const FIXABLE: ReadonlySet<Code> = new Set<Code>([
 
 const asString = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
-/** The search engines last built for corpora that named a version, newest last — a few, one per vault being searched. */
-const engines = new Map<string, Engine>();
-const ENGINES = 4;
+/**
+ * One hit as every asker is answered: the document, the part a result opens onto, and the snippet —
+ * marked with `**`, which is how the CLI prints it, and as `runs` beside it for a caller that draws
+ * its own marks. Here and on the worker's search (`server/searching.ts`) alike.
+ */
+export function foundOf(doc: Omit<SearchDoc, "units">, unit: Unit, score: number, terms: string[]): Found {
+  const runs = snippet(unit.text, terms);
+  return {
+    id: doc.id,
+    name: doc.name,
+    kind: doc.kind,
+    title: doc.title ?? null,
+    part: unit.part ?? null,
+    what: unit.what,
+    score,
+    terms,
+    snippet: runs.map((r) => (r.hit ? `**${r.text}**` : r.text)).join(""),
+    runs,
+  };
+}
 
 export async function handle(req: DslRequest): Promise<DslResponse> {
   const { method, route, query } = req;
@@ -353,41 +370,13 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
   if (method === "POST" && route === "/search") {
     const docs = body.docs;
     const q = asString(body.q);
-    const version = asString(body.version);
     if (q === undefined) return bad(400, "expected `q: string`");
-    if (docs !== undefined && !Array.isArray(docs)) return bad(400, "expected `docs: [{id, name, kind, title?, units}]`");
+    if (!Array.isArray(docs)) return bad(400, "expected `docs: [{id, name, kind, title?, units}]`");
     const limit = body.limit === undefined ? undefined : Number(body.limit);
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) return bad(400, "`limit` is a whole number above zero");
-    /* Building the engine is the cost — three seconds over 5,000 notes — and the query is not, so a
-       corpus named by a `version` keeps its engine for the next query naming the same one. Sent the
-       version alone, an engine this process does not hold is asked for with the docs (412). */
-    let engine: Engine;
-    const held = version === undefined ? undefined : engines.get(version);
-    if (held) engine = held;
-    else if (Array.isArray(docs)) {
-      engine = buildEngine(docs as SearchDoc[]);
-      if (version !== undefined) {
-        engines.set(version, engine);
-        for (const old of engines.keys()) if (engines.size > ENGINES) engines.delete(old);
-      }
-    } else return { status: 412, body: { error: "send `docs`: no engine is held for this version", code: "docs" } };
-    const hits = search(engine, q, limit).map((h): Found => {
-      const runs = snippet(h.unit.text, h.terms);
-      return {
-        id: h.doc.id,
-        name: h.doc.name,
-        kind: h.doc.kind,
-        title: h.doc.title ?? null,
-        part: h.unit.part ?? null,
-        what: h.unit.what,
-        score: h.score,
-        terms: h.terms,
-        /* Marked with `**`, which is how the CLI prints it — and `runs` beside it
-           for a caller that draws its own marks. */
-        snippet: runs.map((r) => (r.hit ? `**${r.text}**` : r.text)).join(""),
-        runs,
-      };
-    });
+    /* Built per question and let go after it: a vault's search keeps its engine where its docs are,
+       on the grammar's worker (`server/searching.ts`), for as long as somebody is searching (#279). */
+    const hits = search(buildEngine(docs as SearchDoc[]), q, limit).map((h) => foundOf(h.doc, h.unit, h.score, h.terms));
     return ok({ query: q, hits });
   }
 

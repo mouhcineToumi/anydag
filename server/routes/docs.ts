@@ -10,7 +10,6 @@
  * - **Ids are in the files** (decision 5); `vault.ident` mints one lazily when somebody asks.
  */
 
-import { createHash } from "node:crypto";
 import { setImmediate as yieldNow } from "node:timers/promises";
 
 import type { Context, Hono } from "hono";
@@ -26,11 +25,11 @@ import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/
 import type { Session } from "../context";
 import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../frontmatter";
 import { OPS_SHAPE } from "../handle";
-import { type Doc, grammar, type Parsed } from "../grammar";
+import { type Doc, grammar, type Over, type Parsed } from "../grammar";
 import type { Entry } from "../parsing";
 import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
-import { paced, SLICE_MS } from "../pace";
+import { paced } from "../pace";
 import { mimeOf } from "../uploads";
 import { Conflict, NotFound, Refused, byKind, textKey, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
@@ -238,54 +237,54 @@ async function indexAnswer(
   return out;
 }
 
-/** The corpus: every text cut into the units a search opens onto, and every attachment by its names. */
-async function corpusDocs(s: Session): Promise<Record<string, unknown>[]> {
-  return (await corpusOf(s)).docs;
+/**
+ * What a corpus and a search are asked over: every listed text with an id — named, with its stamp
+ * from the kept listing, its id and the title its listing gives it — and every attachment with an id.
+ * Nothing here reads a text: the worker reads, parses and answers (`server/searching.ts`), and the
+ * units and the engine stay there (#279).
+ */
+async function overOf(s: Session): Promise<Over> {
+  const tree = await s.vault.tree();
+  const all = listed(tree);
+  const stamps = s.vault.textStamps(tree);
+  const over: Over = { entries: [], meta: [], files: [] };
+  await paced(all, (d) => {
+    const stamp = stamps?.get(d.key);
+    over.entries.push(stamp === undefined ? [d.key, d.name, d.kind] : [d.key, d.name, d.kind, stamp]);
+    over.meta.push([d.id, tree.titles[d.name] ?? null]);
+  });
+  for (const n of tree.files) if (tree.ids[n]) over.files.push([tree.ids[n], n, tree.titles[n] ?? null]);
+  return over;
 }
 
-/* The last corpus each vault answered, and the version that names it: the same array while nothing
-   in it moved, so a search can name the engine built from it rather than build one per query. */
-const corpora = new WeakMap<Parsed, { key: string; version: string; docs: Record<string, unknown>[] }>();
-
-async function corpusOf(s: Session): Promise<{ version: string; docs: Record<string, unknown>[] }> {
-  const tree = await s.vault.tree();
-  const parsed = s.corpus;
-  const { docs, found } = await parsedOf(s, parsed, tree);
-  const out: Record<string, unknown>[] = [];
-  await paced(docs, (d) =>
-    out.push({
-      id: d.id,
-      name: d.name,
-      kind: d.kind,
-      title: (found.get(d.key)?.title as string | undefined) ?? tree.titles[d.name] ?? leafOf(d.name),
-      units: (found.get(d.key)?.units as unknown[] | undefined) ?? [],
-    }),
-  );
-  for (const n of tree.files) {
-    if (!tree.ids[n]) continue;
-    const title = tree.titles[n] ?? null;
-    out.push({
-      id: tree.ids[n],
-      name: n,
-      kind: "file",
-      title,
-      units: [...(title ? [{ what: "title", text: title }] : []), { what: "file", text: leafOf(n) }],
-    });
-  }
-  /* The units are the parse's, and `generation` says when those moved; the rest is names and titles —
-     the sha1 of `[[id, name, kind, title], …]` as JSON, hashed a doc at a time. */
-  const hash = createHash("sha1").update("[");
-  let first = true;
-  await paced(out, (d) => {
-    hash.update(`${first ? "" : ","}${JSON.stringify([d.id, d.name, d.kind, d.title])}`);
-    first = false;
+/**
+ * `/__board/corpus`, streamed as the worker cuts it: its parts are the JSON of their docs already,
+ * handed on as they come and asked for one at a time as the answer is read (#279) — the corpus of
+ * 50,000 files is 140 MB, and nothing of it is held here.
+ */
+async function corpusAnswer(c: Context, s: Session): Promise<Response> {
+  const parts = s.corpus.corpus(await overOf(s));
+  const enc = new TextEncoder();
+  let opened = false;
+  let any = false;
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(ctl) {
+      const head = opened ? "" : '{"docs":[';
+      opened = true;
+      const got = await parts.next();
+      if (got.done) {
+        ctl.enqueue(enc.encode(`${head}]}`));
+        ctl.close();
+        return;
+      }
+      ctl.enqueue(enc.encode(head + (any ? "," : "") + got.value));
+      any = true;
+    },
+    async cancel() {
+      await parts.return(undefined);
+    },
   });
-  const key = `${parsed.generation}:${hash.update("]").digest("hex")}`;
-  const had = corpora.get(parsed);
-  if (had?.key === key) return had;
-  const now = { key, version: `${s.vault.id}:${key}`, docs: out };
-  corpora.set(parsed, now);
-  return now;
+  return c.body(stream, 200, { "content-type": "application/json" });
 }
 
 /** The zone a time with no offset is read in: the vault's settings, else the app's, else this machine's. */
@@ -323,35 +322,6 @@ async function jsonPaced(body: Record<string, unknown>): Promise<string> {
 
 /** About how much text an answer is written in at a time. */
 const CHUNK = 256 * 1024;
-
-/**
- * `c.json({ docs })`, written a doc at a time and streamed, the thread handed back between slices:
- * on 50,000 files the index is 12 MB of JSON and the corpus 140 MB, and as one `JSON.stringify` and
- * one encoding of it that was every other request waiting for seconds (#287). The text is the same.
- */
-function jsonDocs(c: Context, docs: readonly unknown[]): Response {
-  const enc = new TextEncoder();
-  let i = 0;
-  let opened = false;
-  const stream = new ReadableStream<Uint8Array>({
-    async pull(ctl) {
-      // A turn for whatever else is waiting on the thread, the requests that would have waited.
-      await yieldNow();
-      const until = performance.now() + SLICE_MS;
-      let out = opened ? "" : '{"docs":[';
-      opened = true;
-      while (i < docs.length && out.length < CHUNK && performance.now() < until)
-        out += (i ? "," : "") + JSON.stringify(docs[i++]);
-      if (i < docs.length) {
-        ctl.enqueue(enc.encode(out));
-        return;
-      }
-      ctl.enqueue(enc.encode(`${out}]}`));
-      ctl.close();
-    },
-  });
-  return c.body(stream, 200, { "content-type": "application/json" });
-}
 
 /**
  * A JSON text made already, streamed a slice at a time with the thread handed back between: one
@@ -458,7 +428,7 @@ export function docRoutes(app: Hono, s: Session): void {
     });
   });
 
-  app.get("/__board/corpus", async (c) => jsonDocs(c, await corpusDocs(s)));
+  app.get("/__board/corpus", async (c) => corpusAnswer(c, s));
 
   app.get("/__board/search", async (c) => {
     const q = c.req.query("q") ?? "";
@@ -466,8 +436,7 @@ export function docRoutes(app: Hono, s: Session): void {
     const raw = c.req.query("limit");
     const limit = raw === undefined ? undefined : Number(raw);
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) throw err(400, "`limit` is a whole number above zero");
-    const corpus = await corpusOf(s);
-    return c.json(await grammar.search(corpus.docs, q, limit, corpus.version));
+    return c.json(await s.corpus.search(await overOf(s), q, limit));
   });
 
   app.get("/__board/resolve", async (c) => {

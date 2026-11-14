@@ -911,3 +911,25 @@
   waits for a node that is not there, and **`locator.boundingBox()` auto-waits too**, so an
   `expect.poll` over it for a row that has gone out of the window times out instead of answering
   *out of view* — count it first. `e2e/sidebar-virtual.spec.ts` is the pattern.
+- **Memory a V8 heap grew into stays with the process, and so does a worker thread's after it
+  ends.** The server held 730 MB at 10,000 files and 2.4 GB at 50,000 after one search, and none of
+  it came back (#279). Collecting the garbage does not return it: a heap of small objects that grew
+  to 500 MB and was collected down to 60 MB left the process at 480 MB, on the main thread or in a
+  worker; and a worker thread that grew to 590 MB and was terminated left it at 490 MB — on Node 22,
+  24 and 26 alike. V8 keeps the pages for itself (on 26, `--no-memory-pool-share-memory-on-teardown`
+  gives a terminated worker's back, but only on the command line, and Electron-as-Node and the
+  `anydag` shebang take none). Only large objects are unmapped as they die. So **the size a process
+  reached is the size it keeps**, and work whose memory should come back runs in a process that
+  exits: the grammar's worker is one (`server/grammar.ts`), ended when idle. **What such a process
+  needs next time goes on disk**, or ending it costs the work again: the grammar's `Reader` keeps
+  its stamps and what it parsed in `<home>/parse.sqlite` (`server/parse-store.ts`), and a worker
+  started again parses nothing that did not move. Measure a change to it with the worker's RSS
+  counted (`serverMem` in `scripts/bench.mjs`), at rest as well as just after the work. To see the
+  first half, allocate three million small objects, drop them, call `gc()`, and read `VmRSS`.
+- **A deadline over work that grows with the vault is a deadline per step, not per question.** The
+  grammar's worker is ended after 60 s without an answer (#9), and a cold `/index` of 50,000 notes is
+  minutes of parsing: before #279 it was ended every time, the caller fell back to parsing
+  inline, and the server's thread was held for 54–83 s (`vault.50000.index.cold.health`). A
+  `Reader` now parses a chunk at a time and the worker says it is alive between chunks
+  (`Reader.steps`, `{ alive }`), which resets the clock: a grammar stuck on one file is still ended,
+  a big vault is not.

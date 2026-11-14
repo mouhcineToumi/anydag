@@ -1,6 +1,6 @@
 # Search
 
-> The corpus and the engine on the server, one query per request from the page, ranking and snippets.
+> The corpus and the engine in the grammar's worker, what it parsed kept in the app's home, one query per request from the page, ranking and snippets.
 
 ## Search
 
@@ -32,8 +32,8 @@ parsing every board and every note on every keystroke, which is the slowest thin
 (remark runs at about 0.3 MB/s), and an index built in the page from the vault's text cost, measured
 on 50,000 files, 20 s to the first answer and 821 MB of the page's heap — in every window, kept for as
 long as the page lived (#282). So the work stays where the parsers are: `GET /__board/corpus` reads
-every text and cuts it into **units** in the server's grammar (`server/grammar.ts`, called
-in-process), `GET /__board/search?q=` matches a query over them with one MiniSearch engine
+every text and cuts it into **units** in the grammar's worker (`server/searching.ts`),
+`GET /__board/search?q=` matches a query over them with one MiniSearch engine
 (`src/search/engine.ts`) and answers with the hits **and their snippets** (`Found`,
 `src/search/wire.ts`), and the page (`useSearch`, `ask.ts`) sends each query and draws the answer. The
 page never holds a document's text and does not import the engine, so nothing about the vault's
@@ -75,43 +75,62 @@ Seven things are load-bearing:
   and is read only while somebody is searching. The card subscribes to the change feed when it opens
   and lets go when it shuts, and keeps nothing in between: the next open asks again. Both routes read
   the vault through one listing, so they cannot disagree about what it holds.
-- **Only a text that changed is parsed again, and only a file whose stat moved is read again.** The
-  `Parsed` cache in `server/grammar.ts` keeps each document's units against the sha1 of the text they
-  came from and parses the rest. `/patch` runs in the server's own process too, so an uncached
-  whole-vault parse after every change is a pause every drag then queues behind (measured: a 5 ms
-  `/diagnostics` took 390 ms while four of them ran, and 5 ms again with the cache). The texts are
-  read where they are parsed (`server/parsing.ts`): a `Reader` stats each file and reads one only when
-  its modified time, change time, size or inode moved. **While the vault is watched it does not even
-  stat** (#280): the kept listing has each text's stamp (mtime, size, inode), each name goes to the
-  `Reader` with it, and a text the `Reader` read at that stamp is answered from what it kept. On
-  50,000 notes, reading and hashing every text was most of a warm `/index`'s 2.9 s; the same answer
-  and its JSON are kept while neither the listing nor the parse moved.
-- **A whole-vault parse is on a thread of its own** (`server/grammar-worker.ts`). `/index`,
-  `/corpus` and `/search` go to a worker; everything else stays inline, being quick. Measured on
-  5,000 notes, a cold `/index` is 14 s of parsing, and on the server's one thread it was every
-  request waiting, `/api/auth/me` included; now `/api/auth/me` answers in 2 ms while it runs. The
-  worker is built beside each bundle (`server/build.mjs`, `cli/build.mjs`), and where there is none
-  (the unit suite, or `ANYDAG_GRAMMAR_INLINE=1`) the calls run inline. `Parsed.of` runs one call at
-  a time, so two cold asks parse once, and its `generation` moves only when its answer does.
+- **Only a text that changed is parsed again, and only a file whose stat moved is read again.** A
+  `Reader` (`server/parsing.ts`) keeps what each text was made into against the sha1 of the text it
+  came from, one per question — `/index`'s and `/corpus`'s — and parses the rest. `/patch` runs in
+  the server's own process too, so an uncached whole-vault parse after every change is a pause every
+  drag then queues behind (measured: a 5 ms `/diagnostics` took 390 ms while four of them ran, and
+  5 ms again with the cache). The texts are read where they are parsed: a `Reader` stats each file
+  and reads one only when its modified time, change time, size or inode moved. **While the vault is
+  watched it does not even stat** (#280): the kept listing has each text's stamp (mtime, size, inode),
+  each name goes to the `Reader` with it, and a text the `Reader` read at that stamp is answered from
+  what it kept. On 50,000 notes, reading and hashing every text was most of a warm `/index`'s 2.9 s;
+  the same answer and its JSON are kept while neither the listing nor the parse moved.
+- **What it parsed is kept in the app's home, not in memory** (#279): `<home>/parse.sqlite`
+  (`server/parse-store.ts`), a row per text per question holding its stat, its stamp, its sha1 and
+  the doc, deflated, under the build that cut it. In memory a `Reader` keeps only the stamps, a few
+  dozen bytes a text, and reads a doc back when an answer needs one. A `Reader` started again takes
+  its stamps from there, and the name of the last answer it gave (`turns`), so the server that holds
+  that answer is told *nothing changed* and nothing is read or parsed; a server started again gets
+  the whole answer from the rows. **It is a cache**: a row another build cut is dropped, a row that is
+  missing is parsed again, and a home without the file parses the vault once. Rows are written as a
+  read goes, the name last — a read cut short is never taken for an answer.
+- **A whole-vault parse is in a process of its own, which ends when it has been idle**
+  (`server/grammar-worker.ts`, `WorkerProcess` in `server/grammar.ts`). `/index`, `/corpus` and
+  `/search` go to it; everything else stays inline, being quick. Measured on 5,000 notes, a cold
+  `/index` is 14 s of parsing, and on the server's one thread it was every request waiting,
+  `/api/auth/me` included; now `/api/auth/me` answers in 2 ms while it runs. **It ends 30 s after
+  its last answer, or 5 min after its last search** (`ANYDAG_GRAMMAR_IDLE_MS`,
+  `ANYDAG_SEARCH_IDLE_MS`), because ending it is the only way its memory comes back — see *Things that
+  will bite*; the next question starts another, which reads what the last one kept. It is run by the
+  server's own binary, is given none of the server's tokens, secrets or keys, and exits when its
+  channel closes. A question it has not answered in 60 s ends it (#9), and a long read says it is
+  alive between chunks of 500 texts (`Reader.steps`), so that is 60 s for a chunk, not for the vault.
+  The worker is built beside each bundle (`server/build.mjs`, `cli/build.mjs`), and where there is
+  none (the unit suite, or `ANYDAG_GRAMMAR_INLINE=1`) the calls run inline. `Parsed.of` runs one call
+  at a time, so two cold asks parse once, and its `generation` moves only when its answer does.
 - **No text crosses to the server's thread, and nothing on it takes long** (#287). The server
   reading every text with `readFileSync` and posting the map to the worker held every request for
   about 2 s on 50,000 files; now the server's thread sends the worker the names (in parts of 2,000), the
   worker reads, parses and keeps what it made of each, and sends back only what changed, in parts
   each asked for once the last was read. The route's own loops — the wiki index (`wikiIndexer`), the
-  answer, the corpus's version hash — run in 8 ms slices (`server/pace.ts`), and the answer is
-  streamed a doc at a time rather than `JSON.stringify`d whole: the corpus of 50,000 notes is 140 MB
-  of JSON. While a cold or a warm `/index`, or a warm `/corpus`, runs on 50,000 files the slowest
-  `/api/health` is 31, 21 and 22 ms, against 1.8, 2.0 and 2.2 s before (`vault.*.index.*.health`
-  and `vault.*.corpus.warm.health` in `scripts/bench.mjs`).
-- **A search keeps its engine.** Building MiniSearch is the cost, 3 s over 5,000 notes, and the
-  query is not. `corpusOf` names the corpus with a `version` (the vault, the parse's `generation` and
-  the names and titles), and `/search` sends the docs to the grammar once per version. After that it
-  sends the version alone and gets a 412 back if that engine is gone (a worker restarted). Warm, the
-  engine answers in 20 to 60 ms; **what a query still costs is reading the vault**: `corpusOf` walks
-  it, reads every text and checks each against the parse cache on every call, about 0.5 s on
-  10,000 files (0.2 s the walk, 0.25 s the reading), so the first match on a vault that size is that
-  plus the 120 ms pause. That is the read an index kept on write replaces (#267), and the page's half
-  of the work does not change when it lands.
+  answer — run in 8 ms slices (`server/pace.ts`), and the answer is streamed rather than
+  `JSON.stringify`d whole.
+- **Nor do the units** (#279). `/corpus` and `/search` send the worker each text's name with its id
+  and listed title (`Over`), and the worker answers whole (`server/searching.ts`): `/corpus` as the
+  JSON of its docs, in parts the route hands on as the answer is read — the corpus of 50,000 notes is
+  140 MB of JSON, none of it held on the server's thread — and `/search` as the hits. The server held
+  the corpus of 10,000 files twice over (37 MB of units), for as long as it ran.
+- **A search keeps its engine while somebody is searching, and lets it go after.** Building
+  MiniSearch is the cost, 3 s over 10,000 files, and the query is not, so the worker keeps one engine
+  per vault, named by every text's sha1 and how it is listed, and builds another only when that
+  changes. The engine keeps where each unit is, not its words: a hit's snippet is cut from its
+  document's row, read when the hit is answered. Five minutes without a search and the worker ends,
+  engine and all; the next search builds it again from the rows, parsing nothing that has not changed.
+  A worker that has parsed 500 texts or more does not build it: it answers `{ again }`, is retired,
+  and a fresh one builds it from the rows, so the engine is not held on top of the room the parse's
+  garbage grew. The engine is the biggest thing the worker holds — 146 MB at 10,000 files, about
+  five times that at 50,000 — and #267 replaces it with an index on disk.
 - **Every word must match, and every word is a prefix** (`combineWith: "AND"`, `prefix: true`), so
   the list narrows as it is typed, the way the names above it do, and `pay sett` finds "payments
   settle". A word of five letters or more forgives one typo in five and a shorter one none; accents

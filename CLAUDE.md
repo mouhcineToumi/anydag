@@ -119,6 +119,8 @@ One line each; the full account with the defect that found it is in
 - **A stub is a claim about another module**; copy it from a route's recorded answer, never invent it.
 - **The desktop forwards the page over `node:http`, not `net.fetch`**: Chromium's six connections to
   a host, filled by streams nobody let go of, froze every request (`desktop/forward.ts`, #123).
+- **A process keeps the memory its V8 heap grew into**, even collected, even a worker thread's after
+  it ends: work whose memory must come back runs in a process that exits (the grammar's worker, #279).
 - **The token and the `Host` are the whole security model** — both checked on every request; a script
   that `fetch`es the server needs `authed()` from `scripts/session.mjs`.
 - **The repository is public, so a committed secret is a published one.** Secrets live in the
