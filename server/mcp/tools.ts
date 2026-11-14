@@ -53,6 +53,12 @@ export interface Kit {
   url(name: string, kind: string, vault?: string): Promise<string>;
   /** Refuse by naming the flag — for a tool that only sometimes writes. */
   needWrite(what: string): void;
+  /**
+   * Set for an Assistant chat: no tool has this process fetch a URL. The fetch leaves the machine
+   * from here, before any route is called, so the chat's guard never sees it and nobody approves
+   * it — and an agent steered by a planted note could put what it read into the address (#9).
+   */
+  noFetch?: boolean;
 }
 
 interface Call extends Omit<CallOptions, "raw"> {
@@ -84,7 +90,7 @@ function refusal(status: number, body: any): ToolError {
 const decoder = new TextDecoder();
 
 /** `home`, for a chat's MCP server: the vault a document link names when a tool named none. */
-export function makeKit(backend: Backend, readOnly: boolean, home?: string): Kit {
+export function makeKit(backend: Backend, readOnly: boolean, home?: string, noFetch = false): Kit {
   const send = async (method: string, route: string, o: Call = {}, raw = false): Promise<Answer> => {
     const { vault, ...rest } = o;
     const got = await backend.call(method, route, { ...rest, query: { ...rest.query, vault }, raw });
@@ -103,6 +109,7 @@ export function makeKit(backend: Backend, readOnly: boolean, home?: string): Kit
   const enc = encodeURIComponent;
   const kit: Kit = {
     readOnly,
+    noFetch,
     via: backend.via,
     async api(method, route, o) {
       return (await send(method, route, o)).json;
@@ -1164,6 +1171,7 @@ async function bytesFrom(
   data: string | undefined,
   url: string | undefined,
 ): Promise<Fetched | null> {
+  if (url !== undefined && kit.noFetch) throw new ToolError("a chat fetches nothing by URL: pass the bytes as `data`");
   if ((data === undefined) === (url === undefined)) throw new ToolError("give exactly one of `data` and `url`");
   if (url === undefined) return null;
   const limits = ((await kit.api("GET", "/__board/files", { vault: v })) as { limits: { maxBytes: number } }).limits;
@@ -1180,11 +1188,15 @@ function extFor(type: string): string | undefined {
   return Object.entries(MIME).find(([, m]) => m === type)?.[0];
 }
 
+/** What `image_add` says about `url`, which a chat's copy of it leaves out (`server/mcp/chat.ts`). */
+export const IMAGE_BY_URL =
+  " — or, instead, `url`: an `https://` address the server fetches the picture from, so its bytes never pass through you. An address on this machine or a private network is refused";
+
 const imageTools: Tool[] = [
   tool({
     name: "image_add",
     description: withNote(
-      "Keep a picture in the vault. `data` is a `data:image/…;base64,…` URL, or plain base64 with `mime` saying what it is (`image/png`) — or, instead, `url`: an `https://` address the server fetches the picture from, so its bytes never pass through you. An address on this machine or a private network is refused.\n\n" +
+      `Keep a picture in the vault. \`data\` is a \`data:image/…;base64,…\` URL, or plain base64 with \`mime\` saying what it is (\`image/png\`)${IMAGE_BY_URL}.\n\n` +
         "It is stored as an attachment in the vault's attachments folder and referred to as `dag:<id>`. On a **board** it is placed too — an `image` item appended at `x`/`y` and `w` wide, on `page` — and the answer names the item. On a **note** or a **quiz** nothing is written: put `![what it shows](<src>)` where it belongs with `note_write`, using the `src` that comes back.",
     ),
     write: true,

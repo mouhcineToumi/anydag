@@ -73,7 +73,7 @@ async function cloudOf(backend: Backend, said: boolean | undefined): Promise<boo
 }
 
 export async function buildMcp(backend: Backend, opts: McpOptions): Promise<McpServer> {
-  const kit = makeKit(backend, opts.readOnly, opts.chat?.home);
+  const kit = makeKit(backend, opts.readOnly, opts.chat?.home, opts.chat !== undefined);
   const cloud = await cloudOf(backend, opts.cloud);
   const server = new McpServer({ name: "anydag", version: opts.version ?? "dev" }, { instructions: INSTRUCTIONS });
 
