@@ -35,6 +35,7 @@ import type { NoteEvent } from "@/note/event";
 import { splitNote } from "@/note/format";
 import { PROJECT_LABEL, type Project } from "@/note/project";
 import { STATUS_LABEL, type Task, type TaskStatus } from "@/note/task";
+import { CalloutAside } from "@/render/Callout";
 import { CodePre, MathCode } from "@/render/CodeBlock";
 import { fail } from "@/telemetry/client";
 import { useTheme } from "@/theme/useTheme";
@@ -712,6 +713,8 @@ function makeRefComponents(depth: number, boards: boolean, placed: boolean): Com
     pre: CodePre,
     /* An inline equation is a `<code>` to react-markdown; every other one is drawn as it was. */
     code: MathCode,
+    /* A callout, which `remarkCallouts` marks as an `aside`: its icon, its tint, its fold. */
+    aside: CalloutAside,
     /* An embed is a block, and react-markdown puts an image on its own line inside a `<p>` — which
        cannot hold a `<div>`, and React says so on the console. A paragraph that is nothing but one
        `dag:` image is therefore drawn as the block it is. */

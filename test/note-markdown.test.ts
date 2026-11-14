@@ -12,6 +12,7 @@ import { ServerBlockNoteEditor } from "@blocknote/server-util";
 import type { List, Nodes, Root } from "mdast";
 
 import { parseBoard } from "@/board/parseBoard";
+import { CALLOUT_KINDS } from "@/note/callout";
 import { joinNote, splitNote } from "@/note/format";
 import {
   applySteps,
@@ -248,6 +249,183 @@ describe("blocks and marks", () => {
     ]);
     expect(md.split("\n")).toHaveLength(3);
     expect(md).toContain("a b");
+  });
+});
+
+/*
+ * Callouts: a quote whose first line is `[!kind]`. Each case is read, held by the real editor, and
+ * written back — and must come back as the same bytes, since every case is written in the house
+ * form already. A plain quote is the other half of the contract: nothing about it may change.
+ */
+describe("callouts", () => {
+  const ALIASES = ["summary", "tldr", "hint", "check", "done", "help", "faq", "attention", "fail", "missing", "error", "cite"];
+  const one = async (md: string) => {
+    const [b] = await hold(mdToBlocks(md));
+    return b;
+  };
+
+  for (const kind of [...CALLOUT_KINDS, ...ALIASES]) {
+    it(`[!${kind}] reads as a callout of that word and writes back byte for byte`, async () => {
+      const md = `> [!${kind}] A title\n> The body, with **bold** and \`code\`.`;
+      const b = await one(md);
+      expect(b.type).toBe("callout");
+      expect(b.props).toMatchObject({ kind, title: "A title", fold: "" });
+      expect(await rewrite(md)).toBe(md);
+    });
+  }
+
+  const cases: [string, string, Record<string, string>][] = [
+    ["GitHub's form, upper case and untitled", "> [!NOTE]\n> Useful information.", { kind: "NOTE", title: "", fold: "" }],
+    [
+      "a titled callout",
+      "> [!warning] Breaking change\n> The `/api/boards` route is gone in 0.6.",
+      { kind: "warning", title: "Breaking change", fold: "" },
+    ],
+    ["an untitled one", "> [!tip]\n> Read the skill first.", { kind: "tip", title: "", fold: "" }],
+    [
+      "one folded shut",
+      "> [!faq]- Why a file?\n> So two writers can share it.",
+      { kind: "faq", title: "Why a file?", fold: "-" },
+    ],
+    ["one folded open", "> [!example]+ A board\n> ```erd\n> users\n> ```", { kind: "example", title: "A board", fold: "+" }],
+    ["an unknown kind, kept as written", "> [!aside] By the way\n> An aside.", { kind: "aside", title: "By the way", fold: "" }],
+    [
+      "a title with Markdown in it, kept as written",
+      "> [!info] The *real* `title`\n> Body.",
+      { kind: "info", title: "The *real* `title`", fold: "" },
+    ],
+    ["one with no body at all", "> [!todo] Write the tests", { kind: "todo", title: "Write the tests", fold: "" }],
+    [
+      "one holding several blocks",
+      "> [!note] Steps\n> First:\n>\n> - one\n> - two\n>\n> Then done.",
+      { kind: "note", title: "Steps", fold: "" },
+    ],
+    ["one inside a list", "- item\n\n  > [!tip] Nested\n  > Inside.", { kind: "tip", title: "Nested", fold: "" }],
+    [
+      "one with an equation",
+      "> [!important] The rule\n> Costs $5, and $x^2$ is TeX.",
+      { kind: "important", title: "The rule", fold: "" },
+    ],
+  ];
+  for (const [what, md, props] of cases) {
+    it(`${what} round-trips`, async () => {
+      const blocks = await hold(mdToBlocks(md));
+      const b = blocks.find((x) => x.type === "callout") ?? blocks[0]?.children?.find((x) => x.type === "callout");
+      expect(b?.props).toMatchObject(props);
+      expect(await rewrite(md)).toBe(md);
+      expect(await rewrite(await rewrite(md))).toBe(md);
+    });
+  }
+
+  it("reads a first line standing alone, and its body after a blank line, as one callout written the short way", async () => {
+    const b = await one("> [!caution]\n>\n> Mind the gap.");
+    expect(b.type).toBe("callout");
+    expect(b.content).toEqual([{ type: "text", text: "Mind the gap.", styles: {} }]);
+    expect(await rewrite("> [!caution]\n>\n> Mind the gap.")).toBe("> [!caution]\n> Mind the gap.");
+  });
+
+  it("puts a blank line under the first line when the body would run into it", () => {
+    /* A title ending in a backslash would make a hard break of the line's end. */
+    const md = blocksToMd([
+      {
+        type: "callout",
+        props: { kind: "note", title: "ends in \\", fold: "" },
+        content: [{ type: "text", text: "body", styles: {} }],
+      },
+    ]);
+    expect(md).toBe("> [!note] ends in \\\n>\n> body");
+    expect(mdToBlocks(md)[0]).toMatchObject({ type: "callout", props: { title: "ends in \\" } });
+  });
+
+  it("writes an edited kind, title and fold in the house form", () => {
+    expect(
+      blocksToMd([
+        {
+          type: "callout",
+          props: { kind: "TIP", title: "  Two   words ", fold: "+" },
+          content: [{ type: "text", text: "x", styles: {} }],
+        },
+      ]),
+    ).toBe("> [!TIP]+ Two words\n> x");
+  });
+
+  const plain: [string, string][] = [
+    ["a plain quote", "> one\n> two"],
+    ["a quote with a second paragraph", "> one\n>\n> two"],
+    ["a quote opening with a link-like bracket", "> [not a callout] text"],
+    ["a quote opening with a bang in brackets and a space", "> [!two words] text"],
+    ["a quote whose marker is bold", "> **[!note]** text"],
+    ["a quote whose marker is glued to a word", "> [!note]text"],
+    ["a quote whose first line ends in a hard break", "> [!note] title\\\n> body"],
+  ];
+  for (const [what, md] of plain) {
+    it(`${what} is still a quote, read and written as before`, async () => {
+      const blocks = await hold(mdToBlocks(md));
+      expect(blocks.map((b) => b.type)).toEqual(["quote"]);
+      const once = await rewrite(md);
+      expect(drawn(once)).toBe(drawn(md));
+      expect(await rewrite(once)).toBe(once);
+    });
+  }
+
+  it("writes a quote exactly as it did before callouts", async () => {
+    expect(await rewrite("> one\n> two")).toBe("> one two");
+    expect(await rewrite("> one\n>\n> two")).toBe("> one\n>\n> two");
+    expect(await rewrite("> [!two words] text")).toBe("> \\[!two words] text");
+  });
+
+  const note = [
+    "# Release",
+    "",
+    ">[!NOTE] ",
+    "> Written  the way   GitHub's docs write it.",
+    "",
+    "> [!warning]- Breaking change",
+    ">   The `/api/boards` route is gone.",
+    "",
+    "> A plain quote.",
+    "",
+    "> [!tip] Last",
+    "> One more.",
+    "",
+  ].join("\n");
+
+  it("leaves a note with callouts untouched when it is opened and saved", async () => {
+    const { blocks, loaded } = load(note);
+    const doc = await hold(blocks);
+    expect(doc.map((b) => b.type)).toEqual(["heading", "callout", "callout", "quote", "callout"]);
+    expect(save(settle(loaded, doc), doc)).toBe(note);
+  });
+
+  it("rewrites only the callout that was edited, in the house form", async () => {
+    const { blocks, loaded } = load(note);
+    const doc = await hold(blocks);
+    const settled = settle(loaded, doc);
+    const warning = doc.find((b) => b.type === "callout" && b.props?.kind === "warning")!;
+    const edited = doc.map((b) =>
+      b.id === warning.id ? { ...b, content: [{ type: "text" as const, text: "The route is gone in 0.6.", styles: {} }] } : b,
+    );
+    expect(save(settled, edited)).toBe(
+      note.replace(
+        "> [!warning]- Breaking change\n>   The `/api/boards` route is gone.",
+        "> [!warning]- Breaking change\n> The route is gone in 0.6.",
+      ),
+    );
+    const retitled = doc.map((b) => (b.id === warning.id ? { ...b, props: { ...b.props, kind: "danger", title: "Gone" } } : b));
+    expect(save(settled, retitled)).toBe(
+      note.replace(
+        "> [!warning]- Breaking change\n>   The `/api/boards` route is gone.",
+        "> [!danger]- Gone\n> The `/api/boards` route is gone.",
+      ),
+    );
+  });
+
+  it("comes back from BlockNote's HTML, its blocks inside it — the way a paste of Markdown arrives", async () => {
+    const md = "> [!tip]- Folded\n> Body *x*\n>\n> - a\n> - b\n\nAfter.";
+    const back = await server._withDOM(async () =>
+      editor.tryParseHTMLToBlocks(editor.blocksToHTMLLossy(mdToBlocks(md) as never)),
+    );
+    expect(blocksToMd(back as unknown as NoteBlock[])).toBe(md);
   });
 });
 
