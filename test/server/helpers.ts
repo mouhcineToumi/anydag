@@ -26,6 +26,13 @@ export interface Env {
 
 const made: string[] = [];
 
+/**
+ * Every test vault watched from the moment it is made, as `anydag serve` watches each vault it opens,
+ * so every store contract holds the kept listing (#280) to what a walk says:
+ * `ANYDAG_TEST_WATCH=1 npx vitest run test/server`.
+ */
+export const watchedFromTheStart = process.env.ANYDAG_TEST_WATCH === "1";
+
 /** A temp vault folder and a temp home, closed and removed by `cleanup`. */
 export function makeEnv(opts: { types?: readonly string[] } = {}): Env {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-vault-"));
@@ -37,6 +44,7 @@ export function makeEnv(opts: { types?: readonly string[] } = {}): Env {
 function build(root: string, homeDir: string, opts: { types?: readonly string[] }): Env {
   const home = new Home(homeDir);
   const vault = new Vault(root, home, opts);
+  if (watchedFromTheStart) void vault.watch();
   const env: Env = {
     root,
     homeDir,

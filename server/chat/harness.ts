@@ -1,6 +1,6 @@
 /**
- * What a turn asks of an agent harness, and what it hears back. Claude Code and OpenCode each
- * implement it (`claude.ts`, `opencode.ts`), and `fake.ts` is a
+ * What a turn asks of an agent harness, and what it hears back. Claude Code, OpenCode and Codex each
+ * implement it (`claude.ts`, `opencode.ts`, `codex.ts`), and `fake.ts` is a
  * scripted one the e2e suite drives — so the runner in `live.ts` never knows which it has.
  *
  * A harness reaches the vault through **one MCP server and nothing else**: `anydag-server mcp --chat
@@ -8,7 +8,7 @@
  * person's is switched off; how is the adapter's business.
  */
 
-import type { Usage } from "./types";
+import type { Provider, Usage } from "./types";
 
 /** How to start the chat's MCP server: a stdio command the harness spawns. */
 export interface McpCommand {
@@ -19,9 +19,9 @@ export interface McpCommand {
 
 export interface RunOptions {
   chat: string;
-  /** The model as its harness spells it: `claude-sonnet-5-5`, `opencode-go/glm-5.3-flash`. */
+  /** The model as its harness spells it: `claude-sonnet-5-5`, `opencode-go/glm-5.3-flash`, `gpt-5.6-luna`. */
   model: string;
-  /** Claude's `--effort`, OpenCode's `#variant`; absent for the model's own. */
+  /** Claude's `--effort`, OpenCode's `#variant`, Codex's `model_reasoning_effort`; absent for the model's own. */
   effort?: string;
   /** The system prompt: the vaults in reach, how to cite. Changes between turns. */
   system: string;
@@ -61,14 +61,14 @@ export interface RunEnd {
 export interface Running {
   /** Settles once the harness has said everything; never rejects. */
   done: Promise<RunEnd>;
-  /** Stop the turn: Claude by SIGTERM, OpenCode by aborting the session. Settles `done`. */
+  /** Stop the turn: Claude and Codex by SIGTERM, OpenCode by aborting the session. Settles `done`. */
   stop(): Promise<void>;
 }
 
 export interface Harness {
   /** The scripted harness (`fake.ts`): no binary, no login, no model. */
   fake?: boolean;
-  readonly provider: "claude" | "opencode";
+  readonly provider: Provider;
   run(o: RunOptions, on: (e: HarnessEvent) => void): Running;
   /** Forget a provider session (a chat deleted). Best effort. */
   forget(session: string): Promise<void>;

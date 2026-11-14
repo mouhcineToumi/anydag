@@ -19,7 +19,8 @@ import { PROVIDER_NAMES } from "../../src/settings/providerNames";
  *   and it is how GLM through **OpenCode Go** is reached, which it has to be: Go's HTTP endpoint is
  *   for coding agents that identify themselves and carry a session (`x-opencode-session`), and
  *   calling it straight from AnyDag is exactly the traffic its terms single out. The CLI *is* the
- *   client it was built for.
+ *   client it was built for. `codex` is OpenAI's Codex CLI on its own login — a ChatGPT plan, or the
+ *   API key it was signed in with — the same way.
  *
  * **No key ever leaves this file's caller.** The registry is resolved on the dev server from its
  * environment, `describeProviders()` reports only whether one is present, and the browser names a
@@ -63,6 +64,9 @@ const refusal = (error: string, code: LlmReasonCode, provider?: string, keyEnv?:
 
 const OPENCODE_DEFAULT_MODEL = "opencode-go/glm-5.3-flash";
 
+/** The oldest Codex the headless run was checked against: every flag `codexIsolation` passes is in it. */
+export const CODEX_MIN: readonly [number, number] = [0, 169];
+
 export interface ProviderSpec {
   id: string;
   /** The app's one name for it (`src/settings/providerNames.ts`). */
@@ -100,6 +104,17 @@ export const PROVIDERS: ProviderSpec[] = [
     keyEnv: [],
     defaultModel: OPENCODE_DEFAULT_MODEL,
     models: ["opencode-go/glm-5.3-flash", "opencode-go/glm-5.3", "opencode-go/kimi-k3", "opencode-go/deepseek-v4.1-flash"],
+  },
+  {
+    id: "codex",
+    label: PROVIDER_NAMES.codex,
+    description: "Uses your Codex login, on your ChatGPT plan or the key Codex holds. No key here.",
+    kind: "cli",
+    keyEnv: [],
+    /* Empty: the default and the list are what Codex's own catalog offers this login (`codexModels`),
+       which changes with every release and with the plan. */
+    defaultModel: "",
+    models: [],
   },
   {
     id: "custom",
@@ -363,6 +378,147 @@ export function opencodeReady(env: Env, model?: string): { ok: true; bin: string
   return found;
 }
 
+/* ---- Codex ---- */
+
+/** Where Codex is, or why it cannot be used. `~/.codex/bin` and `~/.local/bin` are where its installers put it. */
+export function findCodex(env: Env): { ok: true; bin: string } | Failure {
+  const r = findCli(
+    "codex",
+    env.ANYDAG_CODEX_BIN,
+    "ANYDAG_CODEX_BIN",
+    (home, exe) => [path.join(home, ".codex", "bin", exe), path.join(home, ".local", "bin", exe)],
+    env,
+  );
+  if (r.ok) return r;
+  return refusal(r.error || "Codex is not installed — install it and sign in, or set ANYDAG_CODEX_BIN", "not-installed", "codex");
+}
+
+/**
+ * The environment a `codex` child runs in: the server's, less the desktop shell's business, and less
+ * a key that would bill instead of the login the person chose this row for — `codex exec` reads
+ * `CODEX_API_KEY` ahead of its own sign-in. `CODEX_THREAD_ID` and the sandbox's variables, set when
+ * a dev server was started from inside a Codex session, would make the child think it is nested.
+ * `CODEX_HOME` stays: it is where the login lives.
+ */
+export function codexEnv(env: Env): Env {
+  const out: Env = { ...env };
+  for (const k of [
+    "ELECTRON_RUN_AS_NODE",
+    "ANYDAG_TOKEN",
+    "CODEX_API_KEY",
+    "OPENAI_API_KEY",
+    "CODEX_THREAD_ID",
+    "CODEX_SANDBOX",
+    "CODEX_SANDBOX_NETWORK_DISABLED",
+  ])
+    delete out[k];
+  return out;
+}
+
+/** The `[major, minor]` that `codex --version` prints (`codex-cli 0.169.0`), or `undefined` when it says nothing readable. */
+export function codexVersion(bin: string, env: Env): [number, number] | undefined {
+  return remembered(
+    `codex-version:${bin}`,
+    () => {
+      const r = spawnSync(bin, ["--version"], { env: codexEnv(env), encoding: "utf8", timeout: 5_000 });
+      const m = /(\d+)\.(\d+)\.\d+/.exec(`${r.stdout ?? ""}`);
+      return m ? ([Number(m[1]), Number(m[2])] as [number, number]) : undefined;
+    },
+    (v) => v !== undefined,
+  );
+}
+
+/**
+ * Whether the Codex at `bin` is signed in, through `codex login status`: exit 0 and "Logged in using
+ * …", or exit 1 and "Not logged in". About 0.1 s. Anything else — a CLI that could not start — is
+ * given the benefit of the doubt: the run itself says what is wrong.
+ */
+export function codexSignedIn(bin: string, env: Env): boolean {
+  return remembered(
+    `codex:${bin}`,
+    () => {
+      const r = spawnSync(bin, ["login", "status"], { env: codexEnv(env), encoding: "utf8", timeout: 5_000 });
+      if (r.status === 0) return true;
+      return !/not logged in/i.test(`${r.stdout ?? ""}${r.stderr ?? ""}`);
+    },
+    (ok) => ok,
+  );
+}
+
+/** One model Codex offers this login, as its catalog describes it. */
+export interface CodexModel {
+  id: string;
+  label: string;
+}
+
+/** What `codex debug models` printed: the whole catalog, and the models it lists for a person, first first. */
+export interface CodexCatalog {
+  /** The catalog as printed, which `codexCatalog` in `llm.ts` rewrites for a run. */
+  raw: { models: Record<string, unknown>[] };
+  models: CodexModel[];
+}
+
+/** The listed models of a catalog, by its own `priority`: the first is Codex's default. Pure, for the tests. */
+export function codexListed(raw: { models?: unknown }): CodexModel[] {
+  const all = Array.isArray(raw.models) ? (raw.models as Record<string, unknown>[]) : [];
+  return all
+    .filter((m) => typeof m.slug === "string" && m.slug && m.visibility === "list")
+    .sort((a, b) => (Number(a.priority) || 0) - (Number(b.priority) || 0))
+    .map((m) => ({
+      id: m.slug as string,
+      label: typeof m.display_name === "string" && m.display_name ? m.display_name : (m.slug as string),
+    }));
+}
+
+/**
+ * Codex's model catalog, through `codex debug models` — about 0.6 s, from the cache Codex keeps for
+ * the login. `undefined` when it would not say. Two things read it: the model lists, and every run,
+ * which hands Codex an edited copy of it (`codexCatalog` in `llm.ts`), because the catalog is where
+ * Codex decides which built-in tools a model is given.
+ */
+export function codexModels(bin: string, env: Env): CodexCatalog | undefined {
+  return remembered(
+    `codex-models:${bin}`,
+    () => {
+      const r = spawnSync(bin, ["debug", "models"], {
+        env: codexEnv(env),
+        encoding: "utf8",
+        timeout: 15_000,
+        maxBuffer: 16 << 20,
+      });
+      try {
+        const raw = JSON.parse(r.stdout) as { models?: unknown };
+        if (!Array.isArray(raw.models)) return undefined;
+        return { raw: raw as CodexCatalog["raw"], models: codexListed(raw) };
+      } catch {
+        return undefined;
+      }
+    },
+    (v) => v !== undefined,
+  );
+}
+
+/**
+ * Codex found, new enough and signed in, or why not.
+ *
+ * **0.169 or later**, the version the headless run was checked against: `--ignore-user-config`,
+ * `model_catalog_json`, an MCP server's `env_vars` and `codex delete --force` are all in it, and
+ * one shape is supported rather than several half-working.
+ */
+export function codexReady(env: Env): { ok: true; bin: string } | Failure {
+  const found = findCodex(env);
+  if (!found.ok) return found;
+  const v = codexVersion(found.bin, env);
+  if (v && (v[0] < CODEX_MIN[0] || (v[0] === CODEX_MIN[0] && v[1] < CODEX_MIN[1])))
+    return refusal(
+      `Codex ${v[0]}.${v[1]} is too old — run \`codex update\` (${CODEX_MIN[0]}.${CODEX_MIN[1]} or later is needed)`,
+      "too-old",
+      "codex",
+    );
+  if (!codexSignedIn(found.bin, env)) return refusal("Codex is not signed in — run `codex login`", "not-signed-in", "codex");
+  return found;
+}
+
 /**
  * Which providers the default is looked for in, first to last. In the desktop app (`ANYDAG_DESKTOP=1`,
  * set by the shell) the coding agents' CLIs come first, because a plan the person already pays for
@@ -371,8 +527,8 @@ export function opencodeReady(env: Env, model?: string): { ok: true; bin: string
  * whose refusal the person is told.
  */
 const DEFAULT_ORDER = {
-  desktop: ["claude", "opencode", "custom"],
-  elsewhere: ["claude", "opencode", "custom"],
+  desktop: ["claude", "opencode", "codex", "custom"],
+  elsewhere: ["claude", "opencode", "codex", "custom"],
 } as const;
 
 /** Ids this build no longer offers. They stay reachable through `custom`'s OpenAI-compatible row. */
@@ -417,13 +573,20 @@ export function resolveProvider(
     return refusal(`no provider \`${id}\` — expected one of ${PROVIDERS.map((p) => p.id).join(", ")}`, "unknown-provider", id);
 
   /* Read against the provider the environment named, and `custom`: a model set for one provider is
-     not a model name Claude Code or OpenCode knows, so it is never sent to them unless one of them
+     not a model name Claude Code, OpenCode or Codex knows, so it is never sent to them unless one of them
      is the provider the environment named. */
   const named = namedProvider(env.ANYDAG_LLM_PROVIDER);
   const envModel = id === "custom" || (named !== undefined && id === named) ? env.ANYDAG_LLM_MODEL?.trim() : undefined;
   /* A retired provider's model goes with it: `gemini-3.8-flash` means nothing to the default. */
   const retired = Boolean(want?.provider?.trim()) && namedProvider(want?.provider) === undefined;
   const model = (retired ? "" : want?.model?.trim()) || envModel || spec.defaultModel;
+  /* Codex names no default of its own here: its catalog's first listed model is the default, and with
+     no catalog the run names no model and Codex picks. So it never needs one to be set. */
+  if (spec.id === "codex") {
+    const ready = codexReady(env);
+    if (!ready.ok) return ready;
+    return { ok: true, value: { spec, model: model || codexModels(ready.bin, env)?.models[0]?.id || "", bin: ready.bin } };
+  }
   if (!model)
     return refusal(`provider \`${id}\` needs a model — set ANYDAG_LLM_MODEL or pick one in Settings`, "needs-model", id);
 
@@ -477,7 +640,10 @@ export function describeProviders(env: Env): { default: string; providers: Publi
         kind: spec.kind,
         keyEnv: [...spec.keyEnv],
         defaultModel: r.ok ? r.value.model : spec.defaultModel,
-        models: spec.models,
+        models:
+          spec.id === "codex" && r.ok && r.value.bin
+            ? (codexModels(r.value.bin, env)?.models.map((m) => m.id) ?? [])
+            : spec.models,
         ready: r.ok,
         error: r.ok ? undefined : r.error,
         reason: r.ok ? undefined : r.reason,

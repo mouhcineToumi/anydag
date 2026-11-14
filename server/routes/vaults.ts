@@ -26,10 +26,10 @@ async function carry(from: Vault, to: Vault, name: string, kind: Kind, created: 
   const id = (await from.peekId(name, kind)) ?? undefined;
   let settled: string;
   if (kind === "file") {
-    const data = await from.getFile(name);
-    if (!data) throw new NotFound(`no file \`${name}\``);
     const info = await from.fileInfo(name);
-    settled = await to.putFile(name, data, info?.title ?? null, { id, created });
+    const data = info && from.fileStream(name);
+    if (!data) throw new NotFound(`no file \`${name}\``);
+    settled = await to.putFile(name, data, info.title, { id, created });
   } else {
     const got = await from.read(name, kind);
     if (!got) throw new NotFound(`no ${kind} \`${name}\``);

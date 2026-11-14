@@ -42,6 +42,7 @@ async function main(): Promise<void> {
     process.argv.slice(2).find((a, i, all) => !a.startsWith("--") && !takes.has(all[i - 1] ?? "")) ?? process.env.ANYDAG_VAULT;
   const home = new Home(homeDir());
   const session = new Session(home, null, VERSION, process.env, { types: parseTypes(process.env.ANYDAG_UPLOAD_TYPES) });
+  session.watchVaults();
   // The folder named, or else the vault opened last — and with neither, none: the page offers to
   // open or make one.
   try {

@@ -102,6 +102,12 @@ lessons about the codebase rather than about charts.
   then disagrees with the categories, which raises a `W_CHART_LENGTH` describing a symptom of the
   `E_CHART_VALUE` one line up. `ctx.broken`'s argument in a dialect with no ids: one wrong word costs
   one diagnostic.
+- **A number the scale cannot resolve never reaches the layout** (`E_CHART_RANGE`, #9). Past one unit
+  in the last place `v += step` gives `v` back, and `niceScale`'s tick loop never ended on a board
+  with `min 1e16` or a value of `1e308`. The parser keeps every number within `CHART_LARGEST` (`1e15`)
+  and drops a pinned `min`–`max` narrower than a `1e-12` share of its own size, a gap and no pin
+  as `E_CHART_VALUE` does; and `niceScale` itself lays out at most one tick past its budget and stops
+  at a step that does not move, so a model built some other way is a short axis rather than a hang.
 - **`legend` means two things and is two fields.** `legend bottom` places the key; `legend solid "in
   sync"` is the shared glyph legend every model carries and `DiagramItem` reads off any model at all.
   So `ChartModel.legend` is `LegendEntry[]` like everything else and the placement is `legendAt` —

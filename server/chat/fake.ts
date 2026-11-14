@@ -20,13 +20,14 @@
  */
 
 import type { Harness, HarnessEvent, RunEnd, RunOptions, Running } from "./harness";
+import type { Provider } from "./types";
 
 const lastWords = (prompt: string): string => {
   const at = prompt.lastIndexOf("The person now says:\n\n");
   return at < 0 ? prompt : prompt.slice(at + "The person now says:\n\n".length);
 };
 
-export function fakeHarness(provider: "claude" | "opencode"): Harness {
+export function fakeHarness(provider: Provider): Harness {
   return {
     provider,
     fake: true,

@@ -7,6 +7,7 @@ import { ALIASES, COLOR, MONO } from "@/render/icon-index";
 import { hueVars } from "@/render/hue";
 import { THEMES, THEME_NAMES } from "@/theme/useTheme";
 import type { Theme } from "@/theme/contract";
+import { collation } from "@/locale";
 
 /**
  * The icon picker: the field that used to be a bare text input over ~2,900 legal values.
@@ -147,7 +148,7 @@ export function searchIcons(query: string, mode: PickMode): string[] {
     const lead = hay.replace(/^emoji:/, "");
     hits.push({ name, lead: terms.some((t) => lead.startsWith(t)) });
   }
-  hits.sort((a, b) => (a.lead === b.lead ? a.name.localeCompare(b.name) : a.lead ? -1 : 1));
+  hits.sort((a, b) => (a.lead === b.lead ? collation().compare(a.name, b.name) : a.lead ? -1 : 1));
   return hits.map((h) => h.name);
 }
 

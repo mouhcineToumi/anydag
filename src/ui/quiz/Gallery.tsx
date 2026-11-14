@@ -5,6 +5,7 @@ import type { BoardTree } from "@/board/useBoard";
 import { folderQuizzes } from "@/quiz/folder";
 
 import type { Practice } from "./practice";
+import { collation } from "@/locale";
 
 /**
  * The Quizzes page: every quiz as a card, and Mistakes first.
@@ -59,7 +60,7 @@ export function QuizzesView({ list, practice, onOpen, onPractice, onMistakes, on
           questions: list.questions[name] ?? 0,
           mistakes: practice?.counts[list.ids[name] ?? ""] ?? 0,
         }))
-        .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }) || a.name.localeCompare(b.name)),
+        .sort((a, b) => collation({ numeric: true }).compare(a.title, b.title) || collation().compare(a.name, b.name)),
     [list, practice],
   );
   const folders = useMemo(() => [...new Set(cards.map((c) => c.folder))].sort(), [cards]);

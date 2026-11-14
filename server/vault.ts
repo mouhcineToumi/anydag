@@ -24,22 +24,43 @@
  * - **Names are the person's** (`names.ts`): verbatim, portable, and case-insensitively unique.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { setImmediate as yieldNow } from "node:timers/promises";
 
 import watcher from "@parcel/watcher";
 
-import { parseQuiz } from "../src/quiz/parse";
-import { eventOf, type NoteEvent } from "../src/note/event";
-import { projectOf, type Project } from "../src/note/project";
-import { taskOf, type Task } from "../src/note/task";
+import type { NoteEvent } from "../src/note/event";
+import type { Project } from "../src/note/project";
+import type { Task } from "../src/note/task";
 import { titleOf } from "../src/refs/extract";
 import type { DocRow, Home } from "./home";
 import { derivedId, frontId, instant, mint, validId, validInstant, withId } from "./ids";
+import { dirOf, type Entry, KeptListing } from "./kept";
+import {
+  forgetVault,
+  type Found,
+  type Front,
+  frontOf,
+  insideOf,
+  type Listed,
+  type Listing,
+  Lister,
+  listVault,
+  readFound,
+  type Scanned,
+  scanDir,
+  type Walked,
+  walk,
+} from "./listing";
 import {
   assetsPrefix,
   classify,
+  COMPONENT_PREFIX,
+  COMPONENTS,
   extOf,
   fileNameFrom,
   fileTarget,
@@ -50,12 +71,12 @@ import {
   KINDS,
   leafOf,
   nameFrom,
-  NOTE_SUFFIXES,
   refusal,
   same,
   SUFFIX,
   type TextKind,
   TEXT_KINDS,
+  textFile,
   unique,
   uniqueFile,
 } from "./names";
@@ -163,6 +184,13 @@ export interface Trashed {
   holds: Removed | null;
 }
 
+/** The index's rows for a vault, by id and by path, as a listing reads them. */
+interface Known {
+  rows: DocRow[];
+  byId: Map<string, DocRow>;
+  byPath: Map<string, DocRow>;
+}
+
 /** What an entry remembers of each document in it — the index's row, path made relative to the entry. */
 interface Kept {
   id: string;
@@ -174,29 +202,6 @@ interface Kept {
 
 /** Where the trash is kept: in the vault, so it travels with it, and out of every listing (a dot-folder). */
 const TRASH = ".anydag/trash";
-
-/** What one text's frontmatter says, against the stat it was read at. */
-interface Front {
-  stamp: string;
-  id: string | null | false;
-  title: string | undefined;
-  task: Task | undefined;
-  project: Project | undefined;
-  event: NoteEvent | undefined;
-  asks: (string | null)[] | undefined;
-}
-
-interface Listed {
-  kind: Kind;
-  name: string;
-  /** The stored file, vault-relative and `/`-separated. */
-  file: string;
-}
-
-/** Where the person's saved components live: in the vault, out of its listing. */
-const COMPONENTS = ".anydag/components";
-/** The wire's name for one: `components/<name>` (`useEditor`'s Keep). */
-const COMPONENT_PREFIX = "components/";
 
 export interface VaultOptions {
   /** The extensions this vault lists as attachments. */
@@ -213,8 +218,57 @@ export class Vault {
   readonly home: Home;
   readonly types: ReadonlySet<string>;
   attachments: string;
-  private readonly born: (abs: string) => Date | null;
+  private readonly born: ((abs: string) => Date | null) | null;
   private fronts = new Map<string, Front>();
+  /** The listing's own reads, kept between listings — used when there is no worker to list on. */
+  private readonly lister: Lister;
+  /** The listing running now, and the one asked for while it ran, which starts when it ends. */
+  private listing: Promise<Tree> | null = null;
+  private nextListing: Promise<Tree> | null = null;
+  /**
+   * How many times something here has moved a document — made, renamed, deleted, trashed, restored
+   * one, or a folder. A listing walks off this thread and reconciles in slices; one a move landed
+   * during is out of date before it is written, and is done again (`tree`).
+   */
+  private moves = 0;
+  /**
+   * The paths `rowNow` gave a row of their own without a walk, lowercased, each with the count
+   * (`givenAt`) it was given at. A listing that read the index before one was given, or walked before
+   * its file was made, would mint that file a second id or drop its row; it looks here first, so the
+   * id a document was opened with is the one the next listing gives it (#286).
+   */
+  private given = new Map<string, number>();
+  private givenAt = 0;
+  /**
+   * The last listing, kept and changed from what moved since rather than walked again (#280) —
+   * only while the watcher runs, which is what says a text changed in place. `null` makes the next
+   * listing walk.
+   */
+  private kept: KeptListing | null = null;
+  /** How many listings walked the folder rather than answering from the kept one: what the tests hold it to. */
+  walks = 0;
+  /** Whether the watcher is subscribed and hearing every change: what lets a listing be kept. */
+  private watching = false;
+  /** Settles once a watcher being started is subscribed, or has failed to be. */
+  private hearing: Promise<void> | null = null;
+  /**
+   * Every path said to have moved since the kept listing was made — by the watcher, or by a row
+   * this process wrote — lowercased, with the order it was said in (`dirtyAt`).
+   */
+  private dirty = new Map<string, { rel: string; at: number }>();
+  private dirtyAt = 0;
+  /** When `dirty` was last emptied without a walk: a listing begun before then is not kept. */
+  private clearedAt = 0;
+  /**
+   * The attachment records' folder's mtime when the kept listing last read them, the records this
+   * process wrote since, and whether somebody else wrote one: a record names the id of a file it may
+   * have been moved from, and only a walk matches the two, so another writer's record makes the next
+   * listing walk.
+   */
+  private recordsMark: number | null = null;
+  private ownRecords = new Map<string, string | null>();
+  private recordsMoved = false;
+
   private listeners = new Set<(c: Change) => void>();
   /**
    * The documents on disk at the last walk, lowercased, kept up to date by the watcher. A save is a
@@ -223,6 +277,8 @@ export class Vault {
    */
   private present: Set<string> | null = null;
   private stopping: Promise<() => Promise<void>> | null = null;
+  /** Attachments whose sha1 the watcher is reading, and whether another event came in meanwhile. */
+  private hashing = new Map<string, boolean>();
   /** Created instants sync adopted for documents it is about to write, keyed by lowercased path. */
   private adopted = new Map<string, string>();
   /** The same, by the id sync wrote it under: a document renamed here before the index walked it. */
@@ -246,8 +302,9 @@ export class Vault {
     this.home = home;
     this.types = new Set((opts.types ?? DEFAULT_TYPES).map((t) => t.toLowerCase()));
     this.attachments = opts.attachments ?? "attachments";
-    this.born = opts.born ?? (() => null);
+    this.born = opts.born ?? null;
     this.id = vaultId(this.root);
+    this.lister = new Lister(this.root);
   }
 
   // -- paths -----------------------------------------------------------------
@@ -304,14 +361,11 @@ export class Vault {
     const comp = kind === "board" ? this.component(name) : null;
     const why = refusal(comp ?? name);
     if (why) throw new Refused(why);
-    if (comp !== null) return `${COMPONENTS}/${comp}${SUFFIX.board}`;
     if (kind === "file") {
       if (!this.isAttachment(name)) throw new Refused(`not a file name \`${name}\``);
       return name;
     }
-    if (kind !== "note") return name + SUFFIX[kind];
-    for (const ext of NOTE_SUFFIXES) if (exists(this.abs(name + ext))) return name + ext;
-    return name + NOTE_SUFFIXES[0];
+    return textFile(name, kind, (rel) => exists(this.abs(rel)));
   }
 
   isAttachment(name: string): boolean {
@@ -335,41 +389,11 @@ export class Vault {
 
   // -- the walk --------------------------------------------------------------
 
-  /** Every document of every kind, and every folder, sorted. */
+  /** Every document of every kind, and every folder, sorted — on this thread, for the callers that need it now. */
   private walk(): { docs: Listed[]; folders: string[] } {
-    const docs: Listed[] = [];
-    const folders: string[] = [];
-    const seen = new Set<string>();
-    const walk = (dir: string, prefix: string): void => {
-      let entries: fs.Dirent[];
-      try {
-        entries = fs.readdirSync(dir, { withFileTypes: true });
-      } catch {
-        return; // a folder listed a moment ago and gone now: the disk's other writer
-      }
-      entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-      for (const e of entries) {
-        if (ignored(e.name)) continue;
-        const rel = prefix + e.name;
-        if (e.isDirectory()) {
-          if (refusal(rel)) continue;
-          folders.push(rel);
-          walk(path.join(dir, e.name), `${rel}/`);
-          continue;
-        }
-        if (!e.isFile()) continue;
-        const found = classify(rel, this.types);
-        if (!found || refusal(found.name)) continue;
-        // `plan.md` beside `plan.note.md` is one name twice; the `.md` is the note.
-        const key = `${found.kind === "file" ? "file" : "text"}:${found.name.toLowerCase()}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        docs.push({ kind: found.kind, name: found.name, file: rel });
-      }
-    };
-    walk(this.root, "");
-    this.present = new Set(docs.map((d) => d.file.toLowerCase()));
-    return { docs, folders };
+    const out = walk(this.root, this.types);
+    this.present = new Set(out.docs.map((d) => d.file.toLowerCase()));
+    return out;
   }
 
   /** What a text's frontmatter says, read only when its stat moved. */
@@ -395,8 +419,375 @@ export class Vault {
     return f;
   }
 
-  async tree(): Promise<Tree> {
-    const { docs, folders } = this.walk();
+  /**
+   * Every document and folder, and what the index says of each. The walk and every frontmatter read
+   * are off this thread (`listing.ts`) and the index is brought into line in slices of a few
+   * milliseconds, so no request waits behind a listing — on 50,000 files it was 5 s of every request
+   * waiting, the board the person opened included (#283). A listing asked for while one runs waits
+   * for it and then runs once for everyone who asked meanwhile, so an answer is never older than its
+   * question.
+   */
+  tree(): Promise<Tree> {
+    if (!this.listing) return this.startListing();
+    const after = (): Promise<Tree> => {
+      this.nextListing = null;
+      return this.startListing();
+    };
+    this.nextListing ??= this.listing.then(after, after);
+    return this.nextListing;
+  }
+
+  private startListing(): Promise<Tree> {
+    const run: Promise<Tree> = this.listNow().finally(() => {
+      if (this.listing === run) this.listing = null;
+    });
+    this.listing = run;
+    return run;
+  }
+
+  /**
+   * A move made here while a listing walked or reconciled makes it out of date before it is written
+   * — a document made during the walk would lose its row, one deleted would get one back — so it is
+   * done again. Three times, and then on this thread, where nothing can land in between.
+   */
+  private async listNow(): Promise<Tree> {
+    // A watcher being started: list once it hears, so the listing can be kept.
+    if (this.hearing && !this.watching) await this.hearing;
+    if (this.kept && this.watching) {
+      const t = await this.refresh(this.kept);
+      if (t) return t;
+      this.kept = null;
+    }
+    this.walks++;
+    for (let tries = 0; tries < 4; tries++) {
+      const moves = this.moves;
+      const from = this.dirtyAt;
+      const given = this.givenAt;
+      const heard = this.watching;
+      const records = mtimeOf(this.folderAbs(RECORDS));
+      const listing = tries < 3 ? await listVault(this.lister, this.types) : this.lister.list(this.types);
+      const t = await this.treeOf(listing, given, tries < 3 ? () => this.moves === moves : null);
+      if (!t) continue;
+      if (heard && this.watching && this.clearedAt <= from) this.keep(listing, t.rows, t.tree, from, records);
+      return t.tree;
+    }
+    throw new Error("unreachable: the last listing runs in one go");
+  }
+
+  /**
+   * Keep a listing: what it found, its rows and its tree. Every path said to have moved before it
+   * began is in it; one said since stays, for the next listing to look at again.
+   */
+  private keep(listing: Listing, rows: Map<string, DocRow>, tree: Tree, from: number, records: number | null): void {
+    const entries = listing.docs.map((d, i): Entry => ({ listed: d, found: listing.found[i]!, row: rows.get(d.file) ?? null }));
+    this.kept = new KeptListing(entries, listing.marks, tree, (d) => textKey(d.name, d.kind as TextKind));
+    this.recordsMark = records;
+    this.recordsMoved = false;
+    for (const [low, d] of this.dirty) if (d.at <= from) this.dirty.delete(low);
+  }
+
+  /**
+   * The kept listing brought up to date with what moved since it was made, or `null` when only a walk
+   * can say. Two things say what moved: **every folder's mtime**, read here on every listing — a
+   * document made, renamed or deleted, by this process or anybody, moves its folder's, so what a
+   * folder holds is never older than the question (a thousand folders are a millisecond) — and **the
+   * watcher**, for a text written in place, which moves no folder. A folder that moved is read again,
+   * each document in it `stat`ed; a path the watcher named is read again; nothing else is touched.
+   *
+   * Only a walk can say when more moved than is worth reading here (`REFRESH_MAX`, a folder copied in
+   * whole), when a document takes an id another listed one still holds (which the walk's tie-break
+   * settles), and when an attachment appears with no row (the walk matches it to a record by its
+   * bytes). A move made here while it reads starts it again, as it does a listing.
+   */
+  private async refresh(k: KeptListing): Promise<Tree | null> {
+    for (let tries = 0; tries < 3; tries++) {
+      // An attachment record somebody else wrote: only the walk matches a record to a moved file.
+      if (this.recordsMoved || mtimeOf(this.folderAbs(RECORDS)) !== this.recordsMark) return null;
+      const moves = this.moves;
+      const upTo = this.dirtyAt;
+      const look = this.looked(k);
+      if (!look) return k.tree;
+      const read = await this.reread(k, look);
+      if (!read) return null;
+      if (this.moves !== moves) continue;
+      // `settle` reads the index as it is now, so every row `rowNow` gave until here is in it.
+      const seen = this.givenAt;
+      const t = this.home.tx(() => this.settle(k, look, read));
+      if (!t) return null;
+      for (const [low, d] of this.dirty) if (d.at <= upTo) this.dirty.delete(low);
+      for (const [file, at] of this.given) if (at <= seen) this.given.delete(file);
+      return t;
+    }
+    return null;
+  }
+
+  /** The folders to read again — each whose mtime moved — and the listed documents the watcher named. */
+  private looked(k: KeptListing): { dirs: string[]; files: Set<string> } | null {
+    const dirs = new Set<string>();
+    for (const [dir, mark] of k.folders) if (mtimeOf(this.folderAbs(dir)) !== mark) dirs.add(dir);
+    const files = new Set<string>();
+    for (const [low, d] of this.dirty) {
+      if (k.entries.has(low)) files.add(low);
+      else {
+        if (k.folders.has(d.rel)) dirs.add(d.rel);
+        dirs.add(k.nearest(d.rel));
+      }
+    }
+    if (!dirs.size && !files.size) return null;
+    // Shallowest first: a folder its parent no longer lists is not read through.
+    return { dirs: [...dirs].sort((a, b) => depthOf(a) - depthOf(b)), files };
+  }
+
+  private folderAbs(dir: string): string {
+    return dir ? path.join(this.root, ...dir.split("/")) : this.root;
+  }
+
+  /**
+   * What the folders and documents `refresh` looks at hold now — read, nothing changed. In slices, the
+   * thread handed back between, since a folder of thousands is that many `stat`s; `null` when more
+   * than `REFRESH_MAX` documents are new or changed, which a walk off this thread reads instead.
+   */
+  private async reread(k: KeptListing, look: { dirs: string[]; files: Set<string> }): Promise<Reread | null> {
+    const out: Reread = { scanned: new Map(), walked: new Map(), found: new Map() };
+    // A folder its parent no longer lists, or under one gone, is not read: it is gone too.
+    const gone = (dir: string): boolean => {
+      if (dir === "") return false;
+      const up = dirOf(dir);
+      const s = out.scanned.get(up);
+      if (s && (s.mark === null || !s.folders.includes(dir))) return true;
+      return gone(up);
+    };
+    const toRead: { d: Listed; had: Front | undefined }[] = [];
+    for (const dir of look.dirs) {
+      if (gone(dir)) continue;
+      // A folder swapped for a link is gone, and its parent — whose mtime the swap moved — says so.
+      const real = dir === "" || fs.lstatSync(this.folderAbs(dir), { throwIfNoEntry: false })?.isDirectory();
+      const s: Scanned = real ? scanDir(this.root, dir, this.types) : { docs: [], folders: [], order: [], mark: null };
+      out.scanned.set(dir, s);
+      if (s.mark === null) continue;
+      for (const d of s.docs) {
+        const e = k.entries.get(d.file.toLowerCase());
+        toRead.push({ d, had: e?.listed.file === d.file ? (e.found.front ?? undefined) : undefined });
+      }
+      for (const sub of s.folders) {
+        if (k.folders.has(sub)) continue;
+        const w = walk(this.root, this.types, sub);
+        out.walked.set(sub, w);
+        for (const d of w.docs) toRead.push({ d, had: undefined });
+      }
+    }
+    for (const low of look.files) {
+      const e = k.entries.get(low)!;
+      if (!out.scanned.has(dirOf(e.listed.file))) toRead.push({ d: e.listed, had: e.found.front ?? undefined });
+    }
+    let fresh = 0;
+    for (const { d, had } of toRead) if (d.kind !== "file" && !had) fresh++;
+    if (fresh > REFRESH_MAX) return null;
+    const inside = insideOf(this.root);
+    let read = 0;
+    const ok = await sliced(
+      toRead,
+      ({ d, had }) => {
+        const f = readFound(this.root, d, had, inside);
+        if (d.kind !== "file" && f.front && f.front !== had) read++;
+        out.found.set(d.file.toLowerCase(), f);
+      },
+      { paced: true, still: () => read <= REFRESH_MAX },
+    );
+    return ok ? out : null;
+  }
+
+  /**
+   * What `reread` found, made the kept listing: documents come and gone, folders come and gone, each
+   * changed document's frontmatter and row — and the tree, new only where it moved. Runs in one go,
+   * in one transaction; `null` when it meets what only a walk can settle.
+   */
+  private settle(k: KeptListing, look: { dirs: string[]; files: Set<string> }, r: Reread): Tree | null {
+    const goneOnes: Entry[] = [];
+    const settled: Entry[] = [];
+    const add = (d: Listed): void => {
+      const f = r.found.get(d.file.toLowerCase());
+      if (f) settled.push({ listed: d, found: f, row: null });
+    };
+    for (const dir of look.dirs) {
+      const s = r.scanned.get(dir);
+      if (!s || (dir !== "" && !k.folders.has(dir))) continue;
+      if (s.mark === null) {
+        if (dir === "") return null; // the vault's own folder is gone
+        goneOnes.push(...k.dropFolder(dir));
+        continue;
+      }
+      k.folder(dir, s.mark);
+      const now = new Map(s.docs.map((d) => [d.file.toLowerCase(), d]));
+      for (const low of [...(k.byDir.get(dir) ?? [])]) {
+        const e = k.entries.get(low)!;
+        const d = now.get(low);
+        if (d && d.file === e.listed.file && d.kind === e.listed.kind) continue;
+        k.drop(low);
+        goneOnes.push(e);
+      }
+      for (const d of s.docs) {
+        const e = k.entries.get(d.file.toLowerCase());
+        const f = r.found.get(d.file.toLowerCase());
+        if (!e) add(d);
+        else if (f && !sameFound(e.found, f)) settled.push({ ...e, found: f });
+      }
+      const subs = new Set(s.folders);
+      for (const sub of k.subfolders(dir)) if (!subs.has(sub)) goneOnes.push(...k.dropFolder(sub));
+      for (const sub of s.folders) {
+        const w = r.walked.get(sub);
+        if (!w) continue;
+        for (const [f, mark] of Object.entries(w.marks)) k.folder(f, mark);
+        for (const d of w.docs) add(d);
+      }
+    }
+    // What the watcher named, or a row written here touched: its frontmatter and its row, again.
+    const again = new Set(settled.map((e) => e.listed.file.toLowerCase()));
+    for (const low of look.files) {
+      const e = k.entries.get(low);
+      if (!e || again.has(low)) continue;
+      settled.push({ ...e, found: r.found.get(low) ?? e.found });
+    }
+    // Every document that is here now before any row of one that went is dropped: a document moved
+    // outside the app takes its row, and its created, with it.
+    for (const e of settled) {
+      const row = this.rowOf(k, e.listed, e.found);
+      if (row === undefined) return null;
+      k.put({ ...e, row });
+    }
+    for (const e of goneOnes) {
+      const low = e.listed.file.toLowerCase();
+      if (k.entries.has(low)) continue;
+      const row = this.home.docByPath(this.id, e.listed.file);
+      if (row && row.path.toLowerCase() === low) this.home.dropDoc(this.id, row.id);
+    }
+    return k.commit();
+  }
+
+  /**
+   * One document's row, settled the way the walk's reconcile settles it (`reconciler`'s `step`), for
+   * the cases one document can settle alone; `undefined` for the rest, which the walk settles.
+   */
+  private rowOf(k: KeptListing, d: Listed, f: Found): DocRow | undefined {
+    const vault = this.id;
+    const row = this.home.docByPath(vault, d.file);
+    const put = (next: DocRow): DocRow => {
+      if (
+        !row ||
+        row.id !== next.id ||
+        row.path !== next.path ||
+        row.kind !== next.kind ||
+        row.minted !== next.minted ||
+        row.title !== next.title ||
+        row.created !== next.created
+      )
+        this.home.putDoc(next);
+      return next;
+    };
+    if (d.kind === "file") {
+      // An attachment's id is a record in `.anydag/files/`, which may name the path it was moved from.
+      if (!row) return undefined;
+      if (!row.minted) return put({ ...row, path: d.file, kind: d.kind });
+      const rec = this.fileRecord(row.id);
+      if (!rec || rec.path.toLowerCase() !== d.file.toLowerCase()) return undefined;
+      return put({ ...row, path: d.file, kind: d.kind, title: rec.title });
+    }
+    const own = f.front?.id || null;
+    if (own) {
+      if (row?.id === own) return put({ ...row, path: d.file, kind: d.kind, minted: 1 });
+      const was = this.home.docById(vault, own);
+      // Two files, one id: which keeps it is the walk's tie-break.
+      if (was && was.path.toLowerCase() !== d.file.toLowerCase() && k.entries.has(was.path.toLowerCase())) return undefined;
+      return put({
+        vault,
+        id: own,
+        path: d.file,
+        kind: d.kind,
+        created: was?.created ?? row?.created ?? this.createdOfId(own, d.file, was) ?? this.bornAt(d.file, f.born ?? undefined),
+        minted: 1,
+        title: null,
+      });
+    }
+    if (row) return put({ ...row, path: d.file, kind: d.kind, minted: 0 });
+    return put({
+      vault,
+      id: mint((x) => !!this.home.docById(vault, x)),
+      path: d.file,
+      kind: d.kind,
+      created: this.bornAt(d.file, f.born ?? undefined),
+      minted: 0,
+      title: null,
+    });
+  }
+
+  /** An attachment's record, `.anydag/files/<id>.json`, or `null` when there is none to read. */
+  private fileRecord(id: string): { path: string; title: string | null } | null {
+    try {
+      const data = JSON.parse(fs.readFileSync(this.abs(`.anydag/files/${id}.json`), "utf8")) as {
+        path?: unknown;
+        title?: unknown;
+      };
+      if (typeof data.path !== "string") return null;
+      return { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Say that `rel` moved, for the kept listing to look at again. Only while a watcher runs: nothing is kept otherwise. */
+  private mark(rel: string): void {
+    if (!this.watching || !rel) return;
+    this.dirty.set(rel.toLowerCase(), { rel, at: ++this.dirtyAt });
+    // So much moved that a walk is cheaper than looking at each: drop the kept listing.
+    if (this.dirty.size > DIRTY_MAX) {
+      this.kept = null;
+      this.dirty.clear();
+      this.clearedAt = this.dirtyAt;
+    }
+  }
+
+  /** A row written outside a listing, and the path it is at: the kept listing reads it again. */
+  private putRow(row: DocRow): void {
+    this.home.putDoc(row);
+    this.mark(row.path);
+  }
+
+  private dropRow(row: DocRow): void {
+    this.home.dropDoc(this.id, row.id);
+    this.mark(row.path);
+  }
+
+  /** What the watcher said moved: a document or folder, or an attachment's record and so its file. */
+  private heard(rel: string): void {
+    if (!rel) return;
+    const rec = /^\.anydag\/files\/([^/]+)\.json$/.exec(rel);
+    if (rec) {
+      let text: string | null = null;
+      try {
+        text = fs.readFileSync(this.folderAbs(rel), "utf8");
+      } catch {
+        /* removed */
+      }
+      if (!this.ownRecords.has(rec[1]!) || this.ownRecords.get(rec[1]!) !== text) this.recordsMoved = true;
+      return;
+    }
+    if (rel.split("/").some(ignored)) return;
+    this.mark(rel);
+  }
+
+  /**
+   * The tree a listing says, the index reconciled with it. `from` is `givenAt` when its walk began.
+   * `still` is asked before every slice and stops it with `null` once it says no; without one, it runs
+   * in one go.
+   */
+  private async treeOf(
+    { docs, folders, found }: Listing,
+    from: number,
+    still: (() => boolean) | null,
+  ): Promise<{ tree: Tree; rows: Map<string, DocRow> } | null> {
+    if (still && !still()) return null;
+    // Only when there is none: a running watcher has kept it since this walk, which is older.
+    this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
     const t: Tree = {
       boards: [],
       notes: [],
@@ -415,39 +806,42 @@ export class Vault {
     };
     const lists = byKind(t);
     const fronts = new Map<string, Front>();
-    const kept = new Map<string, Front>();
-    for (const d of docs) {
+    const births = new Map<string, number>();
+    const pace = { still, paced: !!still };
+    let at = 0;
+    const read = (d: Listed): void => {
+      const f = found[at++]!;
       lists[d.kind].push(d.name);
+      if (f.born !== null) births.set(d.file, f.born);
       if (d.kind === "file") {
-        try {
-          t.sizes[d.name] = fs.statSync(this.abs(d.file)).size;
-        } catch {
-          /* gone between the walk and here */
-        }
-        continue;
+        if (f.size !== null) t.sizes[d.name] = f.size;
+        return;
       }
-      const f = this.front(d);
       // A document nobody titled is called by its file's name.
-      t.titles[d.name] = f?.title || leafOf(d.name);
-      if (!f) continue;
-      fronts.set(d.file, f);
-      kept.set(d.file, f);
-      if (f.task) t.tasks[d.name] = f.task;
-      if (f.project) t.projects[d.name] = f.project;
-      if (f.event) t.events[d.name] = f.event;
-      if (f.asks) t.questions[d.name] = f.asks;
-    }
-    this.fronts = kept;
-    const rows = this.reconcile(docs, fronts);
-    for (const d of docs) {
+      t.titles[d.name] = f.front?.title || leafOf(d.name);
+      if (!f.front) return;
+      fronts.set(d.file, f.front);
+      if (f.front.task) t.tasks[d.name] = f.front.task;
+      if (f.front.project) t.projects[d.name] = f.front.project;
+      if (f.front.event) t.events[d.name] = f.front.event;
+      if (f.front.asks) t.questions[d.name] = f.front.asks;
+    };
+    if (!(await sliced(docs, read, pace))) return null;
+    const rows = await this.reconcileSliced(docs, fronts, births, pace, from);
+    if (!rows) return null;
+    const answer = (d: Listed): void => {
       const row = rows.get(d.file);
-      if (!row) continue;
+      if (!row) return;
       t.ids[d.name] = row.id;
       t.created[d.name] = row.created;
       if (d.kind === "file") t.titles[d.name] = row.title || leafOf(d.name);
+    };
+    if (!(await sliced(docs, answer, { paced: pace.paced, still: null }))) return null;
+    for (const l of Object.values(lists)) {
+      l.sort(byName);
+      if (pace.paced) await yieldNow();
     }
-    for (const l of Object.values(lists)) l.sort(byName);
-    return t;
+    return { tree: t, rows };
   }
 
   // -- ids -------------------------------------------------------------------
@@ -467,8 +861,11 @@ export class Vault {
       const id = e.slice(0, -5);
       if (!validId(id)) continue;
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown };
-        if (typeof data.path === "string")
+        const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown } | null;
+        /* The record syncs, and anybody who writes the folder writes it: a `path` no vault name can
+           be — `../../x.pdf` — is a record of nothing, dropped like one that does not parse. Kept, it
+           reached `abs()`, which refused it, and that refusal failed the whole listing (#9). */
+        if (data && typeof data.path === "string" && refusal(data.path) === null)
           out.set(id, { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null });
       } catch {
         /* a half-synced file: read again next time */
@@ -480,12 +877,29 @@ export class Vault {
   private writeFileId(id: string, file: string, title: string | null): void {
     const target = this.writeAt(`.anydag/files/${id}.json`);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    writeAtomic(target, `${JSON.stringify({ path: file, ...(title ? { title } : {}) }, null, 1)}\n`);
+    const text = `${JSON.stringify({ path: file, ...(title ? { title } : {}) }, null, 1)}\n`;
+    writeAtomic(target, text);
+    this.wroteRecord(id, text);
   }
 
   private dropFileId(id: string): void {
-    fs.rmSync(this.abs(`.anydag/files/${id}.json`), { force: true });
+    this.rmFileId(id);
     this.home.set(this.digestKey(id), null);
+  }
+
+  private rmFileId(id: string): void {
+    fs.rmSync(this.abs(`.anydag/files/${id}.json`), { force: true });
+    this.wroteRecord(id, null);
+  }
+
+  /**
+   * A record this process wrote (`null`: removed), so neither the watcher's report of it nor the
+   * folder's mtime it moved reads as somebody else's — which the kept listing would walk for.
+   */
+  private wroteRecord(id: string, text: string | null): void {
+    if (!this.watching) return;
+    this.ownRecords.set(id, text);
+    this.recordsMark = mtimeOf(this.folderAbs(RECORDS));
   }
 
   /** Where the index keeps an attachment's size and sha1, which find it again after a move by hand. */
@@ -501,7 +915,7 @@ export class Vault {
     this.markSynced();
     this.adopted.set(rel.toLowerCase(), at);
     const row = this.home.docByPath(this.id, rel);
-    if (row && row.created !== at) this.home.putDoc({ ...row, created: at });
+    if (row && row.created !== at) this.putRow({ ...row, created: at });
   }
 
   /**
@@ -580,16 +994,22 @@ export class Vault {
 
   /** While sync's first download runs, a duplicate id's fix stays in the index and out of the file. */
   holdFixes(on: boolean): void {
+    // Released: the fixes held are written by the walk that finds them again, which a kept listing
+    // would not do — it never looks at a document that did not move.
+    if (this.held && !on) this.kept = null;
     this.held = on;
   }
 
-  private bornAt(file: string): string {
+  /** When `file` was born: what sync adopted for it, else the disk's birth (`seen`, when a listing read it). */
+  private bornAt(file: string, seen?: number): string {
     const adopted = this.adopted.get(file.toLowerCase());
     if (adopted) return adopted;
     try {
-      const abs = this.abs(file);
-      const st = fs.statSync(abs);
-      return instant(this.born(abs) ?? (st.birthtimeMs ? st.birthtime : st.mtime));
+      const told = this.born?.(this.abs(file));
+      if (told) return instant(told);
+      if (seen !== undefined) return instant(seen);
+      const st = fs.statSync(this.abs(file));
+      return instant(st.birthtimeMs ? st.birthtime : st.mtime);
     } catch {
       return instant();
     }
@@ -603,15 +1023,102 @@ export class Vault {
    * one — written into it, and said on the console.
    */
   private reconcile(docs: Listed[], fronts: Map<string, Front>): Map<string, DocRow> {
+    const r = this.reconciler(docs, fronts);
+    this.home.tx(() => {
+      for (const d of docs) r.step(d);
+      for (const row of r.rows) r.drop(row);
+    });
+    r.fix();
+    return r.out;
+  }
+
+  /**
+   * `reconcile` in slices of a few milliseconds, each its own transaction, handing the thread back
+   * between them; `null` when `still` said no before one, and nothing after that is written.
+   */
+  private async reconcileSliced(
+    docs: Listed[],
+    fronts: Map<string, Front>,
+    births: Map<string, number>,
+    pace: { paced: boolean; still: (() => boolean) | null },
+    from: number,
+  ): Promise<Map<string, DocRow> | null> {
+    // A row given before the index is read is in what it reads; one given after is looked up.
+    const seen = this.givenAt;
+    const known = await this.rowsSliced(pace);
+    if (!known || (pace.still && !pace.still())) return null;
+    const r = this.reconciler(docs, fronts, births, known, from);
+    const tx = { ...pace, wrap: (run: () => void) => this.home.tx(run) };
+    if (!(await sliced(docs, r.step, tx))) return null;
+    if (!(await sliced(r.rows, r.drop, tx))) return null;
+    r.fix();
+    for (const [file, at] of this.given) if (at <= seen) this.given.delete(file);
+    return r.out;
+  }
+
+  /**
+   * Every row the index has for this vault, by id and by path, a page at a time with the thread
+   * handed back between — 50,000 rows read and filed in one go are 180 ms of it. `null` when `still`
+   * said no.
+   */
+  private async rowsSliced(pace: { paced: boolean; still: (() => boolean) | null }): Promise<Known | null> {
+    const known: Known = { rows: [], byId: new Map(), byPath: new Map() };
+    const file = (page: DocRow[]): void => {
+      for (const r of page) {
+        known.rows.push(r);
+        known.byId.set(r.id, r);
+        known.byPath.set(r.path.toLowerCase(), r);
+      }
+    };
+    if (!pace.paced) {
+      file(this.home.docs(this.id));
+      return known;
+    }
+    for (let after = ""; ; ) {
+      if (pace.still && !pace.still()) return null;
+      const page = this.home.docsAfter(this.id, after, ROWS_PAGE);
+      file(page);
+      if (page.length < ROWS_PAGE) return known;
+      after = page[page.length - 1]!.id;
+      await yieldNow();
+    }
+  }
+
+  /** `reconcile`'s three steps: each listed document, then the rows nothing claimed, then the duplicate ids. */
+  private reconciler(
+    docs: Listed[],
+    fronts: Map<string, Front>,
+    births?: Map<string, number>,
+    indexed?: Known,
+    from = this.givenAt,
+  ): {
+    rows: DocRow[];
+    step: (d: Listed) => void;
+    drop: (r: DocRow) => void;
+    fix: () => void;
+    out: Map<string, DocRow>;
+  } {
+    const born = (file: string): string => this.bornAt(file, births?.get(file));
     const vault = this.id;
-    const rows = this.home.docs(vault);
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    const byPath = new Map(rows.map((r) => [r.path.toLowerCase(), r]));
+    const rows = indexed?.rows ?? this.home.docs(vault);
+    const byId = indexed?.byId ?? new Map(rows.map((r) => [r.id, r]));
+    const byPath = indexed?.byPath ?? new Map(rows.map((r) => [r.path.toLowerCase(), r]));
     const fileIds = docs.some((d) => d.kind === "file") || rows.some((r) => r.kind === "file") ? this.fileIds() : new Map();
     const filePaths = new Map([...fileIds].map(([id, v]) => [v.path.toLowerCase(), id]));
     // A record whose file is gone, and a file with no record: moved outside the app with the record
     // left behind. The bytes the app last saw it holding say whether they are one file.
-    const orphans = [...fileIds].filter(([, v]) => !exists(this.abs(v.path)));
+    // A path the vault refuses is no file of its own to lose: not an orphan, and never a throw.
+    const at = (rel: string): string | null => {
+      try {
+        return this.abs(rel);
+      } catch {
+        return null;
+      }
+    };
+    const orphans = [...fileIds].filter(([, v]) => {
+      const abs = at(v.path);
+      return abs !== null && !exists(abs);
+    });
     if (orphans.length) {
       for (const d of docs) {
         if (d.kind !== "file" || filePaths.has(d.file.toLowerCase())) continue;
@@ -625,7 +1132,7 @@ export class Vault {
         if (!want.length) continue;
         let digest: string;
         try {
-          digest = digestOf(fs.readFileSync(this.abs(d.file)));
+          digest = digestFileSync(this.abs(d.file));
         } catch {
           continue;
         }
@@ -663,7 +1170,7 @@ export class Vault {
         byPath.get(f.toLowerCase())?.created ??
         this.adopted.get(f.toLowerCase()) ??
         this.createdOfId(id, f, byId.get(id)) ??
-        this.bornAt(f);
+        born(f);
       const [co, cd] = [createdAt(other.file), createdAt(d.file)];
       const older = co !== cd ? co < cd : other.file.toLowerCase() < d.file.toLowerCase();
       const keepOther = known === other.file.toLowerCase() || (known !== d.file.toLowerCase() && older);
@@ -680,96 +1187,143 @@ export class Vault {
       return !keepOther;
     };
 
-    this.home.tx(() => {
-      for (const d of docs) {
-        const own = d.kind === "file" ? (filePaths.get(d.file.toLowerCase()) ?? null) : (fronts.get(d.file)?.id ?? null);
-        const row = byPath.get(d.file.toLowerCase());
-        if (own) {
-          if (!claim(d, own)) continue;
-          const was = byId.get(own);
-          const next: DocRow = {
-            vault,
-            id: own,
-            path: d.file,
-            kind: d.kind,
-            // A document renamed before this walk is its id's created, not the rename's birth: the
-            // tie-break above and `createdOf` read it so, and the row must too (seed 2, loaded).
-            created: was?.created ?? row?.created ?? this.createdOfId(own, d.file, was) ?? this.bornAt(d.file),
-            minted: 1,
-            title: d.kind === "file" ? (fileIds.get(own)?.title ?? null) : null,
-          };
-          if (!was || was.path !== next.path || was.minted !== 1 || was.kind !== next.kind || was.title !== next.title)
-            this.home.putDoc(next);
-          out.set(d.file, next);
-          continue;
-        }
-        // No id of its own: the provisional one the index gave this path, or a new one.
-        if (row && !claimed.has(row.id) && !(row.minted && row.kind === "file" && fileIds.has(row.id))) {
-          claimed.set(row.id, d);
-          const next = { ...row, path: d.file, kind: d.kind, minted: 0 };
-          if (row.minted !== 0 || row.path !== d.file || row.kind !== d.kind) this.home.putDoc(next);
-          out.set(d.file, next);
-          continue;
-        }
-        const id = mint((x) => byId.has(x) || claimed.has(x));
-        claimed.set(id, d);
-        const next: DocRow = { vault, id, path: d.file, kind: d.kind, created: this.bornAt(d.file), minted: 0, title: null };
-        this.home.putDoc(next);
-        byId.set(id, next);
-        out.set(d.file, next);
-      }
-      for (const r of rows)
-        if (!claimed.has(r.id) || claimed.get(r.id)!.file.toLowerCase() !== r.path.toLowerCase()) {
-          if (!claimed.has(r.id)) this.home.dropDoc(vault, r.id);
-        }
-    });
+    // The row `rowNow` gave a path after the index was read: what the index holds there now.
+    const given = (file: string): DocRow | undefined => {
+      if (!this.given.has(file.toLowerCase())) return undefined;
+      const r = this.home.docByPath(vault, file);
+      if (!r) return undefined;
+      byId.set(r.id, r);
+      byPath.set(r.path.toLowerCase(), r);
+      return r;
+    };
 
-    for (const { listed, id } of fixes) {
-      console.warn(`anydag: ${listed.file} carried an id another file has; it is ${id} now`);
-      const row: DocRow = {
-        vault,
-        id,
-        path: listed.file,
-        kind: listed.kind,
-        created: this.bornAt(listed.file),
-        minted: 0,
-        title: null,
-      };
-      this.home.putDoc(row);
-      if (this.held) {
-        out.set(listed.file, row);
-        continue;
+    const step = (d: Listed): void => {
+      const own = d.kind === "file" ? (filePaths.get(d.file.toLowerCase()) ?? null) : (fronts.get(d.file)?.id ?? null);
+      const row = byPath.get(d.file.toLowerCase()) ?? given(d.file);
+      if (own) {
+        if (!claim(d, own)) return;
+        const was = byId.get(own);
+        const next: DocRow = {
+          vault,
+          id: own,
+          path: d.file,
+          kind: d.kind,
+          // A document renamed before this walk is its id's created, not the rename's birth: the
+          // tie-break above and `createdOf` read it so, and the row must too (seed 2, loaded).
+          created: was?.created ?? row?.created ?? this.createdOfId(own, d.file, was) ?? born(d.file),
+          minted: 1,
+          title: d.kind === "file" ? (fileIds.get(own)?.title ?? null) : null,
+        };
+        if (!was || was.path !== next.path || was.minted !== 1 || was.kind !== next.kind || was.title !== next.title)
+          this.home.putDoc(next);
+        out.set(d.file, next);
+        return;
       }
-      this.mintRow(row, true);
-      out.set(listed.file, { ...row, minted: 1 });
-    }
-    return out;
+      // No id of its own: the provisional one the index gave this path, or a new one.
+      if (row && !claimed.has(row.id) && !(row.minted && row.kind === "file" && fileIds.has(row.id))) {
+        claimed.set(row.id, d);
+        const next = { ...row, path: d.file, kind: d.kind, minted: 0 };
+        if (row.minted !== 0 || row.path !== d.file || row.kind !== d.kind) this.home.putDoc(next);
+        out.set(d.file, next);
+        return;
+      }
+      const id = mint((x) => byId.has(x) || claimed.has(x));
+      claimed.set(id, d);
+      const next: DocRow = { vault, id, path: d.file, kind: d.kind, created: born(d.file), minted: 0, title: null };
+      this.home.putDoc(next);
+      byId.set(id, next);
+      out.set(d.file, next);
+    };
+
+    // A row nothing listed claimed: its file is gone — unless `rowNow` gave it after this walk began,
+    // for a file it found on disk, and it is the walk that is out of date.
+    const drop = (r: DocRow): void => {
+      if (claimed.has(r.id) || (this.given.get(r.path.toLowerCase()) ?? -1) > from) return;
+      this.home.dropDoc(vault, r.id);
+    };
+
+    const fix = (): void => {
+      for (const { listed, id } of fixes) {
+        console.warn(`anydag: ${listed.file} carried an id another file has; it is ${id} now`);
+        const row: DocRow = {
+          vault,
+          id,
+          path: listed.file,
+          kind: listed.kind,
+          created: born(listed.file),
+          minted: 0,
+          title: null,
+        };
+        this.home.putDoc(row);
+        if (this.held) {
+          out.set(listed.file, row);
+          continue;
+        }
+        this.mintRow(row, true);
+        out.set(listed.file, { ...row, minted: 1 });
+      }
+    };
+
+    return { rows, step, drop, fix, out };
   }
 
-  /** The row for a document, reconciling the vault when the index has not seen it. */
-  private row(name: string, kind: Kind): DocRow | null {
+  /**
+   * The row for a document, when one can be had without a walk: the index's, or — the index has not
+   * seen it — the one the walk would give it, given now. A text with no id of its own has nothing to
+   * collide with, and the walk would mint it a provisional id; one whose id the index does not hold
+   * keeps it. `undefined` when only the walk can say: an attachment, whose id is a record in
+   * `.anydag/files/` perhaps naming the path it was moved from, and a text whose id the index holds
+   * at another path — moved there, or a copy, which only the walk tells apart. On 50,000 files that
+   * walk was 5.7 s of every request waiting, for a note with no `id:` opened on a new home (#286).
+   */
+  private rowNow(name: string, kind: Kind): DocRow | null | undefined {
     const file = this.fileOf(name, kind);
     if (!exists(this.abs(file))) return null;
     const hit = this.home.docByPath(this.id, file);
     if (hit) return hit;
-    const listed: Listed = { kind, name, file };
-    const fronts = new Map<string, Front>();
-    if (kind !== "file") {
-      const f = this.front(listed);
-      if (f) fronts.set(file, f);
-    }
-    // One document: the full walk is the only place a duplicate is told apart, so only the cheap
-    // half here — its own id, or a provisional one.
-    const own = kind === "file" ? null : (fronts.get(file)?.id ?? null);
-    if (own && !this.home.docById(this.id, own)) {
-      const r: DocRow = { vault: this.id, id: own, path: file, kind, created: this.bornAt(file), minted: 1, title: null };
-      this.home.putDoc(r);
-      return r;
-    }
-    return this.reconcileAll(file);
+    if (kind === "file") return undefined;
+    // `false` is somebody else's key, which is no id of ours.
+    const own = this.front({ kind, name, file })?.id || null;
+    if (own && this.home.docById(this.id, own)) return undefined;
+    const r: DocRow = {
+      vault: this.id,
+      id: own ?? mint((x) => !!this.home.docById(this.id, x)),
+      path: file,
+      kind,
+      created: this.bornAt(file),
+      minted: own ? 1 : 0,
+      title: null,
+    };
+    this.putRow(r);
+    this.given.set(file.toLowerCase(), ++this.givenAt);
+    return r;
+  }
+
+  /**
+   * The row for a document. When only the walk can say, it waits for a listing, which walks off this
+   * thread: the first open of such a document waits, and nothing else does.
+   */
+  private async row(name: string, kind: Kind): Promise<DocRow | null> {
+    const now = this.rowNow(name, kind);
+    if (now !== undefined) return now;
+    await this.tree();
+    return this.home.docByPath(this.id, this.fileOf(name, kind)) ?? null;
+  }
+
+  /**
+   * `row` for a move, which must not hand the thread back between reading the row and moving the
+   * file — another request could take the name it settled on — so when only the walk can say, it
+   * walks here.
+   */
+  private rowHere(name: string, kind: Kind): DocRow | null {
+    const now = this.rowNow(name, kind);
+    return now !== undefined ? now : this.reconcileAll(this.fileOf(name, kind));
   }
 
   private reconcileAll(file: string): DocRow | null {
+    this.moves++;
+    // Rows written by a walk here, which the kept listing did not see written: the next listing walks.
+    this.kept = null;
     const { docs } = this.walk();
     const fronts = new Map<string, Front>();
     for (const d of docs) {
@@ -777,6 +1331,7 @@ export class Vault {
       const f = this.front(d);
       if (f) fronts.set(d.file, f);
     }
+    this.fronts = fronts; // what is no longer listed is no longer kept
     return this.reconcile(docs, fronts).get(file) ?? null;
   }
 
@@ -800,7 +1355,7 @@ export class Vault {
       if (had === false && !force) return false;
       if (had !== row.id) writeAtomic(abs, withId(text, row.id));
     }
-    this.home.putDoc({ ...row, minted: 1 });
+    this.putRow({ ...row, minted: 1 });
     return true;
   }
 
@@ -816,7 +1371,7 @@ export class Vault {
 
   /** This document's id, written into it if it was only the index's. `null` when it does not exist. */
   async ident(name: string, kind: Kind = "board"): Promise<string | null> {
-    const row = this.row(name, kind);
+    const row = await this.row(name, kind);
     if (!row) return null;
     this.mintRow(row);
     return row.id;
@@ -824,7 +1379,7 @@ export class Vault {
 
   /** The id the listing gives a document, without writing anything. */
   async peekId(name: string, kind: Kind = "board"): Promise<string | null> {
-    return this.row(name, kind)?.id ?? null;
+    return (await this.row(name, kind))?.id ?? null;
   }
 
   /** The `{name, kind}` answering to an id in this vault, or `null`. */
@@ -841,7 +1396,7 @@ export class Vault {
   }
 
   async created(name: string, kind: Kind): Promise<string | null> {
-    return this.row(name, kind)?.created ?? null;
+    return (await this.row(name, kind))?.created ?? null;
   }
 
   // -- texts -----------------------------------------------------------------
@@ -883,6 +1438,7 @@ export class Vault {
    * that is free here (an export imported again keeps every link to it), else a new one.
    */
   async create(name: string, kind: TextKind, text: string, opts: { id?: string; created?: string } = {}): Promise<string> {
+    this.moves++;
     const comp = kind === "board" ? this.component(name) : null;
     const stem = comp !== null ? `${COMPONENT_PREFIX}${nameFrom(comp, "component")}` : nameFrom(name);
     const settled = comp !== null ? this.uniqueComponent(stem) : unique(stem, (n) => this.taken(n));
@@ -899,7 +1455,7 @@ export class Vault {
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : own && !taken(own) ? own : mint(taken);
     const body = own === false ? text : withId(text, id);
     writeAtomic(abs, body);
-    this.home.putDoc({
+    this.putRow({
       vault: this.id,
       id,
       path: file,
@@ -928,6 +1484,7 @@ export class Vault {
     to: string,
     opts: { copy?: boolean; edit?: (text: string) => string } = {},
   ): Promise<string> {
+    this.moves++;
     const copy = !!opts.copy;
     const from = this.fileOf(name, kind);
     const fromAbs = this.abs(from);
@@ -946,18 +1503,18 @@ export class Vault {
     const target = kind === "note" ? settled + from.slice(name.length) : this.fileOf(settled, kind);
     const toAbs = this.writeAt(target);
     fs.mkdirSync(path.dirname(toAbs), { recursive: true });
-    const row = this.row(name, kind);
+    const row = this.rowHere(name, kind);
 
     if (kind === "file") {
       if (copy) {
         fs.copyFileSync(fromAbs, toAbs);
         const id = mint((x) => !!this.home.docById(this.id, x));
-        this.home.putDoc({ vault: this.id, id, path: target, kind, created: instant(), minted: 0, title: row?.title ?? null });
+        this.putRow({ vault: this.id, id, path: target, kind, created: instant(), minted: 0, title: row?.title ?? null });
       } else {
         moveFile(fromAbs, toAbs);
         if (row) {
           const next = { ...row, path: target };
-          this.home.putDoc(next);
+          this.putRow(next);
           if (row.minted) this.writeFileId(row.id, target, row.title);
         }
       }
@@ -969,7 +1526,7 @@ export class Vault {
       const own = frontId(text);
       const id = mint((x) => !!this.home.docById(this.id, x));
       writeAtomic(toAbs, own === false ? text : own ? withId(text, id) : text);
-      this.home.putDoc({ vault: this.id, id, path: target, kind, created: instant(), minted: own ? 1 : 0, title: null });
+      this.putRow({ vault: this.id, id, path: target, kind, created: instant(), minted: own ? 1 : 0, title: null });
       const assets = this.abs(assetsPrefix(name));
       if (isDir(assets)) fs.cpSync(assets, this.abs(assetsPrefix(settled)), { recursive: true });
       return settled;
@@ -981,13 +1538,14 @@ export class Vault {
     } else moveFile(fromAbs, toAbs);
     const assets = this.abs(assetsPrefix(name));
     if (isDir(assets)) moveFile(assets, this.abs(assetsPrefix(settled)));
-    if (row) this.home.putDoc({ ...row, path: target });
+    if (row) this.putRow({ ...row, path: target });
     if (next !== text) this.mintTargets(next, text);
     return settled;
   }
 
   /** Delete a document. Its legacy `.assets/` go with it; an attachment's id record too. */
   async delete(name: string, kind: Kind = "board"): Promise<void> {
+    this.moves++;
     const file = this.fileOf(name, kind);
     const abs = this.writeAt(file);
     if (!isFile(abs)) throw new NotFound(`no ${kind} \`${name}\``);
@@ -998,7 +1556,7 @@ export class Vault {
       return;
     }
     if (row) {
-      this.home.dropDoc(this.id, row.id);
+      this.dropRow(row);
       if (row.kind === "file") this.dropFileId(row.id);
     }
     if (kind !== "file") fs.rmSync(this.abs(assetsPrefix(name)), { recursive: true, force: true });
@@ -1024,6 +1582,7 @@ export class Vault {
    * somebody loses work, so the default is the refusal and only the modal's answer sends it.
    */
   async rmdir(name: string, recursive = false): Promise<Removed> {
+    this.moves++;
     const stem = this.folder(name);
     if (!stem) throw new Refused("the top level is not a folder");
     const abs = this.writeAt(stem);
@@ -1042,7 +1601,7 @@ export class Vault {
       gone[pluralOf(d.kind)].push(d.name);
       const row = this.home.docByPath(this.id, d.file);
       if (row) {
-        this.home.dropDoc(this.id, row.id);
+        this.dropRow(row);
         if (row.kind === "file") this.dropFileId(row.id);
       }
     }
@@ -1056,6 +1615,7 @@ export class Vault {
    * into its own subtree. The same name is a no-op; one that differs only by case is a rename.
    */
   async moveFolder(name: string, to: string): Promise<string> {
+    this.moves++;
     const ends = folderMove(name, to);
     if (typeof ends === "string") throw new Refused(ends);
     const [src, dst] = ends;
@@ -1071,7 +1631,7 @@ export class Vault {
       for (const r of this.home.docs(this.id)) {
         if (!r.path.toLowerCase().startsWith(prefix)) continue;
         const moved = `${dst}/${r.path.slice(prefix.length)}`;
-        this.home.putDoc({ ...r, path: moved });
+        this.putRow({ ...r, path: moved });
         if (r.kind === "file" && r.minted) this.writeFileId(r.id, moved, r.title);
       }
     });
@@ -1172,7 +1732,10 @@ export class Vault {
   private manifest(id: string): (Trashed & { docs: Record<string, Kept> }) | null {
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(fs.readFileSync(path.join(this.trashDir(id), "entry.json"), "utf8")) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(fs.readFileSync(path.join(this.trashDir(id), "entry.json"), "utf8"));
+      // `null` parses, and reading `.id` off it threw out of every trash route (#9).
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      data = parsed as Record<string, unknown>;
     } catch {
       return null;
     }
@@ -1208,6 +1771,7 @@ export class Vault {
 
   /** Move a document to the trash, its legacy `.assets/` with it. A saved component goes for good. */
   async trash(name: string, kind: Kind = "board"): Promise<Trashed> {
+    this.moves++;
     if (kind === "board" && this.component(name) !== null) {
       await this.delete(name, kind);
       return { id: mint(), name, kind, title: null, deleted: instant(), doc: null, holds: null };
@@ -1215,7 +1779,7 @@ export class Vault {
     const file = this.fileOf(name, kind);
     const abs = this.abs(file);
     if (!isFile(abs)) throw new NotFound(`no ${kind} \`${name}\``);
-    const row = this.row(name, kind);
+    const row = this.rowHere(name, kind);
     const title = kind === "file" ? (row?.title ?? null) : (titleOf(fs.readFileSync(abs, "utf8")) ?? null);
     const entry: Trashed = {
       id: mint((x) => exists(this.trashDir(x))),
@@ -1237,8 +1801,8 @@ export class Vault {
       moveFile(assets, dst);
     }
     if (row) {
-      this.home.dropDoc(this.id, row.id);
-      if (row.kind === "file") fs.rmSync(this.abs(`.anydag/files/${row.id}.json`), { force: true });
+      this.dropRow(row);
+      if (row.kind === "file") this.rmFileId(row.id);
     }
     this.toldTrash();
     return entry;
@@ -1249,6 +1813,7 @@ export class Vault {
    * refusal is the contract an old tab, a script and an MCP client were written against.
    */
   async trashFolder(name: string, recursive = false): Promise<Trashed> {
+    this.moves++;
     const stem = this.folder(name);
     if (!stem) throw new Refused("the top level is not a folder");
     const abs = this.writeAt(stem);
@@ -1263,6 +1828,7 @@ export class Vault {
       const f = this.front(d);
       if (f) fronts.set(d.file, f);
     }
+    this.fronts = fronts; // what is no longer listed is no longer kept
     const rows = this.reconcile(docs, fronts);
     const inside = `${stem}/`.toLowerCase();
     const holds = emptyRemoved();
@@ -1293,8 +1859,8 @@ export class Vault {
     moveFile(abs, target); // one `rename(2)`: every file, every `.assets/` and every empty folder
     this.home.tx(() => {
       for (const row of under) {
-        this.home.dropDoc(this.id, row.id);
-        if (row.kind === "file") fs.rmSync(this.abs(`.anydag/files/${row.id}.json`), { force: true });
+        this.dropRow(row);
+        if (row.kind === "file") this.rmFileId(row.id);
       }
     });
     this.toldTrash();
@@ -1312,7 +1878,14 @@ export class Vault {
     const out: Trashed[] = [];
     for (const n of names) {
       if (!validId(n)) continue;
-      const m = this.manifest(n);
+      /* One entry is one thing deleted, and one that cannot be read is skipped: a manifest is written
+         by whoever wrote the folder, and one that threw used to take the whole trash with it (#9). */
+      let m: (Trashed & { docs: Record<string, Kept> }) | null;
+      try {
+        m = this.manifest(n);
+      } catch {
+        continue;
+      }
       if (!m) continue;
       const { docs: _docs, ...entry } = m;
       out.push(entry);
@@ -1335,7 +1908,7 @@ export class Vault {
         }
       }
     }
-    this.home.putDoc({
+    this.putRow({
       vault: this.id,
       id,
       path: file,
@@ -1377,6 +1950,7 @@ export class Vault {
    * that name stores, and the source stays under this entry's `files/` with no link on the way.
    */
   async restore(id: string): Promise<Trashed> {
+    this.moves++;
     const m = this.manifest(id);
     if (!m) throw new NotFound(`nothing in the trash is \`${id}\``);
     const at = this.trashDir(id);
@@ -1449,26 +2023,43 @@ export class Vault {
   /**
    * Store an attachment under `name` — a file's name, extension and all — returning the name the vault
    * settled on, numbered before its extension when taken. Its id record is written as it is made.
+   *
+   * **The bytes may be a stream**, and are then never held whole: they go to a temp file beside the
+   * target, hashed as they pass, and are renamed into place once the last one is down. A stream that
+   * fails half-way leaves nothing but its error — the temp file is removed. The name is settled
+   * after the bytes are down, with nothing awaited between choosing a free name and taking it, so
+   * two uploads of one name at once are two files.
    */
   async putFile(
     name: string,
-    data: Uint8Array,
+    data: FileBytes,
     title: string | null,
     opts: { id?: string; created?: string } = {},
   ): Promise<string> {
+    this.moves++;
     const asked = fileNameFrom(name, this.types);
     if (!asked) throw new Refused(`not a file name \`${name}\``);
-    const settled = uniqueFile(asked, (n) => this.taken(n));
-    const abs = this.writeAt(settled);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.${process.pid}.tmp`);
-    fs.writeFileSync(tmp, data);
-    moveFile(tmp, abs);
+    const dir = path.dirname(this.writeAt(asked));
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = path.join(dir, `.${path.basename(asked)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+    let settled: string;
+    let digest: string;
+    try {
+      if (data instanceof Uint8Array) {
+        fs.writeFileSync(tmp, data);
+        digest = digestOf(data);
+      } else digest = await streamInto(tmp, data);
+      settled = uniqueFile(asked, (n) => this.taken(n));
+      moveFile(tmp, this.writeAt(settled));
+    } catch (e) {
+      fs.rmSync(tmp, { force: true });
+      throw e;
+    }
     const taken = (x: string): boolean => !!this.home.docById(this.id, x);
     const id = validId(opts.id) && !taken(opts.id) ? opts.id : mint(taken);
     const clean = title?.trim() || null;
     this.writeFileId(id, settled, clean);
-    this.home.putDoc({
+    this.putRow({
       vault: this.id,
       id,
       path: settled,
@@ -1477,16 +2068,32 @@ export class Vault {
       minted: 1,
       title: clean,
     });
-    this.home.set(this.digestKey(id), digestOf(data));
+    this.home.set(this.digestKey(id), digest);
     return settled;
   }
 
+  /** An attachment's bytes, whole. For a test or a small file: a route streams, with `fileStream`. */
   async getFile(name: string): Promise<Buffer | null> {
     try {
       return fs.readFileSync(this.abs(this.fileOf(name, "file")));
     } catch {
       return null;
     }
+  }
+
+  /**
+   * An attachment's bytes as a stream, from `start` to `end` inclusive (the whole file without them),
+   * read as they are sent — so a range of a large PDF reads only that range. `null` when it is not there.
+   */
+  fileStream(name: string, range?: { start: number; end: number }): Readable | null {
+    let abs: string;
+    try {
+      abs = this.abs(this.fileOf(name, "file"));
+    } catch {
+      return null;
+    }
+    if (!isFile(abs)) return null;
+    return fs.createReadStream(abs, range ? { start: range.start, end: range.end } : {});
   }
 
   async fileInfo(name: string): Promise<FileInfo | null> {
@@ -1498,20 +2105,20 @@ export class Vault {
     }
     const st = fs.statSync(this.abs(file), { throwIfNoEntry: false });
     if (!st?.isFile()) return null;
-    const row = this.row(name, "file");
+    const row = await this.row(name, "file");
     return { name, title: row?.title ?? null, bytes: st.size };
   }
 
   /** Call an attachment something. A PDF has no frontmatter, so the title is its id record's. */
   async titleFile(name: string, title: string): Promise<void> {
-    const row = this.row(name, "file");
+    const row = await this.row(name, "file");
     if (!row) throw new NotFound(`no file \`${name}\``);
     if (row.title === title) return;
     const next = { ...row, title, minted: 1 };
     this.writeFileId(row.id, row.path, title);
-    this.home.putDoc(next);
-    const bytes = await this.getFile(name);
-    this.emit({ type: "doc", kind: "file", name, sha1: bytes ? sha1(bytes) : null, title });
+    this.putRow(next);
+    const sum = await sha1File(this.abs(row.path)).catch(() => null);
+    this.emit({ type: "doc", kind: "file", name, sha1: sum, title });
   }
 
   // -- legacy pictures -------------------------------------------------------
@@ -1539,6 +2146,7 @@ export class Vault {
   }
 
   async dropAssets(paths: readonly string[]): Promise<void> {
+    this.moves++;
     for (const p of paths) {
       const abs = this.assetPath(p);
       if (isFile(abs)) fs.rmSync(abs);
@@ -1548,7 +2156,18 @@ export class Vault {
   // -- reading many ----------------------------------------------------------
 
   /**
-   * Every text, for the index, the corpus and the sweep: a board under its name, any other kind
+   * Each listed text's stamp — mtime, size, inode — as the kept listing last read it, by the key
+   * `texts` gives it: what lets `/__board/index` parse again only what changed without reading every
+   * text to find out (#280). `null` when nothing is kept (no watcher) or `tree` is not the kept one.
+   */
+  textStamps(tree: Tree): ReadonlyMap<string, string> | null {
+    const k = this.kept;
+    return k && k.tree === tree ? k.stamps : null;
+  }
+
+  /**
+   * Every text, for the sweep and relinking — `/index` and `/corpus` read theirs on the grammar's
+   * worker (`server/parsing.ts`, #287): a board under its name, any other kind
    * under `<name>.<kind>.md` so nothing mistakes one for a board, and the saved components under
    * `components/<name>`.
    */
@@ -1708,8 +2327,28 @@ export class Vault {
     }
   }
 
+  /**
+   * Start the watcher now rather than with the first listener, so the first listing can be kept and
+   * every one after it costs what changed (#280). `anydag serve` watches each vault it opens; the
+   * CLI's one-off server does not, and lists as it always did.
+   */
+  watch(): Promise<void> {
+    if (!this.stopping) this.stopping = this.startWatch();
+    return this.stopping.then(
+      () => undefined,
+      (e) => {
+        this.stopping = null;
+        throw e;
+      },
+    );
+  }
+
   /** End every feed on this vault — it is being closed. */
   async close(): Promise<void> {
+    this.watching = false;
+    this.kept = null;
+    this.dirty.clear();
+    forgetVault(this.root);
     this.emit({ type: "gone" });
     this.listeners.clear();
     this.rawListeners.clear();
@@ -1718,12 +2357,53 @@ export class Vault {
     if (stop) await (await stop.catch(() => async () => undefined))();
   }
 
+  /**
+   * An attachment changed on disk: say so on the feed with the sha1 of its bytes, **read as a stream**
+   * — a large file copied in by hand is never held whole. The events a copy raises while it is being
+   * written are one read, done again once if another came in during it, and the change is said after
+   * the read rather than in the watcher's batch.
+   */
+  private hashThenSay(abs: string, rel: string, name: string): void {
+    if (this.hashing.has(abs)) {
+      this.hashing.set(abs, true);
+      return;
+    }
+    this.hashing.set(abs, false);
+    void (async () => {
+      for (;;) {
+        const sum = await sha1File(abs).catch(() => null);
+        if (this.hashing.get(abs)) {
+          this.hashing.set(abs, false);
+          continue;
+        }
+        this.hashing.delete(abs);
+        /* Gone meanwhile (its delete is its own event), or the vault was closed. */
+        if (sum === null || !this.stopping) return;
+        try {
+          const row = this.home.docByPath(this.id, rel);
+          this.emit({ type: "doc", kind: "file", name, sha1: sum, title: row?.title ?? null });
+        } catch {
+          /* the index closed under the read */
+        }
+        return;
+      }
+    })();
+  }
+
   private async startWatch(): Promise<() => Promise<void>> {
-    if (!this.present) this.walk();
-    const sub = await watcher.subscribe(
+    let heard!: () => void;
+    this.hearing = new Promise((ok) => {
+      heard = ok;
+    });
+    const subscribing = watcher.subscribe(
       this.root,
       (err, events) => {
-        if (err) return;
+        // Events were dropped (a queue overflowed): what is kept may be missing some, so walk.
+        if (err) {
+          this.kept = null;
+          return;
+        }
+        if (this.watching) for (const ev of events) this.heard(this.rel(ev.path));
         if (this.rawListeners.size) {
           const rels = [...new Set(events.map((ev) => this.rel(ev.path)).filter(Boolean))];
           if (rels.length) {
@@ -1771,14 +2451,7 @@ export class Vault {
             continue;
           }
           if (found.kind === "file") {
-            let bytes: Buffer;
-            try {
-              bytes = fs.readFileSync(ev.path);
-            } catch {
-              continue;
-            }
-            const row = this.home.docByPath(this.id, rel);
-            this.emit({ type: "doc", kind: "file", name: found.name, sha1: sha1(bytes), title: row?.title ?? null });
+            this.hashThenSay(ev.path, rel, found.name);
             continue;
           }
           let text: string;
@@ -1802,6 +2475,19 @@ export class Vault {
       },
       { ignore: [".git", ".obsidian", ".trash", ".stversions", "node_modules", ".anydag/vault.json"] },
     );
+    let sub: Awaited<typeof subscribing>;
+    try {
+      sub = await subscribing;
+      this.watching = true;
+    } finally {
+      heard();
+    }
+    // Off this thread: on a big vault the walk alone is a pause every request would wait behind. A
+    // listing running or kept already says what is present.
+    if (!this.present && !this.listing && !this.kept) {
+      const { docs } = await listVault(this.lister, this.types, true);
+      this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+    }
     return async () => {
       try {
         await sub.unsubscribe();
@@ -1815,30 +2501,67 @@ export class Vault {
 /** The key `texts` gives a document: a board its name, any other kind `<name>.<kind>.md`. */
 export const textKey = (name: string, kind: TextKind): string => (kind === "board" ? name : `${name}.${kind}.md`);
 
-function frontOf(kind: TextKind, text: string, stamp: string): Front {
-  let asks: (string | null)[] | undefined;
-  if (kind === "quiz") {
-    try {
-      asks = parseQuiz(text).questions.map((q) => q.id ?? null);
-    } catch {
-      asks = [];
-    }
-  }
-  return {
-    stamp,
-    id: frontId(text),
-    title: titleOf(text),
-    task: kind === "note" ? taskOf(text) : undefined,
-    project: kind === "note" ? projectOf(text) : undefined,
-    event: kind === "note" ? eventOf(text) : undefined,
-    asks,
-  };
-}
-
 const DAG_ID = /dag:([0-9a-z]{10})(?![0-9a-z])/g;
 const idsIn = (text: string): string[] => [...new Set([...text.matchAll(DAG_ID)].map((m) => m[1]!))];
 
 const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * How many new or changed texts the kept listing reads on this thread before it would rather walk
+ * off it: a folder of thousands copied in is a walk's work, a burst of saves is not.
+ */
+const REFRESH_MAX = 2000;
+/** Where attachments' records are: `.anydag/files/<id>.json`. */
+const RECORDS = ".anydag/files";
+/** How many moved paths may wait for the next listing before the kept one is dropped for a walk. */
+const DIRTY_MAX = 20_000;
+
+/** What `refresh` read of the folders and documents it looked at. */
+interface Reread {
+  /** Each folder looked at, as it is now. */
+  scanned: Map<string, Scanned>;
+  /** Each folder new since, walked whole. */
+  walked: Map<string, Walked>;
+  /** Each document looked at, by its file lowercased. */
+  found: Map<string, Found>;
+}
+
+const depthOf = (dir: string): number => (dir ? dir.split("/").length : 0);
+
+const mtimeOf = (abs: string): number | null => fs.statSync(abs, { throwIfNoEntry: false })?.mtimeMs ?? null;
+
+/** Whether two reads of one document say the same. */
+const sameFound = (a: Found, b: Found): boolean => a.front === b.front && a.size === b.size;
+
+/** How long a listing holds the thread before it hands it back — well under what a request notices. */
+const SLICE_MS = 8;
+/** How many of the index's rows a listing reads before it hands the thread back. */
+const ROWS_PAGE = 4000;
+
+/**
+ * `each` over every item, in slices of `SLICE_MS` each run inside `wrap`, handing the thread back
+ * between them — or in one slice when not `paced`. `still` is asked before each slice, and a no ends
+ * it with `false`, the rest not run.
+ */
+async function sliced<T>(
+  items: readonly T[],
+  each: (item: T) => void,
+  o: { paced: boolean; still: (() => boolean) | null; wrap?: (run: () => void) => void },
+): Promise<boolean> {
+  let i = 0;
+  while (i < items.length) {
+    if (o.still && !o.still()) return false;
+    const until = performance.now() + SLICE_MS;
+    const run = (): void => {
+      do each(items[i++]!);
+      while (i < items.length && (!o.paced || performance.now() < until));
+    };
+    if (o.wrap) o.wrap(run);
+    else run();
+    if (o.paced && i < items.length) await yieldNow();
+  }
+  return true;
+}
 
 function emptyRemoved(): Removed {
   return { boards: [], notes: [], quizzes: [], tables: [], files: [], folders: [] };
@@ -1932,4 +2655,51 @@ export function writeAtomic(file: string, text: string | Uint8Array): void {
 /** `${size}:${sha1}` of an attachment's bytes. */
 function digestOf(data: Uint8Array): string {
   return `${data.byteLength}:${sha1(data)}`;
+}
+
+/** Bytes to keep as an attachment: whole, or as they arrive. */
+export type FileBytes = Uint8Array | AsyncIterable<Uint8Array>;
+
+/** Write a stream of bytes to `file` (which must not exist), returning their `digestOf`. */
+async function streamInto(file: string, source: AsyncIterable<Uint8Array>): Promise<string> {
+  const hash = createHash("sha1");
+  let size = 0;
+  await pipeline(
+    source,
+    async function* (chunks: AsyncIterable<Uint8Array>) {
+      for await (const chunk of chunks) {
+        hash.update(chunk);
+        size += chunk.byteLength;
+        yield chunk;
+      }
+    },
+    fs.createWriteStream(file, { flags: "wx" }),
+  );
+  return `${size}:${hash.digest("hex")}`;
+}
+
+/** The sha1 of a file's bytes, read a chunk at a time and never held whole. */
+async function sha1File(file: string): Promise<string> {
+  const hash = createHash("sha1");
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+/** `digestOf` a file on disk, a megabyte at a time: the walk is synchronous, and a file may be large. */
+function digestFileSync(file: string): string {
+  const hash = createHash("sha1");
+  const buf = Buffer.allocUnsafe(1 << 20);
+  const fd = fs.openSync(file, "r");
+  let size = 0;
+  try {
+    for (;;) {
+      const n = fs.readSync(fd, buf, 0, buf.length, null);
+      if (!n) break;
+      hash.update(buf.subarray(0, n));
+      size += n;
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  return `${size}:${hash.digest("hex")}`;
 }

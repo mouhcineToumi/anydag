@@ -12,6 +12,7 @@
 import { parseDagUrl } from "../refs/extract";
 import type { Column, ColumnType, FilterRule, Row, SortKey, Tab, Table } from "./parse";
 import type { TableDiagnostic } from "./codes";
+import { collation } from "../locale";
 
 /** A cell as its type reads it. `null` is an empty cell; `ok: false` a value the type cannot read. */
 export type Read =
@@ -154,7 +155,8 @@ export function tableDiagnostics(table: Table): TableDiagnostic[] {
   return [...table.diagnostics, ...cellDiagnostics(table)].sort((a, b) => a.line - b.line || a.col - b.col);
 }
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+/** Asked each time rather than kept: the page names its locale after this module is loaded (`src/locale.ts`). */
+const collator = (): Intl.Collator => collation({ numeric: true, sensitivity: "base" });
 
 /** Where a read value sorts: a key within its rank, the ranks being value, unreadable, empty. */
 function sortable(type: ColumnType, text: string, options: readonly string[]): { rank: number; key: number | string } {
@@ -173,7 +175,7 @@ function sortable(type: ColumnType, text: string, options: readonly string[]): {
 }
 
 const compareKeys = (a: number | string, b: number | string): number =>
-  typeof a === "number" && typeof b === "number" ? a - b : collator.compare(String(a), String(b));
+  typeof a === "number" && typeof b === "number" ? a - b : collator().compare(String(a), String(b));
 
 /**
  * The rows in the order the tab's sort puts them, each with its stored index. **Stable**: the
@@ -251,7 +253,7 @@ function passes(column: Column, text: string, rule: FilterRule, options: readonl
     if (rule.op !== "=" && rule.op !== "!=" && (column.type === "number" || column.type === "date")) return false;
     /* A link compares by what it says, which is what a person sees in the cell. */
     const seen = r.ok && r.value !== null && typeof r.value === "object" ? (r.value as LinkValue).text : cell;
-    order = collator.compare(seen, want);
+    order = collator().compare(seen, want);
   }
   switch (rule.op) {
     case "=":

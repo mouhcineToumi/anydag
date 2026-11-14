@@ -24,7 +24,7 @@ workflow (issues, branches, PRs) is in [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTI
   **events** (a note with `status:`, `project:` or `start:`), **attachments**, a **calendar**, a
   **trash** (nothing is deleted at once), several **vaults** in one server, an end-to-end-encrypted
   **sync** server, a read-only **lock**, **opt-in anonymous logs**.
-- **Prompt cards** and the **Assistant** run a model through the person's own Claude Code, OpenCode
+- **Prompt cards** and the **Assistant** run a model through the person's own Claude Code, OpenCode, Codex
   login or API key; the real parser checks what comes back before it lands.
 - **Everything the page can do, an agent can do through the MCP server** (`anydag mcp`), held in step
   by `docs/parity.json`. The `anydag` CLI is an admin tool — vaults, whole files, sync, trash,
@@ -50,6 +50,7 @@ the app's home).
   compares none (see *Gate* below).
 - `npm run parity` — redraw `docs/PARITY.md` after touching `docs/parity.json`.
 - `node scripts/snapshot.mjs <board>` — render a board and print its diagnostics.
+- `node scripts/bench.mjs [--quick]` — measure memory, CPU and timings on synthetic vaults (`docs/architecture/limits.md`).
 
 ## The layers, and what each may not know
 
@@ -158,6 +159,7 @@ One line each; the full account with the defect that found it is in
 | anonymous logs | [`logs.md`](docs/architecture/logs.md) |
 | Send feedback, the feedback relay | [`feedback.md`](docs/architecture/feedback.md) |
 | the gate, CI, releases | [`gate-and-releases.md`](docs/architecture/gate-and-releases.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), `docs/RELEASING.md` |
+| resource use, limits, `scripts/bench.mjs` and its nightly guards | [`limits.md`](docs/architecture/limits.md) |
 
 Section names in italics inside those files (*Picking a node*, *The time zone*) are listed with their
 file in the index at the foot of [`docs/architecture/README.md`](docs/architecture/README.md).
