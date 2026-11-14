@@ -44,7 +44,8 @@ the app's home).
 - `ANYDAG_CLOUD_BUILD=on|off` and `ANYDAG_CLOUD=on|off` — the build's feature switch (`server/features.ts`,
   see *Feature switches* in `docs/architecture/server.md`): whether the app carries the features that talk to
   an AnyDag server (sync, anonymous logs, feedback). Off unless a build says on — no release does — and the
-  run-time override wins. Dev and the test suites run on.
+  run-time override wins. Dev and the test suites run on. The Settings → Privacy toggle is drawn in every
+  build (#326): with the switch off it records the choice with no request.
 - `npm run e2e:smoke` / `npm run e2e:docker` — the Playwright suite's smoke tier / all of it, in the
   pinned Playwright Docker image, screenshots compared. `npm run e2e:local` is the host browser and
   compares none (see *Gate* below).

@@ -35,7 +35,7 @@ below.
 | | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on |
 | | Agent access | the command that connects Claude Code, Claude Desktop or another MCP client to this vault, with a **Read only** switch that adds the server's own `--read-only` |
 | This board | Layout | the open board's row width and spacing, written to its frontmatter's `flow:` — drawn only while a board is open and editable |
-| *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) |
+| *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. **Drawn in every build**: with the `cloud` switch off it is the toggle and one line saying logs are not sent from this version yet, and the choice is kept for the first build that can send them (#326) |
 | | Keyboard shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
 | | About | the build's `VERSION` and the server's; in the desktop app, also **Updates**: what the check found, when it last got an answer, *Check for updates*, and, when a check failed, a sentence about what to do (`desktop/updates.ts`; [`desktop.md`](desktop.md)). Not drawn in a browser, or in a desktop run with nothing packaged |
 

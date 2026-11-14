@@ -7,7 +7,11 @@
 Everything here is behind the build's `cloud` switch (`server/features.ts`, the account in
 [`server.md`](server.md#feature-switches)): off in a release build, no membership question is ever
 drawn, no route answers, no batch is resolved to a destination, and any address a build baked in for
-logs is never read. The dev server and the test suites say on.
+logs is never read. **One exception (#326): Settings → Privacy is drawn in every build.** Off, it is
+the toggle and one line saying logs are not sent from this version yet; the choice is held in this
+browser until the first build whose switch is on carries it to the app's home. Nothing else of the
+logs comes with it — no first-run question, no event, no destination, no route. The dev server and
+the test suites say on.
 
 Anonymous logs from installs whose person said yes, and from no other. Off
 until answered; asked once per install, after the first board, note, quiz or table has been the
@@ -16,7 +20,7 @@ open page for a few seconds; changed in Settings → Privacy or with `anydag tel
 | Where | Owns |
 |---|---|
 | `api/protocol/logs.ts` | what a log may hold: `EVENTS`, each prop a count, a duration, a boolean or one word of a list; `scrub`; `cleanEvent` and `cleanBatch`, which every hop runs |
-| `src/telemetry/client.ts` | the page's half: the answer (`useTelemetry`), `track`, `fail`, the error listeners, a post every 30 s and on `pagehide` |
+| `src/telemetry/client.ts` | the page's half: the answer (`useTelemetry`), `track`, `fail`, the error listeners, a post every 30 s and on `pagehide`, and the choice an off build holds (`dag:telemetry-pending`) until a build that can send carries it up |
 | `src/telemetry/Prompt.tsx` · `what.ts` | the first-run toast and its *What's sent* dialog, drawn by `Shell` once a file is open · the two lists it and the Privacy tab both say |
 | `server/telemetry.ts` · `server/routes/telemetry.ts` | the answer in the home's `kv`, the install id, what is held, the route summary, where it goes, the send |
 | `api/server/routes/logs.ts` | `POST /v1/logs` on the api server: open, rate-limited, one JSONL file a day in `<data>/logs/` |
@@ -34,8 +38,16 @@ pages and of each diagram type), `feature.use` (export, generate, tidy — one w
 `route.timing` (each route template's count, 5xx count, mean and max, summed per minute), and an
 `env` of the version, desktop or browser, the system, the arch, the language, and a random install id.
 
-Eight things are load-bearing:
+Nine things are load-bearing:
 
+- **The switch off is no request and no send, but Privacy is still honest (#326).** It is the one
+  surface #103's rule lets through: Settings → Privacy draws the toggle and one line saying logs are
+  not sent from this version yet, and records the choice in this browser
+  (`dag:telemetry-pending`). With no route registered there is nothing to ask, so it makes no
+  request and sends nothing. The first build whose `cloud` switch is on PUTs that held answer to
+  `/api/telemetry` before it asks anything — so the choice made in an off build is the one an on
+  build starts with, and somebody who already answered is not asked by the first-run question.
+  Nothing else of the logs follows it: no event, no listener, no destination, no question.
 - **No prop can hold a person's words.** Every prop is a number, a boolean, a route *template* or
   one word from a list in `logs.ts`; an unknown event or prop is dropped, not kept. The two free-text
   props are an error's `message` and `stack`, and `scrub` takes out every quoted run (the app quotes
@@ -76,7 +88,8 @@ Eight things are load-bearing:
   answer with `page.route`.
 
 Names claimed, grepped first: `dag-telemetry*`, `data-dag-telemetry*`, `data-dag-setting-telemetry*`,
-the Settings tab `privacy`, and the event `dag:telemetry` (in `test/prefs.test.ts`'s list).
+the Settings tab `privacy`, the event `dag:telemetry`, and the storage key `dag:telemetry-pending`
+(the answer an off build holds, #326) — both in `test/prefs.test.ts`'s list.
 
 **Not feedback.** The feedback card (`feedback.md`) is a separate, explicit channel: a person presses
 Send, their own words go, and the result is public. It never rides a batch, and the answer here has

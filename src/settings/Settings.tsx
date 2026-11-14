@@ -143,9 +143,10 @@ export function Settings({
 }) {
   const boardOpen = board !== null && editable;
   const [tab, setTabState] = useState<SettingsTab>(() => asked ?? lastTab(boardOpen));
-  /* What the server says this build may show (`src/features.ts`): Privacy (only the logs hold it)
-     and Sync are its tabs. A person reads no sign a server exists on a build without them — nor,
-     while the answer is on its way, which is why the unknown hides them too. */
+  /* What the server says this build may show (`src/features.ts`): Sync is its tab. Privacy is drawn
+     in every build (#326) — off, its toggle records the choice in this browser and one line says
+     logs are not sent from this version yet. A person reads no sign a server exists on a build
+     without the rest: nor, while the answer is on its way, which is why the unknown hides Sync. */
   const features = useFeatures();
   const cloud = features?.cloud === true;
   /* With every AI feature off (#296) there is nothing for a provider to answer, so its tab goes. */

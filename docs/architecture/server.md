@@ -147,6 +147,14 @@ The switch is read as follows, from one function (`cloudOn`):
   one line — *Sync is not available in this build.* — and are out of `anydag --help` when the CLI's
   own build says off.
 
+**One exception to #103's rule (#326): Settings → Privacy is drawn in every build.** Off, it is the
+anonymous-logs toggle and one sentence saying logs are not sent from this version yet. The toggle
+records the choice in the browser (`dag:telemetry-pending`), makes no request and sends nothing; the
+first build whose switch is on carries that choice to the app's home (`PUT /api/telemetry`) before
+it asks anything, so the choice made in an off build is the one an on build starts with. No other
+server-backed surface follows it: Sync, Send feedback and the first-run logs question stay hidden.
+This is the only component mount that ignores the switch.
+
 Nothing is deleted when the switch is off. A vault that was linked keeps its `key` and `pair.json`
 in the app's home, a consent answer keeps its place in `kv`, and turning the switch on
 (`ANYDAG_CLOUD=on` on any build) resumes them: the loop starts at the next vault open, the next

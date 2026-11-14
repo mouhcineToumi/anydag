@@ -150,7 +150,7 @@ async function start(): Promise<void> {
   /* Before the first paint, so the top row never draws under the macOS traffic lights. */
   watchWindowInset();
 
-  const [, account, features] = await Promise.all([
+  const [, account] = await Promise.all([
     facesLoaded().catch(() => undefined),
     me()
       .then((account) => {
@@ -158,9 +158,10 @@ async function start(): Promise<void> {
         return account;
       })
       .catch(() => null),
-    /* What this build may show of the server-backed features — sync, the logs, Send feedback. One
-       unscoped call at boot, with the page's opinion of it coming only from here
-       (`src/features.ts`). Nothing waits for it alone: it lands with the fonts and the session. */
+    /* What this build may show of the server-backed features — sync, the logs question and the
+       sending, Send feedback. One unscoped call at boot, with the page's opinion of it coming only
+       from here (`src/features.ts`). Nothing waits for it alone: it lands with the fonts and the
+       session. */
     loadFeatures(),
   ]);
   let id = "";
@@ -178,11 +179,13 @@ async function start(): Promise<void> {
     if (id) await pull();
     /* The account's time zone is read before anything draws a time. */
     watchZone();
-    /* Whether this install sends logs, asked once; the first page asks the person when nobody has
-       answered (`telemetry/Prompt.tsx`) — and never when the build's `cloud` switch is off
-       (`server/features.ts` says so through `/api/health`): no request at all. Not awaited. */
-    if (id && features?.cloud) void startTelemetry();
   }
+  /* Whether this install sends logs, read once; the first page asks the person when nobody has
+     answered (`telemetry/Prompt.tsx`) — and a build whose `cloud` switch is off asks nothing at all:
+     Settings → Privacy still reads the answer held in this browser and records a new one (#326).
+     Called with no vault open too, because the answer is the install's and Privacy is drawn on
+     Home. Not awaited. */
+  if (account) void startTelemetry();
 
   /* The page itself, which `preload()` has been fetching since the session answered: drawn in the
      first render, never behind a `Suspense`. With no session there is no page — `Gate` says so. */

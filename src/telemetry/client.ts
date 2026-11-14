@@ -10,7 +10,9 @@
  * - **Nothing is held, listened for or posted unless the answer is yes.** `track` and `fail` return
  *   at once otherwise, and the error listeners are added only on yes. With the build's `cloud`
  *   switch off (`src/features.ts`), `startTelemetry` asks nothing: `/api/telemetry` is not
- *   registered on that build, and the page must not be seen looking for it.
+ *   registered on that build, and the page must not be seen looking for it. Settings → Privacy is
+ *   still drawn (#326), so the choice there is kept in this browser (`dag:telemetry-pending`) and
+ *   the first build whose switch is on carries it to the app's home — see *the answer* below.
  * - **Never under `?snapshot=1` or `?view=1`**: a picture of a board, and a page somebody was handed
  *   to read, are not somebody using the app. `startTelemetry` does nothing there, and nothing asks.
  * - **A prop is one of `api/protocol/logs.ts`'s words, a count or a duration** — the types say so,
@@ -21,6 +23,7 @@
 import { useSyncExternalStore } from "react";
 
 import { cloudOn } from "@/features";
+import { readPref, TELEMETRY_PENDING, writeLocal } from "@/settings/prefs";
 import { desktop } from "@/vault/desktop";
 
 import {
@@ -91,9 +94,30 @@ export function useTelemetry(): TelemetryStatus | null {
 
 const yes = (): boolean => status?.consent === true;
 
+/**
+ * Whether this page may actually collect: the build carries the feature *and* the person said yes.
+ * The two are different questions, and with the `cloud` switch off the first is what keeps a yes
+ * held from an older answer — or one given in Settings in this off build (#326) — from turning the
+ * page into a collector that posts to a route which is not there.
+ */
+const sending = (): boolean => cloudOn() && yes();
+
+/**
+ * The answer a build with the switch off is holding for the first one that can carry it (#326).
+ * `null` is never answered — the same three states the server's `telemetry.consent` has.
+ */
+function heldConsent(): boolean | null {
+  const held = readPref(TELEMETRY_PENDING);
+  return held === "1" ? true : held === "0" ? false : null;
+}
+
+function holdConsent(enabled: boolean | null): void {
+  writeLocal(TELEMETRY_PENDING, enabled === null ? null : enabled ? "1" : "0");
+}
+
 /** One event, held for the next post. */
 export function track(name: EventName, props: Props): void {
-  if (!yes()) return;
+  if (!sending()) return;
   const e = cleanEvent({ name, at: new Date().toISOString(), props });
   if (!e) return;
   held.push(e);
@@ -102,7 +126,7 @@ export function track(name: EventName, props: Props): void {
 
 /** Something that went wrong on this page: its message and stack, both scrubbed here and again on the server. */
 export function fail(kind: "error" | "rejection" | "render", e: unknown): void {
-  if (!yes()) return;
+  if (!sending()) return;
   const err = e instanceof Error ? e : new Error(typeof e === "string" ? e : "a value that is not an error");
   track("error", {
     where: "page",
@@ -114,7 +138,7 @@ export function fail(kind: "error" | "rejection" | "render", e: unknown): void {
 
 /** Post what is held. `leaving` is the page going away, which wants `keepalive` and nothing large. */
 export function flush(leaving = false): void {
-  if (!yes() || !held.length) return;
+  if (!sending() || !held.length) return;
   const events = held;
   held = [];
   const body = JSON.stringify({ events });
@@ -147,10 +171,10 @@ function listen(on: boolean): void {
 }
 
 function adopt(next: TelemetryStatus): void {
-  const was = yes();
+  const was = sending();
   status = next;
-  listen(yes());
-  if (yes() && !was && started) opened();
+  listen(sending());
+  if (sending() && !was && started) opened();
   announce();
 }
 
@@ -170,34 +194,74 @@ function opened(): void {
   setTimeout(() => watch.disconnect(), 60_000);
 }
 
-/** Ask the server for the answer, once, when the page starts. */
+/**
+ * The person's answer, asked once when the page starts — or, in a build whose `cloud` switch is off,
+ * read from this browser and held for the first build that can carry it (#326).
+ *
+ * With the switch off nothing is asked: `/api/telemetry` is not registered, and the page must not be
+ * seen looking for it. But Settings → Privacy is drawn in every build, so the answer is kept in this
+ * browser (`dag:telemetry-pending`) and `adopt` still tells the tab what it is. The switch on, a
+ * held answer goes up *before* anything is asked, so the first on build starts from the choice made
+ * in an off one — and somebody who already answered is not asked again by the first-run question.
+ */
 export async function startTelemetry(): Promise<void> {
   if (started || quietPage()) return;
-  /* Only a build that carries the features knows the question: `cloud` off (`src/features.ts`
-     reading what the server answered at boot) means no request for one that is not registered. */
-  if (!cloudOn()) return;
   started = true;
+  if (!cloudOn()) {
+    adopt({ consent: heldConsent(), destination: null });
+    return;
+  }
+  const held = heldConsent();
+  if (held !== null) {
+    const taken = await sendConsent(held);
+    if (taken) {
+      holdConsent(null);
+      adopt(taken);
+      return;
+    }
+  }
   try {
     const r = await fetch("/api/telemetry");
     if (!r.ok) return;
-    adopt((await r.json()) as TelemetryStatus);
+    const next = (await r.json()) as TelemetryStatus;
+    /* The server has an answer: the held copy is spent, even where the two agreed. */
+    if (next.consent !== null) holdConsent(null);
+    adopt(next);
   } catch {
     /* No server: nothing asked, nothing sent. */
   }
 }
 
-/** Yes, no, or back to never asked. Answers whether the server took it. */
-export async function setConsent(enabled: boolean | null): Promise<boolean> {
+/** The PUT, shared by `setConsent` and the held answer above. `null` is the server not taking it. */
+async function sendConsent(enabled: boolean | null): Promise<TelemetryStatus | null> {
   try {
     const r = await fetch("/api/telemetry", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ enabled }),
     });
-    if (!r.ok) return false;
-    adopt((await r.json()) as TelemetryStatus);
-    return true;
+    if (!r.ok) return null;
+    return (await r.json()) as TelemetryStatus;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Yes, no, or back to never asked. Answers whether the choice was recorded.
+ *
+ * With the `cloud` switch off it is this browser's alone: no request, nothing sent, and the answer is
+ * held for the first build that can send (`dag:telemetry-pending`, #326).
+ */
+export async function setConsent(enabled: boolean | null): Promise<boolean> {
+  if (!cloudOn()) {
+    holdConsent(enabled);
+    adopt({ consent: enabled, destination: null });
+    return true;
+  }
+  const next = await sendConsent(enabled);
+  if (!next) return false;
+  holdConsent(null);
+  adopt(next);
+  return true;
 }
