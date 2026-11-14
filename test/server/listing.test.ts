@@ -150,3 +150,68 @@ describe("a listing beside other work", () => {
     expect(await third).toBe(await second);
   });
 });
+
+/** Every file under `root` and its bytes, dot-folders included: what opening must not change. */
+function bytesOf(root: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const e of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
+    if (!e.isFile()) continue;
+    const abs = path.join(e.parentPath, e.name);
+    out.set(path.relative(root, abs), fs.readFileSync(abs, "base64"));
+  }
+  return out;
+}
+
+describe("a document opened before the vault is listed (#286)", () => {
+  it("a text with no id is given its provisional id without a walk, and the listing gives it the same", async () => {
+    for (let i = 0; i < 200; i++) write(env.root, `n/${i}.md`, "x\n");
+    write(env.root, "inbox/item.md", "---\ntitle: Item\n---\nno id\n");
+    const before = bytesOf(env.root);
+    const id = await env.vault.peekId("inbox/item", "note");
+    expect(id).toMatch(/^[0-9a-z]{10}$/);
+    // Only its own row: the vault was not walked to answer.
+    expect(env.home.docs(env.vault.id).map((r) => r.path)).toEqual(["inbox/item.md"]);
+    expect(await env.vault.created("inbox/item", "note")).not.toBeNull();
+    const t = await env.vault.tree();
+    expect(t.ids["inbox/item"]).toBe(id);
+    expect(await env.vault.peekId("inbox/item", "note")).toBe(id);
+    expect(bytesOf(env.root)).toEqual(before);
+  });
+
+  it("a text with an id of its own the index does not hold keeps it, without a walk", async () => {
+    for (let i = 0; i < 200; i++) write(env.root, `n/${i}.md`, "x\n");
+    write(env.root, "mine.md", "---\nid: 0123456789\n---\n");
+    expect(await env.vault.peekId("mine", "note")).toBe("0123456789");
+    expect(env.home.docs(env.vault.id)).toHaveLength(1);
+    expect((await env.vault.tree()).ids.mine).toBe("0123456789");
+  });
+
+  it("a text whose id the index holds at another path waits for the listing, and is the one it moved", async () => {
+    write(env.root, "a.md", "---\nid: 0123456789\n---\n");
+    await env.vault.tree();
+    fs.renameSync(path.join(env.root, "a.md"), path.join(env.root, "b.md"));
+    expect(await env.vault.peekId("b", "note")).toBe("0123456789");
+    expect((await env.vault.tree()).ids.b).toBe("0123456789");
+  });
+
+  it("opened while a listing reconciles, after it read the index, the listing gives it the id it was opened with", async () => {
+    for (let i = 0; i < 3000; i++) write(env.root, `n/${i}.md`, "x\n");
+    write(env.root, "zz-last.md", "no id\n");
+    const listing = env.vault.tree();
+    // The listing is reconciling once rows appear; the last file's row is not one of them yet.
+    while (env.home.docs(env.vault.id).length === 0) await yieldNow();
+    expect(env.home.docByPath(env.vault.id, "zz-last.md")).toBeUndefined();
+    const id = await env.vault.peekId("zz-last", "note");
+    expect((await listing).ids["zz-last"]).toBe(id);
+    expect((await env.vault.tree()).ids["zz-last"]).toBe(id);
+  });
+
+  it("made after a listing walked and opened before it reconciled, its row outlives that listing", async () => {
+    for (let i = 0; i < 2000; i++) write(env.root, `n/${i}.md`, "x\n");
+    const listing = env.vault.tree();
+    write(env.root, "late.md", "no id\n");
+    const id = await env.vault.peekId("late", "note");
+    expect((await listing).notes).not.toContain("late");
+    expect((await env.vault.tree()).ids.late).toBe(id);
+  });
+});
