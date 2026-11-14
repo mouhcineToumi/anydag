@@ -15,6 +15,8 @@
  */
 import type { Nodes, Root } from "mdast";
 import { parse as parseYaml } from "yaml";
+
+import { QUIET } from "../note/quiet";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
@@ -25,7 +27,7 @@ import { eventOf, type NoteEvent } from "../note/event";
 import { projectOf, type Project } from "../note/project";
 import { taskOf, type Task } from "../note/task";
 import { parseQuiz } from "../quiz/parse";
-import { resolveWiki, wikilinkTree, parseWikiUrl, type WikiCandidate } from "./wikilinks";
+import { resolveWiki, wikilinkTree, parseWikiUrl, type WikiCandidate, type WikiIndex } from "./wikilinks";
 import { remarkMath } from "../note/math";
 
 type RefType = "link" | "embed";
@@ -85,8 +87,14 @@ export function refsInMarkdown(md: string): Ref[] {
  * Every wikilink's id, from the vault's list: what `[[Plan]]` names now. One that names nothing keeps
  * `id: ""`, which no document has, so it is a backlink of nothing until the note it names exists.
  */
-export function resolveWikiRefs<R extends Pick<Ref, "id" | "wiki">>(refs: readonly R[], docs: readonly WikiCandidate[]): R[] {
-  return refs.map((r) => (r.wiki === undefined ? r : { ...r, id: resolveWiki(r.wiki, docs)?.id ?? "" }));
+export function resolveWikiRefs<R extends Pick<Ref, "id" | "wiki">>(
+  refs: readonly R[],
+  docs: readonly WikiCandidate[] | WikiIndex<WikiCandidate>,
+): R[] {
+  const resolve = Array.isArray(docs)
+    ? (t: string) => resolveWiki(t, docs as readonly WikiCandidate[])
+    : (t: string) => (docs as WikiIndex<WikiCandidate>).resolve(t);
+  return refs.map((r) => (r.wiki === undefined ? r : { ...r, id: resolve(r.wiki)?.id ?? "" }));
 }
 
 /**
@@ -118,7 +126,7 @@ export function titleOf(text: string): string | undefined {
   const m = FRONT.exec(text);
   if (!m) return undefined;
   try {
-    const data = parseYaml(m[1]!) as { title?: unknown } | null;
+    const data = parseYaml(m[1]!, QUIET) as { title?: unknown } | null;
     return typeof data?.title === "string" && data.title.trim() ? data.title.trim() : undefined;
   } catch {
     return undefined;

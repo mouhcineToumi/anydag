@@ -96,7 +96,7 @@ Out of scope:
 
 - an attacker who already has your user account, your unlocked machine or the contents of your app
   home (the token is a per-launch secret on your own machine, not a defence against local malware);
-- problems in a model provider, Claude Code, OpenCode, or another tool that AnyDag only calls;
+- problems in a model provider, Claude Code, OpenCode, Codex, or another tool that AnyDag only calls;
 - a note, board or attachment that is *only* ugly, broken or crashes the page when opened (a bug —
   please file an issue);
 - denial of service by a huge file on a machine the attacker already controls;

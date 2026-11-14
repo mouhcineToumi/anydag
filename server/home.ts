@@ -2,9 +2,11 @@
  * `~/.anydag/` — everything the app keeps that is not the person's documents (decision 6).
  *
  * `anydag.sqlite` holds the id index, the recent vaults, practice records and the rebuildable
- * caches; `settings.json` the person's own preferences. **Nothing here is needed for a vault to be
- * correct**: the ids are in the files and every row of `docs` can be rebuilt by walking a vault, so
- * deleting this folder costs a rescan and a practice history, never a document or a link.
+ * caches; `parse.sqlite` what the grammar made of each text (`server/parse-store.ts`), a cache by
+ * stat and sha1 that the grammar's worker keeps; `settings.json` the person's own preferences.
+ * **Nothing here is needed for a vault to be correct**: the ids are in the files and every row of
+ * `docs` can be rebuilt by walking a vault, so deleting this folder costs a rescan, a parse and a
+ * practice history, never a document or a link.
  *
  * `node:sqlite`, so there is no native module to rebuild for Electron. WAL and a busy timeout,
  * because the CLI running the server in-process and the app may both have it open.
@@ -103,6 +105,15 @@ export class Home {
 
   docs(vault: string): DocRow[] {
     return this.sql("select * from docs where vault = ?").all(vault) as unknown as DocRow[];
+  }
+
+  /** `docs`, a page at a time: up to `limit` rows whose id is after `after`, in id order. */
+  docsAfter(vault: string, after: string, limit: number): DocRow[] {
+    return this.sql("select * from docs where vault = ? and id > ? order by id limit ?").all(
+      vault,
+      after,
+      limit,
+    ) as unknown as DocRow[];
   }
 
   docById(vault: string, id: string): DocRow | undefined {

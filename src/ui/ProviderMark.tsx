@@ -14,8 +14,8 @@ import marks from "../../icons/data/providers.json";
  * diagram vocabulary. The artwork is a generated icon set, which is why it lives in `icons/` and
  * not in `src/`.
  *
- * A provider with no mark in either source falls back to its name. OpenAI-compatible borrows
- * OpenAI's mark because that is the dialect it speaks.
+ * A provider with no mark in either source falls back to its name. Codex draws OpenAI's mark, whose
+ * agent it is, and OpenAI-compatible borrows it because that is the dialect it speaks.
  */
 interface Glyph {
   body: string;
@@ -29,6 +29,7 @@ interface Glyph {
 const MARKS: Readonly<Record<string, { set: "color" | "mono"; name: string }>> = {
   claude: { set: "mono", name: "anthropic" },
   opencode: { set: "mono", name: "opencode" },
+  codex: { set: "mono", name: "openai" },
   custom: { set: "mono", name: "openai" },
 };
 

@@ -10,23 +10,23 @@
  * Pure, so `test/search-results.test.ts` holds the rule rather than a browser.
  */
 import { keyOf } from "../ui/tree";
-import type { Hit, SearchDoc } from "./engine";
+import type { Found } from "./wire";
 
 /** A document as both lists name it: the key the tree gives its row, rather than a second spelling. */
-export const docKey = (doc: Pick<SearchDoc, "kind" | "name">): string => keyOf(doc);
+export const docKey = (doc: Pick<Found, "kind" | "name">): string => keyOf(doc);
 
 export interface Split {
   /** The hits to draw under "In the text": every file without a row of its own. */
-  hits: Hit[];
+  hits: Found[];
   /** The keys of the files drawn by name that also matched in their text. */
   inText: Set<string>;
 }
 
-export function byDocument(hits: readonly Hit[], named: ReadonlySet<string>): Split {
+export function byDocument(hits: readonly Found[], named: ReadonlySet<string>): Split {
   const inText = new Set<string>();
-  const rest: Hit[] = [];
+  const rest: Found[] = [];
   for (const h of hits) {
-    const key = docKey(h.doc);
+    const key = docKey(h);
     if (named.has(key)) inText.add(key);
     else rest.push(h);
   }

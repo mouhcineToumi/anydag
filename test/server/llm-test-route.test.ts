@@ -59,7 +59,7 @@ describe("/__board/llm", () => {
     const said = await call("GET", "/__board/llm?fresh=1");
     expect(said.status).toBe(200);
     const providers = said.body.providers as { id: string; keyEnv: string[] }[];
-    expect(providers.map((p) => p.id)).toEqual(["claude", "opencode", "custom"]);
+    expect(providers.map((p) => p.id)).toEqual(["claude", "opencode", "codex", "custom"]);
     expect(providers.find((p) => p.id === "custom")?.keyEnv).toEqual(["ANYDAG_LLM_API_KEY"]);
     expect(providers.find((p) => p.id === "claude")?.keyEnv).toEqual([]);
   });

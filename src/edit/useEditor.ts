@@ -33,6 +33,7 @@ import type { Tool, ViewportHandle } from "@/canvas/Viewport";
 import { boardToSvg, itemToSvg } from "@/export/svg";
 import { svgToPng } from "@/export/png";
 import { fileStem, saveFile } from "@/export/save";
+import { openTemplates } from "@/ui/templates";
 import { bindingFor, CHORD_MS, LEADER_CODE, topicKeyFor, WHICHKEY_MS, type Command } from "@/edit/bindings";
 
 import { renameItemId, renameNodeLinks } from "@/board/rename";
@@ -122,6 +123,7 @@ import { type RewriteOutcome, requestRewrite, rewriteContext, rewriteOps } from 
 import { toggleAssistant } from "@/assistant/panelState";
 import { lost } from "@/board/survive";
 import { refuseLocked } from "@/settings/lock";
+import { aiOn } from "@/settings/aiSwitch";
 import { readSettings } from "@/settings/store";
 import { track } from "@/telemetry/client";
 
@@ -4119,6 +4121,8 @@ export function useEditor({
           return setTool("pen");
         case "note":
           return add("md", at());
+        case "template":
+          return openTemplates();
         case "prompt":
           return add("prompt");
         case "library":
@@ -4241,7 +4245,9 @@ export function useEditor({
         if (!mod) {
           take();
           if (e.key === "Escape") return;
-          const b = bindingFor(e.key);
+          /* A chord of an AI feature that is off is no chord at all (#296), read at the press. */
+          const ai = readSettings();
+          const b = bindingFor(e.key, (f) => aiOn(ai, f));
           /* Locked, a chord may go somewhere or show something, and may not make anything. */
           if (b && lockedRef.current && !READS.has(b.command)) return void refuseLocked();
           if (b) run(b.command);

@@ -1,14 +1,15 @@
 /**
  * What the model picker offers (`GET /__board/chat/models`): per provider, the models and the effort
  * levels. Claude Code's are a short list we keep; OpenCode's are whatever `opencode models` prints for
- * this person's logins, asked once and kept for ten minutes. A provider that is not installed, too
+ * this person's logins, asked once and kept for ten minutes; Codex's are the models its catalog lists
+ * for this login (`codexModels`), the first being Codex's own default. A provider that is not installed, too
  * old or not signed in is listed as unavailable, with the sentence the prompt card's settings say
- * (`claudeReady`, `opencodeReady`), so the picker can say so rather than fail on the first turn.
+ * (`claudeReady`, `opencodeReady`, `codexReady`), so the picker can say so rather than fail on the first turn.
  */
 
 import { execFile } from "node:child_process";
 
-import { claudeReady, opencodeReady } from "../../plugins/generate/providers";
+import { claudeReady, codexModels, codexReady, opencodeReady } from "../../plugins/generate/providers";
 import { PROVIDER_NAMES } from "../../src/settings/providerNames";
 import type { Provider } from "./types";
 
@@ -37,6 +38,8 @@ const CLAUDE_MODELS: ModelChoice[] = [
 ];
 
 const OPENCODE_DEFAULT = "opencode-go/glm-5.3-flash";
+/** The scripted harness's Codex model: it reaches no model, so any id would do, and this one says so. */
+const CODEX_FAKE = "gpt-fake";
 
 let cached: { at: number; models: ModelChoice[] } | null = null;
 
@@ -58,7 +61,7 @@ function opencodeModels(bin: string): Promise<ModelChoice[]> {
 }
 
 /**
- * `fake`: the server runs the scripted harness, which needs neither binary — so both are available
+ * `fake`: the server runs the scripted harness, which needs no binary — so every provider is available
  * whatever is installed, and the answer says so for the e2e suite to check.
  */
 export async function modelsFor(
@@ -87,6 +90,19 @@ export async function modelsFor(
     models: listed.length ? listed : [{ id: OPENCODE_DEFAULT, label: OPENCODE_DEFAULT }],
     efforts: ["", "low", "medium", "high", "max"],
     default: listed.some((m) => m.id === OPENCODE_DEFAULT) || !listed.length ? OPENCODE_DEFAULT : listed[0]!.id,
+  });
+  const codex = fake ? { ok: true as const, bin: "fake" } : codexReady(env);
+  const codexListed = !fake && codex.ok && have.includes("codex") ? (codexModels(codex.bin, env)?.models ?? []) : [];
+  const codexList = codexListed.length ? codexListed : fake ? [{ id: CODEX_FAKE, label: "GPT Fake" }] : [];
+  out.push({
+    provider: "codex",
+    label: PROVIDER_NAMES.codex,
+    /* A Codex with no catalog cannot run a turn (`codexHarness`), so it is not offered as if it could. */
+    available: have.includes("codex") && codex.ok && codexList.length > 0,
+    ...(codex.ok ? (codexList.length ? {} : { why: "Codex did not list its models" }) : { why: codex.error }),
+    models: codexList,
+    efforts: ["", "low", "medium", "high", "max"],
+    default: codexList[0]?.id ?? "",
   });
   return fake ? { providers: out, fake: true } : { providers: out };
 }

@@ -49,6 +49,7 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `board_title` · `board_rename` · `board_duplicate` · `board_delete` | a board's title (with `follow`, its name follows) and the file operations |
 | `board_mkdir` · `board_rmdir` · `board_mvdir` | folders; `board_mvdir` moves one whole and refuses a destination that exists; `board_rmdir` moves one to the trash, and one with anything in it only with `recursive` |
 | `note_list` · `note_read` · `note_create` · `note_write` · `note_rename` · `note_duplicate` · `note_delete` · `note_title` | notes, the same way — Markdown, under the same `base` rule |
+| `template_list` · `note_from_template` · `template_starters` | note templates — the notes in the vault's templates folder (`Templates` when it exists); `note_from_template` makes a note from one with `{{title}}`, `{{date}}`, `{{time}}` and `{{date:FORMAT}}` filled in once, and a template with a `status:` or a `start:` makes a task or an event; `template_starters` writes a Meeting, a Daily and an ADR template **only when the person asked** |
 | `quiz_list` · `quiz_read` · `quiz_create` · `quiz_write` · `quiz_rename` · `quiz_duplicate` · `quiz_delete` · `quiz_title` · `quiz_check` | quizzes, the same way, and `quiz_check` for the `EQ_`/`WQ_` codes (with `text`, a draft's) |
 | `quiz_question_set` · `quiz_question_remove` · `quiz_question_move` | **one question at a time** by its `{#id}`, every other byte of the quiz left alone: add or replace one (its Markdown from the `##`, written as given), remove one, reorder — use these rather than `quiz_write` for anything but a new quiz |
 | `quiz_questions` · `quiz_answer` · `quiz_mistakes` · `quiz_threshold` | running one in the conversation: the questions as data, then **only the answers the person gave**; what is still in Mistakes; how many right in a row take one out |
@@ -421,6 +422,7 @@ title asking for one. What the editor holds:
 | `image` | `![alt](attachments/file.png "caption")`, relative to the note |
 | `embed` | `![Title](dag:<id>)` on a line of its own — a board drawn inside the note, another note as a card, an attachment's picture inline or its card |
 | `equation` | `$$` on a line, the TeX, `$$` on a line — or a ```` ```math ```` fence — drawn centred by KaTeX |
+| `callout` | a `>` quote whose first line is `[!kind]`, an optional title after it, and `-` (folded) or `+` (open) straight after the bracket to make it fold — GitHub's `note` `tip` `important` `warning` `caution` and Obsidian's `abstract` `info` `todo` `success` `question` `failure` `danger` `bug` `example` `quote`, with Obsidian's aliases (`hint`, `error`, `faq`, …); an unknown kind is drawn as a `note` and kept as written |
 
 **Equations are TeX between dollars, everywhere Markdown is drawn** — a note, a board's text card, a
 quiz: `$x^2$` in a line, and `$$\sum_i x_i$$` written mid-line is drawn centred on a line of its own.

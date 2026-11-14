@@ -16,7 +16,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
 
-import { Parsed, grammar } from "./grammar";
+import { cleanFolder } from "../src/note/template";
+import { Parsed } from "./grammar";
 import type { Home } from "./home";
 import { err } from "./http";
 import { Practice } from "./practice";
@@ -58,7 +59,12 @@ function vaultOptions(root: string, base: VaultOptions = {}): VaultOptions {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(root, ".anydag", "settings.json"), "utf8")) as Record<string, unknown>;
     const at = raw["dag:attachments"];
-    if (typeof at === "string") return { ...base, attachments: at.replace(/^\/+|\/+$/g, "") };
+    const tpl = raw["dag:templates"];
+    return {
+      ...base,
+      ...(typeof at === "string" ? { attachments: at.replace(/^\/+|\/+$/g, "") } : {}),
+      ...(typeof tpl === "string" ? { templates: tpl } : {}),
+    };
   } catch {
     /* no settings yet */
   }
@@ -71,6 +77,7 @@ export class Session {
   private defaultId: string | null = null;
   private links: SyncLinks | null = null;
   private logs: Telemetry | null = null;
+  private watches = false;
 
   constructor(
     readonly home: Home,
@@ -81,6 +88,20 @@ export class Session {
     readonly options: VaultOptions = {},
   ) {
     if (first) this.adopt(first);
+  }
+
+  /**
+   * Watch each vault this session serves from the moment it opens, not only while a page listens:
+   * what lets a listing be kept and answer from what changed (#280). `anydag serve` does; the CLI's
+   * one-off session and the unit suite's do not, and list as they always did.
+   */
+  watchVaults(): void {
+    this.watches = true;
+    for (const o of this.open.values()) this.watchOne(o.vault);
+  }
+
+  private watchOne(vault: Vault): void {
+    vault.watch().catch((e) => console.warn(`anydag: not watching ${vault.root}: ${(e as Error)?.message ?? e}`));
   }
 
   /** Which open vaults sync, and their loops (`server/sync/link.ts`). Nothing for a vault not linked. */
@@ -151,14 +172,15 @@ export class Session {
     }
     const at: Open = {
       vault,
-      index: new Parsed(grammar.index),
-      corpus: new Parsed(grammar.corpus),
+      index: new Parsed("index", vault.root, { home: this.home.dir }),
+      corpus: new Parsed("corpus", vault.root, { home: this.home.dir }),
       practice: new Practice(this.home, vault.id),
     };
     this.open.set(vault.id, at);
     this.defaultId = vault.id;
     this.remember(vault);
     this.sync.opened(vault);
+    if (this.watches) this.watchOne(vault);
     return at;
   }
 
@@ -241,6 +263,8 @@ export class Session {
       this.defaultId = last?.id ?? null;
     }
     await this.sync.closed(id);
+    at.index.forget();
+    at.corpus.forget();
     await at.vault.close();
   }
 
@@ -254,20 +278,31 @@ export class Session {
     if (this.open.has(newId)) throw new Refused(`vault \`${newId}\` is already open`);
     const at = this.open.get(oldId);
     if (!at) throw err(404, `vault \`${oldId}\` is not open`, { code: "vault" });
+    // Another vault's sync link is never moved over: asked before anything changes (#9).
+    if (oldId !== newId && this.sync.claimed(newId))
+      throw new Refused(`vault \`${newId}\` already has sync state on this machine`);
     const root = at.vault.root;
     const types = [...at.vault.types];
     const attachments = at.vault.attachments;
+    const templates = at.vault.templates;
     const wasDefault = this.defaultId === oldId;
     this.open.delete(oldId);
     await this.sync.closed(oldId);
+    at.index.forget();
+    at.corpus.forget();
     await at.vault.close();
     this.home.rekeyVault(oldId, newId);
     this.sync.moved(oldId, newId);
     writeVaultId(root, newId);
-    const vault = new Vault(root, this.home, vaultOptions(root, { ...this.options, types, attachments }));
+    const vault = new Vault(root, this.home, vaultOptions(root, { ...this.options, types, attachments, templates }));
     const next = this.adopt(vault);
     if (!wasDefault) this.defaultId = [...this.open.keys()].find((k) => k !== newId) ?? newId;
     return next.vault;
+  }
+
+  /** Whether `id` is a vault this machine has: open, or on the recent list. */
+  knows(id: string): boolean {
+    return this.open.has(id) || this.home.sql("select 1 from vaults where id = ?").get(id) !== undefined;
   }
 
   /** Take a vault off the recent list — closing it first. The folder stays. */
@@ -294,6 +329,10 @@ export class Session {
   reconfigure(vault: Vault): void {
     const opts = vaultOptions(vault.root);
     vault.attachments = opts.attachments ?? "attachments";
+    const was = vault.templatesFolder();
+    vault.templates = cleanFolder(opts.templates ?? "");
+    /* Every page reads which notes are tasks off the list, and a folder named templates changes that. */
+    if (vault.templatesFolder() !== was) vault.emit({ type: "tree" });
   }
 
   async closeAll(): Promise<void> {

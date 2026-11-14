@@ -89,10 +89,13 @@ Ten things are load-bearing:
   already carried it, and is cleared once used, or opening another board from the sidebar would look
   for the same item id there: `md-1` is on most boards. `replaceState` fires no `hashchange`, so
   setting one announces `dag:target`, which is how a result on the board already open moves the view.
-- **`App` is a lazy chunk.** `Gate` mounts `ViewApp` for `?view=1` and otherwise loads the canvas on
-  demand, so "without the editor" is a fact about the network rather than about the tree.
-  `test/view-graph.test.ts` walks the static import graph from `main.tsx`, and `view.spec.ts` checks
-  the requests a view page actually makes.
+- **The canvas and the view are chunks of their own.** `main.tsx` imports `ViewApp` for `?view=1`
+  and `App` otherwise, beside the fonts and the session, and `Gate` draws whichever came in the
+  first render. So "without the editor" is a fact about the network rather than about the tree, and
+  a page with a vault never fetches the view either. Neither is `React.lazy`, whose 300 ms reveal
+  throttle every page paid while `App` was (#303). `test/view-graph.test.ts` walks the static import
+  graph from `main.tsx` and from `ViewApp`, and `view.spec.ts` checks the requests a view page
+  actually makes.
 
 `@` and `[[` insert a reference and `![` (Markdown's own start of an image) an embed; the slash
 menu's *Board* opens the `![` picker. Two documents with one title are told apart by their folders in
@@ -117,8 +120,9 @@ and `dag-embed--placed`, `dag-embed__mark`, `dag-embed__text`, `dag-embed__name`
 `data-dag-embed-missing`, `data-dag-embed-failed`.
 
 **Out, and why:** a references table stored beside the texts (a second copy of what the files say;
-the scan is right for tens of documents and is the thing to replace, with an index kept on write,
-once a vault holds thousands); hiding a block's `^id` inside the editor (it wants a schema prop
+since #280 the index is kept on write in the server's memory instead — the kept listing says which
+texts moved, only those are parsed again, and only their links resolved again while no name moved —
+and rebuilt from the files when the server starts); hiding a block's `^id` inside the editor (it wants a schema prop
 on every block type, and nothing yet points at a block from the UI); a board embedded in a board; and
 mobile viewing, which the view is built for. Sharing a vault stays the folder's: it is shared the
 way any folder is.

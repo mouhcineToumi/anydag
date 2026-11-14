@@ -53,6 +53,12 @@ export interface Kit {
   url(name: string, kind: string, vault?: string): Promise<string>;
   /** Refuse by naming the flag — for a tool that only sometimes writes. */
   needWrite(what: string): void;
+  /**
+   * Set for an Assistant chat: no tool has this process fetch a URL. The fetch leaves the machine
+   * from here, before any route is called, so the chat's guard never sees it and nobody approves
+   * it — and an agent steered by a planted note could put what it read into the address (#9).
+   */
+  noFetch?: boolean;
 }
 
 interface Call extends Omit<CallOptions, "raw"> {
@@ -84,7 +90,7 @@ function refusal(status: number, body: any): ToolError {
 const decoder = new TextDecoder();
 
 /** `home`, for a chat's MCP server: the vault a document link names when a tool named none. */
-export function makeKit(backend: Backend, readOnly: boolean, home?: string): Kit {
+export function makeKit(backend: Backend, readOnly: boolean, home?: string, noFetch = false): Kit {
   const send = async (method: string, route: string, o: Call = {}, raw = false): Promise<Answer> => {
     const { vault, ...rest } = o;
     const got = await backend.call(method, route, { ...rest, query: { ...rest.query, vault }, raw });
@@ -103,6 +109,7 @@ export function makeKit(backend: Backend, readOnly: boolean, home?: string): Kit
   const enc = encodeURIComponent;
   const kit: Kit = {
     readOnly,
+    noFetch,
     via: backend.via,
     async api(method, route, o) {
       return (await send(method, route, o)).json;
@@ -853,6 +860,48 @@ const tableTools: Tool[] = [
   }),
 ];
 
+const templateTools: Tool[] = [
+  tool({
+    name: "template_list",
+    description: withNote(
+      "The vault's note templates — the notes in its templates folder, which Settings names and which is `Templates` when that folder exists — each with its `name`, `title` and what it `makes`: a `note`, or a `task` or an `event` when its frontmatter carries a `status:` or a `start:`. `folder` is null when the vault has none, and then there are no templates; `template_starters` writes three (a meeting, a day, an ADR).\n\n" +
+        "A template is an ordinary note: read it with `note_read`, change it with `note_write`. It is left out of `task_list`, `event_list` and the calendar even when it carries those lines.",
+    ),
+    write: false,
+    input: { vault },
+    run: ({ vault: v }, kit) => kit.api("GET", "/__board/templates", { vault: v }),
+  }),
+  tool({
+    name: "note_from_template",
+    description: withNote(
+      "Make a note from a template: its frontmatter and text, with the variables filled in once — `{{title}}`, `{{date}}` (`YYYY-MM-DD`), `{{time}}` (`HH:mm`) and `{{date:FORMAT}}` (Moment's tokens: `YYYY MM DD dddd MMMM HH mm`, `[text]` kept as is) — in the person's time zone. Any other `{{…}}` is left as written. The note is a plain note afterwards: it does not remember the template.\n\n" +
+        "`template` is a name from `template_list`. With a `title` the file is named after it, in `folder` if given; without one it starts *Untitled* (or takes the title its template's frontmatter fills in), and `{{title}}` reads *Untitled*. A template with a `status:` makes a task, one with a `start:` an event.",
+    ),
+    write: true,
+    input: { template: z.string(), title: z.string().optional(), folder: z.string().optional(), vault },
+    run: async ({ template, title, folder, vault: v }, kit) => {
+      kit.needWrite("make a note from a template");
+      const got = await kit.api("POST", "/__board/from-template", {
+        vault: v,
+        body: { template, ...(title !== undefined ? { title } : {}), ...(folder !== undefined ? { folder } : {}) },
+      });
+      return { name: got.name, id: got.id, base: got.base, url: await kit.url(got.name, "note", v) };
+    },
+  }),
+  tool({
+    name: "template_starters",
+    description: withNote(
+      "Write the three starter templates — Meeting, Daily and ADR — into the templates folder (`Templates` when the vault names none), making it if it is not there. **Only when the person asked for them**: opening a vault never makes the folder. A file that is already there is left as it is, and comes back under `skipped`.",
+    ),
+    write: true,
+    input: { vault },
+    run: ({ vault: v }, kit) => {
+      kit.needWrite("add the starter templates");
+      return kit.api("POST", "/__board/templates/starters", { vault: v, body: {} });
+    },
+  }),
+];
+
 const taskTools: Tool[] = [
   tool({
     name: "task_list",
@@ -1164,6 +1213,7 @@ async function bytesFrom(
   data: string | undefined,
   url: string | undefined,
 ): Promise<Fetched | null> {
+  if (url !== undefined && kit.noFetch) throw new ToolError("a chat fetches nothing by URL: pass the bytes as `data`");
   if ((data === undefined) === (url === undefined)) throw new ToolError("give exactly one of `data` and `url`");
   if (url === undefined) return null;
   const limits = ((await kit.api("GET", "/__board/files", { vault: v })) as { limits: { maxBytes: number } }).limits;
@@ -1180,11 +1230,15 @@ function extFor(type: string): string | undefined {
   return Object.entries(MIME).find(([, m]) => m === type)?.[0];
 }
 
+/** What `image_add` says about `url`, which a chat's copy of it leaves out (`server/mcp/chat.ts`). */
+export const IMAGE_BY_URL =
+  " — or, instead, `url`: an `https://` address the server fetches the picture from, so its bytes never pass through you. An address on this machine or a private network is refused";
+
 const imageTools: Tool[] = [
   tool({
     name: "image_add",
     description: withNote(
-      "Keep a picture in the vault. `data` is a `data:image/…;base64,…` URL, or plain base64 with `mime` saying what it is (`image/png`) — or, instead, `url`: an `https://` address the server fetches the picture from, so its bytes never pass through you. An address on this machine or a private network is refused.\n\n" +
+      `Keep a picture in the vault. \`data\` is a \`data:image/…;base64,…\` URL, or plain base64 with \`mime\` saying what it is (\`image/png\`)${IMAGE_BY_URL}.\n\n` +
         "It is stored as an attachment in the vault's attachments folder and referred to as `dag:<id>`. On a **board** it is placed too — an `image` item appended at `x`/`y` and `w` wide, on `page` — and the answer names the item. On a **note** or a **quiz** nothing is written: put `![what it shows](<src>)` where it belongs with `note_write`, using the `src` that comes back.",
     ),
     write: true,
@@ -1570,7 +1624,7 @@ const appTools: Tool[] = [
     name: "settings",
     description:
       "The person's preferences — or, with `set`, a change to them. **Only when they asked.**\n\n" +
-      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`) and `dag:favourites`; travels with the vault's folder. `app` level: the person's, the same in every vault — `dag:theme`, `dag:ai` (a JSON string: `{llm: {provider, model, reasoning}, assistant: {provider, model}}` — which model a prompt card and a new Assistant chat use), how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
+      "`vault` level: the vault's own `settings.json` — `settings` (the settings card: `problems`, `paste`, `export`) and `dag:favourites`; travels with the vault's folder. `app` level: the person's, the same in every vault — `dag:theme`, `dag:ai` (a JSON string: `{llm: {provider, model, reasoning}, assistant: {provider, model}, features: {ai, prompts, rewrite, flashcards, assistant}}` — which model a prompt card and a new Assistant chat use, and which AI features the page draws, `ai` being the master switch), how the window is laid out (`dag:library`, `dag:sidebar`, `dag:inspector-w` and the like) and `dag:time-zone`, the IANA zone times are read and written in. `set` merges keys into what is stored (`settings` a group at a time); a key set to null is removed. " +
       NOTE_VAULT,
     // Only a `set` writes; reading is allowed under --read-only.
     write: false,
@@ -1734,6 +1788,7 @@ const syncTools: Tool[] = [
 export const TOOLS: Tool[] = [
   ...boardTools,
   ...noteTools,
+  ...templateTools,
   ...quizTools,
   ...quizMore,
   ...tableTools,

@@ -71,8 +71,11 @@ export interface DockActions {
   onRedo(): void;
   library: boolean;
   onLibrary(open: boolean): void;
-  /** A prompt card under the pointer — the one thing here that is deliberately promoted. */
-  onPrompt(): void;
+  /**
+   * A prompt card under the pointer — the one thing here that is deliberately promoted. Absent with
+   * prompt cards turned off (#296), and the button with it.
+   */
+  onPrompt?(): void;
   /** Open the links between items — the page's `edges` fence — in the editor panel. */
   onLinks(): void;
   /** Tidy up: the board, or the selection when there is one. */
@@ -195,17 +198,19 @@ export function Dock({ edit, locked = false }: { edit?: DockActions; locked?: bo
             {/* Promoted, and accented, the way both references promote exactly one thing. Ours is the
             prompt card rather than an "AI" button, because the card is a real item on the board
             that survives a reload and is undone like anything else. */}
-            <IconButton
-              className="dag-icon--accent"
-              data-dag-dock-prompt=""
-              aria-label={`Prompt card${hint("prompt")}`}
-              {...blocked}
-              onClick={act(edit.onPrompt)}
-              tip="Prompt card: describe a diagram and a model draws it"
-              shortcut={chordFor("prompt")}
-            >
-              <Sparkles {...ICON} aria-hidden="true" />
-            </IconButton>
+            {edit.onPrompt ? (
+              <IconButton
+                className="dag-icon--accent"
+                data-dag-dock-prompt=""
+                aria-label={`Prompt card${hint("prompt")}`}
+                {...blocked}
+                onClick={act(edit.onPrompt)}
+                tip="Prompt card: describe a diagram and a model draws it"
+                shortcut={chordFor("prompt")}
+              >
+                <Sparkles {...ICON} aria-hidden="true" />
+              </IconButton>
+            ) : null}
             <IconButton
               className={edit.library ? "dag-icon--on" : undefined}
               data-dag-library-toggle=""

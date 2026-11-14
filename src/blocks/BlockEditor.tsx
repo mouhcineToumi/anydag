@@ -54,13 +54,14 @@ import {
   getDefaultReactSlashMenuItems,
   useCreateBlockNote,
 } from "@blocknote/react";
-import { LayoutDashboard, Sigma, Trash2, Upload } from "lucide-react";
+import { LayoutDashboard, MessageSquareQuote, Sigma, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { applySteps, type NoteBlock, type Step } from "@/note/markdown";
 import { noteSchema } from "@/note/schema";
 import { readIndex } from "@/refs/useIndex";
 
+import { calloutBlock, insertCallout } from "./callout";
 import { codeBlock } from "./code";
 import { EquationButton, equationBlock, insertEquation, mathInline, mathKeys } from "./math";
 import { syntaxColours } from "./syntax";
@@ -77,7 +78,13 @@ import { EMBED_TRIGGER, embedBlock, embedFor, refFor, refInline, refItems } from
  * it is called on.
  */
 const editorSchema = BlockNoteSchema.create({
-  blockSpecs: { ...noteSchema.blockSpecs, codeBlock: codeBlock(), embed: embedBlock(), equation: equationBlock() },
+  blockSpecs: {
+    ...noteSchema.blockSpecs,
+    codeBlock: codeBlock(),
+    embed: embedBlock(),
+    equation: equationBlock(),
+    callout: calloutBlock(),
+  },
   inlineContentSpecs: { ...noteSchema.inlineContentSpecs, ref: refInline, math: mathInline },
   styleSpecs: noteSchema.styleSpecs,
 });
@@ -200,6 +207,14 @@ function slashItems(editor: Editor, pickFiles?: () => void) {
       group: "Basic blocks",
       icon: <Sigma size={18} />,
       onItemClick: () => insertEquation(editor),
+    },
+    callout: {
+      title: "Callout",
+      subtext: "A note, a tip or a warning, set apart in its colour",
+      aliases: ["callout", "admonition", "alert", "note", "tip", "warning", "info"],
+      group: "Basic blocks",
+      icon: <MessageSquareQuote size={18} />,
+      onItemClick: () => insertCallout(editor),
     },
   };
   const out: { key?: string; group?: string }[] = getDefaultReactSlashMenuItems(editor).filter((item) =>

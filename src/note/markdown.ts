@@ -34,7 +34,9 @@ import type { InlineMath } from "mdast-util-math";
 import type {
   AlignType,
   BlockContent,
+  Blockquote,
   Definition,
+  Html,
   ListItem,
   Nodes,
   PhrasingContent,
@@ -45,6 +47,7 @@ import type {
   TableRow,
 } from "mdast";
 
+import { calloutLine, splitCallout } from "./callout";
 import { blockTex, inlineMathNode, inlineTex, isDisplay, MATH_WRITE, remarkEscapeDollars, remarkMath } from "./math";
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -122,6 +125,8 @@ export const NOTE_BLOCKS = [
   "embed",
   /* An equation on lines of its own — `$$`, or a ```math fence. */
   "equation",
+  /* A quote whose first line names a kind, `> [!tip] Title` — GitHub's and Obsidian's (`callout.ts`). */
+  "callout",
 ] as const;
 export type NoteBlockType = (typeof NOTE_BLOCKS)[number];
 
@@ -288,6 +293,8 @@ function nodeBlocks(n: RootContent | BlockContent, ctx: Ctx): NoteBlock[] {
       return items;
     }
     case "blockquote": {
+      const callout = calloutBlock(n, ctx);
+      if (callout) return [callout];
       const [first, ...rest] = n.children;
       const lead = first?.type === "paragraph";
       return [
@@ -314,6 +321,35 @@ function nodeBlocks(n: RootContent | BlockContent, ctx: Ctx): NoteBlock[] {
     default:
       return [{ type: "paragraph", content: [run(src(ctx, n), {})] }];
   }
+}
+
+/**
+ * A quote that opens with `[!kind]`, as a `callout` block: the kind as written (so `[!NOTE]` stays
+ * upper case and an unknown word stays itself), the fold, and the title **as the bytes it was
+ * written in** — a title is one line, and whatever Markdown is in it is written back exactly. The
+ * rest of the first paragraph is the block's text, and so is the quote's next paragraph when the
+ * first line stood alone (`> [!note]`, `>`, `> words`), which is the same callout.
+ */
+function calloutBlock(n: Blockquote, ctx: Ctx): NoteBlock | null {
+  const parts = splitCallout(n);
+  const first = n.children[0];
+  const start = first?.position?.start.offset;
+  if (!parts || start === undefined) return null;
+  const end = ctx.md.indexOf("\n", start);
+  const line = ctx.md.slice(start, end < 0 ? first.position?.end.offset : end);
+  const title = line.replace(/^\[![^\]]*\][+-]?/, "").trim();
+  let content = parts.body;
+  let rest = parts.rest;
+  if (!content.length && rest[0]?.type === "paragraph") {
+    content = rest[0].children;
+    rest = rest.slice(1);
+  }
+  return {
+    type: "callout",
+    props: { kind: parts.word, title, fold: parts.fold },
+    content: inline(content, ctx),
+    children: toBlocks(rest, ctx),
+  };
 }
 
 function tableBlock(t: Table, ctx: Ctx): NoteBlock {
@@ -633,6 +669,9 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
         });
         continue; /* its children are inside it, not after it */
       }
+      case "callout":
+        out.push(calloutMd(b));
+        continue; /* its children are inside it, not after it */
       case "codeBlock": {
         const lang = typeof b.props?.language === "string" && b.props.language !== "text" ? b.props.language : null;
         out.push({ type: "code", lang, value: plain(b.content) });
@@ -681,9 +720,42 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
   return out;
 }
 
-/** The blocks in the house form, with no trailing newline. */
-export function blocksToMd(blocks: NoteBlock[]): string {
-  const children = toMdast(blocks);
+/**
+ * A callout in the house form: its line, then its text and blocks as a quote under it —
+ *
+ *     > [!tip] Title
+ *     > The text.
+ *
+ * — which is how GitHub and Obsidian are written. The quote under the line is the writer's own, so
+ * everything in it is escaped as any quote's is; the line is written as it was given, because the
+ * title is the bytes it was read as (`calloutBlock`). Where the first line would run into what
+ * follows it — a body that opens with something that would continue it, or underline it into a
+ * heading — a blank `>` line goes between them, which is the same callout. Which is decided by
+ * reading the two back, not by guessing at Markdown's rules.
+ *
+ * A raw node, so the writer puts it where it belongs and indents it in a list or a quote; its
+ * equations are found by parsing it (`equationsOf`).
+ */
+function calloutMd(b: NoteBlock): RootContent {
+  const p = b.props ?? {};
+  const head = `> ${calloutLine(String(p.kind ?? "note"), String(p.fold ?? ""), String(p.title ?? ""))}`;
+  const para = inlineMd(b.content);
+  const kids: BlockContent[] = [
+    ...(para.length ? [{ type: "paragraph" as const, children: para }] : []),
+    ...(toMdast(b.children ?? []) as BlockContent[]),
+  ];
+  let value = head;
+  if (kids.length) {
+    const quoted = stringify([{ type: "blockquote", children: kids }]);
+    const compact = `${head}\n${quoted}`;
+    const apart = `${head}\n>\n${quoted}`;
+    value = JSON.stringify(mdToBlocks(compact)) === JSON.stringify(mdToBlocks(apart)) ? compact : apart;
+  }
+  return { type: "html", value, data: { callout: true } } as RootContent;
+}
+
+/** Some mdast in the house form, with no trailing newline. */
+function stringify(children: RootContent[]): string {
   if (!children.length) return "";
   const root: Root = { type: "root", children };
   let out = String(writer.stringify(root));
@@ -694,16 +766,30 @@ export function blocksToMd(blocks: NoteBlock[]): string {
   return out.replace(/\n+$/, "");
 }
 
+/** The blocks in the house form, with no trailing newline. */
+export function blocksToMd(blocks: NoteBlock[]): string {
+  return stringify(toMdast(blocks));
+}
+
 /** Every equation in a tree, in order, as one string to compare. */
 function equationsOf(root: Root): string {
+  return equationsIn(root).join("\u0000");
+}
+
+/** A callout `calloutMd` wrote: raw Markdown in the tree, whose equations are found by reading it. */
+const isCallout = (n: Nodes): n is Html => n.type === "html" && !!(n.data as { callout?: boolean } | undefined)?.callout;
+
+/* A callout is written before the rest, already settled, so its equations are the ones it says. */
+function equationsIn(root: Nodes): string[] {
   const out: string[] = [];
   const walk = (n: Nodes) => {
     if (n.type === "inlineMath") out.push(`${isDisplay(n) ? "$$" : "$"}${n.value}`);
     else if (n.type === "math") out.push(`B${n.value}`);
+    else if (isCallout(n)) out.push(...equationsIn(parser.parse(n.value)));
     if ("children" in n) for (const c of n.children as Nodes[]) walk(c);
   };
   walk(root);
-  return out.join("\u0000");
+  return out;
 }
 
 /* ------------------------------------------------------------------------------------------------ */

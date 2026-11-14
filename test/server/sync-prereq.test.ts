@@ -208,6 +208,20 @@ describe("rekeyVault", () => {
     await expect(s.rekeyVault("0123456789", "bad")).rejects.toThrow();
     await next.close();
   });
+
+  it("refuses an id another vault's sync state is kept under, and changes nothing (#9)", async () => {
+    const e = env();
+    const s = new Session(e.home, e.vault, "t");
+    const old = e.vault.id;
+    const theirs = s.sync.dir("0123456789");
+    fs.mkdirSync(theirs, { recursive: true });
+    fs.writeFileSync(path.join(theirs, "pair.json"), '{"token":"theirs"}');
+    await expect(s.rekeyVault(old, "0123456789")).rejects.toThrow(/sync state/);
+    expect(fs.readFileSync(path.join(theirs, "pair.json"), "utf8")).toBe('{"token":"theirs"}');
+    expect(JSON.parse(readText(e.root, ".anydag/vault.json")).id).toBe(old);
+    expect(s.served().map((v) => v.id)).toEqual([old]);
+    await s.closeAll();
+  });
 });
 
 describe("mergeKeys", () => {

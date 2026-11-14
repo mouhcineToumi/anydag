@@ -19,7 +19,9 @@
  */
 import { dayOf, isDay, momentOf, timeOf, type NoteEvent } from "../note/event";
 import type { Task } from "../note/task";
+import { inTemplates } from "../note/template";
 import { currentZone, instantOf, utc, wallOf } from "../note/zone";
+import { collation } from "../locale";
 
 /** The three things a calendar holds, in the order the toggles read. */
 export const CAL_KINDS = ["task", "event", "note"] as const;
@@ -58,6 +60,8 @@ export interface Listing {
   tasks?: Readonly<Record<string, Task>>;
   events?: Readonly<Record<string, NoteEvent>>;
   created?: Readonly<Record<string, string>>;
+  /** The templates folder: what is in it is never on the calendar, whatever its frontmatter says. */
+  templates?: string | null;
 }
 
 /* -- days ------------------------------------------------------------------------------------- */
@@ -191,6 +195,7 @@ export function itemsOf(
     if (item.last >= first && item.first <= last && keep(item.name)) out.push(item);
   };
   for (const name of listing.notes) {
+    if (inTemplates(name, listing.templates)) continue;
     const task = listing.tasks?.[name];
     const event = listing.events?.[name];
     if (task) {
@@ -212,7 +217,7 @@ export function itemsOf(
       daysBetween(b.first, b.last) - daysBetween(a.first, a.last) ||
       RANK[a.kind] - RANK[b.kind] ||
       (a.at?.start ?? 0) - (b.at?.start ?? 0) ||
-      a.title.localeCompare(b.title, undefined, { numeric: true }),
+      collation({ numeric: true }).compare(a.title, b.title),
   );
 }
 

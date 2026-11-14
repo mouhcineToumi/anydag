@@ -19,15 +19,16 @@ failed on both.
 
 | Where | Owns |
 |---|---|
-| `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, updates |
+| `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, the updater's wiring |
+| `desktop/updates.ts` | the update state machine: `idle · checking · downloading · ready · manual · error`, the six-hour re-check, the install; no Electron import |
 | `desktop/forward.ts` | a page request sent on to the server over `node:http`, and let go of when the page lets go |
-| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key |
+| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the system's locale, the updates (`state`, `onChange`, `check`, `install`) |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
 | `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Twelve things are load-bearing:
+Eighteen things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
@@ -41,7 +42,18 @@ Twelve things are load-bearing:
   watcher's own package was packed rather than unpacked — it resolved only because a from-source
   rebuild happened to mark it native. `!node_modules/**/*` and then the five runtime modules by name
   is the list now (19 MB), and `npmRebuild: false`: the watcher is N-API and prebuilt, and a
-  rebuild from its `binding.gyp` cannot cross-compile, which is what the macOS job does.
+  rebuild from its `binding.gyp` cannot cross-compile, which is what the macOS job does. The
+  watcher's C++ headers, install script and Flow types are excluded too, as is the CLI's
+  `meta.json`, which only `cli/anydag.mjs` in a checkout reads (#302).
+- **Only three of Chromium's 55 locale packs ship**: `en-US`, `fr` and `ar` (`electronLanguages`,
+  #302), which took the AppImage from 132.2 to 130.1 MiB and the unpacked app from 314.0 to
+  306.7 MiB (the table is in `limits.md`, *Disk*). A pack holds Chromium's own strings — spelling
+  suggestions, form validation, the date picker — but it is also **the page's default locale**: on a
+  system whose language has no pack, Chromium runs in `en-US`, so `navigator.language` and `Intl`'s
+  default are `en-US` there (measured: `de` before, `en-US` after, on `LANG=de_DE.UTF-8`; French and
+  Arabic unchanged). A date the page formats with no locale named is a US date on a German system
+  until the page asks the main process for `app.getSystemLocale()` (#304). A language #265 adds
+  needs its pack added here, or its own speakers get `en-US`.
 - **Each macOS architecture is its own build, from one job.** Not universal: that is both Electrons
   in one bundle for everybody. One job, so there is one `latest-mac.yml` naming both zips, and
   `electron-updater` picks the one whose name says its arch. `npm ci` installs only the runner's
@@ -54,7 +66,8 @@ Twelve things are load-bearing:
   (`-c.mac.identity=-`) — an Apple Silicon Mac runs nothing unsigned, and the hardened runtime's
   default entitlements turn library validation off so the watcher loads. The shell is rebuilt with
   `ANYDAG_SIGNED`, because an ad-hoc macOS app cannot update itself (Squirrel.Mac checks the new
-  version against a designated requirement an ad-hoc signature does not have), so it does not try.
+  version against a designated requirement an ad-hoc signature does not have), so it does not try:
+  it still asks whether a newer version exists, and the answer is `manual` (see *Updates*).
   electron-builder skips signing on a pull request, ad hoc included, so `CSC_FOR_PULL_REQUEST` is
   set when there is no certificate to protect. `desktop.yml` is handed no secrets at all.
 - **Electron and electron-builder's tools come from npmmirror in CI, not GitHub's release
@@ -65,6 +78,41 @@ Twelve things are load-bearing:
   pins, and `package.mjs` writes those same `checksums.json` into Electron's cache as
   `SHASUMS256.txt-<version>`, so the zip electron-builder unpacks is checked against them too rather
   than against the mirror's `SHASUMS256.txt`.
+- **Updates are the app's own state, not the operating system's notification** (#268).
+  `checkForUpdatesAndNotify()` is gone: `desktop/updates.ts` calls `checkForUpdates()` and turns the
+  updater's events into one `UpdateState` — `idle`, `checking`, `downloading` (with a percent),
+  `ready`, `manual`, `error` — plus the new `version`, `checkedAt` (the last check that got an
+  answer) and `error`, a sentence the person can act on (*Could not reach GitHub…*), never a stack;
+  the raw message goes to the console. `main.ts` pushes every change to every window (`update:state`)
+  and the preload gives the page `updates.state()`, `onChange()`, `check()` and `install()`. The
+  module imports nothing from Electron; the updater, the clock, the timer and the two things the
+  shell does are handed in, so `test/desktop-updates.test.ts` drives it with a fake updater.
+  - **When it asks:** once after the first window, then every 6 hours while the app runs (a timer
+    that is `unref`ed, so it never keeps the process alive) — many people never quit — and when
+    Settings → About says *Check for updates*. One question at a time, and nothing while an update
+    is downloading, ready or waiting: those answers cannot change before the next launch. Only a
+    packaged app asks (`enabled`); `desktop:dev` and the smoke run never do, and the page then draws
+    no button and no update facts. The channel is still the version's own (`UPDATE_CHANNEL`).
+  - **A build that cannot install says `manual`** and downloads nothing (`autoDownload` is off): an
+    unsigned macOS build (`SIGNED`), and an AppImage whose file or folder the person cannot write
+    to (`canInstallUpdates`). The button then opens that version's release page —
+    `releases/tag/v<version>` — through `shell.openExternal`.
+  - **`install()` quits in the order a normal quit does, and only from the page's top frame**
+    (`fromPage`, the check `page:key` makes). The page writes what it holds first (it calls
+    `flushPending` before the call — see *Pending writes* in [`sidebar.md`](sidebar.md)); then
+    `prepareToQuit` sets `quitting` (so the child's exit is not read as "the server went") and runs
+    `stopServer()` — it closes the IPC channel the server was spawned with and waits for the child to
+    leave — and only then `quitAndInstall(false, true)`. The order matters on Windows, where the
+    installer starts inside `quitAndInstall` and the server would still hold the vault; and
+    `quitting` already being set is what lets `before-quit` through instead of running `quit()` and
+    `app.exit(0)` over the installer. If the install then fails (the updater emits `error` after
+    `quitAndInstall`, say a `.AppImage` that cannot be replaced), the state is `error`, `quitting` is
+    cleared and `restartServer()` brings the server back, so the app is whole again rather than
+    running with no server.
+  - **Not verified here:** the restart itself. A packaged app updating to a published release can
+    be run only on a published release, on each system; nothing in the suite does it. The state
+    machine and the quit order are held by the unit test against a fake updater, the page's half
+    by `e2e/update.spec.ts` against a stub of the bridge.
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to
@@ -122,6 +170,15 @@ Twelve things are load-bearing:
   Linux and Windows keep the system frame, and the browser has no bridge, so none of it applies.
   **Electron's drag region ignores what is drawn over it**: a scrim or a menu over the top 48px
   drags the window rather than taking the press, unless it is itself `no-drag`.
+- **Dates, times and sorting follow the system, not `navigator.language`** (#304). Chromium takes
+  the page's default locale from the locale pack it loads, and the app ships only the packs of the
+  languages it speaks (#302), so on a German system the page's default is `en-US`: a 12-hour clock,
+  month-first dates, English collation. The main process reads the system's own
+  (`app.getSystemLocale()`, which needs no pack), the preload hands it over as `locale`, and
+  `src/main.tsx` sets it in `src/locale.ts` before the first render. **A site that formats a date or
+  sorts words for a person passes `locale()` (or sorts with `collation()`) where it would pass
+  `undefined`**; one that names `"en"` does so because the words around it are English. The server
+  and the CLI never set it and keep Node's own.
 - **A load always names `index.html`.** `anydag://app/?x` canonicalises to a pathname of `//`, and
   the page's own `history.replaceState` then resolves to an address with no host, which Chromium
   refuses as another origin — the smoke run's `ready=never` before it was found.

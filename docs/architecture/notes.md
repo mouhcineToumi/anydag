@@ -35,7 +35,7 @@ Seven things are load-bearing:
   group whose JSON changed is turned back into Markdown — 4 ms a save on a 118 KB note, where
   serialising every group was 65 ms of main thread every quarter-second while somebody typed.
   Opening is dominated by remark's own parse, about 0.3 MB/s, the same parser `MarkdownItem` pays.
-- **The schema is the Markdown's.** Twelve blocks and four marks, `NOTE_BLOCKS`/`NOTE_STYLES`, and
+- **The schema is the Markdown's.** Thirteen blocks and four marks, `NOTE_BLOCKS`/`NOTE_STYLES`, and
   beside text two inline kinds of content, a reference and an equation; no
   underline, no toggle, no file, no colour (a colour the theme does not own — the *A custom colour*
   refusal). Leaving a block out of the schema is what takes it out of the menus; the slash menu is
@@ -133,6 +133,172 @@ refusal the boards make); a diagram inside a note (a fenced
 packages; a note's saved version history (undo is the editor's, for the session). A board's own `md` cards
 are edited in the same block editor, on the card, under the same rule — see *An md card's text, in
 place* in `editing.md`.
+
+## Note templates
+
+A **template** is an ordinary note in the vault's **templates folder**; *New note from template* makes
+a new note from one, with a few variables filled in, and the new note is a plain note from then on.
+The template's frontmatter is carried over as it is, so a template with a `status:` makes a task and
+one with a `start:` an event — those are notes with a line — and nothing else about it is special.
+
+    ---
+    title: "Meeting {{date}}"          Choosing it with the title "Q4 planning" makes
+    tags: [meeting]                    <folder>/Q4 planning.md:
+    ---                                  # Q4 planning
+    # {{title}}                          On 2026-11-14 at 09:30.
+    On {{date}} at {{time}}.
+
+| Where | What it does |
+|---|---|
+| Settings → This vault → Files and images → *Templates folder* | the vault's `dag:templates`, relative to its root; empty is `Templates`, **used only when that folder exists** |
+| the sidebar | **New note from template…** in the New menu and in a folder's menu, which makes in that folder |
+| the search card | a miss offers *New note “…” from template…*, the words typed being the title |
+| the leader key | `space m`, on a board and on every other page — refused while the app is locked, as every chord that makes something is |
+| the dialog (`src/ui/TemplatePicker.tsx`) | a **title** field first, with the caret in it, then the templates; Enter in the field makes the note when there is one template, and focuses the list when there are several; with none it says where templates live and offers **Add starter templates** |
+| `GET /__board/templates` · `POST /__board/from-template` · `POST /__board/templates/starters` | the list, the note made, and the three starters — over MCP `template_list`, `note_from_template`, `template_starters` |
+
+Eight things are load-bearing:
+
+- **The folder is a vault setting, and the server reads it.** `Vault.templatesFolder()` is the setting,
+  else `Templates` *if the folder exists on disk*, else none — asked of the disk each time, so a folder
+  made in a file manager is the templates folder at once and **nothing here ever creates it**: opening a
+  vault writes nothing, the dialog writes nothing, and a setting that names a folder that is not there
+  holds no templates. It is a vault preference like `dag:attachments` (`VAULT_PREF_KEYS`, in the vault's
+  bundle, `Session.reconfigure` re-reading it when the bundle is written, and a `tree` event when the
+  folder it names changes so every page reads the list again), because the server must know it to leave
+  templates out of what it answers.
+- **Variables are filled once, by one pure module.** `src/note/template.ts` — no browser, no `@/` — reads
+  `{{title}}`, `{{date}}` (`YYYY-MM-DD`), `{{time}}` (`HH:mm`) and `{{date:FORMAT}}`, with blanks allowed
+  inside the braces. **Anything else between braces is left exactly as written** (`{{note}}`, `{{date:}}`,
+  a Handlebars snippet), and a single pass fills the text, so a title that itself says `{{date}}` is not
+  filled again. `FORMAT` is Moment's tokens — `YYYY YY MMMM MMM MM M DD D dddd ddd HH H hh h mm m ss s A
+  a`, `[text]` copied as it is, any other character itself — in **English, fixed**, so one template makes
+  one text on every machine. There is no escape for a literal `{{date}}`, and no logic: Templater-style
+  scripting and applying a template to a note that exists are out.
+- **"Today" is the reader's zone.** The moment is read with `wallOf(at, zone)` in the zone Settings →
+  Calendar names (`zoneOf` in `server/routes/docs.ts`, the vault's, then the app's, then the machine's),
+  never `Date`'s local getters: a note made at 23:30 UTC is the 15th in Tokyo.
+  `test/template.test.ts` holds it, a zone's clock change included.
+- **A value in the frontmatter stays YAML.** Inside the block each line is filled by its quoting: a
+  `"…"` value has `\` and `"` escaped, a `'…'` value has `'` doubled, and a plain one is quoted (JSON) when
+  what was put in no longer reads back as the string it is — `title: {{title}}` with "Plan: Q4 #1" — a
+  title always a string even when it is `2026`, while `due: {{date}}` and `year: {{date:YYYY}}` stay a
+  date and a number. The body is text and takes a value as it is.
+- **The note is filed the way `/create` files any text**: a typed title is the name (verbatim, numbered if
+  taken, in the folder asked for) and wins over a `title:` the template fills in; with none, the template's
+  own title names it, else it starts *Untitled* — `{{title}}` reading *Untitled* — and its page asks for the
+  title first, as New note's does. **The template's `id:` is taken off**: a note made from one is its own
+  document, and a copy of the id would be two documents answering to one.
+- **A template is no task, project or event — and is still a note.** `Vault.tree()`, the change feed and
+  `/__board/index` leave a template out of `tasks`, `projects` and `events` (so the Tasks page, the
+  sidebar's count and glyphs, Due soon, `task_list` and `event_list` all agree without a line of their
+  own), and out of the sidebar's title: **a template is called by its file's name**, because its
+  `title:` is the new note's and may say `{{date}}`. `/__board/list` carries `templates`, the folder, so
+  the calendar — which draws a *note* on the day it was made — leaves the folder out (`itemsOf`).
+  A template stays in the file list, in search and in backlinks like any note, and its own page shows
+  its real frontmatter. What a template *makes* (`makes` in the list, and the mark on its row) is read
+  off the text **as it would be filled**, since `start: {{date}}` is no date until it is.
+  **The kept listing (#280) holds the same rule** (`KeptListing.wanted`, given the folder it was made
+  with), and a templates folder that moves — renamed in Settings, or a `Templates` folder made or
+  removed by hand — drops it, so the next listing walks: which notes are tasks changed for every note in
+  the folder at once. The index's per-document answers and the list's JSON are cached with the folder
+  too (`routes/docs.ts`). `test/server/kept.test.ts` holds both.
+- **The starters are written only when asked.** `src/note/starters.ts` is *Meeting*, *Daily* and *ADR*,
+  written by `POST /__board/templates/starters` into the templates folder (`Templates` when none is named),
+  making the folder, and **never over a name that is taken**, in any kind. None carries a `status:` or a
+  `start:` (an ADR's status is a word in its text: `status: accepted` would be no task's), and the person
+  edits, renames and deletes them like any note.
+- **A template's braces are not YAML, and the parsers do not complain about it.** `due: {{date}}` is a flow
+  map holding a flow map, which `yaml` warns about on every parse — to the server's stderr and the page's
+  console, where a warning fails a browser spec. `src/note/quiet.ts`'s `QUIET` (`logLevel: "error"`) is
+  passed by every parser that reads a note's frontmatter: errors still throw, warnings are not printed.
+
+Names claimed, grepped first: `dag-templates`, `dag-templates__where`, `dag-templates__none`,
+`dag-templates__problem`, `data-dag-templates`, `data-dag-templates-title`, `data-dag-templates-close`,
+`data-dag-templates-empty`, `data-dag-templates-starters`, `data-dag-templates-problem`,
+`data-dag-templates-failed`, `data-dag-template`, `data-dag-template-makes`,
+`data-dag-sidebar-new-template`, `data-dag-hits-new-from-template`, `data-dag-setting-templates`,
+`data-dag-setting-templates-problem`, the preference `dag:templates`, and the leader chord `space m`.
+
+**Out, and why:** templates for boards, quizzes and tables (a board already has `src/board/templates.ts`
+for items — a later issue); logic or scripting; applying a template to a note that exists; and a
+templates folder the app makes unasked.
+
+## Callouts
+
+A quote whose first line names a kind is a **callout**, as GitHub and Obsidian write one, and it is
+drawn as one everywhere Markdown is drawn — the note editor, `?view=1`, a snapshot, the PDF, an
+embedded note, a board's text card, a quiz, the Assistant's words.
+
+    > [!warning] Breaking change
+    > The `/api/boards` route is gone in 0.6.
+
+| Written | Is |
+|---|---|
+| `> [!tip]` on the quote's first line | a callout of that kind, headed with its word (`Tip`) |
+| `> [!tip] Title` | the same, headed with the title |
+| `> [!tip]- Title`, `> [!tip]+ Title` | one that folds: drawn shut, or open |
+| GitHub's `note` `tip` `important` `warning` `caution`; Obsidian's `abstract` `info` `todo` `success` `question` `failure` `danger` `bug` `example` `quote` | each drawn in its own hue and icon |
+| Obsidian's aliases — `summary` `tldr` `hint` `check` `done` `help` `faq` `attention` `fail` `missing` `error` `cite` | drawn as the kind they name, kept as written |
+| any other word, `> [!aside]` | drawn as a `note`, headed with its own word, kept as written |
+| `> [!two words]`, `> **[!note]**`, `> [!note]text`, a first line ending in a hard break | a plain quote, as before |
+
+| Where | It |
+|---|---|
+| `src/note/callout.ts` | the grammar: the kinds and aliases, `splitCallout`, the house form's first line, and `remarkCallouts` for every read-only renderer |
+| `src/note/markdown.ts` | `calloutBlock` (a quote → a `callout` block) and `calloutMd` (back) |
+| `src/note/schema.ts` | `CALLOUT_CONFIG`, its keyboard, and the HTML a paste goes through |
+| `src/render/Callout.tsx` | each kind's hue and icon, and `CalloutAside`, the `aside` `remarkCallouts` makes |
+| `src/blocks/callout.tsx` | the editor's frame and head, `/Callout`, and `[!tip]` typed in a quote |
+
+Six things are load-bearing:
+
+- **One decision, on the tree.** `splitCallout` decides what a callout is from the parsed quote, and
+  the bridge and `remarkCallouts` both ask it, so the editor and every page agree on which quotes
+  are callouts — `test/note-callout.test.ts` holds them to each other on the cases where Markdown
+  is close: a first line is everything before the first soft break, and a first line that does not
+  end inside text — a hard break, a link or code span running onto the next line — is not a
+  callout.
+- **The file keeps its words.** `kind` is the word as written (`NOTE` stays upper case, `hint` stays
+  `hint`, an unknown word stays itself) and `title` is the rest of the first line *as bytes*, so a
+  title with Markdown in it is written back exactly; the editor shows it as the text it is, and the
+  pages draw its Markdown. Changing the kind in the editor keeps the file's case: `[!NOTE]` becomes
+  `[!WARNING]`.
+- **The house form is GitHub's.** An edited callout is written `> [!kind]fold title`, then its text
+  and blocks as a quote under that line. Where the body would run into the first line — a title
+  ending in a backslash makes its line end a hard break — a blank `>` line goes between them, which
+  is the same callout; which of the two is decided by reading both back, not by guessing at
+  Markdown's rules. Its text is the body's first paragraph, and the body's other blocks are its
+  children; a first line standing alone with the body after a blank line reads as the same block, so
+  it is written the short way once somebody edits it. The callout is a raw node in the writer's tree,
+  so it is indented in a list or a quote like anything else, and its equations are found by parsing
+  it, for the dollar check.
+- **The box is the block's frame.** The editor's callout draws its box in `renderFrame`, and
+  BlockNote puts the block's text and its child blocks in the frame's slot, so a callout of three
+  paragraphs is one tinted box, as on a page. The head — the icon with the kind's `<select>` laid
+  over it, the title's `<input>`, the chevron — is chrome outside the slot, whose events and DOM
+  BlockNote leaves alone; the kind and title are props written with `updateBlock`, the title on Enter
+  or blur. Enter in its text starts its body, Enter on an empty last line of the body leaves it, and
+  Backspace at its start makes it a quote again (`CALLOUT_KEYBOARD`).
+- **The colours are the theme's ten hues.** Each kind maps onto one (`CALLOUT_LOOK`), and `quote`
+  onto none — the theme's quiet greys. They are bound on the box as `--callout-h` and `--callout-t`,
+  never `--dag-h`, which a callout in a hued card would otherwise inherit. In `neutral`, whose hues
+  are greys on purpose, the icon tells the kinds apart. The box takes a code block's padding and the
+  quote's bar; nothing in `markdown.css` names a length.
+- **Folding writes nothing.** A page draws a folding callout as `<details>`, so opening one is the
+  browser's; the editor's chevron is the frame's own state. `-` and `+` only say how it is drawn when
+  the note opens.
+
+Names claimed, grepped first: `dag-callout*` (`dag-callout__head`, `__icon`, `__title`, `__body`,
+`__chevron`, `__slot`, `__text`, `__pick`, `__kind`, `__fold`, `dag-callout--editor`),
+`data-dag-callout`, `data-dag-callout-word`, `data-dag-callout-title`, `data-dag-callout-fold`,
+`data-dag-callout-open`, `data-dag-callout-kind`, `data-dag-callout-title-field`,
+`data-dag-callout-fold-button`, `data-dag-callout-text`, `data-dag-callout-children`, and the custom
+properties `--callout-h` and `--callout-t`.
+
+**Out, and why:** a person's own kinds (Obsidian's CSS snippets — a colour the theme does not own);
+a callout inside a callout beyond what a quote already holds; and a search result naming a callout
+rather than a quote, which is what it still is to the index.
 
 ## Equations
 

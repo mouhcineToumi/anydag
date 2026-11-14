@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { remarkWikilinks } from "@/refs/wikilinks";
 
 import { remarkAnchors } from "@/note/anchors";
+import { remarkCallouts } from "@/note/callout";
 import { remarkMath } from "@/note/math";
 import { urlTransform } from "@/refs/Ref";
 import { AssetUrlContext, ownAssets } from "@/render/assets";
@@ -14,8 +15,9 @@ import { AssetUrlContext, ownAssets } from "@/render/assets";
  * already a URL — the same rule `ImageItem` follows for a board. The note editor reads this; a page
  * drawing a note read-only asks `AssetUrlContext`, which is this unless the page is a share link's.
  */
-/* GFM, equations between dollars, and a block's `^id` taken off its words. */
-const PLUGINS = [remarkGfm, remarkMath, remarkAnchors, remarkWikilinks];
+/* GFM, equations between dollars, a block's `^id` taken off its words, and callouts — after the
+   anchors, so a callout keeps its first paragraph's. */
+const PLUGINS = [remarkGfm, remarkMath, remarkAnchors, remarkWikilinks, remarkCallouts];
 
 export function resolverFor(name: string) {
   return (src: string) => ownAssets(name, src);

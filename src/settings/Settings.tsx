@@ -43,6 +43,7 @@ import { SettingsFeedback } from "./feedback";
 import { narrow } from "./narrow";
 import { needsAttention } from "./providerStatus";
 import { useProviders } from "./useProviders";
+import { anyAiOn } from "./aiSwitch";
 import { useSettings } from "./useSettings";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
@@ -77,25 +78,6 @@ const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   shortcuts: Keyboard,
   about: Info,
 };
-
-/** Whether Settings is up, and on which tab it was asked to open — the state each page keeps. */
-export interface SettingsOpen {
-  /** The tab a request named; absent is "where the last one left off". */
-  tab?: SettingsTab;
-}
-
-/**
- * The state a page holds for the modal, and the three ways it is changed: a request that names a tab
- * (the switcher's *Vault settings…*, the account menu), `ctrl+,` which toggles it, and a close.
- * One hook for the three pages that draw it, so the rule is written once.
- */
-export function useSettingsOpen() {
-  const [open, setOpen] = useState<SettingsOpen | null>(null);
-  const show = useCallback((tab?: SettingsTab) => setOpen({ tab }), []);
-  const toggle = useCallback(() => setOpen((v) => (v ? null : {})), []);
-  const close = useCallback(() => setOpen(null), []);
-  return { open, show, toggle, close };
-}
 
 /**
  * What the *app* does, as opposed to what a board says — a modal whose tabs are grouped by **where
@@ -166,7 +148,10 @@ export function Settings({
      while the answer is on its way, which is why the unknown hides them too. */
   const features = useFeatures();
   const cloud = features?.cloud === true;
-  const sections = useMemo(() => drawnSections(SECTIONS, { cloud, board: boardOpen }), [cloud, boardOpen]);
+  /* With every AI feature off (#296) there is nothing for a provider to answer, so its tab goes. */
+  const settings = useSettings();
+  const ai = anyAiOn(settings);
+  const sections = useMemo(() => drawnSections(SECTIONS, { cloud, board: boardOpen, ai }), [cloud, boardOpen, ai]);
   const groups = useMemo(() => sections.filter((s): s is TabGroup<SettingsGroup> => s.group !== "foot"), [sections]);
   const foot = useMemo(() => sections.find((s) => s.group === "foot")?.tabs ?? [], [sections]);
   const walked = useMemo(() => sections.flatMap((s) => s.tabs), [sections]);
@@ -249,7 +234,6 @@ export function Settings({
 
   /* A dot on AI providers when a provider somebody uses cannot answer: the diagrams' provider (the
      server's default when none is chosen), and the Assistant's when one is chosen. */
-  const settings = useSettings();
   const [llm] = useProviders();
   const attention = needsAttention(llm, [
     settings.llm.provider,

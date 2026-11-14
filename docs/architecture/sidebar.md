@@ -32,7 +32,7 @@ because a new person has not learned the key yet. **The toggle is one button in 
 top-left corner that never moves** (Claude.ai's arrangement): `Shell` draws it above the
 column and the page, and the docked header or the toolbar keeps a slot for it.
 
-Fourteen things are load-bearing:
+Fifteen things are load-bearing:
 
 - **The shell is above both pages, which is the whole reason it exists.** `App` renders a `NoteApp`
   or a `BoardApp` and never both, so a sidebar inside either would be torn down and rebuilt on every
@@ -47,6 +47,28 @@ Fourteen things are load-bearing:
 - **The dock is this board, and the sidebar is the app.** Settings left the dock's `⋯` for the
   sidebar's foot, and a dock with nothing to edit now draws
   nothing at all rather than a menu of nothing.
+- **The foot's Update button (#268).** When the desktop app has a new version, **Update** sits
+  in the foot's Settings row, to the right of *Settings* (`.dag-sidebar__setrow`; Settings' label is
+  what gives way, so it never wraps). It is a `Button` (`secondary`, `sm`; `md`, so 44px, in the phone's
+  sheet) with the version in its tooltip, and it is there in two states only: **`ready`**, *Update*,
+  which restarts into the downloaded version, and **`manual`**, *Download update* with an
+  external-link glyph, which opens the release page on a build that cannot install it (an unsigned
+  Mac, an AppImage it cannot write to). While the shell is checking or downloading, and when there
+  is nothing newer, **nothing is drawn**: the foot never changes under a person's pointer for
+  something they did not ask for. With no desktop bridge — `anydag serve`, `npm run dev`, any
+  browser — `useUpdates()` is `null` and the button is never rendered. The state is the shell's
+  (`desktop/updates.ts`, [`desktop.md`](desktop.md) *Updates*) and arrives through
+  `window.anydagDesktop.updates`; `src/ui/updates.ts` is the page's hook and the click's action.
+  `data-dag-update="ready|manual"` is the e2e hook.
+  **Pending writes.** A restart must not lose text still on its debounce, so a writer that can hold
+  some registers with `src/ui/pendingWrites.ts` (`registerPendingWrites`) — the note editor
+  (`NoteView`), a quiz's and a table's file (`useDocFile`), and the practice answers
+  (`practice.ts`) — and `installUpdate` awaits `flushPending()` before it asks the shell to quit. A
+  board's own edits commit when the gesture ends, and a card being typed in commits when the click
+  on the button takes its focus. A click flushes, then calls `install()`, and the button says
+  *Restarting…* and cannot be pressed twice. The tabs and open documents come back because they are
+  the page's own `localStorage` and the vault's own files. `pagehide` is still the net under all of
+  it: each of those writers also sends what it holds as the window goes.
 - **The tree is flat rows with a depth**, `rows()` in `src/ui/tree.ts`, rather than nested
   elements: `aria-level`, `aria-setsize` and `aria-posinset` are said on each row, the keyboard walks
   the rows in order (the WAI tree pattern: arrows, Home, End, → into a folder, ← to its parent, F2 to
@@ -56,6 +78,43 @@ Fourteen things are load-bearing:
   **A row's `⋯` and a folder's `+` live inside its `role="treeitem"`**, because they act on that
   row; the tree owns only treeitems and groups. The loading line, *Nothing here yet* and a refused
   create sit beside it rather than in it, so the tree is never a tree with a paragraph in it.
+- **Only the rows in view, and a margin, are in the DOM** (#281). A folder of 5,000 files was 5,000 rows,
+  90,000 elements and 6.7 s to draw (`limits.md`); it is a window of about forty rows now, so what it
+  costs is the tree's height, not the folder's size. `src/ui/virtual.ts` is the window with no DOM in it
+  (`offsetsOf`, `windowFor`, `scrollFor`, `drawn`; `test/virtual.test.ts`), and it is hand-written rather
+  than `@tanstack/react-virtual` because the tree's other code has to ask *where is row i* and *which
+  rows are drawn*, and a library keeps both behind its own element: the rows have two heights, both
+  known from the list, so a prefix sum is all the library would have added. Five things hold it up:
+  - **Every line is `position: absolute` at its offset** inside a `role="tree"` as tall as the whole list,
+    so a row's place never depends on the rows before it being drawn, which is what lets a pinned row stay
+    put while the rows around it come and go. A row's height is the stylesheet's — `--sidebar-row` (30px, the
+    sheet's 44px) and `--sidebar-empty` on `.dag-sidebar__tree` — **read from the computed style, not repeated
+    in the component**, so the phone's rows are CSS's to say. A line with its box open is nominally a row's
+    height (`.dag-sidebar__line--ask` has no vertical padding on the sheet, for that); a mistake of a few
+    pixels moves where the *next* window starts, never what is drawn.
+  - **Nothing asks the page for a row.** The arrows, Home, End, shift-and-arrow, a shift-click's range,
+    ←'s parent and the reveal all work from `lines`, `order` and `rowIndex` (key → index) and then
+    `focusRow(key)`: scroll it into view (`reveal`), and focus it when it is in the DOM — straight away, or
+    on the commit that draws it (`wanted`, honoured once and only within a second, so a row that never
+    comes cannot take the focus later). `querySelector` on a row is only for a row somebody pressed.
+  - **Two rows are drawn whatever the window says**: the tab stop (`stopKey`, which is what Tab reaches
+    and where the focus is while it is in the tree) and the one a question is open on, which holds a rename
+    box with half a name in it. Both keep their offset, so scrolling away from either leaves it where it was.
+  - **A drag is painted, and the rows it fades are read at render.** `data-dag-sidebar-lifted` is put on the
+    rows that are in the DOM when it lifts, and `liftedKeys` is read by every row that is drawn afterwards,
+    so one the glide scrolls into view is as faded as the rest; the drop mark (`data-dag-sidebar-over`) is
+    on whichever row is under the pointer, and `OVERSCAN` (12 rows, 360px) is what makes that row exist
+    when the glide has scrolled the list under a still pointer: the scroll event that draws more rows is a
+    frame later than `aim()`. `GLIDE_SPEED` is 16px a frame.
+  - **`aria-setsize` and `aria-posinset` were already said on every row**, which is the half of a
+    virtual tree that a nested one gets from its markup; nothing about what a screen reader is told
+    changed.
+
+  A spec that needs a row far down the list cannot `scrollIntoViewIfNeeded` it — it is not in the page.
+  `e2e/sidebar-virtual.spec.ts` shows the three ways round that: a key that walks to it, a scroll
+  measured from a row that is drawn, and the end of the list. (The first draw of a large vault was also
+  half a second of `localeCompare(b, undefined, { numeric: true })`, which builds its collator on every
+  call; `tree.ts` keeps one.)
 - **Every file operation lives here and only here.** A row's `⋯`, a right-click and `shift+F10` open
   one menu; a folder's `+` makes things in it, and that row menu's **New in “<folder>”…** opens the
   New menu scoped to that folder — the way a folder is filled on a phone, where the `+` is hidden
@@ -73,6 +132,10 @@ Fourteen things are load-bearing:
   hover icons, and a control in two places is two places to keep in step, so it lost them.
   `Delete` is deliberately not a key: undo is a version of a board's *text* and never reaches the
   file.
+- **New note from template is a row of the New menu, and of a folder's menu** — *Note from template…* /
+  *New note from template…* — which makes nothing itself: it opens the dialog that asks for a title and a
+  template (`openTemplates({ folder })`, a store like the Assistant's, drawn by `Shell`). See *Note
+  templates* in [`notes.md`](notes.md).
 - **Make, then name — and the name is the title**. The New menu, a folder's `+`, a
   duplicate and the welcome card all make a file under `untitled` (numbered if taken) carrying
   `title: Untitled` (`blankBoardText`, `blankNoteText`), open it, and name it **where its title is
@@ -147,8 +210,8 @@ Fourteen things are load-bearing:
   since what is under a still pointer changed. A folder move says *Moving “name”…* under the tree
   while it runs and the server's reason there when it is refused.
 - **The open file's row is brought into view once per open file, not on every change in the list.**
-  The effect that shows it (`"center"`, and only when it is out of view) depends on `lines.length` so
-  that it can find the row when the list arrives after the file does, and `lines.length` is also
+  The effect that shows it (`reveal(i, "center")`, and only when it is out of view) depends on `rowIndex` so
+  that it can find the row when the list arrives after the file does, and `rowIndex` changes with
   every file or folder anyone makes or removes anywhere in the vault. Run on each of those it pulled
   the list back to the open row whenever a person had scrolled away from it — and undid a drag's
   glide a few pixels a frame as fast as another writer added a row. `shownKey` remembers which file

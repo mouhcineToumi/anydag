@@ -166,6 +166,55 @@ describe("a trash manifest the vault did not write", () => {
   });
 });
 
+describe("a record or a manifest that breaks what lists it (#9)", () => {
+  async function get(route: string): Promise<{ status: number; json: any }> {
+    const session = new Session(env.home, env.vault, "test");
+    const app = createApp({ session, token: "t", page: null });
+    const res = await app.request(route, { headers: { host: "127.0.0.1", "x-anydag-token": "t" } });
+    return { status: res.status, json: await res.json().catch(() => null) };
+  }
+
+  async function post(route: string, body: unknown): Promise<number> {
+    const session = new Session(env.home, env.vault, "test");
+    const app = createApp({ session, token: "t", page: null });
+    const res = await app.request(route, {
+      method: "POST",
+      headers: { host: "127.0.0.1", "x-anydag-token": "t", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.status;
+  }
+
+  it("lists the vault past a files record whose path climbs out of it, and reads nothing there", async () => {
+    await env.vault.putFile("attachments/report.pdf", PDF, null);
+    expect((await get("/__board/list")).status).toBe(200);
+    write(env.root, ".anydag/files/abcdefghjk.json", JSON.stringify({ path: "../../../x.pdf", title: "planted" }));
+    write(env.root, ".anydag/files/abcdefghjm.json", JSON.stringify({ path: "/etc/x.pdf" }));
+    write(env.root, ".anydag/files/abcdefghjn.json", "null");
+
+    const list = await get("/__board/list");
+    expect(list.status).toBe(200);
+    expect(list.json.files).toEqual(["attachments/report.pdf"]);
+    expect((await get("/__board/index")).status).toBe(200);
+    // The records are not anybody's to delete on the vault's behalf.
+    expect(fs.existsSync(path.join(env.root, ".anydag", "files", "abcdefghjk.json"))).toBe(true);
+  });
+
+  it("lists, restores and empties the trash past an entry.json holding null", async () => {
+    await env.vault.create("plan", "board", BOARD);
+    const gone = await env.vault.trash("plan", "board");
+    write(env.root, ".anydag/trash/4ppjybn22v/entry.json", "null");
+    write(env.root, ".anydag/trash/4ppjybn22w/entry.json", "[]");
+
+    const listed = await get("/__board/trash");
+    expect(listed.status).toBe(200);
+    expect(listed.json.entries.map((e: { id: string }) => e.id)).toEqual([gone.id]);
+    expect(await post("/__board/trash/restore", { id: gone.id })).toBe(200);
+    expect(fs.existsSync(path.join(env.root, "plan.board.md"))).toBe(true);
+    expect(await post("/__board/trash/empty", {})).toBe(200);
+  });
+});
+
 describe("a folder that claims another vault's id", () => {
   it("gets a fresh id, and leaves the original's link and recent row alone", () => {
     const session = new Session(env.home, env.vault, "test");

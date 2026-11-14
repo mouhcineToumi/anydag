@@ -14,20 +14,26 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/app.ts` | the gate — the `Host`, then the token — which vault a request means, the routes, and the built page |
 | `server/context.ts` | the `Session`: the open vaults, `?vault=<id>` through `AsyncLocalStorage`, so no route learned there is more than one |
 | `server/vault.ts` | the store over a folder: every kind listed and foldered, names that are titles, ids in frontmatter, attachments, the watcher |
+| `server/listing.ts` · `list-worker.ts` | the listing as the disk gives it — the walk, every stat and frontmatter read — and the worker it runs on |
+| `server/kept.ts` | the listing kept between answers while the vault is watched, and the tree it makes, changed only where something moved |
 | `server/home.ts` | the app's home — `ANYDAG_HOME`, else the platform's data folder — and its `node:sqlite` index |
-| `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on |
+| `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on: a process, ended when idle |
+| `server/parsing.ts` · `pace.ts` | the texts of `/index` and `/corpus` read, parsed and kept where the grammar runs · a whole-vault loop in slices |
+| `server/parse-store.ts` · `searching.ts` | what the grammar parsed, kept in `<home>/parse.sqlite` · a vault's corpus and search, answered in the worker |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
 
-Seven things are load-bearing:
+Nine things are load-bearing:
 
 - **Nothing the app needs to be correct lives only outside the vault.** A document's id is `id:` in
   its frontmatter; an attachment's is `<vault>/.anydag/files/<id>.json`; a vault's own id and
   settings are in `<vault>/.anydag/`. The SQLite file in the app's home maps id → path, created,
   title and kind so the app, the CLI and MCP agree without walking the vault, and it is an index:
-  delete it and the next open rebuilds it, losing practice records and nothing else. **SQLite is
-  never in the vault**, because a sync tool copies a database while it is written.
+  delete it and the next open rebuilds it, losing practice records and nothing else. Beside it,
+  `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1: delete it and the
+  next question parses the vault again. **SQLite is never in the vault**, because a sync tool copies
+  a database while it is written.
 - **Frontmatter wins.** Two files with one id — a copy made in a file manager — keep it for the
   older by created date, and the copy is given a new id, written into it. A file moved outside the
   app keeps its id and the index learns the new path from the watcher.
@@ -38,6 +44,57 @@ Seven things are load-bearing:
 - **Nothing the store may do may block sync**: no single shared index file in
   the vault, `.git/ .stversions/ *.sync-conflict-* *.icloud .trash/` ignored, the sha1 base, the 409 and
   `merge3` kept, and opening never writes.
+- **No request waits behind the listing** (#283). `Vault.tree()` — what `/__board/list`, `/index`,
+  `/corpus` and every other whole-vault read start from — walks the folder and reads every text's
+  frontmatter on a worker (`server/list-worker.ts`, which keeps each text's frontmatter against its
+  stat, so a second listing reads only what changed), sends it back in parts asked for one at a time,
+  and brings the index into line in slices of 8 ms, each its own transaction, handing the thread back
+  between them; `/__board/list` writes its 9 MB of JSON a key at a time the same way. On 50,000 files
+  the first listing held every request for 5 s, the board the person opened included, and a warm one
+  for 1.1 s; now none waits more than about 40 ms for either. Two things keep it correct now
+  that it is no longer one step: **a listing asked for while one runs waits for it and runs once more
+  for everyone who asked meanwhile**, so an answer is never older than its question; and **a move made
+  here while one walks or reconciles makes it start again** (`moves`, see *Things that will bite*),
+  three times and then on this thread. Where no worker is built beside the bundle (the unit suite) or
+  `ANYDAG_LIST_INLINE=1`, the same code lists inline, still reconciling in slices. **Nor behind
+  `/index` or `/corpus`** (#287): their texts are read on the grammar's worker, never on this
+  thread, and only what changed comes back — see *Search*.
+- **Nor behind opening a document the index has not seen** (#286). `/__board/get` answers with the
+  document's id, and on an app home that has never listed the vault — a first launch, a deep link
+  into an imported vault — a note with no `id:` used to have it found by a walk of the whole vault on
+  the server's thread: 5.7 s on 50,000 files. `Vault.rowNow` gives it its row alone instead: a text
+  with no id of its own has nothing to collide with, so it is minted the provisional id the walk would
+  have minted it, and one whose id the index does not hold keeps it. Only what needs the walk —
+  an attachment, whose id is a record that may name the path it was moved from, and a text whose id
+  the index holds at another path — waits for a listing (`row`), off this thread; a rename or a trash
+  that meets one walks here (`rowHere`), so the name it settled on cannot be taken in between. The id
+  answered is the one the next listing gives the file — see `given` in *Things that will bite*.
+- **A warm listing costs what changed, not what the vault holds** (#280). `anydag serve` — and so the
+  desktop app — watches each vault from the moment it opens it (`Session.watchVaults`), and while the
+  watcher runs `Vault` keeps its last listing (`server/kept.ts`): every document with its stat,
+  frontmatter and row, every folder with its mtime, and the tree they make. The next listing does
+  not walk. It reads every folder's mtime — a document made, renamed or deleted by anybody moves its
+  folder's, so what a folder holds is never older than the question, and on 50,000 files in 991
+  folders that is a millisecond — reads again each folder that moved and each path the watcher named
+  since, settles those documents' rows the way the walk's reconcile would, and makes a new tree
+  sharing every field nothing touched; while nothing moved it answers the same tree, and
+  `/__board/list` the same JSON. **A text written in place moves no folder, so it is the watcher's
+  to say**: it is in the listing once the watcher has reported it — the moment the change feed tells
+  the page, and before the page asks — and not before. A row written outside a listing says so
+  (`putRow`, `dropRow`), and it walks again whenever only a walk can say: more than 2,000 new or changed
+  texts at once, a document taking an id another still holds, an attachment with no row, an attachment
+  record somebody else wrote, the watcher reporting dropped events, a held duplicate fix released.
+  `/__board/index` reads only texts whose stamp moved — the stamp goes with each name to the `Reader`
+  on the grammar's worker (#287), which answers a text at the stamp it read it at without looking at
+  the disk — and resolves links again only for documents whose parse moved while no name or title
+  did. On 50,000 files a warm `/list` went from 1.1 s to about 25 ms and a warm `/index` from 2.9 s
+  to about 50 ms. **Why not the watcher alone,
+  or a stat-walk behind it every time**: the folder check costs a millisecond and makes every
+  addition, rename and deletion exact at the question, where the watcher reports a change about 75 ms
+  after it lands; a stat of every file would be 60–100 ms on every answer at 50k files to catch only an
+  in-place write the watcher reports anyway. `ANYDAG_TEST_WATCH=1 npx vitest run test/server` runs the
+  store's contracts with every vault watched, which CI does beside the fast tier;
+  `test/server/kept.test.ts` compares the kept tree with a walk's after each kind of change.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
   there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
   see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a

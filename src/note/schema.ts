@@ -30,6 +30,7 @@ import {
   defaultStyleSpecs,
 } from "@blocknote/core";
 import Code from "@tiptap/extension-code";
+import { DOMParser as PMParser, Fragment, type Schema } from "@tiptap/pm/model";
 
 const code = createStyleSpecFromTipTapMark(Code.extend({ excludes: "" }), "boolean");
 
@@ -68,6 +69,18 @@ export const EQUATION_CONFIG = {
   content: "none",
 } as const;
 
+/**
+ * A callout: a quote whose first line names a kind (`src/note/callout.ts`). `kind` is the word as
+ * written — `NOTE`, `hint`, a word nobody knows — `title` the rest of that line as written, and
+ * `fold` its `-` or `+`. Its text is the body's first paragraph, and the body's other blocks are its
+ * children. Drawn with its icon, tint and title in `src/blocks/callout.tsx`; here as a quote.
+ */
+export const CALLOUT_CONFIG = {
+  type: "callout",
+  propSchema: { kind: { default: "note" }, title: { default: "" }, fold: { default: "" } },
+  content: "inline",
+} as const;
+
 const mathInline = createInlineContentSpec(MATH_CONFIG, {
   render: (ic) => {
     const dom = document.createElement("span");
@@ -84,6 +97,78 @@ const equation = createBlockSpec(EQUATION_CONFIG, {
     dom.textContent = block.props.tex;
     return { dom };
   },
+});
+
+/**
+ * A callout as HTML, and read back from it — which is how a paste of Markdown arrives: `mdToBlocks`,
+ * then BlockNote's lossy HTML, then its parser (`src/blocks/paste.ts`). The props ride on the
+ * element, its text in one child and its blocks in another, so nothing the editor draws around a
+ * callout — the kind's name, the title field — can be read back into its text. The editor's own
+ * spec (`src/blocks/callout.tsx`) writes the same shape.
+ */
+export const CALLOUT_ATTR = { word: "data-dag-callout-word", title: "data-dag-callout-title", fold: "data-dag-callout-fold" };
+
+export function calloutParse(el: HTMLElement): { kind: string; title: string; fold: string } | undefined {
+  /* Only the element below: a read-only page's callout, copied, carries the word too, and is read as the paragraphs it draws. */
+  if (!el.hasAttribute(CALLOUT_ATTR.word) || !el.querySelector(":scope > [data-dag-callout-text]")) return undefined;
+  return {
+    kind: el.getAttribute(CALLOUT_ATTR.word) || "note",
+    title: el.getAttribute(CALLOUT_ATTR.title) ?? "",
+    fold: el.getAttribute(CALLOUT_ATTR.fold) ?? "",
+  };
+}
+
+/** Its text, then its blocks as a group at the end — the shape BlockNote's own toggles hand back. */
+export function calloutParseContent({ el, schema }: { el: HTMLElement; schema: Schema }): Fragment {
+  const parser = PMParser.fromSchema(schema);
+  const text = el.querySelector(":scope > [data-dag-callout-text]");
+  const content = text
+    ? parser.parse(text, { topNode: schema.nodes.paragraph!.create(), preserveWhitespace: true }).content
+    : Fragment.empty;
+  const kids = el.querySelector(":scope > [data-dag-callout-children]");
+  if (!kids?.childElementCount) return content;
+  const group = document.createElement("div");
+  group.setAttribute("data-node-type", "blockGroup");
+  for (const k of Array.from(kids.childNodes)) group.appendChild(k.cloneNode(true));
+  const blocks = parser.parse(group, { topNode: schema.nodes.blockGroup!.create() });
+  return blocks.content.size > 0 ? content.addToEnd(blocks) : content;
+}
+
+/** The element `calloutParse` reads: a `div` with the props, holding its text and its blocks. */
+function calloutHTML(props: { kind: string; title: string; fold: string }): {
+  dom: HTMLElement;
+  contentDOM: HTMLElement;
+  childrenDOM: HTMLElement;
+} {
+  const dom = document.createElement("div");
+  dom.setAttribute(CALLOUT_ATTR.word, props.kind);
+  dom.setAttribute(CALLOUT_ATTR.title, props.title);
+  dom.setAttribute(CALLOUT_ATTR.fold, props.fold);
+  const contentDOM = document.createElement("p");
+  contentDOM.setAttribute("data-dag-callout-text", "");
+  const childrenDOM = document.createElement("div");
+  childrenDOM.setAttribute("data-dag-callout-children", "");
+  dom.append(contentDOM, childrenDOM);
+  return { dom, contentDOM, childrenDOM };
+}
+
+/** Enter in a callout's text starts its body; Enter on an empty last line of the body leaves it; Backspace at its start makes it a quote again. */
+export const CALLOUT_KEYBOARD = {
+  enter: "into-children",
+  emptyChildEnter: "exit-at-end",
+  resetsTo: { type: "quote" },
+} as const;
+
+const callout = createBlockSpec(CALLOUT_CONFIG, {
+  experimental_keyboard: CALLOUT_KEYBOARD,
+  parse: calloutParse,
+  parseContent: calloutParseContent,
+  render: () => {
+    const dom = document.createElement("blockquote");
+    dom.className = "dag-callout";
+    return { dom, contentDOM: dom };
+  },
+  toExternalHTML: (block) => calloutHTML(block.props),
 });
 
 const ref = createInlineContentSpec(REF_CONFIG, {
@@ -127,6 +212,7 @@ export const noteSchema = BlockNoteSchema.create({
     image: defaultBlockSpecs.image,
     embed: embed(),
     equation: equation(),
+    callout: callout(),
   },
   inlineContentSpecs: { ...defaultInlineContentSpecs, ref, math: mathInline },
   styleSpecs: {

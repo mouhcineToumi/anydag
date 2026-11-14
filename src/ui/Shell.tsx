@@ -60,18 +60,21 @@ import { openVault, transferFile, transferFolder, vaultsNow } from "@/vault/api"
 import { GONE, switchVault } from "@/vault/current";
 
 import { isLocked, refuseLocked } from "@/settings/lock";
+import { useAi } from "@/settings/useAi";
 import { useLockKey, useLockedRoot } from "./Lock";
 import { nameWhenOpened } from "./NoteTitle";
 import { nameInBar } from "./Toolbar";
-import { AssistantPanel } from "@/assistant/Panel";
+import { TemplatePicker } from "./TemplatePicker";
+import { closeTemplates, createFromTemplate, useTemplatePicker } from "./templates";
 import { IconButton } from "@/ui/controls";
-import { usePanel } from "@/assistant/panelState";
+import { closeAssistant, usePanel } from "@/assistant/panelState";
+import { AssistantPanel } from "./chunks";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
 import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
-import { ancestors, follow, keyOf, leaf, rebase, type Change } from "./tree";
+import { ancestors, follow, keyOf, leaf, parentOf, rebase, type Change } from "./tree";
 
 /**
  * What the sidebar is doing, for the one other place that has to know: the toolbar, which keeps
@@ -300,8 +303,14 @@ export function Shell({
   open(kind: FileKind, name: string | null): void;
   children: ReactNode;
 }) {
-  /* The Assistant's panel, down the right of whatever page is open (`space A`). */
+  /* The Assistant's panel, down the right of whatever page is open (`space A`). Turning the
+     Assistant off (#296) shuts it as well as hiding it, so turning it back on does not bring back
+     a panel nobody asked for. */
   const panel = usePanel();
+  const assistantOn = useAi().assistant;
+  useEffect(() => {
+    if (!assistantOn) closeAssistant();
+  }, [assistantOn]);
   const [docked, setDocked] = useState(() => readFlag(SIDEBAR, true));
   const narrow = useNarrow();
   /* Over the page, for a hover or for a narrow window's click. Two flags rather than one, because
@@ -837,6 +846,22 @@ export function Shell({
 
   const retitle = useCallback((kind: FileKind, name: string, title: string) => files.retitle(kind, name, title), [files]);
 
+  /* A note made from a template, by the title typed over it — opened the way every New opens its note. A
+     note asked for with no title starts *Untitled* and is named on its own page, as New note is; one the
+     template titled itself, or the person did, is open as it is, with no question left to ask. */
+  const picker = useTemplatePicker();
+  const makeFromTemplate = useCallback(
+    async (template: string, folder: string, title: string) => {
+      const made = await createFromTemplate(template, folder, title);
+      if ("error" in made) return made.error;
+      closeTemplates();
+      if (!title && /^Untitled( \d+)?$/.test(leaf(made.name))) nameWhenOpened(made.name);
+      onOpen("note", made.name);
+      return null;
+    },
+    [onOpen],
+  );
+
   const idOf = useCallback((name: string) => ids[name], [ids]);
   const ctl = useMemo<SidebarControl>(
     () => ({ docked: mode === "docked", reveal, create, renamed, retitle, idOf, home: openHome }),
@@ -945,10 +970,14 @@ export function Shell({
                 dismiss();
               }}
               assistantOpen={assistantOpen}
-              onAssistant={() => {
-                openAssistant();
-                dismiss();
-              }}
+              onAssistant={
+                assistantOn
+                  ? () => {
+                      openAssistant();
+                      dismiss();
+                    }
+                  : undefined
+              }
               trashOpen={trashOpen}
               onTrash={() => {
                 openTrash();
@@ -978,7 +1007,15 @@ export function Shell({
             />
           ) : null}
           {children}
-          {panel.open && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {panel.open && assistantOn && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {picker.open ? (
+            <TemplatePicker
+              folder={picker.folder ?? parentOf(board ?? note ?? quiz ?? table ?? file ?? "")}
+              title={picker.title}
+              onMake={makeFromTemplate}
+              onClose={closeTemplates}
+            />
+          ) : null}
           {trashed ? (
             <TrashNotice
               key={trashed.n}

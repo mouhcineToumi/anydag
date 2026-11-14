@@ -23,6 +23,7 @@ import {
   type QuestionInput,
 } from "@/quiz/write";
 import { ownAssets } from "@/render/assets";
+import { useAi } from "@/settings/useAi";
 import { startDrag } from "@/ui/pointerDrag";
 
 import { addCards } from "./generate";
@@ -604,6 +605,11 @@ export function QuizEditor({
   const [refused, setRefused] = useState<{ key: string; why: string } | null>(null);
   /* The flashcards dialog (#140): open while a model's cards are asked for and chosen from. */
   const [generating, setGenerating] = useState(false);
+  /* With Generate flashcards turned off (#296) the button goes, and so does a panel left open. */
+  const flashcards = useAi().flashcards;
+  useEffect(() => {
+    if (!flashcards) setGenerating(false);
+  }, [flashcards]);
   const root = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   /*
@@ -823,16 +829,18 @@ export function QuizEditor({
             <Plus size={16} strokeWidth={2} aria-hidden="true" />
             Add a flashcard
           </button>
-          <button
-            type="button"
-            className="dag-quiz__add"
-            data-dag-quiz-generate=""
-            title="A model writes flashcards from a topic or a note; you choose which to keep"
-            onClick={() => setGenerating(true)}
-          >
-            <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
-            Generate flashcards
-          </button>
+          {flashcards ? (
+            <button
+              type="button"
+              className="dag-quiz__add"
+              data-dag-quiz-generate=""
+              title="A model writes flashcards from a topic or a note; you choose which to keep"
+              onClick={() => setGenerating(true)}
+            >
+              <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
+              Generate flashcards
+            </button>
+          ) : null}
         </div>
         {generating ? (
           <GenerateCards

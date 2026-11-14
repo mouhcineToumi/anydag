@@ -26,12 +26,15 @@
  * none. That is the drift `check:skill` exists to catch one layer out, applied to a key table.
  */
 
+import type { AiSwitch } from "@/settings/aiSwitch";
+
 /** What a leader chord can ask for. `useEditor` maps each onto the callback that does it. */
 export type Command =
   | "select"
   | "hand"
   | "pen"
   | "note"
+  | "template"
   | "prompt"
   | "library"
   | "links"
@@ -74,6 +77,10 @@ export const WHICHKEY_MS = 400;
 /** In the order a person meets them, which is also the order the sheet prints. */
 export const BINDINGS: Binding[] = [
   { key: "n", command: "note", label: "A note under the pointer" },
+  /* `m` for a *model* note: not `t`, which is tidy's, and the one making binding that is not a card on
+     the board — it opens the dialog that asks for a title and a template, and the note it makes is
+     a file of its own. */
+  { key: "m", command: "template", label: "A new note from a template" },
   { key: "p", command: "prompt", label: "A prompt card: describe a diagram, and a model draws it" },
   { key: "l", command: "library", label: "The component library" },
   { key: "k", command: "links", label: "The links between items, as text" },
@@ -93,10 +100,26 @@ export const BINDINGS: Binding[] = [
   { key: "?", command: "help", label: "Every shortcut, on one sheet" },
 ];
 
-/** The binding a key press asks for, or nothing. */
-export function bindingFor(key: string): Binding | undefined {
+/**
+ * The commands that belong to an AI feature, and which one (#296). A feature that is off takes its
+ * chord with it: the key does nothing, and the overlay and the sheet do not list it.
+ */
+export const AI_COMMAND: Readonly<Partial<Record<Command, AiSwitch>>> = {
+  prompt: "prompts",
+  assistant: "assistant",
+};
+
+/** Whether a binding is live, given which AI features are on. */
+export function bindingOn(b: Binding, on: (feature: AiSwitch) => boolean): boolean {
+  const feature = AI_COMMAND[b.command];
+  return feature === undefined || on(feature);
+}
+
+/** The binding a key press asks for, or nothing — and nothing for a feature that is off. */
+export function bindingFor(key: string, on: (feature: AiSwitch) => boolean = () => true): Binding | undefined {
   const k = key.toLowerCase();
-  return BINDINGS.find((b) => b.key === k);
+  const b = BINDINGS.find((x) => x.key === k);
+  return b && bindingOn(b, on) ? b : undefined;
 }
 
 /**
