@@ -67,7 +67,7 @@ import { nameInBar } from "./Toolbar";
 import { TemplatePicker } from "./TemplatePicker";
 import { closeTemplates, createFromTemplate, useTemplatePicker } from "./templates";
 import { IconButton } from "@/ui/controls";
-import { closeAssistant, usePanel } from "@/assistant/panelState";
+import { closeAssistant, setPanelDocument, usePanel } from "@/assistant/panelState";
 import { AssistantPanel } from "./chunks";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
@@ -377,6 +377,18 @@ export function Shell({
     () => ({ board, note, quiz, table, file }),
     [board, note, quiz, table, file],
   );
+
+  /* What the Assistant's panel calls the document it is beside (#321). A chat belongs to one:
+     closing the panel and opening it again on the same page keeps the chat it had, and any other
+     page — another file, a list, Home — starts a new one. The Assistant's own page is not a move:
+     the panel is not drawn there, and going back to the file it was opened from should keep it. */
+  const place =
+    FILE_KINDS.map((kind) => (opened[kind] ? `${kind}:${opened[kind]}` : null)).find((key) => key !== null) ??
+    (tasksOpen ? "tasks" : calendarOpen ? "calendar" : quizzesOpen ? "quizzes" : trashOpen ? "trash" : "home");
+  useEffect(() => {
+    if (assistantOpen) return;
+    setPanelDocument(place);
+  }, [assistantOpen, place]);
 
   /* How many questions are in Mistakes, for the count beside Quizzes. Asked here rather
      than in the column, which mounts again on every peek: this is up for as long as the window is. */
