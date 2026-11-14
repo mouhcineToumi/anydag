@@ -105,6 +105,15 @@ export class Home {
     return this.sql("select * from docs where vault = ?").all(vault) as unknown as DocRow[];
   }
 
+  /** `docs`, a page at a time: up to `limit` rows whose id is after `after`, in id order. */
+  docsAfter(vault: string, after: string, limit: number): DocRow[] {
+    return this.sql("select * from docs where vault = ? and id > ? order by id limit ?").all(
+      vault,
+      after,
+      limit,
+    ) as unknown as DocRow[];
+  }
+
   docById(vault: string, id: string): DocRow | undefined {
     return this.sql("select * from docs where vault = ? and id = ?").get(vault, id) as unknown as DocRow | undefined;
   }
