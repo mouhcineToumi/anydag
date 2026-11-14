@@ -1,6 +1,6 @@
 # Search
 
-> The corpus on the server, the index in the page, ranking and snippets.
+> The corpus and the engine on the server, one query per request from the page, ranking and snippets.
 
 ## Search
 
@@ -27,13 +27,28 @@ folder, and Enter presses the board. Both go through the sidebar's own create
 asked for here or from the `+`, and the file that is made opens. A name that matched something is
 not a miss: the offers appear only when there is no name, no text and no folder.
 
-The design is **local-first, with the grammar on the server**, and it is a split of the work rather
-than a choice of platform. Parsing a search in the browser would mean parsing every board and
-every note on every keystroke, which is the slowest thing the page does (remark runs at
-about 0.3 MB/s). So the work goes where the parsers already are: `GET /__board/corpus` reads every
-text and cuts it into **units** in the server's grammar (`server/grammar.ts`, called in-process);
-the page fetches that while its search card is open, builds a MiniSearch index, and matches every
-keystroke with no round trip.
+The design is **the server matches, the page draws**. Parsing a search in the browser would mean
+parsing every board and every note on every keystroke, which is the slowest thing the page does
+(remark runs at about 0.3 MB/s), and an index built in the page from the vault's text cost, measured
+on 50,000 files, 20 s to the first answer and 821 MB of the page's heap — in every window, kept for as
+long as the page lived (#282). So the work stays where the parsers are: `GET /__board/corpus` reads
+every text and cuts it into **units** in the server's grammar (`server/grammar.ts`, called
+in-process), `GET /__board/search?q=` matches a query over them with one MiniSearch engine
+(`src/search/engine.ts`) and answers with the hits **and their snippets** (`Found`,
+`src/search/wire.ts`), and the page (`useSearch`, `ask.ts`) sends each query and draws the answer. The
+page never holds a document's text and does not import the engine, so nothing about the vault's
+size is in its heap but the file names the card lists. The CLI and an agent over MCP ask the same
+route, so all three rank one query the same way.
+
+**One request per paused query, and a newer one cancels it** (`src/search/ask.ts`, held by
+`test/search-ask.test.ts`). A query goes out 120 ms after typing pauses; asking again, clearing the
+box or closing the card aborts the request in flight, and an answer that arrives anyway is dropped, so
+a slow answer to `pay` never lands over the one to `payments`. What is drawn stays until the next
+answer replaces it, so the list does not blink between keys; `settled` says the answer is to the query
+now in the box, and *nothing matches*, the miss's offers and Enter on a hit wait for it. While the
+card is open the same query is asked again after the change feed says something moved (the debounce
+of `useIndex`: at most one wait after the *first* change), and since every query reads the vault, a
+word an agent wrote a moment ago is found on the next one.
 
 | Unit | Its `part` | Holds |
 |---|---|---|
@@ -51,18 +66,15 @@ Seven things are load-bearing:
 - **A block nothing has anchored is named by its line**, never by an anchor minted for the
   occasion. A search is a read, and writing ` ^name` into a note to link to it would turn it into a
   write into a file somebody may be typing in. A line is not a permanent name and does not need to
-  be: the corpus is at most one change old, and the link is followed the moment it is made. Lines are
+  be: the answer is read from the vault as it is at the query, and the link is followed the moment it is made. Lines are
   the **file's**, frontmatter counted, which is what a person or an agent would count; the editor
   takes the frontmatter off and `blockAt` in `src/note/markdown.ts` finds the block — a list item by
   its own line, off the span map rather than a second parse.
 - **Its own route, not more fields on `/index`.** The references index is read by every page that
   shows a backlink and is subscribed for as long as the page is up; this is the heavier of the two
-  and is read only while somebody is searching. `useCorpus` subscribes when the card opens and lets
-  go when it shuts, keeping what it had, so a card opened again shows the last answer at once and the
-  fresh one replaces it. While the card is open it follows the change feed with `useIndex`'s
-  debounce — at most one wait after the *first* change — so the index is kept updated
-  on edit. Both routes read the vault through one listing, so they cannot
-  disagree about what it holds.
+  and is read only while somebody is searching. The card subscribes to the change feed when it opens
+  and lets go when it shuts, and keeps nothing in between: the next open asks again. Both routes read
+  the vault through one listing, so they cannot disagree about what it holds.
 - **Only a text that changed is parsed again.** The `Parsed` cache in `server/grammar.ts` keeps each
   document's units against the sha1 of the text they came from and parses the rest. `/patch` runs in
   the server's own process too, so an uncached whole-vault parse after every change is a pause every
@@ -80,8 +92,12 @@ Seven things are load-bearing:
 - **A search keeps its engine.** Building MiniSearch is the cost, 3 s over 5,000 notes, and the
   query is not. `corpusOf` names the corpus with a `version` (the vault, the parse's `generation` and
   the names and titles), and `/search` sends the docs to the grammar once per version. After that it
-  sends the version alone and gets a 412 back if that engine is gone (a worker restarted). Warm, a
-  query is 0.25 s.
+  sends the version alone and gets a 412 back if that engine is gone (a worker restarted). Warm, the
+  engine answers in 20 to 60 ms; **what a query still costs is reading the vault**: `corpusOf` walks
+  it, reads every text and checks each against the parse cache on every call, about 0.5 s on
+  10,000 files (0.2 s the walk, 0.25 s the reading), so the first match on a vault that size is that
+  plus the 120 ms pause. That is the read an index kept on write replaces (#267), and the page's half
+  of the work does not change when it lands.
 - **Every word must match, and every word is a prefix** (`combineWith: "AND"`, `prefix: true`), so
   the list narrows as it is typed, the way the names above it do, and `pay sett` finds "payments
   settle". A word of five letters or more forgives one typo in five and a shorter one none; accents
