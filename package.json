@@ -94,7 +94,7 @@
     "@lezer/rust": "^1.0.3",
     "@lezer/yaml": "^1.0.4",
     "@mantine/core": "8.3.18",
-    "@mantine/hooks": "8.3.18",
+    "@mantine/hooks": "9.8.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@parcel/watcher": "^2.6.0",
     "@tiptap/core": "3.32.2",
