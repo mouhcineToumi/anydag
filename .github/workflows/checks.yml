@@ -69,6 +69,14 @@ jobs:
       # CI, in `scripts/gate.sh` and in `.githooks/pre-commit`. The script prints each step's name,
       # so a red run still says which one went red.
       - run: npm run checks
+      # The store's contracts once more with every test vault watched from the start, as `anydag
+      # serve` watches each vault it opens: what holds the kept listing (#280) to what a walk says.
+      # About 15 s, so here rather than in the commit hook.
+      - name: The store's contracts over a kept listing
+        env:
+          ANYDAG_TEST_WATCH: "1"
+          ANYDAG_CLOUD: "on"
+        run: npx vitest run test/server
 
   # typescript-eslint's three promise rules (`eslint.config.mjs`) over one program that includes
   # `e2e/` and `desktop/`, which no `tsc` step checks. About 40 s, so it is a job of its own beside the

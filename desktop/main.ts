@@ -851,6 +851,15 @@ async function whenReady(): Promise<void> {
   ipcMain.on("window:full-screen?", (event) => {
     event.returnValue = BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false;
   });
+  /* The system's locale, for the page's dates, times and sorting (#304). Chromium takes the page's
+     default from the locale pack it loads, and the app ships only the packs of the languages it
+     speaks, so on any other system `navigator.language` is `en-US`. These read the system without one.
+     Linux answers `und` when the system's locale is not installed (measured: `LANG=de_DE.UTF-8` on a
+     machine with only `en_US`), and the languages the person prefers still name it. */
+  ipcMain.on("system:locale", (event) => {
+    const system = app.getSystemLocale();
+    event.returnValue = (system && system !== "und" ? system : app.getPreferredSystemLanguages()[0]) || null;
+  });
   /* Where the `anydag` command is, so the AI tab's MCP lines work without it on the PATH. */
   ipcMain.on("cli:path", (event) => {
     event.returnValue = shimAt;

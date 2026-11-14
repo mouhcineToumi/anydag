@@ -15,9 +15,9 @@ import {
 import { itemName } from "@/board/types";
 import type { FileKind } from "@/board/useBoard";
 import { FileIcon } from "@/files/FileIcon";
-import { search, snippet, type Hit } from "@/search/engine";
 import { byDocument } from "@/search/results";
-import { useCorpus } from "@/search/useCorpus";
+import { useSearch } from "@/search/useSearch";
+import type { Found } from "@/search/wire";
 
 import { Dialog } from "./Dialog";
 import { useSidebar } from "./Shell";
@@ -191,10 +191,10 @@ export function BoardBrowser({
   /*
    * And what the words are *in*. The names above answer "which file is called that"; this
    * answers "where did I write that", across every board's items and every note's blocks, in one
-   * list. The corpus is read while this card is open and matched here, with no round trip per key.
+   * list. The server matches (`/__board/search`) and the page draws what it sends, so the page never
+   * holds the vault's text; a query goes out when typing pauses and a newer one cancels it.
    */
-  const corpus = useCorpus();
-  const hits = useMemo<Hit[]>(() => (corpus.engine && query.trim() ? search(corpus.engine, query) : []), [corpus.engine, query]);
+  const { hits, settled } = useSearch(query);
 
   /*
    * A file that matched by name is already a row; listing its blocks under the words would say the
@@ -210,9 +210,9 @@ export function BoardBrowser({
   const here = parentOf(board ?? note ?? quiz ?? table ?? file ?? "");
 
   /* A miss is no name, no text and no folder: there is nothing to show, so there is something to
-     make. Not while the corpus is still being read — a hit may be a moment away, and "nothing
+     make. Not while the answer is still on its way — a hit may be a moment away, and "nothing
      matches" must not become a button somebody presses before the answer lands. */
-  const miss = terms.length > 0 && corpus.loaded && shown.length === 0 && root.folders.length === 0 && hits.length === 0;
+  const miss = terms.length > 0 && settled && shown.length === 0 && root.folders.length === 0 && hits.length === 0;
 
   /**
    * Opening a board is what this is for, so it is also what closes it.
@@ -228,9 +228,9 @@ export function BoardBrowser({
 
   /** A match opens its document where the words are: the item, the block — or the top, for a title. */
   const openHit = useCallback(
-    (h: Hit) => {
-      if (onOpenAt) onOpenAt(h.doc.kind, h.doc.name, h.unit.part);
-      else onOpen(h.doc.kind, h.doc.name);
+    (h: Found) => {
+      if (onOpenAt) onOpenAt(h.kind, h.name, h.part ?? undefined);
+      else onOpen(h.kind, h.name);
       onClose();
     },
     [onOpenAt, onOpen, onClose],
@@ -273,7 +273,7 @@ export function BoardBrowser({
          with nothing at all, the first of the two offers — New board — is what Enter makes. */
       e.preventDefault();
       if (query.trim() && shown[0]) open(shown[0]);
-      else if (hits[0]) openHit(hits[0]);
+      else if (settled && hits[0]) openHit(hits[0]);
       else if (shown[0]) open(shown[0]);
       else if (miss) create("board");
     }
@@ -418,31 +418,29 @@ export function BoardBrowser({
                 /* With its place: two units of one document can share a part — two blocks with no
                      anchor on one line of a table, say — and a key React sees twice is a console
                      warning, which is a failed suite. */
-                key={`${h.doc.id}#${h.unit.part ?? ""}#${i}`}
+                key={`${h.id}#${h.part ?? ""}#${i}`}
                 type="button"
                 className="dag-hit"
-                data-dag-hit={h.doc.name}
-                data-dag-hit-kind={h.doc.kind}
-                data-dag-hit-part={h.unit.part ?? ""}
-                title={h.doc.name}
+                data-dag-hit={h.name}
+                data-dag-hit-kind={h.kind}
+                data-dag-hit-part={h.part ?? ""}
+                title={h.name}
                 onClick={() => openHit(h)}
               >
                 <span className="dag-hit__where">
-                  <KindMark kind={h.doc.kind} name={h.doc.name} />
-                  <span className="dag-hit__doc">{h.doc.title ?? leaf(h.doc.name)}</span>
-                  <span className="dag-hit__what">{WHAT[h.unit.what] ?? kindWord(h.unit.what)}</span>
+                  <KindMark kind={h.kind} name={h.name} />
+                  <span className="dag-hit__doc">{h.title ?? leaf(h.name)}</span>
+                  <span className="dag-hit__what">{WHAT[h.what] ?? kindWord(h.what)}</span>
                 </span>
                 <span className="dag-hit__text">
-                  {snippet(h.unit.text, h.terms).map((r, i) =>
-                    r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>,
-                  )}
+                  {h.runs.map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>))}
                 </span>
               </button>
             ))}
             {hits.length === 0 ? (
               <p className="dag-panel__empty" data-dag-hits-empty="">
-                {!corpus.loaded
-                  ? "reading the text of every board and note…"
+                {!settled
+                  ? "searching the text of every board and note…"
                   : shown.length === 0 && root.folders.length === 0
                     ? `nothing matches “${query}”`
                     : `no text matches “${query}”`}

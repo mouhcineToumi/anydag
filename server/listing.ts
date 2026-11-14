@@ -51,9 +51,7 @@ export interface Found {
   born: number | null;
 }
 
-export interface Listing {
-  docs: Listed[];
-  folders: string[];
+export interface Listing extends Walked {
   /** One per doc, in `docs`' order. */
   found: Found[];
 }
@@ -78,41 +76,118 @@ export function frontOf(kind: TextKind, text: string, stamp: string): Front {
   };
 }
 
-/** Every document of every kind, and every folder, sorted. Never follows a link. */
-export function walk(root: string, types: ReadonlySet<string>): { docs: Listed[]; folders: string[] } {
+/** One folder's own documents and folders, and its mtime read before them — `null` when it is gone. */
+export interface Scanned {
+  docs: Listed[];
+  folders: string[];
+  /** Both, in the folder's sorted order: a folder is a string. */
+  order: (Listed | string)[];
+  mark: number | null;
+}
+
+/**
+ * What one folder holds directly, by the walk's rules: sorted, nothing ignored or refused, no link
+ * followed, and `plan.md` beside `plan.note.md` listed once. Its mtime is read **before** its entries,
+ * so a change landing between the two moves it again and is not missed by whoever compares it.
+ */
+export function scanDir(root: string, rel: string, types: ReadonlySet<string>): Scanned {
+  const dir = rel ? path.join(root, ...rel.split("/")) : root;
+  const prefix = rel ? `${rel}/` : "";
+  let mark: number;
+  let entries: fs.Dirent[];
+  try {
+    mark = fs.statSync(dir).mtimeMs;
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return { docs: [], folders: [], order: [], mark: null }; // a folder listed a moment ago and gone now: the disk's other writer
+  }
+  entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const docs: Listed[] = [];
   const folders: string[] = [];
+  const order: (Listed | string)[] = [];
   const seen = new Set<string>();
-  const into = (dir: string, prefix: string): void => {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return; // a folder listed a moment ago and gone now: the disk's other writer
-    }
-    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    for (const e of entries) {
-      if (ignored(e.name)) continue;
-      const rel = prefix + e.name;
-      if (e.isDirectory()) {
-        if (refusal(rel)) continue;
-        folders.push(rel);
-        into(path.join(dir, e.name), `${rel}/`);
-        continue;
+  for (const e of entries) {
+    if (ignored(e.name)) continue;
+    const at = prefix + e.name;
+    if (e.isDirectory()) {
+      if (!refusal(at)) {
+        folders.push(at);
+        order.push(at);
       }
-      if (!e.isFile()) continue;
-      const found = classify(rel, types);
-      if (!found || refusal(found.name)) continue;
-      // `plan.md` beside `plan.note.md` is one name twice; the `.md` is the note.
-      const key = `${found.kind === "file" ? "file" : "text"}:${found.name.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      docs.push({ kind: found.kind, name: found.name, file: rel });
+      continue;
+    }
+    if (!e.isFile()) continue;
+    const found = classify(at, types);
+    if (!found || refusal(found.name)) continue;
+    // `plan.md` beside `plan.note.md` is one name twice; the `.md` is the note.
+    const key = `${found.kind === "file" ? "file" : "text"}:${found.name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const d: Listed = { kind: found.kind, name: found.name, file: at };
+    docs.push(d);
+    order.push(d);
+  }
+  return { docs, folders, order, mark };
+}
+
+/** What a walk found: every document and folder, and each folder's mtime (`""` is the root's). */
+export interface Walked {
+  docs: Listed[];
+  folders: string[];
+  marks: Record<string, number>;
+}
+
+/** Every document of every kind under `from` (the root when empty), and every folder, sorted. Never follows a link. */
+export function walk(root: string, types: ReadonlySet<string>, from = ""): Walked {
+  const docs: Listed[] = [];
+  const folders: string[] = [];
+  const marks: Record<string, number> = {};
+  const into = (rel: string): void => {
+    const s = scanDir(root, rel, types);
+    if (s.mark === null) return;
+    marks[rel] = s.mark;
+    for (const x of s.order) {
+      if (typeof x !== "string") docs.push(x);
+      else {
+        folders.push(x);
+        into(x);
+      }
     }
   };
-  into(root, "");
-  return { docs, folders };
+  into(from);
+  return { docs, folders, marks };
 }
+
+/**
+ * One document's stat and, for a text, its frontmatter — `had` again when the stat has not moved,
+ * read otherwise. A path that is a link, or that leads out of the vault (a folder swapped for a link
+ * after the walk), is not read: the walk never follows one, and neither does this.
+ */
+export function readFound(root: string, d: Listed, had: Front | undefined, inside: (abs: string) => boolean): Found {
+  const none: Found = { front: null, size: null, born: null };
+  const abs = path.join(root, ...d.file.split("/"));
+  let st: fs.Stats;
+  try {
+    st = fs.lstatSync(abs);
+    if (!st.isFile() || !inside(abs)) return none;
+  } catch {
+    return none;
+  }
+  const born = st.birthtimeMs || st.mtimeMs;
+  if (d.kind === "file") return { front: null, size: st.size, born };
+  const stamp = stampOf(st);
+  if (had?.stamp === stamp) return { front: had, size: null, born };
+  let text: string;
+  try {
+    text = fs.readFileSync(abs, "utf8");
+  } catch {
+    return { ...none, born };
+  }
+  return { front: frontOf(d.kind, text, stamp), size: null, born };
+}
+
+/** What says a text has not changed since it was read: its mtime, size and inode. */
+const stampOf = (st: fs.Stats): string => `${st.mtimeMs}:${st.size}:${st.ino}`;
 
 /**
  * The listing of one folder, keeping each text's frontmatter against the stat it was read at, so a
@@ -120,57 +195,42 @@ export function walk(root: string, types: ReadonlySet<string>): { docs: Listed[]
  */
 export class Lister {
   private fronts = new Map<string, Front>();
-  private realRoot: string | null = null;
 
   constructor(readonly root: string) {}
 
   list(types: ReadonlySet<string>): Listing {
-    const { docs, folders } = walk(this.root, types);
+    const { docs, folders, marks } = walk(this.root, types);
     const kept = new Map<string, Front>();
-    const found = docs.map((d) => this.find(d, kept));
+    const inside = insideOf(this.root);
+    const found = docs.map((d) => {
+      const f = readFound(this.root, d, this.fronts.get(d.file), inside);
+      if (f.front) kept.set(d.file, f.front);
+      return f;
+    });
     this.fronts = kept;
-    return { docs, folders, found };
+    return { docs, folders, marks, found };
   }
+}
 
-  /**
-   * One document's stat and, for a text, its frontmatter — read again only when the stat moved. A
-   * path that is a link, or that leads out of the vault (a folder swapped for a link after the walk),
-   * is not read: the walk never follows one, and neither does this.
-   */
-  private find(d: Listed, kept: Map<string, Front>): Found {
-    const none: Found = { front: null, size: null, born: null };
-    const abs = path.join(this.root, ...d.file.split("/"));
-    let st: fs.Stats;
-    try {
-      st = fs.lstatSync(abs);
-      if (!st.isFile() || !this.inside(abs)) return none;
-    } catch {
-      return none;
+/**
+ * Whether a regular file (`readFound` has `lstat`ed it) is inside `root`: its folder's real path is.
+ * A file that is not a link leads nowhere its folder does not, so each folder is resolved once —
+ * resolving every file was 250 ms of a listing of 50,000.
+ */
+export function insideOf(root: string): (abs: string) => boolean {
+  let real: string | null = null;
+  const dirs = new Map<string, boolean>();
+  return (abs) => {
+    real ??= fs.realpathSync(root);
+    const dir = path.dirname(abs);
+    let ok = dirs.get(dir);
+    if (ok === undefined) {
+      const resolved = fs.realpathSync(dir);
+      ok = resolved === real || resolved.startsWith(real + path.sep);
+      dirs.set(dir, ok);
     }
-    const born = st.birthtimeMs || st.mtimeMs;
-    if (d.kind === "file") return { front: null, size: st.size, born };
-    const stamp = `${st.mtimeMs}:${st.size}:${st.ino}`;
-    const had = this.fronts.get(d.file);
-    if (had?.stamp === stamp) {
-      kept.set(d.file, had);
-      return { front: had, size: null, born };
-    }
-    let text: string;
-    try {
-      text = fs.readFileSync(abs, "utf8");
-    } catch {
-      return { ...none, born };
-    }
-    const f = frontOf(d.kind, text, stamp);
-    kept.set(d.file, f);
-    return { front: f, size: null, born };
-  }
-
-  private inside(abs: string): boolean {
-    const real = (this.realRoot ??= fs.realpathSync(this.root));
-    const resolved = fs.realpathSync(abs);
-    return resolved.startsWith(real + path.sep);
-  }
+    return ok;
+  };
 }
 
 /* -- the thread ----------------------------------------------------------------------------- */
@@ -185,7 +245,7 @@ export type ListAsk = { id: number; root: string; types: string[]; walkOnly: boo
  */
 export type ListAnswer =
   | { id: number; docs: Listed[]; found: Found[] }
-  | { id: number; folders: string[] }
+  | { id: number; folders: string[]; marks: Record<string, number> }
   | { id: number; error: string };
 
 const PART = 2000;
@@ -193,7 +253,7 @@ const PART = 2000;
 /** A listing as the messages that carry it. */
 export function* parts(id: number, l: Listing): Generator<ListAnswer> {
   for (let i = 0; i < l.docs.length; i += PART) yield { id, docs: l.docs.slice(i, i + PART), found: l.found.slice(i, i + PART) };
-  yield { id, folders: l.folders };
+  yield { id, folders: l.folders, marks: l.marks };
 }
 
 let workerOverride: string | null | undefined;
@@ -239,7 +299,7 @@ class Thread {
       this.waiting.delete(m.id);
       if (!this.waiting.size) w.unref();
       if ("error" in m) at.no(new Error(m.error));
-      else at.ok({ docs: at.docs, folders: m.folders, found: at.found });
+      else at.ok({ docs: at.docs, folders: m.folders, marks: m.marks, found: at.found });
     });
     // A worker that died takes its questions with it; the next one starts a new worker.
     const gone = (e: Error) => {

@@ -48,6 +48,8 @@ import { watchZone } from "./calendar/usePrefs";
 import { pull } from "./settings/sync";
 import { startTelemetry } from "./telemetry/client";
 import { loadVaults } from "./vault/api";
+import { desktop } from "./vault/desktop";
+import { setLocale } from "./locale";
 import { settleVault, watchVault } from "./vault/current";
 import { watchWindowInset } from "./ui/windowInset";
 import "./styles/base.css";
@@ -112,6 +114,9 @@ const NoVaultPage = lazy(() => import("./ui/NoVaultPage").then((m) => ({ default
 async function start(): Promise<void> {
   if (new URLSearchParams(location.search).get("board")) warmLayout();
 
+  /* Before anything is drawn, so every date and every sorted list follows the system rather than
+     the desktop app's locale pack (`src/locale.ts`). A browser has no bridge and needs none. */
+  setLocale(desktop()?.locale);
   /* Before the first request, so that every one of them says which vault it is about. */
   watchVault();
   /* Before the first paint, so the top row never draws under the macOS traffic lights. */

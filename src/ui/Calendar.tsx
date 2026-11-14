@@ -57,6 +57,7 @@ import { withVault } from "@/vault/current";
 import { startDrag } from "./pointerDrag";
 import { TaskGlyph } from "./TaskGlyph";
 import { NO_PROJECT, type ProjectFilter } from "./Tasks";
+import { collation } from "@/locale";
 
 /**
  * The Calendar page: tasks, events and notes on one timeline, as a
@@ -220,7 +221,7 @@ export function CalendarView({
         .sort(
           (a, b) =>
             Number(a.project.status === "done") - Number(b.project.status === "done") ||
-            a.title.localeCompare(b.title, undefined, { numeric: true }),
+            collation({ numeric: true }).compare(a.title, b.title),
         ),
     [owners, list.projects, list.titles],
   );
