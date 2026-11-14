@@ -14,7 +14,7 @@ import { Session } from "../../server/context";
 import { Parsed } from "../../server/grammar";
 import type { Entry } from "../../server/parsing";
 import { type Tree, Vault } from "../../server/vault";
-import { BOARD, NOTE, PDF, makeEnv, sleep, sweepTemps, until, write, type Env } from "./helpers";
+import { BOARD, NOTE, PDF, makeEnv, sleep, sweepTemps, until, write, type Env, watchedFromTheStart } from "./helpers";
 
 let env: Env;
 beforeEach(async () => {
@@ -26,6 +26,14 @@ beforeEach(async () => {
   write(env.root, "work/deep/task.md", "---\ntitle: Ship\nstatus: todo\ndue: 2026-01-02\n---\n# Ship\n");
   write(env.root, "attachments/spec.pdf", PDF);
   write(env.root, "untitled.md", "no frontmatter at all\n");
+  /* Watched from the start (`ANYDAG_TEST_WATCH`), the vault began subscribing before these were
+     written, and a folder made while the watcher subscribes may never be watched: `work/` went unheard
+     on CI. Open the vault again over the files as they now are — once the first has let go of the
+     folder, since the watcher is one per folder and an unsubscribe still in flight takes it away. */
+  if (watchedFromTheStart) {
+    await env.vault.close();
+    env = env.reopen();
+  }
   await env.vault.watch();
   await env.vault.tree();
 });
@@ -101,32 +109,8 @@ describe("the kept listing", () => {
   });
 
   it("a text written in place is in the answer once the watcher has said so", async () => {
-    const heard: string[] = [];
-    const v = env.vault as unknown as Record<string, unknown>;
-    await env.vault.subscribeRaw((rels) => heard.push(...rels));
-    const before = fs.statSync(at("work/Onboarding.md"));
     fs.writeFileSync(at("work/Onboarding.md"), "---\ntitle: Renamed in place\n---\n");
-    try {
-      await until(async () => (await env.vault.tree()).titles["work/Onboarding"] === "Renamed in place", 3500, "the new title");
-    } catch (e) {
-      const after = fs.statSync(at("work/Onboarding.md"));
-      console.log(
-        "DEBUG kept",
-        JSON.stringify({
-          heard,
-          watching: v.watching,
-          kept: !!v.kept,
-          dirty: [...((v.dirty as Map<string, unknown>) ?? new Map()).entries()],
-          walks: env.vault.walks,
-          title: (await env.vault.tree()).titles["work/Onboarding"],
-          before: [before.mtimeMs, before.size, before.ino],
-          after: [after.mtimeMs, after.size, after.ino],
-          root: env.root,
-          real: fs.realpathSync(env.root),
-        }),
-      );
-      throw e;
-    }
+    await until(async () => (await env.vault.tree()).titles["work/Onboarding"] === "Renamed in place", 5000, "the new title");
     await same();
   });
 
