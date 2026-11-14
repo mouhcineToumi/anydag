@@ -467,8 +467,11 @@ export class Vault {
       const id = e.slice(0, -5);
       if (!validId(id)) continue;
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown };
-        if (typeof data.path === "string")
+        const data = JSON.parse(fs.readFileSync(path.join(dir, e), "utf8")) as { path?: unknown; title?: unknown } | null;
+        /* The record syncs, and anybody who writes the folder writes it: a `path` no vault name can
+           be — `../../x.pdf` — is a record of nothing, dropped like one that does not parse. Kept, it
+           reached `abs()`, which refused it, and that refusal failed the whole listing (#9). */
+        if (data && typeof data.path === "string" && refusal(data.path) === null)
           out.set(id, { path: data.path, title: typeof data.title === "string" && data.title ? data.title : null });
       } catch {
         /* a half-synced file: read again next time */
@@ -611,7 +614,18 @@ export class Vault {
     const filePaths = new Map([...fileIds].map(([id, v]) => [v.path.toLowerCase(), id]));
     // A record whose file is gone, and a file with no record: moved outside the app with the record
     // left behind. The bytes the app last saw it holding say whether they are one file.
-    const orphans = [...fileIds].filter(([, v]) => !exists(this.abs(v.path)));
+    // A path the vault refuses is no file of its own to lose: not an orphan, and never a throw.
+    const at = (rel: string): string | null => {
+      try {
+        return this.abs(rel);
+      } catch {
+        return null;
+      }
+    };
+    const orphans = [...fileIds].filter(([, v]) => {
+      const abs = at(v.path);
+      return abs !== null && !exists(abs);
+    });
     if (orphans.length) {
       for (const d of docs) {
         if (d.kind !== "file" || filePaths.has(d.file.toLowerCase())) continue;
@@ -1172,7 +1186,10 @@ export class Vault {
   private manifest(id: string): (Trashed & { docs: Record<string, Kept> }) | null {
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(fs.readFileSync(path.join(this.trashDir(id), "entry.json"), "utf8")) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(fs.readFileSync(path.join(this.trashDir(id), "entry.json"), "utf8"));
+      // `null` parses, and reading `.id` off it threw out of every trash route (#9).
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      data = parsed as Record<string, unknown>;
     } catch {
       return null;
     }
@@ -1312,7 +1329,14 @@ export class Vault {
     const out: Trashed[] = [];
     for (const n of names) {
       if (!validId(n)) continue;
-      const m = this.manifest(n);
+      /* One entry is one thing deleted, and one that cannot be read is skipped: a manifest is written
+         by whoever wrote the folder, and one that threw used to take the whole trash with it (#9). */
+      let m: (Trashed & { docs: Record<string, Kept> }) | null;
+      try {
+        m = this.manifest(n);
+      } catch {
+        continue;
+      }
       if (!m) continue;
       const { docs: _docs, ...entry } = m;
       out.push(entry);
