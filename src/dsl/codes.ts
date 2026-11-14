@@ -78,6 +78,15 @@ export const CODES = {
    */
   E_CHART_VALUE: "E_CHART_VALUE",
   /**
+   * A chart number the scale cannot be drawn with: a value, `min` or `max` larger than
+   * `CHART_LARGEST`, or a pinned `min`–`max` too narrow for its magnitude to hold two ticks.
+   *
+   * Both once hung the page: past one unit in the last place, adding a tick's step to a tick gives
+   * the same tick back, and the loop that lays them out never ended (#9). The value is a gap and the
+   * pin is dropped, as for `E_CHART_VALUE`, so the rest of the chart still draws.
+   */
+  E_CHART_RANGE: "E_CHART_RANGE",
+  /**
    * A second form line — `bar` and then `pie` in one chart.
    *
    * The form is the one thing a chart body says about itself before it says any data, and two of
