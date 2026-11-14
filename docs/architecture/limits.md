@@ -134,9 +134,22 @@ for 1k, 1.8 MB for 10k, 17.6 MB for 50k (`vault.*.home.size`), unchanged by a bu
 **Opening a vault wrote nothing to it** at any size, `.anydag/` included (`vault.*.open.writes`). The
 trash is the vault's (`<vault>/.anydag/trash/`) and is bounded by time, thirty days, not by size.
 
-The Linux installer: the AppImage is 132 MiB; unpacked it is 314 MB, of which the Electron binary is
-225 MB, `resources/` (the asar and the unpacked server) 40 MB, and `locales/` 7.8 MB for 55 locales
-(`en-US.pak` is 96 KB) — so `electronLanguages` (#267 item 7) saves about 7.7 MB unpacked, 2.5%.
+The Linux installer, measured with `npm run desktop:dist` (no bench group; `du --apparent-size`):
+
+| | Before #302 | After #302 | Change |
+|---|---|---|---|
+| AppImage | 132.21 MiB | 130.11 MiB | −2.10 MiB (−1.6%) |
+| Unpacked (`linux-unpacked/`) | 314.02 MiB | 306.72 MiB | −7.31 MiB (−2.3%) |
+| `locales/` | 7.64 MiB, 55 packs | 0.37 MiB, 3 packs | −7.27 MiB |
+| `resources/` (the asar and what is unpacked from it) | 40.20 MiB | 40.16 MiB | −37 KB |
+
+The Electron binary is 224 MiB of the unpacked tree and the rest of Chromium (`resources.pak`,
+`icudtl.dat`, the licences, SwiftShader) another 42 MiB; none of it is the app's to cut. The
+`resources/` that is the app's holds no source maps, tests or docs: the page's bundle is 21 MiB of the
+asar (the emoji sets, the icon set, ELK and pdf.js the largest), and the unpacked server and CLI 18 MiB
+— each with its own grammar and listing workers, because the CLI serves in-process. #302 kept only
+the English, French and Arabic locale packs (`electronLanguages`) and dropped what the watcher's
+package carries for a build from source, and the CLI's `meta.json`.
 
 ### What bears on #267
 
