@@ -8,8 +8,15 @@
  *
  * **Every file but `chat.json` is written once**, so two machines never edit one file and sync never
  * has to merge one. Ids sort by time and carry the device, so the order needs no index and two
- * machines never mint the same one. What is this machine's alone — the device id, and the provider
- * session a turn can resume — is kept in the home's `kv`, never in the vault.
+ * machines never mint the same one. What is this machine's alone — the device id, the provider
+ * session a turn can resume, and the other vaults the person let a chat reach — is kept in the
+ * home's `kv`, never in the vault.
+ *
+ * **A grant is authority, so it is never read from the vault** (#9). `chat.json` syncs, and anyone
+ * who writes the vault's folder writes it: a `grant:<vault>` planted there would have let a chat
+ * read and change another vault with nobody asked. The person grants on this machine — the access
+ * card or the scope menu — and that is what `grants()` answers; a `grant:` key in the file is not
+ * read at all.
  */
 
 import fs from "node:fs";
@@ -19,7 +26,10 @@ import type { Home } from "../home";
 import { ALPHABET } from "../ids";
 import { writeAtomic } from "../vault";
 import { isOp } from "./record";
-import type { ChatMeta, ChatRow, Provider, Turn, UndoRecord } from "./types";
+import type { ChatMeta, ChatRow, Mode, Provider, Turn, UndoRecord } from "./types";
+
+/** What this machine let a chat reach: `null` is a grant taken back, kept so undo knows it was given once. */
+export type Grants = Record<string, { mode: Mode; at: string } | null>;
 
 const CHATS = ".anydag/chats";
 
@@ -217,6 +227,34 @@ export class ChatStore {
   remove(root: string, chat: string): void {
     fs.rmSync(dirOf(root, chat), { recursive: true, force: true });
     for (const p of ["claude", "opencode"] as const) this.home.set(sessionKey(chat, p), null);
+    this.home.set(grantsKey(chat), null);
+  }
+
+  /** The vaults the person let this chat reach, on this machine. A record that is not one is none. */
+  grants(chat: string): Grants {
+    const raw = this.home.get(grantsKey(chat));
+    if (!raw) return {};
+    let got: unknown;
+    try {
+      got = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+    if (!got || typeof got !== "object" || Array.isArray(got)) return {};
+    const out: Grants = {};
+    for (const [vault, g] of Object.entries(got as Record<string, unknown>)) {
+      if (g === null) out[vault] = null;
+      else if (g && typeof g === "object") {
+        const { mode, at } = g as { mode?: unknown; at?: unknown };
+        if ((mode === "ask" || mode === "edit") && typeof at === "string") out[vault] = { mode, at };
+      }
+    }
+    return out;
+  }
+
+  /** Grant `vault`, or take it back with `null`. Only the person's answer calls this. */
+  setGrant(chat: string, vault: string, grant: { mode: Mode; at: string } | null): void {
+    this.home.set(grantsKey(chat), JSON.stringify({ ...this.grants(chat), [vault]: grant }));
   }
 
   /** The provider session this machine can resume, and the model it was made on. */
@@ -236,3 +274,4 @@ export class ChatStore {
 }
 
 const sessionKey = (chat: string, provider: Provider): string => `chat-session:${chat}:${provider}`;
+const grantsKey = (chat: string): string => `chat-grants:${chat}`;
