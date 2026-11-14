@@ -11,7 +11,7 @@ import { setImmediate as yieldNow } from "node:timers/promises";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useListWorker } from "../../server/listing";
-import { BOARD, NOTE, PDF, QUIZ, TABLE, makeEnv, sweepTemps, write, type Env } from "./helpers";
+import { BOARD, NOTE, PDF, QUIZ, TABLE, makeEnv, sweepTemps, write, type Env, watchedFromTheStart } from "./helpers";
 
 let env: Env;
 beforeEach(() => {
@@ -139,7 +139,8 @@ describe("a listing beside other work", () => {
     expect(env.home.docById(env.vault.id, id!)).toBeUndefined();
   });
 
-  it("one asked for while another runs is never older than its question", async () => {
+  // Watched (`ANYDAG_TEST_WATCH`), the first listing waits for the watcher, and is newer than this asks.
+  it.skipIf(watchedFromTheStart)("one asked for while another runs is never older than its question", async () => {
     for (let i = 0; i < 2000; i++) write(env.root, `n/${i}.md`, "x\n");
     const first = env.vault.tree();
     write(env.root, "late.md", "---\ntitle: Late\n---\n");
@@ -206,12 +207,17 @@ describe("a document opened before the vault is listed (#286)", () => {
     expect((await env.vault.tree()).ids["zz-last"]).toBe(id);
   });
 
-  it("made after a listing walked and opened before it reconciled, its row outlives that listing", async () => {
-    for (let i = 0; i < 2000; i++) write(env.root, `n/${i}.md`, "x\n");
-    const listing = env.vault.tree();
-    write(env.root, "late.md", "no id\n");
-    const id = await env.vault.peekId("late", "note");
-    expect((await listing).notes).not.toContain("late");
-    expect((await env.vault.tree()).ids.late).toBe(id);
-  });
+  // Watched (`ANYDAG_TEST_WATCH`), the listing is the kept one, which reads the folder after the file
+  // is made: there is no walk to be older than it.
+  it.skipIf(watchedFromTheStart)(
+    "made after a listing walked and opened before it reconciled, its row outlives that listing",
+    async () => {
+      for (let i = 0; i < 2000; i++) write(env.root, `n/${i}.md`, "x\n");
+      const listing = env.vault.tree();
+      write(env.root, "late.md", "no id\n");
+      const id = await env.vault.peekId("late", "note");
+      expect((await listing).notes).not.toContain("late");
+      expect((await env.vault.tree()).ids.late).toBe(id);
+    },
+  );
 });

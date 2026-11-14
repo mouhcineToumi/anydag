@@ -69,9 +69,11 @@ Seven things are load-bearing:
   whole-vault parse after every change is a pause every drag then queues behind (measured: a 5 ms
   `/diagnostics` took 390 ms while four of them ran, and 5 ms again with the cache). The texts are
   read where they are parsed (`server/parsing.ts`): a `Reader` stats each file and reads one only when
-  its modified time, change time, size or inode moved. A warm `/index` still stats every file and
-  answers every document, 3 s on 50,000 files — off the server's thread, but the thing to replace
-  with an index kept on write (#280).
+  its modified time, change time, size or inode moved. **While the vault is watched it does not even
+  stat** (#280): the kept listing has each text's stamp (mtime, size, inode), each name goes to the
+  `Reader` with it, and a text the `Reader` read at that stamp is answered from what it kept. On
+  50,000 notes, reading and hashing every text was most of a warm `/index`'s 2.9 s; the same answer
+  and its JSON are kept while neither the listing nor the parse moved.
 - **A whole-vault parse is on a thread of its own** (`server/grammar-worker.ts`). `/index`,
   `/corpus` and `/search` go to a worker; everything else stays inline, being quick. Measured on
   5,000 notes, a cold `/index` is 14 s of parsing, and on the server's one thread it was every

@@ -25,14 +25,15 @@ long enough to read as hung, or that is refused.
 
 | Dimension | Works well up to | Degrades at | Breaks at |
 |---|---|---|---|
-| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 1.2 s (2.2 s before #283); first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 0.5 s, re-run after every change; a 1,000-file folder takes 1.6 s to draw; server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder 6.7 s and 90k DOM elements; a cold `/index` holds every other request for 1.7 s |
+| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 1.2 s (2.2 s before #283); first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 14 ms and 0.33 s after a burst of 200 writes (0.5 s and 2.3 s before #280); a 1,000-file folder takes 1.6 s to draw; server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder 6.7 s and 90k DOM elements; a cold `/index` holds every other request for 1.7 s |
 | **Board size** (items, one in ten a 6-node diagram) | **500** — 0.95 s to `data-dag-ready`, its renderer 285 MB | **2,000** — 5.7 s, its renderer 643 MB, 30k DOM elements | not reached at 2,000 |
 | **Diagram size** (`arch` nodes, ELK) | **200** — 0.9 s | **500** — 2.9 s | **1,000** — 8.3 s with nothing drawn until it is done |
 | **Attachment size** | **100 MB** — upload 0.26 s, read 0.17 s; the server peaks at 540 MB | **500 MB** — the server peaks at 1.6 GB and keeps it (#278) | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 5 ms |
 | **Note size** (words) | **1,000** — 0.5 s | **100,000** (≈ 600 KB) — 2.0 s | not reached at 100,000 |
 
 The vault limit is set by three things that scale with the vault rather than with what changed —
-search (#282, and #267's index), the listing and references index (#280), and the server's memory
+search (#282, and #267's index), the listing and references index (cold only since #280: warm, each
+costs what changed), and the server's memory
 (#279) — and the sidebar's tree (#281). None of them is the disk. Startup no longer is one: since
 #283 the listing runs off the server's thread and a board is drawn in about the same time at every
 vault size (*Startup*).
@@ -74,7 +75,8 @@ renderer Chromium keeps for the site, not the board — a fresh tab with the boa
 **A burst of 200 external writes** (an agent or a sync tool landing files) is heard in full by the
 change feed in 62–68 ms and costs the server 0.03–0.4 s of CPU at any vault size
 (`vault.*.burst.*`). What follows it is the cost: the page's next `/index` is 0.3 s at 1k files and
-3.1 s at 50k (#280).
+3.1 s at 50k before #280, and 0.33 s at 10k and 0.5–0.6 s at 50k since: only the 200 texts that moved
+are read, parsed and their links resolved again (`search.md`, `server.md`).
 
 ### Time
 
@@ -82,7 +84,9 @@ change feed in 62–68 ms and costs the server 0.03–0.4 s of CPU at any vault 
 |---|---|---|---|
 | server spawn to listening, vault opened | 164 ms | 168 ms | 167 ms |
 | `/__board/list` cold · warm | 168 · 25 ms | 1.1 s · 232 ms | 5.2 s · 1.1 s |
+| … warm since #280 | 3–4 ms | 12–37 ms | 24–63 ms |
 | `/__board/index` cold · warm | 1.4 s · 57 ms | 11.0 s · 540 ms | 53.0 s · 2.9 s |
+| … warm since #280 · after 200 external writes | 2–3 ms · 0.3–0.8 s | 14–16 ms · 0.33–0.35 s | 36–82 ms · 0.48–0.59 s |
 | `/__board/search` cold · warm | 2.3 s · 53 ms | 22.6 s · 513 ms | 113 s · 2.8 s |
 | a note opened in the page, to `data-dag-ready` | 0.7 s | 1.1 s | 3.4 s |
 | the search card's first match · next query | 0.8 s · 18 ms | 4.2 s · 111 ms | 20.0 s · 221 ms |

@@ -308,6 +308,11 @@ let parsedCount = 0;
  * and `/corpus` ask different ones of the same text). The texts are read and parsed where the
  * grammar runs (a `Reader`, `server/parsing.ts`): this thread names them, and holds what came back.
  * Pruned to what it is asked about on every call, so a deleted document does not stay cached.
+ *
+ * **A text whose stat has not moved is not read** (#280): an entry may carry the stamp — mtime, size,
+ * inode — the kept listing gave its text, and a `Reader` holding that text at that stamp answers from
+ * what it kept without touching the disk. On 50,000 notes, reading and hashing every text was most of
+ * a warm `/index`'s 2.9 s. The same map answers while nothing in it moved.
  */
 export class Parsed {
   private had = new Map<string, Doc | null>();
@@ -368,9 +373,11 @@ export class Parsed {
     await paced(entries, ([key]) => {
       if (!missing.has(key)) now.set(key, fresh.has(key) ? fresh.get(key)! : (this.had.get(key) ?? null));
     });
-    if (got.parsed || got.whole || now.size !== this.had.size) this.generation++;
-    this.had = now;
     this.since = { on, turn: got.turn };
+    // Nothing parsed again and nothing gone: the last map, so what was made of it can be kept (#280).
+    if (!got.parsed && !got.whole && now.size === this.had.size) return this.had;
+    this.generation++;
+    this.had = now;
     return now;
   }
 }
