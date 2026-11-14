@@ -6,6 +6,7 @@ import { remarkWikilinks } from "@/refs/wikilinks";
 
 import type { BoardItem } from "@/board/types";
 
+import { remarkCallouts } from "@/note/callout";
 import { remarkMath } from "@/note/math";
 import { refComponents, urlTransform } from "@/refs/Ref";
 
@@ -20,8 +21,8 @@ import { hueVars } from "./hue";
 let refs: Components | null = null;
 const REFS = (): Components => (refs ??= refComponents({ boards: false, placed: true }));
 
-/* GFM, and equations between dollars. One array, so a re-render hands react-markdown the same plugins. */
-const PLUGINS = [remarkGfm, remarkMath, remarkWikilinks];
+/* GFM, equations between dollars, and callouts. One array, so a re-render hands react-markdown the same plugins. */
+const PLUGINS = [remarkGfm, remarkMath, remarkWikilinks, remarkCallouts];
 
 /**
  * Markdown, including GFM tables.

@@ -421,6 +421,7 @@ title asking for one. What the editor holds:
 | `image` | `![alt](attachments/file.png "caption")`, relative to the note |
 | `embed` | `![Title](dag:<id>)` on a line of its own — a board drawn inside the note, another note as a card, an attachment's picture inline or its card |
 | `equation` | `$$` on a line, the TeX, `$$` on a line — or a ```` ```math ```` fence — drawn centred by KaTeX |
+| `callout` | a `>` quote whose first line is `[!kind]`, an optional title after it, and `-` (folded) or `+` (open) straight after the bracket to make it fold — GitHub's `note` `tip` `important` `warning` `caution` and Obsidian's `abstract` `info` `todo` `success` `question` `failure` `danger` `bug` `example` `quote`, with Obsidian's aliases (`hint`, `error`, `faq`, …); an unknown kind is drawn as a `note` and kept as written |
 
 **Equations are TeX between dollars, everywhere Markdown is drawn** — a note, a board's text card, a
 quiz: `$x^2$` in a line, and `$$\sum_i x_i$$` written mid-line is drawn centred on a line of its own.

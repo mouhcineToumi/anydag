@@ -72,6 +72,11 @@ describe("the slash menu", () => {
     image: { type: "image", props: { url: "n.assets/p.png", name: "p" } },
     embed: { type: "embed", props: { href: "dag:0123456789", title: "The plan" } },
     equation: { type: "equation", props: { tex: "x^2", fenced: false } },
+    callout: {
+      type: "callout",
+      props: { kind: "tip", title: "T", fold: "" },
+      content: [{ type: "text", text: "c", styles: {} }],
+    },
   };
   for (const type of NOTE_BLOCKS) {
     it(`a ${type} comes back from the file as a ${type}`, () => {
@@ -88,7 +93,7 @@ describe("the slash menu", () => {
   describe("a quiz field", () => {
     it("holds only blocks a note holds, and none of the quiz's own syntax", () => {
       for (const type of FIELD_BLOCKS) expect(NOTE_BLOCKS).toContain(type);
-      for (const type of ["heading", "checkListItem", "quote", "divider"]) expect(FIELD_BLOCKS).not.toContain(type);
+      for (const type of ["heading", "checkListItem", "quote", "divider", "callout"]) expect(FIELD_BLOCKS).not.toContain(type);
       for (const key of FIELD_SLASH_KEYS) {
         expect(SLASH_KEYS).toContain(key);
         expect(FIELD_BLOCKS).toContain(SLASH[key]);
