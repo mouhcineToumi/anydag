@@ -91,6 +91,20 @@ export type Settings = {
     provider: "claude" | "opencode" | null;
     model: string | null;
   };
+  /**
+   * Which AI features are drawn at all (#296). `ai` is the master switch: off, every feature is off
+   * whatever its own switch says, and each keeps its value for when the master is turned back on.
+   * Off means gone — no button, no shortcut, no page — not greyed out; `aiOn` in `aiSwitch.ts` is
+   * the one reading of the pair. All on by default, so an install that never opens the tab sees
+   * nothing change.
+   */
+  features: {
+    ai: boolean;
+    prompts: boolean;
+    rewrite: boolean;
+    flashcards: boolean;
+    assistant: boolean;
+  };
 };
 
 export const DEFAULTS: Settings = {
@@ -99,6 +113,7 @@ export const DEFAULTS: Settings = {
   export: { scale: 2, paper: true, margin: 4 },
   llm: { provider: null, model: null, reasoning: null },
   assistant: { provider: null, model: null },
+  features: { ai: true, prompts: true, rewrite: true, flashcards: true, assistant: true },
 };
 
 /** A write to any part of the settings object: one section, or several at once. */
@@ -108,18 +123,19 @@ export type SettingsPatch = {
   export?: Partial<Settings["export"]>;
   llm?: Partial<Settings["llm"]>;
   assistant?: Partial<Settings["assistant"]>;
+  features?: Partial<Settings["features"]>;
 };
 
-const SECTIONS = ["problems", "paste", "export", "llm", "assistant"] as const;
+const SECTIONS = ["problems", "paste", "export", "llm", "assistant", "features"] as const;
 
 /**
  * **Two homes for one object** (#191). `problems`, `paste` and `export` are the vault's, kept under
  * {@link STORE} and carried in the vault's bundle. `llm` and `assistant` — which model each AI feature
- * uses — are the person's, kept under `AI` (`prefs.ts`) and carried in the person's bundle, the same
- * in every vault. Every reader still gets one `Settings` from `readSettings`, and every writer still
+ * uses — and `features` — which AI features are drawn at all (#296) — are the person's, kept under
+ * `AI` (`prefs.ts`) and carried in the person's bundle, the same in every vault. Every reader still gets one `Settings` from `readSettings`, and every writer still
  * calls `writeSettings`: only where a section is stored moved.
  */
-const PERSON_SECTIONS = ["llm", "assistant"] as const;
+const PERSON_SECTIONS = ["llm", "assistant", "features"] as const;
 type PersonSection = (typeof PERSON_SECTIONS)[number];
 const isPerson = (k: string): k is PersonSection => (PERSON_SECTIONS as readonly string[]).includes(k);
 
@@ -168,6 +184,9 @@ export function normalise(raw: unknown): Settings {
   const e = o.export ?? {};
   const l = o.llm ?? {};
   const ast = o.assistant ?? {};
+  const f = o.features ?? {};
+  /* A switch is off only when it says so: a missing or junk value is the default, which is on. */
+  const flag = (v: unknown, fallback: boolean): boolean => (typeof v === "boolean" ? v : fallback);
   const max = p.maxWidth;
   /* A provider this build dropped reads as Automatic, and its model goes with it: a Gemini model
      name means nothing to whichever provider the default now is. */
@@ -199,6 +218,13 @@ export function normalise(raw: unknown): Settings {
     assistant: {
       provider: ast.provider === "claude" || ast.provider === "opencode" ? ast.provider : null,
       model: ident(ast.model),
+    },
+    features: {
+      ai: flag(f.ai, DEFAULTS.features.ai),
+      prompts: flag(f.prompts, DEFAULTS.features.prompts),
+      rewrite: flag(f.rewrite, DEFAULTS.features.rewrite),
+      flashcards: flag(f.flashcards, DEFAULTS.features.flashcards),
+      assistant: flag(f.assistant, DEFAULTS.features.assistant),
     },
   };
 }
@@ -238,7 +264,7 @@ export function readSettings(): Settings {
      there: a vault's old `llm` is read once, by `migrate.ts`, and never again. */
   const vault = stored(storageKey(STORE)) ?? {};
   const person = stored(storageKey(AI)) ?? {};
-  return normalise({ ...vault, llm: person.llm, assistant: person.assistant });
+  return normalise({ ...vault, llm: person.llm, assistant: person.assistant, features: person.features });
 }
 
 /** Merge a patch into what is stored, section by section, and tell the window. */
@@ -250,6 +276,7 @@ export function writeSettings(patch: SettingsPatch): Settings {
     export: { ...now.export, ...patch.export },
     llm: { ...now.llm, ...patch.llm },
     assistant: { ...now.assistant, ...patch.assistant },
+    features: { ...now.features, ...patch.features },
   });
   write(next, Object.keys(patch));
   announce(now, next, patch);
@@ -258,7 +285,7 @@ export function writeSettings(patch: SettingsPatch): Settings {
 
 /**
  * Store `next`, in the home of each section `touched` names: the vault's key when any of the vault's
- * sections changed, the person's when either AI section did. A write to one never rewrites the other,
+ * sections changed, the person's when an AI section did. A write to one never rewrites the other,
  * so picking a model does not stamp the vault's bundle, nor an export scale the person's.
  */
 function write(next: Settings, touched: readonly string[]): void {
@@ -273,7 +300,7 @@ export function vaultPart(s: Settings): Omit<Settings, PersonSection> {
 
 /** The person's sections of a whole settings object: what `dag:ai` carries. */
 export function personPart(s: Settings): Pick<Settings, PersonSection> {
-  return { llm: s.llm, assistant: s.assistant };
+  return { llm: s.llm, assistant: s.assistant, features: s.features };
 }
 
 /**

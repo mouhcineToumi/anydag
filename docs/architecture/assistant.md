@@ -12,6 +12,10 @@ change, every change can be undone, and the scope menu grants another vault Read
 bar's sparkle) and a full page at `?chat=<id>|new|1` with every chat down the side and the
 chat's change blocks in a Changes column.
 
+**It can be turned off** from Settings → AI (#296), alone or with every AI feature: the sidebar
+row, the sparkle, `space A` and the panel go, and `?chat=` opens home. See *Turning AI off* in
+[`settings.md`](settings.md).
+
 **The page with no chat is a welcome, not an empty thread.** `?chat=new`, or `?chat=1` in a vault
 with none, draws a short greeting with the composer centred under it, focused, and no title:
 the history's New chat row is the only control that says those words. The first message makes the

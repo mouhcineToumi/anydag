@@ -318,21 +318,35 @@ export function EmptyBoard({
   locked?: boolean;
   onNote(): void;
   onLibrary(): void;
-  onPrompt(): void;
+  /** Absent with prompt cards turned off (#296): the card offers the other two, and says so. */
+  onPrompt?(): void;
 }) {
   const chord = (c: "note" | "library" | "prompt") => chordFor(c);
   const blocked = lockedAffordance(locked);
   const acts: { key: string; label: string; hint: string; icon: typeof FileText; go(): void; lead?: boolean }[] = [
     { key: "note", label: "A note", hint: chord("note") ?? "Space N", icon: FileText, go: onNote },
     { key: "library", label: "The library", hint: chord("library") ?? "Space L", icon: LibraryBig, go: onLibrary },
-    { key: "prompt", label: "Describe a diagram", hint: chord("prompt") ?? "Space P", icon: Sparkles, go: onPrompt, lead: true },
+    ...(onPrompt
+      ? [
+          {
+            key: "prompt",
+            label: "Describe a diagram",
+            hint: chord("prompt") ?? "Space P",
+            icon: Sparkles,
+            go: onPrompt,
+            lead: true,
+          },
+        ]
+      : []),
   ];
   return (
     <div className="dag-welcome__layer" data-dag-empty-board="">
       <section className="dag-welcome dag-welcome--empty" aria-label="An empty board">
         <p className="dag-welcome__hint">
           {locked
-            ? "Read only: unlock to add a note, open the library, or describe a diagram."
+            ? onPrompt
+              ? "Read only: unlock to add a note, open the library, or describe a diagram."
+              : "Read only: unlock to add a note or open the library."
             : "An empty board. Double-click anywhere for a note, or start with"}
         </p>
         <div className="dag-welcome__acts">
