@@ -90,7 +90,12 @@ Ten things are load-bearing:
 - **Chat mode lists only the tools a chat may use**, rather than listing everything and refusing at
   call time: a listed schema is ~300 input tokens a request, and a tool the model can see is a tool it
   tries. `NEVER_IN_CHAT` leaves out opening, making or closing a vault, settings, sync, a second model,
-  the quiz record, emptying the trash and uploads. **A document's eight everyday tools are one each
+  the quiz record, emptying the trash and uploads. **A chat fetches nothing by URL** (#9):
+  `image_add`'s `url` had the MCP process fetch any public address itself, so the request never
+  passed the guard and nobody approved it, while the address could carry what the chat had read.
+  `chatTools` takes every `url` argument out of the schemas, at any depth, and the chat's kit
+  (`Kit.noFetch`) refuses one at the single place a tool fetches (`bytesFrom`); a picture comes as
+  `data`. **A document's eight everyday tools are one each
   with a `kind`** — `doc_list`, `doc_read`, `doc_create`, `doc_write`, `doc_rename`, `doc_duplicate`,
   `doc_delete`, `doc_title` stand for the per-kind tools in `FOLDED`, and a call is held to the named
   tool's own schema before it runs it — and a description loses the `vault` sentence the system prompt
