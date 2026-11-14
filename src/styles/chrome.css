@@ -6259,8 +6259,9 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
  * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-app--calendar`, `dag-eventbar*`,
  * `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-eventbar*`,
  * `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
- * `data-dag-sidebar-event`, `data-dag-note-make-event`, the storage keys `dag:calendar-hide`,
- * `dag:week-start` and `dag:calendar-view`, and the query keys `calendar`, `view`, `date` and `days`.
+ * `data-dag-sidebar-event`, `data-dag-note-make-event`, `dag-cal-menu*` and `data-dag-cal-menu*`, the
+ * storage keys `dag:calendar-hide`, `dag:week-start` and `dag:calendar-view`, and the query keys
+ * `calendar`, `view`, `date` and `days`.
  */
 .dag-calendar {
   flex: 1;
@@ -6426,6 +6427,28 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__time { flex: none; color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
 .dag-calendar__mark { flex: none; color: var(--dag-color-slate); }
 .dag-calendar__item[data-kind="event"] .dag-calendar__mark { color: var(--dag-color-accent); }
+
+/* An item's menu: the sidebar's menu control, placed at the pointer (or under the item, from the
+   keyboard) and kept inside the window by `menuWithin`. Names grepped first: `dag-cal-menu*` and
+   `data-dag-cal-menu*` were nobody's. */
+.dag-cal-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 184px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
+}
+.dag-cal-menu .dag-more__item { width: 100%; color: var(--dag-color-ink); }
+.dag-cal-menu .dag-more__item > svg { flex: none; color: var(--dag-color-slate); }
+.dag-cal-menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-cal-menu__danger:hover { color: var(--dag-color-dangerText); }
+.dag-cal-menu__locked { margin: 4px 8px 2px; font-size: var(--dag-ui-text-sm); color: var(--dag-color-slate); }
 
 /* The month. */
 .dag-cal-month {

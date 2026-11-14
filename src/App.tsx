@@ -766,6 +766,7 @@ function CalendarApp({
 }) {
   const snapshot = query.get("snapshot") === "1";
   const locked = useLocked() && !snapshot;
+  const sidebar = useSidebar();
   const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open });
   const [last] = useState(readCalendarView);
   const rawView = query.get("calendar");
@@ -821,6 +822,8 @@ function CalendarApp({
         onScope={chooseScope}
         onGo={onGo}
         onOpen={(name) => open("note", name)}
+        onDuplicate={(name) => sidebar?.duplicate("note", name)}
+        onTrash={(name) => sidebar?.trash("note", name)}
         locked={locked}
       />
       {cards}
