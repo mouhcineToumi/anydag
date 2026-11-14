@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 
-import { listTools, NOTE_VAULT, TOOLS, ToolError, type Tool } from "./tools";
+import { IMAGE_BY_URL, listTools, NOTE_VAULT, TOOLS, ToolError, type Tool } from "./tools";
 
 /**
  * Never in a chat. Opening or making a vault reaches any folder the person can write to; a chat
@@ -163,6 +163,42 @@ const docTools = DOC_OPS.map(({ op, kinds, description }) => docTool(op, kinds, 
 const tail = `\n${NOTE_VAULT}`;
 const brief = (t: Tool): Tool => (t.description.endsWith(tail) ? { ...t, description: t.description.slice(0, -tail.length) } : t);
 
+/*
+ * **A chat fetches nothing by URL** (#9). `image_add`'s `url` — and a `feedback` file's — has this
+ * process fetch the address itself, so the request leaves the machine without passing the chat's
+ * guard or an approval card, carrying whatever the agent put in it. The chat's kit refuses a `url`
+ * (`Kit.noFetch`); here every `url` argument is taken out of the schemas too, at any depth, so the
+ * model is never offered one to try.
+ */
+const hasUrl = (s: z.ZodType): boolean => {
+  if (s instanceof z.ZodObject)
+    return Object.entries(s.shape as z.ZodRawShape).some(([k, v]) => k === "url" || hasUrl(v as z.ZodType));
+  if (s instanceof z.ZodArray) return hasUrl(s.element as z.ZodType);
+  if (s instanceof z.ZodOptional || s instanceof z.ZodDefault) return hasUrl(s.unwrap() as z.ZodType);
+  return false;
+};
+
+const urlless = (shape: z.ZodRawShape): z.ZodRawShape =>
+  Object.fromEntries(
+    Object.entries(shape)
+      .filter(([k]) => k !== "url")
+      .map(([k, v]) => [k, withoutUrl(v as z.ZodType)]),
+  );
+
+function withoutUrl(s: z.ZodType): z.ZodType {
+  if (!hasUrl(s)) return s;
+  let out: z.ZodType;
+  if (s instanceof z.ZodObject) out = z.object(urlless(s.shape as z.ZodRawShape));
+  else if (s instanceof z.ZodArray) out = z.array(withoutUrl(s.element as z.ZodType));
+  else if (s instanceof z.ZodOptional) out = withoutUrl(s.unwrap() as z.ZodType).optional();
+  else if (s instanceof z.ZodDefault) out = withoutUrl(s.unwrap() as z.ZodType).default(s.def.defaultValue as never);
+  else return s;
+  return s.description ? out.describe(s.description) : out;
+}
+
+const noUrl = (t: Tool): Tool =>
+  hasUrl(z.object(t.input)) ? { ...t, input: urlless(t.input), description: t.description.replace(IMAGE_BY_URL, "") } : t;
+
 /** The tools a chat is offered: every one the `cloud` switch leaves (`listTools`), but `NEVER_IN_CHAT` and the folded per-kind tools. */
 export function chatTools(cloud: boolean): Tool[] {
   const allowed = (t: Tool) => !NEVER_IN_CHAT.has(t.name);
@@ -171,6 +207,8 @@ export function chatTools(cloud: boolean): Tool[] {
     ...listTools(cloud)
       .filter((t) => !FOLDED.has(t.name))
       .map(brief),
-  ].filter(allowed);
+  ]
+    .filter(allowed)
+    .map(noUrl);
   return [...base, changeBlock, vaultRequest];
 }
