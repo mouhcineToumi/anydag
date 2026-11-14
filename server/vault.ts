@@ -41,6 +41,8 @@ import { forgetVault, type Front, frontOf, type Listed, type Listing, Lister, li
 import {
   assetsPrefix,
   classify,
+  COMPONENT_PREFIX,
+  COMPONENTS,
   extOf,
   fileNameFrom,
   fileTarget,
@@ -51,12 +53,12 @@ import {
   KINDS,
   leafOf,
   nameFrom,
-  NOTE_SUFFIXES,
   refusal,
   same,
   SUFFIX,
   type TextKind,
   TEXT_KINDS,
+  textFile,
   unique,
   uniqueFile,
 } from "./names";
@@ -182,11 +184,6 @@ interface Kept {
 
 /** Where the trash is kept: in the vault, so it travels with it, and out of every listing (a dot-folder). */
 const TRASH = ".anydag/trash";
-
-/** Where the person's saved components live: in the vault, out of its listing. */
-const COMPONENTS = ".anydag/components";
-/** The wire's name for one: `components/<name>` (`useEditor`'s Keep). */
-const COMPONENT_PREFIX = "components/";
 
 export interface VaultOptions {
   /** The extensions this vault lists as attachments. */
@@ -314,14 +311,11 @@ export class Vault {
     const comp = kind === "board" ? this.component(name) : null;
     const why = refusal(comp ?? name);
     if (why) throw new Refused(why);
-    if (comp !== null) return `${COMPONENTS}/${comp}${SUFFIX.board}`;
     if (kind === "file") {
       if (!this.isAttachment(name)) throw new Refused(`not a file name \`${name}\``);
       return name;
     }
-    if (kind !== "note") return name + SUFFIX[kind];
-    for (const ext of NOTE_SUFFIXES) if (exists(this.abs(name + ext))) return name + ext;
-    return name + NOTE_SUFFIXES[0];
+    return textFile(name, kind, (rel) => exists(this.abs(rel)));
   }
 
   isAttachment(name: string): boolean {
@@ -1741,7 +1735,8 @@ export class Vault {
   // -- reading many ----------------------------------------------------------
 
   /**
-   * Every text, for the index, the corpus and the sweep: a board under its name, any other kind
+   * Every text, for the sweep and relinking — `/index` and `/corpus` read theirs on the grammar's
+   * worker (`server/parsing.ts`, #287): a board under its name, any other kind
    * under `<name>.<kind>.md` so nothing mistakes one for a board, and the saved components under
    * `components/<name>`.
    */

@@ -123,9 +123,10 @@ launch, a deep link into an imported vault — had its id found by a walk on the
 given its provisional id alone, and both answer in 15 ms at 1k and at 50k files
 (`desktop.startup.*.open.*`, which also checks that the listing after it gives the note the same id).
 
-What still holds the thread at launch, measured on 50k files: a cold `/__board/index` 1.7 s (it reads
-every text on the server's thread to send to the grammar's worker; #280's ground). It is not on the
-path the bench measures, and is its own issue (#287).
+What still held the thread at launch, measured on 50k files: a cold `/__board/index` 1.8 s, and a
+warm one 2.0 s, reading every text on the server's thread to send to the grammar's worker. Since #287
+the worker reads them, and the slowest `/api/health` while either runs is 31 and 21 ms
+(`vault.*.index.*.health`).
 
 ### Disk
 

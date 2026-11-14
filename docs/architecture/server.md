@@ -17,6 +17,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/listing.ts` · `list-worker.ts` | the listing as the disk gives it — the walk, every stat and frontmatter read — and the worker it runs on |
 | `server/home.ts` | the app's home — `ANYDAG_HOME`, else the platform's data folder — and its `node:sqlite` index |
 | `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on |
+| `server/parsing.ts` · `pace.ts` | the texts of `/index` and `/corpus` read, parsed and kept where the grammar runs · a whole-vault loop in slices |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
@@ -51,7 +52,9 @@ Nine things are load-bearing:
   for everyone who asked meanwhile**, so an answer is never older than its question; and **a move made
   here while one walks or reconciles makes it start again** (`moves`, see *Things that will bite*),
   three times and then on this thread. Where no worker is built beside the bundle (the unit suite) or
-  `ANYDAG_LIST_INLINE=1`, the same code lists inline, still reconciling in slices.
+  `ANYDAG_LIST_INLINE=1`, the same code lists inline, still reconciling in slices. **Nor behind
+  `/index` or `/corpus`** (#287): their texts are read on the grammar's worker, never on this
+  thread, and only what changed comes back — see *Search*.
 - **Nor behind opening a document the index has not seen** (#286). `/__board/get` answers with the
   document's id, and on an app home that has never listed the vault — a first launch, a deep link
   into an imported vault — a note with no `id:` used to have it found by a walk of the whole vault on

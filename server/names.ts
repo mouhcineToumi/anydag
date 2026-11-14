@@ -29,7 +29,25 @@ export const SUFFIX: Readonly<Record<TextKind, string>> = {
 };
 
 /** The suffixes a note may be stored under, the one a new note is written with first. */
-export const NOTE_SUFFIXES = [".md", ".note.md"] as const;
+const NOTE_SUFFIXES = [".md", ".note.md"] as const;
+
+/** Where the person's saved components live: in the vault, out of its listing. */
+export const COMPONENTS = ".anydag/components";
+/** The wire's name for one: `components/<name>` (`useEditor`'s Keep). */
+export const COMPONENT_PREFIX = "components/";
+
+/**
+ * The vault-relative file a text is stored in — `Vault.fileOf`'s rule for a text, on whichever
+ * thread reads it (`server/parsing.ts`). `exists` says whether a vault-relative path is there: a
+ * note is the `.md` when there is one, else the `.note.md`. Checks no name; the caller refuses first.
+ */
+export function textFile(name: string, kind: TextKind, exists: (rel: string) => boolean): string {
+  if (kind === "board" && name.startsWith(COMPONENT_PREFIX))
+    return `${COMPONENTS}/${name.slice(COMPONENT_PREFIX.length)}${SUFFIX.board}`;
+  if (kind !== "note") return name + SUFFIX[kind];
+  for (const ext of NOTE_SUFFIXES) if (exists(name + ext)) return name + ext;
+  return name + NOTE_SUFFIXES[0];
+}
 
 /** What each kind is called when there are several — the key a listing and a removal answer under. */
 export const PLURAL: Readonly<Record<Kind, string>> = {
