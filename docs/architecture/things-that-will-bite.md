@@ -851,3 +851,14 @@
   file list and the reference index used to wait for the feed's next change, which after an agent's
   last write never comes (`src/board/refresher.ts`). To see the first half again, open six
   `EventSource`s through a `protocol.handle` that forwards with `net.fetch` and try a seventh request.
+- **The sidebar's tree draws a window of its rows, so a row is not a thing to ask the page for** (#281). The
+  keyboard, a selection, the reveal and a rename all work from `lines` and `rowIndex` in `Sidebar.tsx`; the
+  first version of `onTreeKey` walked `querySelectorAll("[data-dag-sidebar-row]")`, which on a folder of
+  five thousand files was the rows in view and a margin, so ArrowDown stopped at the edge of the window
+  and Home and End went to the window's ends. Anything new that needs *the next row* or *the row for
+  this key* asks the list and then `focusRow` / `reveal`; anything that must keep a node (a rename box,
+  the roving tab stop) is a **pinned** row in `pins`, or it is unmounted with its half-typed text when
+  the list scrolls away. **A spec must not assume a row exists**: `locator.scrollIntoViewIfNeeded()`
+  waits for a node that is not there, and **`locator.boundingBox()` auto-waits too**, so an
+  `expect.poll` over it for a row that has gone out of the window times out instead of answering
+  *out of view* — count it first. `e2e/sidebar-virtual.spec.ts` is the pattern.
