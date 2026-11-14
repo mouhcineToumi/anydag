@@ -45,7 +45,9 @@ develop has moved since the last one, it makes a `nightly/<version>` branch hold
 stamps the version, tags it `v<version>`, runs the whole tier against it, and publishes a
 pre-release. It keeps the GitHub *releases* of the newest seven nightlies and never deletes a tag or a
 branch — electron-updater reads the ten newest releases, and ten nightlies in a row would hide a
-beta's next version from it.
+beta's next version from it. Beside the build it runs the two resource guards,
+`node scripts/bench.mjs --guard` (idle CPU on a 1k-file vault, a 200-node layout), which go red on a
+2x regression and hold nothing back — see *The bench* in [`limits.md`](limits.md).
 
 **The update channel is the version's own word.** `0.2.0` is `latest`, `0.2.0-beta.1` is `beta`,
 `0.2.0-nightly.…` is `nightly`. The update files are named after it (`latest*.yml`, `beta*.yml`,

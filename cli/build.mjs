@@ -27,8 +27,12 @@ export async function build() {
   const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
   const result = await esbuild({
     absWorkingDir: root,
-    /* The grammar's worker too, for the server the CLI and `anydag mcp` run in-process. */
-    entryPoints: { anydag: "cli/main.ts", "grammar-worker": "server/grammar-worker.ts" },
+    /* The grammar's worker and the listing's too, for the server the CLI and `anydag mcp` run in-process. */
+    entryPoints: {
+      anydag: "cli/main.ts",
+      "grammar-worker": "server/grammar-worker.ts",
+      "list-worker": "server/list-worker.ts",
+    },
     bundle: true,
     platform: "node",
     format: "esm",
