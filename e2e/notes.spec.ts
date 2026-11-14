@@ -155,6 +155,81 @@ test("opening a note and looking at it writes nothing", async ({ page }) => {
   expect(fs.statSync(file).mtimeMs).toBe(before);
 });
 
+/*
+ * The line after the last block (#317). A note ending in a picture, a table or a code block had no
+ * way to write after it: the empty space below the text was the page's, and ArrowDown at the end was
+ * taken by the editor and did nothing. Both now leave the caret in an empty paragraph — which the
+ * bridge writes no bytes for, so a click and a leave is the file it was.
+ */
+const PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120"><rect width="320" height="120" fill="#888888"/></svg>`;
+
+/** A note whose last block is a picture, and the picture beside it. */
+function pictureNote(): string {
+  const assets = path.join(DIR, `${name}.assets`);
+  fs.mkdirSync(assets, { recursive: true });
+  fs.writeFileSync(path.join(assets, "picture.svg"), PICTURE);
+  const md = `---\ntitle: A note\n---\n# The plan\n\n![a picture](${name}.assets/picture.svg)\n`;
+  fs.writeFileSync(file, md);
+  return md;
+}
+
+/** The block the caret is in, and whether the editor has the focus. */
+function caret(page: Page) {
+  return page.evaluate(() => {
+    const node = getSelection()?.anchorNode;
+    const el = node instanceof Element ? node : node?.parentElement;
+    return {
+      block: el?.closest(".bn-block-outer")?.getAttribute("data-id") ?? null,
+      editor: !!document.activeElement?.closest(".bn-editor"),
+    };
+  });
+}
+
+test("a click below the last block gives an empty paragraph, and leaving without typing writes nothing", async ({ page }) => {
+  const md = pictureNote();
+  await open(page);
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(2);
+  await page.locator("[data-dag-note-tail]").click();
+  await expect(blocks).toHaveCount(3);
+  const last = blocks.last();
+  await expect(last.locator(".bn-block-content")).toHaveAttribute("data-content-type", "paragraph");
+  await expect(last).toHaveText("");
+  const id = await last.getAttribute("data-id");
+  await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+  /* Leaving without a letter typed writes not one byte — the empty paragraph is the editor's until
+     it holds words, and Markdown has no empty paragraph to write. */
+  await page.goto("about:blank");
+  await page.waitForTimeout(400);
+  expect(read()).toBe(md);
+});
+
+test("Arrow down from a picture at the end gives an empty paragraph after it", async ({ page }) => {
+  const md = pictureNote();
+  await open(page);
+  await page.locator(".bn-block-content[data-content-type=image]").click();
+  await page.keyboard.press("ArrowDown");
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(3);
+  const id = await blocks.last().getAttribute("data-id");
+  await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+  await page.keyboard.type("After the picture.");
+  await expect.poll(read, { timeout: 5_000 }).toBe(md.replace(/\n$/, "\n\nAfter the picture.\n"));
+});
+
+test("Arrow down at the end of a last paragraph gives an empty paragraph too", async ({ page }) => {
+  /* The editor's own trailing block takes ArrowDown here and stops, which is the half no picture
+     covers: a note whose last words are a paragraph had no line under them either. */
+  fs.writeFileSync(file, "# The plan\n\nThe last paragraph.\n");
+  await open(page);
+  await endOf(page, "The last paragraph.");
+  await page.keyboard.press("ArrowDown");
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(3);
+  const id = await blocks.last().getAttribute("data-id");
+  await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+});
+
 test("the slash menu offers only what a Markdown file can say", async ({ page }) => {
   await open(page);
   await endOf(page, "The last paragraph.");

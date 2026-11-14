@@ -54,8 +54,9 @@ import {
   getDefaultReactSlashMenuItems,
   useCreateBlockNote,
 } from "@blocknote/react";
+import { Selection } from "@tiptap/pm/state";
 import { LayoutDashboard, MessageSquareQuote, Sigma, Trash2, Upload } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 
 import { applySteps, type NoteBlock, type Step } from "@/note/markdown";
 import { noteSchema } from "@/note/schema";
@@ -102,6 +103,14 @@ export interface NoteEditor {
    */
   focusStart(newLine?: boolean): void;
   /**
+   * Put the caret in an empty paragraph after the last block — the line a note ending in a picture,
+   * a table or a code block has no other way to reach. A click below the text and the arrow down at
+   * its end both come here. An empty paragraph already at the end is used rather than a second one,
+   * so clicking twice is still one line. **Nothing is written until something is typed in it**:
+   * `src/note/markdown.ts` writes no bytes for an empty paragraph.
+   */
+  afterLast(): void;
+  /**
    * Put the caret at the start of one block and bring it into the middle of the page — what a
    * search result or a link to a block opens onto. The block's words are marked for a
    * moment so the eye finds them, by a CSS highlight rather than by anything in the document.
@@ -134,6 +143,10 @@ export interface BlockEditorProps {
 }
 
 type Editor = ReturnType<typeof useNoteEditor>;
+
+/** A paragraph nothing has been typed into. Markdown has no empty paragraph, so it writes nothing. */
+const blank = (b: { type: string; content?: unknown } | undefined): boolean =>
+  b?.type === "paragraph" && Array.isArray(b.content) && b.content.length === 0;
 
 function useNoteEditor(props: BlockEditorProps) {
   const { initial, upload, resolve } = props;
@@ -266,6 +279,25 @@ export default function BlockEditor(props: BlockEditorProps) {
   const { onReady, onChange } = props;
 
   /*
+   * The empty paragraph after the last block, for the two gestures that ask for it: a press on the
+   * strip below the text (`NoteView`'s tail) and ArrowDown at its end. Both used to do nothing in a
+   * note ending in a picture, a table or a code block. An existing empty paragraph is reused, so a
+   * second press does not stack a second blank line nobody can see.
+   */
+  const afterLast = useCallback(() => {
+    const top = editor.document;
+    const last = top[top.length - 1];
+    if (!last) return;
+    let target = last;
+    if (!blank(last)) {
+      const [made] = editor.insertBlocks([{ type: "paragraph" }] as never, last, "after");
+      if (made) target = made;
+    }
+    editor.setTextCursorPosition(target, "end");
+    editor.focus();
+  }, [editor]);
+
+  /*
    * The contenteditable itself has no name: BlockNote gives it `aria-autocomplete` and
    * `aria-haspopup` for its suggestion menus, and the note's title is what it edits. The
    * attribute has to go on ProseMirror's own element, which is not a React child here; setting
@@ -356,13 +388,13 @@ export default function BlockEditor(props: BlockEditorProps) {
       focus: () => editor.focus(),
       focusStart: (newLine) => {
         const first = editor.document[0];
-        const empty = first?.type === "paragraph" && Array.isArray(first.content) && first.content.length === 0;
-        if (first && newLine && !empty) {
+        if (first && newLine && !blank(first)) {
           const [made] = editor.insertBlocks([{ type: "paragraph" }] as never, first, "before");
           editor.setTextCursorPosition(made ?? first, "start");
         } else if (first) editor.setTextCursorPosition(first, "start");
         editor.focus();
       },
+      afterLast,
       reveal: (id) => {
         if (!editor.getBlock(id)) return;
         editor.setTextCursorPosition(id, "start");
@@ -373,7 +405,26 @@ export default function BlockEditor(props: BlockEditorProps) {
         markFound(el.querySelector(".bn-block-content") ?? el);
       },
     });
-  }, [editor, onReady]);
+  }, [editor, onReady, afterLast]);
+
+  /*
+   * ArrowDown at the very end of the text is the keyboard's way to the same line. ProseMirror's own
+   * trailing-block extension takes the key there and stops it without doing anything, so it is taken
+   * in the capture phase, before the editor's handlers see it. A suggestion menu's keys are its own,
+   * and a key held with a modifier is somebody else's gesture.
+   */
+  const keyAtEnd = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (props.editable === false) return;
+    if (e.key !== "ArrowDown" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
+    /* A callout's title, a code block's language: chrome inside the editor, and its keys are its own. */
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, button")) return;
+    if (document.querySelector(".bn-suggestion-menu, [data-dag-math-field]")) return;
+    const view = editor.prosemirrorView;
+    if (!view.state.selection.eq(Selection.atEnd(view.state.doc))) return;
+    e.preventDefault();
+    e.stopPropagation();
+    afterLast();
+  };
 
   return (
     /* Files dragged in from the computer are attachments: taken here, in the capture
@@ -382,6 +433,7 @@ export default function BlockEditor(props: BlockEditorProps) {
     <div
       className="dag-blocks-drop"
       data-dag-note-drop=""
+      onKeyDownCapture={keyAtEnd}
       onDragOverCapture={(e) => {
         if (!props.attach || !Array.from(e.dataTransfer.types).includes("Files")) return;
         e.preventDefault();

@@ -4698,6 +4698,26 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
    `dag-note-view__editor` and `data-dag-note-first` were unclaimed. */
 .dag-note-view__first > .dag-note-view__page { margin: 0; padding-block: 0; max-width: none; }
 .dag-note-view__editor[hidden] { display: none; }
+/* A note's writing page fills the window, and the strip under its last block is a press away from
+   an empty paragraph (`data-dag-note-tail`): a note ending in a picture, a table or a code block has
+   no other line to put a caret in. The page carries the height and the strip the old 160px of bottom
+   padding, so the target is as tall as the window is empty below the text. */
+.dag-note-view__page--write {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding-bottom: 0;
+}
+.dag-note-view__page--write > .dag-note-view__editor:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+.dag-note-view__tail {
+  flex: 1 0 160px;
+  cursor: text;
+}
 /* A note's title, at the top of its page: Notion's page title. The field and the read-only
    heading are one class, so a picture of a note is laid out exactly as the page is. It sits in the
    editor's own 54px gutter, as the task bar under it does, and is a size up from the Markdown ramp's
