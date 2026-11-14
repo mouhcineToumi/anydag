@@ -11,7 +11,7 @@ import { setImmediate as yieldNow } from "node:timers/promises";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useListWorker } from "../../server/listing";
-import { BOARD, NOTE, PDF, QUIZ, TABLE, makeEnv, sweepTemps, write, type Env, watchedFromTheStart } from "./helpers";
+import { BOARD, NOTE, PDF, QUIZ, TABLE, makeEnv, sweepTemps, until, write, type Env, watchedFromTheStart } from "./helpers";
 
 let env: Env;
 beforeEach(() => {
@@ -103,6 +103,9 @@ describe("the listing's worker", () => {
     write(env.root, "a.md", "---\ntitle: First\n---\n");
     expect((await env.vault.tree()).titles.a).toBe("First");
     write(env.root, "a.md", "---\ntitle: Second, and longer\n---\n");
+    // Watched (`ANYDAG_TEST_WATCH`), a text written in place is listed once the watcher says so (#280).
+    if (watchedFromTheStart)
+      await until(async () => (await env.vault.tree()).titles.a === "Second, and longer", 5000, "the new title");
     expect((await env.vault.tree()).titles.a).toBe("Second, and longer");
   });
 });
