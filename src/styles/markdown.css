@@ -130,6 +130,47 @@
   color: var(--dag-color-slate);
 }
 
+/* A callout — a quote whose first line names a kind (`src/note/callout.ts`) — drawn in its kind's
+   hue: a tint behind it, a bar down its left edge where a quote has one, and the hue on its icon and
+   title. The hue and tint are bound on the box as `--callout-h` and `--callout-t` from the theme's
+   own ten (`src/render/Callout.tsx`), never invented here. Not scoped to `.dag-md`: the note editor
+   draws the same box around its callout block. The padding is a code block's, the gap under the
+   head is a code block's under its language. */
+.dag-callout {
+  margin: 0 0 var(--dag-metric-md-blockGap);
+  padding: var(--dag-metric-md-prePadY) var(--dag-metric-md-quotePad);
+  background: var(--callout-t);
+  border-left: var(--dag-metric-md-quoteBar) solid var(--callout-h);
+  border-radius: var(--dag-metric-radius-small);
+  color: var(--dag-color-ink);
+}
+.dag-callout__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  font-weight: 600;
+  color: var(--callout-h);
+}
+.dag-callout__icon,
+.dag-callout__chevron {
+  display: inline-flex;
+  flex: none;
+}
+.dag-callout__icon svg,
+.dag-callout__chevron svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.dag-callout__chevron { margin-left: auto; }
+summary.dag-callout__head {
+  cursor: pointer;
+  list-style: none;
+}
+summary.dag-callout__head::-webkit-details-marker { display: none; }
+details.dag-callout[open] > summary .dag-callout__chevron svg { transform: rotate(90deg); }
+.dag-callout__body { margin-top: var(--dag-metric-md-codeLangGap); }
+.dag-callout__body > :last-child { margin-bottom: 0; }
+
 .dag-md table {
   border-collapse: collapse;
   width: 100%;

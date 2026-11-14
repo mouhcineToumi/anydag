@@ -4,13 +4,14 @@ import remarkGfm from "remark-gfm";
 
 import { remarkWikilinks } from "@/refs/wikilinks";
 
+import { remarkCallouts } from "@/note/callout";
 import { remarkMath } from "@/note/math";
 import { refComponents, urlTransform } from "@/refs/Ref";
 import { AssetUrlContext } from "@/render/assets";
 import { withComponents, type MarkdownImg } from "@/view/NoteRead";
 
-/* GFM, and equations between dollars. */
-const PLUGINS = [remarkGfm, remarkMath, remarkWikilinks];
+/* GFM, equations between dollars, and callouts. */
+const PLUGINS = [remarkGfm, remarkMath, remarkWikilinks, remarkCallouts];
 
 const Span = ({ children }: { children?: ReactNode }) => <span>{children}</span>;
 

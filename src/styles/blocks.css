@@ -101,6 +101,66 @@
   color: var(--dag-color-slate);
   border-left-color: var(--dag-color-outline);
 }
+/* A callout's box is its frame (`src/blocks/callout.tsx`), drawn by `markdown.css`'s `.dag-callout`;
+   what is here is only what an editor has and a page does not. Its blocks sit in the box, at the
+   text's edge, without the line BlockNote draws down nested blocks. */
+.dag-blocks .dag-callout { margin: 4px 0; }
+.dag-blocks .dag-callout__slot > .bn-block-content { padding-top: 0; }
+.dag-blocks .dag-callout__slot > .bn-block-group { margin-left: 0; }
+.dag-blocks .dag-callout__slot > .bn-block-group > .bn-block-outer::before { display: none; }
+.dag-blocks .dag-callout[data-dag-callout-open="false"] > .dag-callout__slot { display: none; }
+.dag-blocks .dag-callout__head { margin-bottom: var(--dag-metric-md-codeLangGap); }
+.dag-blocks .dag-callout[data-dag-callout-open="false"] > .dag-callout__head { margin-bottom: 0; }
+.dag-blocks .dag-callout__text { margin: 0; }
+/* The kind is a native select laid over the icon, so the head reads as a page draws it — an icon
+   and a title — and the icon is what a person clicks to change it. */
+.dag-blocks .dag-callout__pick {
+  position: relative;
+  display: inline-flex;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.dag-blocks .dag-callout__pick:hover,
+.dag-blocks .dag-callout__pick:focus-within { box-shadow: 0 0 0 2px var(--dag-color-outline); }
+.dag-blocks .dag-callout__kind {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.dag-blocks .dag-callout__kind:disabled { cursor: default; }
+.dag-blocks input.dag-callout__title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+.dag-blocks input.dag-callout__title::placeholder {
+  color: inherit;
+  opacity: 1;
+}
+.dag-blocks .dag-callout__fold {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.dag-blocks .dag-callout__fold:hover { background: var(--dag-color-paper200); }
+.dag-blocks .dag-callout__fold svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.dag-blocks .dag-callout__fold[aria-expanded="true"] svg { transform: rotate(90deg); }
+
 .dag-blocks [data-content-type="divider"] hr { border-top-color: var(--dag-color-outlineSoft); }
 
 /* BlockNote pads a table in by 9px for its handles, so it sat off the text column: the left edge is the text's. */
