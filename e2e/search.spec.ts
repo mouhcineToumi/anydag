@@ -272,6 +272,41 @@ test("the list follows an edit made while the card is open", async ({ page }) =>
   await expect(hit(page, board(), "late")).toBeVisible({ timeout: 10_000 });
 });
 
+test("a word written a moment ago is found by the next query", async ({ page }) => {
+  await page.goto(`/?board=${board()}`);
+  await ready(page);
+  await openBoards(page);
+  const input = page.locator("[data-dag-boards] input");
+  await input.fill(`${word}fresh`);
+  await expect(page.locator("[data-dag-hits-empty]")).toContainText("matches");
+  /* The other writer, and then a different query at once: the server reads the vault per query, so
+     the answer does not wait for the change feed. */
+  fs.writeFileSync(
+    path.join(BOARDS, `${board()}.board.md`),
+    `${BOARD(word)}\n\`\`\`md {#fresh x=0 y=800}\nWritten ${word}fresh just now.\n\`\`\`\n`,
+  );
+  await input.fill(`${word}fre`);
+  await expect(hit(page, board(), "fresh")).toBeVisible({ timeout: 10_000 });
+});
+
+test("typing a word is one request to the server, and the page keeps no copy of the vault", async ({ page }) => {
+  const asked: string[] = [];
+  const corpus: string[] = [];
+  page.on("request", (r) => {
+    const url = new URL(r.url());
+    if (url.pathname === "/__board/search") asked.push(url.searchParams.get("q") ?? "");
+    if (url.pathname === "/__board/corpus") corpus.push(url.pathname);
+  });
+  await page.goto(`/?board=${board()}`);
+  await ready(page);
+  await openBoards(page);
+  /* A key every 30 ms, well inside the pause that sends a query. */
+  await page.locator("[data-dag-boards] input").pressSequentially(word, { delay: 30 });
+  await expect(hit(page, board(), "far")).toBeVisible();
+  expect(asked).toEqual([word]);
+  expect(corpus).toEqual([]);
+});
+
 test("Tab never leaves the search: thirty presses, and the focus is in the dialog after each", async ({ page }) => {
   await page.goto(`/?board=${board()}`);
   await ready(page);

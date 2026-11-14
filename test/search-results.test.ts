@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import type { Hit } from "../src/search/engine";
 import { byDocument, docKey } from "../src/search/results";
+import type { Found } from "../src/search/wire";
 
 /** What the two lists say about one file: a name match is the row, its blocks are not a second one. */
 
-const hit = (kind: Hit["doc"]["kind"], name: string, part?: string): Hit => ({
-  doc: { id: `${kind}-${name}`, kind, name, units: [] },
-  unit: { part, what: "md", text: "API spec" },
+const hit = (kind: Found["kind"], name: string, part?: string): Found => ({
+  id: `${kind}-${name}`,
+  kind,
+  name,
+  title: null,
+  part: part ?? null,
+  what: "md",
   score: 1,
   terms: ["api", "spec"],
+  snippet: "**API** **spec**",
+  runs: [
+    { text: "API", hit: true },
+    { text: " ", hit: false },
+    { text: "spec", hit: true },
+  ],
 });
 
 describe("search results", () => {
@@ -20,7 +30,7 @@ describe("search results", () => {
       named,
     );
 
-    expect(split.hits.map((h) => `${h.doc.name}#${h.unit.part}`)).toEqual(["journal#L4"]);
+    expect(split.hits.map((h) => `${h.name}#${h.part}`)).toEqual(["journal#L4"]);
     expect([...split.inText]).toEqual(["board:work/api-spec"]);
   });
 
@@ -28,7 +38,7 @@ describe("search results", () => {
     const named = new Set([docKey({ kind: "board", name: "plan" })]);
     const split = byDocument([hit("board", "plan"), hit("note", "plan", "L1")], named);
 
-    expect(split.hits.map((h) => `${h.doc.kind}:${h.doc.name}`)).toEqual(["note:plan"]);
+    expect(split.hits.map((h) => `${h.kind}:${h.name}`)).toEqual(["note:plan"]);
     expect([...split.inText]).toEqual(["board:plan"]);
   });
 

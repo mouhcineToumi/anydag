@@ -11,6 +11,7 @@ import { stampItems } from "../src/board/stamp";
 import { indexTexts } from "../src/refs/extract";
 import { corpusTexts } from "../src/search/corpus";
 import { buildEngine, search, snippet, type Engine, type SearchDoc } from "../src/search/engine";
+import type { Found } from "../src/search/wire";
 import { parseQuiz, pinned } from "../src/quiz/parse";
 import { applyQuizOps } from "../src/quiz/ops";
 import { stampIds } from "../src/quiz/write";
@@ -344,10 +345,10 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
   /*
    * A query matched against a corpus.
    *
-   * The page matches every keystroke in the browser over `/corpus`, and that stays. A
-   * caller with no browser — the CLI, an agent over MCP, a script — asks this instead, which runs the
-   * page's own engine (`src/search/engine.ts`) over the same units. So the three rank one query the
-   * same way and mark the same words, which a second implementation could only promise.
+   * Every asker is answered here: the search card (`useSearch`, one request per paused query), the
+   * CLI, an agent over MCP, a script. One engine (`src/search/engine.ts`) over the corpus's units, so
+   * they all rank a query the same way and mark the same words, and the page holds no text to match.
+   * The answer is `Found[]` (`src/search/wire.ts`), snippets included.
    */
   if (method === "POST" && route === "/search") {
     const docs = body.docs;
@@ -370,7 +371,7 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
         for (const old of engines.keys()) if (engines.size > ENGINES) engines.delete(old);
       }
     } else return { status: 412, body: { error: "send `docs`: no engine is held for this version", code: "docs" } };
-    const hits = search(engine, q, limit).map((h) => {
+    const hits = search(engine, q, limit).map((h): Found => {
       const runs = snippet(h.unit.text, h.terms);
       return {
         id: h.doc.id,
