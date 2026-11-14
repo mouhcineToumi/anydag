@@ -1,3 +1,20 @@
+/** The app's updates as the shell reports them (`desktop/updates.ts`, copied here because the page
+ *  is built apart from the shell). */
+export interface UpdateState {
+  status: "idle" | "checking" | "downloading" | "ready" | "manual" | "error";
+  /** `false` in a run with nothing packaged to replace. */
+  enabled: boolean;
+  /** The version running. */
+  current: string;
+  /** The newer version, from `downloading` to `manual`. */
+  version: string | null;
+  percent: number | null;
+  /** When the last answered check finished, epoch milliseconds. */
+  checkedAt: number | null;
+  /** A sentence the person can act on, when `status` is `error`. */
+  error: string | null;
+}
+
 /**
  * What the desktop shell (Electron) offers the page, and a browser does not. Every use is optional:
  * without it the page asks for a path in a field, and has no "reveal" button.
@@ -22,6 +39,13 @@ export interface DesktopBridge {
   providerEnv?: {
     get(): Promise<Record<string, string>>;
     set(name: string, value: string): Promise<boolean>;
+  };
+  /** The app's own updates: what is known, a check, and the restart. Absent in a browser. */
+  updates?: {
+    state(): Promise<UpdateState>;
+    onChange(listener: (state: UpdateState) => void): () => void;
+    check(): Promise<UpdateState>;
+    install(): Promise<void>;
   };
   /** `process.platform` of the shell: `"darwin"` is the one whose window has no title bar. */
   platform?: string;

@@ -1128,6 +1128,11 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar__tree[data-dag-sidebar-stale] > [role="tree"] > .dag-sidebar__line { opacity: 0.55; }
 
 .dag-sidebar__account-wrap { position: relative; margin-top: 4px; }
+/* Settings and, when a new version waits, the Update button beside it (#268): the row takes what the
+   button leaves, and Settings' label is what gives way. */
+.dag-sidebar__setrow { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.dag-sidebar__setrow > .dag-sidebar__account-wrap { flex: 1; min-width: 0; margin-top: 0; }
+.dag-sidebar__update { flex: none; }
 .dag-sidebar__account {
   display: flex;
   align-items: center;

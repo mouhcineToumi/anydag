@@ -19,15 +19,16 @@ failed on both.
 
 | Where | Owns |
 |---|---|
-| `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, updates |
+| `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, the updater's wiring |
+| `desktop/updates.ts` | the update state machine: `idle · checking · downloading · ready · manual · error`, the six-hour re-check, the install; no Electron import |
 | `desktop/forward.ts` | a page request sent on to the server over `node:http`, and let go of when the page lets go |
-| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key |
+| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the updates (`state`, `onChange`, `check`, `install`) |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
 | `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Twelve things are load-bearing:
+Thirteen things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
@@ -54,7 +55,8 @@ Twelve things are load-bearing:
   (`-c.mac.identity=-`) — an Apple Silicon Mac runs nothing unsigned, and the hardened runtime's
   default entitlements turn library validation off so the watcher loads. The shell is rebuilt with
   `ANYDAG_SIGNED`, because an ad-hoc macOS app cannot update itself (Squirrel.Mac checks the new
-  version against a designated requirement an ad-hoc signature does not have), so it does not try.
+  version against a designated requirement an ad-hoc signature does not have), so it does not try:
+  it still asks whether a newer version exists, and the answer is `manual` (see *Updates*).
   electron-builder skips signing on a pull request, ad hoc included, so `CSC_FOR_PULL_REQUEST` is
   set when there is no certificate to protect. `desktop.yml` is handed no secrets at all.
 - **Electron and electron-builder's tools come from npmmirror in CI, not GitHub's release
@@ -65,6 +67,41 @@ Twelve things are load-bearing:
   pins, and `package.mjs` writes those same `checksums.json` into Electron's cache as
   `SHASUMS256.txt-<version>`, so the zip electron-builder unpacks is checked against them too rather
   than against the mirror's `SHASUMS256.txt`.
+- **Updates are the app's own state, not the operating system's notification** (#268).
+  `checkForUpdatesAndNotify()` is gone: `desktop/updates.ts` calls `checkForUpdates()` and turns the
+  updater's events into one `UpdateState` — `idle`, `checking`, `downloading` (with a percent),
+  `ready`, `manual`, `error` — plus the new `version`, `checkedAt` (the last check that got an
+  answer) and `error`, a sentence the person can act on (*Could not reach GitHub…*), never a stack;
+  the raw message goes to the console. `main.ts` pushes every change to every window (`update:state`)
+  and the preload gives the page `updates.state()`, `onChange()`, `check()` and `install()`. The
+  module imports nothing from Electron; the updater, the clock, the timer and the two things the
+  shell does are handed in, so `test/desktop-updates.test.ts` drives it with a fake updater.
+  - **When it asks:** once after the first window, then every 6 hours while the app runs (a timer
+    that is `unref`ed, so it never keeps the process alive) — many people never quit — and when
+    Settings → About says *Check for updates*. One question at a time, and nothing while an update
+    is downloading, ready or waiting: those answers cannot change before the next launch. Only a
+    packaged app asks (`enabled`); `desktop:dev` and the smoke run never do, and the page then draws
+    no button and no update facts. The channel is still the version's own (`UPDATE_CHANNEL`).
+  - **A build that cannot install says `manual`** and downloads nothing (`autoDownload` is off): an
+    unsigned macOS build (`SIGNED`), and an AppImage whose file or folder the person cannot write
+    to (`canInstallUpdates`). The button then opens that version's release page —
+    `releases/tag/v<version>` — through `shell.openExternal`.
+  - **`install()` quits in the order a normal quit does, and only from the page's top frame**
+    (`fromPage`, the check `page:key` makes). The page writes what it holds first (it calls
+    `flushPending` before the call — see *Pending writes* in [`sidebar.md`](sidebar.md)); then
+    `prepareToQuit` sets `quitting` (so the child's exit is not read as "the server went") and runs
+    `stopServer()` — it closes the IPC channel the server was spawned with and waits for the child to
+    leave — and only then `quitAndInstall(false, true)`. The order matters on Windows, where the
+    installer starts inside `quitAndInstall` and the server would still hold the vault; and
+    `quitting` already being set is what lets `before-quit` through instead of running `quit()` and
+    `app.exit(0)` over the installer. If the install then fails (the updater emits `error` after
+    `quitAndInstall`, say a `.AppImage` that cannot be replaced), the state is `error`, `quitting` is
+    cleared and `restartServer()` brings the server back, so the app is whole again rather than
+    running with no server.
+  - **Not verified here:** the restart itself. A packaged app updating to a published release can
+    be run only on a published release, on each system; nothing in the suite does it. The state
+    machine and the quit order are held by the unit test against a fake updater, the page's half
+    by `e2e/update.spec.ts` against a stub of the bridge.
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to

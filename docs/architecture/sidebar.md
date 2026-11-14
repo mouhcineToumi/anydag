@@ -47,6 +47,28 @@ Fourteen things are load-bearing:
 - **The dock is this board, and the sidebar is the app.** Settings left the dock's `⋯` for the
   sidebar's foot, and a dock with nothing to edit now draws
   nothing at all rather than a menu of nothing.
+- **The foot's Update button (#268).** When the desktop app has a new version, **Update** sits
+  in the foot's Settings row, to the right of *Settings* (`.dag-sidebar__setrow`; Settings' label is
+  what gives way, so it never wraps). It is a `Button` (`secondary`, `sm`; `md`, so 44px, in the phone's
+  sheet) with the version in its tooltip, and it is there in two states only: **`ready`**, *Update*,
+  which restarts into the downloaded version, and **`manual`**, *Download update* with an
+  external-link glyph, which opens the release page on a build that cannot install it (an unsigned
+  Mac, an AppImage it cannot write to). While the shell is checking or downloading, and when there
+  is nothing newer, **nothing is drawn**: the foot never changes under a person's pointer for
+  something they did not ask for. With no desktop bridge — `anydag serve`, `npm run dev`, any
+  browser — `useUpdates()` is `null` and the button is never rendered. The state is the shell's
+  (`desktop/updates.ts`, [`desktop.md`](desktop.md) *Updates*) and arrives through
+  `window.anydagDesktop.updates`; `src/ui/updates.ts` is the page's hook and the click's action.
+  `data-dag-update="ready|manual"` is the e2e hook.
+  **Pending writes.** A restart must not lose text still on its debounce, so a writer that can hold
+  some registers with `src/ui/pendingWrites.ts` (`registerPendingWrites`) — the note editor
+  (`NoteView`), a quiz's and a table's file (`useDocFile`), and the practice answers
+  (`practice.ts`) — and `installUpdate` awaits `flushPending()` before it asks the shell to quit. A
+  board's own edits commit when the gesture ends, and a card being typed in commits when the click
+  on the button takes its focus. A click flushes, then calls `install()`, and the button says
+  *Restarting…* and cannot be pressed twice. The tabs and open documents come back because they are
+  the page's own `localStorage` and the vault's own files. `pagehide` is still the net under all of
+  it: each of those writers also sends what it holds as the window goes.
 - **The tree is flat rows with a depth**, `rows()` in `src/ui/tree.ts`, rather than nested
   elements: `aria-level`, `aria-setsize` and `aria-posinset` are said on each row, the keyboard walks
   the rows in order (the WAI tree pattern: arrows, Home, End, → into a folder, ← to its parent, F2 to
