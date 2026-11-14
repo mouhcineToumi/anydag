@@ -929,7 +929,7 @@
 - **A deadline over work that grows with the vault is a deadline per step, not per question.** The
   grammar's worker is ended after 60 s without an answer (#9), and a cold `/index` of 50,000 notes is
   minutes of parsing: before #279 it was ended every time, the caller fell back to parsing
-  inline, and the server's thread was held for 83 s (`vault.50000.index.cold.health`). A
+  inline, and the server's thread was held for 54–83 s (`vault.50000.index.cold.health`). A
   `Reader` now parses a chunk at a time and the worker says it is alive between chunks
   (`Reader.steps`, `{ alive }`), which resets the clock: a grammar stuck on one file is still ended,
   a big vault is not.

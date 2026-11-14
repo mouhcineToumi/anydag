@@ -25,7 +25,7 @@ long enough to read as hung, or that is refused.
 
 | Dimension | Works well up to | Degrades at | Breaks at |
 |---|---|---|---|
-| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 174 MB at rest, 342 MB while a search engine is held | **10,000** — startup to a drawn board 1.2 s (2.2 s before #283); first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 14 ms and 0.33 s after a burst of 200 writes (0.5 s and 2.3 s before #280); a 1,000-file folder is on the screen 47 ms after the listing arrives (936 DOM elements, it was 18k); server 272 MB at rest, 753 MB while a search engine is held (#279) | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 413 MB at rest, 1.6 GB while a search engine is held (2.6 GB before #279); cold `/index` 53 s; a 5,000-file folder is on the screen 180 ms after the listing arrives, in 936 DOM elements (it was 90k and 1.4 s), but the first listing itself is a 5.2 s walk; a cold `/index` holds every other request for 1.7 s |
+| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 174 MB at rest, 342 MB while a search engine is held | **10,000** — startup to a drawn board 1.2 s (2.2 s before #283); first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 14 ms and 0.33 s after a burst of 200 writes (0.5 s and 2.3 s before #280); a 1,000-file folder is on the screen 47 ms after the listing arrives (936 DOM elements, it was 18k); server 389 MB at rest, 807 MB while a search engine is held (#279) | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 431 MB at rest, 1.8 GB while a search engine is held, a 575 MB peak in the server itself (3.2 GB before #279); cold `/index` 53 s; a 5,000-file folder is on the screen 180 ms after the listing arrives, in 936 DOM elements (it was 90k and 1.4 s), but the first listing itself is a 5.2 s walk; a cold `/index` holds every other request for 1.7 s |
 | **Board size** (items, one in ten a 6-node diagram) | **500** — 0.95 s to `data-dag-ready`, its renderer 285 MB | **2,000** — 5.7 s, its renderer 643 MB, 30k DOM elements | not reached at 2,000 |
 | **Diagram size** (`arch` nodes, ELK) | **200** — 0.9 s | **500** — 2.9 s | **1,000** — 8.3 s with nothing drawn until it is done |
 | **Attachment size** | **512 MB**, the limit — streamed both ways (#278): a 500 MB upload 1.1 s, read 0.8 s, a 1 KB range of it 5 ms; the server peaks about 80 MB over its resting size, the same at 100 MB as at 500 | not reached at the limit | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 6 ms |
@@ -54,23 +54,25 @@ The desktop app with a 1k-file vault and a board of 20 items open, at rest (`des
 
 The server starts at 100 MB whatever the vault (Node and the bundle). Before #279 it grew with the
 vault from the first whole-vault request and never let go: 312 MB at 1k, 829 MB at 10k, 1.8 GB at 50k
-after list, index and search, a 3.1 GB peak at 50k — V8 keeps the pages its heap grew into, a worker
+after list, index and search, a 3.2 GB peak at 50k — V8 keeps the pages its heap grew into, a worker
 thread's included. Since #279 the grammar's worker is a process that exits when idle (30 s, or 5 min
 after a search), and what it parsed is kept in the home's `parse.sqlite` rather than in its memory, so
-the next one starts from there. Measured on the same machine (`vault.*.server.rss.*`):
+the next one starts from there. Measured on the same machine (`vault.*.server.rss.*`; 1k from an
+earlier run):
 
 | | 1k | 10k | 50k |
 |---|---|---|---|
-| server and worker, after list, index and search (`used`) | 342 MB | 753 MB | 1.6 GB |
-| the server alone, its peak (`peak`) | 174 MB | 340 MB | 481 MB |
-| at rest, the worker ended (`rest`) | 174 MB | 272 MB | 413 MB |
+| server and worker, after list, index and search (`used`) | 342 MB | 807 MB | 1.8 GB |
+| the server alone, its peak (`peak`) | 174 MB | 389 MB | 575 MB |
+| at rest, the worker ended (`rest`) | 174 MB | 389 MB | 431 MB |
 
 What `used` still holds is the search engine (MiniSearch over every unit, in the worker while it is
 up); #267's on-disk index replaces it. Most of what `rest` holds over the 100 MB start is the listing's
 worker thread (#288): 258 MB after the first `/list` on 10k files. A worker started again after it
-ended answers a warm `/index` in 0.26–0.4 s, parsing nothing whose stamp or sha1 did not move
-(`vault.*.index.after-idle`), and rebuilds the engine for the first search: 1.3 s at 1k, 11 s at 10k,
-20 s at 50k (`vault.*.search.after-idle`). It is not a leak — 30 more rounds of list, index and search
+ended answers a warm `/index` in 0.16–0.33 s, parsing nothing whose stamp or sha1 did not move
+(`vault.*.index.after-idle`), but the first search after it rebuilds the engine from the rows: 1.3 s
+at 1k, 4 s at 10k, 20 s at 50k (`vault.*.search.after-idle`), where a warm search is 50–270 ms. Until
+#267, that is a search that hangs after a pause of more than 5 min. It is not a leak — 30 more rounds of list, index and search
 on 10k files hold it flat, and 100 change feeds opened and dropped add 4 MB. The page's own heap is
 13 MB on a note and 22–100 MB on a board; the search card's index is the page's biggest cost (#282).
 
@@ -149,17 +151,17 @@ the worker reads them, and the slowest `/api/health` while either runs is 31 and
 
 On 50k files that worker then ran into its own deadline: one read of the whole vault took longer than
 the 60 s the server gives the worker, so a cold `/index` fell back to running inline and held
-`/api/health` for 83 s, and every warm `/index`, `/corpus` and search after it waited the full 60 s
-first. Since #279 the deadline is per step: the worker reads and parses 500 texts (or 2 MB) at a time,
-saves them, and tells the server it is still going, and the engine is built a thousand documents at a
-time. A cold `/index` on 50k files holds `/api/health` for 58 ms at most, a warm one answers in 0.33 s
-and a warm search in 0.34 s (`vault.50000.*`).
+`/api/health` for 54–83 s, and every warm `/index`, `/corpus` and search after it waited the full
+60 s first (a warm `/index` took 60 s, a search 76 s). Since #279 the deadline is per step: the
+worker reads and parses 500 texts (or 2 MB) at a time, saves them, and tells the server it is still
+going, and the engine is built a thousand documents at a time. A cold `/index` on 50k files holds `/api/health` for 81 ms at most (54 s before), a warm one
+answers in 0.1 s and a warm search in 0.27 s (`vault.50000.*`).
 
 ### Disk
 
 The app home holds the SQLite index and, since #279, `parse.sqlite` — what the grammar's worker
-parsed, deflated — and nothing that grows on its own: 2.1 MB for 1k files, 25.7 MB for 10k, 97 MB for
-50k (`vault.*.home.size`; 0.34, 3.9 and 14 MB before #279), unchanged by a burst of writes. It is a
+parsed, deflated — and nothing that grows on its own: 2.1 MB for 1k files, 24 MB for 10k, 97 MB for
+50k (`vault.*.home.size`; 0.34, 3.6 and 13 MB before #279), unchanged by a burst of writes. It is a
 cache: deleting `parse.sqlite` costs one parse of the vault, and rows written by another build are
 not trusted.
 **Opening a vault wrote nothing to it** at any size, `.anydag/` included (`vault.*.open.writes`). The
