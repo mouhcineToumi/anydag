@@ -690,6 +690,12 @@
      under the quarter rule the grip on that same window moved nothing at all. */
   width: min(var(--sidebar-w, 272px), var(--sidebar-cap));
   --sidebar-cap: max(232px, 25vw);
+  /* A row's height, wherever the column draws one: the tree and the favourites above it are the
+     same row (#319). `--sidebar-row` used to live on the tree alone, so a favourite's row fell back
+     to `height: auto` — shorter than the 24px tool it holds, which is what made `.dag-sidebar__favs`
+     scroll. `Sidebar.tsx` reads it from the tree's computed style to place the rows it has not
+     drawn. The phone's taller row is the sheet's rule below. */
+  --sidebar-row: 30px;
   height: 100%;
   min-height: 0;
   font-size: var(--dag-ui-text-md);
@@ -833,10 +839,9 @@
 .dag-sidebar__section h2 { flex: 1; margin: 0; font-size: var(--dag-ui-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
 
 .dag-sidebar__tree {
-  /* A row's height and an open empty folder's *Empty* line, said once: the tree draws only the rows in
-     view (`virtual.ts`) and places each by its offset, so `Sidebar.tsx` reads these to know where a row
-     it has not drawn would be. The phone's taller row is the sheet's rule below. */
-  --sidebar-row: 30px;
+  /* An open empty folder's *Empty* line, said once: the tree draws only the rows in view
+     (`virtual.ts`) and places each by its offset, so `Sidebar.tsx` reads this to know where a line
+     it has not drawn would be. The row's height is the column's `--sidebar-row` above. */
   --sidebar-empty: 26px;
   flex: 1;
   min-height: 0;
@@ -1411,6 +1416,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-radius: 0;
   box-shadow: none;
   font-size: var(--dag-ui-text-lg);
+  /* The tree and the favourites are one row height here too. */
+  --sidebar-row: 44px;
   animation: dag-sheet-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sheet-in { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -1436,7 +1443,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* Settings shares the foot with Trash and the two cloud rows; it was the one 28px row left. */
 .dag-sidebar[data-sheet] .dag-sidebar__account { min-height: 44px; }
 .dag-sidebar[data-sheet] .dag-sidebar__foot { padding: 8px 12px 16px; }
-.dag-sidebar[data-sheet] .dag-sidebar__tree { --sidebar-row: 44px; padding-bottom: 12px; }
+.dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
 /* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
 .dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: var(--dag-ui-text-lg); }
 /* Labelled now (#215), so as wide as the word, and still a finger's 44 each way (#209). */

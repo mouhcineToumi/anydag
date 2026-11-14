@@ -87,8 +87,9 @@ Fifteen things are load-bearing:
   known from the list, so a prefix sum is all the library would have added. Five things hold it up:
   - **Every line is `position: absolute` at its offset** inside a `role="tree"` as tall as the whole list,
     so a row's place never depends on the rows before it being drawn, which is what lets a pinned row stay
-    put while the rows around it come and go. A row's height is the stylesheet's — `--sidebar-row` (30px, the
-    sheet's 44px) and `--sidebar-empty` on `.dag-sidebar__tree` — **read from the computed style, not repeated
+    put while the rows around it come and go. A row's height is the stylesheet's — `--sidebar-row` on
+    `.dag-sidebar` (30px, the sheet's 44px), so the tree and the favourites above it draw the same row, and
+    `--sidebar-empty` on `.dag-sidebar__tree` — **read from the computed style, not repeated
     in the component**, so the phone's rows are CSS's to say. A line with its box open is nominally a row's
     height (`.dag-sidebar__line--ask` has no vertical padding on the sheet, for that); a mistake of a few
     pixels moves where the *next* window starts, never what is drawn.
