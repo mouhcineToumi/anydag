@@ -2,8 +2,10 @@
  * The page's half of an export with its files: where an attachment's bytes and a pasted
  * picture's are fetched from for the account that owns them, handed to `bundle` — the half the CLI
  * shares — and the one file saved. A document that names nothing saves as the Markdown it always was.
+ *
+ * `bundle` and the zip writer under it (`fflate`) are imported when an export runs, not with the page:
+ * nobody waits on them to draw anything.
  */
-import { bundle, zipBundle } from "@/export/bundle";
 import { saveFile } from "@/export/save";
 import { readIndex } from "@/refs/useIndex";
 import { ownAssets } from "@/render/assets";
@@ -24,7 +26,7 @@ const bytesOf = async (url: string): Promise<Uint8Array | null> => {
  * holding it and them. `doc` is the document's name, which a pasted picture's path is relative to.
  */
 export async function saveWithFiles(doc: string, mdPath: string, text: string): Promise<void> {
-  const index = await readIndex();
+  const [index, { bundle, zipBundle }] = await Promise.all([readIndex(), import("@/export/bundle")]);
   const made = await bundle(
     mdPath,
     text,

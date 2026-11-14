@@ -411,8 +411,11 @@
   session put its text on screen 365 ms after the click in the packaged desktop app, and preloading
   the chunk changed nothing: the editor still came up 320 ms after the page did, and a second note
   took 40 ms. `useBlockEditor` keeps the loaded module and renders it in the same pass (#120).
-  Anything the person waits on is not behind a `lazy` on the path of a click; a page reached by
-  loading it, like `NoVaultPage`, can be.
+  The first load paid it too: `App` was `lazy`, so every page came up as much as 300 ms after its
+  chunk had arrived, until `main.tsx` awaited the chunk beside the fonts and drew it in the first
+  render (#303). Nothing the person waits on belongs behind a `lazy`; a quiz form's rich field is
+  the one still there (`notes.md`). A chunk a page asks for as it mounts goes through
+  `src/ui/chunk.ts` (`chunk()` and `useChunk`), which is `useBlockEditor` made general.
 - **A component handed to a BlockNote controller is a component type, so it must be the same one
   on every render.** `SideMenuController` draws its `sideMenu` as `<sideMenu />`, and the note editor
   handed it an arrow written in the render: every re-render of the editor — the page re-renders it

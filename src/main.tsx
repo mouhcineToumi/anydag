@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, lazy } from "react";
+import { StrictMode, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 
 import "@fontsource/inter/400.css";
@@ -78,11 +78,11 @@ import "./styles/items.css";
 /**
  * What the page will want first, asked for the moment the session is known to be there.
  *
- * `Gate` loads the canvas lazily and a note's page loads the editor lazily, and both used to be
- * requested only once the fonts, the session, the workspaces and the preferences had all come back:
- * round trips with nothing else on the wire. A later `import()` of the same module is the one
- * already on its way, so nothing is fetched twice. Not for the read-only view or the consent card,
- * which draw neither, and not before the session, because a sign-in card needs none of it.
+ * The page this address draws — the canvas, or the read-only view for `?view=1` — is a chunk of its
+ * own, and so is a note's editor; both used to be requested only once the fonts, the session, the
+ * workspaces and the preferences had all come back: round trips with nothing else on the wire. A later
+ * `import()` of the same module is the one already on its way, so nothing is fetched twice. Not
+ * before the session, because a page with no server answering draws neither.
  *
  * The layout worker is `start()`'s to begin for a board, before anything is asked: a board lays
  * something out the moment it is drawn, and this is where the worker used to start by being
@@ -92,7 +92,7 @@ import "./styles/items.css";
 function preload(): void {
   const q = new URLSearchParams(location.search);
   const view = q.get("view") === "1";
-  if (!view) void import("./App");
+  void topPage(view);
   if (!view && q.get("note")) void preloadEditor();
   if (q.get("board")) return;
   const root = document.documentElement;
@@ -106,8 +106,36 @@ function preload(): void {
   const timer = setTimeout(later, 5_000);
 }
 
+/**
+ * The page the address asks for, each a chunk of its own: the canvas and every page that edits
+ * (`App`), or the read-only view (`ViewApp`). So the entry holds only what every page needs before
+ * its first render, a viewer never fetches the editor, and a board never fetches the view.
+ * `test/view-graph.test.ts` holds the import graph to that.
+ *
+ * **Not `React.lazy`.** A lazy component suspends on its first render even when its chunk has
+ * long since arrived, and React then holds the content back until 300 ms after the fallback went up
+ * (*`React.lazy` costs 300 ms the first time it renders*). The chunk is awaited beside the fonts and
+ * the session instead, and the component it holds is drawn in the very first render.
+ */
+let top: { view: boolean; page: Promise<ComponentType> } | null = null;
+function topPage(view: boolean): Promise<ComponentType> {
+  if (top?.view !== view)
+    top = {
+      view,
+      page: view ? import("./view/ViewApp").then((m) => m.ViewApp) : import("./App").then((m) => m.App),
+    };
+  return top.page;
+}
+
 /** The picker for when no vault is open: a chunk of its own, so a page that has a vault never fetches it. */
-const NoVaultPage = lazy(() => import("./ui/NoVaultPage").then((m) => ({ default: m.NoVaultPage })));
+const noVaultPage = () => import("./ui/NoVaultPage").then((m) => m.NoVaultPage);
+
+/** A chunk that did not come, thrown from render for the page's error boundary, as a lazy's was. */
+const failed =
+  (error: unknown): ComponentType =>
+  () => {
+    throw error;
+  };
 
 async function start(): Promise<void> {
   if (new URLSearchParams(location.search).get("board")) warmLayout();
@@ -151,17 +179,15 @@ async function start(): Promise<void> {
     if (id && features?.cloud) void startTelemetry();
   }
 
+  /* The page itself, which `preload()` has been fetching since the session answered: drawn in the
+     first render, never behind a `Suspense`. With no session there is no page — `Gate` says so. */
+  const Page: ComponentType | null = !account
+    ? null
+    : await (id ? topPage(new URLSearchParams(location.search).get("view") === "1") : noVaultPage()).catch(failed);
+
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <Boundary>
-        {account && !id ? (
-          <Suspense fallback={null}>
-            <NoVaultPage />
-          </Suspense>
-        ) : (
-          <Gate initial={account} />
-        )}
-      </Boundary>
+      <Boundary>{account && !id && Page ? <Page /> : <Gate initial={account} page={Page} />}</Boundary>
     </StrictMode>,
   );
 }
