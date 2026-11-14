@@ -101,6 +101,7 @@ import {
 } from "./tree";
 import { IconButton } from "./controls";
 import { VaultSwitcher } from "./Vaults";
+import { drawn, offsetsOf, scrollFor, windowFor, type Window } from "./virtual";
 import { statusTone, statusWords } from "@/sync/status";
 import { useSyncStatus } from "@/sync/useSyncStatus";
 import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
@@ -559,6 +560,10 @@ export function Sidebar({
   /* How many listed tasks are not done — the count beside Tasks. */
   const openTasks = useMemo(() => notes.filter((n) => tasks[n] && tasks[n]!.status !== "done").length, [notes, tasks]);
   const lines = useMemo(() => rowsOf(all, openFolders), [all, openFolders]);
+  /* The rows' keys in the order they are drawn, and where each is: what the keyboard, a selection and
+     the reveal ask of a row that may not be in the DOM, answered from the list and never from the page. */
+  const order = useMemo(() => lines.map(rowKey), [lines]);
+  const rowIndex = useMemo(() => new Map(order.map((k, i) => [k, i])), [order]);
   /* Which folders are projects, and whose note makes each one. */
   const owners = useMemo(() => projectFolders(projects), [projects]);
   /* Every folder that exists, the ones only a file's name implies included — what a folder's
@@ -566,7 +571,14 @@ export function Sidebar({
      rather than by a 409 the server has to be asked for. */
   const known = useMemo(() => {
     const out = new Set(folders);
-    for (const e of entries) for (const a of ancestors(e.name)) out.add(a);
+    /* A folder's files all have the same ancestors: walk them once per folder, not once per file. */
+    const walked = new Set<string>();
+    for (const e of entries) {
+      const dir = parentOf(e.name);
+      if (walked.has(dir)) continue;
+      walked.add(dir);
+      for (const a of ancestors(e.name)) out.add(a);
+    }
     return out;
   }, [folders, entries]);
 
@@ -599,7 +611,6 @@ export function Sidebar({
             : null;
   /* The open file, whichever kind — where the New menu offers to make the next one. */
   const currentName = board ?? note ?? quiz ?? table ?? file;
-  const keys = useMemo(() => new Set(lines.map(rowKey)), [lines]);
   /* The favourites that still name something. One renamed elsewhere — by an agent, on disk, on
      another device — names nothing here, and is left undrawn rather than drawn broken; the next
      change to the list lets it go. */
@@ -672,37 +683,125 @@ export function Sidebar({
    */
   const [stop, setStop] = useState<string | null>(null);
   const stopKey =
-    stop && keys.has(stop) ? stop : currentKey && keys.has(currentKey) ? currentKey : lines[0] ? rowKey(lines[0]) : null;
+    stop && rowIndex.has(stop) ? stop : currentKey && rowIndex.has(currentKey) ? currentKey : lines[0] ? rowKey(lines[0]) : null;
 
   /* A question about a row that has since gone — deleted in another tab, renamed by an agent — is a
      question about nothing, and is let go. */
   useEffect(() => {
-    if (mode && !keys.has(mode.key)) setMode(null);
-  }, [mode, keys]);
+    if (mode && !rowIndex.has(mode.key)) setMode(null);
+  }, [mode, rowIndex]);
+
+  /*
+   * **Only the rows in view, and a margin, are in the DOM** (`virtual.ts`): a folder of five thousand files
+   * is as quick to draw as one of a hundred. Every row is placed by its offset from the top of
+   * the list, so a row's place does not depend on the ones before it being drawn, and everything
+   * below that has to find a row — the arrows, the reveal, a drop's target — asks `lines` and
+   * `offsets`, never the page. `row` and `empty` are the CSS's (`--sidebar-row`, `--sidebar-empty`), read
+   * rather than repeated here, so the phone's taller rows are the stylesheet's to say.
+   */
+  const [metrics, setMetrics] = useState({ row: 30, empty: 26 });
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const css = getComputedStyle(el);
+    const row = Number.parseFloat(css.getPropertyValue("--sidebar-row")) || 30;
+    const empty = Number.parseFloat(css.getPropertyValue("--sidebar-empty")) || 26;
+    setMetrics((m) => (m.row === row && m.empty === empty ? m : { row, empty }));
+  }, [sheet]);
+  const offsets = useMemo(
+    () => offsetsOf(lines.map((l) => metrics.row + (l.type === "folder" && l.open && l.empty ? metrics.empty : 0))),
+    [lines, metrics],
+  );
+  /* Read by the scroll handler and the reveal, which must not be recreated on every list. */
+  const offsetsRef = useRef(offsets);
+  offsetsRef.current = offsets;
+  const indexRef = useRef(rowIndex);
+  indexRef.current = rowIndex;
+  const treeRef = useRef<HTMLDivElement>(null);
+  /* `null` until the list has been measured: the first draw assumes a window as tall as the screen. */
+  const [view, setView] = useState<Window | null>(null);
+  /** Where the rows start, down the scrolling list — under the failed notice, when there is one. */
+  const baseOf = (list: HTMLElement, rows: HTMLElement) =>
+    rows.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
+  /** Draw the rows that the list's scroll position now shows. */
+  const syncView = useCallback(() => {
+    const list = listRef.current;
+    const rows = treeRef.current;
+    if (!list || !rows) return;
+    const top = list.scrollTop - baseOf(list, rows);
+    setView((prev) => windowFor(offsetsRef.current, top, list.clientHeight, prev));
+  }, []);
+  /* The rows change, or the notice above them comes or goes: what is in view is other rows. */
+  useLayoutEffect(syncView, [offsets, failed, syncView]);
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(syncView);
+    watch.observe(list);
+    return () => watch.disconnect();
+  }, [syncView]);
+
+  /** Scroll so row `i` shows — only when it does not already: scrolling a row somebody has just clicked
+      to the middle would move it from under their pointer. */
+  const reveal = useCallback(
+    (i: number, block: "nearest" | "center") => {
+      const list = listRef.current;
+      const rows = treeRef.current;
+      if (!list || !rows) return;
+      const base = baseOf(list, rows);
+      const top = list.scrollTop - base;
+      const to = scrollFor(offsetsRef.current, i, top, list.clientHeight, block);
+      if (to !== top) list.scrollTop = to + base;
+      syncView();
+    },
+    [syncView],
+  );
+
+  const rowFor = useCallback(
+    (key: string) =>
+      listRef.current?.querySelector<HTMLElement>(`[data-dag-sidebar-row][data-dag-sidebar-key="${CSS.escape(key)}"]`) ?? null,
+    [],
+  );
+  /* A row asked for that was not drawn yet, focused by the commit that draws it — and let go of after a second, so a row that never comes cannot take the focus later. */
+  const wanted = useRef<{ key: string; at: number } | null>(null);
+  /** Bring a row into view and put the focus on it, whether or not it is in the DOM: the arrows walk `lines`. */
+  const focusRow = useCallback(
+    (key: string, block: "nearest" | "center" = "nearest") => {
+      const i = indexRef.current.get(key);
+      if (i === undefined) return;
+      reveal(i, block);
+      const el = rowFor(key);
+      if (el) el.focus({ preventScroll: true });
+      else wanted.current = { key, at: Date.now() };
+    },
+    [reveal, rowFor],
+  );
+  useLayoutEffect(() => {
+    const want = wanted.current;
+    if (!want) return;
+    const el = rowFor(want.key);
+    if (el) el.focus({ preventScroll: true });
+    if (el || Date.now() - want.at >= 1_000 || !rowIndex.has(want.key)) wanted.current = null;
+  });
 
   /* The open file, brought into view when it changes — but only when it is not already in view.
-     Scrolling a row somebody has just clicked to the middle of the list would move it out from
-     under their pointer, which a column that is up all day cannot afford the way a dialog could.
-     `"center"` when it does scroll, because `"nearest"` leaves it
-     flush against the edge with nothing around it.
+     `"center"` when it does scroll, because `"nearest"` leaves it flush against the edge with nothing
+     around it.
 
-     **Once per open file.** `lines.length` is a dependency so that the row can be found when the list
-     arrives after the file does, and it is also every other file or folder made or removed anywhere
-     in the vault — by an agent, the CLI, another tab. Each of those brought the open row back to
-     the middle whenever it was out of view, which is the whole time somebody has scrolled away from
-     it: the list was pulled back under their hand, and a drag held at the tree's edge, whose glide
-     scrolls it a few pixels a frame, was undone as fast as another writer added a row. The row is
+     **Once per open file.** The row is looked for each time the list changes, so that it is found when
+     the list arrives after the file does, and the list changes for every other file or folder made or
+     removed anywhere in the vault — by an agent, the CLI, another tab. Each of those brought the open
+     row back to the middle whenever it was out of view, which is the whole time somebody has scrolled
+     away from it: the list was pulled back under their hand, and a drag held at the tree's edge, whose
+     glide scrolls it a few pixels a frame, was undone as fast as another writer added a row. The row is
      shown the first time it exists for this file, and not again until the open file is another. */
   const shownKey = useRef<string | null>(null);
   useEffect(() => {
-    const list = listRef.current;
-    const row = list?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!list || !row || shownKey.current === currentKey) return;
+    const i = currentKey ? rowIndex.get(currentKey) : undefined;
+    if (i === undefined || shownKey.current === currentKey) return;
     shownKey.current = currentKey;
-    const a = list.getBoundingClientRect();
-    const b = row.getBoundingClientRect();
-    if (b.top < a.top || b.bottom > a.bottom) row.scrollIntoView({ block: "center" });
-  }, [currentKey, lines.length]);
+    reveal(i, "center");
+  }, [currentKey, rowIndex, reveal]);
 
   /* A row picked up by a long press is dragged, not scrolled past. */
   useEffect(() => {
@@ -710,29 +809,35 @@ export function Sidebar({
     return list ? holdStill(list) : undefined;
   }, []);
 
-  const rowFor = useCallback(
-    (key: string) =>
-      listRef.current?.querySelector<HTMLElement>(`[data-dag-sidebar-row][data-dag-sidebar-key="${CSS.escape(key)}"]`) ?? null,
-    [],
-  );
-
-  /* A folder asked for by name — the toolbar's breadcrumb — is focused and brought into view. */
+  /* A folder asked for by name — the toolbar's breadcrumb — is focused and brought into view, once its
+     row exists: the list can arrive after the request does, on a vault big enough for that to be a
+     second, and the request was lost when the row was looked for once. `showed` is the last honoured. */
+  const showed = useRef(0);
   useEffect(() => {
-    if (!shown) return;
-    const row = rowFor(folderKey(shown.folder));
-    row?.scrollIntoView({ block: "center" });
-    row?.focus();
-  }, [shown, rowFor]);
+    if (!shown || shown.n === showed.current || !rowIndex.has(folderKey(shown.folder))) return;
+    showed.current = shown.n;
+    focusRow(folderKey(shown.folder), "center");
+  }, [shown, rowIndex, focusRow]);
 
   /* Something just made is named where it is drawn — once its row exists, which is a round trip
      after the file does. `handled` keeps one request from being honoured twice. */
   const handled = useRef(0);
   useEffect(() => {
-    if (!naming || naming.n === handled.current || !keys.has(naming.key)) return;
+    if (!naming || naming.n === handled.current || !rowIndex.has(naming.key)) return;
     handled.current = naming.n;
     setMode({ kind: "rename", key: naming.key });
-  }, [naming, keys]);
+    reveal(rowIndex.get(naming.key)!, "nearest");
+  }, [naming, rowIndex, reveal]);
 
+  /* The rows that are drawn whatever the window says: the tab stop, which is what Tab reaches and
+     where the focus is when it is in the tree, and the one a question is open on, which holds a box
+     with a half-typed name in it. Both stay where they are, positioned, when they scroll out of view. */
+  const pins = [stopKey, mode?.key].flatMap((k) => (k !== undefined && k !== null ? (rowIndex.get(k) ?? []) : []));
+  const shownRows = drawn(view ?? windowFor(offsets, 0, window.innerHeight), lines.length, pins);
+  /* The keys of the rows a drag is carrying, read by the rows as they are drawn: a row the glide
+     scrolls into view mid-drag is as faded as the ones that were there when it lifted. */
+  const liftedKeys = useRef<ReadonlySet<string>>(NO_KEYS);
+  /** The rows that are in the DOM — a window of the list, which is all a gesture on the page can touch. */
   const rowEls = () => Array.from(listRef.current?.querySelectorAll<HTMLElement>("[data-dag-sidebar-row]") ?? []);
 
   /** Let go of the question and put the focus back on the row it was about. */
@@ -757,26 +862,29 @@ export function Sidebar({
   };
 
   const onTreeKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    const els = rowEls();
-    const at = els.indexOf(e.target as HTMLElement);
+    /* The rows, by their place in the list — a row off the screen is not in the page to be the next one. */
+    const target = e.target as HTMLElement;
+    if (!target.hasAttribute("data-dag-sidebar-row")) return;
+    const at = indexRef.current.get(target.dataset.dagSidebarKey ?? "") ?? -1;
     if (at === -1) return;
-    const line = lines.find((r) => rowKey(r) === els[at]?.dataset.dagSidebarKey);
+    const line = lines[at];
+    const clamp = (i: number) => Math.max(0, Math.min(lines.length - 1, i));
     const go = (i: number) => {
       e.preventDefault();
-      els[Math.max(0, Math.min(els.length - 1, i))]?.focus();
+      focusRow(order[clamp(i)]!);
     };
     if (line && (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey))) {
       e.preventDefault();
-      return openMenu(line, e.target as HTMLElement);
+      return openMenu(line, target);
     }
     /* Shift and an arrow grows the selection a row at a time from where it started; a plain
        arrow moves where the next one would start from. */
     const walk = (i: number) => {
-      const to = els[Math.max(0, Math.min(els.length - 1, i))]?.dataset.dagSidebarKey;
+      const to = order[clamp(i)];
       if (to && e.shiftKey) {
-        anchor.current ??= els[at]?.dataset.dagSidebarKey ?? null;
+        anchor.current ??= order[at] ?? null;
         setMode(null);
-        setSel(new Set(between(lines.map(rowKey), anchor.current, to)));
+        setSel(new Set(between(order, anchor.current, to)));
       } else if (to) anchor.current = to;
       go(i);
     };
@@ -788,25 +896,26 @@ export function Sidebar({
       case "Home":
         return go(0);
       case "End":
-        return go(els.length - 1);
+        return go(lines.length - 1);
       case "F2":
         if (!line) return;
         e.preventDefault();
         if (lockedRef.current) return void refuseLocked();
         return setMode({ kind: "rename", key: rowKey(line) });
-      case "ArrowRight":
+      case "ArrowRight": {
         if (line?.type !== "folder") return;
         e.preventDefault();
+        const next = lines[at + 1];
         if (!line.open) onFolder(line.path, true);
-        else if (els[at + 1] && lines.find((r) => rowKey(r) === els[at + 1]!.dataset.dagSidebarKey)?.depth === line.depth + 1)
-          els[at + 1]!.focus();
+        else if (next && next.depth === line.depth + 1) focusRow(order[at + 1]!);
         return;
+      }
       case "ArrowLeft": {
         if (!line) return;
         e.preventDefault();
         if (line.type === "folder" && line.open) return onFolder(line.path, false);
         const parent = parentOf(whereOf(line));
-        if (parent) rowFor(folderKey(parent))?.focus();
+        if (parent) focusRow(folderKey(parent));
         return;
       }
       default:
@@ -860,8 +969,7 @@ export function Sidebar({
     setMode(null);
     setBulk(null);
     if (e.shiftKey) {
-      const order = lines.map(rowKey);
-      const from = anchor.current ?? (currentKey && order.includes(currentKey) ? currentKey : null);
+      const from = anchor.current ?? (currentKey && rowIndex.has(currentKey) ? currentKey : null);
       const run = between(order, from, key);
       setSel((had) => new Set(toggle ? [...had, ...run] : run));
     } else {
@@ -1041,7 +1149,6 @@ export function Sidebar({
     };
     /* The chip, the rows it lifted, where the pointer is, and the frame that scrolls the tree. */
     let ghost: HTMLElement | null = null;
-    let lifted: HTMLElement[] = [];
     let at = { x: e.clientX, y: e.clientY };
     let gliding = 0;
     const lift = () => {
@@ -1058,8 +1165,8 @@ export function Sidebar({
       ghost.append(label);
       document.body.append(ghost);
       const keys = new Set(group ? [...group.folders.map(folderKey), ...group.files.map(keyOf)] : [key]);
-      lifted = rowEls().filter((el) => keys.has(el.dataset.dagSidebarKey ?? ""));
-      for (const el of lifted) el.dataset.dagSidebarLifted = "";
+      liftedKeys.current = keys;
+      for (const el of rowEls()) if (keys.has(el.dataset.dagSidebarKey ?? "")) el.dataset.dagSidebarLifted = "";
     };
     const trail = () => {
       if (ghost) ghost.style.transform = `translate(${at.x + GHOST_OFFSET.x}px, ${at.y + GHOST_OFFSET.y}px)`;
@@ -1167,7 +1274,8 @@ export function Sidebar({
           clearMarks();
           cancelAnimationFrame(gliding);
           ghost?.remove();
-          for (const el of lifted) delete el.dataset.dagSidebarLifted;
+          liftedKeys.current = NO_KEYS;
+          for (const el of rowEls()) delete el.dataset.dagSidebarLifted;
           delete document.documentElement.dataset.dagSidebarDrag;
         },
       },
@@ -1432,6 +1540,7 @@ export function Sidebar({
         className="dag-sidebar__tree"
         ref={listRef}
         onKeyDown={onTreeKey}
+        onScroll={syncView}
         data-dag-sidebar-drop=""
         /* The rows are from an answer before the one that failed; dimmed so they read as the list
            this browser kept rather than as a list the server just confirmed. */
@@ -1490,10 +1599,20 @@ export function Sidebar({
         {/* Only treeitems and their groups live in the tree. A status, an empty line or a
             refused create is a sibling before it, so a screen reader hears a file tree rather
             than a tree with a paragraph or an alert in it. */}
-        <div role="tree" aria-multiselectable="true" aria-labelledby="dag-sidebar-files">
-          {lines.map((line) => {
-            const key = rowKey(line);
+        <div
+          role="tree"
+          aria-multiselectable="true"
+          aria-labelledby="dag-sidebar-files"
+          ref={treeRef}
+          style={{ position: "relative", height: offsets[lines.length] }}
+        >
+          {shownRows.map((i) => {
+            const line = lines[i]!;
+            const key = order[i]!;
             const depth = { "--depth": line.depth } as CSSProperties;
+            /* Every line is placed by its offset, so the rows that are not drawn leave the ones that are where they were. */
+            const at = { position: "absolute", top: offsets[i], left: 0, right: 0 } as const;
+            const ask = { ...depth, ...at };
             const name = line.type === "folder" ? line.name : labelOf(line.entry);
             const where = whereOf(line);
 
@@ -1515,7 +1634,7 @@ export function Sidebar({
                name follows it in the background. A `/` is a character of a title, never a folder —
                moving is Move to… and a drag, which say so. */
               return (
-                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={ask} {...treeItem}>
                   <NameBox
                     value={name}
                     label={`New title for ${name}`}
@@ -1535,7 +1654,7 @@ export function Sidebar({
               const parent = parentOf(where);
               const destOf = (v: string) => (v.includes("/") ? v : parent ? `${parent}/${v}` : v);
               return (
-                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={ask} {...treeItem}>
                   <NameBox
                     value={name}
                     label={`New name for ${where}`}
@@ -1561,7 +1680,7 @@ export function Sidebar({
             if (mode?.kind === "transfer" && mode.key === key) {
               /* Every vault but this one, as a real `<select>` — the move's own shape one level up. */
               return (
-                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={ask} {...treeItem}>
                   <select
                     className="dag-sidebar__move"
                     data-dag-sidebar-transfer-to=""
@@ -1604,7 +1723,7 @@ export function Sidebar({
                 .filter((f) => line.type !== "folder" || (f !== where && !f.startsWith(`${where}/`)))
                 .sort();
               return (
-                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={depth} {...treeItem}>
+                <div key={key} className="dag-sidebar__line dag-sidebar__line--ask" style={ask} {...treeItem}>
                   <select
                     className="dag-sidebar__move"
                     data-dag-sidebar-move-to=""
@@ -1641,6 +1760,7 @@ export function Sidebar({
               "data-dag-sidebar-key": key,
               tabIndex: key === stopKey ? 0 : -1,
               "data-dag-sidebar-picked": sel.has(key) ? "" : undefined,
+              "data-dag-sidebar-lifted": liftedKeys.current.has(key) ? "" : undefined,
               onFocus: () => setStop(key),
               onPointerDown: onRowPointerDown(line),
               onContextMenu: (e: ReactMouseEvent<HTMLButtonElement>) => {
@@ -1702,7 +1822,7 @@ export function Sidebar({
               const owner = owners.get(line.path);
               const proj = owner ? projects[owner] : undefined;
               return (
-                <div key={key} className="dag-sidebar__line" {...treeItem} aria-expanded={line.open}>
+                <div key={key} className="dag-sidebar__line" style={at} {...treeItem} aria-expanded={line.open}>
                   <button
                     type="button"
                     className="dag-sidebar__row dag-sidebar__row--folder"
@@ -1749,7 +1869,12 @@ export function Sidebar({
             const { kind } = line.entry;
             const current = key === currentKey;
             return (
-              <div key={key} className={current ? "dag-sidebar__line dag-sidebar__line--on" : "dag-sidebar__line"} {...treeItem}>
+              <div
+                key={key}
+                className={current ? "dag-sidebar__line dag-sidebar__line--on" : "dag-sidebar__line"}
+                style={at}
+                {...treeItem}
+              >
                 <button
                   type="button"
                   className={current ? "dag-sidebar__row dag-sidebar__row--on" : "dag-sidebar__row"}

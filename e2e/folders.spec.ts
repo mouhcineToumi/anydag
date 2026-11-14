@@ -309,7 +309,9 @@ test("a dragged row rides beside the pointer, and the row it came from fades unt
 
 /**
  * Forty rows under `b`, so there is a tree's height to scroll below it whatever else is listed. Open,
- * and `b` expanded with its last row drawn: the one setup both checks below share.
+ * and `b` expanded with its first row drawn: the one setup both checks below share. Its *last* row is
+ * forty rows down and not in the page until the tree scrolls to it — the tree draws the rows in view
+ * and a margin (#281) — so it is the first row that says the folder is open.
  */
 async function withForty(page: Page): Promise<void> {
   for (let i = 0; i < 40; i++) fs.writeFileSync(at(parent, "b", `n${String(i).padStart(2, "0")}.board.md`), BOARD);
@@ -317,7 +319,7 @@ async function withForty(page: Page): Promise<void> {
   const b = page.locator(folderRow(`${parent}/b`));
   await b.scrollIntoViewIfNeeded();
   if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
-  await expect(page.locator(fileRow(`${parent}/b/n39`))).toHaveCount(1);
+  await expect(page.locator(fileRow(`${parent}/b/n00`))).toHaveCount(1);
 }
 
 test("a row held at the bottom of the tree scrolls it, and at the top scrolls it back", async ({ page }) => {
@@ -340,7 +342,7 @@ test("a row held at the bottom of the tree scrolls it, and at the top scrolls it
   await expect(async () => {
     await page.mouse.up();
     if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
-    await expect(page.locator(fileRow(`${parent}/b/n39`))).toHaveCount(1);
+    await expect(page.locator(fileRow(`${parent}/b/n00`))).toHaveCount(1);
     /* In the middle, never at an edge: an edge is where holding it scrolls. */
     await b.evaluate((el) => el.scrollIntoView({ block: "center" }));
     const a = (await b.boundingBox())!;
@@ -410,7 +412,10 @@ test("a file somebody else makes does not bring the list back to the open board"
   const open = page.locator(fileRow(`${parent}/plan`));
   const outOfView = async () => {
     const t = (await tree.boundingBox())!;
-    const r = (await open.boundingBox())!;
+    /* A row scrolled far enough away is not in the page at all (#281), which is out of view too — and
+       the list pulled back to it would draw it, in view. */
+    if ((await open.count()) === 0) return true;
+    const r = (await open.boundingBox({ timeout: 1_000 }))!;
     return r.y + r.height <= t.y || r.y >= t.y + t.height;
   };
   /* Scrolled away from the open board: it is listed after `b`'s forty rows, so the top is far from it. */
@@ -419,10 +424,14 @@ test("a file somebody else makes does not bring the list back to the open board"
   });
   await expect.poll(outOfView).toBe(true);
 
+  /* The new folder is listed after `b`'s forty rows, far below what is drawn: the tree is taller by its
+     row once the list has it, which is what is waited on. */
+  const height = () => tree.evaluate((el) => el.scrollHeight);
+  const taller = (await height()) + 1;
   fs.mkdirSync(at(parent, "later"), { recursive: true });
   fs.writeFileSync(at(parent, "later", "arrived.board.md"), BOARD);
-  await expect(page.locator(folderRow(`${parent}/later`))).toHaveCount(1);
-  /* The row is in the DOM; give the effect that would have moved the list a frame or two to do it. */
+  await expect.poll(height).toBeGreaterThanOrEqual(taller);
+  /* The list has it; give the effect that would have moved the list a frame or two to do it. */
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   expect(await outOfView()).toBe(true);
 });

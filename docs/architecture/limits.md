@@ -25,7 +25,7 @@ long enough to read as hung, or that is refused.
 
 | Dimension | Works well up to | Degrades at | Breaks at |
 |---|---|---|---|
-| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 2.2 s; first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 0.5 s, re-run after every change; a 1,000-file folder takes 1.6 s to draw; server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder 6.7 s and 90k DOM elements; startup 6.4 s, with every request held behind the first listing |
+| **Vault size** (files, 90% notes) | **1,000** — every route under 1.5 s cold and 60 ms warm; the app starts to a drawn board in 1.1 s; first search 0.8 s; server 309 MB | **10,000** — startup to a drawn board 2.2 s; first search 4.2 s in the page (`page.10000.search.first`) and 23 s cold on the server; a warm `/index` 0.5 s, re-run after every change; a 1,000-file folder is on the screen 47 ms after the listing arrives (936 DOM elements, it was 18k); server 719 MB | **50,000** — first search 20 s and a 2.5 GB renderer (`page.50000.rss.renderer.search`); server 2.6 GB; cold `/index` 53 s; a 5,000-file folder is on the screen 180 ms after the listing arrives, in 936 DOM elements (it was 90k and 1.4 s), but the listing itself arrives about 2 s after the note is ready, held behind the first walk; startup 6.4 s, with every request held behind the first listing |
 | **Board size** (items, one in ten a 6-node diagram) | **500** — 0.95 s to `data-dag-ready`, its renderer 285 MB | **2,000** — 5.7 s, its renderer 643 MB, 30k DOM elements | not reached at 2,000 |
 | **Diagram size** (`arch` nodes, ELK) | **200** — 0.9 s | **500** — 2.9 s | **1,000** — 8.3 s with nothing drawn until it is done |
 | **Attachment size** | **100 MB** — upload 0.26 s, read 0.17 s; the server peaks at 540 MB | **500 MB** — the server peaks at 1.6 GB and keeps it (#278) | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 5 ms |
@@ -33,8 +33,9 @@ long enough to read as hung, or that is refused.
 
 The vault limit is set by three things that scale with the vault rather than with what changed —
 search (#282, and #267's index), the listing and references index (#280), and the server's memory
-(#279) — the sidebar's tree (#281), and the first listing holding the server's thread at launch
-(#283). None of them is the disk.
+(#279) — and the first listing holding the server's thread at launch (#283). None of them is the disk.
+The sidebar's tree was a fourth until #281: it draws the rows in view and a margin now, so a folder
+of 5,000 files costs what one of 100 does.
 
 ### Memory, per process
 
@@ -130,8 +131,13 @@ The Linux installer: the AppImage is 132 MiB; unpacked it is 314 MB, of which th
 - **Search at 5k notes:** between the 1k and 10k rows above, so by interpolation a cold server search
   of about 11 s, a first answer in the page of about 2 s and a warm query of about 0.25 s — the warm
   figure `search.md` already records. #282 and #267's index are the fix.
-- **Lists at 10k files:** a 1,000-row folder is 18k DOM elements and 1.6 s to draw, a 5,000-row one
-  90k and 6.7 s — #281.
+- **Lists at 10k files:** a 1,000-row folder was 18k DOM elements and 1.6 s to draw, a 5,000-row one
+  90k and 6.7 s. The sidebar draws the rows in view and a margin since #281 (`sidebar.md`): 936 elements
+  whatever the folder holds, and the rows are on the screen 47 ms (1,000 rows) and 180 ms (5,000) after
+  the listing reaches the page, from 270 ms and 1,400 ms. `sidebar.drawn` at 50k files is still 2.3 s
+  after `note.ready` because the page's `/__board/list` is the last of three requests the server's one
+  thread answers in turn (the note's `get`, `/api/practice`, then the listing, each about a second at
+  50k): that is #283, and `sidebar.after-list` is the part that is the sidebar's.
 - **Time to first paint:** 0.36 s to a window at every vault size, and 1.1 s to a drawn board on 1k
   files but 6.4 s on 50k (*Startup*). The update check runs after the window in a packaged build and
   is off in a dev run, so it is not in the number; deferring work past the first paint (#267 item 6)
@@ -186,7 +192,7 @@ the rest moved by up to 2x between runs on this laptop (a board timed straight a
 with the browser still giving back gigabytes, was twice as slow, which is why boards now run first), and
 a guard that fails on noise is one nobody reads; and fixing what was found, which is one issue each:
 #278 (attachments held whole in memory), #279 (the server's memory grows with the vault), #280 (the
-listing and the references index re-read the vault per call), #281 (the sidebar is not virtualised),
+listing and the references index re-read the vault per call), #281 (the sidebar was not virtualised; it is now),
 #282 (the search card loads the vault's text into the page), #283 (the first listing holds the
 server's thread, so startup grows with the vault).
 
@@ -194,7 +200,12 @@ server's thread, so startup grows with the vault).
 
 `node scripts/bench.mjs --json bench.json`, 2026-11-14, the machine above. The `desktop.startup.*`
 lines at the end are from `node scripts/bench.mjs --only desktop` the same day, run after startup was
-added to the script.
+added to the script. The `page.100`, `page.1000`, `page.10000` and `page.50000` lines `note.ready`
+through `rss.browser` are from `node scripts/bench.mjs --only page` after the sidebar was virtualised
+(#281), on a quiet machine, the same day: `sidebar.drawn` is now the first 10 rows of `inbox/` (it
+waited for all of them while the tree drew them all), and `sidebar.after-list` is new. Before it, at
+10k and 50k files, `sidebar.drawn` was 1.6 s and 6.7 s, `sidebar.rows` 1,006 and 5,042,
+`dom.nodes` 18,092 and 89,894, and `sidebar.after-list` 0.27 s and 1.4 s.
 
 ```text
 # AnyDag bench · 2026-11-14T08:27:37.344Z
@@ -282,13 +293,14 @@ vault.100.burst.settle                   62.7 ms           # first write to the 
 vault.100.burst.cpu                      0.03 s            # server CPU for the burst
 vault.100.index.after-burst              413 ms            # only what changed is parsed again
 vault.100.home.size.after-burst          0.13 MB
-page.100.note.ready                      1627 ms           # a note in inbox/ opened cold to data-dag-ready
-page.100.sidebar.drawn                   1636 ms           # from navigation to 10 rows of inbox/ in the sidebar
-page.100.sidebar.rows                    13 count
+page.100.note.ready                      578 ms            # a note in inbox/ opened cold to data-dag-ready
+page.100.sidebar.drawn                   580 ms            # from navigation to 10 rows of inbox/ in the sidebar
+page.100.sidebar.after-list              138 ms            # from the listing arriving in the page to those rows drawn
+page.100.sidebar.rows                    13 count          # rows in the DOM: a window of the list since #281
 page.100.dom.nodes                       448 count
-page.100.heap                            13 MB             # the page's JS heap
-page.100.rss.renderer                    188 MB            # every renderer of the browser (one page open)
-page.100.rss.browser                     538 MB            # every Chromium process
+page.100.heap                            12.4 MB           # the page's JS heap
+page.100.rss.renderer                    190 MB            # every renderer of the browser (one page open)
+page.100.rss.browser                     533 MB            # every Chromium process
 page.100.idle.cpu                        0.07 %            # all Chromium processes, a note open, 15 s
 page.100.idle.main-thread                0 %               # the page's main thread busy, 15 s
 page.100.search.first                    376 ms            # card opened to the first match in the text (corpus fetched, index built)
@@ -314,13 +326,14 @@ vault.1000.burst.settle                  68.3 ms           # first write to the 
 vault.1000.burst.cpu                     0.05 s            # server CPU for the burst
 vault.1000.index.after-burst             329 ms            # only what changed is parsed again
 vault.1000.home.size.after-burst         0.29 MB
-page.1000.note.ready                     687 ms            # a note in inbox/ opened cold to data-dag-ready
-page.1000.sidebar.drawn                  689 ms            # from navigation to 100 rows of inbox/ in the sidebar
-page.1000.sidebar.rows                   102 count
-page.1000.dom.nodes                      2016 count
-page.1000.heap                           13.5 MB           # the page's JS heap
-page.1000.rss.renderer                   203 MB            # every renderer of the browser (one page open)
-page.1000.rss.browser                    552 MB            # every Chromium process
+page.1000.note.ready                     637 ms            # a note in inbox/ opened cold to data-dag-ready
+page.1000.sidebar.drawn                  639 ms            # from navigation to 10 rows of inbox/ in the sidebar
+page.1000.sidebar.after-list             122 ms            # from the listing arriving in the page to those rows drawn
+page.1000.sidebar.rows                   30 count
+page.1000.dom.nodes                      746 count
+page.1000.heap                           11.5 MB           # the page's JS heap
+page.1000.rss.renderer                   198 MB            # every renderer of the browser (one page open)
+page.1000.rss.browser                    548 MB            # every Chromium process
 page.1000.idle.cpu                       0.07 %            # all Chromium processes, a note open, 15 s
 page.1000.idle.main-thread               0 %               # the page's main thread busy, 15 s
 page.1000.search.first                   833 ms            # card opened to the first match in the text (corpus fetched, index built)
@@ -350,13 +363,14 @@ vault.10000.burst.settle                 64.5 ms           # first write to the 
 vault.10000.burst.cpu                    0.03 s            # server CPU for the burst
 vault.10000.index.after-burst            831 ms            # only what changed is parsed again
 vault.10000.home.size.after-burst        1.8 MB
-page.10000.note.ready                    1125 ms           # a note in inbox/ opened cold to data-dag-ready
-page.10000.sidebar.drawn                 1626 ms           # from navigation to 1000 rows of inbox/ in the sidebar
-page.10000.sidebar.rows                  1006 count
-page.10000.dom.nodes                     18092 count
-page.10000.heap                          24.6 MB           # the page's JS heap
-page.10000.rss.renderer                  248 MB            # every renderer of the browser (one page open)
-page.10000.rss.browser                   603 MB            # every Chromium process
+page.10000.note.ready                    1122 ms           # a note in inbox/ opened cold to data-dag-ready
+page.10000.sidebar.drawn                 1424 ms           # from navigation to 10 rows of inbox/ in the sidebar
+page.10000.sidebar.after-list            47.2 ms           # from the listing arriving in the page to those rows drawn
+page.10000.sidebar.rows                  43 count
+page.10000.dom.nodes                     936 count
+page.10000.heap                          18.5 MB           # the page's JS heap
+page.10000.rss.renderer                  210 MB            # every renderer of the browser (one page open)
+page.10000.rss.browser                   553 MB            # every Chromium process
 page.10000.idle.cpu                      0.07 %            # all Chromium processes, a note open, 15 s
 page.10000.idle.main-thread              0 %               # the page's main thread busy, 15 s
 page.10000.search.first                  4170 ms           # card opened to the first match in the text (corpus fetched, index built)
@@ -382,13 +396,14 @@ vault.50000.burst.settle                 65.4 ms           # first write to the 
 vault.50000.burst.cpu                    0.41 s            # server CPU for the burst
 vault.50000.index.after-burst            3092 ms           # only what changed is parsed again
 vault.50000.home.size.after-burst        17.6 MB
-page.50000.note.ready                    3376 ms           # a note in inbox/ opened cold to data-dag-ready
-page.50000.sidebar.drawn                 6746 ms           # from navigation to 5000 rows of inbox/ in the sidebar
-page.50000.sidebar.rows                  5042 count
-page.50000.dom.nodes                     89894 count
-page.50000.heap                          77.3 MB           # the page's JS heap
-page.50000.rss.renderer                  492 MB            # every renderer of the browser (one page open)
-page.50000.rss.browser                   842 MB            # every Chromium process
+page.50000.note.ready                    3433 ms           # a note in inbox/ opened cold to data-dag-ready
+page.50000.sidebar.drawn                 5770 ms           # from navigation to 10 rows of inbox/ in the sidebar
+page.50000.sidebar.after-list            180 ms            # from the listing arriving in the page to those rows drawn
+page.50000.sidebar.rows                  43 count
+page.50000.dom.nodes                     936 count
+page.50000.heap                          43.4 MB           # the page's JS heap
+page.50000.rss.renderer                  306 MB            # every renderer of the browser (one page open)
+page.50000.rss.browser                   650 MB            # every Chromium process
 page.50000.idle.cpu                      0 %               # all Chromium processes, a note open, 15 s
 page.50000.idle.main-thread              0 %               # the page's main thread busy, 15 s
 page.50000.search.first                  19975 ms          # card opened to the first match in the text (corpus fetched, index built)

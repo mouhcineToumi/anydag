@@ -65,7 +65,10 @@ export interface Tree {
 /* Numerically, so `round-2` comes before `round-10` rather than after `round-15`. Board names here
    are as often numbered as worded — `1-today`, `201-notes` — and a
    plain string sort scatters exactly the sets somebody made a folder for. */
-const by = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+const collator = new Intl.Collator(undefined, { numeric: true });
+/* One collator, not `a.localeCompare(b, undefined, { numeric: true })`, which builds the same one on
+   every call: sorting the 50,000 files of a large vault was half a second of the page's first draw. */
+const by = (a: string, b: string) => collator.compare(a, b);
 
 /**
  * The folders as they actually are: nested.

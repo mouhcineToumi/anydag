@@ -722,21 +722,33 @@ async function pageGroup(n, s, v, b) {
   const { context, page, metrics, problems } = await pageOn(b, s);
   try {
     const note = "inbox/item-000000";
+    /* When the page has the listing: the sidebar cannot draw a row before, and how long the server
+       takes to answer it (it is queued behind the page's other requests) is not the sidebar's. */
+    let listed = null;
+    page.on("requestfinished", (req) => {
+      if (listed === null && req.url().includes("/__board/list")) listed = now();
+    });
     const ready = await readyAfter(page, `${s.origin}/?note=${encodeURIComponent(note)}`);
     record(`${p}.note.ready`, ready, "ms", "a note in inbox/ opened cold to data-dag-ready");
-    const rows = v.inbox;
+    /* The tree draws the rows in view and a margin (#281), so a folder of 5000 files has a screenful in
+       the DOM, never 5000: drawn is the first rows of `inbox/` being there. */
+    const rows = Math.min(v.inbox, 10);
     let t = now();
     let drawn = "timeout";
+    let afterList = "n/a";
     try {
-      await page.waitForFunction((want) => document.querySelectorAll("[data-dag-sidebar-row]").length >= want, rows, {
+      await page.waitForFunction((want) => document.querySelectorAll('[data-dag-sidebar-file^="inbox/"]').length >= want, rows, {
         timeout: STEP_MS,
         polling: 100,
       });
-      drawn = now() - t + (typeof ready === "number" ? ready : 0);
+      const seen = now();
+      drawn = seen - t + (typeof ready === "number" ? ready : 0);
+      if (listed !== null) afterList = seen - listed;
     } catch {
       /* drawn stays timeout */
     }
     record(`${p}.sidebar.drawn`, drawn, "ms", `from navigation to ${rows} rows of inbox/ in the sidebar`);
+    record(`${p}.sidebar.after-list`, afterList, "ms", "from the listing arriving in the page to those rows drawn");
     const counted = await page.evaluate(() => ({
       rows: document.querySelectorAll("[data-dag-sidebar-row]").length,
       nodes: document.getElementsByTagName("*").length,
