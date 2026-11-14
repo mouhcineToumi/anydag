@@ -16,12 +16,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Bases, sha1Of } from "../../server/sync/bases";
 import { HttpSyncApi, SyncError } from "../../server/sync/client";
 import { SyncEngine } from "../../server/sync/engine";
+import { POKE_EVENT_MAX, PokeEvents, PokeTooLarge } from "../../server/sync/loop";
 import { homeSecret, loadVaultKey, saveVaultKey, SecretElsewhere } from "../../server/sync/keys";
 import { conflictName, freshCopy, isJson, isText, mergeContent } from "../../server/sync/merge";
 import { syncs } from "../../server/sync/scope";
 import { SyncState } from "../../server/sync/state";
 import { frontId } from "../../server/ids";
-import { keyOf, keysOf, randomKey } from "../../api/protocol/crypto";
+import { blobId, keyOf, keysOf, randomKey, sealBlob } from "../../api/protocol/crypto";
 import { MetaRefused, openMeta, sealMeta } from "../../api/protocol/meta";
 import { PROTOCOL, PROTOCOL_HEADER, type Change } from "../../api/protocol/wire";
 import { FakeServer } from "./sync-fake";
@@ -349,6 +350,74 @@ describe("HttpSyncApi", () => {
   });
 });
 
+describe("a sync server that answers too much (#9)", () => {
+  const headers = { [PROTOCOL_HEADER]: String(PROTOCOL) };
+  /** A body that streams `total` bytes of `fill` in `chunk`-sized pieces, saying no length. */
+  const streamed = (total: number, chunk = 1024, fill = 97): ReadableStream<Uint8Array> => {
+    let sent = 0;
+    return new ReadableStream({
+      pull(c) {
+        if (sent >= total) return c.close();
+        const n = Math.min(chunk, total - sent);
+        sent += n;
+        c.enqueue(new Uint8Array(n).fill(fill));
+      },
+    });
+  };
+
+  it("refuses a reply past the bound, whether its length is said or not", async () => {
+    const replyMax = { json: 4096, blob: 8192 };
+    const said = (async () =>
+      new Response("{}", { headers: { ...headers, "content-length": "999999" } })) as unknown as typeof fetch;
+    const big = await new HttpSyncApi({ url: "https://s.example", fetch: said, replyMax }).vaults().catch((e: unknown) => e);
+    expect((big as SyncError).code).toBe("ES_TOO_LARGE");
+
+    const endless = (async () => new Response(streamed(1024 * 1024), { headers })) as unknown as typeof fetch;
+    const api = new HttpSyncApi({ url: "https://s.example", fetch: endless, replyMax });
+    expect(((await api.changes("v", 0).catch((e: unknown) => e)) as SyncError).code).toBe("ES_TOO_LARGE");
+    expect(((await api.getBlob("v", "b".repeat(43)).catch((e: unknown) => e)) as SyncError).code).toBe("ES_TOO_LARGE");
+
+    // Under the bound an answer reads as it always did.
+    const fine = (async () => new Response(JSON.stringify({ vaults: [] }), { headers })) as unknown as typeof fetch;
+    expect(await new HttpSyncApi({ url: "https://s.example", fetch: fine, replyMax }).vaults()).toEqual({ vaults: [] });
+    const blob = (async () => new Response(streamed(8192, 1000, 7), { headers })) as unknown as typeof fetch;
+    expect(
+      (await new HttpSyncApi({ url: "https://s.example", fetch: blob, replyMax }).getBlob("v", "b".repeat(43))).byteLength,
+    ).toBe(8192);
+  });
+
+  it("cuts the poke stream into events as it arrives, whatever the chunks", () => {
+    const events = new PokeEvents();
+    expect(events.feed('data: {"seq":1}\n')).toEqual([]);
+    expect(events.feed('\ndata: {"seq":2}\r')).toEqual(['data: {"seq":1}']);
+    expect(events.feed('\n\r\n: ping\n\ndata: {"se')).toEqual(['data: {"seq":2}', ": ping"]);
+    expect(events.feed('q":3}\n\n')).toEqual(['data: {"seq":3}']);
+  });
+
+  it("refuses an event past the bound, and reads a long stream of small ones in linear time", () => {
+    const endless = new PokeEvents();
+    const kib = "a".repeat(1024);
+    let thrown: unknown = null;
+    try {
+      for (let i = 0; i < 16 * 1024; i++) endless.feed(kib);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(PokeTooLarge);
+
+    // 8 MiB of well-formed pokes, a kibibyte at a time: each chunk is searched once.
+    const many = new PokeEvents();
+    const poke = 'data: {"seq":1}\n\n';
+    const chunk = poke.repeat(Math.floor(1024 / poke.length));
+    const t = performance.now();
+    let n = 0;
+    for (let i = 0; i < 8 * 1024; i++) n += many.feed(chunk).length;
+    expect(n).toBe(8 * 1024 * Math.floor(1024 / poke.length));
+    expect(performance.now() - t).toBeLessThan(2000);
+    expect(POKE_EVENT_MAX).toBe(64 * 1024);
+  });
+});
+
 // -- what the server, or a stolen device token, can replay ---------------------------------------
 
 describe("a version that does not belong where it arrived", () => {
@@ -482,6 +551,53 @@ describe("a version that does not belong where it arrived", () => {
 });
 
 // -- devices ------------------------------------------------------------------------------------
+
+describe("a pull outside what syncs (#9)", () => {
+  /* A device holding the vault key can seal any path. A pull wrote whatever one named — create-only,
+     but anywhere in the vault, and in folders other tools run things from. */
+  function plant(server: FakeServer, vk: Uint8Array, rel: string, kind: "file" | "dir", body = "planted\n"): void {
+    const k = keysOf(vk);
+    const plain = kind === "dir" ? new Uint8Array() : bytes(body);
+    const id = blobId(k.blob, plain);
+    server.blobs.set(id, sealBlob(k.enc, id, plain));
+    const key = keyOf(k.path, rel);
+    const at = { key, blob: id, parent: server.heads.get(key)?.seq ?? null };
+    const meta = { path: rel, kind, created: null, mtime: 0, size: plain.byteLength };
+    server.commit("dev-peer", server.vault, [{ ...at, meta: sealMeta(k.enc, at, meta) }]);
+  }
+
+  it("writes nothing out of scope, keeps what is there, and still takes what is in it", async () => {
+    const { server, devs, vk } = world(2);
+    const [a, b] = devs as [Device, Device];
+    a.fs.write("plan.md", "plan\n");
+    b.fs.write(".git/hooks/pre-push", "ORIGINAL\n");
+    await settle(server, devs);
+
+    const outside = [
+      ".git/hooks/post-checkout",
+      ".git/hooks/pre-push",
+      ".vscode/tasks.json",
+      "node_modules/x/index.js",
+      ".anydag/not-in-scope.json",
+      "tool.exe",
+    ];
+    for (const rel of outside) plant(server, vk, rel, "file");
+    plant(server, vk, ".obsidian/plugins/evil", "dir");
+    plant(server, vk, "planted.md", "file", "in scope\n");
+    await b.sync();
+
+    for (const rel of outside.filter((r) => r !== ".git/hooks/pre-push")) expect(b.fs.readText(rel), rel).toBeNull();
+    expect(fs.existsSync(path.join(b.fs.root, ".obsidian"))).toBe(false);
+    expect(b.fs.readText(".git/hooks/pre-push")).toBe("ORIGINAL\n");
+    expect(fs.readdirSync(path.join(b.fs.root, ".git", "hooks"))).toEqual(["pre-push"]);
+    // What is in scope still lands, and nothing about the rest is pushed back.
+    expect(b.fs.readText("planted.md")).toBe("in scope\n");
+    const before = server.seq;
+    await b.sync();
+    expect(server.seq).toBe(before);
+    expect(b.engine.pending()).toBe(0);
+  });
+});
 
 describe("the engine", () => {
   it("propagates a create", async () => {

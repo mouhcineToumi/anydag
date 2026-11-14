@@ -611,6 +611,12 @@ export class SyncEngine {
     this.opened(r.del);
     const meta = this.opened(r.create);
     const rel = normalise(meta.path);
+    // A rename out of what syncs is a delete here and nothing written: `apply` decides both halves.
+    if (!this.inScope(rel, meta.kind)) {
+      await this.apply(r.del);
+      await this.apply(r.create);
+      return;
+    }
     const theirs = this.sized(meta, await this.fetchBlob(r.create.blob!));
     const base = (await this.baseOf(r.from)) ?? theirs;
     const res = mergeContent(rel, base, r.ours, theirs);
@@ -679,11 +685,24 @@ export class SyncEngine {
     return bytes;
   }
 
+  /**
+   * Whether a path that arrived is one this device would have sent: the same `syncs()` and
+   * `dirSyncs()` the scan asks (#9). A device holding the vault key can seal any path, and a pull
+   * used to write whatever it named — `.git/hooks/…`, `.obsidian/plugins/…`, `node_modules/…`, any
+   * extension. Outside the scope a change is acknowledged and nothing is written.
+   */
+  private inScope(rel: string, kind: "file" | "dir"): boolean {
+    return kind === "dir" ? dirSyncs(rel) : syncs(rel, this.types);
+  }
+
   private async apply(e: Incoming): Promise<void> {
     const st = this.state.entry(e.key);
     if (st && st.seq >= e.seq) return;
     const meta = this.opened(e);
     const rel = normalise(meta.path);
+    /* No state row either: the page's cursor moves on without one, a later version of the key is
+       judged the same way, and a path with no row is never marked to push (`touch`). */
+    if (!this.inScope(rel, meta.kind)) return;
     if (meta.kind === "dir") return this.applyDir(e, rel);
     const theirs = e.blob ? this.sized(meta, await this.fetchBlob(e.blob)) : null;
     if (st && st.rel !== rel && st.blob !== null) await this.moveCase(st, rel);
