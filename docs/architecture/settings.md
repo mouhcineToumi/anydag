@@ -282,9 +282,9 @@ a config file the server reads (it would put a person's preference into every vi
 `src/board/` could not read one anyway); a per-board preferences store (the board's own settings are
 the file's — `flow:` and `w=` — and a theme is not one of them, it is the reader's, see *Settings*
 above); un-embedding the fonts from an export (the layout was measured against the
-theme's face, so a file without it is a different diagram); and the window keys — the library and
-the inspector's mode and width — which each have a control where they act. (There were five; the
-board list's went with the column.)
+theme's face, so a file without it is a different diagram); and the window keys — the library, the
+inspector's width and the Assistant panel's — which each have a control where they act, so they are
+not Settings rows. (There were five; the board list's went with the column.)
 
 ### *Turning AI off*
 

@@ -158,6 +158,12 @@ export const UPDATE_LINKS = "dag:update-links";
  * browser or a home is read by nothing.
  */
 export const INSPECTOR_WIDTH = "dag:inspector-w";
+/**
+ * How wide somebody dragged the Assistant's panel. The person's, in every vault, for
+ * {@link INSPECTOR_WIDTH}'s reason: it says how this person reads beside a page, not what the vault
+ * holds. `src/assistant/width.ts` owns the bounds and the accessor.
+ */
+export const ASSISTANT_WIDTH = "dag:assistant-w";
 
 /**
  * Every preference that is not the settings object.
@@ -171,6 +177,7 @@ export const PREF_KEYS = [
   AI,
   LIBRARY,
   INSPECTOR_WIDTH,
+  ASSISTANT_WIDTH,
   SIDEBAR,
   SIDEBAR_WIDTH,
   FAVOURITES,

@@ -16,6 +16,18 @@ chat's change blocks in a Changes column.
 row, the sparkle, `space A` and the panel go, and `?chat=` opens home. See *Turning AI off* in
 [`settings.md`](settings.md).
 
+**The panel's width is pulled at its left edge and remembered.** A 24px grip on the edge — the
+sidebar's shape, a hairline drawn on the border it moves — follows the pointer while it is held and
+settles into `dag:assistant-w` when it is let go; a double-click puts it back to the default 380px.
+`src/assistant/width.ts` owns the range (320–720px, and never more than half the window). For the
+length of the gesture the width is painted as `--assistant-w` on the panel rather than set in React
+state, so the page beside it reflows through the shell's flex row without re-rendering the chat, and
+`App`'s ResizeObserver on `.dag-viewport` moves the canvas's published box with it. The grip is a
+focusable `separator`: Left widens and Right narrows (Shift takes a longer step), and `useEditor`'s
+capture handler leaves its arrows alone (`[data-dag-assistant-grip]`) so a board's selection is not
+nudged instead. The width is the person's, in `PREF_KEYS` beside the inspector's, so a reload reads
+it back; under 720px the panel is the window and the grip is not drawn.
+
 **The page with no chat is a welcome, not an empty thread.** `?chat=new`, or `?chat=1` in a vault
 with none, draws a short greeting with the composer centred under it, focused, and no title:
 the history's New chat row is the only control that says those words. The first message makes the
@@ -161,7 +173,8 @@ Codex's own default. A Codex whose catalog cannot be read is unavailable rather 
 Nothing here draws under `?snapshot=1`, and the canvas never learns a chat exists: a turn's writes
 reach an open board through the change feed like any other writer's. Deleting a chat emits a `gone`
 event on the chat stream, so every open history drops the row at once and a page on that chat goes to
-New chat; the panel's open state is not remembered across a reload, and Settings → AI holds the default engine and model.
+New chat; the panel's open state is not remembered across a reload (its width is, above), and
+Settings → AI holds the default engine and model.
 
 Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`,
 the setting `assistant`, the leader binding `space A`, and the query key `chat`.

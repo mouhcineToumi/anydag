@@ -191,6 +191,10 @@ describe("the preference list", () => {
     expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:templates", "dag:update-links"]);
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:theme");
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:ai");
+    /* The Assistant's panel width is how this person reads beside a page, like the inspector's:
+       it travels with them, and another vault does not have its own. */
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:assistant-w");
+    expect(VAULT_PREF_KEYS as readonly string[]).not.toContain("dag:assistant-w");
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {
