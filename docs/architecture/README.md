@@ -48,6 +48,7 @@ the file for that area, not to a new place.
 | [`api.md`](api.md) | The api server: its features, config, what it stores and never stores, and running and deploying it. |
 | [`feedback.md`](feedback.md) | Send feedback: the card, what leaves the machine, the stateless relay that makes a GitHub issue, and how to run it. |
 | [`gate-and-releases.md`](gate-and-releases.md) | Versions, how a release is cut, and what `npm run gate`, `checks` and CI run. |
+| [`limits.md`](limits.md) | What the app costs to run and where it slows down and stops, measured; the bench and the nightly guards. |
 
 ## Find a section by name
 
@@ -98,6 +99,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Quotas and history | [`sync.md`](sync.md) |
 | Reaching what the file can say | [`editing-drag.md`](editing-drag.md) |
 | Reading it as a tree | [`sidebar.md`](sidebar.md) |
+| Resource use and limits | [`limits.md`](limits.md) |
 | References, ids and the read-only view | [`references.md`](references.md) |
 | Running the relay | [`feedback.md`](feedback.md) |
 | Search | [`search.md`](search.md) |
@@ -107,6 +109,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Sync | [`sync.md`](sync.md) |
 | The api server | [`api.md`](api.md) |
+| The bench | [`limits.md`](limits.md) |
 | Tables | [`tables.md`](tables.md) |
 | Tasks | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Text emphasis | [`editing.md`](editing.md) |

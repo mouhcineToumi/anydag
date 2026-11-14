@@ -36,30 +36,42 @@ import { proposedItem } from "@/edit/rewrite";
 import { SelectionBar, type RewriteRun } from "@/edit/SelectionBar";
 import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
-import { FeedbackCard } from "@/feedback/FeedbackCard";
-import { Settings, useSettingsOpen } from "@/settings/Settings";
+import { useSettingsOpen } from "@/settings/open";
 import type { LlmReason } from "@/settings/llmReason";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
 import { Item } from "@/render/Item";
 import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
-import { BoardBrowser } from "@/ui/BoardBrowser";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
 import { FileProblem } from "@/ui/FileProblem";
 import { Shell, useSidebar } from "@/ui/Shell";
+import {
+  AssistantView,
+  BoardBrowser,
+  CalendarView,
+  FeedbackCard,
+  LayoutToggle,
+  QuizEditor,
+  QuizzesView,
+  Settings,
+  TablePage,
+  TasksView,
+  TrashView,
+} from "@/ui/chunks";
+import { preloadChunks } from "@/ui/chunk";
 import type { SettingsTab } from "@/settings/tabs";
 import type { ChromeAsk } from "@/ui/chrome";
 import type { PlaceFile } from "@/ui/Sidebar";
 import { NoteView, type NoteHandle } from "@/ui/NoteView";
 import type { ProjectMembers } from "@/ui/ProjectBar";
 import { nameWhenOpened } from "@/ui/NoteTitle";
-import { LayoutToggle, NO_PROJECT, TasksView, type ProjectFilter, type TasksLayout } from "@/ui/Tasks";
+import type { TasksLayout } from "@/ui/Tasks";
+import { NO_PROJECT, type ProjectFilter } from "@/ui/projectFilter";
 import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
 import { rememberOpened } from "@/ui/recents";
 import { CALENDAR_VIEW, LIBRARY, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
 import { MAX_DAYS, VIEWS, type CalView } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
-import { CalendarView } from "@/ui/Calendar";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
 import { PageBar } from "@/ui/PageBar";
@@ -81,15 +93,11 @@ import { folderLabel, folderOfRun, folderQuizzes } from "@/quiz/folder";
 import { askable, parseQuiz, type Question } from "@/quiz/parse";
 import { stampIds } from "@/quiz/write";
 import { sealId } from "@/board/envelope";
-import { QuizEditor } from "@/ui/quiz/Editor";
-import { QuizzesView, type QuizzesRun } from "@/ui/quiz/Gallery";
-import { TrashView } from "@/ui/Trash";
-import { AssistantView } from "@/assistant/Page";
+import type { QuizzesRun } from "@/ui/quiz/Gallery";
 import { toggleAssistant } from "@/assistant/panelState";
 import { answer, flush as flushAnswers, readPractice, usePractice } from "@/ui/quiz/practice";
 import { Runner, Sheet, type RunQuestion } from "@/ui/quiz/Runner";
 import { useQuizFile } from "@/ui/quiz/useQuizFile";
-import { TablePage } from "@/ui/table/TablePage";
 import { NotePrint } from "@/view/NotePrint";
 import { leaf } from "@/ui/tree";
 import { useIndex } from "@/refs/useIndex";
@@ -225,7 +233,7 @@ type SetQuery = ReturnType<typeof useQuery>[1];
  * kind sent through any of them would have opened a quiz as a board. The keys it clears
  * are every page this app has: a board, a note, a quiz, and the two pages that list them.
  */
-export function pageQuery(kind: FileKind, target: string | null): Record<string, string | null> {
+function pageQuery(kind: FileKind, target: string | null): Record<string, string | null> {
   return {
     board: null,
     note: null,
@@ -290,6 +298,10 @@ export function App() {
      both pages and reads the same answer the search and the feedback card do. */
   const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
   useFollowing(list, go);
+  /* The pages and cards this one did not need (`ui/chunks.tsx`), fetched once it is drawn. */
+  useEffect(() => {
+    preloadChunks();
+  }, []);
   const open = useCallback((kind: FileKind, target: string | null) => setQuery(pageQuery(kind, target)), [setQuery]);
   const openTasks = useCallback(() => setQuery({ ...pageQuery("board", null), tasks: "1" }), [setQuery]);
   const openCalendar = useCallback(() => setQuery({ ...pageQuery("board", null), calendar: "1" }), [setQuery]);

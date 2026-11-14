@@ -52,7 +52,7 @@ always reaches its own vault* and read as doing nothing (#118).
 | `server/routes/chat.ts` | the routes, the guard's registration, the SSE stream |
 | `src/assistant/` | the panel, the page, the composer, the steps, the approval, access and block cards — its model and effort controls are `src/ui/ModelPicker` and `src/ui/EffortPicker`, shared with Settings |
 
-Ten things are load-bearing:
+Eleven things are load-bearing:
 
 - **The app owns the conversation; the harness owns one turn.** A turn is one process (or, for
   OpenCode, one request to a `serve` the chat keeps), parsed into steps and written to disk when it
@@ -94,7 +94,12 @@ Ten things are load-bearing:
 - **Chat mode lists only the tools a chat may use**, rather than listing everything and refusing at
   call time: a listed schema is ~300 input tokens a request, and a tool the model can see is a tool it
   tries. `NEVER_IN_CHAT` leaves out opening, making or closing a vault, settings, sync, a second model,
-  the quiz record, emptying the trash and uploads. **A document's eight everyday tools are one each
+  the quiz record, emptying the trash and uploads. **A chat fetches nothing by URL** (#9):
+  `image_add`'s `url` had the MCP process fetch any public address itself, so the request never
+  passed the guard and nobody approved it, while the address could carry what the chat had read.
+  `chatTools` takes every `url` argument out of the schemas, at any depth, and the chat's kit
+  (`Kit.noFetch`) refuses one at the single place a tool fetches (`bytesFrom`); a picture comes as
+  `data`. **A document's eight everyday tools are one each
   with a `kind`** — `doc_list`, `doc_read`, `doc_create`, `doc_write`, `doc_rename`, `doc_duplicate`,
   `doc_delete`, `doc_title` stand for the per-kind tools in `FOLDED`, and a call is held to the named
   tool's own schema before it runs it — and a description loses the `vault` sentence the system prompt
@@ -104,8 +109,16 @@ Ten things are load-bearing:
   `docs/parity.json` says why.
 - **Every file but `chat.json` is written once.** A running turn lives in memory and the SSE stream;
   undoing a block writes a new file under `undo/`, and a block's state is its last undo file by time.
-  So sync never merges a turn, and `chat.json` merges by key — a grant is its own top-level
-  `grant:<vaultId>` key and a revoke sets it to `null`, so neither side's grant is lost.
+  So sync never merges a turn, and `chat.json` merges by key.
+- **What a chat reaches is this machine's word, never the vault's** (#9). `chat.json` is vault
+  content — sync carries it, and so does anyone who writes the folder — so a `grant:` key or a
+  `home` planted there once let a chat read and change another vault with nobody asked. A grant is
+  kept in the app's home (`chat-grants:<chat>` in `kv`, `ChatStore.grants`) and written only by the
+  person's answer: the access card or the scope menu, through `Assistant.grant`. The chat's own
+  vault is the one `locate` found it in. `Assistant.reachOf` puts both into every meta the server
+  hands out or decides with — the guard, the prompt, `vault_request` and undo all read that — and a
+  revoke is `null` there, so undo still knows the vault was granted once. The cost is that a grant
+  does not follow a chat to another machine: the person is asked again there, which is the point.
 - **A block undoes to its before-images if each file is still what the block left**; a file changed
   since is listed as a conflict and left alone, the rest undone. A deleted file comes back from the
   trash, and undo is itself recorded, so it redoes. **A block is read back from the vault, so nothing

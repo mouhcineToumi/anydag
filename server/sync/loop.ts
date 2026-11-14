@@ -69,6 +69,50 @@ export const TUNE: Tune = {
   clearTimeout: (t) => clearTimeout(t as NodeJS.Timeout),
 };
 
+/**
+ * The most a poke event may hold before its blank line. A poke is `data: {"seq":N}`; anything near
+ * this is not one, and a stream that never sends a blank line is not a stream of pokes (#9).
+ */
+export const POKE_EVENT_MAX = 64 * 1024;
+
+/** A poke event past `POKE_EVENT_MAX`: the stream is dropped, and counted as a failure. */
+export class PokeTooLarge extends Error {
+  constructor() {
+    super(`poke: an event longer than ${POKE_EVENT_MAX} characters`);
+    this.name = "PokeTooLarge";
+  }
+}
+
+/**
+ * The poke stream cut into events, as it arrives. Each chunk is searched for the blank line from
+ * where the last search stopped — one character back, for a `\n` the chunk before ended on — never
+ * from the start, and what has no blank line yet is at most `POKE_EVENT_MAX`. The buffer used to be
+ * searched whole after every chunk and grow without end, so a server sending no blank line held the
+ * event loop for seconds at a time (#9).
+ */
+export class PokeEvents {
+  private buf = "";
+  /** A `\r` that ended a chunk: the `\n` that may complete it is in the next one. */
+  private cr = false;
+
+  /** The events this chunk completes, in order. Throws `PokeTooLarge` past the bound. */
+  feed(chunk: string): string[] {
+    let text = (this.cr ? "\r" : "") + chunk;
+    this.cr = text.endsWith("\r");
+    if (this.cr) text = text.slice(0, -1);
+    let from = Math.max(0, this.buf.length - 1);
+    this.buf += text.replace(/\r\n?/g, "\n");
+    const out: string[] = [];
+    for (let at = this.buf.indexOf("\n\n", from); at >= 0; at = this.buf.indexOf("\n\n", from)) {
+      out.push(this.buf.slice(0, at));
+      this.buf = this.buf.slice(at + 2);
+      from = 0;
+    }
+    if (this.buf.length > POKE_EVENT_MAX) throw new PokeTooLarge();
+    return out;
+  }
+}
+
 /** What a device kept when it paired: `<home>/sync/<vault>/pair.json`, mode 0600. */
 export interface Pairing {
   server: string;
@@ -355,6 +399,10 @@ export class SyncLoop {
     while (!this.stopped && !this.halted) {
       const ctl = new AbortController();
       this.pokeAbort = ctl;
+      /* Whether this stream said something whole. The backoff is taken back by that, not by a 200 —
+         or a server sending one endless event would be asked again every two seconds for ever — and
+         never by a stream that then sent an event past the bound (#9). */
+      let heard = false;
       try {
         const res = await fetcher(url, {
           headers: { authorization: `Bearer ${this.o.pairing.token}`, accept: "text/event-stream" },
@@ -363,29 +411,33 @@ export class SyncLoop {
         // Pokes switched off on the server: the poll is all there is.
         if (res.status === 204) break;
         if (!res.ok || !res.body) throw new Error(`poke: ${res.status}`);
-        failures = 0;
         const reader = res.body.getReader();
         const text = new TextDecoder();
-        let buf = "";
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += text.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-          for (let at = buf.indexOf("\n\n"); at >= 0; at = buf.indexOf("\n\n")) {
-            const block = buf.slice(0, at);
-            buf = buf.slice(at + 2);
-            const data = /^data:\s?(.*)$/m.exec(block)?.[1];
-            if (data === undefined) continue;
-            let seq = Number.NaN;
-            try {
-              seq = Number((JSON.parse(data) as { seq?: unknown }).seq);
-            } catch {
-              /* a poke that says nothing readable still says something changed */
+        const events = new PokeEvents();
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            for (const block of events.feed(text.decode(value, { stream: true }))) {
+              heard = true;
+              const data = /^data:\s?(.*)$/m.exec(block)?.[1];
+              if (data === undefined) continue;
+              let seq = Number.NaN;
+              try {
+                seq = Number((JSON.parse(data) as { seq?: unknown }).seq);
+              } catch {
+                /* a poke that says nothing readable still says something changed */
+              }
+              if (!(seq <= this.state.cursor())) void this.kick(false);
             }
-            if (!(seq <= this.state.cursor())) void this.kick(false);
           }
+        } catch (e) {
+          await reader.cancel().catch(() => undefined);
+          throw e;
         }
-      } catch {
+        if (heard) failures = 0;
+      } catch (e) {
+        if (heard && !(e instanceof PokeTooLarge)) failures = 0;
         failures++;
       } finally {
         if (this.pokeAbort === ctl) this.pokeAbort = null;
