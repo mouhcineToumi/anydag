@@ -21,7 +21,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
 
-Eight things are load-bearing:
+Nine things are load-bearing:
 
 - **Nothing the app needs to be correct lives only outside the vault.** A document's id is `id:` in
   its frontmatter; an attachment's is `<vault>/.anydag/files/<id>.json`; a vault's own id and
@@ -52,6 +52,16 @@ Eight things are load-bearing:
   here while one walks or reconciles makes it start again** (`moves`, see *Things that will bite*),
   three times and then on this thread. Where no worker is built beside the bundle (the unit suite) or
   `ANYDAG_LIST_INLINE=1`, the same code lists inline, still reconciling in slices.
+- **Nor behind opening a document the index has not seen** (#286). `/__board/get` answers with the
+  document's id, and on an app home that has never listed the vault — a first launch, a deep link
+  into an imported vault — a note with no `id:` used to have it found by a walk of the whole vault on
+  the server's thread: 5.7 s on 50,000 files. `Vault.rowNow` gives it its row alone instead: a text
+  with no id of its own has nothing to collide with, so it is minted the provisional id the walk would
+  have minted it, and one whose id the index does not hold keeps it. Only what needs the walk —
+  an attachment, whose id is a record that may name the path it was moved from, and a text whose id
+  the index holds at another path — waits for a listing (`row`), off this thread; a rename or a trash
+  that meets one walks here (`rowHere`), so the name it settled on cannot be taken in between. The id
+  answered is the one the next listing gives the file — see `given` in *Things that will bite*.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
   there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
   see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a

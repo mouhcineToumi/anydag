@@ -117,10 +117,15 @@ sidebar fills in when it arrives. In a browser on `anydag serve` the first page 
 included, is 0.54 s (`board.empty.first`), and the server is listening 165 ms after it is spawned at
 every vault size.
 
+A document with no `id:` opened by name on an app home that has never listed the vault — a first
+launch, a deep link into an imported vault — had its id found by a walk on the server's thread: on
+50k files `/__board/get` of such a note took 5.3 s and `/api/health` waited as long. Since #286 it is
+given its provisional id alone, and both answer in 15 ms at 1k and at 50k files
+(`desktop.startup.*.open.*`, which also checks that the listing after it gives the note the same id).
+
 What still holds the thread at launch, measured on 50k files: a cold `/__board/index` 1.7 s (it reads
-every text on the server's thread to send to the grammar's worker; #280's ground), and a document with
-no `id:` opened by name on an app home that has never listed the vault, 5.7 s (its id is found by a
-walk on the thread). Neither is on the path the bench measures; each is its own issue.
+every text on the server's thread to send to the grammar's worker; #280's ground). It is not on the
+path the bench measures, and is its own issue (#287).
 
 ### Disk
 

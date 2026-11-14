@@ -11,6 +11,15 @@
   deleted one its row back. Every method that changes which path holds a document bumps `moves`, and a
   listing that sees it moved starts again; `test/server/listing.test.ts` makes and deletes one mid-listing
   and fails without it. A save in place (`write`) and minting an id need not: the next listing reads them.
+- **A row given without a walk must be told to the listing: `given`.** Opening a document the index
+  has not seen gives it its row on the spot (`rowNow`, #286) rather than walking the vault, and no
+  listing restarts for it — one would, on every first open during the 5 s first listing. But a listing
+  that read the index before that row was written finds no row at the path and mints the file a second
+  id, which replaces the first (one path, one row), so the id the page was answered with was not the
+  one the list gave; and one that walked before the file was made drops the row as gone. So `rowNow`
+  records each path it gives a row with a count, a listing that misses a path recorded there reads the
+  index for it again, and it does not drop a row recorded after its walk began.
+  `test/server/listing.test.ts` opens one in each window and fails with either check removed.
 - **`elk.bundled.js` is the wrong import.** On the main thread its "fake worker" runs the algorithm
   synchronously and blocks the canvas; inside a worker of ours it throws, because
   `elk-worker.min.js` stops exporting the fake `Worker` class once it detects it *is* the worker.

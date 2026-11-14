@@ -61,7 +61,8 @@
  *   with a temp `HOME`, so the shim it writes on launch lands in the temp folder. Before each size's
  *   launches, what waits behind the first listing (#283): `anydag serve` on the same vault and a
  *   fresh app home, the slowest `/api/health` and `/__board/get` of the board asked back to back while
- *   its cold `/__board/list` runs.
+ *   its cold `/__board/list` runs; and what waits behind opening a note with no `id:` on a fresh app
+ *   home before anything has listed it (#286), the open itself and the slowest `/api/health` beside it.
  *
  * **The guards** (`--guard`) are two cheap numbers the nightly holds: the server's idle CPU with the
  * change feed open on a 1k-file vault, and the time to `data-dag-ready` of a 200-node `arch`
@@ -1100,13 +1101,56 @@ async function listProbe(dir, n) {
   }
 }
 
+/**
+ * What waits behind opening a document the index has not seen (#286): on `anydag serve` with a fresh
+ * app home and nothing listed yet — a first launch, or a deep link into an imported vault —
+ * `/__board/get` of a note with no `id:`, and `/api/health` asked back to back while it runs. Then
+ * the first listing, which must give the note the id the open answered with.
+ */
+async function openProbe(dir, n) {
+  const home = path.join(work, `open-home-${n}`);
+  const s = await startServer(dir, home, { page: false });
+  try {
+    let done = false;
+    const get = timedReq(s, "/__board/get?kind=note&name=Unindexed").finally(() => {
+      done = true;
+    });
+    const health = [];
+    do {
+      const h = await timedReq(s, "/api/health");
+      if (typeof h.ms === "number") health.push(h.ms);
+    } while (!done);
+    const g = await get;
+    const p = `desktop.startup.${n}.open`;
+    record(`${p}.get`, g.ms, "ms", "anydag serve, fresh app home, nothing listed: /__board/get of a note with no id:");
+    record(
+      `${p}.health`,
+      health.length ? Math.max(...health) : null,
+      "ms",
+      `the slowest /api/health of ${health.length} asked while it ran`,
+    );
+    const id = typeof g.ms === "number" ? g.json().id : null;
+    const l = await timedReq(s, "/__board/list");
+    const listed = typeof l.ms === "number" ? l.json().ids?.Unindexed : null;
+    if (!id || id !== listed) throw new Error(`/__board/get answered id ${id}, the listing after it ${listed}`);
+  } finally {
+    await s.stop();
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+}
+
 /** Startup at each vault size: a first launch on a fresh app home, then a second on the same one. */
 async function desktopStartup() {
   for (const n of SIZES) {
     const dir = path.join(work, `vault-startup-${n}`);
     const v = makeVault(dir, n, 13);
     fs.writeFileSync(path.join(dir, "Bench.board.md"), boardText(rng(13), 20, "Bench"));
+    fs.writeFileSync(
+      path.join(dir, "Unindexed.md"),
+      "---\ntitle: Unindexed\n---\n\nA note with no id, as an imported vault's are.\n",
+    );
     await listProbe(dir, n);
+    await openProbe(dir, n);
     const appHome = path.join(work, `startup-home-${n}`);
     for (const run of ["cold", "warm"]) {
       const d = await launchDesktop(dir, v.id, appHome);
