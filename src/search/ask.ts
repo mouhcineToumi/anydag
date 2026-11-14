@@ -33,22 +33,27 @@ export function asker(answered: (query: string, hits: Found[]) => void, wait = D
     ctl = null;
   };
 
+  /** Never rejects: an abort, a refusal or a server that is not there all end in silence. */
+  const send = async (query: string, mine: AbortController): Promise<void> => {
+    try {
+      const r = await fetch(`/__board/search?q=${encodeURIComponent(query)}`, { signal: mine.signal });
+      if (!r.ok) return;
+      const { hits } = (await r.json()) as { hits: Found[] };
+      if (!mine.signal.aborted) answered(query, hits);
+    } catch {
+      /* Aborted, or the server is not there. */
+    }
+  };
+
   return {
     stop,
     ask(query) {
       stop();
-      timer = setTimeout(async () => {
+      timer = setTimeout(() => {
         timer = null;
         const mine = new AbortController();
         ctl = mine;
-        try {
-          const r = await fetch(`/__board/search?q=${encodeURIComponent(query)}`, { signal: mine.signal });
-          if (!r.ok) return;
-          const { hits } = (await r.json()) as { hits: Found[] };
-          if (!mine.signal.aborted) answered(query, hits);
-        } catch {
-          /* Aborted, or the server is not there. */
-        }
+        void send(query, mine);
       }, wait);
     },
   };
