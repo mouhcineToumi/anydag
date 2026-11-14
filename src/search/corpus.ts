@@ -4,7 +4,7 @@
  * **Derived from the texts, never stored beside them**, which is the references index's argument
  * (`src/refs/extract.ts`) made a second time: every word a search could match is already in a file,
  * so a second copy is one a write could leave behind. The local server runs this over every text
- * the vault has (`POST /corpus`) and the page builds its index from the answer, in the browser.
+ * the vault has (`POST /corpus`) and builds the search engine over the answer (`src/search/engine.ts`), which the page asks per query.
  *
  * A **unit** is the smallest thing a result can open onto, and it has to be something with a stable
  * name, because the result is a link:
