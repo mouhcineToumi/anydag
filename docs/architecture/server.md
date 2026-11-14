@@ -14,13 +14,14 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/app.ts` | the gate — the `Host`, then the token — which vault a request means, the routes, and the built page |
 | `server/context.ts` | the `Session`: the open vaults, `?vault=<id>` through `AsyncLocalStorage`, so no route learned there is more than one |
 | `server/vault.ts` | the store over a folder: every kind listed and foldered, names that are titles, ids in frontmatter, attachments, the watcher |
+| `server/listing.ts` · `list-worker.ts` | the listing as the disk gives it — the walk, every stat and frontmatter read — and the worker it runs on |
 | `server/home.ts` | the app's home — `ANYDAG_HOME`, else the platform's data folder — and its `node:sqlite` index |
 | `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
 
-Seven things are load-bearing:
+Nine things are load-bearing:
 
 - **Nothing the app needs to be correct lives only outside the vault.** A document's id is `id:` in
   its frontmatter; an attachment's is `<vault>/.anydag/files/<id>.json`; a vault's own id and
@@ -38,6 +39,29 @@ Seven things are load-bearing:
 - **Nothing the store may do may block sync**: no single shared index file in
   the vault, `.git/ .stversions/ *.sync-conflict-* *.icloud .trash/` ignored, the sha1 base, the 409 and
   `merge3` kept, and opening never writes.
+- **No request waits behind the listing** (#283). `Vault.tree()` — what `/__board/list`, `/index`,
+  `/corpus` and every other whole-vault read start from — walks the folder and reads every text's
+  frontmatter on a worker (`server/list-worker.ts`, which keeps each text's frontmatter against its
+  stat, so a second listing reads only what changed), sends it back in parts asked for one at a time,
+  and brings the index into line in slices of 8 ms, each its own transaction, handing the thread back
+  between them; `/__board/list` writes its 9 MB of JSON a key at a time the same way. On 50,000 files
+  the first listing held every request for 5 s, the board the person opened included, and a warm one
+  for 1.1 s; now none waits more than about 40 ms for either. Two things keep it correct now
+  that it is no longer one step: **a listing asked for while one runs waits for it and runs once more
+  for everyone who asked meanwhile**, so an answer is never older than its question; and **a move made
+  here while one walks or reconciles makes it start again** (`moves`, see *Things that will bite*),
+  three times and then on this thread. Where no worker is built beside the bundle (the unit suite) or
+  `ANYDAG_LIST_INLINE=1`, the same code lists inline, still reconciling in slices.
+- **Nor behind opening a document the index has not seen** (#286). `/__board/get` answers with the
+  document's id, and on an app home that has never listed the vault — a first launch, a deep link
+  into an imported vault — a note with no `id:` used to have it found by a walk of the whole vault on
+  the server's thread: 5.7 s on 50,000 files. `Vault.rowNow` gives it its row alone instead: a text
+  with no id of its own has nothing to collide with, so it is minted the provisional id the walk would
+  have minted it, and one whose id the index does not hold keeps it. Only what needs the walk —
+  an attachment, whose id is a record that may name the path it was moved from, and a text whose id
+  the index holds at another path — waits for a listing (`row`), off this thread; a rename or a trash
+  that meets one walks here (`rowHere`), so the name it settled on cannot be taken in between. The id
+  answered is the one the next listing gives the file — see `given` in *Things that will bite*.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
   there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
   see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a
