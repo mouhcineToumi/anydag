@@ -20,6 +20,7 @@ import { TUNE } from "../../server/sync/loop";
 import type { SyncDevices, SyncLinked, SyncPaired, SyncRemotes, SyncStatus } from "../../server/sync/types";
 import { Vault, type Change } from "../../server/vault";
 import { harness, type Harness } from "../../api/test/helpers";
+import { PROTOCOL, PROTOCOL_HEADER } from "../../api/protocol/wire";
 import { mintPairCode } from "../../api/server/routes/pair";
 import { makeEnv, NOTE, readText, write, type Env } from "./helpers";
 
@@ -283,6 +284,38 @@ describe("linking two vaults through /api/sync", () => {
     B.s.sync.tune = TUNED;
   });
 
+  it("a poke stream that answers 200 and says nothing whole backs off rather than asking again at once (#9)", {
+    timeout: 15_000,
+  }, async () => {
+    let asked = 0;
+    const junk = new TextEncoder().encode("x".repeat(70 * 1024));
+    const hostile: typeof fetch = async (input, init) => {
+      const where = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (!where.endsWith("/poke")) return fetch(input, init);
+      asked++;
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(junk);
+          c.close();
+        },
+      });
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    };
+    B.s.sync.tune = { ...TUNED, poke: true, fetch: hostile, backoffMs: 20, backoffMaxMs: 10_000 };
+    try {
+      await B.s.sync.closed(B.s.vault.id);
+      await B.s.sync.start(B.s.vault);
+      await pause(1500);
+      // Doubling from 20 ms, 1.5 s holds about seven; taking the backoff back on a 200 asks every 20 ms.
+      expect(asked).toBeGreaterThan(0);
+      expect(asked).toBeLessThan(12);
+    } finally {
+      B.s.sync.tune = TUNED;
+      await B.s.sync.closed(B.s.vault.id);
+      await B.s.sync.start(B.s.vault);
+    }
+  });
+
   it("a change B's watcher reports is pushed after the debounce, and says so on the feed", { timeout: 30_000 }, async () => {
     // Quiet first: B's loop may still be hearing the files the last two tests had it write, and a
     // run that is no more than that echo would answer every "pending, then idle" below without
@@ -439,6 +472,47 @@ describe("what a process that is not the app does with a linked vault", () => {
     } finally {
       await s.closeAll();
     }
+  });
+});
+
+describe("an upload the sync server answers with another vault's id (#9)", () => {
+  it("is refused, and the other vault's sync state and this vault's id stay as they were", { timeout: 30_000 }, async () => {
+    const G = app();
+    // Another vault this machine has: opened once in the same home, with sync state of its own.
+    const otherRoot = fs.mkdtempSync(path.join(path.dirname(G.env.root), "anydag-other-"));
+    const other = G.s.openFolder(otherRoot);
+    const otherId = other.id;
+    const otherDir = G.s.sync.dir(otherId);
+    fs.mkdirSync(otherDir, { recursive: true });
+    fs.writeFileSync(path.join(otherDir, "pair.json"), "{}");
+    await G.s.close(otherId);
+
+    await paired(G);
+    const mine = G.s.vault.id;
+    const spoken = { [PROTOCOL_HEADER]: String(PROTOCOL) };
+    const hostile: typeof fetch = async (input, init) => {
+      const where = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const method = init?.method ?? "GET";
+      if (method === "POST" && where.endsWith("/v1/vaults")) {
+        const res = await fetch(input, init);
+        const made = (await res.json()) as Record<string, unknown>;
+        return Response.json({ ...made, id: otherId }, { status: res.status, headers: spoken });
+      }
+      if (method === "PUT" && where.endsWith(`/v1/vaults/${otherId}/key`))
+        return Response.json(JSON.parse(String(init?.body)), { status: 200, headers: spoken });
+      return fetch(input, init);
+    };
+    G.s.sync.tune = { ...TUNED, fetch: hostile };
+    try {
+      const res = await G.call("POST", "/api/sync/link", { mode: "upload", passphrase: PASS });
+      expect(res.status, JSON.stringify(res.json)).toBe(409);
+      expect(res.json.code).toBe("linked");
+    } finally {
+      G.s.sync.tune = TUNED;
+    }
+    expect(G.s.vault.id).toBe(mine);
+    expect(G.s.sync.linked(mine)).toBe(false);
+    expect(fs.readFileSync(path.join(otherDir, "pair.json"), "utf8")).toBe("{}");
   });
 });
 
