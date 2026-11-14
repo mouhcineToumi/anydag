@@ -10,6 +10,8 @@
  * - **Ids are in the files** (decision 5); `vault.ident` mints one lazily when somebody asks.
  */
 
+import { setImmediate as yieldNow } from "node:timers/promises";
+
 import type { Context, Hono } from "hono";
 
 import { HUE_ORDER } from "../../src/dsl/ir";
@@ -182,13 +184,28 @@ function titled(asked: string, text: string): { name: string; text: string } {
   return { name, text: leafOf(name) === title ? withoutTitle(text) : text };
 }
 
+/**
+ * `c.json`, written a key at a time with the thread handed back between: the listing of 50,000 files
+ * is 9 MB of JSON, and in one `JSON.stringify` that is 50 ms every other request waits (#283). The
+ * text is the same.
+ */
+async function jsonPaced(c: Context, body: Record<string, unknown>): Promise<Response> {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    parts.push(`${JSON.stringify(key)}:${JSON.stringify(value)}`);
+    await yieldNow();
+  }
+  return c.body(`{${parts.join(",")}}`, 200, { "content-type": "application/json" });
+}
+
 /** The largest draft `POST /__board/diagnostics` will read. */
 const DRAFT_MAX = 4 * 1024 * 1024;
 
 export function docRoutes(app: Hono, s: Session): void {
   app.get("/__board/list", async (c) => {
     const t = await s.vault.tree();
-    return c.json({
+    return jsonPaced(c, {
       boards: t.boards,
       folders: t.folders,
       notes: t.notes,

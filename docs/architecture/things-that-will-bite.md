@@ -4,6 +4,13 @@
 
 ## Things that will bite
 
+- **A method that moves a document must say so: `this.moves++`.** `Vault.tree()` walks off the
+  server's thread and reconciles the index in slices (#283), so other requests run in between. A
+  document made, renamed, deleted, trashed or restored in that gap was out of the walk, and the
+  reconcile that followed dropped its row — losing a transferred document's created date — or gave a
+  deleted one its row back. Every method that changes which path holds a document bumps `moves`, and a
+  listing that sees it moved starts again; `test/server/listing.test.ts` makes and deletes one mid-listing
+  and fails without it. A save in place (`write`) and minting an id need not: the next listing reads them.
 - **`elk.bundled.js` is the wrong import.** On the main thread its "fake worker" runs the algorithm
   synchronously and blocks the canvas; inside a worker of ours it throws, because
   `elk-worker.min.js` stops exporting the fake `Worker` class once it detects it *is* the worker.
