@@ -7,6 +7,10 @@
  *   a size cap (`MAX_BATCH_BYTES`), a per-address rate (`PER_MINUTE`) and a whole-server one
  *   (`ALL_PER_MINUTE`); a batch over either is answered `{accepted: 0}` and dropped, never an error a
  *   client would retry.
+ * - **The disk they take is bounded, not only the rate** (#10): a sender at its rate writes about
+ *   8 MB a minute, and an address is cheap (an IPv6 prefix holds billions). A day's file stops at
+ *   `ANYDAG_API_LOGS_DAY_MB`, so the logs never hold more than that times `ANYDAG_API_LOGS_DAYS`;
+ *   and a body with no `Content-Length` is cut off at the cap as it arrives, never read whole first.
  * - **The batch is `cleanBatch`'s again here** (`protocol/logs.ts`): whatever sent it, what is
  *   written is what that file can describe, every free-text field scrubbed once more.
  * - **On disk, never in the database**: `<data>/logs/YYYY-MM-DD.jsonl`, one event a line with its
@@ -19,6 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 
 import { cleanBatch, MAX_BATCH_BYTES, type LogBatch, type LogsAccepted } from "../../protocol/logs";
 import { clientAddress, HttpError, Rate, type Deps, type Vars } from "./http";
@@ -29,24 +34,33 @@ const ALL_PER_MINUTE = 3000;
 /** The day files, and the pruning that keeps them to their number of days. */
 export class LogStore {
   private day = "";
+  /** What today's file holds, read once when the day turns and added to as it is written. */
+  private bytes = 0;
 
   constructor(
     readonly dir: string,
     private readonly days: number,
+    private readonly dayBytes = Number.POSITIVE_INFINITY,
   ) {}
 
+  /** How many events were kept: all of the batch, or none when the day's file has no room for it. */
   append(batch: LogBatch, now: Date): number {
     const day = now.toISOString().slice(0, 10);
+    const file = path.join(this.dir, `${day}.jsonl`);
     if (day !== this.day) {
       fs.mkdirSync(this.dir, { recursive: true });
       this.prune(now);
       this.day = day;
+      this.bytes = fs.statSync(file, { throwIfNoEntry: false })?.size ?? 0;
     }
     const received = now.toISOString();
-    const lines = batch.events
+    const lines = `${batch.events
       .map((e) => JSON.stringify({ received, ...batch.env, name: e.name, at: e.at, props: e.props }))
-      .join("\n");
-    fs.appendFileSync(path.join(this.dir, `${day}.jsonl`), `${lines}\n`);
+      .join("\n")}\n`;
+    const size = Buffer.byteLength(lines);
+    if (this.bytes + size > this.dayBytes) return 0;
+    fs.appendFileSync(file, lines);
+    this.bytes += size;
     return batch.events.length;
   }
 
@@ -72,14 +86,12 @@ export class LogStore {
 
 export function logRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   const app = new Hono<{ Variables: Vars }>();
-  const store = new LogStore(path.join(deps.config.data, "logs"), deps.config.logsDays);
+  const store = new LogStore(path.join(deps.config.data, "logs"), deps.config.logsDays, deps.config.logsDayBytes);
   const rate = new Rate(PER_MINUTE, ALL_PER_MINUTE);
+  const none: LogsAccepted = { accepted: 0 };
 
-  app.post("/v1/logs", async (c) => {
+  app.post("/v1/logs", bodyLimit({ maxSize: MAX_BATCH_BYTES, onError: (c) => c.json(none, 202) }), async (c) => {
     if (!deps.config.logs) throw new HttpError("ES_NOT_FOUND", "this server does not keep logs");
-    const none: LogsAccepted = { accepted: 0 };
-    const length = Number(c.req.header("content-length") ?? 0);
-    if (length > MAX_BATCH_BYTES) return c.json(none, 202);
     if (!rate.allow(clientAddress(c, deps.config.trustProxy), deps.now().getTime())) return c.json(none, 202);
     const raw = await c.req.text();
     if (raw.length > MAX_BATCH_BYTES) return c.json(none, 202);
