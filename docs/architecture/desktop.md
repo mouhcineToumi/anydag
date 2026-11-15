@@ -149,6 +149,12 @@ Nineteen things are load-bearing:
   `mouseup`. Alt+Left/Right (⌘[ / ⌘] on macOS) are the page's too, because there is no browser
   chrome to answer them. The same listener is not in a browser: it already has all four, and taking
   them in the page as well would move two entries for one press.
+- **Ctrl/⌘+W is the page's, not the window menu's** (#264). The menu Electron gives every window
+  binds it to *close the window*, and a menu accelerator wins over a page's key handler. The page
+  has document tabs, and in a desktop app that has them the chord closes the tab in front: so
+  `createWindow` takes the press in `before-input-event` (Ctrl, or ⌘ alone on macOS; not with Shift
+  or Alt), prevents it, and sends `tabs:close`, which the preload exposes as `tabs.onClose` and
+  `src/ui/tabs/keys.ts` answers. The window still closes from its title bar and the app menu's item.
 - **The window is isolated and sandboxed with no Node**, no webviews, and only `http(s)://` and
   `mailto:` go to the OS (`shell.openExternal`): `file://`, `smb://` or a registered handler's
   scheme in a note is one click from running something, and a note is text anybody could write.

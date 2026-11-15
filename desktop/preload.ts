@@ -56,6 +56,12 @@ export interface AnyDagDesktopHistory {
   onCommand(listener: (to: "back" | "forward") => void): () => void;
 }
 
+/** Ctrl/⌘+W, taken before the window's menu closes the window with it (`desktop/main.ts`). The
+ *  page closes its tab in front. */
+export interface AnyDagDesktopTabs {
+  onClose(listener: () => void): () => void;
+}
+
 export interface AnyDagDesktop {
   /** What the page puts on a write so the shell knows the page sent it (`desktop/main.ts`,
    *  `trusted`). Absent in a subframe and on any document that is not the page. */
@@ -71,6 +77,7 @@ export interface AnyDagDesktop {
   providerEnv: AnyDagDesktopProviderEnv;
   updates: AnyDagDesktopUpdates;
   history: AnyDagDesktopHistory;
+  tabs: AnyDagDesktopTabs;
   readonly version: string;
   readonly platform: string;
   /** Whether the window is in full screen now. */
@@ -112,6 +119,13 @@ const api: AnyDagDesktop = {
       };
       ipcRenderer.on("history:go", on);
       return () => ipcRenderer.removeListener("history:go", on);
+    },
+  },
+  tabs: {
+    onClose(listener: () => void): () => void {
+      const on = () => listener();
+      ipcRenderer.on("tabs:close", on);
+      return () => ipcRenderer.removeListener("tabs:close", on);
     },
   },
   updates: {
