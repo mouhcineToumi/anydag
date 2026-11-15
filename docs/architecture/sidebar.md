@@ -622,14 +622,14 @@ rather than opening it twice (`holding`); a board's tab is the board on any of i
 on any date. Home is the exception: two Home tabs are two places to start from.
 
 **How one opens.** A middle click, or Ctrl/⌘ and a click, on anything that opens a document — a
-search hit, a row on Home, a task, a calendar item, a link in a note — opens it **behind** the tab
+search hit, a row on Home, a calendar item, a link in a note — opens it **behind** the tab
 in front, as a browser opens a link; Shift as well opens it in front. Successive tabs opened behind
 one tab line up after it in the order they were opened. None of those places was written to pass a
 modifier along, so `intent.ts` notes the press in the capture phase and `visit` in `App` asks while
 the same event is dispatched; a middle click is an `auxclick`, which each opener answers with
-`onAuxClick={middle(…)}`. **The sidebar keeps Ctrl/⌘-click for its multi-row selection**, so a row
-opens a tab by a middle click or its menu's *Open in a new tab*; the calendar's item menu says the
-same and does the same. The strip's `+` opens Home in front.
+`onAuxClick={middle(…)}`. **The sidebar and the Tasks page keep Ctrl/⌘-click for their multi-row
+selection**, so a row there opens a tab by a middle click — or, in the sidebar, its menu's *Open in
+a new tab*; the calendar's item menu says the same and does the same. The strip's `+` opens Home in front.
 
 **It is drawn from two tabs**, for the page strip's reason: one tab says nothing a sidebar row does
 not, and would cost a row on every page (the e2e suite, which starts with the sidebar away, would
