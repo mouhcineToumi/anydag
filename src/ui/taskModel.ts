@@ -1,5 +1,5 @@
 import { collation } from "@/locale";
-import type { Task, TaskStatus } from "@/note/task";
+import { today, type Task, type TaskStatus } from "@/note/task";
 
 /**
  * The Tasks page's rules with no drawing in them (#311): which tab a task is on, how its date and
@@ -62,4 +62,46 @@ export function countLine(tab: TaskTab, c: Counted, filtered: boolean): string {
 /** The Done tab's order: what was finished most recently first, then by title. */
 export function compareRecent(a: { task: Task; title: string }, b: { task: Task; title: string }): number {
   return (b.task.changed ?? 0) - (a.task.changed ?? 0) || collation({ numeric: true }).compare(a.title, b.title);
+}
+
+/**
+ * How far a due date is, in words, for a task's page: *Due today*, *1 day left*, *7 days left*,
+ * *2 days late*. Nothing for a done task — its date says when and nothing more, as on the row.
+ */
+export function dueDistance(due: string, status: TaskStatus, now: string = today()): string {
+  if (status === "done") return "";
+  const day = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+  const diff = Math.round((day(due) - day(now)) / 86_400_000);
+  if (diff === 0) return "Due today";
+  const n = Math.abs(diff);
+  return `${n} ${n === 1 ? "day" : "days"} ${diff > 0 ? "left" : "late"}`;
+}
+
+/** When a task last changed, in words, for its page: *just now*, *5 minutes ago*, *3 days ago*. */
+export function changedWords(changed: number, now: number = Date.now()): string {
+  const s = Math.max(0, (now - changed) / 1000);
+  const say = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  if (s < 60) return "just now";
+  if (s < 3600) return say(Math.floor(s / 60), "minute");
+  if (s < 86_400) return say(Math.floor(s / 3600), "hour");
+  if (s < 30 * 86_400) return say(Math.floor(s / 86_400), "day");
+  if (s < 365 * 86_400) return say(Math.floor(s / (30 * 86_400)), "month");
+  return say(Math.floor(s / (365 * 86_400)), "year");
+}
+
+/*
+ * The order the Tasks page last drew its rows in — the tab, the filter, the grouping and the order
+ * as they were — so a task's page can step to the one before and after it ("2 of 13"). Kept in this
+ * module rather than in storage: it is what this tab was just looking at, and a reload that lost it
+ * falls back to the page's default order.
+ */
+let lastOrder: readonly string[] | null = null;
+
+export function rememberOrder(names: readonly string[]): void {
+  lastOrder = names;
+}
+
+/** The order to step through: the Tasks page's last one when it holds `name`, else `fallback`. */
+export function stepOrder(name: string, fallback: () => readonly string[]): readonly string[] {
+  return lastOrder?.includes(name) ? lastOrder : fallback();
 }

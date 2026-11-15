@@ -573,14 +573,16 @@ test("space O opens the list while the caret is not in the text, and is a space 
  * A task's page is a note's page, so a task has the title too — above its status and date,
  * as Notion puts a page's properties under its name.
  */
-test("a task's title sits above its bar, with Untitled as its placeholder", async ({ page }) => {
+test("a task's title has Untitled as its placeholder, and its properties are beside it or under it", async ({ page }) => {
   fs.writeFileSync(file, "---\ntitle: Untitled\nstatus: todo\n---\n");
   await open(page);
   const title = page.locator("textarea[data-dag-note-title]");
   await expect(title).toHaveValue("");
   await expect(title).toHaveAttribute("placeholder", "Untitled");
-  const bar = page.locator("[data-dag-taskbar]");
-  expect((await title.boundingBox())!.y).toBeLessThan((await bar.boundingBox())!.y);
+  /* Beside the text in a panel when the window has room (#311), and a line under the title when not. */
+  const at = (await title.boundingBox())!;
+  const bar = (await page.locator("[data-dag-taskbar]").boundingBox())!;
+  expect(bar.x >= at.x + at.width || bar.y > at.y).toBe(true);
 });
 
 test("an image pasted into a note is stored beside it and written as Markdown", async ({ page }) => {

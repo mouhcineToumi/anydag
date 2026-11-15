@@ -3,7 +3,17 @@ import { describe, expect, it } from "vitest";
 import { indexedTask, taskFactsOf } from "@/note/task";
 import { blankDraft, newTaskName, newTaskText } from "@/ui/NewTask";
 import { dueText } from "@/ui/TaskGlyph";
-import { compareRecent, countLine, onTab, sinceText, tabOf } from "@/ui/taskModel";
+import {
+  changedWords,
+  compareRecent,
+  countLine,
+  dueDistance,
+  onTab,
+  rememberOrder,
+  sinceText,
+  stepOrder,
+  tabOf,
+} from "@/ui/taskModel";
 
 /**
  * The Tasks page's rules with no drawing in them (#311): what the listing counts off a task's body,
@@ -141,5 +151,30 @@ describe("a task being made", () => {
     expect(newTaskName({ ...blankDraft(), title: "Book the room" })).toBe("book-the-room");
     expect(newTaskName({ ...blankDraft("launch/launch"), title: "Book the room" })).toBe("launch/book-the-room");
     expect(newTaskName({ ...blankDraft(), title: "!!!" })).toBe("untitled");
+  });
+});
+
+describe("a task's page in words", () => {
+  it("says how far the due date is, and nothing for a done task", () => {
+    expect(dueDistance("2026-11-15", "todo", "2026-11-15")).toBe("Due today");
+    expect(dueDistance("2026-11-16", "todo", "2026-11-15")).toBe("1 day left");
+    expect(dueDistance("2026-11-22", "in-progress", "2026-11-15")).toBe("7 days left");
+    expect(dueDistance("2026-11-13", "todo", "2026-11-15")).toBe("2 days late");
+    expect(dueDistance("2026-11-13", "done", "2026-11-15")).toBe("");
+  });
+
+  it("says when it changed as a sentence does", () => {
+    const now = Date.UTC(2026, 10, 15, 12);
+    expect(changedWords(now - 5_000, now)).toBe("just now");
+    expect(changedWords(now - 60_000, now)).toBe("1 minute ago");
+    expect(changedWords(now - 5 * 3_600_000, now)).toBe("5 hours ago");
+    expect(changedWords(now - 3 * 86_400_000, now)).toBe("3 days ago");
+    expect(changedWords(now - 400 * 86_400_000, now)).toBe("1 year ago");
+  });
+
+  it("steps through the order the Tasks page drew, or the fallback when it does not hold the task", () => {
+    rememberOrder(["a", "b", "c"]);
+    expect(stepOrder("b", () => ["x"])).toEqual(["a", "b", "c"]);
+    expect(stepOrder("z", () => ["z", "y"])).toEqual(["z", "y"]);
   });
 });

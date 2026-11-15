@@ -1,16 +1,17 @@
-import { Calendar, CalendarDays, CalendarPlus, CircleSlash, Folder, Plus, X } from "lucide-react";
+import { CalendarDays, Folder, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import { createNote, type Made } from "@/board/useBoard";
 import type { Spot } from "@/calendar/menu";
-import { folderOf, type Project } from "@/note/project";
-import { PRIORITY_LABEL, STATUS_LABEL, STATUSES, titleStem, today, withTask, type Priority, type TaskStatus } from "@/note/task";
+import { folderOf } from "@/note/project";
+import { PRIORITY_LABEL, STATUS_LABEL, titleStem, withTask, type Priority, type TaskStatus } from "@/note/task";
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
 import { Button, IconButton } from "./controls";
 import { Dialog } from "./Dialog";
 import { ProjectGlyph } from "./ProjectBar";
-import { dueText, PRIORITY_KEYS, PriorityMark, TaskGlyph } from "./TaskGlyph";
+import { dueRows, priorityRows, projectRows, showDatePicker, statusRows, type ProjectChoice } from "./taskMenus";
+import { dueText, PriorityMark, TaskGlyph } from "./TaskGlyph";
 import { TasksMenu, under, type MenuRow } from "./TasksMenu";
 
 /**
@@ -31,13 +32,6 @@ export interface NewTaskDraft {
   priority: Priority | null;
   project: string | null;
   due: string | null;
-}
-
-/** A project a pill can offer: its note's name, the project, and what it is called. */
-export interface ProjectChoice {
-  name: string;
-  project: Project;
-  title: string;
 }
 
 export const blankDraft = (project: string | null = null, status: TaskStatus = "todo"): NewTaskDraft => ({
@@ -70,13 +64,6 @@ export function newTaskName(d: NewTaskDraft): string {
 
 const makeTask = (d: NewTaskDraft, description = ""): Promise<Made> => createNote(newTaskName(d), newTaskText(d, description));
 
-/** `YYYY-MM-DD`, `days` after today here. */
-function inDays(days: number): string {
-  const at = new Date();
-  at.setDate(at.getDate() + days);
-  return today(at);
-}
-
 type Field = "status" | "priority" | "project" | "due";
 
 /**
@@ -108,87 +95,17 @@ function TaskPills({
   const rows = (field: Field): MenuRow[] => {
     switch (field) {
       case "status":
-        return STATUSES.map((s, i) => ({
-          key: s,
-          label: STATUS_LABEL[s],
-          icon: <TaskGlyph status={s} />,
-          hint: String(i + 1),
-          checked: draft.status === s,
-          onPick: () => set({ status: s }),
-        }));
+        return statusRows(draft.status, (status) => set({ status }));
       case "priority":
-        return PRIORITY_KEYS.map(({ priority, key, label }) => ({
-          key: priority ?? "none",
-          label,
-          icon: <PriorityMark priority={priority ?? undefined} />,
-          hint: key,
-          checked: draft.priority === priority,
-          data: { "data-dag-task-menu-priority": priority ?? "none" },
-          onPick: () => set({ priority }),
-        }));
+        return priorityRows(draft.priority, (priority) => set({ priority }));
       case "project":
-        return [
-          {
-            key: "none",
-            label: "No project",
-            icon: <CircleSlash size={14} strokeWidth={2} aria-hidden="true" />,
-            checked: draft.project === null,
-            data: { "data-dag-task-menu-project": "" },
-            onPick: () => set({ project: null }),
-          },
-          ...projects.map((p) => ({
-            key: p.name,
-            label: p.title,
-            icon: <ProjectGlyph project={p.project} />,
-            checked: draft.project === p.name,
-            data: { "data-dag-task-menu-project": p.name },
-            onPick: () => set({ project: p.name }),
-          })),
-        ];
-      case "due": {
-        const day = (key: string, label: string, value: string): MenuRow => ({
-          key,
-          label,
-          icon: <Calendar size={14} strokeWidth={2} aria-hidden="true" />,
-          hint: dueText(value),
-          checked: draft.due === value,
-          data: { "data-dag-task-menu-due": key },
-          onPick: () => set({ due: value }),
-        });
-        return [
-          day("today", "Today", inDays(0)),
-          day("tomorrow", "Tomorrow", inDays(1)),
-          day("week", "In a week", inDays(7)),
-          {
-            key: "pick",
-            label: "Pick a date…",
-            icon: <CalendarPlus size={14} strokeWidth={2} aria-hidden="true" />,
-            data: { "data-dag-task-menu-due": "pick" },
-            onPick: () => {
-              /* The browser's own picker, which knows the locale and the keyboard; a browser
-                 without `showPicker` gets the field focused instead. */
-              const el = date.current;
-              if (!el) return;
-              try {
-                el.showPicker();
-              } catch {
-                el.focus();
-              }
-            },
-          },
-          ...(draft.due
-            ? [
-                {
-                  key: "none",
-                  label: "No due date",
-                  icon: <X size={14} strokeWidth={2} aria-hidden="true" />,
-                  data: { "data-dag-task-menu-due": "none" },
-                  onPick: () => set({ due: null }),
-                },
-              ]
-            : []),
-        ];
-      }
+        return projectRows(projects, draft.project, (project) => set({ project }));
+      case "due":
+        return dueRows(
+          draft.due,
+          (due) => set({ due }),
+          () => showDatePicker(date.current),
+        );
     }
   };
 

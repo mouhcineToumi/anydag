@@ -102,6 +102,8 @@ export const TASKS_VIEW = "dag:tasks-view";
  * which of their tasks somebody is looking at is view state, this browser's, not in `PREF_KEYS`.
  */
 export const TASKS_TAB = "dag:tasks-tab";
+/** Whether a task's properties are beside its text or folded into a line above it (#311): this browser's view. */
+export const TASK_PANEL = "dag:task-panel";
 
 /**
  * Whether a run's *About this quiz* panel is folded away, `"0"` when it is. The Tasks
