@@ -52,6 +52,7 @@ import { desktop } from "./vault/desktop";
 import { setLocale } from "./locale";
 import { settleVault, watchVault } from "./vault/current";
 import { installHistory } from "./ui/history";
+import { watchTextSize } from "./ui/textSize";
 import { watchWindowInset } from "./ui/windowInset";
 import "./styles/base.css";
 import "./styles/chrome.css";
@@ -187,6 +188,10 @@ async function start(): Promise<void> {
      Called with no vault open too, because the answer is the install's and Privacy is drawn on
      Home. Not awaited. */
   if (account) void startTelemetry();
+  /* The person's reading size, on `<html>` before anything is drawn. After `pull()`, so the step is
+     the account's rather than this browser's cache of it, and before the first render, so the
+     chrome never paints at the old one. A snapshot reads no preference and gets the default. */
+  watchTextSize();
 
   /* The page itself, which `preload()` has been fetching since the session answered: drawn in the
      first render, never behind a `Suspense`. With no session there is no page — `Gate` says so. */

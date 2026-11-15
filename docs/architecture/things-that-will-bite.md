@@ -251,7 +251,9 @@
   literally.** The panel's remembered width is `--inspector-w` for exactly that reason: no theme has
   an opinion about how wide somebody dragged their editor, and naming it `--dag-inspector-w` demanded
   a key in all three themes. Same argument as `chrome.css` itself. `--canvas-x` and `--canvas-w`
-  are the second pair to be named this way, for the same reason.
+  are the second pair to be named this way, for the same reason; `--text-scale`,
+  `--chrome-text-*` and `--chrome-note-*` (#325) are the third, because how big a person reads is
+  no theme's decision.
 - **`.dag-body` is not the canvas, and five floating things were positioned as though it were.**
   The dock, the selection bar, the problems dock, the which-key strip and the zoom cluster are
   `position: absolute` inside `.dag-body` — right, because it keeps them out of the flex tree and

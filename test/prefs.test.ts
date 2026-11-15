@@ -201,6 +201,9 @@ describe("the preference list", () => {
        it travels with them, and another vault does not have its own. */
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:assistant-w");
     expect(VAULT_PREF_KEYS as readonly string[]).not.toContain("dag:assistant-w");
+    /* How big this person reads their notes and the app is theirs too, in every vault (#325). */
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:text-size");
+    expect(VAULT_PREF_KEYS as readonly string[]).not.toContain("dag:text-size");
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {

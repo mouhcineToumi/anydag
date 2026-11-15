@@ -5,7 +5,8 @@ import { openSidebar } from "./sidebar";
 /**
  * The chrome's type comes from one place (#206).
  *
- * Every font size in `chrome.css` reads `--dag-ui-text-*`, so two menus built from the same item
+ * Every font size in `chrome.css` reads a `--chrome-text-*` step — the theme's `--dag-ui-text-*`,
+ * which is what these read at the default text size — so two menus built from the same item
  * class draw it at one size (they were 12 and 13 px), and a button takes the size of where it sits
  * instead of the browser's own 13.33 px. This reads what the browser computed, on real menus.
  */
