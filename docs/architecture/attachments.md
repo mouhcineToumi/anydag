@@ -26,7 +26,10 @@ Nine things are load-bearing:
   the vault's attachments folder like any upload (`storePasted` in `server/routes/files.ts`), so one
   picture pasted into two notes is two references to one file — a screenshot belongs to the vault
   rather than to the document it was pasted into. `<name>.assets/` is read, so every
-  existing document still draws, and never written again.
+  existing document still draws, and never written again. Its route, `/__board/assets/*`, sends
+  the headers `/__board/file` does (`fileHeaders`: the sandbox CSP and `nosniff`, or an SVG opened
+  as a page runs script on the app's origin), and checks the `.assets` folder only after the path
+  is normalised, since it decodes an `%2F` the router left alone (#10, `test/server/legacy-assets.test.ts`).
 - **The name keeps its extension and nothing else's does.** `specs/Q3 report.pdf`: a portable stem
   (`cleanSegment` in `server/names.ts`), then an extension of `[a-z0-9]{1,12}` the vault lists —
   `md` and `assets` refused, so no attachment is ever a document or a picture folder. A move keeps

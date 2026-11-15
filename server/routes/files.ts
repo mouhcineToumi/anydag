@@ -235,6 +235,9 @@ export function fileRoutes(app: Hono, s: Session): void {
       throw e;
     }
     if (!data) throw err(404, "not found");
-    return c.body(new Uint8Array(data), 200, { "content-type": mimeOf(extOf(rel)), "cache-control": "no-cache" });
+    /* The headers every attachment goes out with — the sandbox CSP and `nosniff` above all: an SVG
+       served bare is a document on the app's origin, and its script runs with the session's
+       authority (#10). */
+    return c.body(new Uint8Array(data), 200, fileHeaders(extOf(rel), leafOf(rel), false));
   });
 }
