@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
-import { lead } from "./keys";
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
 
 /**
  * Keeping a selection as a component, and putting it back on a board.

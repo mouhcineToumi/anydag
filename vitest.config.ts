@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { fileURLToPath, URL } from "node:url";
 
 import { defineConfig } from "vitest/config";
@@ -22,19 +23,21 @@ export default defineConfig({
     include: ["test/**/*.test.ts", "api/**/*.test.ts"],
     environment: "node",
     /*
-     * **Modules are shared between the files a worker runs, and two workers run them.** Isolated,
-     * every one of the 78 files imported the dsl, the layout and the library afresh in a fresh
-     * process — 13 s and 85 s of CPU for 18 s of tests, on the hook that runs before every commit.
-     * Shared, a worker pays for an import once: 8.4 s and 21 s of CPU, measured on eight cores.
-     * More workers than two bought no wall time here — the longest file is the floor — and each one
-     * costs another copy of every import.
+     * **Modules are shared between the files a worker runs, and up to four workers run them.**
+     * Isolated, every one of the 78 files imported the dsl, the layout and the library afresh in a
+     * fresh process — 13 s and 85 s of CPU for 18 s of tests, on the hook that runs before every
+     * commit. Shared, a worker pays for an import once: 8.4 s and 21 s of CPU, measured on eight
+     * cores. Two workers were the floor then, when the longest file was; at 203 files they were not
+     * (#258, twelve cores: 33 s on two, 26 s on three, 23 s on four, ten runs at four all green), and
+     * past four each worker costs another copy of every import for a second or two. Never more
+     * workers than cores: CI's runner has four.
      *
      * Sharing is safe because nothing in `test/` leaves state behind: the globals a file stubs it
      * takes back in `afterEach`, and five shuffled file orders all pass. A new test that stubs a
      * global or pins module state has to put it back the same way.
      */
     isolate: false,
-    maxWorkers: 2,
+    maxWorkers: Math.min(4, availableParallelism()),
     minWorkers: 1,
   },
 });

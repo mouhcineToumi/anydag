@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { lead } from "./keys";
 import { openSidebar } from "./sidebar";
-import { vaulted } from "./vault";
 
 /**
  * The lock. Read only, so nothing changes by accident: every check here
@@ -154,7 +153,7 @@ test("the Read only pill meets 4.5:1 in every theme", async ({ page }) => {
 
 test("with nothing open, a locked card says read only and unlocks in place", async ({ page }) => {
   await lockFirst(page);
-  await page.goto(await vaulted(page, "/"));
+  await page.goto("/");
   const card = page.locator("[data-dag-welcome]");
   await expect(card).toBeVisible({ timeout: 10_000 });
   await expect(card).toContainText("Read only: nothing here can be changed until you unlock.");

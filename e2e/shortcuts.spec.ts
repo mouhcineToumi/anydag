@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BINDINGS, LEADER_CODE, WHICHKEY_MS } from "../src/edit/bindings";
-import { lead } from "./keys";
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
 
 /**
  * The leader key.

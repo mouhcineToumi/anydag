@@ -44,7 +44,7 @@ npm run dev     # Vite + the local server on boards/local/ → http://localhost:
 | `npm run checks` | the **fast tier**: Biome lint and format check, knip, typechecks, the contract checks, parity, the unit tests. No browser, about half a minute. It is also the pre-commit hook |
 | `npm test` | the unit tests alone (`npm run test:watch` while you work) |
 | `npm run e2e:docker` | the browser suite in the same Playwright Docker image CI uses |
-| `npm run e2e:smoke` | the browser suite's `@smoke` tier, in the same image — what CI runs on a pull request |
+| `npm run e2e:smoke` | the browser suite's `@smoke` tier, in the same image — the core of what CI runs on a pull request, beside the specs the change reaches |
 | `npm run format` | Biome's formatter over the code |
 | `npm run parity` | redraws `docs/PARITY.md` from `docs/parity.json` |
 
@@ -181,7 +181,10 @@ Examples: `feat/231-table-csv-export`, `fix/142-note-title-focus`, `docs/contrib
    - **`src/board/`, `src/dsl/`, `src/note/`, `src/quiz/` and `src/table/` are plain Node**: no browser
      APIs and no `@/` aliases, because the server and the CLI bundle them.
 3. **Write the test first or with the change.** Unit tests are in `test/`, browser checks in `e2e/`. A
-   bug fix includes a test that fails without it.
+   bug fix includes a test that fails without it. A browser check imports `test` and `expect` from
+   `e2e/fixture.ts`, never from `@playwright/test`: that fixture is what pins every page it opens to
+   the suite's vault (see *A page that names no vault lands in the server's default* in
+   [`docs/architecture/things-that-will-bite.md`](docs/architecture/things-that-will-bite.md)).
 4. **Commit as you go** with [Conventional Commits](https://www.conventionalcommits.org/) messages.
    The pre-commit hook runs `npm run checks`; if it fails, fix the cause rather than skipping it.
 5. **Screenshots.** The visual baselines are compared against one pinned Chromium in Docker. They are

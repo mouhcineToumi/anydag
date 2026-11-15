@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page, type Route } from "./fixture";
 
 /**
  * Changing a diagram with a model, from the selection toolbar's icon and dialog.

@@ -6369,8 +6369,9 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
  * `--hour`, so the page never measures a pixel it did not draw. Every colour is the theme's: an event
  * wears the accent's soft tint, a task the paper, a note nothing but its mark.
  *
- * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-app--calendar`, `dag-eventbar*`,
- * `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-eventbar*`,
+ * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-app--calendar`,
+ * `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`,
+ * `data-dag-cal-mini*`, `data-dag-eventbar*`,
  * `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
  * `data-dag-sidebar-event`, `data-dag-note-make-event`, `dag-cal-menu*` and `data-dag-cal-menu*`, the
  * storage keys `dag:calendar-hide`, `dag:week-start` and `dag:calendar-view`, and the query keys
@@ -6387,6 +6388,9 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-ink);
 }
 .dag-calendar__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+/* The view and, beside it, the small month a week or a run of days keeps — one row filling what the
+   bar leaves. */
+.dag-calendar__body { flex: 1; min-height: 0; display: flex; gap: 16px; }
 /* Every control in one cluster at the right: where the view moves, then what it looks like. */
 .dag-calendar__cluster { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; margin-left: auto; }
 .dag-calendar__move,
@@ -6562,6 +6566,51 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-cal-menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-cal-menu__danger:hover { color: var(--dag-color-dangerText); }
 .dag-cal-menu__locked { margin: 4px 8px 2px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+
+/* A small month beside a week or a run of days, as most calendar apps keep: its own arrows move it
+   and nothing else, a day takes the view there, today keeps the accent ring, and the days the view
+   shows wear its tint. `data-in-view` is paint, so a day's number still reads on it (`ink` on
+   `accentSoft`); under 720px it is not drawn, because a week's seven columns already have the
+   phone's whole width. */
+.dag-cal-mini {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 240px;
+  padding: 12px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-mini__head { display: flex; align-items: center; gap: 4px; }
+.dag-cal-mini__title { flex: 1; min-width: 0; margin: 0; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-mini__step { display: inline-flex; gap: 2px; }
+.dag-cal-mini__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.dag-cal-mini__name { padding: 2px 0; text-align: center; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-cal-mini__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The 24px floor every control meets (#209). */
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-cal-mini__day[data-out] { color: var(--dag-color-slate); }
+.dag-cal-mini__day[data-in-view] { background: var(--dag-color-accentSoft); }
+.dag-cal-mini__day:hover { background: var(--dag-color-paper200); }
+.dag-cal-mini__day[data-today] { font-weight: var(--dag-ui-weight-strong); box-shadow: inset 0 0 0 1.5px var(--dag-color-accent); }
+.dag-cal-mini__day:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 /* The month. */
 .dag-cal-month {
@@ -6807,6 +6856,8 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   .dag-calendar__views > * { flex: 1; justify-content: center; }
   .dag-calendar__today { min-height: 40px; }
   .dag-calendar__step .dag-icon { width: 44px; height: 44px; }
+  /* A week's seven columns already have the phone's whole width; there is none for a month beside them. */
+  .dag-cal-mini { display: none; }
 }
 
 /* An event's own page: its bar under the title, and its line where nothing may change it. */
@@ -7931,6 +7982,15 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer__input--tall { min-height: 320px; max-height: 60vh; }
 .dag-chat-composer__input::placeholder { color: var(--dag-color-slate); }
 .dag-chat-composer__why { margin: 0; font-size: var(--chrome-text-sm); color: var(--dag-color-dangerText); }
+/* The documents a message is about, above the field: the chat's subject (#323), and the `@` mentions
+   to come. A chip is a pill on the paper, quieter than the field it sits on; its remove button is the
+   small icon button, with the chip's padding taken in on that side so the glyph sits centred. */
+.dag-chat-composer__docs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.dag-chat-docchip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; height: 28px; padding: 0 10px; box-sizing: border-box; font-size: var(--chrome-text-sm); color: var(--dag-color-ink); background: var(--dag-color-paper100); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-pill); }
+.dag-chat-docchip > svg { flex: none; color: var(--dag-color-slate); }
+.dag-chat-docchip__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-chat-docchip:has(.dag-chat-docchip__remove) { padding-right: 2px; }
+.dag-chat-docchip__remove { flex: none; border-radius: var(--dag-ui-radius-pill); }
 /* One row: scope, then model, effort, expand and Send pushed to the right. Each control can shrink and
    ellipsize rather than wrap, so a long vault or model name reads shorter instead of pushing Send onto
    a second line. `field-sizing` sizes a select to what it shows rather than its widest option, where

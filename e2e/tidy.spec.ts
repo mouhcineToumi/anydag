@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
-import { lead } from "./keys";
 import { BOARDS } from "./boards";
-import { vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
 
 /**
  * Tidy up, from the key to the bytes.
@@ -53,7 +52,7 @@ const at = (id: string, text = read()) => {
 };
 
 async function open(page: Page, query = "") {
-  await page.goto(await vaulted(page, `/?board=${name}${query}`));
+  await page.goto(`/?board=${name}${query}`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
 }
 

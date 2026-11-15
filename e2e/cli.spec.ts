@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { expect, test, type Page } from "@playwright/test";
+
+import { expect, test, type Page } from "./fixture";
 
 /**
  * The CLI against the running server, and the page drawing what it wrote.

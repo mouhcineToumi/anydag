@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixture";
 
 /**
  * The channel `anydag snapshot` reads the quality report out of.

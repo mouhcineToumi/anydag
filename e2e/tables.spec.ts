@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
 import { openMore } from "./more";
 import { openSidebar } from "./sidebar";
-import { suiteVault, vaulted } from "./vault";
+import { suiteVault } from "./vault";
 
 /**
  * Tables. A table is `<name>.table.md`, and the grid's checks read the
@@ -68,7 +68,7 @@ function write(leaf: string, text = TABLE): string {
 }
 
 async function open(page: Page, name: string, extra = ""): Promise<void> {
-  await page.goto(await vaulted(page, `/?table=${encodeURIComponent(name)}${extra}`));
+  await page.goto(`/?table=${encodeURIComponent(name)}${extra}`);
   await expect(page.locator("[data-dag-grid-wrap]")).toBeVisible();
 }
 
@@ -76,7 +76,7 @@ async function idOf(page: Page, name: string): Promise<string> {
   let id: string | undefined;
   await expect
     .poll(async () => {
-      const list = await page.request.get(`/__board/list?vault=${await suiteVault(page)}`);
+      const list = await page.request.get(`/__board/list?vault=${await suiteVault(page.request)}`);
       id = ((await list.json()) as { ids: Record<string, string> }).ids[name];
       return id;
     })
@@ -401,7 +401,7 @@ test("a table on a board is a live card of its tab, and a double-click opens it"
     path.join(dir, "board.board.md"),
     `---\ntitle: Plan\n---\n\n\`\`\`md {#t1 x=0 y=0 w=560}\n![Pipeline](dag:${id})\n\`\`\`\n\n\`\`\`md {#t2 x=640 y=0 w=360}\n![Pipeline](dag:${id}#people)\n\`\`\`\n`,
   );
-  await page.goto(await vaulted(page, `/?board=${folder}/board`));
+  await page.goto(`/?board=${folder}/board`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   const deals = page.locator('[data-dag-tablecard="deals"]');
   await expect(deals).toContainText("Deals · 3 rows");
@@ -436,12 +436,12 @@ test("a search finds a row, and opens the table on it, marked", async ({ page })
 
 test("?view=1 draws the grid with nothing to edit, and a snapshot draws every tab", async ({ page }) => {
   const name = write("pipeline");
-  await page.goto(await vaulted(page, `/?table=${encodeURIComponent(name)}&view=1`));
+  await page.goto(`/?table=${encodeURIComponent(name)}&view=1`);
   await expect(page.locator(".dag-grid--read")).toBeVisible();
   await expect(page.locator("[data-dag-grid-wrap]")).toHaveCount(0);
   await expect(page.locator(".dag-tablepage__title")).toHaveText("Pipeline");
 
-  await page.goto(await vaulted(page, `/?table=${encodeURIComponent(name)}&snapshot=1`));
+  await page.goto(`/?table=${encodeURIComponent(name)}&snapshot=1`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await expect(page.locator(".dag-tablepage__tabname")).toHaveText(["Deals", "People"]);
 });
@@ -467,7 +467,7 @@ test("a CSV imported onto a board becomes a table, and its card is placed", asyn
   const name = write("pipeline");
   fs.writeFileSync(path.join(dir, "board.board.md"), `---\ntitle: Plan\n---\n`);
   await idOf(page, name);
-  await page.goto(await vaulted(page, `/?board=${folder}/board`));
+  await page.goto(`/?board=${folder}/board`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await openMore(page);
   const leaf = `csv-${Date.now().toString(36)}`;
@@ -483,6 +483,6 @@ test("a CSV imported onto a board becomes a table, and its card is placed", asyn
   try {
     expect(fs.readFileSync(made, "utf8")).toContain("| Oslo {#r");
   } finally {
-    await page.request.post(`/__board/delete?vault=${await suiteVault(page)}`, { data: { name: leaf, kind: "table" } });
+    await page.request.post(`/__board/delete?vault=${await suiteVault(page.request)}`, { data: { name: leaf, kind: "table" } });
   }
 });

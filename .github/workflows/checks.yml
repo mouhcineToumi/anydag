@@ -2,7 +2,12 @@
 #
 # One definition for `ci.yml`, `nightly.yml` and `release.yml`. The fast tier is `npm run checks`
 # (`scripts/checks.sh`: typecheck, lint, the `check:*` contracts, parity and the unit suite): no
-# browser, no network, about a minute.
+# browser, no network.
+#
+# **Its halves run side by side** (#258): `fast tier` is `checks.sh static` (seven seconds behind the
+# install), `unit` is `checks.sh unit`, and the watched store contracts are a job of their own. In
+# one job they were two minutes on the path to `CI passed`, one after another; apart, the longest is
+# the unit suite, and each extra job costs only its twenty-second install.
 #
 # **`tsc` is incremental** and keeps its build info under `node_modules/.cache/tsc/`, which `npm ci`
 # deletes. It is restored after the install, keyed on what decides whether it is valid (the
@@ -67,11 +72,44 @@ jobs:
             tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}-
       # One step rather than a list, and `scripts/checks.sh` is why: the same list was written out in
       # CI, in `scripts/gate.sh` and in `.githooks/pre-commit`. The script prints each step's name,
-      # so a red run still says which one went red.
-      - run: npm run checks
-      # The store's contracts once more with every test vault watched from the start, as `anydag
-      # serve` watches each vault it opens: what holds the kept listing (#280) to what a walk says.
-      # About 15 s, so here rather than in the commit hook.
+      # so a red run still says which one went red. The unit suite is the `unit` job's.
+      - run: npm run checks -- static
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run checks -- unit
+
+  # The store's contracts once more with every test vault watched from the start, as `anydag serve`
+  # watches each vault it opens: what holds the kept listing (#280) to what a walk says. About 18 s,
+  # so not in the commit hook.
+  watched:
+    name: store over a kept listing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - name: The store's contracts over a kept listing
         env:
           ANYDAG_TEST_WATCH: "1"

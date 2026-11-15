@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { pageMore } from "./more";
 import { newFile, openSettings, openSidebar } from "./sidebar";
 
@@ -153,16 +153,95 @@ test("the week starts on the day Settings says, Monday until then", async ({ pag
   write("x", "Something", ["start: 2031-03-12"]);
   await calendar(page, "calendar=week&date=2031-03-12");
   await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-10");
+  /* The small month starts its weeks on the same day: March 2031 opens on Saturday the 1st, so the
+     grid starts on Monday the 24th of February — Sunday the 23rd once Settings says Sunday. */
+  await expect(page.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-24");
+  await expect(page.locator(".dag-cal-mini__name").first()).toHaveText("Mo");
   await openSettings(page, "calendar");
   await page.locator("[data-dag-setting-week-start]").selectOption("0");
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-09");
   await expect(page.locator(".dag-cal-cols__weekday").first()).toHaveText("Sun");
+  await expect(page.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-23");
+  await expect(page.locator(".dag-cal-mini__name").first()).toHaveText("Su");
   /* And back, so the next test to run in this browser profile starts on Monday. */
   await openSettings(page, "calendar");
   await page.locator("[data-dag-setting-week-start]").selectOption("1");
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-10");
+  await expect(page.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-24");
+});
+
+test("a week keeps a small month beside it, marking the week, and a click takes the week there", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=week&date=2031-03-12", trip);
+
+  const mini = page.locator("[data-dag-cal-mini]");
+  await expect(mini).toBeVisible();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-03");
+  await expect(page.locator("[data-dag-cal-mini-title]")).toHaveText("March 2031");
+
+  /* Whole weeks, Monday first: March 2031 begins on a Saturday and ends on a Monday. */
+  await expect(mini.locator("[data-dag-cal-mini-day]")).toHaveCount(42);
+  await expect(mini.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-24");
+  await expect(mini.locator("[data-dag-cal-mini-day]").last()).toHaveAttribute("data-dag-cal-mini-day", "2031-04-06");
+  await expect(mini.locator(".dag-cal-mini__name")).toHaveText(["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]);
+
+  /* The week the view shows is tinted; the days either side of it are not. */
+  for (const day of ["2031-03-10", "2031-03-11", "2031-03-12", "2031-03-13", "2031-03-14", "2031-03-15", "2031-03-16"])
+    await expect(mini.locator(`[data-dag-cal-mini-day="${day}"]`)).toHaveAttribute("data-in-view", "");
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-09"]')).not.toHaveAttribute("data-in-view", "");
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-17"]')).not.toHaveAttribute("data-in-view", "");
+  /* A day of another month is quieter. */
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-02-24"]')).toHaveAttribute("data-out", "");
+
+  /* A click on a day takes the week to it, and the address says which day. */
+  await mini.locator('[data-dag-cal-mini-day="2031-03-26"]').click();
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-24");
+  await expect(page.locator('[data-dag-cal-column="2031-03-26"]')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("date")).toBe("2031-03-26");
+  /* The tint moved with the week. */
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-24"]')).toHaveAttribute("data-in-view", "");
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-23"]')).not.toHaveAttribute("data-in-view", "");
+});
+
+test("the small month's arrows move it alone, and today is marked where it is", async ({ page }) => {
+  write("anchor", "Anchor", [`start: ${today()}`]);
+  await calendar(page, "calendar=week", `${folder}/anchor`);
+
+  const mini = page.locator("[data-dag-cal-mini]");
+  const now = today();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", now.slice(0, 7));
+  const marked = mini.locator(`[data-dag-cal-mini-day="${now}"]`);
+  await expect(marked).toHaveAttribute("data-today", "");
+  await expect(marked).toHaveAttribute("aria-current", "date");
+  await expect(marked).toHaveAttribute("data-in-view", "");
+  await expect(marked).toHaveAccessibleName(/, today$/);
+
+  /* A run of days three weeks on: the arrows move the small month and nothing else — not the page,
+     and not the address. */
+  await page.goto(page.url().replace("calendar=week", "calendar=days&days=3&date=2031-03-11"));
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-03", { timeout: 15_000 });
+  const where = () => {
+    const url = new URL(page.url());
+    return { view: url.searchParams.get("calendar"), date: url.searchParams.get("date"), days: url.searchParams.get("days") };
+  };
+  const was = where();
+  await page.locator("[data-dag-cal-mini-next]").click();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-04");
+  await expect(page.locator("[data-dag-cal-mini-title]")).toHaveText("April 2031");
+  await page.locator("[data-dag-cal-mini-prev]").click();
+  await page.locator("[data-dag-cal-mini-prev]").click();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-02");
+  await expect(page.locator("[data-dag-cal-mini-title]")).toHaveText("February 2031");
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-11");
+  expect(where()).toEqual(was);
+
+  /* A day of the month it was moved to takes the run to it, and the address follows. */
+  await mini.locator('[data-dag-cal-mini-day="2031-02-17"]').click();
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-02-17");
+  await expect(page.locator('[data-dag-cal-column="2031-02-17"]')).toBeVisible();
+  expect(where()).toEqual({ view: "days", date: "2031-02-17", days: "3" });
 });
 
 test("times are shown and written in the time zone Settings says", async ({ page }) => {

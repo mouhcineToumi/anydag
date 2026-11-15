@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+
 import { BOARDS } from "./boards";
+import { expect, test } from "./fixture";
 
 /**
  * Dragging an item writes to the board file.

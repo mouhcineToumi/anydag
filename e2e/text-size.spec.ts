@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
-
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { openMore } from "./more";
 import { openSettings, openSidebar, settingsTab, type SettingsTab } from "./sidebar";
 
@@ -180,6 +179,52 @@ test("a note reads at the step, its text and its title", async ({ page }) => {
   await choose(page, "default");
   expect(await sizeOf(page, ".dag-note-view .bn-editor")).toBeCloseTo(14, 1);
   expect(await sizeOf(page, ".dag-note-title")).toBeCloseTo(26 * 1.35, 0);
+});
+
+test("the calendar's small month follows the step, and stays inside its card", async ({ page }, info) => {
+  await openBoard(page);
+  await choose(page, "large");
+
+  await page.goto("/?calendar=week&date=2035-07-15");
+  const mini = page.locator("[data-dag-cal-mini]");
+  await expect(mini).toBeVisible({ timeout: 15_000 });
+
+  /* Every size on it is the chrome's step: a day number `sm`, the month `md`, a weekday `xs`. */
+  expect(await sizeOf(page, "[data-dag-cal-mini-day]")).toBeGreaterThan(12);
+  expect(await sizeOf(page, "[data-dag-cal-mini-title]")).toBeGreaterThan(13);
+  expect(await sizeOf(page, ".dag-cal-mini__name")).toBeGreaterThan(11);
+
+  /* The card is a fixed 240px column of seven days: at Large the grid still fits it, every day keeps
+     its 24px target, and no number is wider than the button that holds it. */
+  expect(await fits(mini), "the small month overflows its card at Large").toBe(true);
+  for (const day of await mini.locator("[data-dag-cal-mini-day]").all()) {
+    const box = (await day.boundingBox())!;
+    expect(box.width, "a day of the small month is under 24px at Large").toBeGreaterThanOrEqual(24);
+    expect(await fits(day), "a day number leaves its button at Large").toBe(true);
+  }
+  await page.screenshot({ path: info.outputPath("calendar-large.png") });
+});
+
+test("the Assistant's subject chip follows the step, and keeps its title inside the pill", async ({ page }) => {
+  await openBoard(page);
+  await choose(page, "large");
+
+  await openNote(page);
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+  const chip = panel.locator(`[data-dag-chat-subject="${name}"]`);
+  await expect(chip).toBeVisible({ timeout: 15_000 });
+
+  /* The chip is the chrome's `sm`, and the document's title ellipsizes inside the pill rather than
+     widening it or spilling out of the panel. */
+  expect(await sizeOf(page, ".dag-chat-docchip")).toBeGreaterThan(12);
+  expect(await fits(panel), "the Assistant panel scrolls sideways at Large").toBe(true);
+  expect(await fits(chip), "the subject chip overflows at Large").toBe(true);
+  const title = chip.locator(".dag-chat-docchip__title");
+  expect(await title.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("ellipsis");
+  const chipBox = (await chip.boundingBox())!;
+  const panelBox = (await panel.boundingBox())!;
+  expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 1);
 });
 
 test("the choice survives a restart, and the tab's reset puts both rows back", async ({ page }) => {

@@ -177,7 +177,8 @@ job and the nightly run it too). `npm run checks` is the fast tier (Biome lint a
 `check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `test/parity.test.ts`,
 vitest). It needs no browser and is the pre-commit hook; CI also runs `npm run lint:promises`. The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)
-and in CI (`e2e.yml`: `@smoke` on a pull request, everything on a push); pre-push runs only what the
+and in CI (`e2e.yml`: on a pull request the `@smoke` tier plus the specs the change reaches, everything on
+a push); pre-push runs only what the
 push can have changed. Update baselines only deliberately, and read them. The required checks are
 `CI passed`, `e2e`, `PR title`, `PR target` and `Linked issue`. Hooks never stash; do not `--no-verify` past a failure, fix the cause. Details: [`gate-and-releases.md`](docs/architecture/gate-and-releases.md).
 

@@ -11,6 +11,7 @@ export type {
   ChatMeta,
   ChatRead,
   ChatRow,
+  DocKind,
   Mode,
   Provider,
   Step,

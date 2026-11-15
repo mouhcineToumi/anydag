@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
+import { BOARDS } from "./boards";
+import { expect, test, type Locator, type Page, type Route } from "./fixture";
 import { lead } from "./keys";
 import { settingsTab } from "./sidebar";
-import { BOARDS } from "./boards";
 
 /**
  * The prompt card: describe a diagram, and a model draws it in the card's place.

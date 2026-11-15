@@ -68,11 +68,14 @@ preference changes. `chrome.css` reads the attribute as `--text-scale` and multi
 by it — the chrome's own steps (`--chrome-text-*`, the theme's `ui.text.*`) and a note's Markdown
 ramp (`--chrome-note-*`, the theme's `type.md*`, restated under `.dag-note-view`). **Nothing on the
 diagram surface is in that list**: a board's `.dag-md`, its cards and its edges read `--dag-type-*`
-and `--dag-metric-*` straight from the theme, and the canvas has its own zoom. A snapshot reads no
+and `--dag-metric-*` straight from the theme, and the canvas has its own zoom. Two surfaces added
+after the setting are chrome and follow it like the rest: the calendar's small month (#350) and the
+Assistant's subject chip (#323). A snapshot reads no
 preference, so its attribute is `default`; a printed note, and the PDF the print dialog makes, puts
 the scale back to 1 with `data-dag-printing`, so what someone keeps is not a picture of this window.
 `e2e/text-size.spec.ts` measures the three steps, the board that does not move, the reload, the
-snapshot, and that the sidebar, a menu and every Settings tab it opens hold at *Large*.
+snapshot, the two fixed-width surfaces above, and that the sidebar, a menu and every Settings tab it
+opens hold at *Large*.
 
 The headings and the words on the tabs are the scopes: *You*, *This computer*, *This vault* and
 *This board*. Each heading is ink, with one short line under it in slate saying what it means — under
