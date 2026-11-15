@@ -19,7 +19,7 @@ import { HUE_ORDER } from "../../src/dsl/ir";
 import { eventOf, isDay } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectFolders, projectFor, withProject, type Project } from "../../src/note/project";
-import { STATUSES, dueOf, titleStem, withTask } from "../../src/note/task";
+import { PRIORITIES, STATUSES, dueOf, titleStem, withTask } from "../../src/note/task";
 import { withEvent } from "../../src/note/event";
 import { FetchRefused, fetchFile, type Fetched } from "../fetch";
 import { endsBeforeItStarts, placed, withTitle } from "../frontmatter";
@@ -906,7 +906,7 @@ const taskTools: Tool[] = [
   tool({
     name: "task_list",
     description: withNote(
-      "Every task — a note whose frontmatter has a `status:` — with its title, status, due date, start date and the project it is in, in the Tasks page's order: in progress, to do, done, each by due date then title. A task with a start and a due date spans the days between on the calendar.\n\n" +
+      "Every task — a note whose frontmatter has a `status:` — with its title, status, priority (`urgent`, `high`, `medium`, `low`, or null for none), due date, start date and the project it is in, in the Tasks page's order: in progress, to do, done, each by due date then title. A task with a start and a due date spans the days between on the calendar.\n\n" +
         "`project` narrows to one project, named by its folder or its note, subfolders included — or `none` for the tasks in no project. `status` narrows to one status.",
     ),
     write: false,
@@ -925,6 +925,7 @@ const taskTools: Tool[] = [
           name,
           title: got.titles[name] ?? null,
           status: task.status,
+          priority: task.priority ?? null,
           due: task.due ?? null,
           start: task.start ?? null,
           project: home,
@@ -942,22 +943,23 @@ const taskTools: Tool[] = [
   tool({
     name: "task_create",
     description: withNote(
-      "Make a task: a note titled `title`, with a `status:` and, if given, a `due:` date and a `start:` date (`YYYY-MM-DD` each). Its file is named after the title, in `folder` if given — a project's folder puts it in that project. Its description is the note's body: write it with `note_write`.",
+      "Make a task: a note titled `title`, with a `status:` and, if given, a `priority:` (`urgent`, `high`, `medium` or `low`), a `due:` date and a `start:` date (`YYYY-MM-DD` each). Its file is named after the title, in `folder` if given — a project's folder puts it in that project. Its description is the note's body: write it with `note_write`.",
     ),
     write: true,
     input: {
       title: z.string(),
       folder: z.string().optional(),
       status: z.enum(STATUSES).default("todo"),
+      priority: z.enum(PRIORITIES).optional(),
       due: z.string().optional(),
       start: z.string().optional(),
       vault,
     },
-    run: async ({ title, folder, status, due, start, vault: v }, kit) => {
+    run: async ({ title, folder, status, priority, due, start, vault: v }, kit) => {
       kit.needWrite("make a task");
       for (const day of [due, start])
         if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
-      const dates = { ...(due ? { due } : {}), ...(start ? { start } : {}) };
+      const dates = { ...(priority ? { priority } : {}), ...(due ? { due } : {}), ...(start ? { start } : {}) };
       const text = withTask(withTitle("", cleanTitle(title) ?? title, "note"), { status, ...dates });
       const name = inFolder(folder, titleStem(title) || "untitled");
       const got = await kit.api("POST", "/__board/create", { vault: v, body: { name, text, kind: "note" } });
@@ -967,26 +969,28 @@ const taskTools: Tool[] = [
   tool({
     name: "task_set",
     description: withNote(
-      "Change a task's status, due date or start date — or make a plain note a task by giving it a status.\n\n" +
-        '`status: "none"` makes it a plain note again, taking all three lines out. `due` and `start` are `YYYY-MM-DD`, or `"none"` to take that date off. Only those lines of the note change.',
+      "Change a task's status, priority, due date or start date — or make a plain note a task by giving it a status.\n\n" +
+        '`status: "none"` makes it a plain note again, taking all four lines out. `priority` is `urgent`, `high`, `medium` or `low`, or `"none"` to take it off. `due` and `start` are `YYYY-MM-DD`, or `"none"` to take that date off. Only those lines of the note change.',
     ),
     write: true,
     input: {
       name: z.string(),
       status: z.enum([...STATUSES, "none"]).optional(),
+      priority: z.enum([...PRIORITIES, "none"]).optional(),
       due: z.string().optional(),
       start: z.string().optional(),
       vault,
     },
-    run: ({ name, status, due, start, vault: v }, kit) => {
+    run: ({ name, status, priority, due, start, vault: v }, kit) => {
       kit.needWrite("change a task");
       const body: Record<string, unknown> = { name };
-      if (status === "none") Object.assign(body, { status: null, due: null, start: null });
+      if (status === "none") Object.assign(body, { status: null, due: null, start: null, priority: null });
       else if (status !== undefined) body.status = status;
       if (due !== undefined && status !== "none") body.due = due === "none" ? null : due;
       if (start !== undefined && status !== "none") body.start = start === "none" ? null : start;
+      if (priority !== undefined && status !== "none") body.priority = priority === "none" ? null : priority;
       if (Object.keys(body).length === 1)
-        throw new ToolError("say what to change: a `status`, a `due` date, a `start` date, or more than one");
+        throw new ToolError("say what to change: a `status`, a `priority`, a `due` date, a `start` date, or more than one");
       return kit.api("POST", "/__board/task", { vault: v, body });
     },
   }),

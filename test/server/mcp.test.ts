@@ -155,6 +155,28 @@ describe("documents", () => {
     const list = (await call(c, "task_list", { status: "done" })).data.tasks;
     expect(list).toEqual([expect.objectContaining({ name: t.name, status: "done", due: "2026-12-01" })]);
   });
+
+  it("task_create and task_set take a priority, task_list says it, and none takes the line out", async () => {
+    const c = await connect();
+    const t = (await call(c, "task_create", { title: "Fix the leak", priority: "urgent" })).data;
+    expect(t.task).toEqual({ status: "todo", priority: "urgent" });
+    const text = async () => (await call(c, "note_read", { name: t.name })).data.text as string;
+    expect(await text()).toContain("\npriority: urgent\n");
+    let list = (await call(c, "task_list")).data.tasks;
+    expect(list).toEqual([expect.objectContaining({ name: t.name, priority: "urgent" })]);
+
+    await call(c, "task_set", { name: t.name, priority: "low" });
+    expect(await text()).toContain("\npriority: low\n");
+    await call(c, "task_set", { name: t.name, priority: "none" });
+    expect(await text()).not.toContain("priority:");
+    list = (await call(c, "task_list")).data.tasks;
+    expect(list[0].priority).toBeNull();
+
+    expect((await call(c, "task_set", { name: t.name, priority: "p1" })).error).toBeDefined();
+    await call(c, "task_set", { name: t.name, priority: "high" });
+    await call(c, "task_set", { name: t.name, status: "none" });
+    expect(await text()).not.toMatch(/status:|priority:/);
+  });
 });
 
 describe("templates", () => {

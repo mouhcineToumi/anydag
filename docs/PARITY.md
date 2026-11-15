@@ -81,9 +81,9 @@ above must say so. The one switch today is `cloud`, and no release build says it
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every task, with its status, due date and project | `GET /__board/list` | · | `task_list` |
+| Every task, with its status, priority, due date and project | `GET /__board/list` | · | `task_list` |
 | Make a task | `POST /__board/create` | · | `task_create` |
-| Change a task's status, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
+| Change a task's status, priority, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
 
 ## Events
 

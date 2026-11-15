@@ -5277,7 +5277,7 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
  * the warning text, done the success text, and a date that has passed the danger text — so a theme
  * that makes those greys (`neutral`) draws tasks in greys, which is its business.
  *
- * Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-toolbar__make-task`,
+ * Names claimed, grepped first: `dag-task-*` (`dag-task-priority`, `dag-task-pri`), `data-priority`, `dag-tasks*`, `dag-taskbar*`, `dag-toolbar__make-task`,
  * `dag-sidebar__badge`, `data-dag-task*`, `data-dag-tasks*`, `data-dag-taskbar*`, `data-dag-taskline`,
  * `data-dag-sidebar-task*`, `data-dag-sidebar-new-task`, `data-dag-note-make-task`, the storage key
  * `dag:tasks-view`, and the query key `tasks`.
@@ -5289,7 +5289,8 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
 .dag-task-glyph[data-status="in-progress"] { color: var(--dag-color-warningText); }
 .dag-task-glyph[data-status="done"] { color: var(--dag-color-successText); }
 
-.dag-task-status {
+.dag-task-status,
+.dag-task-pri {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -5303,9 +5304,23 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
   border: none;
   border-radius: var(--dag-ui-radius-control);
 }
-button.dag-task-status { cursor: pointer; }
-button.dag-task-status:hover { background: var(--dag-color-paper200); }
-button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
+button.dag-task-status,
+button.dag-task-pri { cursor: pointer; }
+button.dag-task-status:hover,
+button.dag-task-pri:hover { background: var(--dag-color-paper200); }
+button.dag-task-status:focus-visible,
+button.dag-task-pri:focus-visible { box-shadow: var(--focus-ring); }
+
+/* The priority mark (#311): four bars, as many filled as the task matters, in the level's colour.
+   Urgent is the danger hue, high the darker amber, medium the accent, low slate; a bar not filled is
+   the outline, and a task with no priority is four of those. */
+.dag-task-priority { flex: none; }
+.dag-task-priority rect { fill: var(--dag-color-outline); }
+.dag-task-priority rect[data-on] { fill: currentColor; }
+.dag-task-priority[data-priority="urgent"] { color: var(--dag-color-danger); }
+.dag-task-priority[data-priority="high"] { color: var(--dag-color-warningText); }
+.dag-task-priority[data-priority="medium"] { color: var(--dag-color-accent); }
+.dag-task-priority[data-priority="low"] { color: var(--dag-color-slate); }
 
 .dag-task-due { flex: none; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
 .dag-task-due[data-overdue] { color: var(--dag-color-dangerText); font-weight: var(--dag-ui-weight-strong); }
@@ -5722,9 +5737,16 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   align-items: center;
   gap: 8px;
   min-height: 38px;
-  padding: 0 16px 0 18px;
+  padding: 0 16px 0 10px;
   border-bottom: 1px solid var(--dag-color-outlineSoft);
 }
+/* The priority sits tight against the status mark: the two read as one lead-in to the title. */
+.dag-tasks__pri { margin-right: -6px; }
+/* No priority is a blank cell, as most tasks have none; the four empty bars show where to press when
+   the row is under the pointer or holds the focus. */
+.dag-tasks__pri[data-dag-task-priority="none"] .dag-task-priority { visibility: hidden; }
+.dag-tasks__row:hover .dag-tasks__pri[data-dag-task-priority="none"] .dag-task-priority,
+.dag-tasks__row:focus-within .dag-tasks__pri[data-dag-task-priority="none"] .dag-task-priority { visibility: visible; }
 .dag-tasks__row:hover { background: var(--dag-color-paper100); }
 .dag-tasks__row[data-done] .dag-tasks__title { color: var(--dag-color-slate); text-decoration: line-through; }
 .dag-tasks__title {

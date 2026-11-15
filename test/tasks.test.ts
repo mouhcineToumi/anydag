@@ -6,6 +6,8 @@ import { splitNote } from "@/note/format";
 import { indexTexts } from "@/refs/extract";
 import {
   compareTasks,
+  PRIORITIES,
+  priorityOf,
   dueOf,
   toggledStatus,
   overdue,
@@ -67,6 +69,17 @@ describe("the parts", () => {
     expect(toggledStatus("todo")).toBe("done");
     expect(toggledStatus("in-progress")).toBe("done");
     expect(toggledStatus("done")).toBe("todo");
+  });
+
+  it("writes every priority it reads back, and none takes the line out", () => {
+    for (const priority of PRIORITIES) {
+      const text = withTask("---\nstatus: todo\n---\n", { priority });
+      expect(taskOf(text)).toEqual({ status: "todo", priority });
+      expect(withTask(text, { priority: null })).toBe("---\nstatus: todo\n---\n");
+    }
+    expect(priorityOf(" URGENT ")).toBe("urgent");
+    expect(priorityOf("p1")).toBeUndefined();
+    expect(priorityOf(1)).toBeUndefined();
   });
 
   it("reads only strings", () => {

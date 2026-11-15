@@ -18,7 +18,7 @@ import { HUE_ORDER } from "../../src/dsl/ir";
 import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
-import { STATUSES, dueOf, indexedTask, statusOf, taskOf, withTask } from "../../src/note/task";
+import { PRIORITIES, STATUSES, dueOf, indexedTask, priorityOf, statusOf, taskOf, withTask } from "../../src/note/task";
 import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
 import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/wikilinks";
@@ -568,15 +568,21 @@ export function docRoutes(app: Hono, s: Session): void {
       if (day === undefined) throw err(400, `\`${str(raw)}\` is not a date: write it YYYY-MM-DD`);
       change[key] = day;
     }
-    if (!Object.keys(change).length) throw err(400, "expected `status`, `due` or `start`");
+    if ("priority" in body) {
+      const raw = body.priority;
+      const priority = raw === null ? null : (priorityOf(raw) ?? undefined);
+      if (priority === undefined) throw err(400, `\`${str(raw)}\` is not a priority: ${PRIORITIES.join(", ")}`);
+      change.priority = priority;
+    }
+    if (!Object.keys(change).length) throw err(400, "expected `status`, `due`, `start` or `priority`");
     const text = await recompute(
       s.vault,
       name,
       "note",
       (t) => {
         const next = withTask(t, change);
-        if ((change.due || change.start) && !taskOf(next))
-          throw err(400, `\`${name}\` is not a task: give it a status as well as a date`);
+        if ((change.due || change.start || change.priority) && !taskOf(next))
+          throw err(400, `\`${name}\` is not a task: give it a status as well as a date or a priority`);
         return next;
       },
       "the status",

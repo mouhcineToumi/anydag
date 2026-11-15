@@ -2063,7 +2063,7 @@ export function Sidebar({
             else if (what === "new-table") reportMake(files.newFile("table", where));
             else if (what === "make-task" || what === "mark-todo") files.task(where, { status: "todo" });
             else if (what === "mark-done") files.task(where, { status: "done" });
-            else if (what === "unmake-task") files.task(where, { status: null, due: null, start: null });
+            else if (what === "unmake-task") files.task(where, { status: null, due: null, start: null, priority: null });
             else if (what === "make-event") files.event(where, nextHourEvent());
             else if (what === "unmake-event") files.event(where, { start: null, end: null });
             else if (what === "new-folder") reportMake(files.newFolder(where));

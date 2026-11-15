@@ -299,6 +299,42 @@ test("a task's own page sets its status and its date through the note's save, an
   await expect(page.locator('[data-dag-taskbar="todo"]')).toBeVisible();
 });
 
+test("a priority is set from the row's mark, from its menu's keys and from the task's page, and a plain note loses it", async ({
+  page,
+}) => {
+  const name = write("pri", "Fix the leak", ["status: todo"]);
+  await tasksPage(page, name);
+  const row = page.locator(`[data-dag-task-row="${name}"]`);
+  const mark = row.locator("[data-dag-task-priority]");
+  await expect(mark).toHaveAttribute("data-dag-task-priority", "none");
+
+  await mark.click();
+  await page.locator('[data-dag-task-menu-priority="high"]').click();
+  await expect.poll(() => read("pri")).toContain("\nstatus: todo\npriority: high\n---\n");
+  await expect(mark).toHaveAttribute("data-dag-task-priority", "high");
+
+  /* The menu's keys: 1 is Urgent, 0 is none. */
+  await mark.click();
+  await page.keyboard.press("1");
+  await expect.poll(() => read("pri")).toContain("\npriority: urgent\n");
+  await mark.click();
+  await page.keyboard.press("0");
+  await expect.poll(() => read("pri")).not.toContain("priority:");
+  await expect(mark).toHaveAttribute("data-dag-task-priority", "none");
+
+  /* The task's own page: the same menu, through the note's save. */
+  await page.goto(`/?note=${name}`);
+  await ready(page);
+  await page.locator("[data-dag-taskbar-priority]").click();
+  await page.locator('[data-dag-task-menu-priority="low"]').click();
+  await expect.poll(() => read("pri")).toBe('---\ntitle: "Fix the leak"\nstatus: todo\npriority: low\n---\nWhat it is about.\n');
+  await expect(page.locator("[data-dag-taskbar-priority]")).toHaveAttribute("data-dag-taskbar-priority", "low");
+
+  /* Not a task takes the priority with the status: a plain note keeps no line it cannot show. */
+  await pageMore(page, "data-dag-taskbar-untask");
+  await expect.poll(() => read("pri")).toBe('---\ntitle: "Fix the leak"\n---\nWhat it is about.\n');
+});
+
 test("the read-only view draws a task's status and date and nothing to change them with", async ({ page }) => {
   const name = write("seen", "Review the draft", ["status: in-progress", `due: ${day(0)}`]);
   await page.goto(`/?view=1&note=${name}`);

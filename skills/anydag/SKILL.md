@@ -55,7 +55,7 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `quiz_questions` · `quiz_answer` · `quiz_mistakes` · `quiz_threshold` | running one in the conversation: the questions as data, then **only the answers the person gave**; what is still in Mistakes; how many right in a row take one out |
 | `table_list` · `table_read` · `table_create` · `table_write` · `table_rename` · `table_duplicate` · `table_delete` · `table_title` · `table_check` | tables, the same way, and `table_check` for the `ET_`/`WT_` codes (with `text`, a draft's) |
 | `table_get` · `table_edit` | a table as data — every tab, column and row with its id, and each cell as written and as read — and edits to its cells, rows, columns and tabs by those ids, which never lose a person's edit to another row |
-| `task_list` · `task_create` · `task_set` | tasks — notes with a `status:` and maybe a `due:` and a `start:` |
+| `task_list` · `task_create` · `task_set` | tasks — notes with a `status:` and maybe a `priority:`, a `due:` and a `start:` |
 | `event_list` · `event_create` · `event_set` | events — notes with a `start:` and maybe an `end:`; a time **as the person said it, with no offset** — the server puts their zone's on, and `whoami` says which zone that is |
 | `project_list` · `project_create` · `project_set` | projects — a folder whose note has a `project:` |
 | `search` · `refs` · `resolve` | the page's search over every board, note, quiz and table; references and backlinks; what a `dag:<id>` names |
@@ -452,10 +452,11 @@ written exactly as any note's.
     The copy is in [Pricing draft](dag:7q2m9xk4tb).
 
 Write the three words as they are: `doing`, `blocked` or `closed` is not a status, and a note saying
-one is not a task. A `due:` is `YYYY-MM-DD`; a due date without a status is ignored. A `start:`, also
+one is not a task. A `priority:` is `urgent`, `high`, `medium` or `low`, and no line is none; any
+other word is read as none. A `due:` is `YYYY-MM-DD`; a due date without a status is ignored. A `start:`, also
 `YYYY-MM-DD`, is the day it begins, and the calendar spans the task from one to the other. To change
-one without touching the text, `POST /__board/task {name, status?, due?, start?}` (`null` takes a line
-out, and all three `null` make it a plain note again) or the `task_set` tool. On a board, a task's embed
+one without touching the text, `POST /__board/task {name, status?, priority?, due?, start?}` (`null` takes a line
+out, and `status: null` with the others `null` makes it a plain note again) or the `task_set` tool. On a board, a task's embed
 card draws its status as a button that changes the file.
 
 **An event is a note with a `start:` and no `status:`**, and an optional `end:`. A date is all day and

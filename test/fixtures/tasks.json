@@ -35,7 +35,13 @@
     { "why": "a start date and a due date span the days between", "text": "---\nstatus: todo\nstart: 2026-09-28\ndue: 2026-10-03\n---\n", "task": { "status": "todo", "start": "2026-09-28", "due": "2026-10-03" } },
     { "why": "a start date alone", "text": "---\nstatus: in-progress\nstart: 2026-09-28\n---\n", "task": { "status": "in-progress", "start": "2026-09-28" } },
     { "why": "a timed start is no start date", "text": "---\nstatus: todo\nstart: 2026-09-28T09:00+02:00\n---\n", "task": { "status": "todo" } },
-    { "why": "an end is not a task's", "text": "---\nstatus: todo\nstart: 2026-09-28\nend: 2026-10-03\n---\n", "task": { "status": "todo", "start": "2026-09-28" } }
+    { "why": "an end is not a task's", "text": "---\nstatus: todo\nstart: 2026-09-28\nend: 2026-10-03\n---\n", "task": { "status": "todo", "start": "2026-09-28" } },
+    { "why": "a priority", "text": "---\nstatus: todo\npriority: urgent\n---\n", "task": { "status": "todo", "priority": "urgent" } },
+    { "why": "a priority in capitals, with space round it", "text": "---\nstatus: todo\npriority: '  High '\n---\n", "task": { "status": "todo", "priority": "high" } },
+    { "why": "a word that is not one of the four is no priority", "text": "---\nstatus: todo\npriority: P1\n---\n", "task": { "status": "todo" } },
+    { "why": "a number is no priority", "text": "---\nstatus: todo\npriority: 1\n---\n", "task": { "status": "todo" } },
+    { "why": "none is no fifth level", "text": "---\nstatus: todo\npriority: none\n---\n", "task": { "status": "todo" } },
+    { "why": "a priority alone is not a task", "text": "---\npriority: high\n---\n", "task": null }
   ],
   "write": [
     { "why": "a status added after the title", "text": "---\ntitle: Plan\n---\nbody\n", "set": { "status": "todo" }, "out": "---\ntitle: Plan\nstatus: todo\n---\nbody\n" },
@@ -54,7 +60,11 @@
     { "why": "a key that only starts with the word is another key", "text": "---\nstatusline: on\n---\n", "set": { "status": "todo" }, "out": "---\nstatusline: on\nstatus: todo\n---\n" },
     { "why": "the body is never read for a key", "text": "---\ntitle: T\n---\nstatus: todo\n", "set": { "status": "done" }, "out": "---\ntitle: T\nstatus: done\n---\nstatus: todo\n" },
     { "why": "a start date added after the due date", "text": "---\nstatus: todo\ndue: 2026-10-03\n---\n", "set": { "start": "2026-09-28" }, "out": "---\nstatus: todo\ndue: 2026-10-03\nstart: 2026-09-28\n---\n" },
-    { "why": "no longer a task takes the start date with it", "text": "---\ntitle: X\nstatus: todo\nstart: 2026-09-28\n---\n", "set": { "status": null, "due": null, "start": null }, "out": "---\ntitle: X\n---\n" }
+    { "why": "no longer a task takes the start date with it", "text": "---\ntitle: X\nstatus: todo\nstart: 2026-09-28\n---\n", "set": { "status": null, "due": null, "start": null }, "out": "---\ntitle: X\n---\n" },
+    { "why": "a priority added at the end", "text": "---\ntitle: X\nstatus: todo\n---\n", "set": { "priority": "high" }, "out": "---\ntitle: X\nstatus: todo\npriority: high\n---\n" },
+    { "why": "a priority that was not one of the four is replaced where it is", "text": "---\nstatus: todo\npriority: P1\ndue: 2026-10-03\n---\n", "set": { "priority": "low" }, "out": "---\nstatus: todo\npriority: low\ndue: 2026-10-03\n---\n" },
+    { "why": "a priority taken out", "text": "---\nstatus: todo\npriority: medium\n---\nbody", "set": { "priority": null }, "out": "---\nstatus: todo\n---\nbody" },
+    { "why": "no longer a task takes the priority with it", "text": "---\ntitle: X\nstatus: todo\npriority: urgent\n---\n", "set": { "status": null, "due": null, "start": null, "priority": null }, "out": "---\ntitle: X\n---\n" }
   ],
   "stems": [
     {"why": "a title read as a name", "title": "Ship the pricing page", "stem": "ship-the-pricing-page"},

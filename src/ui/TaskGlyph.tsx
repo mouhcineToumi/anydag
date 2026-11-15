@@ -1,7 +1,17 @@
 import { Circle, CircleCheck, Contrast } from "lucide-react";
 
 import { locale } from "@/locale";
-import { overdue, STATUS_LABEL, today, toggledStatus, type Task, type TaskStatus } from "@/note/task";
+import {
+  overdue,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  STATUS_LABEL,
+  today,
+  toggledStatus,
+  type Priority,
+  type Task,
+  type TaskStatus,
+} from "@/note/task";
 
 /**
  * How a task's status and due date are drawn, wherever one is: a row in the sidebar, the
@@ -84,6 +94,48 @@ export function StatusButton({
   );
 }
 
+/** How many of the four bars each priority fills: urgent all of them, low one. */
+const FILLED: Readonly<Record<Priority, number>> = { urgent: 4, high: 3, medium: 2, low: 1 };
+
+/**
+ * A task's priority (#311): four bars rising left to right, as many filled as it matters — four for
+ * urgent, one for low — and none filled for a task with no priority, so the column keeps its place
+ * and a row without one reads as *not set* rather than as a gap. The filled bars take the level's
+ * colour from `chrome.css` (`[data-priority]`: the danger hue, the warning text, the accent, slate);
+ * the others are the outline. Drawn on the row, the task's page, the New task row and a card.
+ */
+export function PriorityMark({ priority, size = 16 }: { priority?: Priority; size?: number }) {
+  const on = priority ? FILLED[priority] : 0;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      className="dag-task-priority"
+      data-priority={priority ?? "none"}
+      aria-hidden="true"
+    >
+      {[0, 1, 2, 3].map((i) => (
+        <rect
+          key={i}
+          x={1 + i * 3.75}
+          y={11 - i * 3}
+          width={2.5}
+          height={4 + i * 3}
+          rx={0.75}
+          data-on={i < on ? "" : undefined}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** The levels a menu offers, most first, with the key that picks each (`P` then `1`–`4`, `0` for none). */
+export const PRIORITY_KEYS: readonly { priority: Priority | null; key: string; label: string }[] = [
+  ...PRIORITIES.map((priority, i) => ({ priority, key: String(i + 1), label: PRIORITY_LABEL[priority] })),
+  { priority: null, key: "0", label: "No priority" },
+];
+
 /* Made once per locale: a list of a hundred dates would otherwise build a formatter for each. */
 const formats = new Map<string, Intl.DateTimeFormat>();
 function format(kind: "week" | "day" | "year"): Intl.DateTimeFormat {
@@ -142,7 +194,7 @@ export function DueLabel({ task }: { task: Task }) {
 }
 
 /**
- * A task's status and date, read-only, above its text wherever it is drawn with nothing to change
+ * A task's status, priority and date, read-only, above its text wherever it is drawn with nothing to change
  * it with: `?view=1`, a share link, `?snapshot=1`, and the PDF. The bar on the task's own page is
  * the editable twin, in `NoteView`.
  */
@@ -151,6 +203,13 @@ export function TaskLine({ task }: { task: Task }) {
     <p className="dag-taskbar dag-taskbar--read" data-dag-taskline={task.status}>
       <TaskGlyph status={task.status} />
       <span>{STATUS_LABEL[task.status]}</span>
+      {task.priority ? (
+        <>
+          <span aria-hidden="true">·</span>
+          <PriorityMark priority={task.priority} size={14} />
+          <span data-dag-taskline-priority={task.priority}>{PRIORITY_LABEL[task.priority]}</span>
+        </>
+      ) : null}
       {task.due ? (
         <>
           <span aria-hidden="true">·</span>

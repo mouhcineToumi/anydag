@@ -327,7 +327,7 @@
     {
       "id": "task.list",
       "area": "Tasks",
-      "what": "Every task, with its status, due date and project",
+      "what": "Every task, with its status, priority, due date and project",
       "rest": ["GET /__board/list"],
       "cli": {"admin": false},
       "mcp": ["task_list"]
@@ -343,7 +343,7 @@
     {
       "id": "task.set",
       "area": "Tasks",
-      "what": "Change a task's status, due date or start date, or make a note a task and back",
+      "what": "Change a task's status, priority, due date or start date, or make a note a task and back",
       "rest": ["POST /__board/task"],
       "cli": {"admin": false},
       "mcp": ["task_set"]

@@ -22,6 +22,20 @@ export type TaskStatus = (typeof STATUSES)[number];
 export const STATUS_LABEL: Readonly<Record<TaskStatus, string>> = { todo: "To do", "in-progress": "In progress", done: "Done" };
 
 /**
+ * How much a task matters, most first (#311). No `priority:` line is none — the default, and what
+ * most tasks are — so there is no fifth word for it in the file.
+ */
+export const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+
+export const PRIORITY_LABEL: Readonly<Record<Priority, string>> = {
+  urgent: "Urgent",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+/**
  * What a task is, off its frontmatter. `due` is `YYYY-MM-DD`, and absent when there is none; so is
  * `start`, the day it begins — a task with both spans the days between on the calendar.
  */
@@ -29,6 +43,7 @@ export interface Task extends TaskFacts {
   status: TaskStatus;
   due?: string;
   start?: string;
+  priority?: Priority;
 }
 
 /**
@@ -50,6 +65,7 @@ export interface TaskChange {
   status?: TaskStatus | null;
   due?: string | null;
   start?: string | null;
+  priority?: Priority | null;
 }
 
 /** The frontmatter pattern `splitNote` and `titleOf` use: a block at the very start of the text. */
@@ -71,6 +87,18 @@ export function statusOf(raw: unknown): TaskStatus | undefined {
     .replace(/[\s_]+/g, "-");
   if (s === "to-do") return "todo";
   return (STATUSES as readonly string[]).includes(s) ? (s as TaskStatus) : undefined;
+}
+
+/**
+ * A `priority:` value, or `undefined` for none — which is what any other value is read as, and the
+ * line is left as it is in the file: a note saying `priority: P1` or `priority: 3` is not refused,
+ * only drawn with none until someone picks one. Lenient in case and surrounding space only, as
+ * {@link statusOf} is.
+ */
+export function priorityOf(raw: unknown): Priority | undefined {
+  if (typeof raw !== "string") return undefined;
+  const s = raw.trim().toLowerCase();
+  return (PRIORITIES as readonly string[]).includes(s) ? (s as Priority) : undefined;
 }
 
 /**
@@ -102,13 +130,14 @@ export function taskOf(text: string): Task | undefined {
     return undefined;
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
-  const fields = data as { status?: unknown; due?: unknown; start?: unknown };
+  const fields = data as { status?: unknown; due?: unknown; start?: unknown; priority?: unknown };
   const status = statusOf(fields.status);
   if (!status) return undefined;
   /* A task's start is a day, as its due date is: a timed `start:` is no start date. */
   const due = dueOf(fields.due);
   const start = dueOf(fields.start);
-  return { status, ...(due ? { due } : {}), ...(start ? { start } : {}) };
+  const priority = priorityOf(fields.priority);
+  return { status, ...(due ? { due } : {}), ...(start ? { start } : {}), ...(priority ? { priority } : {}) };
 }
 
 /** A Markdown check item, `- [ ]` or `1. [x]`, as remark's GFM reads one: the box and the space after it. */
@@ -191,7 +220,7 @@ export function toggledStatus(status: TaskStatus): TaskStatus {
 }
 
 /**
- * `text` with its frontmatter's `status:`, `due:` and `start:` set as `change` asks — one line each,
+ * `text` with its frontmatter's `status:`, `due:`, `start:` and `priority:` set as `change` asks — one line each,
  * and every other byte as it was.
  *
  * `with_title`'s rule, because a frontmatter is carried byte for byte by the note editor
@@ -203,7 +232,7 @@ export function toggledStatus(status: TaskStatus): TaskStatus {
  * is not a frontmatter to any reader here, and would draw as two rules.
  */
 export function withTask(text: string, change: TaskChange): string {
-  return withKeys(text, change, ["status", "due", "start"]);
+  return withKeys(text, change, ["status", "due", "start", "priority"]);
 }
 
 /**

@@ -29,6 +29,7 @@ import { folderOf, projectFolders, projectFor, within, type Project } from "@/no
 import {
   compareTasks,
   overdue,
+  PRIORITY_LABEL,
   STATUS_LABEL,
   STATUSES,
   titleStem,
@@ -42,7 +43,7 @@ import { Button, IconButton } from "./controls";
 import { startDrag } from "./pointerDrag";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
-import { DueLabel, StatusButton, TaskGlyph } from "./TaskGlyph";
+import { DueLabel, PRIORITY_KEYS, PriorityMark, StatusButton, TaskGlyph } from "./TaskGlyph";
 import { compareRecent, countLine, onTab, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
 import { TasksMenu, under, type MenuRow } from "./TasksMenu";
 import { Toast, ToastName, ToastWords } from "./Toast";
@@ -85,7 +86,8 @@ interface Row {
 }
 
 const leaf = (name: string) => name.slice(name.lastIndexOf("/") + 1);
-const same = (a: Task | undefined, b: Task | undefined) => a?.status === b?.status && a?.due === b?.due;
+const same = (a: Task | undefined, b: Task | undefined) =>
+  a?.status === b?.status && a?.due === b?.due && a?.priority === b?.priority;
 
 /** List or board, at the end of the top bar: a radiogroup of two, because it is one choice. */
 export function LayoutToggle({ layout, onLayout }: { layout: TasksLayout; onLayout(next: TasksLayout): void }) {
@@ -202,7 +204,8 @@ export function TasksView({
   const [pending, setPending] = useState<Record<string, Task>>({});
   const [filter, setFilter] = useState("");
   const [settling, setSettling] = useState<Settling | null>(null);
-  const [menu, setMenu] = useState<{ row: Row; at: Spot } | null>(null);
+  /* A row's menu: its statuses, or its four priorities. */
+  const [menu, setMenu] = useState<{ row: Row; at: Spot; of: "status" | "priority" } | null>(null);
 
   useEffect(() => {
     setPending((had) => {
@@ -271,8 +274,14 @@ export function TasksView({
          holding `null` would never compare equal to the list's and never be let go of. */
     const status = next.status ?? row.task.status;
     const due = next.due === undefined ? row.task.due : (next.due ?? undefined);
+    const priority = next.priority === undefined ? row.task.priority : (next.priority ?? undefined);
     /* And a start date, which nothing here changes and nothing here may drop. */
-    const want: Task = { status, ...(due ? { due } : {}), ...(row.task.start ? { start: row.task.start } : {}) };
+    const want: Task = {
+      status,
+      ...(due ? { due } : {}),
+      ...(row.task.start ? { start: row.task.start } : {}),
+      ...(priority ? { priority } : {}),
+    };
     setPending((had) => ({ ...had, [row.name]: want }));
     const got = await setTask(row.name, next);
     setPending((had) => {
@@ -310,8 +319,8 @@ export function TasksView({
   }, [settling, scopedRows, onChange]);
 
   const openMenu = useCallback(
-    (row: Row, at: Spot) => {
-      if (!locked) setMenu({ row, at });
+    (row: Row, at: Spot, of: "status" | "priority" = "status") => {
+      if (!locked) setMenu({ row, at, of });
     },
     [locked],
   );
@@ -428,7 +437,27 @@ export function TasksView({
           ))}
         </div>
       )}
-      {menu ? (
+      {menu?.of === "priority" ? (
+        <TasksMenu
+          at={menu.at}
+          label={`${menu.row.title}: priority`}
+          data={{ "data-dag-task-menu": menu.row.name }}
+          onClose={() => setMenu(null)}
+          rows={PRIORITY_KEYS.map(
+            ({ priority, key, label }): MenuRow => ({
+              key: priority ?? "none",
+              label,
+              icon: <PriorityMark priority={priority ?? undefined} />,
+              hint: key,
+              checked: (menu.row.task.priority ?? null) === priority,
+              data: { "data-dag-task-menu-priority": priority ?? "none" },
+              onPick: () => {
+                if ((menu.row.task.priority ?? null) !== priority) onChange(menu.row, { priority });
+              },
+            }),
+          )}
+        />
+      ) : menu ? (
         <TasksMenu
           at={menu.at}
           label={`${menu.row.title}: status`}
@@ -522,7 +551,7 @@ function TaskRow({
   onOpen(name: string): void;
   /** Absent while the app is locked. */
   onCheck?(row: Row, to: TaskStatus): void;
-  onMenu(row: Row, at: Spot): void;
+  onMenu(row: Row, at: Spot, of?: "status" | "priority"): void;
 }) {
   const items = r.task.items;
   const changed = r.task.changed;
@@ -538,6 +567,27 @@ function TaskRow({
         onMenu(r, { x: e.clientX, y: e.clientY });
       }}
     >
+      {onCheck ? (
+        <button
+          type="button"
+          className="dag-task-pri dag-tasks__pri"
+          data-dag-task-priority={r.task.priority ?? "none"}
+          aria-label={`${r.title}: priority, ${r.task.priority ? PRIORITY_LABEL[r.task.priority].toLowerCase() : "none"}`}
+          aria-haspopup="menu"
+          title={r.task.priority ? `Priority: ${PRIORITY_LABEL[r.task.priority]}` : "Set a priority"}
+          onClick={(e) => onMenu(r, under(e.currentTarget), "priority")}
+        >
+          <PriorityMark priority={r.task.priority} />
+        </button>
+      ) : (
+        <span
+          className="dag-task-pri dag-tasks__pri"
+          data-dag-task-priority={r.task.priority ?? "none"}
+          title={r.task.priority ? `Priority: ${PRIORITY_LABEL[r.task.priority]}` : undefined}
+        >
+          <PriorityMark priority={r.task.priority} />
+        </span>
+      )}
       <StatusButton status={r.task.status} label={r.title} onStatus={onCheck ? (next) => onCheck(r, next) : undefined} />
       <button
         type="button"
@@ -825,8 +875,17 @@ function Columns({
                     />
                     <span className="dag-tasks__card-title">{r.title}</span>
                   </div>
-                  {r.task.due || chip(r) ? (
+                  {r.task.due || r.task.priority || chip(r) ? (
                     <div className="dag-tasks__card-meta">
+                      {r.task.priority ? (
+                        <span
+                          className="dag-task-pri"
+                          data-dag-task-priority={r.task.priority}
+                          title={`Priority: ${PRIORITY_LABEL[r.task.priority]}`}
+                        >
+                          <PriorityMark priority={r.task.priority} />
+                        </span>
+                      ) : null}
                       {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
                       <DueLabel task={r.task} />
                     </div>
