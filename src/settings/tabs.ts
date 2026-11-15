@@ -101,11 +101,12 @@ export function scopeOf(tab: SettingsTab): SettingsGroup {
 }
 
 /**
- * The tabs that describe the app's server-backed features, and are drawn only when the build's
- * `cloud` switch is on (`server/features.ts`): the logs (Privacy's only content) and sync. Off,
- * a person reads no sign that a server exists — these two are what would have told them.
+ * The tabs that exist only when the build's `cloud` switch is on (`server/features.ts`): Sync.
+ * Privacy is drawn in every build (#326) — with the switch off it is the logs toggle and the one
+ * sentence saying logs are not sent from this version yet — so a person can always see the setting
+ * and say no in advance. Sync and Send feedback stay hidden (#103).
  */
-export const CLOUD_TABS: readonly SettingsTab[] = ["privacy", "sync"];
+export const CLOUD_TABS: readonly SettingsTab[] = ["sync"];
 
 /** The groups, with the switch's out when it is off. */
 export function withoutCloudTabs<G extends string>(sections: readonly TabGroup<G>[], cloud: boolean): readonly TabGroup<G>[] {

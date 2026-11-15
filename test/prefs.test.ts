@@ -15,6 +15,7 @@ import {
   STAMP,
   SYNC,
   TASKS_VIEW,
+  TELEMETRY_PENDING,
   WEEK_START,
   VAULT_PREF_KEYS,
   VAULT_STAMP,
@@ -146,6 +147,8 @@ describe("the preference list", () => {
       RECENT_FILES,
       LOCKED,
       RECENT_KEY,
+      /* The logs answer an off build holds for the first build that can carry it (#326). */
+      TELEMETRY_PENDING,
     ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);
@@ -181,6 +184,9 @@ describe("the preference list", () => {
     /* Nor the five models this browser picked last: a quick choice here need not become a list on
        every other machine, and the picker works without it. */
     expect(PREF_KEYS as readonly string[]).not.toContain(RECENT_KEY);
+    /* Nor the logs answer an off build is holding for the first one that can carry it (#326): it is
+       the install's answer in transit, not a preference that travels with the settings. */
+    expect(PREF_KEYS as readonly string[]).not.toContain(TELEMETRY_PENDING);
   });
 
   it("splits into the account's half and the vault's, with nothing in both or neither", () => {

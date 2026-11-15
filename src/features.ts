@@ -2,7 +2,8 @@
  * What the page is allowed to show, asked of its own server once at boot.
  *
  * Some features talk to an AnyDag server somebody else runs — sync (Settings → Sync, the sidebar's
- * row), the anonymous logs (the first-run question, Settings → Privacy), Send feedback (the
+ * row), the anonymous logs (the first-run question and the sending; Settings → Privacy draws its
+ * toggle in every build, #326), Send feedback (the
  * sidebar's row, its card and `/api/feedback`). They are behind **one switch, `cloud`**, which the *local server* decides
  * (`server/features.ts`) and answers with `/api/health`, beside the version it already reports.
  *
