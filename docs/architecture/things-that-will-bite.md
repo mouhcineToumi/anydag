@@ -330,7 +330,12 @@
   **the session deleted after**, by the id its events carry, because a standalone run still writes
   one into the person's history — 1.x runs left a dozen behind. The thinking level is `model#variant`
   now. `opencodeComplete` in `plugins/generate/llm.ts` is all of it, `test/llm.test.ts` holds each,
-  and `opencodeReady` refuses a 1.x with "upgrade" rather than half-working.
+  and `opencodeReady` refuses a 1.x with "upgrade" rather than half-working. A sixth, for safety
+  rather than for the run: **`OPENCODE_DISABLE_PROJECT_CONFIG=1`** (and `OPENCODE_DISABLE_CLAUDE_CODE=1`),
+  set by `opencodeEnv`. The throwaway directory is under the OS temp dir, and OpenCode reads
+  `opencode.json`, `.opencode/` and `AGENTS.md` in every folder above it up to `/` — a shared
+  `/tmp`, where 2.3 loaded another user's `opencode.json` and ran a plugin from their `.opencode/` as
+  the person (#10). The config in `OPENCODE_CONFIG_CONTENT` is still read with the walk off.
 - **A stub is a claim about another module, and a wrong one passes every test.** The MCP tests
   stubbed the grammar once with a `{sheets: [...]}` shape `GET /dsl` had never returned, and a
   resource raised on every call while nineteen tests agreed it was fine. The rule is not "do

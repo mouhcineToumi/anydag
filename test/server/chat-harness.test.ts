@@ -722,6 +722,8 @@ describe("the OpenCode harness", () => {
     expect(serve.args).toEqual(["serve", "--port", "0", "--hostname", "127.0.0.1"]);
     const xdg = serve.opts.env!.XDG_CONFIG_HOME!;
     expect(fs.readdirSync(xdg)).toEqual([]);
+    /* No config from the folders above the chat's, which are a shared /tmp (#10). */
+    expect(serve.opts.env!.OPENCODE_DISABLE_PROJECT_CONFIG).toBe("1");
     const cfg = JSON.parse(serve.opts.env!.OPENCODE_CONFIG_CONTENT!);
     expect(cfg.mcp.anydag.command).toEqual(["node", "cli.mjs", "mcp", "--chat", "c1"]);
     const promptFile = /^\{file:(.+)\}$/.exec(cfg.agent["dag-assistant"].prompt)![1]!;
