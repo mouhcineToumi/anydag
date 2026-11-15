@@ -85,8 +85,22 @@ a move since is followed; one that cannot be found is kept as it was. Three thin
   and `reachOf` drops a `subject` without a subject's shape.
 
 The chip is `src/assistant/DocChip.tsx`, which knows nothing about why it names a document — the
-subject is a `data-dag-chat-subject` attribute its caller puts on it — so the `@` mentions to come
-(#324) draw the same chip.
+subject is a `data-dag-chat-subject` attribute its caller puts on it — so the subject and every `@`
+mention a message carries draw the same chip.
+
+**A message can name a document with `@`** (#324). Typing `@` at the start of a word opens the
+vault's documents, filtered by what follows it with the reference picker's ranking — `rank` in
+`src/refs/rank.ts`, which the note editor's picker imports too, so there is one order and not two.
+Arrow keys move the row Enter picks, Escape closes the list and leaves the words where they are,
+and the pointer picks a row as well. Picking takes the `@query` out of the field and puts a
+`DocChip` in the message's documents row; Backspace at the chip's edge takes the last one as a
+single unit. An `@` inside a word — an email address — does not open the list. The turn request
+carries `mentions: [{name, kind}]`; the server resolves each in the page's vault with `peekId`, so
+naming one writes nothing to it, and `systemPrompt` adds *Documents mentioned in this message* with
+each document's `[title](dag:<id>)`. The fake's `mentions` command says that section back, which is
+how `test/server/chat-live.test.ts` checks the page's chips reached the turn. A mention is one
+message's, not the chat's, so it is not kept in `chat.json`; and it does not widen what the guard
+lets a turn change without asking — the subject's rule still holds.
 
 The composer is one field and one row under it: the scope chip, the model — the provider's mark and
 the model's short name, the harness named only inside the open picker — the effort resolved to what
@@ -235,8 +249,9 @@ is, above), and
 Settings → AI holds the default engine and model.
 
 Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`
-— among them `dag-chat-docchip*`, `dag-chat-composer__docs`, `data-dag-chat-docchip*` and
-`data-dag-chat-subject` for the chip —
+— among them `dag-chat-docchip*`, `dag-chat-composer__docs`, `data-dag-chat-docchip*`,
+`data-dag-chat-subject`, `dag-chat-mentions`, `dag-chat-mention*`, `data-dag-chat-mentions` and
+`data-dag-chat-mention-*` for the subject and the `@` mentions —
 the setting `assistant`, the leader binding `space A`, and the query key `chat`.
 `src/assistant/panelState.ts` is not `panel.ts`, which `check:case` refuses beside `Panel.tsx`.
 

@@ -40,6 +40,18 @@ const subject = (v: unknown): { name: string; kind: DocKind } | null | undefined
   return { name: o.name, kind: o.kind as DocKind };
 };
 
+/** A turn's `mentions`: absent or `[]` is none, and each is a document of this vault. */
+const mentions = (v: unknown): { name: string; kind: DocKind }[] | undefined => {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v) || v.length > 20) throw err(400, "`mentions` is a list of at most 20 `{name, kind}`");
+  return v.map((x) => {
+    const o = x as { name?: unknown; kind?: unknown };
+    if (!o || typeof o !== "object" || typeof o.name !== "string" || !o.name || !DOC_KINDS.includes(o.kind as DocKind))
+      throw err(400, "each mention is `{name, kind}`");
+    return { name: o.name, kind: o.kind as DocKind };
+  });
+};
+
 /** Requests from a chat's MCP server: the reach, the approvals, the recorder. Registered
  *  before the vault scoping, so a chat's request is scoped to the chat's vault, not the default. */
 export function chatGuard(app: Hono, a: Assistant): void {
@@ -85,6 +97,7 @@ export function chatRoutes(app: Hono, a: Assistant): void {
       model: typeof b.model === "string" && b.model ? b.model : undefined,
       effort: b.effort === null ? null : typeof b.effort === "string" ? b.effort : undefined,
       subject: subject(b.subject),
+      mentions: mentions(b.mentions),
     });
     return c.json({ turn });
   });
