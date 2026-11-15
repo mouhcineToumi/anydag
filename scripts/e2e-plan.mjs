@@ -2,9 +2,11 @@
 /**
  * What does a change need from the browser suite? One answer, asked by two callers:
  *
- *   - `.githooks/pre-push` — which tests to run before a push leaves the machine;
  *   - `.github/workflows/e2e.yml` — whether a pull request or a push needs the suite at all (a
- *     change to nothing but prose must still get a green `e2e` check, without paying for a browser).
+ *     change to nothing but prose must still get a green `e2e` check, without paying for a browser),
+ *     and which tests a pull request's shards run;
+ *   - `.githooks/pre-push`, with `ANYDAG_PREPUSH_E2E=1` — the same selection before a push leaves the
+ *     machine.
  *
  *     node scripts/e2e-plan.mjs --base origin/develop --head <sha>      # prints JSON
  *     node scripts/e2e-plan.mjs --head <sha> --head <sha> --field run   # `--head` may repeat; one field

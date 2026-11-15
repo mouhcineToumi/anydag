@@ -1,29 +1,32 @@
 #!/usr/bin/env bash
 #
-# The browser suite, before a push — but only the part of it the push can have changed.
+# Before a push: the two cheap checks that only CI used to run, and — when asked — the browser suite
+# the push can have changed.
 #
-# CI runs the same image on every pull request (`.github/workflows/e2e.yml`: the `@smoke` tier on a
-# PR, everything on `develop`), so this is the early, cheap look, and it is one `--no-verify` deep.
-# What it does not do is run five minutes of browser checks for a push that cannot have broken one:
+# **What it runs, and why that and nothing else** (#258, which has the numbers). The checks that
+# went red on a pull request were the ones no hook ran: `npm run lint:promises` (typescript-eslint's
+# promise rules over `e2e/` and `desktop/` too, ~27 s) and the store's contracts over a watched vault
+# (`ANYDAG_TEST_WATCH=1 vitest run test/server`, ~18 s). They run here side by side, about half a
+# minute, so a push that would fail them does not leave the machine. The browser suite does **not**
+# run by default any more: it was the same `@smoke` grep, in the same image, that the pull request's
+# `e2e` run starts a minute later (`.github/workflows/e2e.yml`, which now also runs the specs the
+# change reaches) — a minute of every push spent repeating CI.
 #
 #   1. **Nothing new** — every pushed commit is already on a remote (`git rev-list <sha> --not
 #      --remotes` is empty: a new branch pointing at an existing commit, a tag) → skipped, with a line.
-#   2. **A deleted branch** — git writes an all-zero sha for it → nothing to test.
-#   3. **Otherwise** `scripts/e2e-plan.mjs` reads what the push changes against `origin/develop`
-#      (else `origin/main`; neither → the whole suite) and answers with the tests it needs — the rule
-#      is written at the top of that file: prose and CI config run nothing; application code the
-#      `@smoke` tier; what can move pixels also the 45 reference screenshots; and a change under
-#      `e2e/` the specs Playwright's `--only-changed` traces it to.
-#
-# The tests run in Playwright's own Docker image (`scripts/e2e-docker.sh`), because the screenshots
-# are only valid there, so local and CI agree. No Docker running → the host's browser runs the same
-# selection (`scripts/e2e-local.sh`) with no screenshots compared, and says so. `ANYDAG_E2E_HOST=1`
-# asks for that on purpose. Workers are chosen from the machine's cores and free memory
-# (`scripts/e2e-lib.sh`); `ANYDAG_E2E_WORKERS` overrides.
+#   2. **A deleted branch** — git writes an all-zero sha for it → nothing to check.
+#   3. **Only prose** — every changed path is a `.md` outside `boards/`, or under `docs/` → nothing to
+#      check; neither check reads one.
+#   4. **Otherwise** the two checks, and with `ANYDAG_PREPUSH_E2E=1` also the browser selection
+#      `scripts/e2e-plan.mjs` answers — prose and CI config nothing; application code the `@smoke`
+#      tier; what can move pixels also the 45 reference screenshots; `api/` also `sync.spec.ts`; a
+#      change under `e2e/` the specs Playwright's `--only-changed` traces it to — in Playwright's
+#      Docker image (`scripts/e2e-docker.sh`), or on the host with no screenshots when Docker is not
+#      running (`scripts/e2e-local.sh`), which says so. `ANYDAG_E2E_HOST=1` asks for the host.
 #
 # `ANYDAG_NO_HOOK=1` is the escape hatch beside `--no-verify`, and a checkout with no `node_modules`
 # is skipped with a word rather than refused — the same argument `.githooks/pre-commit` and
-# `check-skill.mjs` make. The tests run on the working tree, as they always have: push the branch you
+# `check-skill.mjs` make. Everything runs on the working tree, as it always has: push the branch you
 # are standing on.
 set -euo pipefail
 
@@ -33,7 +36,7 @@ if [ -n "${ANYDAG_NO_HOOK:-}" ]; then
 fi
 
 if [ ! -d node_modules ]; then
-  echo "pre-push: skipping the suites — no node_modules; run: npm ci"
+  echo "pre-push: skipping the checks — no node_modules; run: npm ci"
   exit 0
 fi
 
@@ -46,7 +49,7 @@ while read -r _local_ref local_sha _remote_ref _remote_sha; do
   pushing=yes
   # A commit is new if no remote-tracking branch has it.
   if [ -n "$(git rev-list --max-count=1 "$local_sha" --not --remotes 2>/dev/null)" ]; then
-    heads+=(--head "$local_sha")
+    heads+=("$local_sha")
   fi
 done
 
@@ -56,15 +59,62 @@ if [ -z "$pushing" ]; then
 fi
 
 if [ "${#heads[@]}" -eq 0 ]; then
-  echo "pre-push: nothing new — every pushed commit is already on a remote; no tests"
+  echo "pre-push: nothing new — every pushed commit is already on a remote; no checks"
   exit 0
 fi
 
-plan="$(node scripts/e2e-plan.mjs "${heads[@]}")"
+# What the push changes, against what it will be merged into. No base to compare with → treat it as
+# code, the safe side.
+base=
+for b in origin/develop origin/main; do
+  if git rev-parse --verify --quiet "$b^{commit}" >/dev/null; then base="$b"; break; fi
+done
+code=yes
+if [ -n "$base" ]; then
+  code=
+  while read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+      boards/*) code=yes; break ;;
+      docs/* | *.md) ;;
+      *) code=yes; break ;;
+    esac
+  done < <(for h in "${heads[@]}"; do git diff --name-only "$base...$h"; done | sort -u)
+fi
+
+if [ -z "$code" ]; then
+  echo "pre-push: only prose changed; no checks"
+  exit 0
+fi
+
+# The two checks side by side, each into its own log, and the log of one that failed printed whole.
+echo "pre-push: lint:promises and the store's contracts over a watched vault"
+logs="$(mktemp -d)"
+trap 'rm -rf "$logs"' EXIT
+npm run --silent lint:promises >"$logs/promises" 2>&1 &
+promises=$!
+ANYDAG_TEST_WATCH=1 ANYDAG_CLOUD=on npx vitest run test/server >"$logs/watched" 2>&1 &
+watched=$!
+failed=
+wait "$promises" || { echo; echo "pre-push: npm run lint:promises failed:"; cat "$logs/promises"; failed=yes; }
+wait "$watched" || { echo; echo "pre-push: ANYDAG_TEST_WATCH=1 vitest run test/server failed:"; cat "$logs/watched"; failed=yes; }
+[ -n "$failed" ] && exit 1
+echo "pre-push: both passed"
+rm -rf "$logs"
+trap - EXIT
+
+if [ -z "${ANYDAG_PREPUSH_E2E:-}" ]; then
+  echo "pre-push: the browser suite runs on the pull request (ANYDAG_PREPUSH_E2E=1 runs its selection here first)"
+  exit 0
+fi
+
+plan_args=()
+for h in "${heads[@]}"; do plan_args+=(--head "$h"); done
+plan="$(node scripts/e2e-plan.mjs "${plan_args[@]}")"
 field() { printf '%s' "$plan" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s)[process.argv[1]];process.stdout.write(v==null?"":String(v))})' "$1"; }
 
 if [ "$(field run)" != "true" ]; then
-  echo "pre-push: $(field why); no tests"
+  echo "pre-push: $(field why); no browser tests"
   exit 0
 fi
 
