@@ -230,5 +230,5 @@ export function renamedIn(text: string, from: string, to: string | null, board: 
   const spelled = everyTagOf(text).filter((t) => tagKey(t) === tagKey(from));
   if (!spelled.length) return text;
   if (to !== null && tagKey(to) === tagKey(from) && spelled.length === 1 && spelled[0] === to) return text;
-  return withTags(text, to === null ? { remove: [from] } : { remove: [from], add: [to] }, { board });
+  return withTags(text, to === null ? { remove: [from] } : { rename: { from, to } }, { board });
 }

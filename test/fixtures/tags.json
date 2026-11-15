@@ -422,6 +422,50 @@
         ]
       },
       "out": "---\ntitle: x\ntags: [a]\n\n---\n"
+    },
+    {
+      "why": "a rename keeps the tag's place in a flow list",
+      "text": "---\ntags: [prices, keep, more]\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "Prices",
+          "to": "pricing"
+        }
+      },
+      "out": "---\ntags: [pricing, keep, more]\n---\nbody\n"
+    },
+    {
+      "why": "a rename keeps the tag's place in a block list, and its dash",
+      "text": "---\ntags:\n  - keep\n  - prices\n  - more\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "prices",
+          "to": "pricing"
+        }
+      },
+      "out": "---\ntags:\n  - keep\n  - pricing\n  - more\n---\nbody\n"
+    },
+    {
+      "why": "a rename onto a tag the text carries is a merge: the renamed entry goes",
+      "text": "---\ntags: [prices, keep, pricing]\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "prices",
+          "to": "Pricing"
+        }
+      },
+      "out": "---\ntags: [keep, pricing]\n---\nbody\n"
+    },
+    {
+      "why": "a respelling keeps the first entry's place and drops another spelling",
+      "text": "---\ntags: [Prices, keep, PRICES]\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "prices",
+          "to": "prices"
+        }
+      },
+      "out": "---\ntags: [prices, keep]\n---\nbody\n"
     }
   ],
   "keys": [

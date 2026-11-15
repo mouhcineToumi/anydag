@@ -104,7 +104,7 @@ describe("POST /__board/tags/rename", () => {
     expect(body.merged).toBe(false);
     expect(body.missed).toEqual([]);
     expect(body.files.map((f: any) => f.name).sort()).toEqual(["Templates/T", "a", "b"]);
-    expect(readText(env.root, "a.md")).toContain("tags: [x, new]");
+    expect(readText(env.root, "a.md")).toContain("tags: [new, x]");
     expect(readText(env.root, "b.board.md")).toContain("tags:\n- new\n");
     expect(readText(env.root, "Templates/T.md")).toContain("tags: [new]");
     expect(tagsFile()).toEqual({ new: { hue: "coral" } });
@@ -129,7 +129,7 @@ describe("POST /__board/tags/rename", () => {
     write(env.root, ".anydag/tags.json", JSON.stringify({ Pricing: { hue: "moss" } }));
     const { body } = await postJson("/__board/tags/rename", { from: "Pricing", to: "pricing" });
     expect(body.files).toEqual([{ name: "a", kind: "note" }]);
-    expect(readText(env.root, "a.md")).toContain("tags: [x, pricing]");
+    expect(readText(env.root, "a.md")).toContain("tags: [pricing, x]");
     expect(tagsFile()).toEqual({ pricing: { hue: "moss" } });
   });
 

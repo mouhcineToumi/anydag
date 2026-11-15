@@ -142,3 +142,20 @@ export async function forgetTag(tag: string): Promise<void> {
   if (!info || info.count > 0) return;
   await post("delete", { tag: info.name });
 }
+
+/** A document a vault-wide change reached, or could not. */
+export interface TagDoc {
+  name: string;
+  kind: TextKind;
+}
+
+/**
+ * A tag renamed in every document, or merged into one that exists: `POST /__board/tags/rename`. A
+ * file that kept changing is in `missed`, nothing is rolled back, and sending it again finishes it.
+ */
+export const renameTag = (from: string, to: string) =>
+  post<{ files: TagDoc[]; missed: TagDoc[]; merged: boolean }>("rename", { from, to });
+
+/** A tag taken off every document and out of the tag list: the hue it had comes back, for *Undo*. */
+export const deleteTag = (tag: string) =>
+  post<{ files: TagDoc[]; missed: TagDoc[]; registered: boolean; hue: Hue | null }>("delete", { tag });

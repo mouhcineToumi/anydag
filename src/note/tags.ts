@@ -27,6 +27,8 @@ import { keyEnd } from "./task";
 export interface TagChange {
   add?: readonly string[];
   remove?: readonly string[];
+  /** One tag respelled where it stands — a vault-wide rename — or, onto a tag the text carries, merged into it. */
+  rename?: { from: string; to: string };
 }
 
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
@@ -181,7 +183,7 @@ function found(lines: readonly string[]): Found {
  * `text` with its frontmatter's tags changed as `change` asks, and every other byte as it was.
  *
  * An added tag the text already carries, in any case, is no change, and one it does not carry goes
- * at the end. A removed tag takes off every entry naming it, before anything is added — so removing
+ * at the end. A renamed tag keeps its place. A removed tag takes off every entry naming it, before anything is added — so removing
  * `Pricing` and adding `pricing` respells it, and a block list stays one. Taking the last entry off removes the
  * line, and a block that leaves empty goes; a text with no frontmatter grows one, followed by a blank
  * line when `board` is set (`withTitle`'s rule: a board's frontmatter is apart from its body).
@@ -196,10 +198,22 @@ export function withTags(text: string, change: TagChange, opts: { board?: boolea
   const end = at >= 0 ? keyEnd(lines, at) : at;
   const was = at >= 0 ? found(lines.slice(at, end)) : { entries: [], item: null };
 
-  const entries = was.entries.filter((e) => {
+  let entries = was.entries.filter((e) => {
     const tag = tagOf(unquoted(e));
     return !(tag && remove.has(tagKey(tag)));
   });
+  if (change.rename) {
+    const { from, to } = change.rename;
+    const keyOf = (e: string) => tagKey(tagOf(unquoted(e)) ?? "");
+    /* The first entry naming `from` becomes `to` where it stands; onto a `to` already there, it goes. */
+    let placed = tagKey(to) !== tagKey(from) && entries.some((e) => keyOf(e) === tagKey(to));
+    entries = entries.flatMap((e) => {
+      if (keyOf(e) !== tagKey(from)) return [e];
+      if (placed) return [];
+      placed = true;
+      return [entryOf(to)];
+    });
+  }
   const has = new Set(
     entries
       .map((e) => tagOf(unquoted(e)))

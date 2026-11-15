@@ -69,7 +69,7 @@ describe("the tab list", () => {
     /* This machine's. */
     expect(scopeOf("providers")).toBe("computer");
     /* Stored with the vault. */
-    for (const tab of ["vault-general", "vault-files", "export", "sync", "agent-access"] as const)
+    for (const tab of ["vault-general", "vault-files", "tags", "export", "sync", "agent-access"] as const)
       expect(scopeOf(tab), tab).toBe("vault");
     /* Stored in the board's own file, and drawn only while one is open. */
     expect(scopeOf("board-layout")).toBe("board");
