@@ -923,6 +923,7 @@ describe("setGroupDir", () => {
     expect(line).toBe(`group a "A" hue=teal dir=TB {`);
     const g = parseDiagram("arch", `${line}\n  service x "X"\n}`)!;
     expect(g.groups[0]?.dir).toBe("DOWN");
+    expect(g.diagnostics).toEqual([]);
   });
 
   it("replaces one that is there, and takes it off with null", () => {
@@ -934,6 +935,10 @@ describe("setGroupDir", () => {
   it("reads LR as RIGHT", () => {
     const g = parseDiagram("arch", `group a "A" dir=LR {\n  service x "X"\n}`)!;
     expect(g.groups[0]?.dir).toBe("RIGHT");
+  });
+
+  it("refuses a line that is not a declaration", () => {
+    expect(setGroupDir("a --> b", "TB")).toBe("a --> b");
   });
 });
 
