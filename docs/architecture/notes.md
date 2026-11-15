@@ -20,7 +20,7 @@ follows from, and it is measured (*Things that will bite*).
 `src/note/markdown.ts` is remark both ways — the parser `MarkdownItem` already draws board text with
 — over a structural subset of BlockNote's block JSON, with no BlockNote import at all.
 
-Eight things are load-bearing:
+Nine things are load-bearing:
 
 - **An edit rewrites only the blocks it touched.** `load` records, for each top-level mdast node, its
   source bytes, the whitespace before it and the ids of the blocks it became; `settle` records what
@@ -92,11 +92,47 @@ Eight things are load-bearing:
   (`dag-note-view__tail`, `data-dag-note-tail`) writes the next line: a press there, or ArrowDown at
   the very end of the document — taken in the capture phase, because BlockNote's own trailing block
   takes that key and stops it without doing anything — puts the caret in an empty paragraph after the
-  last block (`afterLast` in `BlockEditor.tsx`). **An empty paragraph is the editor's and writes no
-  bytes**: `blocksToMd` gives it nothing, as it gives a blank line somebody left between two blocks
-  nothing. So a press below the end and a leave is the file it was, which `e2e/notes.spec.ts` checks
-  by bytes. A board's `md` card is not this page — `FieldEditor` draws in the card's own box, and a
-  press outside that box closes the card (`editing.md`).
+  last block (`afterLast` in `BlockEditor.tsx`). **An empty paragraph at either end of the note is
+  the editor's and writes no bytes** — this one, the one Enter in the title opens above the first
+  block, the one an empty note opens as — so a press below the end and a leave is the file it was,
+  which `e2e/notes.spec.ts` checks by bytes. A board's `md` card is not this page — `FieldEditor`
+  draws in the card's own box, and a press outside that box closes the card (`editing.md`).
+- **An empty line between two blocks is `&nbsp;` on a line of its own** (#318). Markdown has no empty
+  paragraph — any number of blank lines is one break — so an Enter pressed twice between two
+  paragraphs used to write nothing and was gone the next time the note opened. Now `toMdast` writes
+  an empty paragraph that is not at either end as a paragraph holding only
+  `&nbsp;` (`BLANK`), and `nodeBlocks` reads a paragraph whose source is exactly that entity back as an
+  empty paragraph; three empty lines are three `&nbsp;` paragraphs. The edges are cut twice: `inner`
+  drops the empty paragraphs at either end of what `blocksToMd` is given (only at the end of a block's
+  nested children, which follow its own text), and `saved` drops the groups at either end of the
+  document that are empty paragraphs **and no loaded unit** — so a `&nbsp;` the file already held,
+  last line included, is written back as it was, while the editor's own empty lines never reach it.
+  An empty paragraph that is a group of its own is serialised with `groupMd`, never `blocksToMd`,
+  which would take it for an edge.
+  **Why `&nbsp;`:** a no-break space is a character, so the line is a real paragraph to every
+  Markdown reader — GitHub, Obsidian, `react-markdown` in the read-only view, the PDF and a board's
+  `md` card all draw it as an empty line of the same height the editor shows — and it is the form
+  people already type by hand for exactly this. It is ASCII, visible in a diff, and reads as itself
+  in a plain-text editor. **Turned down:**
+  - *Counting blank lines* — three blank lines in the file opening as two empty paragraphs. It would
+    keep the file free of markup, but it gives the editor a meaning nothing else agrees with: every
+    other renderer draws three blank lines as one break, so the note would look different in the
+    editor than in `?view=1`, on GitHub and in a snapshot, and every file an agent or another tool
+    wrote with a stray double blank line would open with empty paragraphs it never meant. Those
+    files must open as what they draw as, and keep their bytes, which they do: the blank lines are a
+    unit's `gap`, written back untouched.
+  - *`<br>` on its own line* — an HTML block. `react-markdown` drops raw HTML unless it is trusted
+    (we do not trust it), so the read-only view, the PDF and a board card would draw nothing where
+    the editor draws a line; and the bridge already keeps any other HTML block as the text it was,
+    so `<br>` would have to be the one tag that is not.
+  - *A lone `\`* — CommonMark's hard break needs text after it on the next line; alone it is a
+    literal backslash, drawn as one.
+  - *An HTML comment or a zero-width character* — invisible in every renderer, so the line would be
+    there in the editor and nowhere else, and a zero-width character is invisible in a diff too.
+  **The cost:** a literal `&nbsp;` typed as the whole of a paragraph is read as an empty line, not
+  as the entity, and a paragraph holding only U+00A0 typed as the character is still that character.
+  `test/note-markdown.test.ts`'s *empty lines* holds the round trip, the edges and the untouched
+  file; `e2e/notes.spec.ts` holds the issue's steps.
 
 **A note exports from the top bar** — a PDF through the browser's print, or its own
 `.note.md` — and a PDF is the file drawn read-only, never the editor's DOM; see *Import and export*.
