@@ -20,6 +20,11 @@
  * `features.cloud` off `/api/health` once at boot (`src/features.ts`), the way it already learns the
  * version.
  *
+ * **One exception (#326):** Settings → Privacy is drawn in every build. Off, its anonymous-logs
+ * toggle records the choice in the browser — no route, no request, nothing sent — and the first build
+ * whose switch is on carries that choice to the app's home before it asks anything. The rest of the
+ * logs, and Sync and Send feedback, stay hidden (#103).
+ *
  * Plain Node, no browser API and no `Session`: the CLI, the MCP server and the tests import it.
  */
 

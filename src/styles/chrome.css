@@ -690,6 +690,12 @@
      under the quarter rule the grip on that same window moved nothing at all. */
   width: min(var(--sidebar-w, 272px), var(--sidebar-cap));
   --sidebar-cap: max(232px, 25vw);
+  /* A row's height, wherever the column draws one: the tree and the favourites above it are the
+     same row (#319). `--sidebar-row` used to live on the tree alone, so a favourite's row fell back
+     to `height: auto` — shorter than the 24px tool it holds, which is what made `.dag-sidebar__favs`
+     scroll. `Sidebar.tsx` reads it from the tree's computed style to place the rows it has not
+     drawn. The phone's taller row is the sheet's rule below. */
+  --sidebar-row: 30px;
   height: 100%;
   min-height: 0;
   font-size: var(--dag-ui-text-md);
@@ -833,10 +839,9 @@
 .dag-sidebar__section h2 { flex: 1; margin: 0; font-size: var(--dag-ui-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
 
 .dag-sidebar__tree {
-  /* A row's height and an open empty folder's *Empty* line, said once: the tree draws only the rows in
-     view (`virtual.ts`) and places each by its offset, so `Sidebar.tsx` reads these to know where a row
-     it has not drawn would be. The phone's taller row is the sheet's rule below. */
-  --sidebar-row: 30px;
+  /* An open empty folder's *Empty* line, said once: the tree draws only the rows in view
+     (`virtual.ts`) and places each by its offset, so `Sidebar.tsx` reads this to know where a line
+     it has not drawn would be. The row's height is the column's `--sidebar-row` above. */
   --sidebar-empty: 26px;
   flex: 1;
   min-height: 0;
@@ -1411,6 +1416,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   border-radius: 0;
   box-shadow: none;
   font-size: var(--dag-ui-text-lg);
+  /* The tree and the favourites are one row height here too. */
+  --sidebar-row: 44px;
   animation: dag-sheet-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
 }
 @keyframes dag-sheet-in { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -1436,7 +1443,7 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /* Settings shares the foot with Trash and the two cloud rows; it was the one 28px row left. */
 .dag-sidebar[data-sheet] .dag-sidebar__account { min-height: 44px; }
 .dag-sidebar[data-sheet] .dag-sidebar__foot { padding: 8px 12px 16px; }
-.dag-sidebar[data-sheet] .dag-sidebar__tree { --sidebar-row: 44px; padding-bottom: 12px; }
+.dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
 /* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
 .dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: var(--dag-ui-text-lg); }
 /* Labelled now (#215), so as wide as the word, and still a finger's 44 each way (#209). */
@@ -4700,6 +4707,26 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
    `dag-note-view__editor` and `data-dag-note-first` were unclaimed. */
 .dag-note-view__first > .dag-note-view__page { margin: 0; padding-block: 0; max-width: none; }
 .dag-note-view__editor[hidden] { display: none; }
+/* A note's writing page fills the window, and the strip under its last block is a press away from
+   an empty paragraph (`data-dag-note-tail`): a note ending in a picture, a table or a code block has
+   no other line to put a caret in. The page carries the height and the strip the old 160px of bottom
+   padding, so the target is as tall as the window is empty below the text. */
+.dag-note-view__page--write {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding-bottom: 0;
+}
+.dag-note-view__page--write > .dag-note-view__editor:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+.dag-note-view__tail {
+  flex: 1 0 160px;
+  cursor: text;
+}
 /* A note's title, at the top of its page: Notion's page title. The field and the read-only
    heading are one class, so a picture of a note is laid out exactly as the page is. It sits in the
    editor's own 54px gutter, as the task bar under it does, and is a size up from the Markdown ramp's
@@ -6261,8 +6288,9 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
  * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-app--calendar`, `dag-eventbar*`,
  * `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-eventbar*`,
  * `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
- * `data-dag-sidebar-event`, `data-dag-note-make-event`, the storage keys `dag:calendar-hide`,
- * `dag:week-start` and `dag:calendar-view`, and the query keys `calendar`, `view`, `date` and `days`.
+ * `data-dag-sidebar-event`, `data-dag-note-make-event`, `dag-cal-menu*` and `data-dag-cal-menu*`, the
+ * storage keys `dag:calendar-hide`, `dag:week-start` and `dag:calendar-view`, and the query keys
+ * `calendar`, `view`, `date` and `days`.
  */
 .dag-calendar {
   flex: 1;
@@ -6428,6 +6456,28 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__time { flex: none; color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
 .dag-calendar__mark { flex: none; color: var(--dag-color-slate); }
 .dag-calendar__item[data-kind="event"] .dag-calendar__mark { color: var(--dag-color-accent); }
+
+/* An item's menu: the sidebar's menu control, placed at the pointer (or under the item, from the
+   keyboard) and kept inside the window by `menuWithin`. Names grepped first: `dag-cal-menu*` and
+   `data-dag-cal-menu*` were nobody's. */
+.dag-cal-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 184px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
+}
+.dag-cal-menu .dag-more__item { width: 100%; color: var(--dag-color-ink); }
+.dag-cal-menu .dag-more__item > svg { flex: none; color: var(--dag-color-slate); }
+.dag-cal-menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-cal-menu__danger:hover { color: var(--dag-color-dangerText); }
+.dag-cal-menu__locked { margin: 4px 8px 2px; font-size: var(--dag-ui-text-sm); color: var(--dag-color-slate); }
 
 /* The month. */
 .dag-cal-month {

@@ -67,7 +67,7 @@ import { nameInBar } from "./Toolbar";
 import { TemplatePicker } from "./TemplatePicker";
 import { closeTemplates, createFromTemplate, useTemplatePicker } from "./templates";
 import { IconButton } from "@/ui/controls";
-import { closeAssistant, usePanel } from "@/assistant/panelState";
+import { closeAssistant, setPanelDocument, usePanel } from "@/assistant/panelState";
 import { AssistantPanel } from "./chunks";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
@@ -107,6 +107,17 @@ export interface SidebarControl {
   retitle(kind: FileKind, name: string, title: string): void;
   /** A listed file's permanent id, which a link to it carries. */
   idOf(name: string): string | undefined;
+  /**
+   * A copy of a file beside it, opening nothing — a page's menu (the calendar's) asking for the
+   * copy the sidebar makes, without the sidebar's follow-up: there, the next thing anybody does to
+   * a copy is name it, and it opens; here the person asked for a copy, not to go there.
+   */
+  duplicate(kind: FileKind, name: string): void;
+  /**
+   * A file into the trash, with the notice whose Undo puts it back — the sidebar's Delete, asked
+   * for from a page that has a file but no row: the calendar's menu.
+   */
+  trash(kind: FileKind, name: string): void;
   /**
    * Home: nothing open, the welcome card, as a new history entry so Back comes back here. What
    * the AnyDag logo does — the column's own while it is docked, the toolbar's while it is away.
@@ -377,6 +388,18 @@ export function Shell({
     () => ({ board, note, quiz, table, file }),
     [board, note, quiz, table, file],
   );
+
+  /* What the Assistant's panel calls the document it is beside (#321). A chat belongs to one:
+     closing the panel and opening it again on the same page keeps the chat it had, and any other
+     page — another file, a list, Home — starts a new one. The Assistant's own page is not a move:
+     the panel is not drawn there, and going back to the file it was opened from should keep it. */
+  const place =
+    FILE_KINDS.map((kind) => (opened[kind] ? `${kind}:${opened[kind]}` : null)).find((key) => key !== null) ??
+    (tasksOpen ? "tasks" : calendarOpen ? "calendar" : quizzesOpen ? "quizzes" : trashOpen ? "trash" : "home");
+  useEffect(() => {
+    if (assistantOpen) return;
+    setPanelDocument(place);
+  }, [assistantOpen, place]);
 
   /* How many questions are in Mistakes, for the count beside Quizzes. Asked here rather
      than in the column, which mounts again on every peek: this is up for as long as the window is. */
@@ -864,8 +887,18 @@ export function Shell({
 
   const idOf = useCallback((name: string) => ids[name], [ids]);
   const ctl = useMemo<SidebarControl>(
-    () => ({ docked: mode === "docked", reveal, create, renamed, retitle, idOf, home: openHome }),
-    [mode, reveal, create, renamed, retitle, idOf, openHome],
+    () => ({
+      docked: mode === "docked",
+      reveal,
+      create,
+      renamed,
+      retitle,
+      idOf,
+      duplicate: (kind, name) => void duplicateBoard(name, undefined, kind),
+      trash: (kind, name) => void files.trash([{ kind, name }]),
+      home: openHome,
+    }),
+    [mode, reveal, create, renamed, retitle, idOf, files, openHome],
   );
 
   /* What Undo did with what came back: a favourite is a favourite again, under the name it has now,

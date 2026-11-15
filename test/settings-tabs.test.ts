@@ -111,13 +111,14 @@ describe("the tab list", () => {
     expect(scopeOf("about")).toBe("computer");
   });
 
-  it("hides every sync and privacy tab when the cloud switch is off", () => {
-    expect(CLOUD_TABS).toEqual(["privacy", "sync"]);
+  it("hides only the sync tab when the cloud switch is off", () => {
+    expect(CLOUD_TABS).toEqual(["sync"]);
     const off = withoutCloudTabs(SECTIONS, false);
     const drawn = off.flatMap((s) => s.tabs);
-    for (const tab of CLOUD_TABS) expect(drawn, tab).not.toContain(tab);
-    /* The foot is still there, without Privacy. */
-    expect(off.find((s) => s.group === "foot")?.tabs).toEqual(["shortcuts", "about"]);
+    expect(drawn).not.toContain("sync");
+    /* Privacy is every build's now (#326): off, it is the logs toggle and its one sentence. */
+    expect(drawn).toContain("privacy");
+    expect(off.find((s) => s.group === "foot")?.tabs).toEqual(["privacy", "shortcuts", "about"]);
     expect(off.map((s) => s.group)).toEqual(["you", "computer", "vault", "board", "foot"]);
     expect(drawn).toContain("ai");
     expect(withoutCloudTabs(SECTIONS, true)).toEqual(SECTIONS);

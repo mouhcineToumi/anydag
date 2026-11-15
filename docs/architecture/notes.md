@@ -20,7 +20,7 @@ follows from, and it is measured (*Things that will bite*).
 `src/note/markdown.ts` is remark both ways — the parser `MarkdownItem` already draws board text with
 — over a structural subset of BlockNote's block JSON, with no BlockNote import at all.
 
-Seven things are load-bearing:
+Eight things are load-bearing:
 
 - **An edit rewrites only the blocks it touched.** `load` records, for each top-level mdast node, its
   source bytes, the whitespace before it and the ids of the blocks it became; `settle` records what
@@ -86,6 +86,17 @@ Seven things are load-bearing:
   BlockNote portals out of it, and `src/styles/blocks.css` sets each `--bn-*` from a `--dag-*` there,
   two classes and an attribute deep so it wins whichever stylesheet loads last. It is chrome in
   `chrome.css`'s sense — off the length list, on the colour rule — and invents no `--dag-*`.
+- **The line after the last block is the editor's, not the file's.** A note that ends in a picture, a
+  table or a code block has no text under it to put a caret in. The writing page is therefore tall
+  enough to fill the window (`dag-note-view__page--write`) and the strip under the text
+  (`dag-note-view__tail`, `data-dag-note-tail`) writes the next line: a press there, or ArrowDown at
+  the very end of the document — taken in the capture phase, because BlockNote's own trailing block
+  takes that key and stops it without doing anything — puts the caret in an empty paragraph after the
+  last block (`afterLast` in `BlockEditor.tsx`). **An empty paragraph is the editor's and writes no
+  bytes**: `blocksToMd` gives it nothing, as it gives a blank line somebody left between two blocks
+  nothing. So a press below the end and a leave is the file it was, which `e2e/notes.spec.ts` checks
+  by bytes. A board's `md` card is not this page — `FieldEditor` draws in the card's own box, and a
+  press outside that box closes the card (`editing.md`).
 
 **A note exports from the top bar** — a PDF through the browser's print, or its own
 `.note.md` — and a PDF is the file drawn read-only, never the editor's DOM; see *Import and export*.
@@ -123,7 +134,8 @@ Names claimed, grepped first: `dag-note-view*` (`dag-note-view__first`, `dag-not
 (a list row), `data-dag-note-view`, `data-dag-note-editor`, `data-dag-note-conflict`,
 `data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`,
 `data-dag-new-note`, `data-dag-new-note-here`, `data-dag-welcome-note`, `dag-note-title`,
-`data-dag-note-title`, `data-dag-note-title-read`, `data-dag-note-first`, and the SSE event
+`data-dag-note-title`, `data-dag-note-title-read`, `data-dag-note-first`,
+`dag-note-view__page--write`, `dag-note-view__tail`, `data-dag-note-tail`, and the SSE event
 `dag:note`. `data-dag-note` is one letter from `data-dag-dock`; they are different attributes, and
 a spec that wants one says which.
 

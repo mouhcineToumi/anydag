@@ -249,6 +249,17 @@ export const STAMP = "dag:prefs-at";
  */
 export const SYNC = "dag:sync";
 
+/**
+ * The anonymous-logs answer given in a build whose `cloud` switch is off (#326).
+ *
+ * **Not a preference, and deliberately not in `PREF_KEYS`.** It is the install's answer waiting for
+ * the first build that can send it (`src/telemetry/client.ts`), held here because a build with the
+ * switch off makes no telemetry request at all — so the app's home is not reachable — and Settings →
+ * Privacy still has to record the person's choice. The first build whose switch is on PUTs it to
+ * `/api/telemetry` and clears it, which is what makes the choice carry over.
+ */
+export const TELEMETRY_PENDING = "dag:telemetry-pending";
+
 function snapshot(): boolean {
   try {
     return new URLSearchParams(location.search).get("snapshot") === "1";

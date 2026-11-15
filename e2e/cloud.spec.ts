@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { BOARDS } from "./boards";
 import { openSettings, openSidebar } from "./sidebar";
@@ -8,9 +8,13 @@ import { openSettings, openSidebar } from "./sidebar";
 /**
  * The build's `cloud` switch (`server/features.ts`), as a person meets it: a build that answers
  * `/api/health` with `features: { cloud: false }` carries none of the features that talk to an
- * AnyDag server, and everything the page would have drawn of them is invisible — no sync row in the
- * sidebar, no Sync tab and no Privacy tab in Settings (the logs are all Privacy holds), no first-run
+ * AnyDag server — no sync row in the sidebar, no Sync tab in Settings, no Send feedback, no first-run
  * logs question — and the page makes no request to what is not there.
+ *
+ * **One exception (#326): Settings → Privacy is drawn in every build.** Off, it is the anonymous-logs
+ * toggle and one sentence saying logs are not sent from this version yet. The toggle records the
+ * choice in this browser, with no request, and the first build whose switch says on carries that
+ * choice to the server before it asks anything.
  *
  * **The page half runs here, the server half in the unit suite** (`test/features.test.ts`): the
  * spec's server is the dev server, which has the switch on, so it must be *told* off the way a
@@ -42,16 +46,41 @@ async function cloudOff(page: Page): Promise<void> {
   });
 }
 
-test("hides every server-backed feature, and asks for none of them", { tag: "@smoke" }, async ({ page }) => {
-  await cloudOff(page);
+/** A server whose logs answer starts as `consent`, and which records every PUT. */
+async function fakeTelemetry(page: Page, consent: boolean | null) {
+  const state = { consent, puts: [] as unknown[] };
+  const answer = async (route: Route) => {
+    if (route.request().method() === "PUT") {
+      const { enabled } = route.request().postDataJSON() as { enabled: boolean | null };
+      state.puts.push(enabled);
+      state.consent = enabled;
+    }
+    await route.fulfill({ json: { consent: state.consent, destination: "sync.example" } });
+  };
+  await page.route("**/api/telemetry?**", answer);
+  await page.route("**/api/telemetry", answer);
+  return state;
+}
+
+/** Every request the page makes to a route a build without the switch would not have. */
+function watchReached(page: Page): string[] {
   const reached: string[] = [];
   page.on("request", (r) => {
     const url = new URL(r.url());
     if (/^\/api\/(sync|telemetry|feedback)/.test(url.pathname)) reached.push(`${r.method()} ${url.pathname}`);
   });
+  return reached;
+}
+
+const ready = (page: Page) =>
+  page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+
+test("hides every server-backed feature but the logs toggle, and asks for none of them", { tag: "@smoke" }, async ({ page }) => {
+  await cloudOff(page);
+  const reached = watchReached(page);
 
   await page.goto(`/?board=${name}`);
-  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await ready(page);
 
   /* No sign of a server anywhere the chrome draws. */
   await expect(page.locator("[data-dag-telemetry-ask]")).toHaveCount(0);
@@ -59,12 +88,21 @@ test("hides every server-backed feature, and asks for none of them", { tag: "@sm
   await expect(page.locator("[data-dag-sync-row]")).toHaveCount(0);
   await expect(page.locator("[data-dag-feedback-open]")).toHaveCount(0);
 
-  /* Settings opens, and its tab list is the one a build without the features has: no Sync, no
-     Privacy, and the tabs that are not about a server still drawn beside the vault's own. */
-  await openSettings(page);
+  /* Settings opens, and its tab list is the one a build without the features has: no Sync, but
+     Privacy stays — it is where the logs toggle records a choice a later build carries up. */
+  await openSettings(page, "privacy");
   await expect(page.locator('[data-dag-settings-tab-button="sync"]')).toHaveCount(0);
-  await expect(page.locator('[data-dag-settings-tab-button="privacy"]')).toHaveCount(0);
-  await expect(page.locator('[data-dag-settings-tab-button="vault-general"]')).toBeVisible();
+  const toggle = page.locator("[data-dag-setting-telemetry]");
+  await expect(toggle).toBeVisible();
+  await expect(toggle).not.toBeChecked();
+  await expect(page.locator('[data-dag-settings-pane="privacy"]')).toContainText("Logs are not sent from this version yet.");
+  /* It records the choice with no request: there is no route to ask and nothing to send. */
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  expect(reached).toEqual([]);
+
+  /* The tabs that are not about a server are all still drawn. */
+  await page.locator('[data-dag-settings-tab-button="vault-general"]').click();
   for (const still of [
     "appearance",
     "ai",
@@ -75,23 +113,45 @@ test("hides every server-backed feature, and asks for none of them", { tag: "@sm
     "vault-files",
     "export",
     "agent-access",
+    "privacy",
     "shortcuts",
     "about",
   ])
     await expect(page.locator(`[data-dag-settings-tab-button="${still}"]`)).toBeVisible();
+});
 
-  /* Nothing went looking for what this build does not have — the logs answer the page would have
-     asked for on its first page among them. */
-  expect(reached).toEqual([]);
+test("the choice made in an off build is the one the next on build starts with", async ({ page }) => {
+  await cloudOff(page);
+  await page.goto(`/?board=${name}`);
+  await ready(page);
+
+  await openSettings(page, "privacy");
+  const toggle = page.locator("[data-dag-setting-telemetry]");
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  /* Held in this browser, not sent: the off build has no route to write it to. */
+  expect(await page.evaluate(() => localStorage.getItem("dag:telemetry-pending"))).toBe("1");
+
+  /* The switch says on: the held answer goes up before anything is asked, so the page starts from
+     it and the first-run question does not ask somebody who has already answered. */
+  await page.unroute("**/api/health");
+  const server = await fakeTelemetry(page, null);
+  await page.reload();
+  await ready(page);
+  await expect.poll(() => server.puts).toEqual([true]);
+  /* Longer than the question's own wait. */
+  await page.waitForTimeout(3500);
+  await expect(page.locator("[data-dag-telemetry-ask]")).toHaveCount(0);
+  /* The held copy is spent once the server has it. */
+  expect(await page.evaluate(() => localStorage.getItem("dag:telemetry-pending"))).toBeNull();
+  await openSettings(page, "privacy");
+  await expect(page.locator("[data-dag-setting-telemetry]")).toBeChecked();
 });
 
 test("a snapshot draws the same with the switch off", { tag: "@smoke" }, async ({ page }) => {
   await cloudOff(page);
-  const reached: string[] = [];
-  page.on("request", (r) => {
-    const url = new URL(r.url());
-    if (/^\/api\/(sync|telemetry|feedback)/.test(url.pathname)) reached.push(`${r.method()} ${url.pathname}`);
-  });
+  const reached = watchReached(page);
   await page.goto(`/?board=${name}&snapshot=1`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 60_000 });
   await expect(page.locator("[data-dag-telemetry-ask]")).toHaveCount(0);
