@@ -55,6 +55,11 @@ export interface DesktopBridge {
   history?: {
     onCommand(listener: (to: "back" | "forward") => void): () => void;
   };
+  /** Ctrl/⌘+W, which the window's menu would take to close the window: the shell takes it first
+   *  and says so here, and the page closes the tab in front (`src/ui/tabs/keys.ts`). */
+  tabs?: {
+    onClose(listener: () => void): () => void;
+  };
   /** `process.platform` of the shell: `"darwin"` is the one whose window has no title bar. */
   platform?: string;
   /** Whether the window is in full screen now. */

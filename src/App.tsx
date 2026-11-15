@@ -79,13 +79,19 @@ import {
   useTabKeep,
   type KeptScroll,
 } from "@/ui/tabs/keep";
+import { useTabKeys } from "@/ui/tabs/keys";
 import {
   PAGE_KEYS,
   addressOf,
   adopt,
+  closeOthers,
   closeTab,
   fileOf,
   holding,
+  moveTab,
+  nth,
+  reopen,
+  stepFrom,
   identity,
   newTabId,
   openTab,
@@ -675,6 +681,41 @@ export function App() {
     changeTabs((t) => openTab(t, "", id));
     go(addressOf("", location.search), null, { id, hash: "" });
   }, [go]);
+  /* Every tab but one. The ones closed can each come back, the last closed first. */
+  const closeOtherTabs = useCallback(
+    (id: string) => {
+      const before = tabsNow();
+      if (!tabById(before, id)) return;
+      changeTabs((t) => closeOthers(t, id));
+      for (const t of before.list) if (t.id !== id) forgetTab(t.id);
+      const kept = tabById(tabsNow(), id)!;
+      if (id !== activeRef.current) swap(addressOf(kept.place, location.search), placeFor(kept.place), id);
+    },
+    [swap, placeFor],
+  );
+  /* The last tab closed, back where it was and in front — as a new entry, as any switch is. */
+  const reopenTab = useCallback(() => {
+    const next = changeTabs(reopen);
+    const front = tabById(next, next.active);
+    if (front && front.id !== activeRef.current)
+      go(addressOf(front.place, location.search), placeFor(front.place), { id: front.id, hash: "" });
+  }, [go, placeFor]);
+  const moveDocTab = useCallback((id: string, to: number) => void changeTabs((t) => moveTab(t, id, to)), []);
+  useTabKeys(!snapshot, {
+    newTab: newDocTab,
+    /* A window of one Home tab has nothing to close: the shell's own close is in its title bar. */
+    closeTab: () => {
+      const now = tabsNow();
+      if (now.list.length === 1 && now.list[0]!.place === "") return;
+      closeDocTab(activeRef.current);
+    },
+    reopen: reopenTab,
+    step: (dir) => switchTab(stepFrom({ ...tabsNow(), active: activeRef.current }, dir).id),
+    nth: (n) => {
+      const t = nth(tabsNow(), n);
+      if (t) switchTab(t.id);
+    },
+  });
 
   /* Home's recent list: the page that opened a file is what knows it did, and this is the one place
      every way of opening one passes through — a sidebar row, a reference, a link, a cold load. The
@@ -801,7 +842,17 @@ export function App() {
       open={open}
     >
       <div className="dag-docs">
-        <DocTabs tabs={tabs} active={active} titles={list.titles} onSwitch={switchTab} onClose={closeDocTab} onNew={newDocTab} />
+        <DocTabs
+          tabs={tabs}
+          active={active}
+          titles={list.titles}
+          onSwitch={switchTab}
+          onClose={closeDocTab}
+          onCloseOthers={closeOtherTabs}
+          onReopen={reopenTab}
+          onMove={moveDocTab}
+          onNew={newDocTab}
+        />
         {frames}
       </div>
     </Shell>

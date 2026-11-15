@@ -756,6 +756,19 @@
 .dag-doctabs__close:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
 .dag-doctabs__close:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 .dag-doctabs__new { align-self: center; flex: none; }
+/* A tab being dragged along the strip, and where it would land: the page strip's marks
+   (`.dag-tab-wrap--dragging`), painted by the gesture and gone at the drop. */
+.dag-doctabs__wrap--dragging { opacity: 0.55; z-index: 1; pointer-events: none; }
+.dag-doctabs__wrap[data-dag-doctab-drop]::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 0;
+  width: 2px;
+  background: var(--dag-color-accent);
+}
+.dag-doctabs__wrap[data-dag-doctab-drop="before"]::after { left: -2px; }
+.dag-doctabs__wrap[data-dag-doctab-drop="after"]::after { right: -2px; }
 [data-dag-window] .dag-doctabs { -webkit-app-region: drag; }
 [data-dag-window] .dag-doctabs :is(button, [role]) { -webkit-app-region: no-drag; }
 /* A finger's strip: a tab, its close and the new-tab button are 44px on a phone. */

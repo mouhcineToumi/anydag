@@ -25,6 +25,7 @@ import {
   type Closed,
   type Tabs,
 } from "@/ui/tabs/model";
+import { tabKey } from "@/ui/tabs/keys";
 
 /**
  * The document tabs (#264) as data: what a tab holds, and every change the strip, the shortcuts and
@@ -222,5 +223,50 @@ describe("the tabs", () => {
     expect(nth(three(), 3)?.id).toBe("tc");
     expect(nth(three(), 5)).toBeUndefined();
     expect(nth(three(), 9)?.id).toBe("tc");
+  });
+});
+
+describe("the keys", () => {
+  const press = (key: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "shiftKey" | "altKey", boolean>> = {}, code = "") => ({
+    key,
+    code,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...mods,
+  });
+
+  it("are Ctrl's elsewhere and ⌘'s on a Mac", () => {
+    expect(tabKey(press("t", { ctrlKey: true }, "KeyT"), false)).toEqual({ do: "new" });
+    expect(tabKey(press("t", { metaKey: true }, "KeyT"), false)).toBeNull();
+    expect(tabKey(press("t", { metaKey: true }, "KeyT"), true)).toEqual({ do: "new" });
+    expect(tabKey(press("t", { ctrlKey: true }, "KeyT"), true)).toBeNull();
+    expect(tabKey(press("W", { ctrlKey: true, shiftKey: false }, "KeyW"), false)).toEqual({ do: "close" });
+    expect(tabKey(press("T", { ctrlKey: true, shiftKey: true }, "KeyT"), false)).toEqual({ do: "reopen" });
+  });
+
+  it("step with Ctrl+Tab and Ctrl+PageDown, on a Mac too", () => {
+    expect(tabKey(press("Tab", { ctrlKey: true }), true)).toEqual({ do: "step", dir: 1 });
+    expect(tabKey(press("Tab", { ctrlKey: true, shiftKey: true }), false)).toEqual({ do: "step", dir: -1 });
+    expect(tabKey(press("PageUp", { ctrlKey: true }), false)).toEqual({ do: "step", dir: -1 });
+    expect(tabKey(press("PageDown", { ctrlKey: true }), false)).toEqual({ do: "step", dir: 1 });
+    expect(tabKey(press("Tab"), false)).toBeNull();
+  });
+
+  it("take a digit by its key or, under another layout, by its place", () => {
+    expect(tabKey(press("3", { ctrlKey: true }, "Digit3"), false)).toEqual({ do: "nth", n: 3 });
+    expect(tabKey(press("&", { ctrlKey: true }, "Digit1"), false)).toEqual({ do: "nth", n: 1 });
+    expect(tabKey(press("0", { ctrlKey: true }, "Digit0"), false)).toBeNull();
+  });
+
+  it("leave Alt and the editors' Shift chords alone", () => {
+    expect(tabKey(press("1", { ctrlKey: true, altKey: true }, "Digit1"), false)).toBeNull();
+    expect(tabKey(press("7", { ctrlKey: true, shiftKey: true }, "Digit7"), false)).toBeNull();
+    expect(tabKey(press("W", { ctrlKey: true, shiftKey: true }, "KeyW"), false)).toBeNull();
+    expect(tabKey(press("z", { ctrlKey: true }, "KeyZ"), false)).toBeNull();
+    /* Redo on a Dvorak board, whose key is where T is on QWERTY. */
+    expect(tabKey(press("y", { ctrlKey: true }, "KeyT"), false)).toBeNull();
+    expect(tabKey(press("е", { ctrlKey: true }, "KeyT"), false)).toEqual({ do: "new" });
   });
 });

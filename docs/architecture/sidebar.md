@@ -637,6 +637,36 @@ also find every page a row lower). Closing the last tab is not possible; closing
 the strip away. While the sidebar is away the strip is the window's top-left corner and keeps the
 toggle's slot, as the toolbar does when the strip is not there.
 
+### The tabs' keys, their order and their menu
+
+`src/ui/tabs/keys.ts` (`tabKey` is the pure part, tested in `test/doctabs.test.ts`):
+
+| Keys | Does |
+|---|---|
+| Ctrl/⌘+T · Ctrl/⌘+W | a new tab on Home, in front · close the tab in front |
+| Ctrl/⌘+Shift+T | open the last closed tab again, where it was, in front |
+| Ctrl+Tab · Ctrl+Shift+Tab, Ctrl+PageDown · Ctrl+PageUp | the next tab · the one before, round the ends (Ctrl on a Mac too, as in its browsers) |
+| Ctrl/⌘+1 … 8 · 9 | the tab at that place · the last |
+
+**They are the desktop app's.** A browser keeps every one of these chords for its own tabs and never
+lets the page hear them, so in `anydag serve` they do what the browser does. The page listens anyway,
+in the capture phase ahead of a board's and a note's own keys, and has them wherever a browser lets
+one through. In the desktop app the window menu Electron gives every window holds Ctrl/⌘+W for
+*close the window*, and a menu accelerator wins over the page: the shell takes the chord in
+`before-input-event` and sends `tabs:close` instead (`desktop.md`). A window of one Home tab has
+nothing to close, and the chord does nothing there; the window closes from its title bar or the
+app menu. The letter is read off the key a person typed, as a browser reads it — Ctrl+Y on a Dvorak
+board is redo, though its key is where T is on QWERTY — and off the key's place only when it typed no
+Latin letter. Nothing else in the app binds these: the editors' chords with a digit carry Alt or
+Shift. The shortcut sheet lists them under *Document tabs*.
+
+**Reordering** is the page strip's: a drag along the strip (`startDrag`, the tab under the pointer,
+a bar where it would land, no click after the drop) or Shift and an arrow on the focused tab, which
+keeps the focus. **A tab's menu** — a right click, or Shift+F10 or the menu key on the focused tab —
+is `TasksMenu`: *Close*, *Close others* and *Reopen closed tab*. Closing others is a `replaceState`
+to the kept tab when it was not in front; each tab it closed comes back with Ctrl/⌘+Shift+T, the last
+closed first. Twenty closed tabs are remembered (`CLOSED_LIMIT`); a closed Home is not one of them.
+
 ### What a tab keeps while another is in front
 
 `src/ui/tabs/keep.ts`, and `TabFrame` in `App`. **Two ways, by what the page costs to build again.**
