@@ -149,7 +149,12 @@ test("files dropped on a folder in the sidebar are kept there, each with the ico
   await expect.poll(() => fs.readdirSync(dir).sort(), { timeout: 10_000 }).toEqual(["Budget.xlsx", "Q3 Report.pdf", "shot.png"]);
   expect(fs.readFileSync(path.join(dir, "Q3 Report.pdf")).equals(pdf())).toBe(true);
 
-  await openFolder(page);
+  /* The drop opens the folder it went into, once the upload has answered (`Shell`'s `upload`) —
+     which can be after the bytes are on disk. Wait for that rather than clicking the row: a click
+     read before it lands toggles the folder shut again. */
+  await expect(page.locator(`[data-dag-sidebar-folder="${folder}"]`)).toHaveAttribute("aria-expanded", "true", {
+    timeout: 10_000,
+  });
   for (const [name, sort] of [
     ["Q3 Report.pdf", "pdf"],
     ["Budget.xlsx", "sheet"],
