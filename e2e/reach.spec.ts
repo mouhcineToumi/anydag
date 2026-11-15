@@ -292,19 +292,9 @@ test("a theme picked in settings survives a reload", async ({ page }) => {
   await expect(theme(page)).toHaveValue("paper");
 });
 
-test("a snapshot reads no stored preference at all", async ({ page }) => {
-  await open(page);
-  await openSettings(page, "appearance");
-  await theme(page).selectOption("neutral");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "neutral");
-
-  /* `?snapshot=1` is a picture being taken by `snapshot.mjs`, `tidy.mjs` or a check here, and a
-     picture of a board must be a fact about the board rather than about whoever last opened it on
-     this machine. It held only because a fresh context has empty storage; now it is stated. */
-  await open(page, "&snapshot=1");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
-  await expect(page.locator("[data-dag-settings-toggle]")).toHaveCount(0);
-});
+/* A snapshot reads no stored preference: `settings.spec.ts` ("a board's theme: changes nothing…")
+   picks `neutral` and finds `paper` under `?snapshot=1`, and `sidebar.spec.ts` ("a snapshot draws no
+   sidebar…") holds the sidebar, and the settings gear in its foot, off the picture (#258). */
 
 /* --------------------------------------------------------------------------- the Mermaid */
 

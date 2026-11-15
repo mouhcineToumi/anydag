@@ -9,7 +9,6 @@ import {
   removeRow,
   rowLines,
   setExtent,
-  setGroupDir,
   setKind,
   setParticipantKind,
   setRow,
@@ -20,7 +19,8 @@ import { PARTICIPANT_KINDS, parseSequence } from "@/dsl/sequence";
 
 /**
  * Sizing and describing any card — the writers behind the controls that replaced typing `w=`, a
- * third string, a one-line row block, `kind=`, a group's `dir=` and the flags the grammar retired.
+ * third string, a one-line row block, `kind=` and the flags the grammar retired. A group's `dir=`
+ * (`setGroupDir`) is held in `restate.test.ts`, beside the other group writers.
  *
  * Every one is held to the property the rest of `restate.ts` is held to: the line is otherwise
  * byte-identical, and a writer handed something it cannot read hands it back unchanged.
@@ -86,24 +86,6 @@ describe("setExtent", () => {
   it("gives a sketch shape both sides", () => {
     const g = parseDiagram("sketch", setExtent(setExtent('circle c "C" x=0 y=0', "w", 120), "h", 90))!;
     expect(g.nodes[0]).toMatchObject({ w: 120, h: 90 });
-  });
-});
-
-describe("setGroupDir", () => {
-  it("writes the group's own direction, and takes it off", () => {
-    expect(setGroupDir('group g "G" {', "TB")).toBe('group g "G" dir=TB {');
-    expect(setGroupDir('group g "G" dir=TB {', "LR")).toBe('group g "G" dir=LR {');
-    expect(setGroupDir('group g "G" dir=TB {', null)).toBe('group g "G" {');
-  });
-
-  it("is what the parser reads as the group's direction", () => {
-    const g = parseDiagram("arch", `${setGroupDir('group g "G" {', "TB")}\n  service a "A"\n}`)!;
-    expect(g.groups[0]!.dir).toBe("DOWN");
-    expect(g.diagnostics).toEqual([]);
-  });
-
-  it("refuses a line that is not a declaration", () => {
-    expect(setGroupDir("a --> b", "TB")).toBe("a --> b");
   });
 });
 
