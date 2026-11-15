@@ -15,9 +15,9 @@
 import type { Hue } from "../src/dsl/ir";
 import { collation } from "../src/locale";
 import { hueOf } from "../src/note/project";
-import { defaultHue, tagKey, tagOf } from "../src/note/tags";
+import { defaultHue, everyTagOf, tagKey, tagOf, withTags } from "../src/note/tags";
 import { leafOf, type TextKind } from "./names";
-import { byKind, TAGS_FILE, type Tree } from "./vault";
+import { byKind, sha1, TAGS_FILE, type Tree } from "./vault";
 
 /** One registered tag: the spelling it was registered with, and its hue — `null` for the default. */
 interface Registered {
@@ -136,4 +136,99 @@ export function carrying(tree: Tree, tag: string): Carrier[] {
   }
   const order = collation({ numeric: true });
   return out.sort((a, b) => order.compare(a.title, b.title) || (a.name < b.name ? -1 : 1));
+}
+
+/* -- writing: the tag list, compare-and-set ------------------------------------------------- */
+
+/** What `changeTags` is handed: the file as an object, every key as it was, to change in place. */
+type Raw = Record<string, unknown>;
+
+/** The key in `raw` naming `tag`, ignoring case, or `undefined`. */
+const keyIn = (raw: Raw, tag: string): string | undefined => Object.keys(raw).find((k) => tagKey(k) === tagKey(tag));
+
+/** A tag list too broken to change without losing what a person wrote in it. */
+export class Unreadable extends Error {}
+
+/**
+ * Change the tag list, **only while it is what was read**: read the file, hand `edit` its object,
+ * and write it back with `writeRawIf` under the sha1 that was read — so a sync pull or a hand edit
+ * that lands in between is never overwritten. On a mismatch it reads and edits again, four times.
+ * `edit` answers whether it changed anything; nothing changed writes nothing, so a vault nobody
+ * created or recoloured a tag in never grows the file. Answers whether it wrote.
+ */
+export function changeTags(
+  vault: { readRaw(rel: string): Buffer | null; writeRawIf(rel: string, bytes: Uint8Array, expect: string | null): boolean },
+  edit: (raw: Raw) => boolean,
+): boolean {
+  for (let i = 0; i < 4; i++) {
+    const cur = vault.readRaw(TAGS_FILE);
+    let raw: Raw = {};
+    if (cur && cur.toString("utf8").trim()) {
+      let data: unknown;
+      try {
+        data = JSON.parse(cur.toString("utf8"));
+      } catch {
+        throw new Unreadable("`.anydag/tags.json` is not JSON: put it right, or remove it, and try again");
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data))
+        throw new Unreadable("`.anydag/tags.json` is not an object of tags: put it right, or remove it, and try again");
+      raw = data as Raw;
+    }
+    if (!edit(raw)) return false;
+    const bytes = new Uint8Array(Buffer.from(`${JSON.stringify(raw, null, 2)}\n`, "utf8"));
+    if (vault.writeRawIf(TAGS_FILE, bytes, cur ? sha1(cur) : null)) return true;
+  }
+  throw new Unreadable("`.anydag/tags.json` kept changing underneath the change; try again");
+}
+
+/** Set `tag`'s hue in `raw`, registering it — `null` for the default, kept registered. */
+export function setHue(raw: Raw, tag: string, hue: Hue | null): boolean {
+  const key = keyIn(raw, tag);
+  const was = key === undefined ? undefined : raw[key];
+  const entry: Raw = was && typeof was === "object" && !Array.isArray(was) ? { ...(was as Raw) } : {};
+  if (hue === null) delete entry.hue;
+  else entry.hue = hue;
+  if (key !== undefined && JSON.stringify(was) === JSON.stringify(entry)) return false;
+  raw[key ?? tag] = entry;
+  return true;
+}
+
+/** Register `tag` with `hue` unless it is registered already. */
+export function register(raw: Raw, tag: string, hue: Hue | null): boolean {
+  return keyIn(raw, tag) === undefined && setHue(raw, tag, hue);
+}
+
+/** Take `tag` out of `raw`, every spelling of it. */
+export function unregister(raw: Raw, tag: string): boolean {
+  let changed = false;
+  for (const k of Object.keys(raw))
+    if (tagKey(k) === tagKey(tag)) {
+      delete raw[k];
+      changed = true;
+    }
+  return changed;
+}
+
+/** `raw`'s entry for `tag` under the spelling `to`, its hue kept: a rename that only changes case. */
+export function respell(raw: Raw, tag: string, to: string): boolean {
+  const key = keyIn(raw, tag);
+  if (key === undefined || key === to) return false;
+  const entry = raw[key];
+  delete raw[key];
+  raw[to] = entry;
+  return true;
+}
+
+/* -- a tag across every document --------------------------------------------------------------- */
+
+/**
+ * `text` with `from` renamed to `to` — or, with `to` null, taken off. Idempotent: a text with no
+ * `from`, or already saying `to` and nothing else for it, is answered as it is, which is what lets
+ * *Try again* send the same request. Onto a tag the text already carries, it is a merge: one entry.
+ */
+export function renamedIn(text: string, from: string, to: string | null, board: boolean): string {
+  const spelled = everyTagOf(text).filter((t) => tagKey(t) === tagKey(from));
+  if (!spelled.length) return text;
+  if (to !== null && tagKey(to) === tagKey(from) && spelled.length === 1 && spelled[0] === to) return text;
+  return withTags(text, to === null ? { remove: [from] } : { remove: [from], add: [to] }, { board });
 }
