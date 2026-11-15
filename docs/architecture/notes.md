@@ -166,6 +166,15 @@ Four things about it:
 The read-only note — `?view=1`, `?snapshot=1` — draws the title as the page's `<h1>`
 (`NoteTitleRead`), at the field's size and place; the PDF has its own, `dag-print__title`.
 
+**A note's tags are a row under its title**, with a task's and an event's other properties, and a
+plain note has the row too (*Tags* in [`tasks-projects-calendar.md`](tasks-projects-calendar.md)).
+They are the frontmatter's `tags:`, read by `tagsOf` and written by `withTags` (`src/note/tags.ts`),
+and the row writes **through the note's own save**, as the task bar does: the page rewrites the
+frontmatter `NoteView` holds and `put`s it, so a tag added while somebody types is one write, not an
+outside writer the page then has to merge with itself. A tag in the text — `#meeting` in a paragraph
+— is prose and is not a tag. The read-only note draws the chips, read only, on the line above the
+text.
+
 Names claimed, grepped first: `dag-note-view*` (`dag-note-view__first`, `dag-note-view__editor`), `dag-app--note`, `dag-blocks`, `dag-board__kind`, `data-dag-note`
 (a list row), `data-dag-note-view`, `data-dag-note-editor`, `data-dag-note-conflict`,
 `data-dag-note-keep`, `data-dag-note-theirs`, `data-dag-note-deleted`, `data-dag-note-failed`,

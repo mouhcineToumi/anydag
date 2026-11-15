@@ -219,6 +219,33 @@ Fifteen things are load-bearing:
   it has shown. `e2e/folders.spec.ts` holds it (*a file somebody else makes does not bring the list
   back to the open board*), and the glide's own check passed under load only after it.
 
+**The tree can be filtered by kind (#360).** *Files* carries a filter button to the left of its `+`,
+and the menu it opens — *Show in Files* — is one row per kind the tree already tells apart by its
+mark: Notes, Tasks, Projects, Events, Boards, Quizzes, Tables and Attachments, each with that mark
+and the count in the vault, with *Show everything* last. **Events have a row of their own** rather
+than counting as notes, because a row already wears a calendar clock for one and a *Notes* row would
+then hide a file wearing a mark the row does not carry. The note-shaped kinds are read in
+`FileIcon`'s order — project, then task, then event, then a note — so the row that hides a file is
+the row whose mark it wears, and the same order is `shownKind` in `src/ui/filter.ts`. Any number of
+kinds may be hidden at once.
+
+While anything is hidden the button is drawn in the accent and the heading says what, *Files · tasks
+hidden* (or *notes and boards hidden*, or *3 kinds hidden*), so a filtered tree is never mistaken
+for an empty vault. **A folder stays even when everything in it is hidden**, so the tree keeps its
+shape, and *Empty* is still read off the vault's own tree rather than the filtered one — a folder
+holding only hidden tasks is not empty. **The open file's row stays** whatever its kind, so the
+column never hides where somebody is. The rule is `filterByKind` in `src/ui/filter.ts`, with no DOM
+in it (`test/filter.test.ts`); the sidebar draws its rows from the filtered tree, so `rows()` — and
+with it the virtual window, the keyboard walk, rename and every drop target — sees exactly what is
+on screen. Search, links, backlinks, the Tasks page and the calendar read the list, not this, and are
+unaffected.
+
+The choice is view state, **this browser's and this vault's**: `dag:sidebar-hidden` is a JSON list of
+the hidden kinds, written with `writeLocal` and in `PER_VAULT` the way `dag:sidebar-open` keeps the
+folders. It is not in `PREF_KEYS`, so it travels nowhere, and opening a vault still writes no byte of
+it. Storing what is hidden rather than what is shown is what makes a kind added later visible by
+default.
+
 **A phone's shell is finger-sized.** Under 720px the sheet's acts, its rows, the Settings row and each
 row's `⋯` are 44×44; the `⋯` keeps its 14px glyph inside a 44px box, because a phone has no
 right-click and that button is the only way to rename, move or delete. The page tabs' close and the
@@ -228,7 +255,7 @@ floors, at 390×844 and 1440×900.
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, `data-dag-sidebar-sheet-home`, the storage keys
-`dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
+`dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open`, `dag:sidebar-hidden` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
 `data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, `dag-sidebar__failed*`, `dag-sidebar__retry`,
@@ -295,7 +322,8 @@ folder. Six things about it:
   Escape does.
 
 Names claimed, grepped first: `dag-sidebar__bulk*`, `data-dag-sidebar-bulk*`, `data-dag-sidebar-picked`
-(and `data-dag-bulk-delete*`, gone with its modal).
+(and `data-dag-bulk-delete*`, gone with its modal) — and the filter's `dag-sidebar__filter*`,
+`dag-sidebar__filtered` and `data-dag-sidebar-filter*`; the diagram owns none of them either.
 
 **The suite runs with it put away.** `e2e/global-setup.ts` seeds `dag:sidebar=0`, because a column
 open by default would move the canvas under every check that measures `.dag-viewport`, for a reason

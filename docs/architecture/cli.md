@@ -67,6 +67,12 @@ rm` went on saying *never recursive* about a thing the app did. It is `folder rm
 running app's server through `server.json`, or one in this process. It speaks on stdout, so it takes no
 `--json`. See *Parity*.
 
+**Tags have no command** (#327). A tag is finer than a whole file, so adding, renaming, recolouring
+and deleting one are the page's and MCP's (`tag_list`, `tag_apply`, `tag_rename`, `tag_delete`,
+`tag_color`), and their features in `docs/parity.json` say `{"admin": false}`. The CLI reads them
+back without a line of its own: `anydag ls --json` is the list route's answer, `tags` included, and
+`<kind> cat` prints the frontmatter that holds them.
+
 **Out, and why:** every gesture inside a document and every feature of the app beyond administering a
 vault (MCP has them); undo; `login`/`logout` (no account); `share` (nothing to reach); `feedback`
 (the MCP `feedback` tool sends it when the person asks; sending feedback is not administering a vault).

@@ -640,6 +640,65 @@ test("a chat started on a note works on it: the chip names it, the turn is told 
   await expect(panel.locator(`[data-dag-chat-subject="${subject}"]`)).toBeVisible();
 });
 
+test("typing @ lists the vault's documents, and the picked one reaches the turn as its reference", async ({ page }) => {
+  /* #324: a message can name a file, so the agent reads exactly that one rather than guessing by a
+     title typed into prose. */
+  const mention = stem("mention");
+  const title = `Mention note ${run}`;
+  fs.writeFileSync(noteFile(mention), `---\ntitle: ${title}\n---\nread me\n`);
+  await page.goto("/?chat=new");
+  await expect(page.locator("[data-dag-chat-welcome]")).toBeVisible();
+  const input = page.locator("[data-dag-chat-input]");
+  const list = page.locator("[data-dag-chat-mentions]");
+
+  /* An @ inside a word — an email address — does not open a list. */
+  await input.fill("mail me at a@b.com");
+  await expect(list).toHaveCount(0);
+
+  /* After a space it does, and what follows narrows it to this run's note. */
+  await input.fill("@");
+  await expect(list).toBeVisible();
+  await input.pressSequentially(mention);
+  const option = list.locator(`[data-dag-chat-mention-item="${mention}"]`);
+  await expect(option).toBeVisible();
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(list).toHaveCount(0);
+  const chip = page.locator(`[data-dag-chat-mention="${mention}"]`);
+  await expect(chip).toBeVisible();
+  await expect(chip).toContainText(title);
+  await expect(chip).toHaveAttribute("data-dag-chat-docchip", "note");
+
+  /* One Backspace takes the whole chip. */
+  await input.fill("");
+  await input.press("Backspace");
+  await expect(chip).toHaveCount(0);
+
+  /* Escape closes the list and leaves what was typed where it is. */
+  await input.fill("@");
+  await input.pressSequentially(mention);
+  await expect(list).toBeVisible();
+  await input.press("Escape");
+  await expect(list).toHaveCount(0);
+  await expect(input).toHaveValue(`@${mention}`);
+
+  /* The pointer picks too; the message then says `mentions`, which the fake repeats back with the
+     references the turn was given. */
+  await input.fill("@");
+  await input.pressSequentially(mention);
+  await expect(option).toBeVisible();
+  await option.click();
+  await expect(chip).toBeVisible();
+  await input.pressSequentially("mentions");
+  await input.press("Enter");
+  const turn = page.locator("[data-dag-chat-turn]").last();
+  await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  chats.push((await page.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!);
+  const answer = turn.locator("[data-dag-chat-said]").last();
+  await expect(answer).toContainText(title);
+  await expect(answer.locator("[data-dag-ref]")).toHaveCount(1);
+});
+
 test("removing the chip makes the chat about the whole vault, before the first message and after it", async ({ page }) => {
   const subject = stem("chipless");
   const other = stem("chipless-other");
