@@ -293,3 +293,24 @@ describe("the rest of the table", () => {
     expect(me.read_only).toBe(false);
   });
 });
+
+describe("tags (#327)", () => {
+  it("tag_list answers the tag list, and the list, read and task tools report a document's tags", async () => {
+    fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [meeting]\n---\nbody\n");
+    fs.writeFileSync(path.join(env.root, "chore.md"), "---\nstatus: todo\ntags: [meeting, ops]\n---\n");
+    fs.writeFileSync(path.join(env.root, "arch.board.md"), "---\ntags: [design]\n---\n\n```md {#one}\nhi\n```\n");
+    const c = await connect(true);
+    const list = await call(c, "tag_list");
+    expect(list.data.tags.map((t: any) => [t.name, t.count])).toEqual([
+      ["design", 1],
+      ["meeting", 2],
+      ["ops", 1],
+    ]);
+    const one = await call(c, "tag_list", { tag: "Meeting" });
+    expect(one.data.docs.map((d: any) => d.name)).toEqual(["chore", "plan"]);
+    expect((await call(c, "note_list")).data.tags).toEqual({ plan: ["meeting"], chore: ["meeting", "ops"] });
+    expect((await call(c, "board_list")).data.tags).toEqual({ arch: ["design"] });
+    expect((await call(c, "note_read", { name: "plan" })).data.tags).toEqual(["meeting"]);
+    expect((await call(c, "task_list")).data.tasks[0].tags).toEqual(["meeting", "ops"]);
+  });
+});

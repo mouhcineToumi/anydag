@@ -397,6 +397,14 @@
       "mcp": ["project_set"]
     },
     {
+      "id": "tag.list",
+      "area": "Tags",
+      "what": "Every tag, with its colour and how many documents carry it",
+      "rest": ["GET /__board/tags"],
+      "cli": {"admin": false},
+      "mcp": ["tag_list"]
+    },
+    {
       "id": "quiz.list",
       "area": "Quizzes",
       "what": "Every quiz, with how many questions each asks",

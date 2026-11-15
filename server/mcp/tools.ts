@@ -19,6 +19,7 @@ import { HUE_ORDER } from "../../src/dsl/ir";
 import { eventOf, isDay } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectFolders, projectFor, withProject, type Project } from "../../src/note/project";
+import { tagsOf } from "../../src/note/tags";
 import { STATUSES, dueOf, titleStem, withTask } from "../../src/note/task";
 import { withEvent } from "../../src/note/event";
 import { FetchRefused, fetchFile, type Fetched } from "../fetch";
@@ -270,6 +271,7 @@ async function docList(
     folders: shown.folders,
     titles: only(got.titles),
     ids: only(got.ids),
+    tags: only(got.tags),
     total: shown.total,
     next_cursor: shown.next_cursor,
   };
@@ -283,10 +285,10 @@ async function docList(
   return out;
 }
 
-const docRead = async (kit: Kit, kind: string, name: string, v?: string) => ({
-  ...(await kit.api("GET", "/__board/get", { vault: v, query: { name, kind } })),
-  url: await kit.url(name, kind, v),
-});
+async function docRead(kit: Kit, kind: string, name: string, v?: string) {
+  const got = await kit.api("GET", "/__board/get", { vault: v, query: { name, kind } });
+  return { ...got, ...(typeof got?.text === "string" ? { tags: tagsOf(got.text) } : {}), url: await kit.url(name, kind, v) };
+}
 
 async function docCreate(kit: Kit, kind: string, name: string, text: string, title: string | undefined, v?: string) {
   kit.needWrite(`make a ${kind}`);
@@ -928,6 +930,7 @@ const taskTools: Tool[] = [
           due: task.due ?? null,
           start: task.start ?? null,
           project: home,
+          tags: got.tags?.[name] ?? [],
         });
       }
       tasks.sort(
@@ -1021,6 +1024,7 @@ const eventTools: Tool[] = [
           end: event.end ?? null,
           all_day: isDay(event.start),
           project: home,
+          tags: got.tags?.[name] ?? [],
           url: await kit.url(name, "note", v),
         });
       }
@@ -1168,6 +1172,19 @@ const projectTools: Tool[] = [
       if (Object.keys(body).length === 1) throw new ToolError("say what to change: a `status`, a `hue`, or both");
       return kit.api("POST", "/__board/project", { vault: v, body });
     },
+  }),
+];
+
+const tagTools: Tool[] = [
+  tool({
+    name: "tag_list",
+    description: withNote(
+      "Every tag in the vault — each one a document carries in its frontmatter `tags:`, and each one registered in the vault's tag list — with its `hue` (one of the ten theme hues), whether it is `registered` (when not, the hue is the default its name hashes to), how many documents carry it (`count`; `0` is unused) and the `kinds` that do. Templates are not counted.\n\n" +
+        "With `tag`, also the documents carrying it, as `docs`: each one's `name`, `kind` and `title`. Tags are compared ignoring case.",
+    ),
+    write: false,
+    input: { tag: z.string().optional(), vault },
+    run: ({ tag, vault: v }, kit) => kit.api("GET", "/__board/tags", { vault: v, query: tag === undefined ? {} : { tag } }),
   }),
 ];
 
@@ -1795,6 +1812,7 @@ export const TOOLS: Tool[] = [
   ...taskTools,
   ...eventTools,
   ...projectTools,
+  ...tagTools,
   ...findTools,
   ...imageTools,
   ...fileTools,

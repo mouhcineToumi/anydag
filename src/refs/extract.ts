@@ -25,6 +25,7 @@ import { isItemType } from "../board/types";
 import { locateItems } from "../board/locate";
 import { eventOf, type NoteEvent } from "../note/event";
 import { projectOf, type Project } from "../note/project";
+import { tagsOf } from "../note/tags";
 import { taskOf, type Task } from "../note/task";
 import { parseQuiz } from "../quiz/parse";
 import { resolveWiki, wikilinkTree, parseWikiUrl, type WikiCandidate, type WikiIndex } from "./wikilinks";
@@ -142,6 +143,8 @@ export interface Indexed {
   project?: Project;
   /** What makes a note an event: when a card on a board says it is. Never beside `task`. */
   event?: NoteEvent;
+  /** The frontmatter's tags, on any kind. Absent when there are none. */
+  tags?: string[];
   /** How many questions a quiz asks — what its card on a board says. Absent on anything else. */
   questions?: number;
   refs: Ref[];
@@ -164,12 +167,14 @@ export function indexTexts(texts: Record<string, string>): Record<string, Indexe
     const task = note ? taskOf(text) : undefined;
     const project = note ? projectOf(text) : undefined;
     const event = note ? eventOf(text) : undefined;
+    const tags = tagsOf(text);
     const refs = note || quiz || table ? refsInMarkdown(text.replace(FRONT, "")) : refsInBoard(text);
     out[key] = {
       title: titleOf(text),
       ...(task ? { task } : {}),
       ...(project ? { project } : {}),
       ...(event ? { event } : {}),
+      ...(tags.length ? { tags } : {}),
       ...(quiz ? { questions: parseQuiz(text).questions.length } : {}),
       refs,
     };
