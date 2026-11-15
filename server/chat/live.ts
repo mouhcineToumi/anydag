@@ -35,6 +35,7 @@ import {
   type ChatRead,
   type ChatRow,
   type DocKind,
+  type Mention,
   type Mode,
   type Provider,
   type Step,
@@ -382,6 +383,7 @@ export class Assistant {
       model?: string;
       effort?: string | null;
       subject?: { name: string; kind: DocKind } | null;
+      mentions?: { name: string; kind: DocKind }[];
     } = {},
   ): Promise<Turn> {
     const words = text.trim();
@@ -401,6 +403,7 @@ export class Assistant {
         : o.subject === null
           ? null
           : await this.subjectOf(o.vault || home, o.subject.name, o.subject.kind);
+    const mentions = o.mentions?.length ? await this.mentioned(o.vault || home, o.mentions) : [];
     /* Looking the subject up handed the thread back: another turn may have started meanwhile. */
     busy();
     const file = this.store.update(root, chat, (m) => {
@@ -471,6 +474,7 @@ export class Assistant {
             system: systemPrompt({
               ...this.reach(meta),
               subject: live.subject && { ...live.subject, home: live.subject.vault === meta.home },
+              mentions,
             }),
             prompt: seeded(unseen, words),
             ...(resume ? { resume } : { fresh }),
@@ -495,6 +499,23 @@ export class Assistant {
     const v = this.s.pick(vault).vault;
     await mustExist(v, name, kind);
     return { vault: v.id, kind, name, id: await v.peekId(name, kind), title: oneLine(await this.titleIn(v, name, kind)) };
+  }
+
+  /**
+   * The documents a message names with `@` (#324), resolved for this turn: each is checked in the
+   * vault the page saw, looked up without writing anything, and listed once however often it was
+   * typed. The prompt is where they reach the model; they are not kept in `chat.json`.
+   */
+  private async mentioned(vault: string, list: readonly { name: string; kind: DocKind }[]): Promise<Mention[]> {
+    const out: Mention[] = [];
+    const seen = new Set<string>();
+    for (const m of list) {
+      const key = `${m.kind}:${m.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(await this.subjectOf(vault, m.name, m.kind));
+    }
+    return out;
   }
 
   /** What the page calls a document: its title, else the last part of its name. */

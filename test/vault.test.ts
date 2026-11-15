@@ -89,7 +89,7 @@ describe("what this browser keeps per vault", () => {
     expect(scopedKey("dag:theme", "")).toBe("dag:theme");
   });
 
-  it("scopes the settings, the favourites, the attachments folder and the open folders — not the window's layout, the theme or the AI choices", () => {
+  it("scopes the settings, the favourites, the attachments folder, the open folders and the hidden kinds — not the window's layout, the theme or the AI choices", () => {
     pinVault("v1");
     expect(storageKey("dag:settings")).toBe("dag:settings@v1");
     /* The person's, in every vault (#191). */
@@ -98,6 +98,8 @@ describe("what this browser keeps per vault", () => {
     expect(storageKey("dag:favourites")).toBe("dag:favourites@v1");
     expect(storageKey("dag:attachments")).toBe("dag:attachments@v1");
     expect(storageKey("dag:sidebar-open")).toBe("dag:sidebar-open@v1");
+    /* A vault's own tree, viewed this browser's way (#360). */
+    expect(storageKey("dag:sidebar-hidden")).toBe("dag:sidebar-hidden@v1");
     expect(storageKey("dag:library")).toBe("dag:library");
     expect(storageKey("dag:sidebar")).toBe("dag:sidebar");
     expect(storageKey("dag:prefs-at")).toBe("dag:prefs-at");

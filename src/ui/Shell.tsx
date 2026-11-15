@@ -72,6 +72,7 @@ import { AssistantPanel } from "./chunks";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
+import { TagPopover, type Tagging } from "./tags/TagPopover";
 import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
 import { ancestors, follow, keyOf, leaf, parentOf, rebase, type Change } from "./tree";
@@ -123,9 +124,16 @@ export interface SidebarControl {
    * the AnyDag logo does — the column's own while it is docked, the toolbar's while it is away.
    */
   home(): void;
+  /**
+   * *Tags…*: a document's tags in a card under `anchor` — the top bar's `⋯` on a board, a quiz or a
+   * table, and a sidebar row's menu on any text (#327). One card for the window, drawn here.
+   */
+  editTags(kind: TextKind, name: string, anchor: HTMLElement | null): void;
 }
 
 const SidebarContext = createContext<SidebarControl | null>(null);
+
+const NO_TAGS: readonly string[] = [];
 
 /** The sidebar's control, or `null` where there is none — a snapshot draws no sidebar. */
 export function useSidebar(): SidebarControl | null {
@@ -232,6 +240,7 @@ export function Shell({
   tasks,
   projects,
   events,
+  tags,
   quizzes,
   questions,
   tables,
@@ -273,6 +282,8 @@ export function Shell({
   projects: Readonly<Record<string, Project>>;
   /** Which notes are events, and when — what a row's glyph and its menu say. */
   events: Readonly<Record<string, NoteEvent>>;
+  /** Each text's tags, by name — what *Tags…* draws. */
+  tags: Readonly<Record<string, readonly string[]>>;
   /** Every quiz, the third kind of file, and how many questions each asks. */
   quizzes: string[];
   questions: Readonly<Record<string, number>>;
@@ -896,6 +907,16 @@ export function Shell({
   );
 
   const idOf = useCallback((name: string) => ids[name], [ids]);
+  /* *Tags…*, asked from the top bar or a row. A narrow window's sheet goes, so the card is not under it. */
+  const [tagging, setTagging] = useState<Tagging | null>(null);
+  const editTags = useCallback(
+    (kind: TextKind, name: string, anchor: HTMLElement | null) => {
+      if (narrow) dismiss();
+      setTagging({ kind, name, anchor });
+    },
+    [narrow, dismiss],
+  );
+  const stopTagging = useCallback(() => setTagging(null), []);
   const ctl = useMemo<SidebarControl>(
     () => ({
       docked: mode === "docked",
@@ -907,8 +928,9 @@ export function Shell({
       duplicate: (kind, name) => void duplicateBoard(name, undefined, kind),
       trash: (kind, name) => void files.trash([{ kind, name }]),
       home: openHome,
+      editTags,
     }),
-    [mode, reveal, create, renamed, retitle, idOf, files, openHome],
+    [mode, reveal, create, renamed, retitle, idOf, files, openHome, editTags],
   );
 
   /* What Undo did with what came back: a favourite is a favourite again, under the name it has now,
@@ -1046,6 +1068,7 @@ export function Shell({
               onPointerEnter={mode === "overlay" && peeking ? cancelLeave : undefined}
               onPointerLeave={mode === "overlay" && peeking && !pinned ? unpeek : undefined}
               onDismiss={dismiss}
+              onTags={editTags}
               sheet={narrow}
             />
           ) : null}
@@ -1071,6 +1094,7 @@ export function Shell({
               onClose={() => setTrashed(null)}
             />
           ) : null}
+          {tagging ? <TagPopover what={tagging} tags={tags[tagging.name] ?? NO_TAGS} onClose={stopTagging} /> : null}
           {cloud ? <TelemetryPrompt page={asking} /> : null}
         </ToastHost>
       </SidebarContext.Provider>

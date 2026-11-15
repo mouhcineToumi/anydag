@@ -1,5 +1,5 @@
-import { AlertCircle, Calendar, CalendarDays, GitMerge, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { AlertCircle, Calendar, CalendarDays, GitMerge, Tag, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import type { Spot } from "@/calendar/menu";
 
 import { useBlockEditor, type NoteEditor } from "@/blocks";
@@ -13,6 +13,8 @@ import { eventOf, withEvent, type EventChange, type NoteEvent } from "@/note/eve
 import { clearTarget, useTarget } from "@/refs/target";
 import { merge3 } from "@/note/merge";
 import { projectOf, withProject, type Project, type ProjectChange } from "@/note/project";
+import { tagsOf, withTags, type TagChange } from "@/note/tags";
+import type { Hue } from "@/dsl/ir";
 import { PRIORITY_LABEL, STATUS_LABEL, STATUSES, taskOf, withTask, type Task, type TaskChange, overdue } from "@/note/task";
 import { NoteMarkdown, resolverFor } from "@/view/NoteRead";
 import { refComponents } from "@/refs/Ref";
@@ -32,6 +34,9 @@ import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
 import { PRIORITY_KEYS, PriorityMark, TaskGlyph, TaskLine } from "./TaskGlyph";
 import { TasksMenu, under } from "./TasksMenu";
 import { Toast } from "./Toast";
+import { TagLine } from "./tags/TagChip";
+import { TagEditor } from "./tags/TagEditor";
+import { colorTag } from "./tags/tagStore";
 
 /**
  * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
@@ -293,6 +298,13 @@ export function NoteView({
     setEventState(next);
     onEventRef.current?.(next);
   }, []);
+  /* And its tags, off the same frontmatter for the same reason — the same list kept while they do not
+     change, so the row is not drawn again for every keystroke's save. */
+  const [tags, setTags] = useState<string[]>(NO_TAGS);
+  const tellTags = useCallback((front: string) => {
+    const next = tagsOf(front);
+    setTags((was) => (was.length === next.length && was.every((t, i) => t === next[i]) ? was : next));
+  }, []);
   /* The title the file has, for the field at the top of the page and for the toolbar. */
   const [title, setTitleState] = useState<string | undefined>(undefined);
   const onTitleRef = useRef(onTitle);
@@ -355,8 +367,9 @@ export function NoteView({
       tell(taskOf(f.front));
       tellProject(projectOf(f.front));
       tellEvent(eventOf(f.front));
+      tellTags(f.front);
     },
-    [named, tell, tellProject, tellEvent],
+    [named, tell, tellProject, tellEvent, tellTags],
   );
 
   useEffect(() => {
@@ -434,8 +447,9 @@ export function NoteView({
       tell(taskOf(f.front));
       tellProject(projectOf(f.front));
       tellEvent(eventOf(f.front));
+      tellTags(f.front);
     },
-    [named, tell, tellProject, tellEvent],
+    [named, tell, tellProject, tellEvent, tellTags],
   );
 
   /* One write at a time: a second one against the base the first is about to move is a 409 by construction. */
@@ -557,6 +571,7 @@ export function NoteView({
             tell(taskOf(f.front));
             tellProject(projectOf(f.front));
             tellEvent(eventOf(f.front));
+            tellTags(f.front);
           } else if (got?.ok && !timer.current && editor.current) adopt(got.text, got.base);
           else named(next);
           ok = true;
@@ -570,7 +585,7 @@ export function NoteView({
       );
       return ok;
     },
-    [flush, serial, adopt, named, tell, tellProject, tellEvent],
+    [flush, serial, adopt, named, tell, tellProject, tellEvent, tellTags],
   );
 
   /**
@@ -623,6 +638,25 @@ export function NoteView({
       void flush(false);
     },
     [flush, tellEvent],
+  );
+
+  /**
+   * The tags changed from the Tags row: `changeTask`'s path, for `tags:` — so a tag change and typing
+   * are one write. A tag the row made is registered with the colour chosen, at once.
+   */
+  const changeTags = useCallback(
+    (change: TagChange, created?: { name: string; hue: Hue }): Promise<void> | undefined => {
+      if (lockedRef.current) return void refuseLocked();
+      const h = held.current;
+      if (!h) return;
+      const front = withTags(h.front, change);
+      if (front === h.front) return;
+      held.current = { ...h, front };
+      tellTags(front);
+      if (created) void colorTag(created.name, created.hue);
+      return flush(false);
+    },
+    [flush, tellTags],
   );
 
   useEffect(() => {
@@ -848,6 +882,23 @@ export function NoteView({
     );
   }
 
+  /* The Tags row, the last of the note's properties (#327): its chips and *Add tag*. Read only, with
+     no tags, there is no row; while the editor is still coming up it is the label alone, so the page
+     does not move under the reader when it is ready. */
+  const tagsEditable = !locked && ready && status.kind !== "conflict" && status.kind !== "deleted";
+  const tagRow: ReactNode =
+    locked && !tags.length ? null : (
+      <>
+        <span className="dag-facts__label">
+          <Tag size={14} strokeWidth={2} aria-hidden="true" />
+          Tags
+        </span>
+        <span className="dag-facts__value" data-dag-note-tags="">
+          <TagEditor tags={tags} editable={tagsEditable} variant="row" onChange={changeTags} />
+        </span>
+      </>
+    );
+
   return (
     <main className="dag-note-view" data-dag-note-view={name} data-dag-ready={settled ? "" : undefined}>
       {/* The note's states that last, in the app's one toast stack (#208): each stays for as long
@@ -904,6 +955,7 @@ export function NoteView({
             {project ? <ProjectLine project={project} /> : null}
             {task ? <TaskLine task={task} /> : null}
             {event ? <EventLine event={event} /> : null}
+            <TagLine tags={tags} />
             <NoteMarkdown name={name} body={body} components={refComponents()} />
           </>
         ) : null
@@ -923,11 +975,26 @@ export function NoteView({
               members={members}
               onChange={changeProject}
               editable={!locked && ready && status.kind !== "conflict"}
-            />
+            >
+              {task || event ? null : tagRow}
+            </ProjectBar>
           ) : null}
-          {task ? <TaskBar task={task} onChange={changeTask} editable={!locked && ready && status.kind !== "conflict"} /> : null}
+          {task ? (
+            <TaskBar task={task} onChange={changeTask} editable={!locked && ready && status.kind !== "conflict"}>
+              {event ? null : tagRow}
+            </TaskBar>
+          ) : null}
           {event ? (
-            <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"} />
+            <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"}>
+              {tagRow}
+            </EventBar>
+          ) : null}
+          {/* A plain note's properties are its tags alone: the row, with *Add tag* — and nothing,
+              read only, when it has none. */}
+          {!task && !event && !project && tagRow ? (
+            <div className="dag-taskbar dag-facts dag-tagbar" data-dag-tagbar="">
+              {tagRow}
+            </div>
           ) : null}
           {/* The text first, read-only, while the editor's chunk loads and BlockNote builds itself:
               on a first open, about 120 ms on a fast machine and 450 at a quarter of its CPU (#120). The editor
@@ -976,6 +1043,8 @@ export function NoteView({
   );
 }
 
+const NO_TAGS: string[] = [];
+
 /**
  * The bar at the top of a task's own page: its status as three choices, its priority, its dates, and
  * the way back to being a plain note. Notion's properties, cut to the few a task has.
@@ -984,7 +1053,18 @@ export function NoteView({
  * all three and a person on the page has come to set one, not to step through them. The date is the
  * browser's own date input, which is the one that already knows the person's locale and keyboard.
  */
-function TaskBar({ task, onChange, editable }: { task: Task; onChange(change: TaskChange): void; editable: boolean }) {
+function TaskBar({
+  task,
+  onChange,
+  editable,
+  children,
+}: {
+  task: Task;
+  onChange(change: TaskChange): void;
+  editable: boolean;
+  /** Rows after the task's own: the Tags row. */
+  children?: ReactNode;
+}) {
   const [menu, setMenu] = useState<Spot | null>(null);
   return (
     <div className="dag-taskbar dag-facts" data-dag-taskbar={task.status}>
@@ -1089,6 +1169,7 @@ function TaskBar({ task, onChange, editable }: { task: Task; onChange(change: Ta
           </button>
         ) : null}
       </span>
+      {children}
     </div>
   );
 }

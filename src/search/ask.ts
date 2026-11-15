@@ -10,8 +10,11 @@ import type { Found } from "./wire";
 export const DEBOUNCE = 120;
 
 export interface Asker {
-  /** Send `query` once typing has paused, replacing whatever was waiting or in flight. */
-  ask(query: string): void;
+  /**
+   * Send `query` once typing has paused, replacing whatever was waiting or in flight — narrowed to
+   * the documents carrying `tag`, when one is given (#327).
+   */
+  ask(query: string, tag?: string): void;
   /** Drop what is waiting and abort what is in flight; the asker can be used again. */
   stop(): void;
 }
@@ -22,7 +25,7 @@ export interface Asker {
  * `pay` can never land over the one to `payments`. A refused or failed request calls nothing — the
  * next key, or the next change, is the next attempt.
  */
-export function asker(answered: (query: string, hits: Found[]) => void, wait = DEBOUNCE): Asker {
+export function asker(answered: (query: string, hits: Found[], tag?: string) => void, wait = DEBOUNCE): Asker {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let ctl: AbortController | null = null;
 
@@ -34,12 +37,13 @@ export function asker(answered: (query: string, hits: Found[]) => void, wait = D
   };
 
   /** Never rejects: an abort, a refusal or a server that is not there all end in silence. */
-  const send = async (query: string, mine: AbortController): Promise<void> => {
+  const send = async (query: string, tag: string | undefined, mine: AbortController): Promise<void> => {
     try {
-      const r = await fetch(`/__board/search?q=${encodeURIComponent(query)}`, { signal: mine.signal });
+      const by = tag ? `&tag=${encodeURIComponent(tag)}` : "";
+      const r = await fetch(`/__board/search?q=${encodeURIComponent(query)}${by}`, { signal: mine.signal });
       if (!r.ok) return;
       const { hits } = (await r.json()) as { hits: Found[] };
-      if (!mine.signal.aborted) answered(query, hits);
+      if (!mine.signal.aborted) answered(query, hits, tag);
     } catch {
       /* Aborted, or the server is not there. */
     }
@@ -47,13 +51,13 @@ export function asker(answered: (query: string, hits: Found[]) => void, wait = D
 
   return {
     stop,
-    ask(query) {
+    ask(query, tag) {
       stop();
       timer = setTimeout(() => {
         timer = null;
         const mine = new AbortController();
         ctl = mine;
-        void send(query, mine);
+        void send(query, tag, mine);
       }, wait);
     },
   };

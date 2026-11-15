@@ -37,12 +37,15 @@ import {
   type TaskChange,
   type TaskStatus,
 } from "@/note/task";
+import { withTags } from "@/note/tags";
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
 import { Button, IconButton } from "./controls";
 import { startDrag } from "./pointerDrag";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
+import { tagMatches, type TagFilter } from "./tagFilter";
+import { TagChips, TagSelect } from "./tags/TagFilter";
 import { DueLabel, PRIORITY_KEYS, PriorityMark, StatusButton, TaskGlyph } from "./TaskGlyph";
 import { compareRecent, countLine, onTab, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
 import { TasksMenu, under, type MenuRow } from "./TasksMenu";
@@ -83,9 +86,19 @@ interface Row {
   folder: string;
   /** The project it is in, innermost first: its note's name, status and title. */
   project?: { name: string; project: Project; title: string };
+  /** Its frontmatter's tags, drawn as chips. */
+  tags: readonly string[];
 }
 
 const leaf = (name: string) => name.slice(name.lastIndexOf("/") + 1);
+const NO_TAGS: readonly string[] = [];
+const ALL_TAGS: TagFilter = { kind: "all" };
+
+/** Where a task typed into the page goes: the folder of the project shown, and the tag shown. */
+interface Into {
+  folder: string;
+  tag?: string;
+}
 const same = (a: Task | undefined, b: Task | undefined) =>
   a?.status === b?.status && a?.due === b?.due && a?.priority === b?.priority;
 
@@ -167,8 +180,14 @@ export function TaskTabs({
   );
 }
 
-/** A task's text when it is typed into the Tasks page: its title, and the column it was typed into. */
-const taskText = (title: string, status: TaskStatus): string => `---\ntitle: ${JSON.stringify(title)}\nstatus: ${status}\n---\n`;
+/**
+ * A task's text when it is typed into the Tasks page: its title, the column it was typed into, and
+ * the tag the page is showing, if it shows one — a task typed in there stays in view.
+ */
+const taskText = (title: string, status: TaskStatus, tag?: string): string => {
+  const text = `---\ntitle: ${JSON.stringify(title)}\nstatus: ${status}\n---\n`;
+  return tag ? withTags(text, { add: [tag] }) : text;
+};
 
 /** A row that was just checked: where it was, until its toast goes. */
 interface Settling {
@@ -184,6 +203,8 @@ export function TasksView({
   onOpen,
   scope = { kind: "all" },
   onScope,
+  tagFilter = ALL_TAGS,
+  onTagFilter,
   locked = false,
   tab = "open",
   onTab: chooseTab,
@@ -199,6 +220,9 @@ export function TasksView({
   /** Which tab of the top bar is pressed: the list's statuses. */
   tab?: TaskTab;
   onTab?(next: TaskTab): void;
+  /** Which tag's tasks to show — the URL's `tag=`. */
+  tagFilter?: TagFilter;
+  onTagFilter?(next: TagFilter): void;
 }) {
   /* What this page has asked for and the list does not say yet, by name. */
   const [pending, setPending] = useState<Record<string, Task>>({});
@@ -232,9 +256,11 @@ export function TasksView({
   const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
   const inScope = useCallback(
     (name: string) =>
-      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
-    [scoped, owners],
+      (scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped)) &&
+      tagMatches(tagFilter, list.tags[name]),
+    [scoped, owners, tagFilter, list.tags],
   );
+  const taskNames = useMemo(() => Object.keys(list.tasks), [list.tasks]);
 
   const words = useMemo(() => filter.trim().toLowerCase().split(/\s+/).filter(Boolean), [filter]);
   /* Every task in the scope, before the tab and the words: what the count line counts from. */
@@ -251,9 +277,10 @@ export function TasksView({
             ? { name: owner, project: list.projects[owner]!, title: list.titles[owner] ?? leaf(owner) }
             : undefined;
         const place = settling?.name === name ? settling.was : task;
-        return { name, task, place, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project };
+        const tags = list.tags[name] ?? NO_TAGS;
+        return { name, task, place, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project, tags };
       });
-  }, [list.notes, list.tasks, list.titles, list.projects, owners, inScope, pending, settling]);
+  }, [list.notes, list.tasks, list.titles, list.projects, list.tags, owners, inScope, pending, settling]);
   const matches = useCallback(
     (r: Row) => words.every((w) => `${r.title} ${r.folder} ${r.project?.title ?? ""}`.toLowerCase().includes(w)),
     [words],
@@ -333,7 +360,7 @@ export function TasksView({
   const total = Object.keys(list.tasks).length;
   const by = (status: TaskStatus) => rows.filter((r) => r.place.status === status);
   /* A task typed in while one project is showing is made in that project's folder. */
-  const into = scoped ?? "";
+  const into = { folder: scoped ?? "", tag: tagFilter.kind === "tag" ? tagFilter.name : undefined };
   /* A row names its project, unless the page is already showing only that project's. */
   const chip = (r: Row) => (r.project && !(scope.kind === "project" && scope.name === r.project.name) ? r.project : undefined);
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
@@ -384,6 +411,14 @@ export function TasksView({
             <option value={NO_PROJECT}>No project</option>
           </select>
         ) : null}
+        <TagSelect
+          list={list}
+          names={taskNames}
+          filter={tagFilter}
+          onFilter={(next) => onTagFilter?.(next)}
+          label="Show the tasks tagged"
+          hook={{ "data-dag-tasks-tag": "" }}
+        />
         <span className="dag-tasks__spacer" />
         <span className="dag-tasks__count" data-dag-tasks-count="" aria-live="polite">
           {total === 0
@@ -603,6 +638,7 @@ function TaskRow({
           <FileText size={14} strokeWidth={2} aria-hidden="true" />
         </span>
       ) : null}
+      <TagChips tags={r.tags} />
       <span className="dag-tasks__spacer" />
       <span className="dag-tasks__cell dag-tasks__cell--items">
         {items ? (
@@ -659,7 +695,7 @@ function Group({
 }: {
   status: TaskStatus;
   rows: Row[];
-  into: string;
+  into: Into;
   locked: boolean;
   children(row: Row): ReactNode;
 }) {
@@ -722,7 +758,7 @@ export function afterQuickAdd(state: QuickAddState, answer: QuickAddAnswer): Qui
  * says what Enter does. A create that did not land keeps the title and says why — the server's own
  * words, or the top bar's *Read only* pill shaking when the app is locked.
  */
-export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: string; locked: boolean }) {
+export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: Into; locked: boolean }) {
   const [state, setState] = useState<QuickAddState>({ title: "", problem: null });
   const [busy, setBusy] = useState(false);
   const make = async () => {
@@ -736,7 +772,7 @@ export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: s
     setBusy(true);
     setState((had) => ({ ...had, problem: null }));
     const stem = titleStem(t) || "untitled";
-    const made = await createNote(into ? `${into}/${stem}` : stem, taskText(t, status));
+    const made = await createNote(into.folder ? `${into.folder}/${stem}` : stem, taskText(t, status, into.tag));
     setBusy(false);
     setState((had) => afterQuickAdd(had, made));
   };
@@ -801,7 +837,7 @@ function Columns({
   onChange?(row: Row, next: TaskChange): void;
   onCheck?(row: Row, to: TaskStatus): void;
   chip(row: Row): Row["project"];
-  into: string;
+  into: Into;
   locked: boolean;
 }) {
   const board = useRef<HTMLDivElement>(null);
@@ -875,7 +911,7 @@ function Columns({
                     />
                     <span className="dag-tasks__card-title">{r.title}</span>
                   </div>
-                  {r.task.due || r.task.priority || chip(r) ? (
+                  {r.task.due || r.task.priority || chip(r) || r.tags.length ? (
                     <div className="dag-tasks__card-meta">
                       {r.task.priority ? (
                         <span
@@ -886,6 +922,7 @@ function Columns({
                           <PriorityMark priority={r.task.priority} />
                         </span>
                       ) : null}
+                      <TagChips tags={r.tags} />
                       {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
                       <DueLabel task={r.task} />
                     </div>

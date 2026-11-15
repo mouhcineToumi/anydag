@@ -12,6 +12,7 @@ import {
   RECENT_FILES,
   SETTINGS_TAB,
   SIDEBAR_FOLDERS,
+  SIDEBAR_HIDDEN,
   STAMP,
   SYNC,
   TASKS_TAB,
@@ -127,6 +128,9 @@ const EVENTS = new Set([
   "dag:guessed",
   /* A linked vault's sync status changed: the change feed's event, a `SyncStatus`. */
   "dag:vault-sync",
+  /* The vault's tag list changed: the change feed's event, and this tab's own after it creates,
+     recolours or deletes a tag — `onTags`, `onTrash`'s shape. */
+  "dag:tags",
 ]);
 
 describe("the preference list", () => {
@@ -138,6 +142,7 @@ describe("the preference list", () => {
       STAMP,
       SYNC,
       SIDEBAR_FOLDERS,
+      SIDEBAR_HIDDEN,
       TASKS_VIEW,
       TASKS_TAB,
       QUIZ_ABOUT,
@@ -165,6 +170,8 @@ describe("the preference list", () => {
     expect(PREF_KEYS as readonly string[]).not.toContain(STORE);
     /* Which folders are unfolded is this browser's view, like a scroll position. */
     expect(PREF_KEYS as readonly string[]).not.toContain(SIDEBAR_FOLDERS);
+    /* Nor which kinds of file its tree hides — the same view state, for the same reason (#360). */
+    expect(PREF_KEYS as readonly string[]).not.toContain(SIDEBAR_HIDDEN);
     /* Nor is whether the Tasks page is a list or a board. */
     expect(PREF_KEYS as readonly string[]).not.toContain(TASKS_VIEW);
     /* Nor whether a run's About panel is folded away. */

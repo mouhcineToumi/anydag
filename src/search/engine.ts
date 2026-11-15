@@ -108,6 +108,8 @@ export function rank<T extends { doc: { id: string } }>(
   query: string,
   limit: number,
   at: (k: number) => T | undefined,
+  /** Which matches may be answered — a search filtered to a tag's documents — before `limit` counts them. */
+  keep?: (got: T) => boolean,
 ): (T & { score: number; terms: string[] })[] {
   if (!query.trim()) return [];
   const found = mini.search(query, {
@@ -119,7 +121,7 @@ export function rank<T extends { doc: { id: string } }>(
   const out: (T & { score: number; terms: string[] })[] = [];
   for (const r of found) {
     const got = at(r.id as number);
-    if (!got) continue;
+    if (!got || (keep && !keep(got))) continue;
     const n = perDoc.get(got.doc.id) ?? 0;
     if (n >= PER_DOC) continue;
     perDoc.set(got.doc.id, n + 1);

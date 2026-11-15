@@ -19,6 +19,7 @@ import { Worker } from "node:worker_threads";
 
 import { eventOf, type NoteEvent } from "../src/note/event";
 import { projectOf, type Project } from "../src/note/project";
+import { tagsOf } from "../src/note/tags";
 import { indexedTask, type Task } from "../src/note/task";
 import { parseQuiz } from "../src/quiz/parse";
 import { titleOf } from "../src/refs/extract";
@@ -40,6 +41,8 @@ export interface Front {
   task: Task | undefined;
   project: Project | undefined;
   event: NoteEvent | undefined;
+  /** The frontmatter's `tags:`, every kind; `undefined` for none, which is most texts. */
+  tags: string[] | undefined;
   asks: (string | null)[] | undefined;
 }
 
@@ -69,6 +72,7 @@ export function frontOf(kind: TextKind, text: string, stamp: string, changed: nu
       asks = [];
     }
   }
+  const tags = tagsOf(text);
   return {
     stamp,
     id: frontId(text),
@@ -76,6 +80,7 @@ export function frontOf(kind: TextKind, text: string, stamp: string, changed: nu
     task: kind === "note" ? indexedTask(text, changed) : undefined,
     project: kind === "note" ? projectOf(text) : undefined,
     event: kind === "note" ? eventOf(text) : undefined,
+    tags: tags.length ? tags : undefined,
     asks,
   };
 }
