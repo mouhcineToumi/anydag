@@ -17,6 +17,18 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    # Tiptap follows BlockNote, so Dependabot must not move it on its own. `@blocknote/*` was built
+    # against one exact tiptap build — every `@tiptap/*` package peer-depends on the same `@tiptap/core`
+    # and `@tiptap/pm` to the patch — and our three direct pins (`@tiptap/core`, `@tiptap/extension-code`,
+    # `@tiptap/pm`) only import it. A bump of them alone leaves BlockNote's own tiptap packages on the
+    # old build, so npm installs a second copy of the editor's types: the `Mark` that
+    # `createStyleSpecFromTipTapMark` takes is no longer the `Mark` BlockNote hands it, and
+    # `src/blocks/math.tsx`, `src/blocks/syntax.ts` and `src/note/schema.ts` stop typechecking. Bump the
+    # pins by hand with BlockNote, in the same commit, and let npm dedupe the family. A major is not
+    # ignored: it arrives as its own pull request, where a BlockNote major is the thing to decide first.
+    ignore:
+      - dependency-name: "@tiptap/*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
 
   - package-ecosystem: github-actions
     directory: /
