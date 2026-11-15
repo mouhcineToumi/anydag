@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaulted, vaultKey } from "./vault";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
 import { openSidebar } from "./sidebar";
+import { vaultKey } from "./vault";
 
 /**
  * Folders in the sidebar: made, named, filled, emptied, renamed and moved.
@@ -49,7 +49,7 @@ const folderRow = (name: string) => `[data-dag-sidebar-folder="${name}"]`;
 const fileRow = (name: string) => `[data-dag-sidebar-file="${name}"]`;
 
 async function open(page: Page, board = `${parent}/plan`): Promise<void> {
-  await page.goto(await vaulted(page, `/?board=${board}`));
+  await page.goto(`/?board=${board}`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await openSidebar(page);
 }

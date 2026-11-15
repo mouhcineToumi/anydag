@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, type Locator, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, type Locator, test, type Page } from "./fixture";
 
 /**
  * Flashcards (#131): a quiz question whose heading says `card`, its closing quote the back. Made in

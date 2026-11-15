@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaultKey, vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
+import { vaultKey } from "./vault";
 
 /**
  * The sidebar: the files as a tree, the account, and the way to the settings.
@@ -387,7 +387,7 @@ test.describe("on a phone", () => {
   test("the sheet's Home row goes home from a board", async ({ page }) => {
     /* The toolbar hides the mark at this width, and the sheet's head has no logo: the row is the
        only way back to the welcome card once a file is open. */
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await ready(page);
     await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
 
@@ -411,7 +411,7 @@ test.describe("on a phone", () => {
   test("a folder's ⋯ makes a note in that folder", async ({ page }) => {
     /* The folder's `+` is hidden here and a finger has no hover, so this menu item is the way a
        phone fills a folder. */
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await ready(page);
     await page.locator("[data-dag-sidebar-toggle]").tap();
     await expect(page.locator("[data-dag-sidebar][data-sheet]")).toBeVisible();

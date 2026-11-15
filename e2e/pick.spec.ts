@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * F1: picking a thing *inside* a diagram.

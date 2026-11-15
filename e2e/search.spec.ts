@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS, openBoards } from "./boards";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * Search across the text of every board and note.

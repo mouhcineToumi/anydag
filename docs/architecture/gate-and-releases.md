@@ -124,6 +124,13 @@ produces a valid one.** `npm run e2e:local` is the host's own browser and compar
 (`ANYDAG_NO_SNAPSHOTS=1` is set for it): the `neutral` theme is `system-ui`, so its cards are measured
 by whatever fonts the machine has, and a host's layout is not the image's.
 
+**Every spec imports `test` from `e2e/fixture.ts`**, which pins every page it opens to the suite's
+vault. One server serves the whole run, and `vaults.spec.ts` and `sync.spec.ts` move its default as the
+point of their checks; a page that names no vault would pin whichever vault was opened last. A check
+that is *about* the default — a bare `/`, a link to a vault that is not open — passes `onServerDefault`
+beside its title and gets no pin. See *A page that names no vault lands in the server's default* in
+[`things-that-will-bite.md`](things-that-will-bite.md).
+
 **CI is a handful of workflows, and each required check always reports.**
 
 | Workflow | Runs | On |

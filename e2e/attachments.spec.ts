@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 import { unzipSync } from "fflate";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { openSettings, openSidebar } from "./sidebar";
 
 /**

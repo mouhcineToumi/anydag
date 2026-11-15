@@ -1,6 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
-
-import { vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * The exported SVG is the diagram, not a picture of something like it.
@@ -42,7 +40,7 @@ test("an exported item renders the same as the item", { tag: "@smoke" }, async (
   const devServer = (await page.request.get("/src/export/svg.ts")).ok();
   test.skip(!devServer, "imports a TypeScript source path, which only the dev server serves");
 
-  await page.goto(await vaulted(page, `/?board=${encodeURIComponent(BOARD)}`));
+  await page.goto(`/?board=${encodeURIComponent(BOARD)}`);
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await page.evaluate(() => document.fonts.ready);
 
