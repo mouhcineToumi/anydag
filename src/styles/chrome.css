@@ -874,7 +874,7 @@
 .dag-sidebar__section h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); text-overflow: ellipsis; white-space: nowrap; }
 /* What the filter holds back, after the heading's word: *Files · tasks hidden*. Regular weight, so
    the section still reads as one heading at a glance. */
-.dag-sidebar__filtered { font-weight: var(--dag-ui-weight-regular); }
+.dag-sidebar__filtered { min-width: 0; overflow: hidden; font-weight: var(--dag-ui-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
 
 .dag-sidebar__tree {
   /* An open empty folder's *Empty* line, said once: the tree draws only the rows in view
