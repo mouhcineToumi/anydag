@@ -286,6 +286,16 @@ rules it keeps:
 - **CPU and memory are per process** — `/proc/<pid>/stat` and `status` on Linux, the Chromium tree
   walked from the browser's pid, Electron's from `app.getAppMetrics()` — never a whole-machine figure.
 
+**The release table** (`node scripts/bench.mjs --release`) is the one table a release carries (#328):
+ten fixed rows — startup to a drawn board, the page's first search, the server's memory at rest, the
+1,000-file vault's `/list`, `/index` and `/search` cold and warm, and a 500-item board to
+`data-dag-ready` — with the release before it beside each, read from `docs/bench/<version>.json` so
+the comparison works offline and a number that moved is a diff in a pull request. The run names the
+machine it ran on in one line. `--save` writes the current run's file for the next release; the step
+is in [`RELEASING.md`](../RELEASING.md). It is not run in CI, because a runner's numbers are not the
+release machine's, and it is not a guard: nothing is held back. The first release to carry it has no
+earlier file, so its table has no previous numbers.
+
 **The guards.** `--guard` runs two numbers against `scripts/bench-guard.json`, in the nightly's
 `bench` job, in the Playwright image the e2e suite uses (`test/e2e-image.test.ts` holds its pin):
 the server's idle CPU with the change feed open on a 1k-file vault (ceiling 1% of a core; it measures
