@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
-import { lead } from "./keys";
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
 
 /**
  * The component library: click to add, drag to place, a part onto its diagram.

@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { settingsTab, type SettingsTab } from "./sidebar";
-import { vaulted } from "./vault";
 
 /**
  * Settings on a phone (#188), measured at 390 × 844.
@@ -150,7 +149,7 @@ async function open(page: Page): Promise<void> {
   await page.route("**/__board/chat/models*", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(CHAT) }),
   );
-  await page.goto(await vaulted(page, `/?board=${name}`));
+  await page.goto(`/?board=${name}`);
   await page.evaluate(() => localStorage.setItem("dag:library", "0"));
   await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
   await page.evaluate(() => document.fonts.ready);

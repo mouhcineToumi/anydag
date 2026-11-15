@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
-import { openMore } from "./more";
 
-import { lead } from "./keys";
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
+import { openMore } from "./more";
 
 /**
  * Groups, and the shortcuts that make and break them.

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { BOARDS, ROOT } from "./boards";
+import { expect, test, type Page, type Route } from "./fixture";
 import { openSidebar } from "./sidebar";
 
 /**

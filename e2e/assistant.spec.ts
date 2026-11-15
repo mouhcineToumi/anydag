@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type APIRequestContext, type Page } from "./fixture";
 import { openSidebar } from "./sidebar";
 
 /**
@@ -258,7 +258,7 @@ test("a fresh chat writes with no switch to flip", async ({ page }) => {
 /**
  * A second vault for a grant test: made under a temp directory, with the suite's own put back as the
  * server's default at once (`e2e/vaults.spec.ts` is the pattern) — **opening a vault makes it the
- * default**, and the rest of the suite loads pages with no `vault=` and would land wherever that is.
+ * default**, and a page that names no vault lands there, so it is put back for the checks that are.
  */
 let parents: string[] = [];
 const made: string[] = [];

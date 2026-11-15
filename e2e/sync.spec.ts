@@ -4,9 +4,9 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { expect, test } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test } from "./fixture";
 import { openSettings, openSidebar } from "./sidebar";
 
 /**
@@ -22,8 +22,8 @@ import { openSettings, openSidebar } from "./sidebar";
  * both pairing codes made through its admin CLI *before* it starts (PGlite is opened by one process
  * at a time). Everything lives in one temp folder, which is the only thing removed afterwards.
  *
- * The vault is made through the route, opened for the page and the suite's own put back as the
- * default at once (`vaults.spec.ts`'s rule: every other spec loads pages with no `vault=`).
+ * The vault is made through the route and opened for the page; the suite's own is put back as the
+ * default at once, for the checks that are about the default (`vaults.spec.ts` opts in to them).
  */
 
 test.describe.configure({ mode: "serial" });

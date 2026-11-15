@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
+import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
 import { pageMore } from "./more";
 import { newFile, openSettings, openSidebar } from "./sidebar";
-import { BOARDS } from "./boards";
 
 /**
  * M27: the things the board file could always say and the pointer could not reach.

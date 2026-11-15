@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS, openBoards } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
 import { openSidebar } from "./sidebar";
-import { suiteVault, vaulted } from "./vault";
+import { suiteVault } from "./vault";
 
 /**
  * Back and forward through the documents this window visited (#320).
@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }, info) => {
   fs.writeFileSync(path.join(BOARDS, folder, "idea.note.md"), "---\ntitle: Idea\n---\n# Idea\n\nStart.\n");
   /* A listing is one round trip behind a file written with `fs`; a page opened in that window asks
      about a board the server has not heard of yet. Wait for the list, as `home.spec.ts` does. */
-  const vault = await suiteVault(page);
+  const vault = await suiteVault(page.request);
   await expect
     .poll(
       async () => {
@@ -70,7 +70,7 @@ async function menu(page: Page, row: string, more: string, item: string): Promis
 
 /** Open A, dock the sidebar with its folder open, and have B a row away. */
 async function openA(page: Page): Promise<void> {
-  await page.goto(await vaulted(page, `/?board=${name("a")}`));
+  await page.goto(`/?board=${name("a")}`);
   await expect(item(page, "a")).toBeVisible({ timeout: 10_000 });
   await openSidebar(page);
   /* The open file's folders are always opened by `Shell`, so A's row is in the tree. */

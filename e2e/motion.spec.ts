@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * The chrome's motion comes from one place (#206).

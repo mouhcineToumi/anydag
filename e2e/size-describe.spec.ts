@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * Size and describe any card — the controls that stand in for typing `w=`, a third string, a row

@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
 import { exportAs } from "./export";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * Callouts — `> [!kind]`, as GitHub and Obsidian write them — everywhere Markdown is drawn: a note

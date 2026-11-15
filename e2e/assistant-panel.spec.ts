@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * The Assistant panel's left edge: a drag, the arrow keys, and the preference a reload reads.
@@ -27,7 +26,7 @@ const MIN_W = 320;
 const MAX_W = 720;
 
 async function open(page: Page): Promise<void> {
-  await page.goto(await vaulted(page, "/?tasks=1"));
+  await page.goto("/?tasks=1");
   await page.locator("[data-dag-assistant-toggle]").click();
   const panel = panelOf(page);
   await expect(panel).toBeVisible();
@@ -134,7 +133,7 @@ test("an arrow at the grip moves the panel's edge, not a selected card", async (
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, BOARD);
   try {
-    await page.goto(await vaulted(page, `/?board=${stem}/plan`));
+    await page.goto(`/?board=${stem}/plan`);
     const card = page.locator('[data-dag-item="card"]');
     await expect(card).toBeVisible({ timeout: 20_000 });
     await card.click();

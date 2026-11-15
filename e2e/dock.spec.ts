@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BINDINGS } from "../src/edit/bindings";
-import { openMore } from "./more";
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
+import { openMore } from "./more";
 
 /**
  * The dock.

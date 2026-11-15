@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { expectAccessible } from "./axe";
 import { BOARDS, openBoards } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { openSidebar } from "./sidebar";
-import { vaulted } from "./vault";
 
 /**
  * The shell's accessibility gate: home, a board, a note and the search, with the sidebar docked
@@ -56,7 +55,7 @@ async function ready(page: Page): Promise<void> {
 
 test.describe("the shell passes axe", { tag: "@smoke" }, () => {
   test("home", async ({ page }) => {
-    await page.goto(await vaulted(page, "/"));
+    await page.goto("/");
     await expect(page.locator("[data-dag-welcome]")).toBeVisible({ timeout: 20_000 });
     await openSidebar(page);
     await expect(page.locator('[data-dag-sidebar] [role="tree"]')).toBeVisible();
@@ -64,7 +63,7 @@ test.describe("the shell passes axe", { tag: "@smoke" }, () => {
   });
 
   test("a board", async ({ page }) => {
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await ready(page);
     await openSidebar(page);
     await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
@@ -78,7 +77,7 @@ test.describe("the shell passes axe", { tag: "@smoke" }, () => {
   });
 
   test("a note", async ({ page }) => {
-    await page.goto(await vaulted(page, `/?note=${note()}`));
+    await page.goto(`/?note=${note()}`);
     const field = page.locator("[data-dag-note-editor] [contenteditable=true]");
     await expect(field).toBeVisible({ timeout: 20_000 });
     /* The editor is a field with no visible label of its own; its name is the note's title. */
@@ -88,7 +87,7 @@ test.describe("the shell passes axe", { tag: "@smoke" }, () => {
   });
 
   test("search", async ({ page }) => {
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await ready(page);
     await openSidebar(page);
     await openBoards(page);
