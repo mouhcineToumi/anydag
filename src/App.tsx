@@ -772,6 +772,9 @@ function usePageChrome({
           files={list.files}
           folders={list.folders}
           titles={list.titles}
+          tags={list.tags}
+          tasks={list.tasks}
+          events={list.events}
           board={null}
           note={null}
           quiz={quiz}
@@ -1897,6 +1900,9 @@ function NoteApp({
           notes={notes}
           folders={folders}
           titles={list.titles}
+          tags={list.tags}
+          tasks={list.tasks}
+          events={list.events}
           board={null}
           note={name}
           quizzes={list.quizzes}
@@ -2968,6 +2974,9 @@ function BoardApp({
             notes={notes}
             folders={folders}
             titles={list.titles}
+            tags={list.tags}
+            tasks={list.tasks}
+            events={list.events}
             board={boardName}
             quizzes={list.quizzes}
             files={list.files}

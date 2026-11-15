@@ -1907,6 +1907,13 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-board--on { color: var(--dag-color-ink); background: var(--dag-color-paper200); font-weight: var(--dag-ui-weight-strong); }
 /* A file found by name and in its text: the row is its one entry, and this says the second half. */
 .dag-board__also { font-weight: var(--dag-ui-weight-regular); font-style: italic; }
+/* Under a tag and no words, a row says its kind at its end; a tag offered for `#` says its count. */
+.dag-board__what { float: right; margin-left: 12px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+/* The tag chip in the search box (#327): a read-only chip with its ×, before the words. */
+.dag-tag--x { padding-right: 0; }
+.dag-panel__search > svg { flex: none; }
+.dag-board > .dag-tag__dot { display: inline-block; vertical-align: 0; margin-right: 10px; }
+.dag-tag--x .dag-tag__remove.dag-icon { width: var(--dag-ui-control-sm); height: var(--dag-ui-control-sm); }
 
 /* Matches in the text of every board and note, under the names in the search card. Two
    lines a row, because a match is two facts: where it is, and the words around it. The words are

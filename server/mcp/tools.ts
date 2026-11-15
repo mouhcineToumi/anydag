@@ -1306,11 +1306,12 @@ const findTools: Tool[] = [
   tool({
     name: "search",
     description: withNote(
-      "Every place the words appear in the vault's boards, notes and quizzes, ranked — the page's own search. Every word must appear, every word is a prefix, a long word forgives a typo. A hit names its document and the `part` — an item id, a `^anchor` or `L<line>` — and its snippet marks the matched words with `**`.",
+      "Every place the words appear in the vault's boards, notes and quizzes, ranked — the page's own search. Every word must appear, every word is a prefix, a long word forgives a typo. A hit names its document and the `part` — an item id, a `^anchor` or `L<line>` — and its snippet marks the matched words with `**`.\n\n" +
+        "`tag` keeps only the hits in documents carrying that tag, ignoring case; with a `tag` and an empty `q`, the answer's `docs` is every document carrying it, by title.",
     ),
     write: false,
-    input: { q: z.string(), limit: z.number().int().optional(), vault },
-    run: ({ q, limit, vault: v }, kit) => kit.api("GET", "/__board/search", { vault: v, query: { q, limit } }),
+    input: { q: z.string(), limit: z.number().int().optional(), tag: z.string().optional(), vault },
+    run: ({ q, limit, tag, vault: v }, kit) => kit.api("GET", "/__board/search", { vault: v, query: { q, limit, tag } }),
   }),
   tool({
     name: "refs",

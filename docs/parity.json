@@ -151,7 +151,7 @@
     {
       "id": "files.search",
       "area": "Files",
-      "what": "Every place some words appear, ranked",
+      "what": "Every place some words appear, ranked; or one tag's documents",
       "rest": ["GET /__board/search", "GET /__board/corpus"],
       "cli": {"admin": false},
       "mcp": ["search"]

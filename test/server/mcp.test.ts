@@ -334,6 +334,18 @@ describe("filtering by tag over MCP (#327)", () => {
     expect(await events({ tag: "none" })).toEqual(["e"]);
     expect(await events({ tag: "q4" })).toEqual([]);
   });
+
+  it("search takes a `tag`, and with no words lists what carries it", async () => {
+    fs.writeFileSync(path.join(env.root, "a.md"), "---\ntitle: Plan\ntags: [Pricing]\n---\nSeat prices.\n");
+    fs.writeFileSync(path.join(env.root, "b.md"), "---\ntitle: Other\n---\nSeat counts.\n");
+    const c = await connect(true);
+    const both = (await call(c, "search", { q: "seat" })).data.hits.map((h: any) => h.name);
+    expect(both.sort()).toEqual(["a", "b"]);
+    const one = await call(c, "search", { q: "seat", tag: "pricing" });
+    expect(one.data.hits.map((h: any) => h.name)).toEqual(["a"]);
+    const all = await call(c, "search", { q: "", tag: "PRICING" });
+    expect(all.data.docs.map((d: any) => [d.name, d.kind])).toEqual([["a", "note"]]);
+  });
 });
 
 describe("changing tags over MCP (#327)", () => {

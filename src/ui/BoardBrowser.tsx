@@ -16,12 +16,18 @@ import {
 import { itemName } from "@/board/types";
 import type { FileKind } from "@/board/useBoard";
 import { FileIcon } from "@/files/FileIcon";
+import { collation } from "@/locale";
+import { tagKey } from "@/note/tags";
+import { hueVars } from "@/render/hue";
 import { byDocument } from "@/search/results";
 import { useSearch } from "@/search/useSearch";
 import type { Found } from "@/search/wire";
 
+import { IconButton } from "./controls";
 import { Dialog } from "./Dialog";
 import { useSidebar } from "./Shell";
+import { tagMatches } from "./tagFilter";
+import { hueOfTag, useTagList } from "./tags/tagStore";
 import { openTemplates } from "./templates";
 import { flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type Entry, type Tree } from "./tree";
 
@@ -42,6 +48,11 @@ interface Props {
   folders: string[];
   /** What each file is called, by name: a row says this, and the search looks in it too. */
   titles?: Readonly<Record<string, string>>;
+  /** Each document's tags, by name — what a tag chip in the box narrows the list to (#327). */
+  tags?: Readonly<Record<string, readonly string[]>>;
+  /** Which notes are tasks and which are events: what a row under a tag says it is. */
+  tasks?: Readonly<Record<string, unknown>>;
+  events?: Readonly<Record<string, unknown>>;
   board: string | null;
   /** The note that is open, if a note is what is open. */
   note?: string | null;
@@ -98,6 +109,10 @@ const NO_QUIZZES: string[] = [];
 const NO_TABLES: string[] = [];
 const NO_FILES: string[] = [];
 const NO_TITLES: Readonly<Record<string, string>> = {};
+const NO_TAGS: Readonly<Record<string, readonly string[]>> = {};
+
+/** What is typed when a tag is being picked: `#` and the start of its name. */
+const TAG_TYPED = /^#([^\s#]*)$/;
 
 /** What each kind wears before its name, in a row and in a hit. A board wears none in a row, as it never has. */
 const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table: Table2, file: FileGlyph } satisfies Record<
@@ -120,6 +135,9 @@ export function BoardBrowser({
   files = NO_FILES,
   folders,
   titles = NO_TITLES,
+  tags = NO_TAGS,
+  tasks = NO_TAGS,
+  events = NO_TAGS,
   board,
   note = null,
   quiz = null,
@@ -130,6 +148,21 @@ export function BoardBrowser({
   onClose,
 }: Props) {
   const [query, setQuery] = useState("");
+  /* A tag chip in the box (#327): only the documents carrying it, names and text alike. */
+  const [tag, setTag] = useState<string | null>(null);
+  const known = useTagList();
+  /* `#` and the start of a name: the tags to pick from, and no search until one is picked. */
+  const picking = TAG_TYPED.exec(query);
+  const pickingWhat = picking ? (picking[1] ?? "") : null;
+  const offered = useMemo(() => {
+    if (pickingWhat === null) return [];
+    const typed = tagKey(pickingWhat);
+    return (known ?? [])
+      .filter((t) => t.count > 0 && tagKey(t.name).includes(typed) && (!tag || tagKey(t.name) !== tagKey(tag)))
+      .sort((a, b) => Number(!tagKey(a.name).startsWith(typed)) - Number(!tagKey(b.name).startsWith(typed)))
+      .slice(0, 8);
+  }, [pickingWhat, known, tag]);
+  const words = picking ? "" : query;
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   /* The sidebar's own create path, for a miss: one way a file begins. `null` only where the whole
@@ -165,8 +198,8 @@ export function BoardBrowser({
     listRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "center" });
   }, []);
 
-  /* The whole tree, before the search narrows it. */
-  const entries = useMemo<Entry[]>(
+  /* The whole tree, before the search narrows it — and before a tag does: an attachment carries none. */
+  const every = useMemo<Entry[]>(
     () => [
       ...boards.map((name) => ({ kind: "board" as const, name, title: titles[name] })),
       ...notes.map((name) => ({ kind: "note" as const, name, title: titles[name] })),
@@ -176,11 +209,16 @@ export function BoardBrowser({
     ],
     [boards, notes, quizzes, tables, files, titles],
   );
-  const all = useMemo(() => tree(entries, folders), [entries, folders]);
+  const entries = useMemo(
+    () => (tag ? every.filter((e) => e.kind !== "file" && tagMatches({ kind: "tag", name: tag }, tags[e.name])) : every),
+    [every, tag, tags],
+  );
+  /* Under a tag the folders are only those its documents are in: an empty one carries nothing. */
+  const all = useMemo(() => tree(entries, tag ? [] : folders), [entries, tag, folders]);
 
   /* What the search left. An empty query keeps everything, including the folders with nothing in
      them — otherwise a folder somebody has just made is unreachable the moment anything is typed. */
-  const terms = useMemo(() => tokens(query), [query]);
+  const terms = useMemo(() => tokens(words), [words]);
   const root = useMemo(
     () => (terms.length === 0 ? all : (prune(all, terms) ?? { ...all, folders: [], files: [] })),
     [all, terms],
@@ -196,7 +234,7 @@ export function BoardBrowser({
    * list. The server matches (`/__board/search`) and the page draws what it sends, so the page never
    * holds the vault's text; a query goes out when typing pauses and a newer one cancels it.
    */
-  const { hits, settled } = useSearch(query);
+  const { hits, settled } = useSearch(words, tag);
 
   /*
    * A file that matched by name is already a row; listing its blocks under the words would say the
@@ -214,7 +252,26 @@ export function BoardBrowser({
   /* A miss is no name, no text and no folder: there is nothing to show, so there is something to
      make. Not while the answer is still on its way — a hit may be a moment away, and "nothing
      matches" must not become a button somebody presses before the answer lands. */
-  const miss = terms.length > 0 && settled && shown.length === 0 && root.folders.length === 0 && hits.length === 0;
+  const miss = !tag && terms.length > 0 && settled && shown.length === 0 && root.folders.length === 0 && hits.length === 0;
+  /* A tag and no words: every document carrying it, one list by title, each saying its kind. */
+  const tagged = useMemo(
+    () =>
+      tag && terms.length === 0
+        ? [...entries].sort((a, b) => collation({ numeric: true }).compare(labelOf(a), labelOf(b)))
+        : null,
+    [tag, terms.length, entries],
+  );
+
+  /** A tag picked from what `#` offered: it is the chip, and the box is the words again. */
+  const pickTag = (name: string) => {
+    setTag(name);
+    setQuery("");
+    searchRef.current?.focus();
+  };
+  const dropTag = () => {
+    setTag(null);
+    searchRef.current?.focus();
+  };
 
   /**
    * Opening a board is what this is for, so it is also what closes it.
@@ -256,7 +313,7 @@ export function BoardBrowser({
   const step = useCallback((from: EventTarget | null, dir: 1 | -1) => {
     const rows = Array.from(
       listRef.current?.querySelectorAll<HTMLButtonElement>(
-        "[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit],[data-dag-hits-new-board],[data-dag-hits-new-note]",
+        "[data-dag-search-tag-option],[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit],[data-dag-hits-new-board],[data-dag-hits-new-note]",
       ) ?? [],
     );
     if (rows.length === 0) return;
@@ -269,6 +326,13 @@ export function BoardBrowser({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       step(null, 1);
+    } else if (e.key === "Backspace" && tag && e.currentTarget.selectionStart === 0 && e.currentTarget.selectionEnd === 0) {
+      /* At the start of the box, the chip before it is the next thing to take back. */
+      e.preventDefault();
+      dropTag();
+    } else if (e.key === "Enter" && picking) {
+      e.preventDefault();
+      if (offered[0]) pickTag(offered[0].name);
     } else if (e.key === "Enter") {
       /* Type enough to leave one board standing and press Enter — the search is the picker. With
          no name left standing, the best match in the text is the first row, so it is what opens;
@@ -305,6 +369,8 @@ export function BoardBrowser({
     e.stopPropagation();
     if (query) {
       setQuery("");
+    } else if (tag) {
+      setTag(null);
     } else {
       onClose();
     }
@@ -375,12 +441,31 @@ export function BoardBrowser({
     <Dialog scrim={{ "data-dag-boards": "" }} onClose={onClose} className="dag-browser" aria-label="Boards" onKeyDown={onEscape}>
       <div className="dag-panel__search">
         <Search {...ICON} aria-hidden="true" />
+        {tag ? (
+          <span className="dag-tag dag-tag--x" data-dag-search-tag={tag}>
+            <span className="dag-tag__dot" style={hueVars(hueOfTag(known, tag))} aria-hidden="true" />
+            <span className="dag-tag__name">{tag}</span>
+            <IconButton
+              size="sm"
+              className="dag-tag__remove"
+              data-dag-search-tag-remove=""
+              aria-label={`Remove the tag ${tag}`}
+              onClick={dropTag}
+            >
+              <X size={14} strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          </span>
+        ) : null}
         <input
           ref={searchRef}
           type="text"
           className="dag-panel__input"
           placeholder={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
-          aria-label={searchLabel(notes.length, quizzes.length, tables.length, files.length)}
+          aria-label={
+            tag
+              ? `${searchLabel(notes.length, quizzes.length, tables.length, files.length)} tagged ${tag}`
+              : searchLabel(notes.length, quizzes.length, tables.length, files.length)
+          }
           spellCheck={false}
           autoComplete="off"
           value={query}
@@ -393,11 +478,12 @@ export function BoardBrowser({
         <button
           className="dag-panel__clear"
           data-dag-boards-close=""
-          aria-label={query ? "Clear search" : "Close"}
-          title={query ? "Clear (Escape)" : "Close (Escape)"}
+          aria-label={query || tag ? "Clear search" : "Close"}
+          title={query || tag ? "Clear (Escape)" : "Close (Escape)"}
           onClick={() => {
-            if (!query) return onClose();
-            setQuery("");
+            if (!query && !tag) return onClose();
+            if (query) setQuery("");
+            else setTag(null);
             searchRef.current?.focus();
           }}
         >
@@ -406,11 +492,51 @@ export function BoardBrowser({
       </div>
 
       <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey}>
-        {entries.length === 0 && terms.length === 0 ? (
-          <p className="dag-panel__empty">nothing here yet: the sidebar makes a board or a note</p>
+        {picking ? (
+          <section className="dag-hits" aria-label="Tags" data-dag-search-tags="">
+            <h2 className="dag-hits__head">Tags</h2>
+            {offered.map((t) => (
+              <button
+                key={t.name}
+                type="button"
+                className="dag-board"
+                data-dag-search-tag-option={t.name}
+                onClick={() => pickTag(t.name)}
+              >
+                <span className="dag-tag__dot dag-board__kind" style={hueVars(t.hue)} aria-hidden="true" />
+                {t.name}
+                <span className="dag-board__what">{t.count === 1 ? "1 document" : `${t.count} documents`}</span>
+              </button>
+            ))}
+            {offered.length === 0 ? (
+              <p className="dag-panel__empty" data-dag-search-tags-empty="">
+                {known === null ? "reading the tags…" : `no tag matches “${query.slice(1)}”`}
+              </p>
+            ) : null}
+          </section>
         ) : null}
 
-        {terms.length === 0 || shown.length > 0 || root.folders.length > 0 ? renderFolder(root) : null}
+        {!picking && entries.length === 0 && terms.length === 0 ? (
+          <p className="dag-panel__empty">
+            {tag ? `nothing is tagged ${tag}` : "nothing here yet: the sidebar makes a board or a note"}
+          </p>
+        ) : null}
+
+        {picking
+          ? null
+          : tagged
+            ? tagged.map((e) => (
+                <div key={keyOf(e)} className="dag-board-row">
+                  <button {...{ [`data-dag-${e.kind}`]: e.name }} className="dag-board" onClick={() => open(e)}>
+                    <KindMark kind={e.kind} name={e.name} className="dag-board__kind" />
+                    {labelOf(e)}
+                    <span className="dag-board__what">{tasks[e.name] ? "task" : events[e.name] ? "event" : e.kind}</span>
+                  </button>
+                </div>
+              ))
+            : terms.length === 0 || shown.length > 0 || root.folders.length > 0
+              ? renderFolder(root)
+              : null}
 
         {terms.length > 0 && (split.hits.length > 0 || hits.length === 0) ? (
           <section className="dag-hits" aria-label={split.hits.length > 0 ? "In the text" : undefined} data-dag-hits="">
@@ -478,10 +604,12 @@ export function BoardBrowser({
         ) : null}
       </div>
 
-      <p className="dag-panel__count">
-        {shown.length === entries.length
-          ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
-          : `${shown.length} of ${entries.length}`}
+      <p className="dag-panel__count" data-dag-boards-count="">
+        {tagged
+          ? `${tagged.length} ${tagged.length === 1 ? "document" : "documents"}`
+          : shown.length === every.length
+            ? countOf(boards.length, notes.length, quizzes.length, tables.length, files.length)
+            : `${shown.length} of ${every.length}`}
         {terms.length > 0 ? ` · ${hits.length} in the text` : null}
       </p>
     </Dialog>
