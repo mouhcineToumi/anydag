@@ -145,6 +145,20 @@ export function withTask(text: string, change: TaskChange): string {
 }
 
 /**
+ * Where the key on `lines[at]` ends: the line after its last. A key's lines are its own, the lines
+ * indented under it (a folded title, an indented list), and — when the key's line holds no value —
+ * the `- ` lines at column 0 after it, which is a block list as Obsidian writes one (`tags:\n- a`).
+ * Taking only the indented lines left such a list behind as YAML no reader parses (*Things that will
+ * bite*).
+ */
+export function keyEnd(lines: readonly string[], at: number): number {
+  const bare = /^[^:]*:\s*(#.*)?$/.test(lines[at]!);
+  let end = at + 1;
+  while (end < lines.length && (/^[ \t]/.test(lines[end]!) || (bare && /^-(\s|$)/.test(lines[end]!)))) end++;
+  return end;
+}
+
+/**
  * `text` with the frontmatter lines `keys` names set as `change` asks — `withTask`'s rule for any
  * set of keys, and the one place it is written. A project's `project:` and `hue:` are the second
  * caller, and both fixtures hold it.
@@ -161,8 +175,7 @@ export function withKeys(text: string, change: object, keys: readonly string[]):
     /* An object rather than a record, so an interface — `TaskChange`, `ProjectChange` — is one. */
     const value = (change as Record<string, string | null | undefined>)[key];
     const at = lines.findIndex((raw) => new RegExp(`^${key}\\s*:`).test(raw));
-    let end = at + 1;
-    if (at >= 0) while (end < lines.length && /^[ \t]/.test(lines[end]!)) end++;
+    const end = at >= 0 ? keyEnd(lines, at) : at + 1;
     if (value === null || value === undefined) {
       if (at >= 0) {
         lines.splice(at, end - at);
