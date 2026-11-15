@@ -4186,10 +4186,14 @@ export function useEditor({
          itself rather than on a control — so without this an arrow or a Delete pressed there moved
          or deleted what is selected on the board behind it. Its Escape and `ctrl+,` are its own.
          Every dialog in the app's frame (`ui/Dialog.tsx`) and every toast (`ui/Toast.tsx`) is the
-         same rule: a key aimed at one of their controls must not reach the board. */
+         same rule: a key aimed at one of their controls must not reach the board. The Assistant
+         panel's grip is here for its arrows: it is focusable and a separator, so it is not
+         `typing()`, and Left/Right must move the panel's edge rather than a selected item. */
       if (
         e.target instanceof Element &&
-        e.target.closest("[data-dag-settings],[data-dag-dialog],[data-dag-toast],[data-dag-telemetry-ask],[data-dag-feedback]")
+        e.target.closest(
+          "[data-dag-settings],[data-dag-dialog],[data-dag-toast],[data-dag-telemetry-ask],[data-dag-feedback],[data-dag-assistant-grip]",
+        )
       )
         return;
       if (typing(e.target)) {

@@ -3351,8 +3351,10 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
   z-index: var(--dag-ui-layer-popover);
 }
 /* While anything is being dragged — an item, a component — the cursor says so everywhere and no
-   text on the board lights up under the pointer's path. */
+   text on the board lights up under the pointer's path. A grip's own drag is the exception: it says
+   `ew-resize`, and it sets the second attribute for exactly as long as it runs. */
 html[data-dag-dragging], html[data-dag-dragging] * { cursor: grabbing !important; user-select: none; }
+html[data-dag-dragging][data-dag-assistant-sizing], html[data-dag-dragging][data-dag-assistant-sizing] * { cursor: ew-resize !important; }
 .dag-item[data-dag-drop] { outline: 2px dashed var(--dag-color-accent); outline-offset: 6px; content-visibility: visible; }
 
 /*
@@ -7863,8 +7865,45 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-scope__line .dag-button { height: 24px; padding: 0 8px; font-size: var(--dag-ui-text-sm); }
 .dag-chat-scope__title { margin: 4px 0 0; padding: 6px 6px 2px; font-size: var(--dag-ui-text-xs); font-weight: var(--dag-ui-weight-strong); letter-spacing: 0.04em; text-transform: uppercase; color: var(--dag-color-slate); border-top: 1px solid var(--dag-color-outline); }
 
-/* The panel: a column of the window, beside whatever page is open. */
-.dag-assistant-panel { flex: none; width: 380px; max-width: 50vw; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--dag-color-outline); background: var(--dag-color-paper); color: var(--dag-color-ink); }
+/*
+ * The panel: a column of the window, beside whatever page is open. `--assistant-w` is what its grip
+ * paints for the length of a drag and what the preference settles into — named with no `--dag-`
+ * prefix for the reason `--inspector-w` has none: that prefix means "a theme said so", and
+ * `check-theme.mjs` reads it literally. `max-width` is the window's half, so a width chosen on a
+ * wide screen cannot crowd out the page on a narrow one; `src/assistant/width.ts` keeps the range.
+ */
+.dag-assistant-panel { position: relative; flex: none; width: var(--assistant-w, 380px); max-width: 50vw; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--dag-color-outline); background: var(--dag-color-paper); color: var(--dag-color-ink); }
+/*
+ * The left edge, dragged to resize the panel. It is 24px wide — #209's floor for a target — and
+ * drawn as a hairline on the border it moves, the sidebar grip's shape: a panel edge is where a
+ * person already aims, and taking a 24px column of the layout would move the panel itself instead.
+ */
+.dag-assistant-panel__grip {
+  position: absolute;
+  left: -12px;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.dag-assistant-panel__grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 2px;
+  background: transparent;
+}
+.dag-assistant-panel__grip:hover::after,
+.dag-assistant-panel__grip:active::after,
+.dag-assistant-panel__grip:focus-visible::after,
+html[data-dag-assistant-sizing] .dag-assistant-panel__grip::after { background: var(--dag-color-accent); }
+/* A separator is a control without a face: the accent line is its ring, and the browser's own
+   outline would draw a second, square one around the whole invisible strip. */
+.dag-assistant-panel__grip:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 .dag-assistant-panel__head { flex: none; display: flex; align-items: center; gap: 4px; min-height: 48px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--dag-color-outline); }
 .dag-assistant-panel__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dag-ui-text-md); }
 .dag-assistant-panel .dag-chat__scroll { padding: 16px 12px 8px; }
@@ -7879,7 +7918,9 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 @media (max-width: 719px) {
   .dag-assistant { grid-template-columns: minmax(0, 1fr); }
   .dag-assistant__history { display: none; }
+  /* The panel is the window here, so there is no column edge to pull; the grip is not drawn. */
   .dag-assistant-panel { position: fixed; inset: 0; z-index: var(--dag-ui-layer-modal); width: auto; max-width: none; border-left: none; }
+  .dag-assistant-panel__grip { display: none; }
   .dag-chat-composer { margin-inline: 12px; }
 }
 
