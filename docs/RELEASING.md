@@ -55,7 +55,7 @@ Pull requests into `develop` must have a Conventional Commit title and close an 
    git fetch origin && git push origin origin/develop:refs/heads/release/0.2.0
    ```
 3. **Stabilise.** Fixes are pull requests *into `release/0.2.0`*, and `develop` goes on. A fix made on
-   the release branch is back in `develop` through step 8.
+   the release branch is back in `develop` through step 9.
 4. **Betas, if you want them.** On the release branch (through a pull request into it if the branch is
    protected):
    ```sh
@@ -69,10 +69,26 @@ Pull requests into `develop` must have a Conventional Commit title and close an 
    Anyone on the `beta` channel is offered it. Another beta is the same with `beta.2`.
    **Before the final release, put the version back:** `node scripts/set-version.mjs 0.2.0` and commit
    it on the branch, or the pull request into `main` would carry a beta's version.
-5. **Open the pull request** `release/0.2.0` → `main`, titled `chore(release): 0.2.0`, with the
+5. **Measure the release.** On `release/0.2.0`, with the final version set and the tree clean, build
+   what the bench measures and run it on the release machine:
+   ```sh
+   npm run desktop:build
+   node scripts/bench.mjs --release --quick      # a few minutes; without --quick it is the whole bench
+   ```
+   It prints one Markdown table of ten fixed rows — startup to a drawn board, the page's first
+   search, the server's memory at rest, the 1k-file vault's routes and a 500-item board — with the
+   previous release's numbers from `docs/bench/<version>.json` beside them. Run it on the machine
+   the numbers should describe (it needs a display for the startup row), with the app quit and
+   nothing else heavy running. It is **not** run in CI: a runner's numbers are not the release
+   machine's. `--save` also writes `docs/bench/0.2.0.json`; commit it on the release branch, so it
+   reaches `main` with this pull request, because it is what the next release compares against. A row
+   the machine cannot measure says `n/a`, and `--save` refuses a file that has one. The first release
+   to carry the table has no file before it; its table has no previous numbers, and its own run is
+   the baseline.
+6. **Open the pull request** `release/0.2.0` → `main`, titled `chore(release): 0.2.0`, with the
    required checks green — the desktop app was built on all three systems for it. **Merge it with a
    merge commit** (never squash: `main` keeps the release branch's history).
-6. **Tag the merge commit** on `main`:
+7. **Tag the merge commit** on `main`:
    ```sh
    git fetch origin
    git tag -a v0.2.0 -m "AnyDag 0.2.0" origin/main
@@ -82,10 +98,12 @@ Pull requests into `develop` must have a Conventional Commit title and close an 
    everything, signs where it has the secrets, and publishes the *latest* release with the installers
    and `latest.yml`, `latest-linux.yml`, `latest-mac.yml` — and nothing at all unless all of them are
    there. Stable builds are offered it within the day.
-7. **The notes** are generated from the merged pull requests by their labels
+8. **The notes** are generated from the merged pull requests by their labels
    (`.github/release.yml`: `type: feature`, `type: bug`, `type: docs`, `type: chore`, `dependencies`;
-   `skip-changelog` leaves one out). Read them on the release page and edit.
-8. **Back-merge into `develop`, and bump it — in one pull request:**
+   `skip-changelog` leaves one out). Read them on the release page and edit, and paste the bench table
+   from step 5 at the foot — it carries its own `### Bench` heading: one table, the same rows every
+   release, with no commentary.
+9. **Back-merge into `develop`, and bump it — in one pull request:**
    ```sh
    git fetch origin
    git switch -c chore/back-merge-0.2.0 origin/main
@@ -110,7 +128,7 @@ git commit -am "chore(release): 0.2.1"
 git push -u origin hotfix/0.2.1
 ```
 
-Then it is a stable release from step 5: a pull request `hotfix/0.2.1` → `main` (merge commit, titled
+Then it is a stable release from step 6: a pull request `hotfix/0.2.1` → `main` (merge commit, titled
 `chore(release): 0.2.1`), the tag `v0.2.1` on the merge commit, and the back-merge into `develop`.
 A beta of a hotfix is tagged `v0.2.1-beta.1` on the hotfix branch like any other.
 
