@@ -80,6 +80,7 @@ import type { ProjectMembers } from "@/ui/ProjectBar";
 import { nameWhenOpened } from "@/ui/NoteTitle";
 import type { TasksLayout } from "@/ui/Tasks";
 import { NO_PROJECT, type ProjectFilter } from "@/ui/projectFilter";
+import { tagFilterOf, tagParam, type TagFilter } from "@/ui/tagFilter";
 import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
 import { rememberOpened } from "@/ui/recents";
 import { CALENDAR_VIEW, LIBRARY, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
@@ -387,6 +388,7 @@ function pageQuery(kind: FileKind, target: string | null): Record<string, string
     file: null,
     tasks: null,
     project: null,
+    tag: null,
     quizzes: null,
     run: null,
     page: null,
@@ -843,6 +845,9 @@ function TasksApp({
       setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
     [setQuery, list.ids],
   );
+  /* `tag=` is the tag's name: a tag has no id, and a rename rewrites every document anyway. */
+  const tagFilter = useMemo(() => tagFilterOf(query.get("tag")), [query]);
+  const chooseTag = useCallback((next: TagFilter) => setQuery("tag", tagParam(next)), [setQuery]);
 
   return (
     <div className="dag-app dag-app--tasks" data-snapshot={snapshot ? "1" : undefined}>
@@ -857,6 +862,8 @@ function TasksApp({
         onOpen={(name) => open("note", name)}
         scope={scope}
         onScope={chooseScope}
+        tagFilter={tagFilter}
+        onTagFilter={chooseTag}
         locked={locked}
       />
       {cards}
@@ -995,6 +1002,9 @@ function CalendarApp({
       setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
     [setQuery, list.ids],
   );
+  /* `tag=` is the tag's name: a tag has no id, and a rename rewrites every document anyway. */
+  const tagFilter = useMemo(() => tagFilterOf(query.get("tag")), [query]);
+  const chooseTag = useCallback((next: TagFilter) => setQuery("tag", tagParam(next)), [setQuery]);
 
   return (
     <div className="dag-app dag-app--calendar" data-snapshot={snapshot ? "1" : undefined}>
@@ -1009,6 +1019,8 @@ function CalendarApp({
         onHidden={onHidden}
         scope={scope}
         onScope={chooseScope}
+        tagFilter={tagFilter}
+        onTagFilter={chooseTag}
         onGo={onGo}
         onOpen={(name) => open("note", name)}
         onDuplicate={(name) => sidebar?.duplicate("note", name)}

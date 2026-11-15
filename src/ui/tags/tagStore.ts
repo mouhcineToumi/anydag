@@ -85,7 +85,12 @@ function subscribe(listen: () => void): () => void {
 
 /** The vault's tags, `null` until the first answer — kept in step with the feed. */
 export function useTagList(): TagInfo[] | null {
-  return useSyncExternalStore(subscribe, () => list);
+  /* Drawn ahead of time (a test's static render), there is no list yet. */
+  return useSyncExternalStore(
+    subscribe,
+    () => list,
+    () => null,
+  );
 }
 
 /** The tag `name` names, in `tags`, ignoring case. */

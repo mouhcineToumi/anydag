@@ -315,6 +315,27 @@ describe("tags (#327)", () => {
   });
 });
 
+describe("filtering by tag over MCP (#327)", () => {
+  it("task_list and event_list take a `tag`, any case, or `none`", async () => {
+    fs.writeFileSync(path.join(env.root, "a.md"), "---\nstatus: todo\ntags: [Pricing, q4]\n---\n");
+    fs.writeFileSync(path.join(env.root, "b.md"), "---\nstatus: done\ntags: [q4]\n---\n");
+    fs.writeFileSync(path.join(env.root, "c.md"), "---\nstatus: todo\n---\n");
+    fs.writeFileSync(path.join(env.root, "d.md"), "---\nstart: 2026-10-03\ntags: [pricing]\n---\n");
+    fs.writeFileSync(path.join(env.root, "e.md"), "---\nstart: 2026-10-04\n---\n");
+    const c = await connect(true);
+    const tasks = async (args: Record<string, unknown>) => (await call(c, "task_list", args)).data.tasks.map((t: any) => t.name);
+    expect(await tasks({ tag: "pricing" })).toEqual(["a"]);
+    expect((await tasks({ tag: "Q4" })).sort()).toEqual(["a", "b"]);
+    expect(await tasks({ tag: "none" })).toEqual(["c"]);
+    expect(await tasks({ tag: "q4", status: "done" })).toEqual(["b"]);
+    const events = async (args: Record<string, unknown>) =>
+      (await call(c, "event_list", args)).data.events.map((e: any) => e.name);
+    expect(await events({ tag: "PRICING" })).toEqual(["d"]);
+    expect(await events({ tag: "none" })).toEqual(["e"]);
+    expect(await events({ tag: "q4" })).toEqual([]);
+  });
+});
+
 describe("changing tags over MCP (#327)", () => {
   it("tag_apply creates a tag the vault has never seen, registered as the app registers one", async () => {
     fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [meeting]\n---\nbody\n");

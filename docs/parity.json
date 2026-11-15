@@ -327,7 +327,7 @@
     {
       "id": "task.list",
       "area": "Tasks",
-      "what": "Every task, with its status, due date and project",
+      "what": "Every task, with its status, due date, project and tags; one project, status or tag",
       "rest": ["GET /__board/list"],
       "cli": {"admin": false},
       "mcp": ["task_list"]
@@ -351,7 +351,7 @@
     {
       "id": "event.list",
       "area": "Events",
-      "what": "Every event, with when it starts and ends, soonest first",
+      "what": "Every event, with when it starts and ends, soonest first; one project or tag",
       "rest": ["GET /__board/list"],
       "cli": {"admin": false},
       "mcp": ["event_list"]

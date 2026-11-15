@@ -19,7 +19,7 @@ import { HUE_ORDER, type Hue } from "../../src/dsl/ir";
 import { eventOf, isDay } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectFolders, projectFor, withProject, type Project } from "../../src/note/project";
-import { tagsOf } from "../../src/note/tags";
+import { tagKey, tagsOf } from "../../src/note/tags";
 import { STATUSES, dueOf, titleStem, withTask } from "../../src/note/task";
 import { withEvent } from "../../src/note/event";
 import { FetchRefused, fetchFile, type Fetched } from "../fetch";
@@ -316,6 +316,11 @@ async function tagNew(kit: Kit, name: string, kind: string, tags: string[] | und
 }
 
 /** The `tags` a create tool takes. */
+/** `tag` on a listing: one tag, any case, or `none` for the documents carrying none. */
+const tagInput = z.string().optional().describe("Only what carries this tag, ignoring case — or `none` for what carries no tag.");
+const tagged = (tag: string | undefined, tags: readonly string[] | undefined): boolean =>
+  tag === undefined || (tag === "none" ? !tags?.length : !!tags?.some((t) => tagKey(t) === tagKey(tag)));
+
 const tagsInput = z
   .array(z.string())
   .optional()
@@ -938,11 +943,11 @@ const taskTools: Tool[] = [
     name: "task_list",
     description: withNote(
       "Every task — a note whose frontmatter has a `status:` — with its title, status, due date, start date and the project it is in, in the Tasks page's order: in progress, to do, done, each by due date then title. A task with a start and a due date spans the days between on the calendar.\n\n" +
-        "`project` narrows to one project, named by its folder or its note, subfolders included — or `none` for the tasks in no project. `status` narrows to one status.",
+        "`project` narrows to one project, named by its folder or its note, subfolders included — or `none` for the tasks in no project. `status` narrows to one status. `tag` narrows to the tasks carrying one tag, ignoring case — or `none` for those carrying none.",
     ),
     write: false,
-    input: { project: z.string().optional(), status: z.enum(STATUSES).optional(), vault },
-    run: async ({ project, status, vault: v }, kit) => {
+    input: { project: z.string().optional(), status: z.enum(STATUSES).optional(), tag: tagInput, vault },
+    run: async ({ project, status, tag, vault: v }, kit) => {
       const got = await kit.api("GET", "/__board/list", { vault: v });
       const folders = projectFolders(got.projects);
       const want = project ? projectArg(project, got) : null;
@@ -952,6 +957,7 @@ const taskTools: Tool[] = [
         if (want?.only && !name.startsWith(`${want.only}/`)) continue;
         if (want?.none && home !== null) continue;
         if (status && task.status !== status) continue;
+        if (!tagged(tag, got.tags?.[name])) continue;
         tasks.push({
           name,
           title: got.titles[name] ?? null,
@@ -1031,11 +1037,17 @@ const eventTools: Tool[] = [
     name: "event_list",
     description: withNote(
       "Every event — a note whose frontmatter has a `start:` and no `status:` — soonest first, with its title, `start`, `end`, whether it is `all_day`, and the project it is in.\n\n" +
-        "A date is all day, and an all-day `end` is the last day, inclusive; a time carries its offset, and a timed `end` is the moment it stops. `time_zone` is the one a time with no offset is written in. `since` and `until` (`YYYY-MM-DD`, both inclusive) keep the events that touch those days, reading a time's day as it is written. `project` narrows to one project, by its folder or its note, or `none` for no project. The description is the note's body: read it with `note_read`.",
+        "A date is all day, and an all-day `end` is the last day, inclusive; a time carries its offset, and a timed `end` is the moment it stops. `time_zone` is the one a time with no offset is written in. `since` and `until` (`YYYY-MM-DD`, both inclusive) keep the events that touch those days, reading a time's day as it is written. `project` narrows to one project, by its folder or its note, or `none` for no project. `tag` narrows to the events carrying one tag, ignoring case, or `none` for those carrying none. The description is the note's body: read it with `note_read`.",
     ),
     write: false,
-    input: { since: z.string().optional(), until: z.string().optional(), project: z.string().optional(), vault },
-    run: async ({ since, until, project, vault: v }, kit) => {
+    input: {
+      since: z.string().optional(),
+      until: z.string().optional(),
+      project: z.string().optional(),
+      tag: tagInput,
+      vault,
+    },
+    run: async ({ since, until, project, tag, vault: v }, kit) => {
       for (const day of [since, until])
         if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
       const got = await kit.api("GET", "/__board/list", { vault: v });
@@ -1046,6 +1058,7 @@ const eventTools: Tool[] = [
         const home = projectFor(name, folders) ?? null;
         if (want?.only && !name.startsWith(`${want.only}/`)) continue;
         if (want?.none && home !== null) continue;
+        if (!tagged(tag, got.tags?.[name])) continue;
         const [first, last] = eventDays(event);
         if ((since && last < since) || (until && first > until)) continue;
         events.push({
