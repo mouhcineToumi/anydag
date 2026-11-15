@@ -107,7 +107,8 @@ export interface NoteEditor {
    * a table or a code block has no other way to reach. A click below the text and the arrow down at
    * its end both come here. An empty paragraph already at the end is used rather than a second one,
    * so clicking twice is still one line. **Nothing is written until something is typed in it**:
-   * `src/note/markdown.ts` writes no bytes for an empty paragraph.
+   * `src/note/markdown.ts` writes no bytes for an empty paragraph at either end of the note — only
+   * one between two blocks, as `&nbsp;` (#318).
    */
   afterLast(): void;
   /**
@@ -144,7 +145,7 @@ export interface BlockEditorProps {
 
 type Editor = ReturnType<typeof useNoteEditor>;
 
-/** A paragraph nothing has been typed into. Markdown has no empty paragraph, so it writes nothing. */
+/** A paragraph nothing has been typed into. At either end of the note it writes nothing; between two blocks, `&nbsp;`. */
 const blank = (b: { type: string; content?: unknown } | undefined): boolean =>
   b?.type === "paragraph" && Array.isArray(b.content) && b.content.length === 0;
 

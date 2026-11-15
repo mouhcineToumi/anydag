@@ -269,6 +269,7 @@ function nodeBlocks(n: RootContent | BlockContent, ctx: Ctx): NoteBlock[] {
     case "heading":
       return [{ type: "heading", props: { level: n.depth }, content: inline(n.children, ctx) }];
     case "paragraph": {
+      if (src(ctx, n).trim() === BLANK) return [{ type: "paragraph", content: [] }];
       const kids = n.children.filter((c) => !(c.type === "text" && !c.value.trim()));
       if (kids.length === 1 && kids[0].type === "image" && isDag(kids[0].url)) {
         return [{ type: "embed", props: { href: kids[0].url, title: kids[0].alt ?? "" } }];
@@ -447,7 +448,7 @@ function piecesOf(content: Inline[], table: boolean): Piece[] {
   const out: Piece[] = [];
   for (const c of content) {
     if (c.type === "math") {
-      /* An equation with no TeX is one somebody emptied: it writes nothing, as an empty paragraph does. */
+      /* An equation with no TeX is one somebody emptied: it writes nothing. */
       const tex = inlineTex(c.props.tex);
       if (tex) out.push({ kind: "math", tex: table ? tex.replace(/\n/g, " ") : tex, display: !!c.props.display, styles: {} });
     } else if (c.type === "ref" && parseWikiUrl(c.props.href)) {
@@ -627,6 +628,37 @@ function tableMd(b: NoteBlock): Table | null {
   };
 }
 
+/**
+ * An empty line somebody made between two blocks, as the file says it: a paragraph holding nothing
+ * but `&nbsp;`. Markdown has no empty paragraph — any number of blank lines is one break — so an
+ * Enter pressed twice between two paragraphs wrote nothing, and was gone the next time the note
+ * opened (#318). A no-break space is the form every Markdown renderer draws as an empty line, and a
+ * paragraph whose source is exactly this entity is read back as an empty paragraph. Blank lines are
+ * never counted: a file another tool wrote with three of them between two paragraphs opens as
+ * those two paragraphs, as it draws everywhere else, and keeps its bytes. `notes.md` has the
+ * alternatives this was chosen over.
+ */
+const BLANK = "&nbsp;";
+
+/** A paragraph with nothing in it and nothing under it: an empty line in the editor. */
+const blank = (b: NoteBlock): boolean => b.type === "paragraph" && !b.children?.length && !inlineMd(b.content).length;
+
+/**
+ * The blocks without the empty lines at either end, which are the editor's and never the file's:
+ * the paragraph a click below the last block leaves (#317), the one Enter in the title opens above
+ * the first, the one an empty note opens as. Only an empty line between two blocks is written.
+ */
+function inner(blocks: NoteBlock[], leading = true): NoteBlock[] {
+  let i = 0;
+  let j = blocks.length;
+  if (leading) while (i < j && blank(blocks[i])) i++;
+  while (j > i && blank(blocks[j - 1])) j--;
+  return i === 0 && j === blocks.length ? blocks : blocks.slice(i, j);
+}
+
+/* Nested blocks come after their parent's own text, so only the empty lines at their end are an edge. */
+const nested = (b: NoteBlock): NoteBlock[] => inner(b.children ?? [], false);
+
 function toMdast(blocks: NoteBlock[]): RootContent[] {
   const out: RootContent[] = [];
   for (let i = 0; i < blocks.length; i++) {
@@ -643,7 +675,7 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
           checked: it.type === "checkListItem" ? !!it.props?.checked : null,
           children: [
             ...(para.length ? [{ type: "paragraph" as const, children: para }] : []),
-            ...(toMdast(it.children ?? []) as BlockContent[]),
+            ...(toMdast(nested(it)) as BlockContent[]),
           ],
         });
       }
@@ -664,7 +696,7 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
           type: "blockquote",
           children: [
             ...(para.length ? [{ type: "paragraph" as const, children: para }] : []),
-            ...(toMdast(b.children ?? []) as BlockContent[]),
+            ...(toMdast(nested(b)) as BlockContent[]),
           ],
         });
         continue; /* its children are inside it, not after it */
@@ -708,14 +740,15 @@ function toMdast(blocks: NoteBlock[]): RootContent[] {
         break;
       }
       default: {
-        /* A paragraph, and anything the schema should never have held, as its words. Markdown has
-           no empty paragraph, so a blank line somebody left between two blocks writes nothing. */
+        /* A paragraph, and anything the schema should never have held, as its words — and an empty
+           paragraph as `&nbsp;`, the one form of an empty line Markdown keeps (`BLANK`). */
         const para = inlineMd(b.content);
         if (para.length) out.push({ type: "paragraph", children: para });
+        else if (blank(b)) out.push({ type: "paragraph", children: [{ type: "html", value: BLANK }] });
       }
     }
     /* Markdown cannot nest a block under a paragraph or a heading; BlockNote can. Un-nested, in order. */
-    if (b.children?.length) out.push(...toMdast(b.children));
+    if (b.children?.length) out.push(...toMdast(nested(b)));
   }
   return out;
 }
@@ -742,7 +775,7 @@ function calloutMd(b: NoteBlock): RootContent {
   const para = inlineMd(b.content);
   const kids: BlockContent[] = [
     ...(para.length ? [{ type: "paragraph" as const, children: para }] : []),
-    ...(toMdast(b.children ?? []) as BlockContent[]),
+    ...(toMdast(nested(b)) as BlockContent[]),
   ];
   let value = head;
   if (kids.length) {
@@ -766,8 +799,13 @@ function stringify(children: RootContent[]): string {
   return out.replace(/\n+$/, "");
 }
 
-/** The blocks in the house form, with no trailing newline. */
+/** The blocks in the house form, with no trailing newline — and none of the editor's empty lines at either end. */
 export function blocksToMd(blocks: NoteBlock[]): string {
+  return groupMd(inner(blocks));
+}
+
+/** Some of a document's blocks in the house form, as they stand: an empty paragraph among them is an empty line. */
+function groupMd(blocks: NoteBlock[]): string {
   return stringify(toMdast(blocks));
 }
 
@@ -902,7 +940,7 @@ export function settle(loaded: Loaded, doc: NoteBlock[]): Loaded {
     units: loaded.units.map((u) => {
       const blocks = u.ids.map((id) => byId.get(id));
       if (!blocks.every(Boolean)) return { ...u, canon: undefined, json: undefined };
-      return { ...u, canon: blocksToMd(blocks as NoteBlock[]), json: JSON.stringify(blocks) };
+      return { ...u, canon: groupMd(blocks as NoteBlock[]), json: JSON.stringify(blocks) };
     }),
   };
 }
@@ -951,6 +989,19 @@ function groups(doc: NoteBlock[], loaded: Loaded): Group[] {
 }
 
 /**
+ * The groups without the editor's empty lines at either end (`inner`). An empty line the file
+ * already held is a unit and stays, so a note that ends in `&nbsp;` keeps it.
+ */
+function edges(gs: Group[]): Group[] {
+  const edge = (g: Group | undefined) => !!g && g.unit === undefined && g.blocks.every(blank);
+  let i = 0;
+  let j = gs.length;
+  while (i < j && edge(gs[i])) i++;
+  while (j > i && edge(gs[j - 1])) j--;
+  return gs.slice(i, j);
+}
+
+/**
  * The body for these blocks: the loaded bytes wherever a group is untouched, the house form
  * wherever it is not. With nothing touched this is the body that was loaded, byte for byte — which
  * `test/note-markdown.test.ts` holds over every Markdown body in the repository.
@@ -970,7 +1021,7 @@ export function save(loaded: Loaded, doc: NoteBlock[]): string {
  */
 export function saved(loaded: Loaded, doc: NoteBlock[]): { body: string; loaded: Loaded } {
   const parts: { text: string; canon: string; json: string; ids: string[]; unit?: number }[] = [];
-  for (const g of groups(doc, loaded)) {
+  for (const g of edges(groups(doc, loaded))) {
     const json = JSON.stringify(g.blocks);
     const ids = g.blocks.map((b) => b.id ?? "");
     const unit = g.unit === undefined ? undefined : loaded.units[g.unit];
@@ -979,7 +1030,7 @@ export function saved(loaded: Loaded, doc: NoteBlock[]): { body: string; loaded:
       parts.push({ text: unit.source, canon: unit.canon, json, ids, unit: g.unit });
       continue;
     }
-    const canon = blocksToMd(g.blocks);
+    const canon = groupMd(g.blocks);
     if (unit && unit.canon !== undefined && unit.canon === canon) {
       parts.push({ text: unit.source, canon, json, ids, unit: g.unit });
     } else if (canon) {
@@ -1035,7 +1086,7 @@ export function plan(loaded: Loaded, doc: NoteBlock[], body: string): { steps: S
       .filter((g) => {
         if (g.unit === undefined) return false;
         const u = loaded.units[g.unit];
-        return (u.json !== undefined && u.json === JSON.stringify(g.blocks)) || blocksToMd(g.blocks) === u.canon;
+        return (u.json !== undefined && u.json === JSON.stringify(g.blocks)) || groupMd(g.blocks) === u.canon;
       })
       .map((g) => g.unit as number),
   );
