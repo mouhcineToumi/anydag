@@ -439,6 +439,93 @@ test("a priority is set from the row's mark, from its menu's keys and from the t
   await expect.poll(() => read("pri")).toBe('---\ntitle: "Fix the leak"\n---\nWhat it is about.\n');
 });
 
+test("the list's Order, Display and Filter, the keys, and the bar that changes every selected task", async ({ page }) => {
+  /* The display is a preference that follows the person: kept in this page, so another test's list
+     running beside this one is not regrouped under it. */
+  await page.route("**/api/settings", (route) =>
+    route.request().method() === "PUT" ? route.fulfill({ status: 200, body: "{}" }) : route.continue(),
+  );
+  const a = write("a", "Alpha", ["status: todo", "priority: low", `due: ${day(3)}`]);
+  const b = write("b", "Bravo", ["status: todo", "priority: urgent"]);
+  const c = write("c", "Charlie", ["status: todo", `due: ${day(1)}`]);
+  await tasksPage(page, a);
+  const order = () =>
+    page
+      .locator('[data-dag-tasks-group="todo"] [data-dag-task-row]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-dag-task-row")));
+
+  /* Grouped by status and ordered by due date, soonest first, until somebody says otherwise. */
+  await expect.poll(order).toEqual([c, a, b]);
+  await page.locator("[data-dag-tasks-order-button]").click();
+  await page.locator('[data-dag-tasks-order="priority"]').click();
+  await expect.poll(order).toEqual([b, a, c]);
+  await page.locator('[data-dag-tasks-order-dir="last"]').click();
+  await expect.poll(order).toEqual([a, b, c]);
+  await page.locator('[data-dag-tasks-order="title"]').click();
+  await expect.poll(order).toEqual([a, b, c]);
+  await page.keyboard.press("Escape");
+
+  /* Display: grouped by priority, and a column switched off. */
+  await page.locator("[data-dag-tasks-display-button]").click();
+  await page.locator('[data-dag-tasks-group-by="priority"]').click();
+  await page.locator('[data-dag-tasks-column-toggle="changed"]').click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(`[data-dag-tasks-group="urgent"] [data-dag-task-row="${b}"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-tasks-group="none"] [data-dag-task-row="${c}"]`)).toBeVisible();
+  await expect(page.locator("[data-dag-tasks]")).toHaveAttribute("data-hide-changed", "");
+  await page.locator("[data-dag-tasks-display-button]").click();
+  await page.locator('[data-dag-tasks-group-by="status"]').click();
+  await page.locator('[data-dag-tasks-column-toggle="changed"]').click();
+  await page.keyboard.press("Escape");
+
+  /* Filter: a field, a value with its count, a chip that clears it. */
+  await page.locator("[data-dag-tasks-filter-button]").click();
+  await page.locator('[data-dag-tasks-filter-field="priority"]').click();
+  await page.locator('[data-dag-tasks-filter-value="priority:urgent"]').click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-dag-tasks-chip="priority"]')).toContainText("Urgent");
+  await expect(page.locator(`[data-dag-task-row="${a}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-dag-task-row="${b}"]`)).toBeVisible();
+  await page.locator('[data-dag-tasks-chip-clear="priority"]').click();
+  await expect(page.locator(`[data-dag-task-row="${a}"]`)).toBeVisible();
+
+  /* The keys: X selects, J walks, and the bar's priority menu changes every selected task. */
+  await page.locator(`[data-dag-task-open="${a}"]`).focus();
+  await page.keyboard.press("x");
+  await page.keyboard.press("j");
+  await page.keyboard.press("x");
+  await expect(page.locator(`[data-dag-task-row="${a}"]`)).toHaveAttribute("data-selected", "");
+  await expect(page.locator(`[data-dag-task-row="${b}"]`)).toHaveAttribute("data-selected", "");
+  await expect(page.locator("[data-dag-tasks-bulk-count]")).toHaveAttribute("data-dag-tasks-bulk-count", "2");
+  await page.locator('[data-dag-tasks-bulk-action="priority"]').click();
+  await page.keyboard.press("3");
+  await expect.poll(() => read("a")).toContain("\npriority: medium\n");
+  await expect.poll(() => read("b")).toContain("\npriority: medium\n");
+  await page.locator("[data-dag-tasks-bulk-clear]").click();
+  await expect(page.locator("[data-dag-tasks-bulk]")).toHaveCount(0);
+
+  /* S then a number sets the status of the row with the focus; Ctrl+Enter checks it off; D its date. */
+  await page.locator(`[data-dag-task-open="${c}"]`).focus();
+  await page.keyboard.press("s");
+  await page.keyboard.press("2");
+  await expect.poll(() => read("c")).toContain("\nstatus: in-progress\n");
+  await page.locator(`[data-dag-task-open="${c}"]`).focus();
+  await page.keyboard.press("d");
+  await page.locator('[data-dag-task-menu-due="today"]').click();
+  await expect.poll(() => read("c")).toContain(`\ndue: ${day(0)}\n`);
+  await page.locator(`[data-dag-task-open="${c}"]`).focus();
+  await page.keyboard.press("Control+Enter");
+  await expect.poll(() => read("c")).toContain("\nstatus: done\n");
+
+  /* Ctrl-click selects without opening; Move to trash takes the file, and Undo brings it back. */
+  await page.locator(`[data-dag-task-open="${a}"]`).click({ modifiers: ["Control"] });
+  await expect(page).toHaveURL(/tasks=1/);
+  await page.locator('[data-dag-tasks-bulk-action="trash"]').click();
+  await expect.poll(() => fs.existsSync(noteFile("a"))).toBe(false);
+  await page.locator("[data-dag-tasks-notice-undo]").click();
+  await expect.poll(() => fs.existsSync(noteFile("a"))).toBe(true);
+});
+
 test("the read-only view draws a task's status and date and nothing to change them with", async ({ page }) => {
   const name = write("seen", "Review the draft", ["status: in-progress", `due: ${day(0)}`]);
   await page.goto(`/?view=1&note=${name}`);

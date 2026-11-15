@@ -1,5 +1,6 @@
 import {
   ChevronDown,
+  CircleAlert,
   CircleCheck,
   Circle,
   FileText,
@@ -9,6 +10,7 @@ import {
   Plus,
   Search,
   SquareKanban,
+  Trash2,
 } from "lucide-react";
 import {
   useCallback,
@@ -22,10 +24,10 @@ import {
   type ReactNode,
 } from "react";
 
-import { createNote, setTask, type BoardTree } from "@/board/useBoard";
+import { createNote, deleteBoard, moveBoard, setTask, type BoardTree, type TrashEntry } from "@/board/useBoard";
 import type { Spot } from "@/calendar/menu";
 import { collation } from "@/locale";
-import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
+import { folderOf, projectFolders, projectFor, type Project } from "@/note/project";
 import {
   compareTasks,
   overdue,
@@ -33,20 +35,53 @@ import {
   STATUS_LABEL,
   STATUSES,
   titleStem,
+  today,
+  toggledStatus,
+  type Priority,
   type Task,
   type TaskChange,
   type TaskStatus,
 } from "@/note/task";
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
+import { TASKS_DISPLAY, writePref } from "@/settings/prefs";
+import { usePref } from "@/settings/usePref";
 
 import { Button, IconButton } from "./controls";
 import { startDrag } from "./pointerDrag";
-import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
+import type { ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
-import { priorityRows, statusRows } from "./taskMenus";
+import { dueRows, priorityRows, projectRows, showDatePicker, statusRows } from "./taskMenus";
+import {
+  BulkBar,
+  displayRows,
+  filterFieldRows,
+  filterValueRows,
+  FilterChip,
+  LineButton,
+  orderRows,
+  filterValue,
+} from "./TasksBar";
 import { DueLabel, PriorityMark, StatusButton, TaskGlyph } from "./TaskGlyph";
-import { compareRecent, countLine, onTab, rememberOrder, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
-import { TasksMenu, under } from "./TasksMenu";
+import { countLine, onTab, rememberOrder, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
+import { restoreFromTrash } from "./trashApi";
+import {
+  compareRows,
+  displayOf,
+  displayText,
+  FILTER_LABEL,
+  filtersInUse,
+  groupRows,
+  NO_FILTERS,
+  passes,
+  toggleFilter,
+  valueCounts,
+  type FilterField,
+  type RowGroup,
+  type TaskDisplay,
+  type TaskFilters,
+  type ViewRow,
+} from "./taskView";
+import { TasksMenu, under, type MenuRow } from "./TasksMenu";
 import { blankDraft, NewTaskDialog, NewTaskRow, type NewTaskDraft } from "./NewTask";
 import { Toast, ToastName, ToastWords } from "./Toast";
 
@@ -65,12 +100,6 @@ import { Toast, ToastName, ToastWords } from "./Toast";
  */
 
 export type TasksLayout = "list" | "board";
-
-/**
- * The list reads what is being worked on first; the board's columns run left to right the way work
- * moves. The same three statuses in two orders, each the one its layout is read in.
- */
-const LIST_ORDER: readonly TaskStatus[] = ["in-progress", "todo", "done"];
 
 /** How long a row that was just checked stays where it was, and its toast with it. */
 const SETTLE_MS = 5000;
@@ -186,6 +215,31 @@ interface Settling {
   to: TaskStatus;
 }
 
+/** What a menu on the page is for: one property of some tasks, the filter, or how the list is drawn. */
+type MenuFor =
+  | { of: "status" | "priority" | "due" | "project"; rows: Row[]; at: Spot }
+  | { of: "filter"; at: Spot }
+  | { of: "filter-values"; field: FilterField; at: Spot }
+  | { of: "order" | "display"; at: Spot };
+
+/** A message at the foot of the window: what a change to several tasks did, and its Undo. */
+interface Notice {
+  text: string;
+  undo?: () => void;
+}
+
+/** The project filter a URL's `project=` asks for, and the URL a project filter is. */
+const projectsOf = (scope: ProjectFilter): string[] =>
+  scope.kind === "project" ? [scope.name] : scope.kind === "none" ? [""] : [];
+const scopeOf = (projects: readonly string[]): ProjectFilter =>
+  projects.length !== 1 ? { kind: "all" } : projects[0] ? { kind: "project", name: projects[0] } : { kind: "none" };
+const sameScope = (a: ProjectFilter, b: ProjectFilter) =>
+  a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
+
+/** A row as the order, the groups and the filter read it: where it is placed, not where it is going. */
+type Placed = ViewRow & { row: Row };
+const placed = (r: Row): Placed => ({ name: r.name, title: r.title, project: r.project, task: r.place, row: r });
+
 export function TasksView({
   list,
   layout,
@@ -215,16 +269,40 @@ export function TasksView({
 }) {
   /* What this page has asked for and the list does not say yet, by name. */
   const [pending, setPending] = useState<Record<string, Task>>({});
-  const [filter, setFilter] = useState("");
+  const [words_, setWords] = useState("");
+  const [filters, setFilters] = useState<TaskFilters>(() => ({ ...NO_FILTERS, project: projectsOf(scope) }));
   const [settling, setSettling] = useState<Settling | null>(null);
-  /* A row's menu: its statuses, or its four priorities. */
-  const [menu, setMenu] = useState<{ row: Row; at: Spot; of: "status" | "priority" } | null>(null);
+  const [menu, setMenu] = useState<MenuFor | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  /* The selected tasks, by name, and the one a Shift-click runs from. */
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const anchor = useRef<string | null>(null);
+  /* Which groups are folded against their default: Done starts shut, the rest open. */
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
   /* The task the New task row is making, and the one just made, tinted where it landed. */
   const [draft, setDraft] = useState<NewTaskDraft>(() => blankDraft(scope.kind === "project" ? scope.name : null));
   const [fresh, setFresh] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
-  /* A project filter is where a new task goes, until the person picks another. */
-  const scopedProject = scope.kind === "project" ? scope.name : null;
+  /* *Pick a date…* for several tasks: the browser's own picker, and the tasks it is for. */
+  const picker = useRef<HTMLInputElement>(null);
+  const [picking, setPicking] = useState<Row[]>([]);
+  const display = displayOf(usePref(TASKS_DISPLAY));
+  const setDisplay = useCallback((next: TaskDisplay) => writePref(TASKS_DISPLAY, displayText(next)), []);
+
+  /* A link to one project's tasks is a project filter; a filter on one project is a link to it. */
+  useEffect(() => {
+    setFilters((f) => (scope.kind === "all" || sameScope(scopeOf(f.project), scope) ? f : { ...f, project: projectsOf(scope) }));
+  }, [scope]);
+  const changeFilters = useCallback(
+    (next: TaskFilters) => {
+      setFilters(next);
+      const s = scopeOf(next.project);
+      if (!sameScope(s, scope)) onScope?.(s);
+    },
+    [scope, onScope],
+  );
+  /* A project filter on one project is where a new task goes, until the person picks another. */
+  const scopedProject = filters.project.length === 1 && filters.project[0] ? filters.project[0] : null;
   useEffect(() => setDraft((d) => ({ ...d, project: scopedProject })), [scopedProject]);
   useEffect(() => {
     if (!fresh) return;
@@ -239,7 +317,7 @@ export function TasksView({
     });
   }, [list.tasks]);
 
-  /* Which folders are projects, and what each is called — the filter's options and the rows' chips. */
+  /* Which folders are projects, and what each is called — the filter's values and the rows' chips. */
   const owners = useMemo(() => projectFolders(list.projects), [list.projects]);
   const projects = useMemo(
     () =>
@@ -253,20 +331,13 @@ export function TasksView({
         ),
     [owners, list.projects, list.titles],
   );
-  /* The folder the page is scoped to: `undefined` for every task, `null` for the tasks in no project. */
-  const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
-  const inScope = useCallback(
-    (name: string) =>
-      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
-    [scoped, owners],
-  );
 
-  const words = useMemo(() => filter.trim().toLowerCase().split(/\s+/).filter(Boolean), [filter]);
-  /* Every task in the scope, before the tab and the words: what the count line counts from. */
-  const scopedRows = useMemo(() => {
+  const words = useMemo(() => words_.trim().toLowerCase().split(/\s+/).filter(Boolean), [words_]);
+  /* Every task, before the tab, the filter and the words: what the counts count from. */
+  const allRows = useMemo(() => {
     const listed = new Set(list.notes);
     return Object.entries({ ...list.tasks, ...pending })
-      .filter(([name]) => listed.has(name) && inScope(name))
+      .filter(([name]) => listed.has(name))
       .map(([name, mine]): Row => {
         /* A pending write knows the status the page asked for; the list knows the rest. */
         const task: Task = { ...list.tasks[name], ...mine };
@@ -278,21 +349,52 @@ export function TasksView({
         const place = settling?.name === name ? settling.was : task;
         return { name, task, place, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project };
       });
-  }, [list.notes, list.tasks, list.titles, list.projects, owners, inScope, pending, settling]);
+  }, [list.notes, list.tasks, list.titles, list.projects, owners, pending, settling]);
   const matches = useCallback(
     (r: Row) => words.every((w) => `${r.title} ${r.folder} ${r.project?.title ?? ""}`.toLowerCase().includes(w)),
     [words],
   );
   /* The board shows every status; the list, the tab's. A row just checked keeps the tab it was on. */
   const tabbed = useMemo(
-    () => (layout === "board" ? scopedRows : scopedRows.filter((r) => onTab(r.place.status, tab))),
-    [scopedRows, layout, tab],
+    () => (layout === "board" ? allRows : allRows.filter((r) => onTab(r.place.status, tab))),
+    [allRows, layout, tab],
   );
+  const now = today();
   const rows = useMemo(
-    () =>
-      tabbed.filter(matches).sort((a, b) => compareTasks({ task: a.place, title: a.title }, { task: b.place, title: b.title })),
-    [tabbed, matches],
+    () => tabbed.filter((r) => matches(r) && passes(filters, placed(r), now)),
+    [tabbed, matches, filters, now],
   );
+  const inUse = filtersInUse(filters);
+  const filtered = words.length > 0 || inUse.length > 0;
+
+  /* The list's order and its headings: the Done tab keeps its own order, most recently finished first. */
+  const order = tab === "done" ? display.done : display.order;
+  const then = tab === "done" ? display.doneTie : display.tie;
+  const groups = useMemo(() => {
+    const all = groupRows(rows.map(placed), display.group, compareRows(order, then), now);
+    const onIt = display.group === "status" ? all.filter((g) => onTab(g.key as TaskStatus, tab)) : all;
+    /* An empty group is where its `+` is, so it stays — unless the filter on the same field leaves it out. */
+    const field = display.group === "status" || display.group === "priority" ? display.group : null;
+    const kept = field ? (filters[field] as string[]) : [];
+    return kept.length ? onIt.filter((g) => kept.includes(g.key)) : onIt;
+  }, [rows, display.group, order, then, now, tab, filters]);
+  /* One group with nothing to tell it from another — no grouping, or the Done tab by status — has no heading. */
+  const flat = display.group === "none" || (display.group === "status" && tab === "done");
+  const groupId = (key: string) => `${display.group}:${key}`;
+  const isOpen = (key: string) => (display.group === "status" && key === "done" && !flat) === flipped.has(groupId(key));
+  /* The rows the keys walk: the open groups', in the order they are drawn. */
+  const walk = useMemo(
+    () => groups.filter((g) => flat || isOpen(g.key)).flatMap((g) => g.rows.map((p) => p.row.name)),
+    [groups, flat, flipped, display.group],
+  );
+  const byName = useMemo(() => new Map(allRows.map((r) => [r.name, r])), [allRows]);
+  /* A task that left the list leaves the selection. */
+  useEffect(() => {
+    setSelected((had) => {
+      const left = [...had].filter((n) => rows.some((r) => r.name === n));
+      return left.length === had.size ? had : new Set(left);
+    });
+  }, [rows]);
 
   const change = useCallback(async (row: Row, next: TaskChange) => {
     /* Built rather than spread: a `due: null` in the change is a task with no date, and an object
@@ -338,40 +440,90 @@ export function TasksView({
   );
   const undo = useCallback(() => {
     if (!settling) return;
-    const row = scopedRows.find((r) => r.name === settling.name);
+    const row = allRows.find((r) => r.name === settling.name);
     setSettling(null);
     if (row) onChange(row, { status: settling.was.status });
-  }, [settling, scopedRows, onChange]);
+  }, [settling, allRows, onChange]);
 
+  /* One change to several tasks: a write each, and a word at the foot for the ones refused. */
+  const changeAll = useCallback(
+    async (targets: Row[], next: TaskChange) => {
+      if (targets.length === 1) return void change(targets[0]!, next);
+      const got = await Promise.all(targets.map((r) => change(r, next)));
+      const refused = got.filter((g) => !g).length;
+      if (refused) setNotice({ text: `${refused} of ${targets.length} tasks could not be changed. Try again.` });
+    },
+    [change],
+  );
+  /* A project is a folder, so putting tasks in one moves their files there. */
+  const moveAll = useCallback(async (targets: Row[], project: string | null) => {
+    const folder = project ? folderOf(project) : "";
+    const moving = targets.filter((r) => (r.project?.name ?? null) !== project);
+    const got = await Promise.all(moving.map((r) => moveBoard(r.name, folder, "note")));
+    const refused = got.filter((g) => !g).length;
+    if (refused)
+      setNotice({
+        text:
+          refused === 1 && moving.length === 1
+            ? "The task could not be moved: a file with its name is already there."
+            : `${refused} of ${moving.length} tasks could not be moved: a file with the same name is already there.`,
+      });
+  }, []);
+  const trashAll = useCallback(async (targets: Row[]) => {
+    const got = await Promise.all(targets.map((r) => deleteBoard(r.name, "note")));
+    const gone = got.filter((g): g is TrashEntry => !!g);
+    setSelected(new Set());
+    setNotice({
+      text:
+        gone.length === targets.length
+          ? `Moved ${gone.length === 1 ? "1 task" : `${gone.length} tasks`} to the trash`
+          : `Moved ${gone.length} of ${targets.length} tasks to the trash; the rest were refused`,
+      undo: gone.length ? () => void Promise.all(gone.map((e) => restoreFromTrash(e.id))) : undefined,
+    });
+  }, []);
+
+  /* What a key or the bar acts on: the selection, or else the row that has the focus. */
+  const targetsFor = useCallback(
+    (at: string | null): Row[] =>
+      selected.size
+        ? [...selected].map((n) => byName.get(n)).filter((r): r is Row => !!r)
+        : at && byName.get(at)
+          ? [byName.get(at)!]
+          : [],
+    [selected, byName],
+  );
   const openMenu = useCallback(
     (row: Row, at: Spot, of: "status" | "priority" = "status") => {
-      if (!locked) setMenu({ row, at, of });
+      if (!locked) setMenu({ of, rows: [row], at });
     },
     [locked],
   );
+  const menuFor = (of: "status" | "priority" | "due" | "project", targets: Row[], el: Element | null) => {
+    if (locked) return void refuseLocked();
+    if (targets.length && el) setMenu({ of, rows: targets, at: under(el) });
+  };
 
   const counted = useMemo(() => {
-    const listed = scopedRows.filter((r) => onTab(r.task.status, tab));
-    const shown = listed.filter(matches);
-    return { all: listed.length, shown: shown.length, late: shown.filter((r) => overdue(r.task)).length };
-  }, [scopedRows, tab, matches]);
+    const shown = rows;
+    return { all: tabbed.length, shown: shown.length, late: shown.filter((r) => overdue(r.task)).length };
+  }, [rows, tabbed]);
   const total = Object.keys(list.tasks).length;
-  const by = (status: TaskStatus) => rows.filter((r) => r.place.status === status);
+  const by = (status: TaskStatus) =>
+    rows
+      .filter((r) => r.place.status === status)
+      .sort((a, b) => compareTasks({ task: a.place, title: a.title }, { task: b.place, title: b.title }));
   /* The order the rows are drawn in, which a task's page steps through ("2 of 13"). */
   useEffect(() => {
     const drawn =
       layout === "board"
-        ? STATUSES.flatMap((s) => rows.filter((r) => r.place.status === s))
-        : tab === "done"
-          ? [...rows].sort(compareRecent)
-          : LIST_ORDER.filter((s) => onTab(s, tab)).flatMap((s) => rows.filter((r) => r.place.status === s));
-    rememberOrder(drawn.map((r) => r.name));
-  }, [rows, layout, tab]);
+        ? STATUSES.flatMap((s) => by(s).map((r) => r.name))
+        : groups.flatMap((g) => g.rows.map((p) => p.row.name));
+    rememberOrder(drawn);
+  }, [rows, groups, layout]);
   /* A task typed in while one project is showing is made in that project's folder. */
-  const into = scoped ?? "";
+  const into = scopedProject ? folderOf(scopedProject) : "";
   /* A row names its project, unless the page is already showing only that project's. */
-  const chip = (r: Row) => (r.project && !(scope.kind === "project" && scope.name === r.project.name) ? r.project : undefined);
-  const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
+  const chip = (r: Row) => (r.project && scopedProject !== r.project.name ? r.project : undefined);
   const live = locked ? undefined : onCheck;
 
   const onMade = useCallback(
@@ -384,8 +536,8 @@ export function TasksView({
   /* The New task row is the list's, on the tabs a new task lands on. */
   const newRow = layout === "list" && tab !== "done";
   /* A group's `+`: the New task row, with that group's value already chosen. */
-  const addTo = useCallback((status: TaskStatus) => {
-    setDraft((d) => ({ ...d, status }));
+  const addTo = useCallback((preset: Partial<NewTaskDraft>) => {
+    setDraft((d) => ({ ...d, ...preset }));
     requestAnimationFrame(() => field.current?.focus());
   }, []);
   const ask = useCallback(() => {
@@ -393,41 +545,260 @@ export function TasksView({
     onAsk?.(true);
   }, [locked, onAsk]);
 
-  /* `N` puts the caret in the New task row, `C` opens the dialog: bare keys, as the list's other
-     keys are, and never one typed into a field, aimed at a menu or a dialog, or after the leader. */
+  const focusRow = (name: string | undefined) => {
+    if (name) document.querySelector<HTMLElement>(`[data-dag-task-open="${CSS.escape(name)}"]`)?.focus();
+  };
+  /* Escape: the selection first, then the filter and the words. */
+  const letGo = useCallback((): boolean => {
+    if (selected.size) {
+      setSelected(new Set());
+      return true;
+    }
+    if (filtered) {
+      setWords("");
+      changeFilters(NO_FILTERS);
+      return true;
+    }
+    return false;
+  }, [selected, filtered, changeFilters]);
+  /* Ctrl/Cmd-click adds a row to the selection or takes it out; Shift-click selects the run from the last one. */
+  const pick = useCallback(
+    (name: string, range: boolean) => {
+      if (locked) return;
+      setSelected((had) => {
+        const next = new Set(had);
+        const from = anchor.current ? walk.indexOf(anchor.current) : -1;
+        const to = walk.indexOf(name);
+        if (range && from >= 0 && to >= 0) {
+          for (const n of walk.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(n);
+        } else if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+      if (!range) anchor.current = name;
+    },
+    [locked, walk],
+  );
+
+  /*
+   * The list's keys, while one of its rows holds the focus: J/K or the arrows walk it (with Shift,
+   * selecting as they go), X selects, Ctrl+Enter checks, S, P, D and M open the row's status,
+   * priority, date and project menus — whose own keys (`1`–`3`, `1`–`4` and `0`) pick — and Escape
+   * lets go of the selection, then of the filter. Enter is the title's own: it opens. Space is the
+   * leader's, and nothing here hears it or the key after it.
+   */
+  const leader = useRef(false);
+  const onListKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented || e.altKey || e.metaKey || isTyping(e.target)) return;
+    if (e.key === " ") {
+      leader.current = !leader.current;
+      return;
+    }
+    const was = leader.current;
+    leader.current = false;
+    if (was) return;
+    const at = (e.target as Element).closest?.("[data-dag-task-row]")?.getAttribute("data-dag-task-row") ?? null;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const step = key === "ArrowDown" || key === "j" ? 1 : key === "ArrowUp" || key === "k" ? -1 : 0;
+    if (step && !e.ctrlKey) {
+      e.preventDefault();
+      const i = at ? walk.indexOf(at) : -1;
+      const next = walk[i < 0 ? (step > 0 ? 0 : walk.length - 1) : Math.max(0, Math.min(walk.length - 1, i + step))];
+      if (e.shiftKey && next && !locked)
+        setSelected((had) => {
+          const out = new Set(had);
+          if (at) out.add(at);
+          out.add(next);
+          return out;
+        });
+      if (!e.shiftKey) anchor.current = next ?? null;
+      focusRow(next);
+      return;
+    }
+    if (key === "Enter" && e.ctrlKey) {
+      e.preventDefault();
+      if (locked) return void refuseLocked();
+      const targets = targetsFor(at);
+      if (targets.length === 1) onCheck(targets[0]!, toggledStatus(targets[0]!.task.status));
+      else if (targets.length)
+        void changeAll(targets, { status: targets.every((r) => r.task.status === "done") ? "todo" : "done" });
+      return;
+    }
+    if (e.ctrlKey || e.shiftKey || e.repeat) return;
+    if (key === "Escape") {
+      if (letGo()) e.preventDefault();
+      return;
+    }
+    const row = at ? document.querySelector(`[data-dag-task-row="${CSS.escape(at)}"]`) : null;
+    const of = ({ s: "status", p: "priority", d: "due", m: "project" } as const)[key as "s" | "p" | "d" | "m"];
+    if (of) {
+      e.preventDefault();
+      menuFor(
+        of,
+        targetsFor(at),
+        row?.querySelector(of === "priority" ? "[data-dag-task-priority]" : "[data-dag-task-open]") ?? row,
+      );
+    } else if (key === "x" && at) {
+      e.preventDefault();
+      pick(at, false);
+    }
+  };
+
+  /* `N` puts the caret in the New task row, `C` opens the dialog, and J or K from nowhere in
+     particular goes to the first row: bare keys, never one typed into a field, aimed at a menu
+     or a dialog, or after the leader. */
   useEffect(() => {
-    let leader = false;
+    let leaderOn = false;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.defaultPrevented || isTyping(e.target) || (e.target as Element | null)?.closest?.("[role=menu], [data-dag-dialog]")) {
-        leader = false;
+        leaderOn = false;
         return;
       }
       if (e.key === " ") {
-        leader = !leader;
+        leaderOn = !leaderOn;
         return;
       }
-      const was = leader;
-      leader = false;
+      const was = leaderOn;
+      leaderOn = false;
       if (was || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       const key = e.key.toLowerCase();
+      const loose = e.target === document.body || e.target === document.documentElement;
       if (key === "n" && newRow) {
         e.preventDefault();
         field.current?.focus();
       } else if (key === "c" || (key === "n" && !newRow)) {
         e.preventDefault();
         ask();
+      } else if (loose && (key === "j" || key === "k") && layout === "list") {
+        e.preventDefault();
+        focusRow(walk[0]);
+      } else if (loose && key === "escape" && letGo()) {
+        e.preventDefault();
       }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [newRow, ask]);
+  }, [newRow, ask, walk, layout, letGo]);
   /* A vault with no task yet: the caret is where the first one is typed. */
   useEffect(() => {
     if (total === 0 && newRow && !locked) field.current?.focus();
   }, [total === 0, newRow, locked]);
 
+  const at = (el: HTMLElement): Spot => under(el);
+  const menuRows = (m: MenuFor): MenuRow[] => {
+    switch (m.of) {
+      case "status": {
+        const one = m.rows.length === 1 ? m.rows[0]!.task.status : null;
+        return statusRows(one, (status) => {
+          const targets = m.rows.filter((r) => r.task.status !== status);
+          if (targets.length) void changeAll(targets, { status });
+        });
+      }
+      case "priority": {
+        const one = m.rows.length === 1 ? (m.rows[0]!.task.priority ?? null) : undefined;
+        return priorityRows(one === undefined ? ("\u0000" as Priority) : one, (priority) => {
+          const targets = m.rows.filter((r) => (r.task.priority ?? null) !== priority);
+          if (targets.length) void changeAll(targets, { priority });
+        });
+      }
+      case "due": {
+        const one = m.rows.length === 1 ? (m.rows[0]!.task.due ?? null) : null;
+        return dueRows(
+          one,
+          (due) => void changeAll(m.rows, { due }),
+          () => {
+            setPicking(m.rows);
+            showDatePicker(picker.current);
+          },
+        );
+      }
+      case "project": {
+        const one = m.rows.length === 1 ? (m.rows[0]!.project?.name ?? null) : undefined;
+        return projectRows(projects, one === undefined ? "\u0000" : one, (name) => void moveAll(m.rows, name));
+      }
+      case "filter":
+        return filterFieldRows(filters, (f) => setMenu({ of: "filter-values", field: f, at: { ...m.at } }));
+      case "filter-values":
+        return filterValueRows(
+          m.field,
+          filters,
+          valueCounts(tabbed.filter(matches).map(placed), filters, m.field, now),
+          projects,
+          (v) => changeFilters(toggleFilter(filters, m.field, v)),
+        );
+      case "order":
+        return orderRows(order, then, (o, t) =>
+          setDisplay(tab === "done" ? { ...display, done: o, doneTie: t } : { ...display, order: o, tie: t }),
+        );
+      case "display":
+        return displayRows(
+          display,
+          (group) => setDisplay({ ...display, group }),
+          (c) =>
+            setDisplay({
+              ...display,
+              hidden: display.hidden.includes(c) ? display.hidden.filter((h) => h !== c) : [...display.hidden, c],
+            }),
+        );
+    }
+  };
+  const menuLabel = (m: MenuFor): string => {
+    switch (m.of) {
+      case "status":
+      case "priority":
+      case "due":
+      case "project": {
+        const what = { status: "status", priority: "priority", due: "due date", project: "project" }[m.of];
+        return m.rows.length === 1 ? `${m.rows[0]!.title}: ${what}` : `${m.rows.length} tasks: ${what}`;
+      }
+      case "filter":
+        return "Filter by";
+      case "filter-values":
+        return `Filter: ${FILTER_LABEL[m.field]}`;
+      case "order":
+        return "Order";
+      case "display":
+        return "Display";
+    }
+  };
+  /* What a group's `+` makes: a task with that group's value. A group with no single value has none. */
+  const preset = (g: RowGroup<Placed>): Partial<NewTaskDraft> | null => {
+    switch (g.by) {
+      case "status":
+        return { status: g.key as TaskStatus };
+      case "priority":
+        return { priority: g.key === "none" ? null : (g.key as Priority) };
+      case "project":
+        return { project: g.key || null };
+      case "due":
+        return g.key === "today" ? { due: now } : null;
+      case "none":
+        return null;
+    }
+  };
+  const drawRow = (r: Row) => (
+    <TaskRow
+      key={r.name}
+      row={r}
+      chip={chip(r)}
+      onOpen={onOpen}
+      onCheck={live}
+      onMenu={openMenu}
+      onPick={locked ? undefined : pick}
+      selected={selected.has(r.name)}
+      fresh={fresh === r.name}
+    />
+  );
+  const hidden = Object.fromEntries(display.hidden.map((c) => [`data-hide-${c}`, ""]));
+
   return (
-    <main className="dag-tasks" data-dag-tasks={layout} data-dag-tasks-showing={layout === "list" ? tab : undefined}>
+    <main
+      className="dag-tasks"
+      data-dag-tasks={layout}
+      data-dag-tasks-showing={layout === "list" ? tab : undefined}
+      data-dag-tasks-grouped={layout === "list" ? display.group : undefined}
+      {...hidden}
+    >
       <div className="dag-tasks__bar">
         <label className="dag-tasks__find">
           <Search size={14} strokeWidth={2} aria-hidden="true" />
@@ -436,51 +807,43 @@ export function TasksView({
             type="search"
             placeholder="Filter tasks"
             aria-label="Filter tasks"
-            value={filter}
+            value={words_}
             data-dag-tasks-filter=""
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => setWords(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape" && filter) {
+              if (e.key === "Escape" && words_) {
                 e.preventDefault();
-                setFilter("");
+                setWords("");
               }
             }}
           />
         </label>
-        {projects.length || scope.kind !== "all" ? (
-          <select
-            className="dag-select dag-tasks__project"
-            aria-label="Show the tasks of"
-            value={scopeValue}
-            data-dag-tasks-project=""
-            onChange={(e) => {
-              const v = e.target.value;
-              onScope?.(v === "" ? { kind: "all" } : v === NO_PROJECT ? { kind: "none" } : { kind: "project", name: v });
-            }}
-          >
-            <option value="">All projects</option>
-            {projects.map((p) => (
-              <option key={p.name} value={p.name}>
-                {p.project.status === "done"
-                  ? `${p.title} (done)`
-                  : p.project.status === "paused"
-                    ? `${p.title} (paused)`
-                    : p.title}
-              </option>
-            ))}
-            <option value={NO_PROJECT}>No project</option>
-          </select>
+        {inUse.map((f) => (
+          <FilterChip
+            key={f}
+            field={f}
+            filters={filters}
+            projects={projects}
+            onOpen={(el) => setMenu({ of: "filter-values", field: f, at: at(el) })}
+            onClear={() => changeFilters({ ...filters, [f]: [] })}
+          />
+        ))}
+        <LineButton kind="filter" label="Filter" onOpen={(el) => setMenu({ of: "filter", at: at(el) })} />
+        {inUse.length >= 2 ? (
+          <Button variant="quiet" size="sm" data-dag-tasks-clear-all="" onClick={() => changeFilters(NO_FILTERS)}>
+            Clear all
+          </Button>
         ) : null}
         <span className="dag-tasks__spacer" />
         <span className="dag-tasks__count" data-dag-tasks-count="" aria-live="polite">
-          {total === 0
-            ? "No tasks yet"
-            : countLine(
-                layout === "board" ? "all" : tab,
-                layout === "board" ? boardCount(scopedRows, matches) : counted,
-                words.length > 0,
-              )}
+          {total === 0 ? "No tasks yet" : countLine(layout === "board" ? "all" : tab, counted, filtered)}
         </span>
+        {layout === "list" ? (
+          <>
+            <LineButton kind="order" label="Order" onOpen={(el) => setMenu({ of: "order", at: at(el) })} />
+            <LineButton kind="display" label="Display" onOpen={(el) => setMenu({ of: "display", at: at(el) })} />
+          </>
+        ) : null}
       </div>
       {newRow ? (
         <NewTaskRow draft={draft} onDraft={setDraft} projects={projects} locked={locked} field={field} onMade={onMade} />
@@ -503,69 +866,86 @@ export function TasksView({
         />
       ) : total > 0 && rows.length === 0 && tabbed.length > 0 ? (
         <NoMatch
-          filter={filter}
+          words={words_}
           tab={tab}
-          onClear={() => setFilter("")}
+          onClear={() => {
+            setWords("");
+            changeFilters(NO_FILTERS);
+          }}
           onAll={tab === "open" ? () => chooseTab?.("all") : undefined}
         />
-      ) : tab === "done" ? (
-        <div className="dag-tasks__groups">
-          <div className="dag-tasks__rows" role="list" aria-label="Done" data-dag-tasks-group="done">
-            {[...rows]
-              .sort((a, b) => compareRecent(a, b))
-              .map((r) => (
-                <TaskRow
-                  key={r.name}
-                  row={r}
-                  chip={chip(r)}
-                  onOpen={onOpen}
-                  onCheck={live}
-                  onMenu={openMenu}
-                  fresh={fresh === r.name}
-                />
-              ))}
-          </div>
-        </div>
       ) : (
-        <div className="dag-tasks__groups">
-          {LIST_ORDER.filter((s) => onTab(s, tab)).map((status) => (
-            <Group key={status} status={status} rows={by(status)} onAdd={locked ? undefined : addTo}>
-              {(r) => (
-                <TaskRow
-                  key={r.name}
-                  row={r}
-                  chip={chip(r)}
-                  onOpen={onOpen}
-                  onCheck={live}
-                  onMenu={openMenu}
-                  fresh={fresh === r.name}
-                />
-              )}
-            </Group>
-          ))}
+        <div className="dag-tasks__groups" onKeyDown={onListKey}>
+          {flat ? (
+            <div
+              className="dag-tasks__rows"
+              role="list"
+              aria-label={groups[0]?.label ?? "Tasks"}
+              data-dag-tasks-group={groups[0]?.key || "none"}
+            >
+              {groups.flatMap((g) => g.rows.map((p) => drawRow(p.row)))}
+            </div>
+          ) : (
+            groups.map((g) => {
+              const p = locked ? null : preset(g);
+              const { mark } = g.by === "none" ? { mark: null } : filterValue(g.by, g.key, projects);
+              return (
+                <Group
+                  key={g.key || "none"}
+                  id={g.key || "none"}
+                  label={g.label}
+                  mark={mark}
+                  count={g.rows.length}
+                  open={isOpen(g.key)}
+                  onToggle={() =>
+                    setFlipped((had) => {
+                      const out = new Set(had);
+                      if (out.has(groupId(g.key))) out.delete(groupId(g.key));
+                      else out.add(groupId(g.key));
+                      return out;
+                    })
+                  }
+                  onAdd={p ? () => addTo(p) : undefined}
+                >
+                  {g.rows.map((x) => drawRow(x.row))}
+                </Group>
+              );
+            })
+          )}
         </div>
       )}
-      {menu?.of === "priority" ? (
-        <TasksMenu
-          at={menu.at}
-          label={`${menu.row.title}: priority`}
-          data={{ "data-dag-task-menu": menu.row.name }}
-          onClose={() => setMenu(null)}
-          rows={priorityRows(menu.row.task.priority ?? null, (priority) => {
-            if ((menu.row.task.priority ?? null) !== priority) onChange(menu.row, { priority });
-          })}
-        />
-      ) : menu ? (
-        <TasksMenu
-          at={menu.at}
-          label={`${menu.row.title}: status`}
-          data={{ "data-dag-task-menu": menu.row.name }}
-          onClose={() => setMenu(null)}
-          rows={statusRows(menu.row.task.status, (status) => {
-            if (status !== menu.row.task.status) onChange(menu.row, { status });
-          })}
+      {selected.size && layout === "list" && !locked ? (
+        <BulkBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onAction={(a, el) => {
+            const targets = targetsFor(null);
+            if (a === "trash") void trashAll(targets);
+            else menuFor(a, targets, el);
+          }}
         />
       ) : null}
+      {menu ? (
+        <TasksMenu
+          at={menu.at}
+          label={menuLabel(menu)}
+          data={{ "data-dag-task-menu": "rows" in menu && menu.rows.length === 1 ? menu.rows[0]!.name : menu.of }}
+          onClose={() => setMenu(null)}
+          rows={menuRows(menu)}
+        />
+      ) : null}
+      <input
+        ref={picker}
+        type="date"
+        className="dag-tasks-pills__date"
+        tabIndex={-1}
+        aria-hidden="true"
+        value=""
+        onChange={(e) => {
+          if (e.target.value && picking.length) void changeAll(picking, { due: e.target.value });
+          setPicking([]);
+        }}
+      />
       {asking ? (
         <NewTaskDialog initial={{ ...draft, title: "" }} projects={projects} onClose={() => onAsk?.(false)} onMade={onMade} />
       ) : null}
@@ -587,24 +967,44 @@ export function TasksView({
           <ToastWords>{`${STATUS_LABEL[settling.to]}: `}</ToastWords>
           <ToastName text={settling.title} />
         </Toast>
+      ) : notice ? (
+        <Toast
+          icon={notice.undo ? Trash2 : CircleAlert}
+          timeout={SETTLE_MS}
+          renew={notice}
+          onTimeout={() => setNotice(null)}
+          onDismiss={() => setNotice(null)}
+          title={notice.text}
+          data-dag-tasks-notice=""
+          actions={
+            notice.undo ? (
+              <Button
+                size="sm"
+                data-dag-tasks-notice-undo=""
+                onClick={() => {
+                  notice.undo?.();
+                  setNotice(null);
+                }}
+              >
+                Undo
+              </Button>
+            ) : undefined
+          }
+        >
+          <ToastWords>{notice.text}</ToastWords>
+        </Toast>
       ) : null}
     </main>
   );
 }
 
-/** What the count line says on the board, which shows every status: every task in the scope. */
-function boardCount(rows: Row[], matches: (r: Row) => boolean) {
-  const shown = rows.filter(matches);
-  return { all: rows.length, shown: shown.length, late: shown.filter((r) => overdue(r.task)).length };
-}
-
 /** A filter that matches nothing: what it searched, and the two ways out. */
-function NoMatch({ filter, tab, onClear, onAll }: { filter: string; tab: TaskTab; onClear(): void; onAll?(): void }) {
+function NoMatch({ words, tab, onClear, onAll }: { words: string; tab: TaskTab; onClear(): void; onAll?(): void }) {
   const what = tab === "open" ? "open task" : tab === "done" ? "done task" : "task";
   return (
     <div className="dag-tasks__none" data-dag-tasks-none="">
       <h2 className="dag-tasks__none-title">
-        No {what} matches “{filter.trim()}”
+        {words.trim() ? `No ${what} matches “${words.trim()}”` : `No ${what} matches the filter`}
       </h2>
       <p className="dag-tasks__none-text">
         The filter reads titles, folders and projects.{tab === "open" ? " Done tasks are on their own tab." : ""}
@@ -628,7 +1028,8 @@ function NoMatch({ filter, tab, onClear, onAll }: { filter: string; tab: TaskTab
  * it has a body, then its columns — check items, project, due date and when it last changed — each
  * in a column of its own so they line up down the list. The last column gives way to the row's menu
  * under the pointer or the keyboard. A narrow window drops the columns in that order, last changed
- * first; the due date stays (`chrome.css`, the container query on `.dag-tasks`).
+ * first; the due date stays (`chrome.css`, the container query on `.dag-tasks`), and the Display
+ * menu can switch any of them but the date off.
  */
 function TaskRow({
   row: r,
@@ -636,6 +1037,8 @@ function TaskRow({
   onOpen,
   onCheck,
   onMenu,
+  onPick,
+  selected = false,
   fresh = false,
 }: {
   row: Row;
@@ -644,6 +1047,9 @@ function TaskRow({
   /** Absent while the app is locked. */
   onCheck?(row: Row, to: TaskStatus): void;
   onMenu(row: Row, at: Spot, of?: "status" | "priority"): void;
+  /** Ctrl/Cmd- or Shift-click: into the selection or out of it. Absent while the app is locked. */
+  onPick?(name: string, range: boolean): void;
+  selected?: boolean;
   /** Just made here: tinted for a moment, and brought into view. */
   fresh?: boolean;
 }) {
@@ -660,7 +1066,14 @@ function TaskRow({
       role="listitem"
       data-dag-task-row={r.name}
       data-fresh={fresh ? "" : undefined}
+      data-selected={selected ? "" : undefined}
       data-done={r.task.status === "done" ? "" : undefined}
+      onClickCapture={(e: ReactMouseEvent) => {
+        if (!onPick || !(e.ctrlKey || e.metaKey || e.shiftKey)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onPick(r.name, e.shiftKey);
+      }}
       onContextMenu={(e: ReactMouseEvent) => {
         if (!onCheck) return;
         e.preventDefault();
@@ -749,42 +1162,47 @@ function TaskRow({
   );
 }
 
-/** One status's section of the list. Done starts shut: it only grows, and it is what nobody is looking for. */
+/**
+ * One group of the list, under a heading of what it is grouped by: a status, a priority, a due
+ * date, a project. Done starts shut — it only grows, and it is what nobody is looking for — and a
+ * heading's `+` makes a task with the group's value, where the group has one.
+ */
 function Group({
-  status,
-  rows,
+  id,
+  label,
+  mark,
+  count,
+  open,
+  onToggle,
   onAdd,
   children,
 }: {
-  status: TaskStatus;
-  rows: Row[];
-  /** The heading's `+`: a new task in this group. Absent while the app is locked. */
-  onAdd?(status: TaskStatus): void;
-  children(row: Row): ReactNode;
+  id: string;
+  label: string;
+  mark: ReactNode;
+  count: number;
+  open: boolean;
+  onToggle(): void;
+  /** The heading's `+`. Absent while the app is locked, and for a group with no one value. */
+  onAdd?(): void;
+  children: ReactNode;
 }) {
-  const [open, setOpen] = useState(status !== "done");
   return (
-    <section className="dag-tasks__group" data-dag-tasks-group={status}>
+    <section className="dag-tasks__group" data-dag-tasks-group={id}>
       <h2 className="dag-tasks__head">
-        <button
-          type="button"
-          className="dag-tasks__twisty"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          data-dag-tasks-twisty={status}
-        >
+        <button type="button" className="dag-tasks__twisty" aria-expanded={open} onClick={onToggle} data-dag-tasks-twisty={id}>
           <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
-          <TaskGlyph status={status} />
-          <span>{STATUS_LABEL[status]}</span>
-          <span className="dag-tasks__n">{rows.length}</span>
+          {mark}
+          <span>{label}</span>
+          <span className="dag-tasks__n">{count}</span>
         </button>
         {onAdd ? (
           <IconButton
             size="sm"
             className="dag-tasks__head-add"
-            aria-label={`New task in ${STATUS_LABEL[status]}`}
-            data-dag-tasks-group-add={status}
-            onClick={() => onAdd(status)}
+            aria-label={`New task in ${label}`}
+            data-dag-tasks-group-add={id}
+            onClick={onAdd}
           >
             <Plus size={14} strokeWidth={2} aria-hidden="true" />
           </IconButton>
@@ -792,7 +1210,7 @@ function Group({
       </h2>
       {open ? (
         <div className="dag-tasks__rows" role="list">
-          {rows.map((r) => children(r))}
+          {children}
         </div>
       ) : null}
     </section>

@@ -102,6 +102,13 @@ export const TASKS_VIEW = "dag:tasks-view";
  * which of their tasks somebody is looking at is view state, this browser's, not in `PREF_KEYS`.
  */
 export const TASKS_TAB = "dag:tasks-tab";
+/**
+ * How the Tasks page's list is ordered, grouped and drawn — the Order and Display menus (#311), one
+ * JSON object read by `displayOf` in `src/ui/taskView.ts`. **The person's, in every vault**, for
+ * `CALENDAR_HIDE`'s reason: how somebody likes their tasks laid out is theirs, not one folder's, and
+ * it is never written to a vault file. Absent is the default: grouped by status, by due date.
+ */
+export const TASKS_DISPLAY = "dag:tasks-display";
 /** Whether a task's properties are beside its text or folded into a line above it (#311): this browser's view. */
 export const TASK_PANEL = "dag:task-panel";
 
@@ -198,6 +205,7 @@ export const PREF_KEYS = [
   SIDEBAR_WIDTH,
   FAVOURITES,
   CALENDAR_HIDE,
+  TASKS_DISPLAY,
   WEEK_START,
   TIME_ZONE,
   TIME_ZONE_SEEN,
