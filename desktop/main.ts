@@ -429,6 +429,13 @@ function createWindow(vaultId: string, search: string): BrowserWindow {
   /* Full screen hides the traffic lights, so the room the page keeps for them goes too. */
   win.on("enter-full-screen", () => win.webContents.send("window:full-screen", true));
   win.on("leave-full-screen", () => win.webContents.send("window:full-screen", false));
+  /* The mouse's back and forward buttons on Windows and Linux arrive here, not in the DOM. The
+     page walks its own history (`src/ui/history.ts`); this only says which way. macOS has no
+     app-command and the page hears the two buttons itself. */
+  win.on("app-command", (_event, command) => {
+    if (command === "browser-backward") win.webContents.send("history:go", "back");
+    else if (command === "browser-forward") win.webContents.send("history:go", "forward");
+  });
   win.on("closed", () => {
     if (windows.get(vaultId) === win) windows.delete(vaultId);
   });

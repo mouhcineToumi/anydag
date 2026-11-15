@@ -86,6 +86,9 @@
 [data-dag-window] .dag-sidebar-toggle { -webkit-app-region: no-drag; }
 .dag-toolbar__title { font-weight: var(--dag-ui-weight-strong); letter-spacing: -0.006em; }
 .dag-toolbar__spacer { flex: 1; }
+/* The two arrows that walk the window's history. No rule of their own: an `IconButton` is the
+   tool the bar already draws, and the pair is a group so a screen reader hears what they are. */
+.dag-toolbar__history { display: flex; align-items: center; gap: 2px; flex: none; margin-right: 2px; }
 
 /* The board's name, and the control that lists the rest. One thing rather than the name beside a
    `PanelLeft` toggle, because there is no column to toggle — and the name is where a

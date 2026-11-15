@@ -311,7 +311,9 @@ export function Shell({
   openAssistant(chat?: string | null): void;
   /** Home: nothing open, the welcome card, as a new history entry — what the AnyDag logo does. */
   openHome(): void;
-  open(kind: FileKind, name: string | null): void;
+  /** A document from a row or the search: a new history entry. `replace` is what a rename, a move
+      or a delete of the file already open does — the same place under another name, or none. */
+  open(kind: FileKind, name: string | null, options?: { replace?: boolean }): void;
   children: ReactNode;
 }) {
   /* The Assistant's panel, down the right of whatever page is open (`space A`). Turning the
@@ -655,7 +657,7 @@ export function Shell({
           done(made !== null);
           if (!made || made === name) return;
           moved({ kind: "file", file: kind, from: name, to: made });
-          if (isOpen(kind, name)) open(kind, made);
+          if (isOpen(kind, name)) open(kind, made, { replace: true });
         });
       },
       duplicate(kind, name) {
@@ -698,7 +700,7 @@ export function Shell({
               file: went.files ?? [],
             };
             const wasOpen = openKind && was !== null && byKind[openKind].includes(was) ? { kind: openKind, name: was } : null;
-            if (wasOpen) open(wasOpen.kind, null);
+            if (wasOpen) open(wasOpen.kind, null, { replace: true });
             gone.push({ entry: went.trash, favourites: favs, open: wasOpen });
           } else {
             const entry = await deleteBoard(t.name, t.kind);
@@ -710,7 +712,7 @@ export function Shell({
             const key = keyOf(t);
             moved({ kind: "file", file: t.kind, from: t.name, to: null });
             const wasOpen = isOpen(t.kind, t.name) ? { kind: t.kind, name: t.name } : null;
-            if (wasOpen) open(t.kind, null);
+            if (wasOpen) open(t.kind, null, { replace: true });
             gone.push({ entry, favourites: favourites.includes(key) ? [key] : [], open: wasOpen });
           }
         }
@@ -724,7 +726,7 @@ export function Shell({
           if (!made) return false;
           moved({ kind: "file", file: kind, from: name, to: made });
           if (folder) setFolders((had) => (had.has(folder) ? had : new Set([...had, ...ancestors(`${folder}/x`)])));
-          if (isOpen(kind, name)) open(kind, made);
+          if (isOpen(kind, name)) open(kind, made, { replace: true });
           return true;
         });
       },
@@ -754,7 +756,7 @@ export function Shell({
             return next;
           });
           const was = openKind ? opened[openKind] : null;
-          if (openKind && was && rebase(was, path, made) !== was) open(openKind, rebase(was, path, made));
+          if (openKind && was && rebase(was, path, made) !== was) open(openKind, rebase(was, path, made), { replace: true });
           return null;
         });
       },
@@ -783,11 +785,11 @@ export function Shell({
               file: gone.files ?? [],
             };
             const was = openKind ? opened[openKind] : null;
-            if (openKind && was !== null && went[openKind].includes(was)) open(openKind, null);
+            if (openKind && was !== null && went[openKind].includes(was)) open(openKind, null, { replace: true });
           } else {
             await transferFile(what.kind, what.name, to);
             moved({ kind: "file", file: what.kind, from: what.name, to: null });
-            if (isOpen(what.kind, what.name)) open(what.kind, null);
+            if (isOpen(what.kind, what.name)) open(what.kind, null, { replace: true });
           }
           done(true);
           dispatchEvent(new CustomEvent("dag:boards"));
@@ -910,7 +912,7 @@ export function Shell({
         const keys = g.favourites.map((k) => `${k.slice(0, k.indexOf(":"))}:${at(k.slice(k.indexOf(":") + 1))}`);
         saveFavourites((had) => [...had, ...keys.filter((k) => !had.includes(k))]);
       }
-      if (g.open) open(g.open.kind, at(g.open.name));
+      if (g.open) open(g.open.kind, at(g.open.name), { replace: true });
     },
     [open, saveFavourites],
   );

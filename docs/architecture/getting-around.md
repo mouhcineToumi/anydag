@@ -57,3 +57,44 @@ for a pointer or keyboard user, not the accessible name.
 
 Since #207 every `IconButton` in the chrome wears it, saying its label (*Design rules*,
 `design-and-layout.md`), so the dock and the zoom bar no longer wrap their buttons by hand.
+
+## Back and forward
+
+**The window keeps the browser's history, and the address is the entry.** Opening a file from a
+sidebar row, the search or a reference is a `pushState` of the address the app already has
+(`?board=`, `?note=`, `?quiz=`, `?table=`, `?file=`); Tasks, Calendar, Quizzes, Trash and the
+Assistant are their own keys, and a board's own page is `?page=`. A theme, a table's tab, a quiz's
+run, a calendar's view and a rename of the file already open are `replaceState`, because they are
+the same place under another coat. So in `anydag serve` the browser's own Back, Forward, Alt+Left,
+⌘[ and mouse buttons work with no help from the page, and a reload lands on the page the address
+names.
+
+| Gesture | Does |
+|---|---|
+| Alt+Left · Alt+Right | back · forward (Linux and Windows) |
+| ⌘[ · ⌘] | back · forward (macOS, where Option+Left belongs to the text) |
+| mouse button 3 · 4 | back · forward |
+| the two arrows at the left of the top bar | back · forward, disabled at either end |
+
+**The desktop app has no browser chrome, so it hears them itself** (`src/ui/history.ts`). Alt/⌘
+are taken in the capture phase and stopped, so a selected item on a board does not also nudge and a
+note does not read the pair as a word. A mouse button is a `mouseup` with button 3 or 4 on macOS,
+and an `app-command` the shell forwards on Windows and Linux (`desktop/main.ts`,
+`desktop/preload.ts`); the two reports of one gesture share a short cooldown. A browser already
+answers all four, so the page listens for none of them there.
+
+**The position is the page's, not `history.length`'s.** Every entry carries `{ at, top }` in
+`history.state`; Back is disabled at `at === 0`, Forward at `at === top`, and `top` is kept on the
+entry so a reload still knows what is ahead. The initial about:blank is not ours and cannot move
+the arrows.
+
+**An entry names a file, and carries its id.** The address has the name a person can read; the
+state has the id the listing minted, so an entry whose file was renamed is followed to the name it
+has now. A file that has gone to the trash is skipped — the pop handler checks before it adopts the
+query, so the page never draws a 404 on the way. At the end of a history of dead entries, home is
+what stands. Going back is a read: it writes no file. An editor with unsaved typing is left exactly
+as the sidebar leaves it — its unmount flushes the save the debounce was holding.
+
+Names claimed, grepped first: `dag-toolbar__history`, `data-dag-history-back` and
+`data-dag-history-forward`; the diagram owns none of them. The state key is `dagHistory`, which is
+not a `data-dag-*` attribute and belongs to the page alone.
