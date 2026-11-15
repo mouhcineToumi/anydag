@@ -1,0 +1,551 @@
+{
+  "//": "What a document's tags are, read and written by `tagsOf`/`withTags` in src/note/tags.ts (test/tags.test.ts), which the server, the page, the CLI and MCP all import; `keys` holds `withKeys` to a block list at column 0, and `hues` pins the default colour a tag nobody registered is drawn in, which every device must agree on.",
+  "read": [
+    {
+      "why": "a flow list",
+      "text": "---\ntags: [meeting, pricing]\n---\nbody\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a block list, indented",
+      "text": "---\ntitle: Q4\ntags:\n  - meeting\n  - pricing\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a block list at column 0, as Obsidian writes it",
+      "text": "---\ntags:\n- meeting\n- pricing\ntitle: Q4\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a string split on commas",
+      "text": "---\ntags: meeting, pricing\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a string split on blanks",
+      "text": "---\ntags: meeting pricing\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a quoted string",
+      "text": "---\ntags: \"meeting, pricing\"\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a leading # is dropped, in a flow list",
+      "text": "---\ntags: [#meeting, pricing]\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a leading # is dropped, in a block list",
+      "text": "---\ntags:\n  - \"#meeting\"\n  - #pricing\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "case is ignored: the first spelling is kept",
+      "text": "---\ntags: [Pricing, pricing, PRICING]\n---\n",
+      "tags": [
+        "Pricing"
+      ]
+    },
+    {
+      "why": "a slash is a character, not a level",
+      "text": "---\ntags: [area/design]\n---\n",
+      "tags": [
+        "area/design"
+      ]
+    },
+    {
+      "why": "letters of any script",
+      "text": "---\ntags: [réunion, 会議]\n---\n",
+      "tags": [
+        "réunion",
+        "会議"
+      ]
+    },
+    {
+      "why": "digits alone are not a tag",
+      "text": "---\ntags: [2026, q-2026]\n---\n",
+      "tags": [
+        "q-2026"
+      ]
+    },
+    {
+      "why": "a character a tag cannot hold makes no tag",
+      "text": "---\ntags: [a.b, c]\n---\n",
+      "tags": [
+        "c"
+      ]
+    },
+    {
+      "why": "words YAML reads as other things are words",
+      "text": "---\ntags: [yes, null, 1e3]\n---\n",
+      "tags": [
+        "yes",
+        "null",
+        "1e3"
+      ]
+    },
+    {
+      "why": "a quoted entry",
+      "text": "---\ntags: [\"meeting\", 'pricing']\n---\n",
+      "tags": [
+        "meeting",
+        "pricing"
+      ]
+    },
+    {
+      "why": "a comment after the list",
+      "text": "---\ntags: [a, b] # the two\n---\n",
+      "tags": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "why": "a flow list over two lines",
+      "text": "---\ntags: [a,\n  b]\n---\n",
+      "tags": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "why": "the singular tag: is not read",
+      "text": "---\ntag: meeting\n---\n",
+      "tags": []
+    },
+    {
+      "why": "an inline #tag in the text is not a tag",
+      "text": "---\ntitle: x\n---\nA #meeting in prose.\n",
+      "tags": []
+    },
+    {
+      "why": "no frontmatter",
+      "text": "#meeting\n",
+      "tags": []
+    },
+    {
+      "why": "an empty key",
+      "text": "---\ntags:\ntitle: x\n---\n",
+      "tags": []
+    },
+    {
+      "why": "a board's frontmatter",
+      "text": "---\ntitle: Plan\nflow:\n  width: 1200\ntags: [arch]\n---\n\n```erd\n```\n",
+      "tags": [
+        "arch"
+      ]
+    },
+    {
+      "why": "a nested tags: key belongs to another key",
+      "text": "---\nflow:\n  tags: [x]\n---\n",
+      "tags": []
+    }
+  ],
+  "write": [
+    {
+      "why": "a new key is a flow list after the last line",
+      "text": "---\ntitle: Q4\n---\nbody\n",
+      "change": {
+        "add": [
+          "meeting"
+        ]
+      },
+      "out": "---\ntitle: Q4\ntags: [meeting]\n---\nbody\n"
+    },
+    {
+      "why": "a text with no frontmatter grows one",
+      "text": "body\n",
+      "change": {
+        "add": [
+          "meeting"
+        ]
+      },
+      "out": "---\ntags: [meeting]\n---\nbody\n"
+    },
+    {
+      "why": "a board with no frontmatter grows one, a blank line after it",
+      "text": "```erd\n```\n",
+      "change": {
+        "add": [
+          "arch"
+        ]
+      },
+      "out": "---\ntags: [arch]\n---\n\n```erd\n```\n",
+      "board": true
+    },
+    {
+      "why": "an added tag goes at the end of a flow list",
+      "text": "---\ntags: [a, b]\ntitle: x\n---\n",
+      "change": {
+        "add": [
+          "c"
+        ]
+      },
+      "out": "---\ntags: [a, b, c]\ntitle: x\n---\n"
+    },
+    {
+      "why": "a tag already carried, in any case, is no change",
+      "text": "---\ntags: [Meeting]\n---\n",
+      "change": {
+        "add": [
+          "meeting"
+        ]
+      },
+      "out": "---\ntags: [Meeting]\n---\n"
+    },
+    {
+      "why": "a string becomes a flow list",
+      "text": "---\ntags: a b\n---\n",
+      "change": {
+        "add": [
+          "c"
+        ]
+      },
+      "out": "---\ntags: [a, b, c]\n---\n"
+    },
+    {
+      "why": "a block list stays a block list at its indent",
+      "text": "---\ntags:\n    - a\ntitle: x\n---\n",
+      "change": {
+        "add": [
+          "b"
+        ]
+      },
+      "out": "---\ntags:\n    - a\n    - b\ntitle: x\n---\n"
+    },
+    {
+      "why": "a block list at column 0 stays at column 0",
+      "text": "---\ntags:\n- a\n- b\ntitle: x\n---\n",
+      "change": {
+        "add": [
+          "c"
+        ]
+      },
+      "out": "---\ntags:\n- a\n- b\n- c\ntitle: x\n---\n"
+    },
+    {
+      "why": "a removal at column 0 leaves no line behind",
+      "text": "---\ntags:\n- a\n- b\ntitle: x\n---\n",
+      "change": {
+        "remove": [
+          "a"
+        ]
+      },
+      "out": "---\ntags:\n- b\ntitle: x\n---\n"
+    },
+    {
+      "why": "a removal takes every spelling",
+      "text": "---\ntags: [Meeting, b]\n---\n",
+      "change": {
+        "remove": [
+          "MEETING"
+        ]
+      },
+      "out": "---\ntags: [b]\n---\n"
+    },
+    {
+      "why": "the last tag taken off removes the line",
+      "text": "---\ntitle: x\ntags: [a]\n---\n",
+      "change": {
+        "remove": [
+          "a"
+        ]
+      },
+      "out": "---\ntitle: x\n---\n"
+    },
+    {
+      "why": "the last tag of a block list at column 0 removes every line",
+      "text": "---\ntags:\n- a\ntitle: x\n---\n",
+      "change": {
+        "remove": [
+          "a"
+        ]
+      },
+      "out": "---\ntitle: x\n---\n"
+    },
+    {
+      "why": "a block left empty goes",
+      "text": "---\ntags: [a]\n---\nbody\n",
+      "change": {
+        "remove": [
+          "a"
+        ]
+      },
+      "out": "body\n"
+    },
+    {
+      "why": "an entry that is not a tag is kept byte for byte",
+      "text": "---\ntags: [a, 2026, \"x.y\"]\n---\n",
+      "change": {
+        "remove": [
+          "a"
+        ],
+        "add": [
+          "b"
+        ]
+      },
+      "out": "---\ntags: [2026, \"x.y\", b]\n---\n"
+    },
+    {
+      "why": "an entry that is not a tag keeps the line",
+      "text": "---\ntags: [a, 2026]\n---\n",
+      "change": {
+        "remove": [
+          "a"
+        ]
+      },
+      "out": "---\ntags: [2026]\n---\n"
+    },
+    {
+      "why": "a word YAML reads otherwise is quoted",
+      "text": "---\ntags: [a]\n---\n",
+      "change": {
+        "add": [
+          "yes",
+          "null",
+          "1e3",
+          "1_000",
+          "on"
+        ]
+      },
+      "out": "---\ntags: [a, \"yes\", \"null\", \"1e3\", \"1_000\", \"on\"]\n---\n"
+    },
+    {
+      "why": "a leading # is dropped from what is added",
+      "text": "---\ntitle: x\n---\n",
+      "change": {
+        "add": [
+          "#meeting"
+        ]
+      },
+      "out": "---\ntitle: x\ntags: [meeting]\n---\n"
+    },
+    {
+      "why": "what is not a tag is not added",
+      "text": "---\ntitle: x\n---\n",
+      "change": {
+        "add": [
+          "2026",
+          "a b"
+        ]
+      },
+      "out": "---\ntitle: x\n---\n"
+    },
+    {
+      "why": "a removal of a tag not carried is no change",
+      "text": "---\ntags: [a]\n---\n",
+      "change": {
+        "remove": [
+          "b"
+        ]
+      },
+      "out": "---\ntags: [a]\n---\n"
+    },
+    {
+      "why": "a rename is a removal and an addition",
+      "text": "---\ntags: [a, old, b]\n---\n",
+      "change": {
+        "remove": [
+          "old"
+        ],
+        "add": [
+          "new"
+        ]
+      },
+      "out": "---\ntags: [a, b, new]\n---\n"
+    },
+    {
+      "why": "a merge leaves one entry",
+      "text": "---\ntags: [old, new]\n---\n",
+      "change": {
+        "remove": [
+          "old"
+        ],
+        "add": [
+          "new"
+        ]
+      },
+      "out": "---\ntags: [new]\n---\n"
+    },
+    {
+      "why": "every other key and comment stays",
+      "text": "---\n# a comment\ntitle: x # here\ntags: [a]\nstatus: todo\n---\n",
+      "change": {
+        "add": [
+          "b"
+        ]
+      },
+      "out": "---\n# a comment\ntitle: x # here\ntags: [a, b]\nstatus: todo\n---\n"
+    },
+    {
+      "why": "CRLF line ends are kept",
+      "text": "---\r\ntitle: x\r\n---\r\nbody\r\n",
+      "change": {
+        "add": [
+          "a"
+        ]
+      },
+      "out": "---\r\ntitle: x\r\ntags: [a]\r\n---\r\nbody\r\n"
+    },
+    {
+      "why": "a blank line at the end of the block stays at the end",
+      "text": "---\ntitle: x\n\n---\n",
+      "change": {
+        "add": [
+          "a"
+        ]
+      },
+      "out": "---\ntitle: x\ntags: [a]\n\n---\n"
+    },
+    {
+      "why": "a rename keeps the tag's place in a flow list",
+      "text": "---\ntags: [prices, keep, more]\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "Prices",
+          "to": "pricing"
+        }
+      },
+      "out": "---\ntags: [pricing, keep, more]\n---\nbody\n"
+    },
+    {
+      "why": "a rename keeps the tag's place in a block list, and its dash",
+      "text": "---\ntags:\n  - keep\n  - prices\n  - more\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "prices",
+          "to": "pricing"
+        }
+      },
+      "out": "---\ntags:\n  - keep\n  - pricing\n  - more\n---\nbody\n"
+    },
+    {
+      "why": "a rename onto a tag the text carries is a merge: the renamed entry goes",
+      "text": "---\ntags: [prices, keep, pricing]\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "prices",
+          "to": "Pricing"
+        }
+      },
+      "out": "---\ntags: [keep, pricing]\n---\nbody\n"
+    },
+    {
+      "why": "a respelling keeps the first entry's place and drops another spelling",
+      "text": "---\ntags: [Prices, keep, PRICES]\n---\nbody\n",
+      "change": {
+        "rename": {
+          "from": "prices",
+          "to": "prices"
+        }
+      },
+      "out": "---\ntags: [prices, keep]\n---\nbody\n"
+    }
+  ],
+  "keys": [
+    {
+      "why": "a key with a block list at column 0 is replaced whole",
+      "text": "---\ntags:\n- a\n- b\nstatus: todo\n---\n",
+      "set": {
+        "tags": "[c]"
+      },
+      "keys": [
+        "tags"
+      ],
+      "out": "---\ntags: [c]\nstatus: todo\n---\n"
+    },
+    {
+      "why": "a key with a block list at column 0 is removed whole",
+      "text": "---\ntitle: x\ntags:\n- a\nstatus: todo\n---\n",
+      "set": {
+        "tags": null
+      },
+      "keys": [
+        "tags"
+      ],
+      "out": "---\ntitle: x\nstatus: todo\n---\n"
+    },
+    {
+      "why": "a key with a value takes no column-0 list after it",
+      "text": "---\nstatus: todo\n- stray\n---\n",
+      "set": {
+        "status": "done"
+      },
+      "keys": [
+        "status"
+      ],
+      "out": "---\nstatus: done\n- stray\n---\n"
+    },
+    {
+      "why": "indented lines are still the key's",
+      "text": "---\ntitle: >\n  long\n  title\nstatus: todo\n---\n",
+      "set": {
+        "title": null
+      },
+      "keys": [
+        "title"
+      ],
+      "out": "---\nstatus: todo\n---\n"
+    }
+  ],
+  "names": [
+    {
+      "why": "a space is written as -",
+      "typed": "two words",
+      "tag": "two-words"
+    },
+    {
+      "why": "a leading # is dropped",
+      "typed": "#meeting",
+      "tag": "meeting"
+    },
+    {
+      "why": "blanks round it go",
+      "typed": " a ",
+      "tag": "a"
+    },
+    {
+      "why": "a character a tag cannot hold is taken out",
+      "typed": "a.b!",
+      "tag": "ab"
+    },
+    {
+      "why": "a slash stays",
+      "typed": "area/design",
+      "tag": "area/design"
+    }
+  ],
+  "hues": {
+    "meeting": "magenta",
+    "pricing": "moss",
+    "roadmap": "violet",
+    "design": "bronze",
+    "Q4-plan": "ochre"
+  }
+}

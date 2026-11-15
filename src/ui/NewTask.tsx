@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type R
 import { createNote, type Made } from "@/board/useBoard";
 import type { Spot } from "@/calendar/menu";
 import { folderOf, type Project } from "@/note/project";
+import { withTags } from "@/note/tags";
 import { PRIORITY_LABEL, STATUS_LABEL, STATUSES, titleStem, today, withTask, type Priority, type TaskStatus } from "@/note/task";
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
@@ -31,6 +32,8 @@ export interface NewTaskDraft {
   priority: Priority | null;
   project: string | null;
   due: string | null;
+  /** The tags it is made with: the one the Tasks page is showing, so a task made there stays in view. */
+  tags?: readonly string[];
 }
 
 /** A project a pill can offer: its note's name, the project, and what it is called. */
@@ -54,11 +57,12 @@ export const blankDraft = (project: string | null = null, status: TaskStatus = "
  */
 export function newTaskText(d: NewTaskDraft, description = ""): string {
   const body = description.trim() ? `${description.trim()}\n` : "";
-  return withTask(`---\ntitle: ${JSON.stringify(d.title.trim())}\n---\n${body}`, {
+  const text = withTask(`---\ntitle: ${JSON.stringify(d.title.trim())}\n---\n${body}`, {
     status: d.status,
     ...(d.priority ? { priority: d.priority } : {}),
     ...(d.due ? { due: d.due } : {}),
   });
+  return d.tags?.length ? withTags(text, { add: d.tags }) : text;
 }
 
 /** Where a new task's file goes: named after its title, in its project's folder or at the top. */

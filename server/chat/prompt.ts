@@ -7,7 +7,7 @@
  * left in a resumed session (Claude's `--system-prompt-snapshot off`).
  */
 
-import type { ChatMeta, Mode, Step, Subject, Turn } from "./types";
+import type { ChatMeta, Mention, Mode, Step, Subject, Turn } from "./types";
 
 export interface Reach {
   id: string;
@@ -36,10 +36,30 @@ function subjectLines(s: Subject & { home: boolean }): string[] {
   ];
 }
 
+/**
+ * The documents a message named with `@` (#324): each by its title, name, kind and reference. It
+ * says what the person meant by the name in their words — not that anything outside the subject may
+ * be changed unasked, which stays the guard's rule.
+ */
+function mentionLines(list: readonly Mention[], home: string | undefined): string[] {
+  const lines = [
+    "## Documents mentioned in this message",
+    "The person named these documents with `@`. Read each before you answer, and cite it by its reference:",
+  ];
+  for (const m of list) {
+    const where = m.vault === home ? "" : ` in vault \`${m.vault}\``;
+    const ref = m.id ? `[${m.title}](dag:${m.id})` : `“${m.title}”`;
+    lines.push(`- ${ref} (\`${m.name}\`, kind \`${m.kind}\`${where})`);
+  }
+  lines.push("");
+  return lines;
+}
+
 export function systemPrompt(o: {
   reach: Reach[];
   others: { id: string; name: string }[];
   subject?: (Subject & { home: boolean }) | null;
+  mentions?: readonly Mention[];
 }): string {
   const home = o.reach.find((r) => r.home);
   const lines = [
@@ -59,6 +79,7 @@ export function systemPrompt(o: {
     "A document is listed, read, made, written, renamed, copied, deleted and retitled with the `doc_*` tools and its `kind`; where a description names `note_read` or `board_write`, that is `doc_read` or `doc_write` with that kind.",
     "",
     ...(o.subject ? subjectLines(o.subject) : []),
+    ...(o.mentions?.length ? mentionLines(o.mentions, home?.id) : []),
     "## Changing things",
     'You may change the vaults in reach that are not marked read only. Before each distinct group of changes, call `change_block` with a short title saying what the group does ("Draw the auth flow", "Move the meeting notes into 2026/") — the person undoes a block as one. Deleting, moving folders and emptying the trash wait for the person\'s approval; if they say no, do not try another way around it.',
     "A vault in reach marked read only cannot be changed; to change it, call `vault_request` with mode `edit`, and the person decides.",

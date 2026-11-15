@@ -51,8 +51,8 @@ const LIST: Record<Kind, "boards" | "notes" | "quizzes" | "tables" | "files"> = 
   file: "files",
 };
 
-type Keyed = "ids" | "titles" | "tasks" | "projects" | "events" | "created" | "questions" | "sizes";
-const KEYED: readonly Keyed[] = ["ids", "titles", "tasks", "projects", "events", "created", "questions", "sizes"];
+type Keyed = "ids" | "titles" | "tasks" | "projects" | "events" | "tags" | "created" | "questions" | "sizes";
+const KEYED: readonly Keyed[] = ["ids", "titles", "tasks", "projects", "events", "tags", "created", "questions", "sizes"];
 
 /** Where `name` is, or would go, in a sorted list. */
 function seek(list: readonly string[], name: string): { at: number; has: boolean } {
@@ -231,6 +231,7 @@ export class KeptListing {
         if (f.front.task) keys.tasks = f.front.task;
         if (f.front.project) keys.projects = f.front.project;
         if (f.front.event) keys.events = f.front.event;
+        if (f.front.tags) keys.tags = f.front.tags;
       }
       if (f.front.asks) keys.questions = f.front.asks;
     }

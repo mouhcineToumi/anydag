@@ -120,7 +120,17 @@ async function read(m: Extract<ReadAsk, { read: number }>): Promise<void> {
         sending.set(id, corpusParts(id, reader, done, got.entries, got.meta, files));
         return;
       }
-      const steps = searchSteps(reader, done, got.entries, got.meta, files, want.search, want.limit, want.retire === true);
+      const steps = searchSteps(
+        reader,
+        done,
+        got.entries,
+        got.meta,
+        files,
+        want.search,
+        want.limit,
+        want.retire === true,
+        want.only,
+      );
       post({ id, answer: await drive(id, steps) } satisfies ReadPart);
     });
   } catch (e) {

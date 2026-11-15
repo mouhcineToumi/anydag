@@ -29,6 +29,7 @@ export type SettingsTab =
   | "providers"
   | "vault-general"
   | "vault-files"
+  | "tags"
   | "export"
   | "sync"
   | "agent-access"

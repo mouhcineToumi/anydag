@@ -21,6 +21,7 @@ const EMPTY: BoardTree = {
   tasks: {},
   projects: {},
   events: {},
+  tags: {},
   created: {},
   ids: {},
   quizzes: [],
@@ -52,7 +53,7 @@ describe("the New task box", () => {
   });
 
   it("is one labelled row, and its placeholder says what Enter does", () => {
-    const html = renderToStaticMarkup(createElement(QuickAdd, { status: "todo", into: "", locked: false }));
+    const html = renderToStaticMarkup(createElement(QuickAdd, { status: "todo", into: { folder: "" }, locked: false }));
     expect(html).toContain('placeholder="New task — type a title and press Enter"');
     expect(html).toContain('aria-label="New task in To do — type a title and press Enter"');
     expect(html).toMatch(/<label[^>]*class="dag-tasks__add-row"/);
