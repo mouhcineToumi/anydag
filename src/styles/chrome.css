@@ -7983,14 +7983,32 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer__input::placeholder { color: var(--dag-color-slate); }
 .dag-chat-composer__why { margin: 0; font-size: var(--chrome-text-sm); color: var(--dag-color-dangerText); }
 /* The documents a message is about, above the field: the chat's subject (#323), and the `@` mentions
-   to come. A chip is a pill on the paper, quieter than the field it sits on; its remove button is the
+   (#324). A chip is a pill on the paper, quieter than the field it sits on; its remove button is the
    small icon button, with the chip's padding taken in on that side so the glyph sits centred. */
 .dag-chat-composer__docs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+/* The `@` list, above the field: one document a row, the one Enter would pick tinted. */
+.dag-chat-mentions { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: var(--dag-ui-layer-popover); max-height: 260px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); box-shadow: var(--dag-ui-elevation-overlay); }
+.dag-chat-mention { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 8px; font: inherit; font-size: var(--chrome-text-sm); text-align: left; color: var(--dag-color-ink); background: transparent; border: none; border-radius: var(--dag-ui-radius-control); cursor: pointer; }
+.dag-chat-mention > svg { flex: none; color: var(--dag-color-slate); }
+.dag-chat-mention:hover { background: var(--dag-color-paper100); }
+.dag-chat-mention[aria-selected="true"] { background: var(--dag-color-accentSoft); }
+.dag-chat-mention__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-chat-mention__where { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-chat-mention__none { margin: 0; padding: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
 .dag-chat-docchip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; height: 28px; padding: 0 10px; box-sizing: border-box; font-size: var(--chrome-text-sm); color: var(--dag-color-ink); background: var(--dag-color-paper100); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-pill); }
 .dag-chat-docchip > svg { flex: none; color: var(--dag-color-slate); }
 .dag-chat-docchip__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-docchip:has(.dag-chat-docchip__remove) { padding-right: 2px; }
 .dag-chat-docchip__remove { flex: none; border-radius: var(--dag-ui-radius-pill); }
+/* The `@` list (#324), above the composer and as wide as it: the ranking is the reference picker's,
+   the rows are documents, and the active one is the accent's tint behind ink — never accent text. */
+.dag-chat-mentions { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: var(--dag-ui-layer-popover); max-height: 280px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); box-shadow: var(--dag-ui-elevation-overlay); }
+.dag-chat-mention { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 6px; font: inherit; font-size: var(--chrome-text-md); text-align: left; color: var(--dag-color-ink); background: transparent; border: none; border-radius: var(--dag-ui-radius-control); cursor: pointer; }
+.dag-chat-mention > svg { flex: none; color: var(--dag-color-slate); }
+.dag-chat-mention[aria-selected="true"], .dag-chat-mention:hover { background: var(--dag-color-accentSoft); }
+.dag-chat-mention__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-chat-mention__where { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-chat-mention__none { margin: 0; padding: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
 /* One row: scope, then model, effort, expand and Send pushed to the right. Each control can shrink and
    ellipsize rather than wrap, so a long vault or model name reads shorter instead of pushing Send onto
    a second line. `field-sizing` sizes a select to what it shows rather than its widest option, where

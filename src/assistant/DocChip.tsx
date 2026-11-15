@@ -5,8 +5,7 @@ import { IconButton } from "@/ui/controls";
 
 import type { DocKind } from "./types";
 
-/* 12px inside a chip (DESIGN.md, *Icons*); 14px on the button that removes it. */
-const MARK = { size: 12, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+/* 14px on the button that removes a chip. */
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 /* Each kind's mark, keyed on the kind so a quiz is never drawn as a board — the references' set. */
@@ -18,11 +17,17 @@ const KIND_ICON = {
   file: FileGlyph,
 } satisfies Record<DocKind, LucideIcon>;
 
-/** A document a chat names: the one it works on (#323), and — next — the ones a message mentions with `@` (#324). */
+/** A document a chat names: the one it works on (#323), and the ones a message mentions with `@` (#324). */
 export interface ChipDoc {
   kind: DocKind;
   name: string;
   title: string;
+}
+
+/** A document kind's mark, which every row and chip that names one shares. */
+export function DocMark({ kind, size = 12 }: { kind: DocKind; size?: number }) {
+  const Mark = KIND_ICON[kind];
+  return <Mark size={size} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" />;
 }
 
 /**
@@ -43,10 +48,9 @@ export function DocChip({
   /** The remove button's name, where "Remove <title>" does not say what removing does. */
   removeLabel?: string;
 } & HTMLAttributes<HTMLSpanElement>) {
-  const Mark = KIND_ICON[doc.kind];
   return (
     <span className="dag-chat-docchip" data-dag-chat-docchip={doc.kind} title={doc.name} {...rest}>
-      <Mark {...MARK} aria-hidden="true" />
+      <DocMark kind={doc.kind} />
       <span className="dag-chat-docchip__title">{doc.title}</span>
       {onRemove ? (
         <IconButton
