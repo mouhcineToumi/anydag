@@ -731,7 +731,9 @@
   needed: a "simple" `POST` from any website the person has open needs no preflight, so without the
   token any site could write into a vault. The desktop shell adds the header in the main process;
   `anydag serve` prints `/?token=…` once and swaps it for an `httpOnly`, `SameSite=Strict` cookie and
-  a redirect; Vite's proxy adds the header in development, after refusing anything that is not this
+  a redirect — and since a cookie is not bound to a port, and a page on any other `127.0.0.1` port
+  is the same site, a write the cookie alone vouches for must also say it came from this page's own
+  origin (`Sec-Fetch-Site`, else `Origin`), or it is a `403` (#10); Vite's proxy adds the header in development, after refusing anything that is not this
   page. `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script
   that `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401`
   as an empty list.

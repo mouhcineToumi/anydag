@@ -38,7 +38,9 @@ Nine things are load-bearing:
   older by created date, and the copy is given a new id, written into it. A file moved outside the
   app keeps its id and the index learns the new path from the watcher.
 - **The token and the `Host` are the whole security model**, and both are checked on every request —
-  see *Things that will bite*. `server.json` is written mode `0600`.
+  see *Things that will bite*. `server.json` is written mode `0600`. A write that carries the token
+  only as `anydag serve`'s cookie must also come from the page's own origin, because the cookie
+  rides along from a page on any other `127.0.0.1` port (`test/server/gate.test.ts`).
 - **One server, several vaults.** Each vault has its own change feed, and `/__board/transfer` moves
   a document or a folder between two open vaults with its id and created date.
 - **Nothing the store may do may block sync**: no single shared index file in

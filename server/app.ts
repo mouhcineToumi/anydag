@@ -47,6 +47,21 @@ export interface ServerOptions {
 
 const COOKIE = "anydag_token";
 
+/** The methods that change nothing: a page elsewhere may send them, and cannot read the answer. */
+const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Whether a browser says this request came from the page this server serves. `Sec-Fetch-Site` is
+ * the browser's own answer and cannot be set by script; `Origin`, which every browser sends on a
+ * cross-origin write, is the fallback for one that sends no `Sec-Fetch-*`. A client that sends
+ * neither is not a browser on another page, which is the only sender of the cookie this guards.
+ */
+function ownOrigin(site: string | undefined, origin: string | undefined, host: string | undefined): boolean {
+  if (site !== undefined && site !== "same-origin" && site !== "none") return false;
+  if (origin !== undefined && origin !== `http://${host ?? ""}`) return false;
+  return true;
+}
+
 /** The routes about the app rather than one vault: they answer with no vault open. */
 const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me", "/api/telemetry"];
 
@@ -73,8 +88,19 @@ export function createApp(opts: ServerOptions): Hono {
       url.searchParams.delete("token");
       return c.redirect(url.pathname + url.search);
     }
-    const said = c.req.header("x-anydag-token") ?? getCookie(c, COOKIE);
+    const header = c.req.header("x-anydag-token");
+    const said = header ?? getCookie(c, COOKIE);
     if (said !== opts.token) return c.json({ error: "this server needs its token", code: "token" }, 401);
+    // The cookie rides on every request to this host, whatever port the page that sent it came
+    // from: a page on another 127.0.0.1 port is the same *site*, so `SameSite=Strict` lets it
+    // through, and a `text/plain` POST needs no preflight. A write the cookie alone vouches for
+    // must therefore come from this page's own origin (#10).
+    if (
+      header === undefined &&
+      !SAFE.has(c.req.method) &&
+      !ownOrigin(c.req.header("sec-fetch-site"), c.req.header("origin"), c.req.header("host"))
+    )
+      return c.json({ error: "a write with the cookie must come from this page", code: "origin" }, 403);
     await next();
   });
 
