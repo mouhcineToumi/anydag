@@ -10,6 +10,7 @@ import { blockAt, load, plan, saved, settle, type Loaded, type NoteBlock } from 
 import { anchorsOf } from "@/note/anchors";
 import { eventOf, withEvent, type EventChange, type NoteEvent } from "@/note/event";
 import { clearTarget, useTarget } from "@/refs/target";
+import { useTabActive } from "@/ui/tabs/keep";
 import { merge3 } from "@/note/merge";
 import { folderOf, projectFolders, projectFor, projectOf, withProject, type Project, type ProjectChange } from "@/note/project";
 import { taskOf, withTask, type Task, type TaskChange, type TaskFacts } from "@/note/task";
@@ -834,8 +835,11 @@ export function NoteView({
    * and is answered with the notice rather than with nothing. Looked at after every listener has had
    * the key, so `space O` — which the page's own keys take — is not mistaken for typing.
    */
+  /* A note kept mounted behind the tab in front (`ui/tabs/keep.ts`) hears no key, reads no part from
+     the address and says nothing about being ready: those are the front page's. */
+  const active = useTabActive();
   useEffect(() => {
-    if (!locked || snapshot) return;
+    if (!locked || snapshot || !active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
       if (e.key.length !== 1 && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "Enter") return;
@@ -846,7 +850,7 @@ export function NoteView({
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [locked, snapshot]);
+  }, [locked, snapshot, active]);
   /* A file dropped on a locked note is not kept, and not opened by the browser in place of the app. */
   const refuseFiles = useCallback(async () => {
     refuseLocked();
@@ -917,7 +921,7 @@ export function NoteView({
    */
   const target = useTarget();
   useEffect(() => {
-    if (!ready || !target || snapshot) return;
+    if (!ready || !target || snapshot || !active) return;
     const ed = editor.current;
     const l = loaded.current;
     const h = held.current;
@@ -932,12 +936,12 @@ export function NoteView({
       if (id) ed.reveal(id);
     }
     clearTarget();
-  }, [ready, target, snapshot, body]);
+  }, [ready, target, snapshot, body, active]);
 
   /* The same signal a board raises when it is finished, on the same element, so `snapshot.mjs` and
      the suite wait for a note exactly as they wait for a board: the text loaded and the editor up. */
   useEffect(() => {
-    if (!settled) return;
+    if (!settled || !active) return;
     /* And its equations drawn by KaTeX, in the editor as on the read-only page. */
     let live = true;
     void drawnSettled().then(() => {
@@ -947,7 +951,7 @@ export function NoteView({
       live = false;
       delete document.documentElement.dataset.dagReady;
     };
-  }, [settled]);
+  }, [settled, active]);
 
   /* Nothing to draw and nothing coming: one card, the same every kind draws. A note that was opened
      before and then failed a later read keeps what it has — this only takes the page when there is

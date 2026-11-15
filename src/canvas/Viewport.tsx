@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 
 import {
   centeredBox,
@@ -75,6 +75,15 @@ export interface ViewportHandle {
  */
 export type Tool = "select" | "hand" | "pen";
 
+/**
+ * Where the view was, kept by whoever outlives this viewport — a document tab whose board is
+ * unmounted while another tab is in front (`src/ui/tabs/keep.ts`). Only a view somebody placed is
+ * put back: an automatic fit is made again, which is what it would have been.
+ */
+export interface ViewKeep {
+  view?: { zoom: number; off: Point; touched: boolean };
+}
+
 interface Props {
   content: Rect;
   tool?: Tool;
@@ -98,6 +107,8 @@ interface Props {
    * swallowed every wheel would stop the note scrolling the moment the pointer crossed it.
    */
   scrollThrough?: boolean;
+  /** The view to open on, and where this one is left when the viewport goes or `keep` changes. */
+  keep?: ViewKeep;
   children: ReactNode;
 }
 
@@ -111,6 +122,7 @@ export function Viewport({
   onPaperDoubleClick,
   handleRef,
   scrollThrough = false,
+  keep,
   children,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -235,6 +247,18 @@ export function Viewport({
       y: (clientY - (box?.top ?? 0) - off.y) / z,
     };
   }, []);
+
+  /* A kept view is painted before the first fit can run, and claims the view as a person's would. */
+  useLayoutEffect(() => {
+    const v = keep?.view;
+    if (v?.touched) {
+      commit(v.zoom, v.off);
+      touched.current = true;
+    }
+    return () => {
+      if (keep) keep.view = { ...applied.current, touched: touched.current };
+    };
+  }, [keep, commit]);
 
   useImperativeHandle(
     handleRef,

@@ -34,7 +34,7 @@ import {
   type FileKind,
   type LoadProblem,
 } from "@/board/useBoard";
-import { Viewport, type Tool, type ViewportHandle } from "@/canvas/Viewport";
+import { Viewport, type Tool, type ViewKeep, type ViewportHandle } from "@/canvas/Viewport";
 import { BoardEdges } from "@/render/BoardEdges";
 import { growable } from "@/edit/build";
 import { Inspector } from "@/edit/Inspector";
@@ -69,6 +69,17 @@ import {
 import { DocTabs } from "@/ui/tabs/DocTabs";
 import { installTabIntent, newTabWanted, type NewTab } from "@/ui/tabs/intent";
 import {
+  forgetTab,
+  keptFor,
+  LIVE_NOTES,
+  restoreScroll,
+  saveScroll,
+  TabFrameContext,
+  useTabActive,
+  useTabKeep,
+  type KeptScroll,
+} from "@/ui/tabs/keep";
+import {
   PAGE_KEYS,
   addressOf,
   adopt,
@@ -81,11 +92,13 @@ import {
   placeOf,
   setPlace,
   tabById,
+  kindOf,
+  type Tab,
   type Tabs,
 } from "@/ui/tabs/model";
 import { changeTabs, tabsNow, useTabs } from "@/ui/tabs/store";
 import { useSettings } from "@/settings/useSettings";
-import { typing, useEditor } from "@/edit/useEditor";
+import { typing, useEditor, type EditorKeep } from "@/edit/useEditor";
 import { Item } from "@/render/Item";
 import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
@@ -649,6 +662,7 @@ export function App() {
   const closeDocTab = useCallback(
     (id: string) => {
       const next = changeTabs((t: Tabs) => closeTab(t, id));
+      forgetTab(id);
       if (id !== activeRef.current) return;
       const front = tabById(next, next.active);
       if (front) swap(addressOf(front.place, location.search), placeFor(front.place), front.id);
@@ -722,23 +736,32 @@ export function App() {
   /* While a reference is being resolved the page draws nothing — but the sidebar stays, where the
      whole window used to go blank for the round trip. Keyed by its tab, so a tab brought to the
      front draws its own page rather than taking over the last tab's. */
-  const page = ref ? null : (
-    <TabPage
-      key={active}
-      shown={shown}
-      query={query}
-      setQuery={setQuery}
-      goSet={goSet}
-      list={list}
-      open={open}
-      openQuizzes={openQuizzes}
-      openTrash={openTrash}
-      goHome={goHome}
-    />
+  const common = { goSet, list, open, openQuizzes, openTrash, goHome };
+  const page = ref ? null : <TabPage shown={shown} query={query} setQuery={setQuery} {...common} />;
+  /* The notes kept mounted behind it (`ui/tabs/keep.ts`): the most recently in front, up to
+     `LIVE_NOTES`. Each is drawn from its own place, and what it sets goes to its tab, not the address. */
+  const recency = useRef<string[]>([]);
+  recency.current = [active, ...recency.current.filter((id) => id !== active && tabById(tabs, id))];
+  const live = new Set(
+    recency.current.filter((id) => id !== active && kindOf(tabById(tabs, id)!.place) === "note").slice(0, LIVE_NOTES),
   );
-  /* A snapshot is a picture of a board, and a picture of a board is a fact about the file: no
-     sidebar, and not even the shell around the page, so the 45 baselines see exactly the `.dag-app`
-     they always have. */
+  const behindTabs = useBehindTabs();
+  const frames = tabs.list
+    .filter((t) => t.id === active || live.has(t.id))
+    .map((t) => (
+      <TabFrame key={t.id} id={t.id} active={t.id === active}>
+        {t.id === active ? (
+          page
+        ) : (
+          <TabPage
+            shown={pagesOf(behindTabs.query(t), ai.assistant)}
+            query={behindTabs.query(t)}
+            setQuery={behindTabs.setter(t.id)}
+            {...common}
+          />
+        )}
+      </TabFrame>
+    ));
   if (snapshot) return page;
   return (
     <Shell
@@ -779,9 +802,80 @@ export function App() {
     >
       <div className="dag-docs">
         <DocTabs tabs={tabs} active={active} titles={list.titles} onSwitch={switchTab} onClose={closeDocTab} onNew={newDocTab} />
-        {page}
+        {frames}
       </div>
     </Shell>
+  );
+}
+
+/**
+ * One tab's page in the column: the tab in front, or a note kept mounted behind it — hidden, inert,
+ * and told so through `TabFrameContext`, so nothing it listens for on the window hears the page in
+ * front's keys. A page that goes leaves its scroll with its tab, and has it back when it is drawn
+ * again (`ui/tabs/keep.ts`).
+ */
+function TabFrame({ id, active, children }: { id: string; active: boolean; children: ReactNode }) {
+  const el = useRef<HTMLDivElement>(null);
+  const info = useMemo(() => ({ id, active }), [id, active]);
+  useLayoutEffect(() => {
+    const root = el.current;
+    if (!root) return;
+    const kept = keptFor<{ scroll?: KeptScroll[] }>(id, "frame", () => ({}));
+    const stop = kept.scroll ? restoreScroll(root, kept.scroll) : undefined;
+    return () => {
+      stop?.();
+      kept.scroll = saveScroll(root);
+    };
+  }, [id]);
+  return (
+    <TabFrameContext value={info}>
+      <div
+        ref={el}
+        className="dag-docs__page"
+        data-dag-docs-page={id}
+        data-dag-docs-away={active ? undefined : ""}
+        inert={!active}
+      >
+        {children}
+      </div>
+    </TabFrameContext>
+  );
+}
+
+/**
+ * A tab behind the one in front reads its own place rather than the address, and what it sets goes
+ * to that place. The same objects across renders, so a page kept mounted is not drawn again for
+ * nothing.
+ */
+function useBehindTabs(): { query(tab: Tab): URLSearchParams; setter(id: string): SetQuery } {
+  const queries = useRef(new Map<string, URLSearchParams>());
+  const setters = useRef(new Map<string, SetQuery>());
+  return useMemo(
+    () => ({
+      query(tab: Tab) {
+        const key = `${tab.id} ${tab.place}`;
+        let q = queries.current.get(key);
+        if (!q) {
+          for (const k of queries.current.keys()) if (k.startsWith(`${tab.id} `)) queries.current.delete(k);
+          q = addressOf(tab.place, location.search);
+          queries.current.set(key, q);
+        }
+        return q;
+      },
+      setter(id: string) {
+        let f = setters.current.get(id);
+        if (!f) {
+          f = (key, value) =>
+            changeTabs((t) => {
+              const tab = tabById(t, id);
+              return tab ? setPlace(t, id, placeOf(withPairs(addressOf(tab.place, "").toString(), pairsOf(key, value)))) : t;
+            });
+          setters.current.set(id, f);
+        }
+        return f;
+      },
+    }),
+    [],
   );
 }
 
@@ -871,7 +965,10 @@ function TabPage({
 function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): void; feedback(): void }) {
   const ref = useRef(on);
   ref.current = on;
+  /* A page kept mounted behind the tab in front is asked nothing: the cards are the front page's. */
+  const active = useTabActive();
   useEffect(() => {
+    if (!active) return;
     const listen = (e: Event) => {
       const ask = (e as CustomEvent<ChromeAsk>).detail;
       if (ask?.what === "settings") ref.current.settings(ask.tab);
@@ -880,7 +977,7 @@ function useChromeRequests(on: { search(): void; settings(tab?: SettingsTab): vo
     };
     document.addEventListener("dag:chrome", listen);
     return () => document.removeEventListener("dag:chrome", listen);
-  }, []);
+  }, [active]);
 }
 
 /**
@@ -903,8 +1000,9 @@ function useFeedbackOpen(): { open: boolean; show(): void; close(): void } {
 function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }) {
   const ref = useRef(on);
   ref.current = on;
+  const active = useTabActive();
   useEffect(() => {
-    if (snapshot) return;
+    if (snapshot || !active) return;
     let leader = false;
     const onKey = (e: KeyboardEvent) => {
       /* `ctrl+,` before the typing test: a modifier chord is not a character, and Settings is what
@@ -940,7 +1038,7 @@ function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [snapshot]);
+  }, [snapshot, active]);
 }
 
 function readLayout(): TasksLayout {
@@ -2031,8 +2129,11 @@ function NoteApp({
 
   /* `dag:export` with `kind: "pdf"` sets the note out for paper and answers with its title once it is
      drawn, leaving it up — the board page's event, and for its reason: `anydag note export --format
-     pdf` drives this page under `?snapshot=1`, where there is no menu, and prints it itself. */
+     pdf` drives this page under `?snapshot=1`, where there is no menu, and prints it itself. A note
+     kept behind the tab in front is not the one asked for. */
+  const active = useTabActive();
   useEffect(() => {
+    if (!active) return;
     const onExport = (e: Event) => {
       const d = (e as CustomEvent<{ kind?: string; reply?: (v: string) => void; fail?: (why: string) => void } | null>).detail;
       if (!d?.reply || d.kind !== "pdf") return;
@@ -2055,7 +2156,7 @@ function NoteApp({
     };
     document.addEventListener("dag:export", onExport);
     return () => document.removeEventListener("dag:export", onExport);
-  }, [name, noteText]);
+  }, [name, noteText, active]);
 
   const chooseTheme = useCallback(
     (n: string) => {
@@ -2414,6 +2515,10 @@ function BoardApp({
 
   const laidOut = useMemo(() => (board ? placeItems(board, page, sizes) : new Map()), [board, page, sizes]);
 
+  /* What this board's tab keeps while another is in front (`ui/tabs/keep.ts`): its undo and
+     selection, and the view of each page. */
+  const editorKeep = useTabKeep<EditorKeep>("editor", () => ({}));
+  const viewKeep = useTabKeep<ViewKeep>(`view:${boardName ?? ""}\u0000${page}`, () => ({}));
   /* Selection, gestures, the clipboard, undo: everything a person does to the items. `places` is
      the flow's answer with the gesture in progress on top, until the file agrees. */
   const editor = useEditor({
@@ -2432,6 +2537,7 @@ function BoardApp({
     onSettings: settings.toggle,
     onOpenBoard: openImported,
     onOpenPage: (p) => goSet("page", p),
+    keep: editorKeep,
   });
   const { places, selected, editing, ctl } = editor;
 
@@ -3040,6 +3146,7 @@ function BoardApp({
         <Viewport
           content={bounds}
           handleRef={viewport}
+          keep={viewKeep}
           /* The zoom figure goes out as an event rather than into state here: as `App` state it
              would re-render every child on every wheel step, which is the cost `data-zoom` was
              painted rather than rendered to avoid. Only `ZoomBar` listens. */
