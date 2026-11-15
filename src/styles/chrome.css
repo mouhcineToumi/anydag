@@ -6660,14 +6660,14 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 }
 .dag-cal-now::before { content: ""; position: absolute; top: -3px; left: -4px; width: 8px; height: 8px; background: var(--dag-color-danger); border-radius: 50%; }
 
-/* The card that names what was drawn. */
+/* The card that sets up what was drawn: its title, when it is, and what it is about. */
 .dag-calendar__new {
   position: fixed;
   z-index: var(--dag-ui-layer-popover);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 280px;
+  width: min(340px, calc(100vw - 24px));
   padding: 12px;
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
@@ -6675,16 +6675,28 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   box-shadow: var(--dag-ui-elevation-overlay);
 }
 .dag-calendar__new-when { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--dag-ui-text-sm); color: var(--dag-color-slate); }
-.dag-calendar__new input {
-  padding: 6px 8px;
+.dag-calendar__new-when > svg { flex: none; }
+.dag-calendar__new-zone { margin-left: auto; }
+.dag-calendar__new-field {
+  min-width: 0;
+  padding: 5px 8px;
   font: inherit;
-  font-size: var(--dag-ui-text-lg);
+  font-size: var(--dag-ui-text-md);
   color: var(--dag-color-ink);
+  color-scheme: inherit;
   background: var(--dag-color-paper);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-ui-radius-control);
 }
-.dag-calendar__new input:focus-visible { box-shadow: var(--focus-ring); }
+.dag-calendar__new-title { font-size: var(--dag-ui-text-lg); }
+.dag-calendar__new-field:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-calendar__new-field:disabled { opacity: 0.6; }
+.dag-calendar__new-allday { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dag-calendar__new-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--dag-ui-text-md); color: var(--dag-color-slate); cursor: pointer; }
+.dag-calendar__new-times { display: grid; grid-template-columns: 44px minmax(0, 1fr) 104px; align-items: center; gap: 6px; }
+.dag-calendar__new-times > label { font-size: var(--dag-ui-text-sm); color: var(--dag-color-slate); }
+.dag-calendar__new-times .dag-calendar__new-field { padding-inline: 6px; }
+.dag-calendar__new-description { min-height: 44px; resize: vertical; }
 .dag-calendar__new-acts { display: flex; justify-content: flex-end; gap: 8px; }
 .dag-calendar__new-cancel,
 .dag-calendar__new-make {

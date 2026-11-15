@@ -79,7 +79,9 @@ async function calendar(page: Page, query: string, expectItem?: string) {
   const project = write("project", "Calendar check", ["project: active"]);
   const id = await idOf(page, project);
   await page.goto(`/?project=${id}&${query}`);
-  await expect(page.locator("[data-dag-calendar]")).toBeVisible();
+  /* The page's first paint waits for its fonts, so a cold dev server on a loaded machine can take
+     longer than Playwright's five seconds — the items below already allow fifteen. */
+  await expect(page.locator("[data-dag-calendar]")).toBeVisible({ timeout: 15_000 });
   if (expectItem) await expect(page.locator(`[data-dag-cal-item="${expectItem}"]`).first()).toBeVisible({ timeout: 15_000 });
 }
 
@@ -278,6 +280,83 @@ test("a drag in the hour grid makes an event with that start and end, in the pro
     .poll(() => read("Planning"))
     .toMatch(/^---\nstart: 2031-03-12T10:00[+-]\d{2}:\d{2}\nend: 2031-03-12T11:30[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/);
   await expect(page.locator(`[data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+});
+
+test("the card's times are the drag's, and editing them changes the event it makes", async ({ page }) => {
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=week&date=2031-03-12", `${folder}/anchor`);
+  /* A drag from 10:00 to 11:30 on the Wednesday, as the test above makes one. */
+  const column = page.locator('[data-dag-cal-column="2031-03-12"]');
+  const b = (await column.boundingBox())!;
+  const minute = b.height / 1440;
+  const x = b.x + b.width / 2;
+  await page.mouse.move(x, b.y + 600 * minute + 2);
+  await page.mouse.down();
+  await page.mouse.move(x, b.y + 680 * minute, { steps: 4 });
+  await page.mouse.up();
+
+  const card = page.locator("[data-dag-calendar-new]");
+  const startDay = card.locator("[data-dag-calendar-new-start-day]");
+  const startTime = card.locator("[data-dag-calendar-new-start-time]");
+  const endDay = card.locator("[data-dag-calendar-new-end-day]");
+  const endTime = card.locator("[data-dag-calendar-new-end-time]");
+  await expect(startDay).toHaveValue("2031-03-12");
+  await expect(startTime).toHaveValue("10:00");
+  await expect(endDay).toHaveValue("2031-03-12");
+  await expect(endTime).toHaveValue("11:30");
+
+  /* A start moved keeps the length, as the event bar does, and the end is set afterwards. */
+  await startTime.fill("14:15");
+  await expect(endTime).toHaveValue("15:45");
+  await endTime.fill("16:30");
+  await endDay.fill("2031-03-13");
+  await endTime.fill("09:45");
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("14:15 – ");
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("09:45");
+
+  await card.locator("[data-dag-calendar-new-description]").fill("Bring the roadmap.");
+  await card.locator("[data-dag-calendar-new-title]").fill("Planning");
+  await card.locator("[data-dag-calendar-new-title]").press("Enter");
+  await expect(card).toHaveCount(0);
+
+  /* Enter still makes it in one step, with the times the card settled on and the description under
+     them — every time carrying this zone's offset. */
+  await expect
+    .poll(() => read("Planning"))
+    .toMatch(
+      /^---\nstart: 2031-03-12T14:15[+-]\d{2}:\d{2}\nend: 2031-03-13T09:45[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\nBring the roadmap\.\n$/,
+    );
+  await expect(page.locator(`[data-dag-cal-column="2031-03-12"] [data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-cal-column="2031-03-13"] [data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+});
+
+test("the all-day switch takes the new event to the all-day row", async ({ page }) => {
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=week&date=2031-03-12", `${folder}/anchor`);
+  const column = page.locator('[data-dag-cal-column="2031-03-12"]');
+  const b = (await column.boundingBox())!;
+  const minute = b.height / 1440;
+  const x = b.x + b.width / 2;
+  await page.mouse.move(x, b.y + 600 * minute + 2);
+  await page.mouse.down();
+  await page.mouse.move(x, b.y + 680 * minute, { steps: 4 });
+  await page.mouse.up();
+
+  const card = page.locator("[data-dag-calendar-new]");
+  await expect(card.locator("[data-dag-calendar-new-start-time]")).toHaveValue("10:00");
+  await card.locator("[data-dag-calendar-new-allday]").check();
+  /* No time to set on an all-day event: the two fields go and the summary says the day. */
+  await expect(card.locator("[data-dag-calendar-new-start-time]")).toHaveCount(0);
+  await expect(card.locator("[data-dag-calendar-new-end-time]")).toHaveCount(0);
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("Wed, Mar 12, 2031");
+
+  await card.locator("[data-dag-calendar-new-title]").fill("Offsite");
+  await card.locator("[data-dag-calendar-new-make]").click();
+  await expect(card).toHaveCount(0);
+
+  await expect.poll(() => read("Offsite")).toMatch(/^---\nstart: 2031-03-12\nid: [0-9a-z]{10}\n---\n$/);
+  await expect(page.locator(`[data-dag-cal-allday] [data-dag-cal-item="${folder}/Offsite"]`)).toBeVisible();
+  await expect(page.locator(`.dag-cal-column [data-dag-cal-item="${folder}/Offsite"]`)).toHaveCount(0);
 });
 
 test("a click on a month's day asks for an all-day event on it, and Escape leaves nothing", async ({ page }) => {
