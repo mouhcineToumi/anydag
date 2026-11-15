@@ -90,6 +90,32 @@ describe("a vault's search and corpus", () => {
     expect(await search(app, "nothing-like-this")).toEqual([]);
   });
 
+  it("narrows to one tag's documents before the limit, and with no words lists them by title (#327)", async () => {
+    await env.vault.create("Plan", "note", "---\ntags: [Pricing]\n---\n# Plan\n\nSeat prices settle.\n");
+    await env.vault.create("Other", "note", "# Other\n\nSeat counts by plan.\n");
+    await env.vault.create("Board", "board", "---\ntitle: Ops board\ntags: [pricing, q4]\n---\n\n```md {#a}\nA seat.\n```\n");
+    await env.vault.create("Templates/T", "note", "---\ntags: [pricing]\n---\n# {{title}}\n\nseat\n");
+    const app = appOf();
+    expect((await search(app, "seat")).map((h) => h.name).sort()).toEqual(["Board", "Other", "Plan", "Templates/T"]);
+    const tagged = await get(app, "/__board/search?q=seat&tag=PRICING");
+    expect(tagged.tag).toBe("PRICING");
+    expect((tagged.hits as Hit[]).map((h) => h.name).sort()).toEqual(["Board", "Plan"]);
+    /* The limit counts what the tag keeps, not what it drops. */
+    expect(((await get(app, "/__board/search?q=seat&tag=q4&limit=1")).hits as Hit[]).map((h) => h.name)).toEqual(["Board"]);
+    /* No words: every document carrying it, by title, with its kind — a template left out. */
+    const all = await get(app, "/__board/search?tag=pricing");
+    expect(all.hits).toEqual([]);
+    expect(all.count).toBe(2);
+    expect((all.docs as { name: string; kind: string; title: string | null }[]).map((d) => [d.name, d.kind, d.title])).toEqual([
+      ["Board", "board", "Ops board"],
+      ["Plan", "note", "Plan"],
+    ]);
+    const res = await app.request("http://127.0.0.1/__board/search?q=x&tag=2026", {
+      headers: { "x-anydag-token": "t", host: "127.0.0.1" },
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("keeps what it parsed in the app's home, a row per text, and writes nothing into the vault", async () => {
     await env.vault.create("Plan", "note", "# Plan\n\nPayments settle overnight.\n");
     await env.vault.create("Other", "note", "# Other\n\nNothing here.\n");

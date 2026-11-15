@@ -10,6 +10,7 @@ import type { Task } from "@/note/task";
 import { ProjectLine } from "@/ui/ProjectBar";
 import { EventLine } from "@/ui/EventBar";
 import { TaskLine } from "@/ui/TaskGlyph";
+import { TagLine } from "@/ui/tags/TagChip";
 
 import { drawn, READY_WITHIN } from "./drawn";
 import { NoteMarkdown } from "./NoteRead";
@@ -46,6 +47,7 @@ export function NotePrint({
   task,
   project,
   event,
+  tags = [],
   body,
   theme,
   onReady,
@@ -59,6 +61,8 @@ export function NotePrint({
   project?: Project;
   /** When it is, when the note is an event. */
   event?: NoteEvent;
+  /** Its tags, as chips under the heading. */
+  tags?: readonly string[];
   /** The Markdown after the frontmatter. */
   body: string;
   /** Always a light one — `paperTheme()` — scoped to this element, so the app behind keeps its own. */
@@ -101,6 +105,7 @@ export function NotePrint({
       {project ? <ProjectLine project={project} /> : null}
       {task ? <TaskLine task={task} /> : null}
       {event ? <EventLine event={event} /> : null}
+      <TagLine tags={tags} />
       <NoteMarkdown name={name} body={body} components={refComponents()} />
     </div>,
     document.body,

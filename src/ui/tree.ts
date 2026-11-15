@@ -276,15 +276,19 @@ export type Row =
  * folder a drop onto it means, and `size`/`pos` are `aria-setsize`/`aria-posinset` — which a
  * nested tree gets from its markup and a flat one has to say. `depth` is also how far the guide
  * rules reach, one per level.
+ *
+ * `empty` is the folders that are empty in the vault, when that is not the same question as empty
+ * in `node`: a filtered tree keeps a folder whose every file is hidden, and calling that one *Empty*
+ * would say the vault holds nothing where it holds only something switched off.
  */
-export function rows(node: Tree, open: ReadonlySet<string>, depth = 0, out: Row[] = []): Row[] {
+export function rows(node: Tree, open: ReadonlySet<string>, depth = 0, out: Row[] = [], empty?: ReadonlySet<string>): Row[] {
   const size = node.folders.length + node.files.length;
   let pos = 0;
   for (const f of node.folders) {
     const shown = open.has(f.path);
-    const empty = f.folders.length === 0 && f.files.length === 0;
-    out.push({ type: "folder", path: f.path, name: f.name, depth, open: shown, empty, size, pos: ++pos });
-    if (shown) rows(f, open, depth + 1, out);
+    const none = empty ? empty.has(f.path) : f.folders.length === 0 && f.files.length === 0;
+    out.push({ type: "folder", path: f.path, name: f.name, depth, open: shown, empty: none, size, pos: ++pos });
+    if (shown) rows(f, open, depth + 1, out, empty);
   }
   for (const entry of node.files) out.push({ type: "file", entry, depth, size, pos: ++pos });
   return out;

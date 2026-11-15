@@ -321,11 +321,17 @@ export class WorkerProcess {
     q: string,
     limit?: number,
     retire = false,
+    only?: readonly string[],
   ): Promise<DslResponse> {
     this.searched = Date.now();
     const { c, id, answer } = this.open<DslResponse>("/search");
     answer.catch(() => undefined);
-    const want: Want = { search: q, ...(limit !== undefined ? { limit } : {}), ...(retire ? { retire } : {}) };
+    const want: Want = {
+      search: q,
+      ...(limit !== undefined ? { limit } : {}),
+      ...(retire ? { retire } : {}),
+      ...(only ? { only: [...only] } : {}),
+    };
     await this.sendEntries(c, { read: id, parsed, home, root, question: "corpus", since: null }, entries, { meta, files, want });
     return answer;
   }
@@ -605,12 +611,12 @@ export class Parsed {
    * the docs are. A worker that has just parsed many texts asks to be replaced first (`{ again }`), and
    * a fresh one builds the engine from what the first kept on disk.
    */
-  async search(over: Over, q: string, limit?: number): Promise<Doc> {
+  async search(over: Over, q: string, limit?: number, only?: readonly string[]): Promise<Doc> {
     const t = this.worker();
     if (t) {
       try {
         const ask = (retire: boolean) =>
-          t.search(this.number, this.home, this.root, over.entries, over.meta, over.files, q, limit, retire);
+          t.search(this.number, this.home, this.root, over.entries, over.meta, over.files, q, limit, retire, only);
         let got = await ask(true);
         if ((got.body as { again?: boolean } | null)?.again) {
           t.retire();
@@ -623,7 +629,8 @@ export class Parsed {
       }
     }
     const reader = this.reader();
-    return searchOver(reader, caughtUp(reader, over.entries), over.entries, over.meta, over.files, q, limit).body as Doc;
+    return searchOver(reader, caughtUp(reader, over.entries), over.entries, over.meta, over.files, q, limit, false, only)
+      .body as Doc;
   }
 
   /** The corpus, as the JSON of its docs a part at a time — joined by commas, with none between parts. */

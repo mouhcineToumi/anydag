@@ -19,6 +19,7 @@ const tree = (over: Partial<BoardTree> = {}): BoardTree => ({
   tasks: {},
   projects: {},
   events: {},
+  tags: {},
   created: {},
   ids: { plan: "id-plan", renamed: "id-plan", "notes/idea": "id-note" },
   quizzes: [],
