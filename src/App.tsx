@@ -1845,7 +1845,7 @@ function NoteApp({
                           icon: CircleSlash,
                           hook: "data-dag-taskbar-untask",
                           split: true,
-                          onSelect: () => noteHandle.current?.task({ status: null, due: null, start: null }),
+                          onSelect: () => noteHandle.current?.task({ status: null, due: null, start: null, priority: null }),
                         }),
                       ]
                     : []),

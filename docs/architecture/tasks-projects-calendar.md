@@ -5,13 +5,15 @@
 ## Tasks
 
 A **task** is a note whose frontmatter has a `status:` — `todo`, `in-progress` or `done` — with an
-optional `due:` date, `YYYY-MM-DD`. Nothing else marks one. Three
+optional `due:` date, `YYYY-MM-DD`, and an optional `priority:` — `urgent`, `high`, `medium` or
+`low`. Nothing else marks one. Three
 design points: a task is a note with a status rather than a third kind of file, its card
 on a board changes the task's file, and a sidebar row dropped on the canvas places it.
 
     ---
     title: Ship the pricing page
     status: in-progress
+    priority: high
     due: 2026-10-03
     ---
     The copy is in [Pricing draft](dag:7q2m9xk4tb).
@@ -20,12 +22,12 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
 | Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
-| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
-| the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
-| a board, or a note, embedding one | a card — status as a button, title, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
-| `?view=1`, a snapshot, the PDF | the status and date on a line above the text |
+| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
+| the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Priority* (the row's menu), *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
+| a board, or a note, embedding one | a card — status as a button, title, priority, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
+| `?view=1`, a snapshot, the PDF | the status, priority and date on a line above the text |
 
-Seven things are load-bearing:
+Ten things are load-bearing:
 
 - **Everything a note is, a task is**, because it is one: the file is `.note.md`, the kind is `note`,
   and the editor, the references in its description, backlinks, search, export
@@ -45,7 +47,7 @@ Seven things are load-bearing:
   rewrites the frontmatter `NoteView` already holds and saves through the note's `put`, so the page
   is never an outside writer to itself and a status change and a paragraph being typed are one
   write. Everywhere else — the Tasks page, a card, a row's menu, the CLI — it is
-  `POST /__board/task {name, status?, due?}`, which recomputes from the text that beat it on a
+  `POST /__board/task {name, status?, due?, start?, priority?}`, which recomputes from the text that beat it on a
   conflict, as `/retitle` does.
 - **The list, the feed and the index carry it**, as they carry a title: `/__board/list`'s `tasks`
   and `ids`, `task` on a note's `dag:note` event so a row is redrawn in place, and `task` on
@@ -58,6 +60,16 @@ Seven things are load-bearing:
   struck through, until the toast that says so goes (five seconds, held while the pointer or the
   focus is on it), so its Undo is where the click happened; a refused write puts it back by itself.
   A click that meant three things in turn was a click nobody could make without looking.
+- **Priority is four words and no line** (#311). `priorityOf` reads `urgent`, `high`, `medium` and
+  `low`, lenient in case and space only; no `priority:` is none, the default, so there is no fifth
+  word for it in the file. **Any other value is read as none and left as it is**: a note saying
+  `priority: P1` is not refused or rewritten, only drawn with none until someone picks a level, and
+  picking one replaces that line where it is. It is drawn as four bars, as many filled as it matters
+  (four for urgent, one for low), in the danger hue, the darker amber, the accent and slate; a row
+  with none shows a blank cell, and the empty bars under the pointer or the focus, which is where
+  to press. A menu row's key picks it while the menu is open — `1`–`4`, and `0` for none.
+  `POST /__board/task` takes `priority` (`null` takes it out), `task_create` and `task_set` take it
+  (`"none"` takes it out), `task_list` says it, and *Not a task* takes it out with the status.
 - **The listing carries three facts that are never a line in the file**: `items`, the check items
   the body ticks of all it has (`- [ ]`, `1. [x]`, as remark's GFM reads one, and none inside a code
   fence); `body`, whether there is any text under the frontmatter; and `changed`, the file's own
@@ -103,14 +115,19 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, `dag-tasks-menu*`,
 `dag-tasks-kbd`, `data-dag-task-menu*`, `data-dag-tasks-tab`, `data-dag-tasks-showing`,
 `data-dag-task-toast`, `data-dag-task-undo`, `data-dag-task-items`, `data-dag-task-page`,
-`data-dag-task-changed`, `data-dag-task-more`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
+`data-dag-task-changed`, `data-dag-task-more`, `data-dag-task-priority`, `data-dag-taskbar-priority`,
+`data-dag-taskbar-priority-menu`, `data-dag-taskline-priority`, `data-dag-embed-priority`, `data-priority`
+on `.dag-task-priority`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
 `data-dag-tasks-look-done`, `data-today` on a due date, the storage keys `dag:tasks-view` and
 `dag:tasks-tab`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
 `tasks`.
 
-**Out, and why:** assignees, priorities and reminders (each is a
-decision about who does what); labels of a task's own (a task carries tags as every document does,
-*Tags* below, and a tag says what it is about, never who does it or how urgent it is); a status set of a person's own (three fixed words are what the
+**Out, and why:** assignees and reminders (each is a
+decision about who does what); priority was out on that ground too, and is in since #311: the
+maintainer decided that a task list a person runs alone still has to say what comes first, and four
+fixed words are what both the menu and the parser can be held to, as the three statuses are; labels
+of a task's own (a task carries tags as every document does, *Tags* below, and a tag says what it is
+about, never who does it or how urgent it is); a status set of a person's own (three fixed words are what the
 columns are and what both parsers can be held to); sub-tasks as files (a check item in the
 description is one); and a manual order within a column (nothing stores one). Tasks are reached
 over MCP too: `task_list`, `task_create`, `task_set`.

@@ -1,5 +1,6 @@
 import { AlertCircle, Calendar, CalendarDays, GitMerge, Tag, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import type { Spot } from "@/calendar/menu";
 
 import { useBlockEditor, type NoteEditor } from "@/blocks";
 import { concerns, onNote } from "@/board/events";
@@ -14,7 +15,7 @@ import { merge3 } from "@/note/merge";
 import { projectOf, withProject, type Project, type ProjectChange } from "@/note/project";
 import { tagsOf, withTags, type TagChange } from "@/note/tags";
 import type { Hue } from "@/dsl/ir";
-import { STATUS_LABEL, STATUSES, taskOf, withTask, type Task, type TaskChange, overdue } from "@/note/task";
+import { PRIORITY_LABEL, STATUS_LABEL, STATUSES, taskOf, withTask, type Task, type TaskChange, overdue } from "@/note/task";
 import { NoteMarkdown, resolverFor } from "@/view/NoteRead";
 import { refComponents } from "@/refs/Ref";
 import { useIndex } from "@/refs/useIndex";
@@ -30,7 +31,8 @@ import { FileProblem } from "./FileProblem";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { registerPendingWrites } from "./pendingWrites";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
-import { TaskGlyph, TaskLine } from "./TaskGlyph";
+import { PRIORITY_KEYS, PriorityMark, TaskGlyph, TaskLine } from "./TaskGlyph";
+import { TasksMenu, under } from "./TasksMenu";
 import { Toast } from "./Toast";
 import { TagLine } from "./tags/TagChip";
 import { TagEditor } from "./tags/TagEditor";
@@ -1044,8 +1046,8 @@ export function NoteView({
 const NO_TAGS: string[] = [];
 
 /**
- * The bar at the top of a task's own page: its status as three choices, its due date, and
- * the way back to being a plain note. Notion's properties, cut to the two a task has.
+ * The bar at the top of a task's own page: its status as three choices, its priority, its dates, and
+ * the way back to being a plain note. Notion's properties, cut to the few a task has.
  *
  * A radiogroup rather than the list's click-to-move-on button, because here there is room to show
  * all three and a person on the page has come to set one, not to step through them. The date is the
@@ -1063,6 +1065,7 @@ function TaskBar({
   /** Rows after the task's own: the Tags row. */
   children?: ReactNode;
 }) {
+  const [menu, setMenu] = useState<Spot | null>(null);
   return (
     <div className="dag-taskbar dag-facts" data-dag-taskbar={task.status}>
       <span className="dag-facts__label">
@@ -1087,6 +1090,43 @@ function TaskBar({
             </button>
           ))}
         </span>
+      </span>
+      {/* The priority, as on the Tasks page's row: the mark, and the same menu of four and none. */}
+      <span className="dag-facts__label">
+        <PriorityMark priority={task.priority} size={14} />
+        Priority
+      </span>
+      <span className="dag-facts__value">
+        <button
+          type="button"
+          className="dag-taskbar__choice"
+          data-dag-taskbar-priority={task.priority ?? "none"}
+          aria-haspopup="menu"
+          disabled={!editable}
+          onClick={(e) => setMenu(under(e.currentTarget))}
+        >
+          <PriorityMark priority={task.priority} size={14} />
+          <span>{task.priority ? PRIORITY_LABEL[task.priority] : "None"}</span>
+        </button>
+        {menu ? (
+          <TasksMenu
+            at={menu}
+            label="Priority"
+            data={{ "data-dag-taskbar-priority-menu": "" }}
+            onClose={() => setMenu(null)}
+            rows={PRIORITY_KEYS.map(({ priority, key, label }) => ({
+              key: priority ?? "none",
+              label,
+              icon: <PriorityMark priority={priority ?? undefined} />,
+              hint: key,
+              checked: (task.priority ?? null) === priority,
+              data: { "data-dag-task-menu-priority": priority ?? "none" },
+              onPick: () => {
+                if ((task.priority ?? null) !== priority) onChange({ priority });
+              },
+            }))}
+          />
+        ) : null}
       </span>
       {/* The day it begins: the calendar spans a task from here to its due date. */}
       <span className="dag-facts__label">

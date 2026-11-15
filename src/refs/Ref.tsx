@@ -34,7 +34,7 @@ import { whenWords } from "@/calendar/model";
 import type { NoteEvent } from "@/note/event";
 import { splitNote } from "@/note/format";
 import { PROJECT_LABEL, type Project } from "@/note/project";
-import { STATUS_LABEL, type Task, type TaskStatus } from "@/note/task";
+import { PRIORITY_LABEL, STATUS_LABEL, type Task, type TaskStatus } from "@/note/task";
 import { CalloutAside } from "@/render/Callout";
 import { CodePre, MathCode } from "@/render/CodeBlock";
 import { fail } from "@/telemetry/client";
@@ -187,6 +187,7 @@ function TaskCard({
         </a>
         <span className="dag-embed__task-meta">
           {STATUS_LABEL[shown.status]}
+          {shown.priority ? <span data-dag-embed-priority={shown.priority}> · {PRIORITY_LABEL[shown.priority]}</span> : null}
           {shown.due ? (
             <>
               <span aria-hidden="true"> · </span>
@@ -295,6 +296,7 @@ function PlacedCard({
           ) : shown ? (
             <>
               {STATUS_LABEL[shown.status]}
+              {shown.priority ? <span data-dag-embed-priority={shown.priority}> · {PRIORITY_LABEL[shown.priority]}</span> : null}
               {shown.due ? (
                 <>
                   <span aria-hidden="true"> · </span>

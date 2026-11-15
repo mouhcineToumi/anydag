@@ -405,6 +405,7 @@ export const everyFile = (tree: KindLists): { name: string; kind: FileKind }[] =
  */
 const sameTask = (a: Task | undefined, b: Task | undefined): boolean =>
   a?.status === b?.status &&
+  a?.priority === b?.priority &&
   a?.due === b?.due &&
   a?.start === b?.start &&
   a?.body === b?.body &&
