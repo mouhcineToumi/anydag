@@ -135,8 +135,8 @@ beside its title and gets no pin. See *A page that names no vault lands in the s
 
 | Workflow | Runs | On |
 |---|---|---|
-| `ci.yml` → `CI passed` | the fast tier and `promises` (`checks.yml`); the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
-| `e2e.yml` → `e2e` | the `@smoke` tier on a pull request; the whole suite sharded four ways on a push, with the shards' reports merged into one | the same branches; `workflow_call` with `scope: smoke \| full` |
+| `ci.yml` → `CI passed` | the fast tier (`checks.yml`: `fast tier` — `checks.sh static` —, `unit` and the watched store contracts, as three jobs side by side) and `promises`; the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
+| `e2e.yml` → `e2e` | on a pull request, what the change can reach (`scope: changed`: the `@smoke` tier plus the specs `scripts/e2e-plan.mjs` names), sharded three ways; the whole suite sharded four ways on a push, one run at a time per branch with only the newest push waiting; the shards' reports merged into one, off the path to `e2e` | the same branches; `workflow_call` with `scope: smoke \| full` |
 | `ci.yml` → `secrets` (in `CI passed`) | gitleaks over the commits the pull request or push adds; the selftest first | the same events as `ci.yml` |
 | `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
 | `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
@@ -148,6 +148,18 @@ them is skipped, and a workflow with `paths-ignore` never starts, and either lea
 "expected" for ever. So the workflow always runs, decides what is owed, and the summary fails only when
 something owed did not pass. `scripts/e2e-plan.mjs` decides what the browser can see (prose, CI config,
 unit tests and the desktop shell are nothing to it; `boards/` is a fixture, not prose).
+
+**The path from a push to a green pull request is the `e2e` chain, and it was cut to its fixed cost**
+(#258, which has the numbers). A shard pays about 47 s before its first test — pulling the image,
+`npm ci`, starting the dev server — so the pull request's selection is split three ways rather than
+run on one job, and `e2e` does not wait for the merged report. A pull request's shards each ask
+`e2e-plan.mjs` for the selection after `npm ci`, because only there can it ask Playwright's
+`--only-changed` which specs a change under `e2e/` reaches; the `plan` job, which has no
+`node_modules`, only decides whether anything runs. **A push to `develop` runs the whole suite once
+for the tip, not once a merge**: the push runs share one concurrency group per branch, which lets one
+run finish and keeps only the newest waiting. Ten merges in ninety seconds had started forty
+four-minute shards and queued every open pull request for up to four and a half minutes. A red push
+run is bisected among the merges since the last green one; the nightly runs the whole suite again.
 
 **The `@smoke` tag** (`test("…", { tag: "@smoke" }, …)`) is a promise about *breadth*: a new surface gets
 one fast test in it. Tag a test that touches a surface nothing tagged touches; do not tag a second test

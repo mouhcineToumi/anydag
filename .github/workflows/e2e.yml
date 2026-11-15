@@ -1,9 +1,18 @@
 # The browser suite, in Playwright's own Docker image — the one place the screenshots are valid.
 #
-#   pull request into develop, release/** or main   the `@smoke` tier: every surface, in minutes
-#   push to develop or release/**                   the whole suite, sharded four ways
+#   pull request into develop, release/** or main   what the change can reach (`scope: changed`): the
+#                                                   `@smoke` tier, plus the specs `scripts/e2e-plan.mjs`
+#                                                   names for it — the selection `.githooks/pre-push`
+#                                                   used to run — sharded three ways
+#   push to develop or release/**                   the whole suite, sharded four ways; a burst of
+#                                                   merges runs it once for the newest, not once each
 #   workflow_call / workflow_dispatch               `scope: smoke | full`, for the nightly and
 #                                                   release workflows (`uses: ./.github/workflows/e2e.yml`)
+#
+# **The pull request's run is the short path to green, and its length is what decided its shape**
+# (#258). A shard is 47 s of fixed cost — pulling the image, `npm ci`, starting the dev server — and
+# the smoke tier was 86 s of tests behind it on one job; three shards cut that to about thirty, and
+# `e2e` no longer waits for the merged HTML report, which nothing needs before the check is green.
 #
 # **The image is the pin.** `mcr.microsoft.com/playwright:v<version>-noble` carries one Chromium
 # build and one set of system fonts, so a baseline taken in `npm run e2e:docker` on a laptop is the
@@ -40,8 +49,15 @@ on:
 
 # One run per pull request, the superseded one cancelled. A push, a dispatch or a call gets a group
 # of its own: a reusable workflow that shared its caller's group would wait on it for ever.
+#
+# **A push to a branch shares one group, which keeps one run going and only the newest waiting.** Ten
+# pull requests merged inside ninety seconds once started ten full runs, forty four-minute shards,
+# and every open pull request queued behind them for up to four and a half minutes (#258). Now the
+# run in flight finishes and the newest push is tested next: the tip is what is checked, and a red
+# one is bisected among the merges since the last green. `github.workflow` is the caller's name in a
+# `workflow_call`, so the nightly and a release never join this group.
 concurrency:
-  group: e2e-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+  group: e2e-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' && github.workflow == 'e2e') && format('push-{0}', github.ref) || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -77,18 +93,19 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_HEAD: ${{ github.sha }}
-          # Browsers shared out across the jobs: smoke is one job (it is minutes), the full suite is
-          # four (about a fifth of it each; Playwright shards by test, not by file).
-          SMOKE_SHARDS: "1"
+          # Browsers shared out across the jobs (Playwright shards by test, not by file): a pull
+          # request's selection or the smoke tier three ways, about thirty seconds of tests each
+          # behind a shard's fixed 47 s; the full suite four ways.
+          SMOKE_SHARDS: "3"
           FULL_SHARDS: "4"
         run: |
           scope="$INPUT_SCOPE"
           if [ -z "$scope" ]; then
-            if [ "$EVENT" = pull_request ]; then scope=smoke; else scope=full; fi
+            if [ "$EVENT" = pull_request ]; then scope=changed; else scope=full; fi
           fi
           case "$scope" in
-            smoke | full) ;;
-            *) echo "::error::scope must be smoke or full, not '$scope'"; exit 1 ;;
+            changed | smoke | full) ;;
+            *) echo "::error::scope must be changed, smoke or full, not '$scope'"; exit 1 ;;
           esac
 
           # Somebody asked (dispatch, call): run. A pull request or a push: run unless every changed
@@ -105,7 +122,7 @@ jobs:
             run="$(printf '%s' "$plan" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).run)))')"
           fi
 
-          if [ "$scope" = smoke ]; then total="$SMOKE_SHARDS"; else total="$FULL_SHARDS"; fi
+          if [ "$scope" = full ]; then total="$FULL_SHARDS"; else total="$SMOKE_SHARDS"; fi
           shards="$(node -e 'console.log(JSON.stringify(Array.from({length:+process.argv[1]},(_,i)=>i+1)))' "$total")"
           {
             echo "run=$run"
@@ -139,7 +156,10 @@ jobs:
       npm_config_cache: /tmp/npm-cache
       PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
     steps:
+      # The whole history for `changed`: the selection is a diff against the pull request's base.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: ${{ needs.plan.outputs.scope == 'changed' && '0' || '1' }}
       - uses: actions/cache@v6
         with:
           path: /tmp/npm-cache
@@ -147,13 +167,27 @@ jobs:
           restore-keys: npm-e2e-
       # Scripts are off: `prepare` installs git hooks, and the native modules arrive prebuilt.
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      # `changed` asks `scripts/e2e-plan.mjs` here rather than in `plan`, because only here is there
+      # a `node_modules` for it to ask Playwright's `--only-changed` which specs a change under `e2e/`
+      # reaches. Every shard asks the same question of the same commits and gets the same answer.
       - name: playwright test
         env:
           SCOPE: ${{ needs.plan.outputs.scope }}
           SHARD: ${{ matrix.shard }}/${{ needs.plan.outputs.total }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          git config --global --add safe.directory "$PWD"
           args=(--shard="$SHARD" --reporter='blob,line' --workers=3)
-          [ "$SCOPE" = smoke ] && args+=(--grep "@smoke")
+          case "$SCOPE" in
+            smoke) args+=(--grep "@smoke") ;;
+            changed)
+              grep="$(node scripts/e2e-plan.mjs --base "$PR_BASE" --head "$PR_HEAD" --field grep)"
+              node scripts/e2e-plan.mjs --base "$PR_BASE" --head "$PR_HEAD" --field why
+              # No grep is the whole suite: a change to every spec's starting point (`global-setup.ts`).
+              [ -n "$grep" ] && args+=(--grep "$grep")
+              ;;
+          esac
           npx playwright test "${args[@]}"
       # The blob is what the report is merged from, and it holds a failed screenshot's expected,
       # actual and diff images; `test-results` is what a failed run leaves beside it.
@@ -201,10 +235,11 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # The one to require. Always runs, and says what happened.
+  # The one to require. Always runs, and says what happened. It does not wait for `report`: the merged
+  # HTML is for reading a failure afterwards, and a green check owes it nothing.
   e2e:
     name: e2e
-    needs: [plan, shard, report]
+    needs: [plan, shard]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

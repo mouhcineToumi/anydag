@@ -19,8 +19,22 @@
 #
 # The order is the one that fails fastest, which is why the unit suite is last despite being four
 # seconds: a type error is a shorter thing to read than a test failure caused by one.
+#
+# **Two halves, so CI can run them side by side** (#258): `checks.sh static` is everything before the
+# unit suite (about seven seconds), `checks.sh unit` is the unit suite, and no argument is both, in
+# order — what the commit hook and `gate.sh` run. A step added here is in exactly one half, so it is
+# still added everywhere.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+part="${1:-all}"
+case "$part" in
+  all | static | unit) ;;
+  *)
+    echo "checks.sh: no part '$part' — all (the default), static or unit" >&2
+    exit 2
+    ;;
+esac
 
 # The build's feature switch (`server/features.ts`): the suite runs on, so the routes, the tools and
 # the commands it holds are the ones it gates. A test that wants them off passes its own environment
@@ -31,6 +45,8 @@ export ANYDAG_CLOUD="${ANYDAG_CLOUD:-on}"
 # steps could say which one went red from the step name alone, and running them as one script must
 # not cost that.
 step() { printf '\n\033[1m— %s\033[0m\n' "$1"; }
+
+if [ "$part" != unit ]; then
 
 # Biome's linter: half a second over the whole tree, so it goes first. The type-aware promise checks
 # are `npm run lint:promises` (typescript-eslint, ~40 s) and run in CI as their own job; they are too
@@ -74,5 +90,9 @@ node scripts/check-skill.mjs
 step "check:design"
 node scripts/check-design.mjs
 
-step "unit"
-npx vitest run
+fi
+
+if [ "$part" != static ]; then
+  step "unit"
+  npx vitest run
+fi
