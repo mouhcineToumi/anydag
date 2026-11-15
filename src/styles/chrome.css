@@ -871,7 +871,10 @@
   flex: none;
   margin: 12px 8px 4px 16px;
 }
-.dag-sidebar__section h2 { flex: 1; margin: 0; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-sidebar__section h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); text-overflow: ellipsis; white-space: nowrap; }
+/* What the filter holds back, after the heading's word: *Files · tasks hidden*. Regular weight, so
+   the section still reads as one heading at a glance. */
+.dag-sidebar__filtered { min-width: 0; overflow: hidden; font-weight: var(--dag-ui-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
 
 .dag-sidebar__tree {
   /* An open empty folder's *Empty* line, said once: the tree draws only the rows in view
@@ -1397,6 +1400,81 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 
 /* New, the + beside Files since the UI review. */
 .dag-sidebar__tool[aria-expanded="true"] { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
+/* Show in Files (#360): the filter button beside the + and the popover it opens. While a kind is
+   hidden the glyph is the accent — expanded, hovered or at rest — so a filtered tree is never
+   mistaken for a tree with nothing in it. The popover is fixed and placed by `FilterMenu`, the
+   `NewMenu` rule, so the column's width and its scroller never clip it. */
+.dag-sidebar__filter { display: inline-flex; flex: none; }
+.dag-sidebar__tool.dag-sidebar__filterbtn--on,
+.dag-sidebar__tool.dag-sidebar__filterbtn--on:hover,
+.dag-sidebar__tool.dag-sidebar__filterbtn--on[aria-expanded="true"] { color: var(--dag-color-accent); }
+.dag-sidebar__filter-menu {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 224px;
+  max-height: min(520px, calc(100vh - 16px));
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  scrollbar-width: thin;
+}
+.dag-sidebar__filter-head { margin: 2px 6px 4px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-sidebar__filter-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__filter-row:hover { background: var(--dag-color-paper100); }
+.dag-sidebar__filter-row:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__filter-row[aria-checked="false"] { color: var(--dag-color-slate); }
+.dag-sidebar__filter-row > svg { flex: none; color: var(--dag-color-slate); }
+/* A 14px box, so a square rather than the 9px control corner made into a circle. */
+.dag-sidebar__filter-tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 0;
+}
+.dag-sidebar__filter-row[aria-checked="true"] .dag-sidebar__filter-tick { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-sidebar__filter-word { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-sidebar__filter-count { flex: none; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+.dag-sidebar__filter-all {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__filter-all:hover { background: var(--dag-color-paper100); }
+.dag-sidebar__filter-all:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 .dag-sidebar__menu--new { min-width: 232px; }
 /* Where the file will go, above what it will be — the header the creation flow was missing. */
 .dag-sidebar__menu-where {
@@ -1468,6 +1546,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] .dag-sidebar__tools { display: flex; top: 0; background: transparent; }
 /* 44×44 each, even though the ⋯ and the + keep their 14px glyph (#209). */
 .dag-sidebar[data-sheet] .dag-sidebar__tool { width: 44px; height: 44px; }
+.dag-sidebar[data-sheet] .dag-sidebar__filter-row,
+.dag-sidebar[data-sheet] .dag-sidebar__filter-all { min-height: 44px; font-size: var(--chrome-text-lg); }
 .dag-sidebar[data-sheet] .dag-sidebar__row:has(+ .dag-sidebar__tools) { padding-right: 52px; }
 .dag-sidebar[data-sheet] .dag-sidebar__tool[data-dag-sidebar-add] { display: none; }
 .dag-sidebar[data-sheet] .dag-sidebar__name-input,
