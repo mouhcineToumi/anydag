@@ -41,11 +41,16 @@ export interface HistoryPlace {
   id?: string;
 }
 
-/** One entry's mark in `history.state`; `top` is the furthest entry this window has reached. */
+/**
+ * One entry's mark in `history.state`; `top` is the furthest entry this window has reached, and
+ * `tab` the document tab the entry was made in (`src/ui/tabs/`), so Back to it brings that tab to the
+ * front again.
+ */
 interface Mark {
   at: number;
   top: number;
   place: HistoryPlace | null;
+  tab?: string;
 }
 
 interface Position {
@@ -82,10 +87,12 @@ function asMark(raw: unknown): Mark | null {
   if (!raw || typeof raw !== "object") return null;
   const held = (raw as { [KEY]?: unknown })[KEY];
   if (!held || typeof held !== "object") return null;
-  const { at, top, place } = held as { at?: unknown; top?: unknown; place?: unknown };
+  const { at, top, place, tab } = held as { at?: unknown; top?: unknown; place?: unknown; tab?: unknown };
   if (typeof at !== "number" || !Number.isInteger(at) || at < 0) return null;
   const reached = typeof top === "number" && Number.isInteger(top) && top >= at ? top : at;
-  return { at, top: reached, place: asPlace(place) };
+  return typeof tab === "string" && tab
+    ? { at, top: reached, place: asPlace(place), tab }
+    : { at, top: reached, place: asPlace(place) };
 }
 
 /** The state an entry is given: other writers' keys kept, this module's one replaced. */
@@ -129,21 +136,28 @@ function onPop(): void {
   publish();
 }
 
-/** A new place in the history: what opening another document or page is. */
-export function pushHistory(url: string, place: HistoryPlace | null): number {
+/** The mark an entry is given, its tab left off when it has none. */
+const markOf = (place: HistoryPlace | null, tab: string | undefined): Mark =>
+  tab ? { at: position.at, top: position.top, place, tab } : { at: position.at, top: position.top, place };
+
+/** A new place in the history: what opening another document or page is, in document tab `tab`. */
+export function pushHistory(url: string, place: HistoryPlace | null, tab?: string): number {
   installHistory();
   position = { at: position.at + 1, top: position.at + 1 };
-  history.pushState({ [KEY]: { ...position, place } }, "", url);
+  history.pushState({ [KEY]: markOf(place, tab) }, "", url);
   publish();
   return position.at;
 }
 
-/** A change inside the entry somebody is on — a theme, a tab, a rename of the open file. */
-export function replaceHistory(url: string, place?: HistoryPlace | null): void {
+/**
+ * A change inside the entry somebody is on — a theme, a page's own tab, a rename of the open file.
+ * The entry keeps its document tab unless `tab` names another.
+ */
+export function replaceHistory(url: string, place?: HistoryPlace | null, tab?: string): void {
   installHistory();
   const mark = asMark(history.state);
   const kept = place === undefined ? (mark?.place ?? null) : place;
-  history.replaceState(withMark(history.state, { at: position.at, top: position.top, place: kept }), "", url);
+  history.replaceState(withMark(history.state, markOf(kept, tab ?? mark?.tab)), "", url);
 }
 
 /** The current entry's place, when the listing did not know the file's id as it was pushed. */
@@ -151,7 +165,18 @@ export function markHistoryPlace(place: HistoryPlace | null): void {
   installHistory();
   const mark = asMark(history.state);
   if (mark?.at === position.at && mark.top === position.top && samePlace(mark.place, place)) return;
-  history.replaceState(withMark(history.state, { at: position.at, top: position.top, place }), "");
+  history.replaceState(withMark(history.state, markOf(place, mark?.tab)), "");
+}
+
+/** The current entry's document tab, when it was made in one and the window still knows which. */
+export const historyTab = (): string | null => asMark(history.state)?.tab ?? null;
+
+/** The current entry belongs to document tab `tab`: an entry made before it, or by a tab now closed. */
+export function markHistoryTab(tab: string): void {
+  installHistory();
+  const mark = asMark(history.state);
+  if (mark?.tab === tab) return;
+  history.replaceState(withMark(history.state, markOf(mark?.place ?? null, tab)), "");
 }
 
 /** Where in the window's history the page is, for the pop handler below. */

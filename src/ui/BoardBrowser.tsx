@@ -30,6 +30,7 @@ import { tagMatches } from "./tagFilter";
 import { hueOfTag, useTagList } from "./tags/tagStore";
 import { openTemplates } from "./templates";
 import { flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type Entry, type Tree } from "./tree";
+import { middle } from "./tabs/intent";
 
 interface Props {
   boards: string[];
@@ -393,6 +394,7 @@ export function BoardBrowser({
           aria-current={current ? "true" : undefined}
           title={kind === "board" ? name : `${name} (${kind})`}
           onClick={() => open(entry)}
+          onAuxClick={middle(() => open(entry))}
         >
           {/* Every kind wears its mark, a board too: with five kinds in one list, the one
               with no mark was the one a reader had to work out by elimination. */}
@@ -527,7 +529,12 @@ export function BoardBrowser({
           : tagged
             ? tagged.map((e) => (
                 <div key={keyOf(e)} className="dag-board-row">
-                  <button {...{ [`data-dag-${e.kind}`]: e.name }} className="dag-board" onClick={() => open(e)}>
+                  <button
+                    {...{ [`data-dag-${e.kind}`]: e.name }}
+                    className="dag-board"
+                    onClick={() => open(e)}
+                    onAuxClick={middle(() => open(e))}
+                  >
                     <KindMark kind={e.kind} name={e.name} className="dag-board__kind" />
                     {labelOf(e)}
                     <span className="dag-board__what">{tasks[e.name] ? "task" : events[e.name] ? "event" : e.kind}</span>
@@ -554,6 +561,7 @@ export function BoardBrowser({
                 data-dag-hit-part={h.part ?? ""}
                 title={h.name}
                 onClick={() => openHit(h)}
+                onAuxClick={middle(() => openHit(h))}
               >
                 <span className="dag-hit__where">
                   <KindMark kind={h.kind} name={h.name} />

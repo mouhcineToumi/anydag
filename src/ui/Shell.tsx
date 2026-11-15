@@ -75,6 +75,7 @@ import { TrashNotice, type Gone } from "./TrashNotice";
 import { TagPopover, type Tagging } from "./tags/TagPopover";
 import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
+import type { NewTab } from "./tabs/intent";
 import { ancestors, follow, keyOf, leaf, parentOf, rebase, type Change } from "./tree";
 
 /**
@@ -324,7 +325,7 @@ export function Shell({
   openHome(): void;
   /** A document from a row or the search: a new history entry. `replace` is what a rename, a move
       or a delete of the file already open does — the same place under another name, or none. */
-  open(kind: FileKind, name: string | null, options?: { replace?: boolean }): void;
+  open(kind: FileKind, name: string | null, options?: { replace?: boolean; tab?: NewTab }): void;
   children: ReactNode;
 }) {
   /* The Assistant's panel, down the right of whatever page is open (`space A`). Turning the
@@ -538,8 +539,8 @@ export function Shell({
   }, [pinned]);
 
   const onOpen = useCallback(
-    (kind: FileKind, name: string) => {
-      open(kind, name);
+    (kind: FileKind, name: string, tab?: NewTab) => {
+      open(kind, name, tab ? { tab } : undefined);
       dismiss();
     },
     [open, dismiss],

@@ -777,10 +777,7 @@ test("duplicate copies the file beside it and opens nothing, and trash leaves th
   await expect.poll(() => fs.existsSync(path.join(dir, "trip.note.md"))).toBe(true);
 });
 
-test("shift+F10 opens the menu on a focused item, and Open in new tab leaves this page where it was", async ({
-  page,
-  context,
-}) => {
+test("shift+F10 opens the menu on a focused item, and Open in new tab leaves this page where it was", async ({ page }) => {
   const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
   await calendar(page, "calendar=month&date=2031-03-15", trip);
   const bar = page.locator(`[data-dag-cal-item="${trip}"]`).first();
@@ -791,12 +788,11 @@ test("shift+F10 opens the menu on a focused item, and Open in new tab leaves thi
   await expect(menu).toBeVisible();
   await expect(menu.locator('[data-dag-cal-menu-item="open"]')).toBeFocused();
 
-  const opened = context.waitForEvent("page");
+  /* A tab of this window, behind the calendar (#264): the strip appears with the note in it, and
+     the calendar is still the page in front. */
   await menu.locator('[data-dag-cal-menu-item="new-tab"]').click();
-  const tab = await opened;
-  await tab.waitForLoadState();
-  expect(new URL(tab.url()).searchParams.get("note")).toBe(trip);
-  await tab.close();
+  await expect(page.locator('[data-dag-doctab-kind="note"]')).toHaveCount(1);
+  await expect(page.locator('[data-dag-doctab-kind="calendar"]')).toHaveAttribute("aria-selected", "true");
   expect(new URL(page.url()).searchParams.get("note")).toBeNull();
   await expect(menu).toHaveCount(0);
 

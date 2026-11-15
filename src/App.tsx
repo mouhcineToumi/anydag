@@ -12,7 +12,7 @@ import {
   ChevronDown,
   PanelRight,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { contentBounds, placeItems } from "@/board/flow";
 import { isDiagramType, isLinkType } from "@/board/types";
@@ -55,8 +55,10 @@ import {
   historyAt,
   historyCanForward,
   historyPlace,
+  historyTab,
   installHistory,
   markHistoryPlace,
+  markHistoryTab,
   pushHistory,
   replaceHistory,
   resolvePlace,
@@ -64,6 +66,24 @@ import {
   type HistoryPlace,
   type PlaceAnswer,
 } from "@/ui/history";
+import { DocTabs } from "@/ui/tabs/DocTabs";
+import { installTabIntent, newTabWanted, type NewTab } from "@/ui/tabs/intent";
+import {
+  PAGE_KEYS,
+  addressOf,
+  adopt,
+  closeTab,
+  fileOf,
+  holding,
+  identity,
+  newTabId,
+  openTab,
+  placeOf,
+  setPlace,
+  tabById,
+  type Tabs,
+} from "@/ui/tabs/model";
+import { changeTabs, tabsNow, useTabs } from "@/ui/tabs/store";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
 import { Item } from "@/render/Item";
@@ -180,7 +200,10 @@ import { track } from "@/telemetry/client";
  * now, and one whose file was trashed is skipped — before the page renders a 404 for it.
  */
 function useQuery(list: BoardTree) {
-  const [q, setQ] = useState(() => new URLSearchParams(location.search));
+  /* The address, and the document tab its history entry was made in — read together, so a pop
+     that moves to another tab is never drawn as one tab holding the other's page for a render. */
+  const [at, setAt] = useState(() => ({ q: new URLSearchParams(location.search), tab: historyTab() }));
+  const setQ = useCallback((q: URLSearchParams) => setAt({ q, tab: historyTab() }), []);
   /* The listing the pop handler reads: the app's own list is fetched above this, and a rename the
      server has told it about is the whole answer a stale entry needs. */
   const listing = useRef(list);
@@ -200,7 +223,7 @@ function useQuery(list: BoardTree) {
     next.delete("ref");
     replaceHistory(`${location.pathname}?${next}`, null);
     setQ(next);
-  }, []);
+  }, [setQ]);
 
   /* A dead entry is walked past in the direction the window was already going. At the end of the
      history there is nowhere left to walk, and home is the one page that is never broken. */
@@ -214,13 +237,16 @@ function useQuery(list: BoardTree) {
   );
 
   /* The entry's file under the name it has now, in the entry it is on: a rename is followed. */
-  const follow = useCallback((next: URLSearchParams, place: HistoryPlace) => {
-    const fixed = new URLSearchParams(next);
-    for (const kind of FILE_KINDS) fixed.delete(kind);
-    fixed.set(place.kind, place.name);
-    replaceHistory(`${location.pathname}?${fixed}${location.hash}`, place);
-    setQ(fixed);
-  }, []);
+  const follow = useCallback(
+    (next: URLSearchParams, place: HistoryPlace) => {
+      const fixed = new URLSearchParams(next);
+      for (const kind of FILE_KINDS) fixed.delete(kind);
+      fixed.set(place.kind, place.name);
+      replaceHistory(`${location.pathname}?${fixed}${location.hash}`, place);
+      setQ(fixed);
+    },
+    [setQ],
+  );
 
   const settle = useCallback(
     (next: URLSearchParams, place: HistoryPlace, direction: 1 | -1) => {
@@ -256,7 +282,7 @@ function useQuery(list: BoardTree) {
         skip(direction);
       })();
     },
-    [follow, skip],
+    [follow, skip, setQ],
   );
 
   /* A pop arrives with the correct address; the page only adopts it once the file it names is
@@ -281,7 +307,7 @@ function useQuery(list: BoardTree) {
     };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
-  }, [settle]);
+  }, [settle, setQ]);
 
   /* The listing arrived: the pop held for it can be decided now. */
   useEffect(() => {
@@ -294,27 +320,7 @@ function useQuery(list: BoardTree) {
   /* One key, or several in one go. Several matters: opening a board sets `board` and clears
      `page` together, and two `replaceState` calls would leave the URL holding the new board
      beside the old board's page for a render — which is exactly the state this is here to avoid. */
-  const set = useCallback((key: string | Record<string, string | null>, value?: string | null) => {
-    const next = new URLSearchParams(location.search);
-    const pairs = typeof key === "string" ? { [key]: value ?? null } : key;
-    for (const [k, v] of Object.entries(pairs)) {
-      if (v === null) next.delete(k);
-      else next.set(k, v);
-    }
-    /* The hash survives: it is the block or the item a reference named (`dag:<id>#^para`). */
-    replaceHistory(`${location.pathname}?${next}${location.hash}`);
-    setQ(next);
-  }, []);
-  /* A new place to be, as a new entry in the history: what opening a document or a page is, and
-     what following a reference is, so Back returns to what was left. In one go, and with the hash
-     of a part a reference named. */
-  const go = useCallback((next: URLSearchParams, place: HistoryPlace | null = null) => {
-    const at = pushHistory(`${location.pathname}?${next}${location.hash}`, place);
-    seen.current = at;
-    setQ(new URLSearchParams(next));
-  }, []);
-  /* The same one or several keys as `set`, as a new entry — a listing page, a board's own page. */
-  const goSet = useCallback(
+  const set = useCallback(
     (key: string | Record<string, string | null>, value?: string | null) => {
       const next = new URLSearchParams(location.search);
       const pairs = typeof key === "string" ? { [key]: value ?? null } : key;
@@ -322,11 +328,58 @@ function useQuery(list: BoardTree) {
         if (v === null) next.delete(k);
         else next.set(k, v);
       }
-      go(next);
+      /* The hash survives: it is the block or the item a reference named (`dag:<id>#^para`). */
+      replaceHistory(`${location.pathname}?${next}${location.hash}`);
+      setQ(next);
     },
-    [go],
+    [setQ],
   );
-  return [q, set, go, goSet] as const;
+  /* A new place to be, as a new entry in the history: what opening a document or a page is, and
+     what following a reference is, so Back returns to what was left. In one go, and with the hash
+     of a part a reference named. The entry belongs to the document tab the window is on, unless
+     `tab` says which — a tab brought to the front, or a new one. */
+  const go = useCallback(
+    (next: URLSearchParams, place: HistoryPlace | null = null, tab?: { id: string; hash?: string }) => {
+      const hash = tab?.hash ?? location.hash;
+      const entry = pushHistory(`${location.pathname}?${next}${hash}`, place, tab?.id ?? historyTab() ?? undefined);
+      seen.current = entry;
+      setQ(new URLSearchParams(next));
+    },
+    [setQ],
+  );
+  /* The address of another document tab, in place of the entry the window is on: what closing the
+     tab in front is, since the tab it named is not somewhere Back should return to. */
+  const swap = useCallback(
+    (next: URLSearchParams, place: HistoryPlace | null, tab: string) => {
+      replaceHistory(`${location.pathname}?${next}`, place, tab);
+      setQ(new URLSearchParams(next));
+    },
+    [setQ],
+  );
+  return [at.q, set, go, swap, at.tab] as const;
+}
+
+/**
+ * The part a search hit opens at, into the address — unless the hit opens in a tab behind this one:
+ * the address is the tab in front's, which would go looking for a part it does not have, and the tab
+ * behind opens at its top.
+ */
+const aimAt = (part: string | null | undefined): void => {
+  if (newTabWanted() !== "behind") setTarget(part ?? null);
+};
+
+/** The pairs one or several keys make, as `set` and `goSet` take them. */
+const pairsOf = (key: string | Record<string, string | null>, value?: string | null): Record<string, string | null> =>
+  typeof key === "string" ? { [key]: value ?? null } : key;
+
+/** The address with `pairs` written over it. */
+function withPairs(address: string, pairs: Record<string, string | null>): URLSearchParams {
+  const next = new URLSearchParams(address);
+  for (const [k, v] of Object.entries(pairs)) {
+    if (v === null) next.delete(k);
+    else next.set(k, v);
+  }
+  return next;
 }
 
 /** Which file an id is, off the list — only a list the server has answered since the page loaded. */
@@ -340,10 +393,11 @@ function whose(list: BoardTree, id: string): { kind: FileKind; name: string } | 
  * Follow a reference here rather than by loading the page again: a plain click on a link
  * to `?ref=<id>` in this workspace, or `follow()` asked by a link that navigates by hand. The target
  * is opened straight off the list when the list knows the id, and through `?ref=` — resolved by the
- * effect in `App` — when it does not; either way as a new history entry. A click with a modifier,
- * a link to another workspace or to the read-only view, is left to the browser.
+ * effect in `App` — when it does not; either way as a new history entry. Ctrl/⌘ and a click, or a
+ * middle click, follows it into a new document tab, as a browser opens a link in a new tab. Shift
+ * or Alt, a link to another workspace or to the read-only view, is left to the browser.
  */
-function useFollowing(list: BoardTree, go: (next: URLSearchParams) => void) {
+function useFollowing(list: BoardTree, visit: (pairs: Record<string, string | null>) => void) {
   const held = useRef(list);
   held.current = list;
   useEffect(() => {
@@ -359,36 +413,39 @@ function useFollowing(list: BoardTree, go: (next: URLSearchParams) => void) {
       if (url.searchParams.get("view") === "1") return false;
       const here = new URLSearchParams(location.search);
       if ((url.searchParams.get("ws") ?? "") !== (here.get("ws") ?? "")) return false;
-      const next = new URLSearchParams(here);
       const hit = whose(held.current, id);
-      for (const [k, v] of Object.entries(pageQuery(hit?.kind ?? "board", hit?.name ?? null))) {
-        if (v === null) next.delete(k);
-        else next.set(k, v);
-      }
-      if (hit) next.delete("ref");
-      else next.set("ref", id);
-      go(next);
+      visit({ ...pageQuery(hit?.kind ?? "board", hit?.name ?? null), ref: hit ? null : id });
       /* The part it names — a block, an item — is the hash, which whoever opens the document reads. */
       const part = url.hash.slice(1);
       setTarget(part ? decodeURIComponent(part) : null);
       return true;
     };
+    /* A plain click, or Ctrl/⌘ and a click — the new tab is `visit`'s to see (`tabs/intent.ts`). */
     const onClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.defaultPrevented || e.button !== 0 || e.altKey || (e.shiftKey && !e.ctrlKey && !e.metaKey)) return;
       const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) return;
+      if (take(a.href)) e.preventDefault();
+    };
+    /* A middle click is an `auxclick`, and its default — the browser's own new tab — is stopped here. */
+    const onAux = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 1) return;
+      const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!a || a.hasAttribute("download")) return;
       if (take(a.href)) e.preventDefault();
     };
     const onFollow = (e: Event) => {
       if (take((e as CustomEvent<string>).detail)) e.preventDefault();
     };
     document.addEventListener("click", onClick);
+    document.addEventListener("auxclick", onAux);
     document.addEventListener(FOLLOW, onFollow);
     return () => {
       document.removeEventListener("click", onClick);
+      document.removeEventListener("auxclick", onAux);
       document.removeEventListener(FOLLOW, onFollow);
     };
-  }, [go]);
+  }, [visit]);
 }
 
 /** The eight on a group's dashed box — the same compass `Item` hands its own. */
@@ -397,7 +454,13 @@ const GROUP_HANDLES = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 const CONNECT_SIDES = ["n", "s", "e", "w"] as const;
 
 type SetQuery = ReturnType<typeof useQuery>[1];
-type GoPage = ReturnType<typeof useQuery>[3];
+/** One key, or several, as a new history entry — a listing page, a board's own page. */
+type GoPage = (key: string | Record<string, string | null>, value?: string | null) => void;
+/**
+ * Open one file of any kind: in the tab in front, or in a tab of its own — `tab: "behind"`, as a
+ * click that asks for a new tab opens one, or `"front"`.
+ */
+type OpenFile = (kind: FileKind, name: string | null, options?: { replace?: boolean; tab?: NewTab }) => void;
 
 /**
  * The query that opens one file of any kind: its own key set, and every other page's cleared.
@@ -407,51 +470,13 @@ type GoPage = ReturnType<typeof useQuery>[3];
  * are every page this app has: a board, a note, a quiz, and the two pages that list them.
  */
 function pageQuery(kind: FileKind, target: string | null): Record<string, string | null> {
-  return {
-    board: null,
-    note: null,
-    quiz: null,
-    table: null,
-    tab: null,
-    file: null,
-    tasks: null,
-    project: null,
-    tag: null,
-    quizzes: null,
-    run: null,
-    page: null,
-    calendar: null,
-    date: null,
-    days: null,
-    trash: null,
-    chat: null,
-    [kind]: target,
-  };
+  return { ...Object.fromEntries(PAGE_KEYS.map((k) => [k, null])), [kind]: target };
 }
 
-/** The keys that say which page is open — `pageQuery`'s own list, and what home clears. */
-const PAGE_KEYS = Object.keys(pageQuery("board", null));
-
-/**
- * A board or a note, and never both on one screen.
- *
- * **A note is a second page, not a mode of this one**. The board page is a
- * canvas: a viewport, an editor that owns every key on the window, a page strip, a dock. A note has
- * none of those, and nothing crosses between the two — so the note page is
- * its own component tree and the canvas does not learn a note exists. In particular `useEditor`'s
- * window key handler and paste listener are simply not mounted under a note, which is what keeps
- * `Delete`, `space` and ctrl+V inside the text a person is typing.
- *
- * `?note=` and `?board=` are exclusive: opening either clears the other.
- */
-export function App() {
-  /* One subscription to the list for the whole window, not one per page — the sidebar lives above
-     both pages and reads the same answer the search and the feedback card do. **Before the query**,
-     because a pop back to a renamed file is answered by the list. */
-  const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
-  const [query, setQuery, go, goSet] = useQuery(list);
-  /* `?tasks=1` is the third page, and `?quizzes=1` and `?quiz=` the fourth and fifth
-: each exclusive with the others, as the first two are with each other. */
+/** Which page an address draws: a listing page first, then a file, by the order the app always read it. */
+function pagesOf(query: URLSearchParams, assistantOn: boolean) {
+  /* `?tasks=1` is the third page, and `?quizzes=1` and `?quiz=` the fourth and fifth: each
+     exclusive with the others, as the first two are with each other. */
   const tasks = query.get("tasks") === "1";
   /* `?calendar=` is the Calendar page — `month`, `week`, `days`, or `1` for the view this
      browser used last — exclusive with the rest as they are with each other. */
@@ -459,11 +484,10 @@ export function App() {
   const quizzes = !tasks && !calendar && query.get("quizzes") === "1";
   /* `?trash=1` is the Trash page, exclusive with the rest. */
   const trash = !tasks && !calendar && !quizzes && query.get("trash") === "1";
-  /* `?chat=` is the Assistant page: a chat's id, `new`, or `1` for the newest —
-     a page with no canvas, exclusive with the rest as they are with each other. With the Assistant
-     turned off (#296) the address names no page, and home is drawn. */
-  const ai = useAi();
-  const assistant = ai.assistant && !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
+  /* `?chat=` is the Assistant page: a chat's id, `new`, or `1` for the newest — a page with no
+     canvas, exclusive with the rest as they are with each other. With the Assistant turned off
+     (#296) the address names no page, and home is drawn. */
+  const assistant = assistantOn && !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
   const listing = tasks || calendar || quizzes || trash || assistant;
   const quiz = listing ? null : query.get("quiz");
   /* `?table=` is a table's page, `&tab=` the tab it shows. */
@@ -472,7 +496,104 @@ export function App() {
   const file = listing || quiz || table ? null : query.get("file");
   const note = listing || quiz || table || file ? null : query.get("note");
   const board = listing || quiz || table || file || note ? null : query.get("board");
-  useFollowing(list, go);
+  return { tasks, calendar, quizzes, trash, assistant, quiz, table, file, note, board };
+}
+
+/**
+ * The window: the sidebar, the document tabs, and the page in front.
+ *
+ * **The address is the tab in front** (`src/ui/tabs/`). Each tab keeps the page half of an address
+ * — `?board=`, `?note=`, `?tasks=1&project=…` — and the window's address is always the front tab's,
+ * so a reload, a deep link, `?view=1` and `?snapshot=1` read it as they always did. **Back and
+ * Forward are the window's**: every history entry names the tab it was made in, so Back retraces the
+ * places this window was — bringing the tab that was in front then back to the front — and an entry
+ * whose tab has since closed is drawn in the tab in front. Bringing a tab to the front is a new entry;
+ * closing the front tab is not, since the tab it named is not somewhere Back should return to.
+ */
+export function App() {
+  /* One subscription to the list for the whole window, not one per page — the sidebar lives above
+     both pages and reads the same answer the search and the feedback card do. **Before the query**,
+     because a pop back to a renamed file is answered by the list. */
+  const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
+  const [query, setQuery, go, swap, entryTab] = useQuery(list);
+  const snapshot = query.get("snapshot") === "1";
+  const ai = useAi();
+  const shown = pagesOf(query, ai.assistant);
+  const { tasks, calendar, quizzes, trash, assistant, quiz, table, file, note, board } = shown;
+
+  /* The document tabs. The first set is the address this page loaded on; the tab in front is the
+     one the history entry names while the window still has it. */
+  tabsNow(placeOf(query));
+  const tabs = useTabs();
+  const active = tabById(tabs, entryTab)?.id ?? tabs.active;
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  /* The tab in front takes the address, whatever moved it — a press, a pop, a page's own key — and
+     an entry made before it knew which tab it was in learns. */
+  useLayoutEffect(() => {
+    if (snapshot) return;
+    changeTabs((t) => adopt(t, active, placeOf(query)));
+    if (historyTab() !== active) markHistoryTab(active);
+  }, [query, active, snapshot]);
+  useEffect(() => {
+    if (!snapshot) installTabIntent();
+  }, [snapshot]);
+
+  /* The history entry's file and its id, for a place a tab is on. */
+  const ids = useRef(list.ids);
+  ids.current = list.ids;
+  const placeFor = useCallback((place: string): HistoryPlace | null => {
+    const f = fileOf(place);
+    if (!f) return null;
+    const id = ids.current[f.name];
+    return id ? { ...f, id } : f;
+  }, []);
+
+  /* The tab a click last opened behind the one in front, so the next opens after it. */
+  const behind = useRef<{ from: string; id: string } | null>(null);
+  /*
+   * Somewhere to go: a document, a listing page, a board's own page — as a new history entry, in the
+   * tab in front. Two things change that. **A middle click, or Ctrl/⌘ and a click, opens a new tab**
+   * (`tabs/intent.ts`): behind the tab in front, as a browser opens a link, so the page it was asked
+   * from stays where it was — or in front with Shift as well. Not for the place the front tab is
+   * already on, a board's own page say, which stays where it is. **A document or page already open
+   * in another tab goes to that tab** rather than opening twice.
+   */
+  const visit = useCallback(
+    (pairs: Record<string, string | null>, options: { replace?: boolean; tab?: NewTab } = {}) => {
+      const next = withPairs(location.search, pairs);
+      const place = placeOf(next);
+      const now = tabsNow();
+      const here = activeRef.current;
+      const mine = identity(tabById(now, here)?.place ?? "");
+      const fresh = identity(place);
+      const wanted = options.tab ?? newTabWanted();
+      const asked = wanted !== null && (fresh === null || fresh !== mine) ? wanted : null;
+      const other = holding(now, place, here);
+      if (other) {
+        changeTabs((t) => setPlace(t, other.id, place));
+        if (asked !== "behind") go(next, placeFor(place), { id: other.id });
+        return;
+      }
+      if (asked) {
+        const id = newTabId();
+        if (asked === "front") {
+          changeTabs((t) => openTab(t, place, id));
+          go(next, placeFor(place), { id });
+          return;
+        }
+        const after = behind.current?.from === here ? behind.current.id : undefined;
+        changeTabs((t) => openTab(t, place, id, false, after));
+        behind.current = { from: here, id };
+        return;
+      }
+      if (options.replace) setQuery(pairs);
+      else go(next, placeFor(place));
+    },
+    [go, setQuery, placeFor],
+  );
+  const goSet = useCallback<GoPage>((key, value) => visit(pairsOf(key, value)), [visit]);
+  useFollowing(list, visit);
   /* The pages and cards this one did not need (`ui/chunks.tsx`), fetched once it is drawn. */
   useEffect(() => {
     preloadChunks();
@@ -482,43 +603,64 @@ export function App() {
    * file that is already open — a row pressed twice is not somewhere new — and for the operations
    * that follow a rename or a delete of it, which are the same place under another name.
    */
-  const open = useCallback(
-    (kind: FileKind, target: string | null, options?: { replace?: boolean }) => {
+  const open = useCallback<OpenFile>(
+    (kind, target, options) => {
       const pairs = pageQuery(kind, target);
       const same = target !== null && query.get(kind) === target && FILE_KINDS.every((k) => k === kind || !query.get(k));
       if (options?.replace || same) {
         setQuery(pairs);
         return;
       }
-      const id = target ? list.ids[target] : undefined;
-      goSet(pairs);
-      if (target) markHistoryPlace(id ? { kind, name: target, id } : { kind, name: target });
+      visit(pairs, { tab: options?.tab });
     },
-    [setQuery, goSet, query, list.ids],
+    [setQuery, visit, query],
   );
-  const openTasks = useCallback(() => goSet({ ...pageQuery("board", null), tasks: "1" }), [goSet]);
-  const openCalendar = useCallback(() => goSet({ ...pageQuery("board", null), calendar: "1" }), [goSet]);
-  const openTrash = useCallback(() => goSet({ ...pageQuery("board", null), trash: "1" }), [goSet]);
+  const openTasks = useCallback(() => visit({ ...pageQuery("board", null), tasks: "1" }), [visit]);
+  const openCalendar = useCallback(() => visit({ ...pageQuery("board", null), calendar: "1" }), [visit]);
+  const openTrash = useCallback(() => visit({ ...pageQuery("board", null), trash: "1" }), [visit]);
   /* The Assistant page, on a chat; `1` is the newest one the vault has. */
   const openAssistantPage = useCallback(
-    (chat?: string | null) => goSet({ ...pageQuery("board", null), chat: chat ?? "1" }),
-    [goSet],
+    (chat?: string | null) => visit({ ...pageQuery("board", null), chat: chat ?? "1" }),
+    [visit],
   );
   /* The Quizzes page, or — with `run: "mistakes"` — the Mistakes run it starts, or with `folder:<path>`
      every quiz in a folder as one run. */
   const openQuizzes = useCallback(
-    (run?: QuizzesRun) => goSet({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
-    [goSet],
+    (run?: QuizzesRun) => visit({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
+    [visit],
   );
   /* Home: no page open, so `Welcome` renders. Every page's key cleared — the vault, the theme and
      the rest of the address kept — as a new history entry, so Back returns to the page that was
      left. What the AnyDag logo does, wherever it is drawn. */
-  const goHome = useCallback(() => {
-    const next = new URLSearchParams(location.search);
-    for (const k of PAGE_KEYS) next.delete(k);
-    go(next);
-  }, [go]);
+  const goHome = useCallback(() => visit({ ...pageQuery("board", null), ref: null }), [visit]);
   const ref = query.get("ref");
+
+  /* Another tab to the front, as a new history entry: Back brings back the one that was. The hash
+     was the last tab's part, and is not this one's. */
+  const switchTab = useCallback(
+    (id: string) => {
+      const t = tabById(tabsNow(), id);
+      if (!t || id === activeRef.current) return;
+      go(addressOf(t.place, location.search), placeFor(t.place), { id, hash: "" });
+    },
+    [go, placeFor],
+  );
+  /* A tab closed. The front one gives the window to its neighbour in place of its own entry. */
+  const closeDocTab = useCallback(
+    (id: string) => {
+      const next = changeTabs((t: Tabs) => closeTab(t, id));
+      if (id !== activeRef.current) return;
+      const front = tabById(next, next.active);
+      if (front) swap(addressOf(front.place, location.search), placeFor(front.place), front.id);
+    },
+    [swap, placeFor],
+  );
+  /* A new tab, on Home. */
+  const newDocTab = useCallback(() => {
+    const id = newTabId();
+    changeTabs((t) => openTab(t, "", id));
+    go(addressOf("", location.search), null, { id, hash: "" });
+  }, [go]);
 
   /* Home's recent list: the page that opened a file is what knows it did, and this is the one place
      every way of opening one passes through — a sidebar row, a reference, a link, a cold load. The
@@ -538,7 +680,7 @@ export function App() {
      has no id until the listing answers, and a file renamed while it is open is the same entry
      under a new name. `resolvePlace` on a later pop is what reads it. */
   useEffect(() => {
-    if (query.get("snapshot") === "1") return;
+    if (snapshot) return;
     const kind = FILE_KINDS.find((k) => query.get(k) !== null);
     const name = kind ? query.get(kind) : null;
     /* A page that names no file — home, a listing — is no filed entry any more: a delete of the
@@ -549,7 +691,7 @@ export function App() {
     }
     const id = list.ids[name];
     markHistoryPlace(id ? { kind, name, id } : { kind, name });
-  }, [query, list.ids]);
+  }, [query, list.ids, snapshot]);
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
      the target being renamed or moved. It is resolved once and replaced by the name it stands for
@@ -578,50 +720,26 @@ export function App() {
   }, [ref, setQuery]);
 
   /* While a reference is being resolved the page draws nothing — but the sidebar stays, where the
-     whole window used to go blank for the round trip. */
-  const page = ref ? null : tasks ? (
-    <TasksApp query={query} setQuery={setQuery} list={list} open={open} />
-  ) : calendar ? (
-    <CalendarApp query={query} setQuery={setQuery} list={list} open={open} />
-  ) : quizzes ? (
-    <QuizzesApp query={query} setQuery={setQuery} list={list} open={open} openQuizzes={openQuizzes} />
-  ) : trash ? (
-    <TrashApp query={query} setQuery={setQuery} list={list} open={open} />
-  ) : assistant ? (
-    <AssistantApp query={query} setQuery={setQuery} list={list} open={open} />
-  ) : quiz ? (
-    <QuizApp
-      name={quiz}
+     whole window used to go blank for the round trip. Keyed by its tab, so a tab brought to the
+     front draws its own page rather than taking over the last tab's. */
+  const page = ref ? null : (
+    <TabPage
+      key={active}
+      shown={shown}
       query={query}
       setQuery={setQuery}
+      goSet={goSet}
       list={list}
       open={open}
       openQuizzes={openQuizzes}
       openTrash={openTrash}
       goHome={goHome}
     />
-  ) : table ? (
-    <TableApp name={table} query={query} setQuery={setQuery} list={list} open={open} openTrash={openTrash} goHome={goHome} />
-  ) : file ? (
-    <FileApp name={file} query={query} setQuery={setQuery} list={list} open={open} />
-  ) : note ? (
-    <NoteApp
-      name={note}
-      query={query}
-      setQuery={setQuery}
-      goSet={goSet}
-      list={list}
-      open={open}
-      openTrash={openTrash}
-      goHome={goHome}
-    />
-  ) : (
-    <BoardApp query={query} setQuery={setQuery} goSet={goSet} list={list} open={open} openTrash={openTrash} goHome={goHome} />
   );
   /* A snapshot is a picture of a board, and a picture of a board is a fact about the file: no
      sidebar, and not even the shell around the page, so the 45 baselines see exactly the `.dag-app`
      they always have. */
-  if (query.get("snapshot") === "1") return page;
+  if (snapshot) return page;
   return (
     <Shell
       boards={list.boards}
@@ -659,8 +777,86 @@ export function App() {
       openHome={goHome}
       open={open}
     >
-      {page}
+      <div className="dag-docs">
+        <DocTabs tabs={tabs} active={active} titles={list.titles} onSwitch={switchTab} onClose={closeDocTab} onNew={newDocTab} />
+        {page}
+      </div>
     </Shell>
+  );
+}
+
+/**
+ * One tab's page: a board or a note, and never both on one screen.
+ *
+ * **A note is a second page, not a mode of this one**. The board page is a
+ * canvas: a viewport, an editor that owns every key on the window, a page strip, a dock. A note has
+ * none of those, and nothing crosses between the two — so the note page is
+ * its own component tree and the canvas does not learn a note exists. In particular `useEditor`'s
+ * window key handler and paste listener are simply not mounted under a note, which is what keeps
+ * `Delete`, `space` and ctrl+V inside the text a person is typing.
+ *
+ * `?note=` and `?board=` are exclusive: opening either clears the other.
+ */
+function TabPage({
+  shown,
+  query,
+  setQuery,
+  goSet,
+  list,
+  open,
+  openQuizzes,
+  openTrash,
+  goHome,
+}: {
+  shown: ReturnType<typeof pagesOf>;
+  query: URLSearchParams;
+  setQuery: SetQuery;
+  goSet: GoPage;
+  list: BoardTree;
+  open: OpenFile;
+  openQuizzes(run?: QuizzesRun): void;
+  openTrash(): void;
+  goHome(): void;
+}) {
+  const { tasks, calendar, quizzes, trash, assistant, quiz, table, file, note } = shown;
+  return tasks ? (
+    <TasksApp query={query} setQuery={setQuery} list={list} open={open} />
+  ) : calendar ? (
+    <CalendarApp query={query} setQuery={setQuery} list={list} open={open} />
+  ) : quizzes ? (
+    <QuizzesApp query={query} setQuery={setQuery} list={list} open={open} openQuizzes={openQuizzes} />
+  ) : trash ? (
+    <TrashApp query={query} setQuery={setQuery} list={list} open={open} />
+  ) : assistant ? (
+    <AssistantApp query={query} setQuery={setQuery} list={list} open={open} />
+  ) : quiz ? (
+    <QuizApp
+      name={quiz}
+      query={query}
+      setQuery={setQuery}
+      list={list}
+      open={open}
+      openQuizzes={openQuizzes}
+      openTrash={openTrash}
+      goHome={goHome}
+    />
+  ) : table ? (
+    <TableApp name={table} query={query} setQuery={setQuery} list={list} open={open} openTrash={openTrash} goHome={goHome} />
+  ) : file ? (
+    <FileApp name={file} query={query} setQuery={setQuery} list={list} open={open} />
+  ) : note ? (
+    <NoteApp
+      name={note}
+      query={query}
+      setQuery={setQuery}
+      goSet={goSet}
+      list={list}
+      open={open}
+      openTrash={openTrash}
+      goHome={goHome}
+    />
+  ) : (
+    <BoardApp query={query} setQuery={setQuery} goSet={goSet} list={list} open={open} openTrash={openTrash} goHome={goHome} />
   );
 }
 
@@ -768,7 +964,7 @@ function usePageChrome({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
   /** The quiz or the table that is open, which the search marks as where you are. */
   quiz?: string | null;
   table?: string | null;
@@ -810,7 +1006,7 @@ function usePageChrome({
           file={file}
           onOpen={open}
           onOpenAt={(kind, target, part) => {
-            setTarget(part ?? null);
+            aimAt(part);
             open(kind, target);
           }}
           onClose={() => setBrowsing(false)}
@@ -850,7 +1046,7 @@ function TasksApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const locked = useLocked() && !snapshot;
@@ -951,7 +1147,7 @@ function TrashApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open });
@@ -978,7 +1174,7 @@ function AssistantApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const { openBrowser, cards } = usePageChrome({ query, setQuery, list, open });
@@ -1024,7 +1220,7 @@ function CalendarApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const locked = useLocked() && !snapshot;
@@ -1088,7 +1284,7 @@ function CalendarApp({
         tagFilter={tagFilter}
         onTagFilter={chooseTag}
         onGo={onGo}
-        onOpen={(name) => open("note", name)}
+        onOpen={(name, tab) => open("note", name, { tab })}
         onDuplicate={(name) => sidebar?.duplicate("note", name)}
         onTrash={(name) => sidebar?.trash("note", name)}
         locked={locked}
@@ -1115,7 +1311,7 @@ function QuizzesApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
   openQuizzes(run?: QuizzesRun): void;
 }) {
   const snapshot = query.get("snapshot") === "1";
@@ -1377,7 +1573,7 @@ function QuizApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
   openQuizzes(run?: QuizzesRun): void;
   openTrash(): void;
   goHome(): void;
@@ -1565,7 +1761,7 @@ function FileApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
 }) {
   const snapshot = query.get("snapshot") === "1";
   const locked = useLocked() && !snapshot;
@@ -1636,7 +1832,7 @@ function TableApp({
   query: URLSearchParams;
   setQuery: SetQuery;
   list: BoardTree;
-  open(kind: FileKind, name: string | null): void;
+  open: OpenFile;
   openTrash(): void;
   goHome(): void;
 }) {
@@ -1683,7 +1879,7 @@ function NoteApp({
   /** The Tasks and Calendar pages, from a project's bar: pages somebody went to, so entries. */
   goSet: GoPage;
   list: BoardTree;
-  open(kind: FileKind, name: string | null, options?: { replace?: boolean }): void;
+  open: OpenFile;
   openTrash(): void;
   goHome(): void;
 }) {
@@ -2044,7 +2240,7 @@ function NoteApp({
           onOpenAt={(kind, target, part) => {
             /* The part goes into the hash first, so the page that opens finds it there — and the
                note already open, which does not reopen, hears it through `dag:target`. */
-            setTarget(part ?? null);
+            aimAt(part);
             if (kind !== "note" || target !== name) open(kind, target);
           }}
           onClose={closeBrowser}
@@ -2080,7 +2276,7 @@ function BoardApp({
   /** A board's own page, as a new history entry: the strip's tabs are pages somebody visits. */
   goSet: GoPage;
   list: BoardTree;
-  open(kind: FileKind, name: string | null, options?: { replace?: boolean }): void;
+  open: OpenFile;
   openTrash(): void;
   goHome(): void;
 }) {
@@ -3117,7 +3313,7 @@ function BoardApp({
             onOpenAt={(kind, target, part) => {
               /* The part goes into the hash first, so the page that opens finds it there — and the
                  board already open, which does not reopen, hears it through `dag:target`. */
-              setTarget(part ?? null);
+              aimAt(part);
               if (kind !== "board" || target !== boardName) open(kind, target);
             }}
             onClose={closeBrowser}

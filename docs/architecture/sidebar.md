@@ -585,3 +585,54 @@ Four things about it:
   drag-and-drop, for the reason the library's drag already gives.
 - **Shift and an arrow reorder from the keyboard**, and a plain arrow roves the tablist. That is
   the WAI pattern, and the only way this is reachable without a pointer.
+
+## The document tabs
+
+`src/ui/tabs/`, across the top of the page: the window's documents, as a browser's tabs are (#264).
+Every kind of document has one — board, note, quiz, table, attachment — and so do Tasks, the
+Calendar, Quizzes, the Trash, the Assistant and Home, which is what a new tab shows. **The search is
+not a tab**: it stays the dialog it was, over whichever tab is in front. Which page a tab is, its
+label and its mark are each a `switch` ending in `assertNever` (`kindOf`, `tabLabel`, `identity` in
+`model.ts`).
+
+**Not the page tabs.** A board's pages are `PageBar` along the bottom and own `dag-tab*` and
+`data-dag-page*`. These are `dag-doctabs*`, `data-dag-doctab*` and `dag-docs` (the column the strip
+and the page share), grepped first; the diagram owns none of them.
+
+**The tab list is the app's, and the address is always the tab in front's.** A tab is an id and a
+*place* — the page half of the query (`PAGE_KEYS` and `ref`, in one order); the window's own keys
+(`vault`, `theme`, `snapshot`, `view`, `ws`) stay in the address and belong to no tab. So a deep
+link, a reload, `?view=1` and `?snapshot=1` read the address as they always did, and a snapshot is
+one page with no strip and reads no preference. Each history entry's `dagHistory` state carries the
+tab it was made in (`src/ui/history.ts`):
+
+- **Switching tabs is a `pushState`** of the tab's place, so Back after a switch is the tab you came
+  from. That is the one rule a browser does not have — its Back is per tab — and it is the reason
+  this design was chosen over a history per tab: the window has one history, the desktop's
+  Alt+Left and mouse buttons drive it, and a second one beside it would be a second Back that only
+  the page could see.
+- **Popping to an entry brings its tab to the front** with that place (`adopt`). An entry whose tab
+  has been closed, or one made before there were tabs, goes to the tab in front: **Back never
+  makes a tab.**
+- **Closing the tab in front is a `replaceState`** to its neighbour, because the closed tab is not
+  somewhere Back should go.
+
+**One tab per document or page.** Opening something another tab already holds goes to that tab
+rather than opening it twice (`holding`); a board's tab is the board on any of its pages, a calendar's
+on any date. Home is the exception: two Home tabs are two places to start from.
+
+**How one opens.** A middle click, or Ctrl/⌘ and a click, on anything that opens a document — a
+search hit, a row on Home, a task, a calendar item, a link in a note — opens it **behind** the tab
+in front, as a browser opens a link; Shift as well opens it in front. Successive tabs opened behind
+one tab line up after it in the order they were opened. None of those places was written to pass a
+modifier along, so `intent.ts` notes the press in the capture phase and `visit` in `App` asks while
+the same event is dispatched; a middle click is an `auxclick`, which each opener answers with
+`onAuxClick={middle(…)}`. **The sidebar keeps Ctrl/⌘-click for its multi-row selection**, so a row
+opens a tab by a middle click or its menu's *Open in a new tab*; the calendar's item menu says the
+same and does the same. The strip's `+` opens Home in front.
+
+**It is drawn from two tabs**, for the page strip's reason: one tab says nothing a sidebar row does
+not, and would cost a row on every page (the e2e suite, which starts with the sidebar away, would
+also find every page a row lower). Closing the last tab is not possible; closing the second takes
+the strip away. While the sidebar is away the strip is the window's top-left corner and keeps the
+toggle's slot, as the toolbar does when the strip is not there.

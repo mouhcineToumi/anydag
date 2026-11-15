@@ -95,6 +95,12 @@ query, so the page never draws a 404 on the way. At the end of a history of dead
 what stands. Going back is a read: it writes no file. An editor with unsaved typing is left exactly
 as the sidebar leaves it — its unmount flushes the save the debounce was holding.
 
+**With document tabs, the history is still the window's** (*The document tabs*, `sidebar.md`).
+Each entry also names the tab it was made in, and switching tabs is an entry of its own, so Back
+walks across tabs in the order they were visited: popping to an entry brings its tab to the front
+with that place, and an entry whose tab has since been closed goes to the tab in front. Back never
+makes a tab, and closing the tab in front replaces its entry rather than leaving one behind.
+
 Names claimed, grepped first: `dag-toolbar__history`, `data-dag-history-back` and
 `data-dag-history-forward`; the diagram owns none of them. The state key is `dagHistory`, which is
 not a `data-dag-*` attribute and belongs to the page alone.

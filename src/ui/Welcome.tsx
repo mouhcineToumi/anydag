@@ -28,6 +28,7 @@ import { Logo } from "./Logo";
 import { readRecent } from "./recents";
 import { leaf } from "./tree";
 import { CreateVaultForm, OpenFolderForm, RecentVaults, pickFolder, enterPath } from "./Vaults";
+import { middle } from "./tabs/intent";
 import { collation } from "@/locale";
 
 /** Lucide at one size and weight, stated once. */
@@ -255,6 +256,7 @@ export function Welcome({
                     data-dag-home-recent-item={file.name}
                     data-dag-home-recent-kind={file.kind}
                     onClick={() => onOpenFile(file.kind, file.name)}
+                    onAuxClick={middle(() => onOpenFile(file.kind, file.name))}
                   >
                     <Icon {...ICON} aria-hidden="true" />
                     <span className="dag-welcome__rowtitle">{list.titles[file.name] ?? leaf(file.name)}</span>
@@ -277,6 +279,7 @@ export function Welcome({
                   className="dag-welcome__row"
                   data-dag-home-due-item={name}
                   onClick={() => onOpenFile("note", name)}
+                  onAuxClick={middle(() => onOpenFile("note", name))}
                 >
                   <SquareCheckBig {...ICON} aria-hidden="true" />
                   <span className="dag-welcome__rowtitle">{title}</span>
