@@ -1,4 +1,18 @@
-import { CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, ListFilter, Lock } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  FileText,
+  ListFilter,
+  Lock,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -46,6 +60,7 @@ import {
   type CalKind,
   type CalView,
 } from "@/calendar/model";
+import { menuKey, menuWithin } from "@/calendar/menu";
 import { useZone } from "@/calendar/usePrefs";
 import { dayOf, timeOf, type NoteEvent } from "@/note/event";
 import { wallOf } from "@/note/zone";
@@ -133,6 +148,18 @@ type Edge = "start" | "end";
  */
 type Grab = (item: CalItem, e: ReactPointerEvent<HTMLElement>, dragged: () => void, edge?: Edge) => void;
 
+/** Open an item's menu at a point on the glass, having been asked by that item. */
+type AskMenu = (item: CalItem, at: { x: number; y: number }, source: HTMLElement) => void;
+
+/** What a right-click on a calendar item offers. */
+type MenuAction = "open" | "new-tab" | "duplicate" | "trash";
+
+/** An item's menu, open at the point it was asked for. */
+interface OpenMenu {
+  item: CalItem;
+  at: { x: number; y: number };
+}
+
 /** What a drag writes: an event's two lines, or a task's dates. */
 type Write = { event: { start: string; end: string | null } } | { task: Pick<TaskChange, "start" | "due"> };
 
@@ -179,6 +206,8 @@ export function CalendarView({
   onScope,
   onGo,
   onOpen,
+  onDuplicate,
+  onTrash,
   locked = false,
 }: {
   list: BoardTree;
@@ -198,6 +227,10 @@ export function CalendarView({
   /** Go somewhere else: another view, another day, another count. `day: null` is today. */
   onGo(next: { view?: CalView; day?: string | null; count?: number }): void;
   onOpen(name: string): void;
+  /** A copy of the item's file, beside it, opening nothing — `Shell`'s duplicate. */
+  onDuplicate(name: string): void;
+  /** Into the trash, with the notice whose Undo puts it back — `Shell`'s Delete. */
+  onTrash(name: string): void;
   /** Read only: nothing is made by a drag or a click on empty time, and nothing is moved. */
   locked?: boolean;
 }) {
@@ -305,6 +338,37 @@ export function CalendarView({
 
   const ask = useCallback((start: string, end: string | null, x: number, y: number) => setMaking({ start, end, x, y }), []);
   const open = useCallback((name: string) => onOpen(name), [onOpen]);
+
+  /* The item menu: where the pointer or the keyboard asked for it, and what it is about. The
+     element that asked keeps the focus to come back to — a keyboard's menu that closed onto nothing
+     would leave the page's next Tab starting from the top. */
+  const [menu, setMenu] = useState<OpenMenu | null>(null);
+  const askedBy = useRef<HTMLElement | null>(null);
+  const openMenu = useCallback<AskMenu>((item, at, source) => {
+    askedBy.current = source;
+    setMenu({ item, at });
+  }, []);
+  const closeMenu = useCallback((back: boolean) => {
+    setMenu(null);
+    const source = askedBy.current;
+    askedBy.current = null;
+    if (back && source?.isConnected) source.focus();
+  }, []);
+  const pick = useCallback(
+    (what: MenuAction) => {
+      if (!menu) return;
+      const name = menu.item.name;
+      /* The menu shuts before the action runs, as every menu here does — and only Duplicate leaves
+         the item it was asked about on the glass to put the focus back on. */
+      closeMenu(what === "duplicate");
+      if (what === "open") onOpen(name);
+      else if (what === "new-tab") window.open(hrefOf(name), "_blank", "noopener,noreferrer");
+      else if (what === "duplicate") onDuplicate(name);
+      else onTrash(name);
+    },
+    [menu, closeMenu, onOpen, onDuplicate, onTrash],
+  );
+
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
 
   return (
@@ -389,7 +453,16 @@ export function CalendarView({
         </div>
       </div>
       {view === "month" && phone ? (
-        <DotMonth first={first} last={last} month={day.slice(0, 7)} around={day} today={today} items={items} onOpen={open} />
+        <DotMonth
+          first={first}
+          last={last}
+          month={day.slice(0, 7)}
+          around={day}
+          today={today}
+          items={items}
+          onOpen={open}
+          onMenu={openMenu}
+        />
       ) : view === "month" ? (
         <Month
           first={first}
@@ -398,6 +471,7 @@ export function CalendarView({
           today={today}
           items={items}
           onOpen={open}
+          onMenu={openMenu}
           onAsk={ask}
           onWrite={locked ? undefined : onWrite}
           onDay={(d) => onGo({ view: "days", day: d, count: 1 })}
@@ -408,11 +482,13 @@ export function CalendarView({
           today={today}
           items={items}
           onOpen={open}
+          onMenu={openMenu}
           onAsk={ask}
           onWrite={locked ? undefined : onWrite}
         />
       )}
       {making ? <NewEvent making={making} locked={locked} onMake={make} onClose={() => setMaking(null)} /> : null}
+      {menu ? <ItemMenu menu={menu} locked={locked} onPick={pick} onClose={() => closeMenu(true)} /> : null}
     </main>
   );
 }
@@ -570,7 +646,8 @@ function KindMark({ kind, item }: { kind: CalKind; item?: CalItem }) {
 
 /**
  * One thing on the calendar, as a link to its note: its mark, a timed event's hour, and its title.
- * The press is stopped, so it is never the start of a range somebody meant to draw.
+ * The press is stopped, so it is never the start of a range somebody meant to draw. A right-click,
+ * and `shift+F10` or the context-menu key on its focus, ask the page for its menu.
  */
 function ItemLink({
   item,
@@ -581,6 +658,7 @@ function ItemLink({
   grab,
   axis,
   onOpen,
+  onMenu,
 }: {
   item: CalItem;
   style?: CSSProperties;
@@ -593,6 +671,8 @@ function ItemLink({
   /** Which way its ends run, so they can be pulled: across for a bar, down for a block in the grid. */
   axis?: "x" | "y";
   onOpen(name: string): void;
+  /** The item's menu, at the pointer or under it. Absent where there is none to offer. */
+  onMenu?: AskMenu;
 }) {
   /* Set when the press became a drag, and cleared when the next press starts — never in `onClick`,
      which a drop that ends somewhere else never sends (the sidebar's lesson). */
@@ -639,6 +719,22 @@ function ItemLink({
         e.preventDefault();
         onOpen(item.name);
       }}
+      /* The browser's own menu off an item, and ours in its place. On empty time neither the
+         calendar nor this answers one, so a right-drag there is still nothing at all. */
+      onContextMenu={(e: ReactMouseEvent<HTMLAnchorElement>) => {
+        if (!onMenu) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMenu(item, { x: e.clientX, y: e.clientY }, e.currentTarget);
+      }}
+      onKeyDown={(e: ReactKeyboardEvent<HTMLAnchorElement>) => {
+        if (!onMenu || !menuKey(e.key, e.shiftKey)) return;
+        e.preventDefault();
+        const r = e.currentTarget.getBoundingClientRect();
+        /* Under the item rather than at an imaginary pointer: the keyboard has none, and the item
+           is where the person is looking. */
+        onMenu(item, { x: r.left, y: r.bottom }, e.currentTarget);
+      }}
     >
       <KindMark kind={item.kind} item={item} />
       {time ? <span className="dag-calendar__time">{time}</span> : null}
@@ -655,6 +751,103 @@ function ItemLink({
   );
 }
 
+/** What right-clicking a calendar item offers: open it here or in a tab, copy it, or trash it. */
+const MENU_ROWS: { what: MenuAction; label: string; icon: LucideIcon; changes?: boolean; danger?: boolean }[] = [
+  { what: "open", label: "Open", icon: ArrowUpRight },
+  { what: "new-tab", label: "Open in new tab", icon: ExternalLink },
+  { what: "duplicate", label: "Duplicate", icon: Copy, changes: true },
+  { what: "trash", label: "Move to trash", icon: Trash2, changes: true, danger: true },
+];
+
+const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+/**
+ * An item's menu — its right-click, the context-menu key or `shift+F10` — at the point that asked
+ * for it, or under the item when the keyboard did. **The sidebar's menu control**: `role="menu"`,
+ * rows of `dag-more__item` walked by the arrow keys, a `card` surface on the popover layer, a press
+ * elsewhere or Escape shutting it. Read only, the two rows that change a file give way to the
+ * lock's sentence, as a row's menu in the column does.
+ */
+function ItemMenu({
+  menu,
+  locked = false,
+  onPick,
+  onClose,
+}: {
+  menu: OpenMenu;
+  /** Read only: what only reads a file is left, and the menu says why the rest is not. */
+  locked?: boolean;
+  onPick(what: MenuAction): void;
+  onClose(): void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState(menu.at);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos(menuWithin(menu.at, r, { width: innerWidth, height: innerHeight }));
+    el.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [menu]);
+
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("pointerdown", down, true);
+    return () => document.removeEventListener("pointerdown", down, true);
+  }, [onClose]);
+
+  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      return onClose();
+    }
+    /* Tab leaves the menu, as it does the column's row menu: a menu is entered and left by Escape,
+       and Tab would otherwise land nowhere once its row is gone. */
+    if (e.key === "Tab") {
+      e.preventDefault();
+      return onClose();
+    }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const rows = Array.from(ref.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? []);
+    const at = rows.indexOf(document.activeElement as HTMLElement);
+    e.preventDefault();
+    rows[(at + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length]?.focus();
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="dag-cal-menu"
+      data-dag-cal-menu=""
+      role="menu"
+      aria-label={`${menu.item.title}: actions`}
+      style={{ left: pos.x, top: pos.y }}
+      onKeyDown={onKey}
+    >
+      {MENU_ROWS.map(({ what, label, icon: Icon, changes, danger }) =>
+        locked && changes ? null : (
+          <button
+            key={what}
+            type="button"
+            role="menuitem"
+            className={danger ? "dag-more__item dag-cal-menu__danger" : "dag-more__item"}
+            data-dag-cal-menu-item={what}
+            onClick={() => onPick(what)}
+          >
+            <Icon {...ICON} aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        ),
+      )}
+      {locked ? <p className="dag-cal-menu__locked">Read only: unlock to change it.</p> : null}
+    </div>
+  );
+}
+
 /* -- the month ------------------------------------------------------------------------------- */
 
 function Month({
@@ -664,6 +857,7 @@ function Month({
   today,
   items,
   onOpen,
+  onMenu,
   onAsk,
   onWrite,
   onDay,
@@ -674,6 +868,7 @@ function Month({
   today: string;
   items: CalItem[];
   onOpen(name: string): void;
+  onMenu: AskMenu;
   /** Absent while the app is locked, and with them the drags that make and move. */
   onAsk?(start: string, end: string | null, x: number, y: number): void;
   onWrite?(item: CalItem, next: Write): void;
@@ -710,6 +905,7 @@ function Month({
           bars={lanes(items, week)}
           grab={onWrite ? grab : undefined}
           onOpen={onOpen}
+          onMenu={onMenu}
           onDay={onDay}
         />
       ))}
@@ -731,6 +927,7 @@ function DotMonth({
   today,
   items,
   onOpen,
+  onMenu,
 }: {
   first: string;
   last: string;
@@ -739,6 +936,7 @@ function DotMonth({
   today: string;
   items: CalItem[];
   onOpen(name: string): void;
+  onMenu: AskMenu;
 }) {
   const days = daysFrom(first, last);
   const [picked, setPicked] = useState<string | null>(null);
@@ -781,7 +979,7 @@ function DotMonth({
       <section className="dag-cal-dots__list" aria-label={on} data-dag-cal-dots-list={on}>
         <h2>{DAY_TITLE.format(calendarDate(on))}</h2>
         {list.length ? (
-          list.map((it) => <ItemLink key={it.name} item={it} onOpen={onOpen} />)
+          list.map((it) => <ItemLink key={it.name} item={it} onOpen={onOpen} onMenu={onMenu} />)
         ) : (
           <p className="dag-cal-dots__none">Nothing on this day.</p>
         )}
@@ -797,6 +995,7 @@ function MonthWeek({
   bars,
   grab,
   onOpen,
+  onMenu,
   onDay,
 }: {
   days: string[];
@@ -805,6 +1004,7 @@ function MonthWeek({
   bars: Bar[];
   grab?: Grab;
   onOpen(name: string): void;
+  onMenu: AskMenu;
   onDay(day: string): void;
 }) {
   const kept = bars.filter((b) => b.lane < MONTH_LANES);
@@ -844,6 +1044,7 @@ function MonthWeek({
           grab={grab}
           axis="x"
           onOpen={onOpen}
+          onMenu={onMenu}
         />
       ))}
       {more.map((n, i) =>
@@ -1085,6 +1286,7 @@ function Columns({
   today,
   items,
   onOpen,
+  onMenu,
   onAsk,
   onWrite,
 }: {
@@ -1092,6 +1294,7 @@ function Columns({
   today: string;
   items: CalItem[];
   onOpen(name: string): void;
+  onMenu: AskMenu;
   /** Absent while the app is locked, and with them the drags that make and move. */
   onAsk?(start: string, end: string | null, x: number, y: number): void;
   onWrite?(item: CalItem, next: Write): void;
@@ -1188,6 +1391,7 @@ function Columns({
             grab={onWrite ? grab : undefined}
             axis="x"
             onOpen={onOpen}
+            onMenu={onMenu}
           />
         ))}
       </div>
@@ -1209,6 +1413,7 @@ function Columns({
               moving={moving?.day === d ? moving : null}
               grab={onWrite ? grab : undefined}
               onOpen={onOpen}
+              onMenu={onMenu}
               onAsk={onAsk}
             />
           ))}
@@ -1242,6 +1447,7 @@ function DayColumn({
   moving,
   grab,
   onOpen,
+  onMenu,
   onAsk,
 }: {
   day: string;
@@ -1250,6 +1456,7 @@ function DayColumn({
   moving: Ghost | null;
   grab?: Grab;
   onOpen(name: string): void;
+  onMenu: AskMenu;
   onAsk?(start: string, end: string | null, x: number, y: number): void;
 }) {
   const placed = useMemo(() => blocks(items, day), [items, day]);
@@ -1313,6 +1520,7 @@ function DayColumn({
           grab={grab}
           axis="y"
           onOpen={onOpen}
+          onMenu={onMenu}
         />
       ))}
       {moving ? (

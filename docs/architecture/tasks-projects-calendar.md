@@ -155,7 +155,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | Where | What it does |
 |---|---|
 | the sidebar | **Calendar** opens the page; **New event** makes `untitled` at the next whole hour, an hour long, and names it in its title; an event's row wears a calendar clock; a row's menu makes a plain note an event, or an event a note |
-| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a drag or a click on empty time makes an event, a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
+| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a right-click on one — or `shift+F10` — opens its menu, a drag or a click on empty time makes an event, a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
 | an event's own page | its properties under the title — all day, the start, the end and the zone they are shown in, each label acting on the value beside it; the top bar's `⋯` has *Not an event*, and a plain note's has *Make it an event* |
 | a task's own page | a *Starts* date beside *Due* |
 | a board | a placed event's card says *Event* and when |
@@ -163,7 +163,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | `?view=1`, a snapshot, the PDF | the event's time on a line above the text, in the reader's zone |
 | Settings | *Weeks start on*, the person's |
 
-Nine things are load-bearing:
+Ten things are load-bearing:
 
 - **An event is a note with a `start:` and no `status:`.** A date is all day and a time is a time —
   there is no `all-day:` key, a second key that could disagree with the first. An all-day `end:` is
@@ -220,6 +220,19 @@ Nine things are load-bearing:
   picked up, so the phone's week is as it was. Escape while it is held puts it back. The page shows
   the change at once and lets go once the list agrees (`pending`, the Tasks page's), because the
   change feed is a wait behind the write.
+- **An item's menu is the sidebar's menu control**: a right-click on an item, the context-menu key or
+  `shift+F10` on it opens `ItemMenu` in `Calendar.tsx` — `role="menu"`, `dag-more__item` rows walked
+  by the arrows, the popover layer, Escape or a press elsewhere to shut it — at the pointer, or under
+  the item when the keyboard asked. It offers **Open**, **Open in new tab**, **Duplicate** and
+  **Move to trash**. **Empty time has no menu**: the handler is on the item alone, so a right-drag
+  there still draws nothing. **Duplicate opens nothing** — it is the sidebar's `/duplicate` route
+  (`duplicateBoard`, named as the sidebar names a copy: `trip 2`), but without the sidebar's
+  follow-up of opening and naming it, because a copy made to keep is not somewhere to go.
+  **Move to trash is the sidebar's Delete**, through `Shell`'s `trash`, so the notice's Undo puts it
+  back and an open file lets go; the item leaves the page at once through `guess`, as a row does.
+  Read only, the two rows that change a file give way to the lock's sentence. `menuKey` and
+  `menuWithin` in `src/calendar/menu.ts` are the two rules with no drawing in them
+  (`test/calendar-menu.test.ts`).
 - **The toggles and the week start are the person's**, `dag:calendar-hide` (what is *off*, so a new
   kind is shown) and `dag:week-start` in `PREF_KEYS`, read through `useWeekStart`/`useCalendarHidden`
   (`src/calendar/usePrefs.ts`) — the Calendar page and Settings' Calendar tab both — so either
@@ -233,7 +246,8 @@ Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-app--calendar`,
 `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-eventbar*`,
 `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
 `data-dag-sidebar-event`, `data-dag-note-make-event`, `data-dag-projectbar-calendar`, and for the
-drag `data-dag-cal-moving`, `data-dag-cal-moving-to`, `data-dag-cal-moving-end`, `dag-cal-ghost--move`,
+menu `dag-cal-menu*` and `data-dag-cal-menu*`, and for the drag `data-dag-cal-moving`,
+`data-dag-cal-moving-to`, `data-dag-cal-moving-end`, `dag-cal-ghost--move`,
 `dag-calendar__edge`, `data-dag-cal-edge`, `data-dag-cal-pulling` on the root, and `data-movable` and
 `data-axis` on an item,
 `data-dag-setting-week-start`, the storage keys `dag:calendar-hide`, `dag:week-start` and

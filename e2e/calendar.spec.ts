@@ -565,3 +565,107 @@ test("a timed event let go on the all-day row is all day there, and an all-day o
   });
   await expect.poll(() => read("trip")).toMatch(/start: 2031-03-15T14:00[+-]\d{2}:\d{2}\nend: 2031-03-15T15:00[+-]\d{2}:\d{2}\n/);
 });
+
+/*
+ * The item menu. A right-click on an item, the context-menu key, or `shift+F10` opens the sidebar's
+ * menu control over the calendar: open it here or in a tab, copy it, or trash it. The menu is the
+ * calendar's, so empty time still has none — a right-drag there is nothing, as it always was.
+ */
+
+test("right-clicking an item offers open, open in a new tab, duplicate and move to trash", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=month&date=2031-03-15", trip);
+  await page.locator(`[data-dag-cal-item="${trip}"]`).first().click({ button: "right" });
+
+  const menu = page.locator("[data-dag-cal-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("[data-dag-cal-menu-item]")).toHaveCount(4);
+  await expect(menu.locator('[data-dag-cal-menu-item="open"]')).toHaveText("Open");
+  await expect(menu.locator('[data-dag-cal-menu-item="new-tab"]')).toHaveText("Open in new tab");
+  await expect(menu.locator('[data-dag-cal-menu-item="duplicate"]')).toHaveText("Duplicate");
+  await expect(menu.locator('[data-dag-cal-menu-item="trash"]')).toHaveText("Move to trash");
+
+  /* Open goes to the note, as a click on the item does. */
+  await menu.locator('[data-dag-cal-menu-item="open"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(trip);
+  expect(new URL(page.url()).searchParams.get("calendar")).toBeNull();
+});
+
+test("duplicate copies the file beside it and opens nothing, and trash leaves the calendar with an Undo", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=month&date=2031-03-15", trip);
+  const bar = page.locator(`[data-dag-cal-item="${trip}"]`).first();
+
+  /* A copy, named as the sidebar's Duplicate names one, and the page stays where it was. */
+  await bar.click({ button: "right" });
+  const menu = page.locator("[data-dag-cal-menu]");
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-dag-cal-menu-item="duplicate"]').click();
+  await expect(menu).toHaveCount(0);
+  await expect.poll(() => fs.existsSync(path.join(dir, "trip 2.note.md"))).toBe(true);
+  expect(new URL(page.url()).searchParams.get("note")).toBeNull();
+  await expect(page.locator(`[data-dag-cal-item="${folder}/trip 2"]`)).toBeVisible({ timeout: 15_000 });
+
+  /* Into the trash through the sidebar's own delete: the notice offers the way back. */
+  await bar.click({ button: "right" });
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-dag-cal-menu-item="trash"]').click();
+  await expect(page.locator(`[data-dag-cal-item="${trip}"]`)).toHaveCount(0);
+  await expect(page.locator("[data-dag-trash-notice]")).toBeVisible();
+  await expect.poll(() => fs.existsSync(path.join(dir, "trip.note.md"))).toBe(false);
+
+  await page.locator("[data-dag-trash-undo]").click();
+  await expect(page.locator(`[data-dag-cal-item="${trip}"]`)).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => fs.existsSync(path.join(dir, "trip.note.md"))).toBe(true);
+});
+
+test("shift+F10 opens the menu on a focused item, and Open in new tab leaves this page where it was", async ({
+  page,
+  context,
+}) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=month&date=2031-03-15", trip);
+  const bar = page.locator(`[data-dag-cal-item="${trip}"]`).first();
+  await bar.focus();
+  await page.keyboard.press("Shift+F10");
+
+  const menu = page.locator("[data-dag-cal-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('[data-dag-cal-menu-item="open"]')).toBeFocused();
+
+  const opened = context.waitForEvent("page");
+  await menu.locator('[data-dag-cal-menu-item="new-tab"]').click();
+  const tab = await opened;
+  await tab.waitForLoadState();
+  expect(new URL(tab.url()).searchParams.get("note")).toBe(trip);
+  await tab.close();
+  expect(new URL(page.url()).searchParams.get("note")).toBeNull();
+  await expect(menu).toHaveCount(0);
+
+  /* Escape shuts the menu and puts the focus back on the item that asked for it. */
+  await bar.focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(bar).toBeFocused();
+});
+
+test("the menu is not opened on empty time, and a right-drag there still makes nothing", async ({ page }) => {
+  const anchor = write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=month&date=2031-03-15", anchor);
+  const cell = async (d: string) => (await page.locator(`.dag-cal-month [data-dag-cal-day="${d}"]`).boundingBox())!;
+  const from = await cell("2031-03-19");
+  const at = { x: from.x + from.width / 2, y: from.y + from.height - 10 };
+
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await expect(page.locator("[data-dag-cal-menu]")).toHaveCount(0);
+
+  const to = await cell("2031-03-21");
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height - 10, { steps: 6 });
+  await page.mouse.up({ button: "right" });
+  await expect(page.locator("[data-dag-calendar-new]")).toHaveCount(0);
+  expect(fs.readdirSync(dir).sort()).toEqual(["anchor.note.md", "project.note.md"]);
+});
