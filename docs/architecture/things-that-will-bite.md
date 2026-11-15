@@ -521,10 +521,12 @@
   **Every spec imports `test` from `e2e/fixture.ts`, never from `@playwright/test`**: a context init
   script writes the suite's vault (`suiteVault`, `e2e/vault.ts`) into an address that names none,
   before the page's own scripts run, so `settleVault` reads it off the URL and never asks which vault
-  is the default. A check that is *about* the default — a bare `/`, a link to a vault that is not
+  is the default. A request a spec makes itself (`page.request`, the `request` fixture) to a document
+  route with no `vault=` is answered by the default too (`s.within` in `server/app.ts`), so the same
+  fixture adds the suite's vault to those, by the page's own rule (`scopeUrl`). A check that is *about* the default — a bare `/`, a link to a vault that is not
   open — passes `onServerDefault` beside its title and gets no pin; `vaults.spec.ts` is the only file
   that should, and a spec that imports from the package has no pin and no symptom until a loaded
-  machine widens the window. Those checks also wait for the suite's vault to be the default again
+  machine widens the window, which is why `test/e2e-fixture.test.ts` refuses that import. Those checks also wait for the suite's vault to be the default again
   before the page reads its vault list (`vaults.spec.ts`'s `waitForSuiteDefault`): under
   `--repeat-each` beside the suite the default is another copy's vault for a moment, and a page that
   settles there is a page the copy closes under it. **Such a page never reports `data-dag-ready`**:
