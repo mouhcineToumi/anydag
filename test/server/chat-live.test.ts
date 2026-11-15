@@ -589,6 +589,60 @@ describe("a chat's subject", () => {
   });
 });
 
+/* A message's `@` mentions (#324): the page sends each document's name and kind, and the turn is
+   told its `dag:` reference. The fake's `mentions` command says the prompt's section back, which is
+   how the test checks the route, the resolver and the prompt together. */
+describe("documents a message mentions", () => {
+  const write = (rel: string, text: string) => fs.writeFileSync(path.join(env.root, rel), text);
+
+  beforeEach(() => {
+    write("plan.md", "---\ntitle: The plan\n---\nmessy\n");
+    write("other.md", "other words\n");
+  });
+
+  it("tells the turn each reference, and writes nothing to the documents", async () => {
+    const chat = await newChat();
+    const before = fs.readFileSync(path.join(env.root, "plan.md"), "utf8");
+    const plan = (await api("GET", "/__board/get?name=plan&kind=note")).json.id as string;
+    const other = (await api("GET", "/__board/get?name=other&kind=note")).json.id as string;
+    const turn = await say(chat.id, "mentions", {
+      mentions: [
+        { name: "plan", kind: "note" },
+        { name: "other", kind: "note" },
+      ],
+    });
+    expect(said(turn)).toContain(`[The plan](dag:${plan})`);
+    expect(said(turn)).toContain(`[other](dag:${other})`);
+    expect(runs[0]!.system).toContain("## Documents mentioned in this message");
+    expect(fs.readFileSync(path.join(env.root, "plan.md"), "utf8")).toBe(before);
+    const meta = (await api("GET", `/__board/chat?id=${chat.id}`)).json.chat as ChatMeta;
+    expect(meta).not.toHaveProperty("mentions");
+  });
+
+  it("says nothing when the message mentions none", async () => {
+    const chat = await newChat();
+    expect(said(await say(chat.id, "mentions"))).toBe("This message mentions no documents.");
+    expect(runs[0]!.system).not.toContain("## Documents mentioned in this message");
+  });
+
+  it("refuses a mention that is not there, or is not a document", async () => {
+    const chat = await newChat();
+    const gone = await api("POST", "/__board/chat/turn", {
+      id: chat.id,
+      text: "hi",
+      mentions: [{ name: "nope", kind: "note" }],
+    });
+    expect(gone.status).toBe(404);
+    const odd = await api("POST", "/__board/chat/turn", {
+      id: chat.id,
+      text: "hi",
+      mentions: [{ name: "plan", kind: "folder" }],
+    });
+    expect(odd.status).toBe(400);
+    expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.turns).toEqual([]);
+  });
+});
+
 describe("undo", () => {
   it("undoes a block and redoes it", async () => {
     const chat = await newChat();

@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Link as LinkMark, Lock, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Link as LinkMark, Lock, Pencil, Tags } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FileKind } from "@/board/useBoard";
@@ -139,6 +139,17 @@ export function Toolbar({
       hook: "data-dag-toolbar-rename",
       onSelect: () => setRenaming(shown ?? ""),
       split: more.length > 0 && !id,
+      disabled: locked,
+    });
+  /* *Tags…* on a board, a quiz or a table — a note has its Tags row under its title (#327). The card
+     hangs from the `⋯` the row was in. */
+  if (sidebar && boardName && (kind === "board" || kind === "quiz" || kind === "table"))
+    rows.push({
+      key: "tags",
+      label: "Tags…",
+      icon: Tags,
+      hook: "data-dag-toolbar-tags",
+      onSelect: (from) => sidebar.editTags(kind, boardName, from ?? null),
       disabled: locked,
     });
   /* The lock's switch lives here while the page is editable (the UI review): an open padlock in the

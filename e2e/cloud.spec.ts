@@ -111,6 +111,7 @@ test("hides every server-backed feature but the logs toggle, and asks for none o
     "providers",
     "vault-general",
     "vault-files",
+    "tags",
     "export",
     "agent-access",
     "privacy",

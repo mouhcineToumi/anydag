@@ -55,6 +55,7 @@ const TABS: SettingsTab[] = [
   "providers",
   "vault-general",
   "vault-files",
+  "tags",
   "export",
   "sync",
   "agent-access",

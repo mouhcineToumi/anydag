@@ -24,6 +24,8 @@ import { frontId, mint, withId } from "../ids";
 import { classify } from "../names";
 
 const SETTINGS = ".anydag/settings.json";
+/** The vault's tag list: one key per tag, so two devices recolouring two tags both keep theirs. */
+const TAGS = ".anydag/tags.json";
 const DOC_SUFFIXES = [".board.md", ".quiz.md", ".table.md", ".note.md", ".md"] as const;
 
 const isDocument = (rel: string): boolean => {
@@ -37,9 +39,9 @@ export function isText(rel: string): boolean {
   return isDocument(rel);
 }
 
-/** Whether `rel` is JSON merged by key: the vault's settings, or an attachment's id file. */
+/** Whether `rel` is JSON merged by key: the vault's settings or tag list, or an attachment's id file. */
 export function isJson(rel: string): boolean {
-  if (rel === SETTINGS) return true;
+  if (rel === SETTINGS || rel === TAGS) return true;
   const parts = rel.split("/");
   // An Assistant chat's `chat.json`: a rename here and a grant there both land.
   if (parts.length === 4 && parts[0] === ".anydag" && parts[1] === "chats" && parts[3] === "chat.json") return true;

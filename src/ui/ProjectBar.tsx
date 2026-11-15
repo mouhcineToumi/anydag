@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   ChevronDown,
@@ -7,16 +7,17 @@ import {
   CirclePause,
   FolderKanban,
   ListTodo,
-  Palette,
-  X,
+  Palette as PaletteIcon,
   type LucideIcon,
 } from "lucide-react";
 
-import { HUE_ORDER, type Hue } from "@/dsl/ir";
+import type { Hue } from "@/dsl/ir";
 import { PROJECT_LABEL, PROJECT_STATUSES, type Project, type ProjectChange, type ProjectStatus } from "@/note/project";
 import { STATUS_LABEL, STATUSES, type TaskStatus } from "@/note/task";
 import { hueVars } from "@/render/hue";
 
+import { Button } from "./controls";
+import { Palette, hueLabel } from "./Palette";
 import { TaskGlyph } from "./TaskGlyph";
 
 /**
@@ -61,11 +62,14 @@ export function ProjectBar({
   members,
   onChange,
   editable,
+  children,
 }: {
   project: Project;
   members?: ProjectMembers;
   onChange(change: ProjectChange): void;
   editable: boolean;
+  /** Rows after the project's own: the Tags row. */
+  children?: ReactNode;
 }) {
   const total = members ? STATUSES.reduce((n, s) => n + members.counts[s], 0) : 0;
   return (
@@ -97,7 +101,7 @@ export function ProjectBar({
         </span>
       </span>
       <span className="dag-facts__label">
-        <Palette size={14} strokeWidth={2} aria-hidden="true" />
+        <PaletteIcon size={14} strokeWidth={2} aria-hidden="true" />
         Colour
       </span>
       <span className="dag-facts__value">
@@ -144,6 +148,7 @@ export function ProjectBar({
           </span>
         </>
       ) : null}
+      {children}
     </div>
   );
 }
@@ -217,36 +222,32 @@ function HuePicker({ hue, editable, onChange }: { hue: Hue | undefined; editable
         onClick={() => setOpen((v) => !v)}
       >
         <span className="dag-projectbar__dot" style={hueVars(hue)} data-none={hue ? undefined : ""} aria-hidden="true" />
-        <span>{hue ? hue.charAt(0).toUpperCase() + hue.slice(1) : "None"}</span>
+        <span>{hue ? hueLabel(hue) : "None"}</span>
         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
       {open ? (
-        <span className="dag-projectbar__hues" role="radiogroup" aria-label="Project colour">
-          {HUE_ORDER.map((h) => (
-            <button
-              key={h}
-              type="button"
-              role="radio"
-              aria-checked={hue === h}
-              aria-label={h}
-              title={h}
-              className="dag-projectbar__hue"
-              data-dag-projectbar-hue={h}
-              style={hueVars(h)}
-              onClick={() => choose(h)}
-            />
-          ))}
+        /* The ten are the shared swatches (`Palette`, #327): 24px targets, 44px under 720px. */
+        <span className="dag-projectbar__hues" data-dag-projectbar-hues="">
+          <Palette
+            value={hue ?? null}
+            label="Project colour"
+            hook="data-dag-projectbar-hue"
+            onPick={choose}
+            onEscape={() => {
+              setOpen(false);
+              box.current?.querySelector<HTMLElement>("[data-dag-projectbar-colour]")?.focus();
+            }}
+          />
           {hue ? (
-            <button
-              type="button"
-              className="dag-taskbar__clear dag-projectbar__clear"
+            <Button
+              variant="quiet"
+              size="sm"
+              className="dag-projectbar__clear"
               data-dag-projectbar-clear-hue=""
-              aria-label="Take the colour off"
-              title="No colour"
               onClick={() => choose(null)}
             >
-              <X size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
+              No colour
+            </Button>
           ) : null}
         </span>
       ) : null}

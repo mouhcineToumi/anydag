@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AssistantError, answerStep, grantVault, makeChat, sayTurn, stopTurn, undoBlock } from "./api";
 import { Composer, type Choice } from "./Composer";
 import type { ChipDoc } from "./DocChip";
+import type { MentionDoc } from "./mentions";
 import { BlockCard, Empty, Turns, type Actions } from "./Thread";
 import type { Mode } from "./types";
 import { useChat, useModels } from "./useChat";
@@ -82,7 +83,7 @@ export function ChatSurface({
   );
 
   const send = useCallback(
-    async (text: string, c: Choice) => {
+    async (text: string, c: Choice, mentions: readonly MentionDoc[]) => {
       setNotice(null);
       setSending(true);
       try {
@@ -96,7 +97,15 @@ export function ChatSurface({
           : dropped && kept
             ? { subject: null }
             : {};
-        await sayTurn({ id: to, text, provider: c.provider, model: c.model, effort: c.effort || null, ...about });
+        await sayTurn({
+          id: to,
+          text,
+          provider: c.provider,
+          model: c.model,
+          effort: c.effort || null,
+          ...about,
+          ...(mentions.length ? { mentions: mentions.map((m) => ({ name: m.name, kind: m.kind })) } : {}),
+        });
       } catch (e) {
         say(e);
       } finally {
@@ -177,7 +186,7 @@ export function ChatSurface({
       models={models}
       running={running}
       autofocus={autofocus}
-      onSend={(t, c) => void send(t, c)}
+      onSend={(t, c, m) => void send(t, c, m)}
       onStop={() => id && void stopTurn(id).catch(say)}
       onGrant={(c, v, m) => void grant(c, v, m)}
       subject={subject}

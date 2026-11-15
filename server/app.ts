@@ -28,6 +28,7 @@ import { folderRoutes } from "./routes/folders";
 import { metaRoutes } from "./routes/meta";
 import { syncRoutes } from "./routes/sync";
 import { telemetryRoutes } from "./routes/telemetry";
+import { tagRoutes } from "./routes/tags";
 import { templateRoutes } from "./routes/templates";
 import { vaultRoutes } from "./routes/vaults";
 import { trashRoutes } from "./routes/trash";
@@ -148,6 +149,7 @@ export function createApp(opts: ServerOptions): Hono {
   vaultRoutes(app, s);
   trashRoutes(app, s);
   templateRoutes(app, s);
+  tagRoutes(app, s);
   if (cloud) {
     syncRoutes(app, s);
     telemetryRoutes(app, s);

@@ -78,6 +78,14 @@ describe("asking the server per query", () => {
     expect(calls[0]!.url).toBe("/__board/search?q=pay%20sett%20%26%20more");
   });
 
+  it("narrows to a tag when one is given, and says which with the answer (#327)", async () => {
+    const got: (string | undefined)[] = [];
+    const a = asker((_q, _hits, tag) => got.push(tag));
+    a.ask("seat", "q4/plan");
+    await vi.advanceTimersByTimeAsync(DEBOUNCE);
+    expect(calls[0]!.url).toBe("/__board/search?q=seat&tag=q4%2Fplan");
+  });
+
   it("aborts the request in flight when a newer query replaces it, and drops its answer", async () => {
     const got: string[] = [];
     const a = asker((q) => got.push(q));

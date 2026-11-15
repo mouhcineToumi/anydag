@@ -18,6 +18,7 @@ import { HUE_ORDER } from "../../src/dsl/ir";
 import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
+import { tagKey, tagOf } from "../../src/note/tags";
 import { PRIORITIES, STATUSES, dueOf, indexedTask, priorityOf, statusOf, taskOf, withTask } from "../../src/note/task";
 import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
@@ -226,6 +227,7 @@ async function indexAnswer(
       task: (own && f?.task) || null,
       project: (own && f?.project) || null,
       event: (own && f?.event) || null,
+      tags: (own && (f?.tags as string[] | undefined)) || null,
       questions: f?.questions ?? null,
       refs: resolveWikiRefs((f?.refs as Ref[] | undefined) ?? [], ix),
     };
@@ -379,6 +381,7 @@ function listOf(t: Tree, templates: string | null): Promise<string> {
     tasks: t.tasks,
     projects: t.projects,
     events: t.events,
+    tags: t.tags,
     templates,
     created: t.created,
     quizzes: t.quizzes,
@@ -430,13 +433,35 @@ export function docRoutes(app: Hono, s: Session): void {
 
   app.get("/__board/corpus", async (c) => corpusAnswer(c, s));
 
+  /* `tag=` keeps the hits in documents carrying that tag (#327), from the listing's tags — so a
+     template is left out, as it is from every filter — and with no words lists those documents, by
+     title. It narrows what is ranked, before `limit` counts. */
   app.get("/__board/search", async (c) => {
     const q = c.req.query("q") ?? "";
-    if (!q.trim()) return c.json({ query: q, hits: [] });
+    const asked = c.req.query("tag");
+    const tag = asked ? tagOf(asked) : undefined;
+    if (asked && !tag) throw err(400, `\`${asked}\` is not a tag: letters, digits, \`_\`, \`-\` and \`/\`, with a letter`);
     const raw = c.req.query("limit");
     const limit = raw === undefined ? undefined : Number(raw);
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) throw err(400, "`limit` is a whole number above zero");
-    return c.json(await s.corpus.search(await overOf(s), q, limit));
+    if (!tag) {
+      if (!q.trim()) return c.json({ query: q, hits: [] });
+      return c.json(await s.corpus.search(await overOf(s), q, limit));
+    }
+    const tree = await s.vault.tree();
+    const names = Object.keys(tree.tags).filter((n) => tree.tags[n]!.some((t) => tagKey(t) === tagKey(tag)));
+    if (q.trim()) return c.json({ ...(await s.corpus.search(await overOf(s), q, limit, names)), tag });
+    const carrying = new Set(names);
+    const docs: { id: string | null; name: string; kind: TextKind; title: string | null }[] = [];
+    for (const kind of ["board", "note", "quiz", "table"] as const)
+      for (const name of byKind(tree)[kind])
+        if (carrying.has(name)) docs.push({ id: tree.ids[name] ?? null, name, kind, title: tree.titles[name] ?? null });
+    const label = (d: (typeof docs)[number]) => d.title ?? leafOf(d.name);
+    docs.sort(
+      (a, b) =>
+        label(a).localeCompare(label(b), undefined, { numeric: true, sensitivity: "base" }) || a.name.localeCompare(b.name),
+    );
+    return c.json({ query: q, tag, hits: [], docs: limit ? docs.slice(0, limit) : docs, count: docs.length });
   });
 
   app.get("/__board/resolve", async (c) => {

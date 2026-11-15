@@ -15,7 +15,8 @@ export interface MoreItem {
   key: string;
   label: string;
   icon: LucideIcon;
-  onSelect(): void;
+  /** `from` is the `⋯` itself, for a row that opens a card hanging from it. */
+  onSelect(from?: HTMLElement | null): void;
   hook?: string;
   title?: string;
   narrow?: boolean;
@@ -127,7 +128,7 @@ export function PageMore({ items }: { items: MoreItem[] }) {
                   disabled={it.disabled}
                   onClick={() => {
                     setOpen(false);
-                    it.onSelect();
+                    it.onSelect(toggle.current);
                   }}
                 >
                   <Icon {...ICON} aria-hidden="true" />

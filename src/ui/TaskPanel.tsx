@@ -32,6 +32,8 @@ export interface TaskProps {
   facts?: TaskFacts;
   /** The note's id, for what links here. */
   id?: string | null;
+  /** The Tags row's editor (#327), the last of the panel's properties; absent, no row. */
+  tags?: ReactNode;
 }
 
 type Field = "status" | "priority" | "project" | "due" | "start";
@@ -90,7 +92,7 @@ function useMenus({ task, onChange, projects, project, onProject }: TaskProps) {
 
 /** The panel beside a task's text. */
 export function TaskPanel(props: TaskProps) {
-  const { task, editable, onChange, projects, project, facts, id } = props;
+  const { task, editable, onChange, projects, project, facts, id, tags } = props;
   const { open, element } = useMenus(props);
   const chosen = project ? projects.find((p) => p.name === project) : undefined;
   const late = overdue(task);
@@ -189,6 +191,14 @@ export function TaskPanel(props: TaskProps) {
             </>
           ) : null}
         </span>
+        {tags ? (
+          <>
+            <span className="dag-taskpanel__label">Tags</span>
+            <span className="dag-taskpanel__value" data-dag-note-tags="">
+              {tags}
+            </span>
+          </>
+        ) : null}
       </div>
       <hr className="dag-taskpanel__rule" />
       <div className="dag-taskpanel__grid">
