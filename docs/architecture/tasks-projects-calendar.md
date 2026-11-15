@@ -249,7 +249,7 @@ Ten things are load-bearing:
   tag created and removed again in one editing session, and carried by no other document, is
   unregistered. **A chip's dot recolours the tag**, through the same swatches and *Use the default
   colour*. The suggestion list and every picker are on the popover layer, anchored to their field.
-- **Every swatch is one component**, a 16px dot in a 24px hit box, 44px under 720px where a strip
+- **Every swatch is one component**, `Palette` (`src/ui/Palette.tsx`), a 16px dot in a 24px hit box, 44px under 720px where a strip
   wraps to two rows of five — and `dag-projectbar__hue` moved onto it, so the project picker has the
   same targets. A chip's 8px dot has a 24px hit area, and under 720px a tap anywhere on an editable
   chip but its × opens the picker. *+n* on a Tasks row is a focusable chip named *2 more tags:
@@ -274,8 +274,9 @@ one). The `*_list` and `*_read` tools, `task_list` and `event_list` report `tags
 There is no `anydag` command: a tag is finer than a whole file (*The command line*), and the CLI reads
 them back through `anydag ls --json` and `<kind> cat`.
 
-Names claimed, grepped first: `dag-tag*`, `dag-tags*`, `dag-tagedit*`, `dag-swatch*`,
-`data-dag-tag*`, `data-dag-tags*`, `data-dag-swatch*`, `data-dag-setting-tags*`, the Settings tab
+Names claimed, grepped first: `dag-tag*`, `dag-tags*`, `dag-tagedit*`, `dag-palette*`
+(`dag-swatch` is the board panel's),
+`data-dag-tag*`, `data-dag-tags*`, `data-dag-palette*`, `data-dag-setting-tags*`, the Settings tab
 `tags`, the query key `tag`, and the event `dag:tags`. The icon is the existing `tags`.
 
 **Out, and why:** any change to projects (a tag never enrols a document in one, and #82 decides
