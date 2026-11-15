@@ -159,6 +159,14 @@ no drawing in them (`test/task-view.test.ts`); the menus and the bar are `TasksB
   `1`–`4` with `0` for none — `X` selects, and `Escape` lets go of the selection and then of the
   filter. `J` from nowhere goes to the first row. Space is the leader's: nothing here hears it or
   the key after it.
+- **A long list draws only the rows in view** (#267). A group, or the whole list when it is not
+  grouped, of more than 100 rows draws the rows in view of the page's scroller and a margin
+  (`TaskRows`, with the sidebar's `virtual.ts`). Every row is one height, measured off a drawn one,
+  and placed by its offset. Two thousand tasks were 73,000 elements and 0.93 s before the first
+  row showed; they are 2,100 and 0.34 s. Nothing above depends on a row being in the DOM. The keys
+  walk the rows by name, and `focusRow` scrolls to a row that is not drawn and focuses it once it
+  is. The focused row and the one just made stay drawn wherever the list is scrolled, so a menu has
+  its row and *scrolled into view* has its target. Up to 100 rows, every row is drawn, as before.
 
 **A template is not a task.** A note in the vault's templates folder (*Note templates*, [`notes.md`](notes.md))
 that carries a `status:`, a `project:` or a `start:` is a note to copy, not work to do, and is left out of

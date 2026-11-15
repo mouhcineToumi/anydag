@@ -965,6 +965,45 @@ async function pageGroup(n, s, v, b) {
       record(`${p}.rss.renderer.search`, mb(sumRss(chromiumProcs(b.pid).renderers)), "MB");
     }
 
+    /* The search card opened with nothing typed: it lists every name in the vault, as a tree. */
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    t = now();
+    let opened = "timeout";
+    try {
+      await page.locator("[data-dag-open-boards]").first().click({ timeout: 10_000 });
+      await page.locator("[data-dag-boards] [data-dag-note]").first().waitFor({ timeout: STEP_MS });
+      opened = now() - t;
+    } catch {
+      /* opened stays timeout */
+    }
+    record(`${p}.search.open`, opened, "ms", "the card opened, nothing typed, to its first row");
+    record(
+      `${p}.search.open.dom`,
+      await page.evaluate(() => document.querySelector("[data-dag-boards]")?.getElementsByTagName("*").length ?? null),
+      "count",
+      "elements in the card",
+    );
+    await page.keyboard.press("Escape");
+
+    /* The Tasks page: every note with a status (4% of the vault here), as a list. */
+    t = now();
+    let tasksAt = "timeout";
+    try {
+      await page.goto(`${s.origin}/?tasks=1`);
+      await page.locator("[data-dag-task-row]").first().waitFor({ timeout: STEP_MS });
+      tasksAt = now() - t;
+    } catch {
+      /* tasksAt stays timeout */
+    }
+    record(`${p}.tasks.ready`, tasksAt, "ms", "navigation to ?tasks=1 to its first row");
+    const tasksDom = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-dag-task-row]").length,
+      nodes: document.getElementsByTagName("*").length,
+    }));
+    record(`${p}.tasks.rows`, tasksDom.rows, "count", "task rows in the DOM");
+    record(`${p}.tasks.dom`, tasksDom.nodes, "count", "elements in the page");
+
     /* A request's cost from a page on `anydag serve`, to set beside the desktop's `anydag://`. */
     if (n === 1000) {
       const cost = await page.evaluate(async () => {

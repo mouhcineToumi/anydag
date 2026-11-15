@@ -1954,9 +1954,6 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  * in `ink` at 600 with the folder mark beside it: the contrast against a row is weight and colour
  * rather than a different alphabet, and the leaf is all it says because the indent says the rest.
  */
-.dag-browser__group + .dag-browser__group,
-.dag-browser__group + .dag-board-row,
-.dag-board-row + .dag-browser__group { margin-top: 2px; }
 
 .dag-browser__folder {
   margin: 0;
@@ -1974,15 +1971,27 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 /*
  * The indent, and the rule that makes it followable.
  *
- * One line per level, at the horizontal centre of the folder mark above it — 15px is this row's
- * 8px of padding plus half a 14px icon — so four levels of nesting are four lines a reader can
- * walk back up. Margin and padding rather than one `padding-left`, because the rule has to sit
- * *between* the two: the mark's column, then the gap, then the rows.
+ * The tree is lines placed by their offset, only those in view drawn (`BoardBrowser.tsx`, #267), so
+ * the indent is each line's own: 25px a level, and one rule per level at the horizontal centre of
+ * the folder mark above it — 15px is a row's 8px of padding plus half a 14px icon — so four levels
+ * of nesting are four lines a reader can walk back up. The rules run the line's full height, its
+ * 2px gap included, so they join from one line to the next.
  */
-.dag-browser__children {
-  margin-left: 15px;
-  padding-left: 9px;
-  border-left: 1px solid var(--dag-color-outlineSoft);
+.dag-browser__rows { position: relative; }
+.dag-browser__line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  padding-left: calc(var(--depth, 0) * 25px);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 15px,
+    var(--dag-color-outlineSoft) 15px 16px,
+    transparent 16px 25px
+  );
+  background-size: calc(var(--depth, 0) * 25px) 100%;
+  background-repeat: no-repeat;
 }
 
 .dag-folder-row {

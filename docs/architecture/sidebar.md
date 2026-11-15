@@ -406,21 +406,28 @@ with three levels on disk it printed `WORK/PLANNING/DESIGN` above boards indente
 as far as a board at the top level. Sorting by path put the descendants next to their ancestor and
 left it at that.
 
-`tree()`, `prune()` and `flatten()` in `src/ui/BoardBrowser.tsx` are the answer, and five things
+`tree()`, `prune()`, `flatten()` and `cardLines()` in `src/ui/tree.ts` are the answer, and six things
 about it are load-bearing:
 
 - **A folder heading says its leaf and nothing else**, in the same mono at the same size as the
   board names it governs, in `ink` at 600 with the folder mark beside it. The contrast against a
   row is weight and colour rather than a different alphabet, and the indent says what the path
   used to. The whole path is the `title`, for the one case where the leaf is ambiguous.
-- **One rule per level, at the horizontal centre of the mark above it.** `margin-left: 15px` is
-  the row's 8px of padding plus half a 14px icon, and the 9px of `padding-left` after it is what
-  puts the line *between* the mark's column and the rows. Four levels of nesting are four lines a
-  reader can walk back up.
+- **One rule per level, at the horizontal centre of the mark above it.** 15px is the row's 8px of
+  padding plus half a 14px icon, and a level is 25px, which puts the rule *between* the mark's
+  column and the rows. Four levels of nesting are four lines a reader can walk back up.
+- **Only the lines in view are drawn** (#267). With nothing typed the card lists every name in the
+  vault: 50,000 names were 400,000 elements and 3.8 s before the first row showed. The tree is
+  `cardLines()`, flat, each line with its depth, placed by its offset the way the sidebar's rows
+  are (`virtual.ts`). The heights are measured off the lines that are drawn, so a phone's taller
+  rows need no second number. A line's indent and its rules are drawn on the line itself
+  (`.dag-browser__line`), because there are no nested folders left to draw them. The arrows walk
+  the files in the model rather than the DOM, scrolling a line into view before focusing it, and
+  the focused line stays drawn wherever the list is scrolled.
 - **`.dag-panel__folder` stopped being shared.** The component library still wants micro-caps —
   `Generate`, `Shapes`, `Charts` are half a dozen prose headings, which is the treatment's job —
-  and a tree is what it is bad at. `.dag-browser__folder`, `.dag-browser__group` and
-  `.dag-browser__children` are the browser's; the search row, the list, the empty line and the
+  and a tree is what it is bad at. `.dag-browser__folder`, `.dag-browser__rows` and
+  `.dag-browser__line` are the browser's; the search row, the list, the empty line and the
   count stay `dag-panel__*`, because those really are the same thing in both.
 - **Folders before boards at every level, numerically.** Every file browser's order, and it is
   what puts the structure on screen rather than under twenty loose boards. `localeCompare(…,

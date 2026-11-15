@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   File as FileGlyph,
   FileText,
@@ -29,8 +29,9 @@ import { useSidebar } from "./Shell";
 import { tagMatches } from "./tagFilter";
 import { hueOfTag, useTagList } from "./tags/tagStore";
 import { openTemplates } from "./templates";
-import { flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type Entry, type Tree } from "./tree";
+import { cardLines, flatten, keyOf, labelOf, leaf, parentOf, prune, tokens, tree, type CardLine, type Entry } from "./tree";
 import { middle } from "./tabs/intent";
+import { drawn, offsetsOf, scrollFor, windowFor, type Window } from "./virtual";
 
 interface Props {
   boards: string[];
@@ -112,6 +113,12 @@ const NO_FILES: string[] = [];
 const NO_TITLES: Readonly<Record<string, string>> = {};
 const NO_TAGS: Readonly<Record<string, readonly string[]>> = {};
 
+/** The 2px a folder after another, or the first file after the folders, keeps above it (`CardLine`'s `gap`). */
+const GAP = 2;
+
+/** The rows the arrows walk outside the tree: the tags `#` offers, the matches in the text and a miss's offers. */
+const OUTSIDE = "[data-dag-search-tag-option],[data-dag-hit],[data-dag-hits-new-board],[data-dag-hits-new-note]";
+
 /** What is typed when a tag is being picked: `#` and the start of its name. */
 const TAG_TYPED = /^#([^\s#]*)$/;
 
@@ -175,29 +182,6 @@ export function BoardBrowser({
      caret already in the filter is one keystroke from the answer. The card owning its own Escape
      needs focus to be *inside* it, which this satisfies — see the handler below. */
   useEffect(() => searchRef.current?.focus(), []);
-
-  /*
-   * And it opens showing where you already are.
-   *
-   * The column could leave this to chance: it was up the whole time, so whatever it was scrolled
-   * to was where somebody had left it. A card that appears for two seconds cannot — fifty-four
-   * boards is six screens of list, the open one is `aria-current` somewhere in the middle of it,
-   * and a dialog that opens at the top makes a person scroll to find out where they are before
-   * they can decide where to go.
-   *
-   * **`"center"`, not `"nearest"`.** `"nearest"` scrolls the least it can, which leaves the row
-   * flush against whichever edge it came in from — so the board you are on is on screen and the
-   * rows *around* it are not, and a copy made from its own row appears below the fold. That is a
-   * row nothing can hover, which is how the suite found it. Centring costs nothing when the target
-   * is already in the first screenful, because `scrollIntoView` never scrolls past the top.
-   *
-   * Once, on open — the dependency list is empty deliberately. Re-running it whenever `board`
-   * changed would yank the list back the moment a rename or a duplicate landed, under the pointer
-   * of somebody who was reading a different part of it.
-   */
-  useEffect(() => {
-    listRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "center" });
-  }, []);
 
   /* The whole tree, before the search narrows it — and before a tag does: an attachment carries none. */
   const every = useMemo<Entry[]>(
@@ -263,6 +247,131 @@ export function BoardBrowser({
     [tag, terms.length, entries],
   );
 
+  /*
+   * **The tree, or the tagged list, as lines, and only the lines in view drawn** (`virtual.ts`, as the
+   * sidebar does): with nothing typed the card lists every name in the vault, and 50,000 of them were
+   * 400,000 elements and 3.8 s before the first row showed (#267). Each line is placed by its offset,
+   * from heights measured off the lines that are drawn — a row, a folder's heading, an empty
+   * folder's line — so the phone's taller rows are the stylesheet's to say.
+   */
+  const lines = useMemo<CardLine[] | null>(() => {
+    if (picking) return null;
+    if (tagged) return tagged.map((entry) => ({ type: "file", entry, depth: 0, gap: false }));
+    return terms.length === 0 || shown.length > 0 || root.folders.length > 0 ? cardLines(root) : null;
+  }, [picking, tagged, terms.length, shown.length, root]);
+  const [heights, setHeights] = useState({ folder: 30, file: 31, empty: 26, measured: false });
+  const offsets = useMemo(
+    () =>
+      offsetsOf(
+        (lines ?? []).map(
+          (l) => (l.type === "folder" ? heights.folder : l.type === "file" ? heights.file : heights.empty) + (l.gap ? GAP : 0),
+        ),
+      ),
+    [lines, heights],
+  );
+  const offsetsRef = useRef(offsets);
+  offsetsRef.current = offsets;
+  const rowsRef = useRef<HTMLDivElement>(null);
+  /* Measured after every commit, off whichever lines are drawn: one more draw when a height was guessed wrong. */
+  useLayoutEffect(() => {
+    const rows = rowsRef.current;
+    if (!rows) return;
+    const of = (selector: string) => rows.querySelector(selector)?.getBoundingClientRect().height || 0;
+    const folder = of(".dag-folder-row");
+    const file = of(".dag-board-row");
+    const empty = of(".dag-panel__empty--folder");
+    setHeights((h) =>
+      (folder && folder !== h.folder) || (file && file !== h.file) || (empty && empty !== h.empty) || (file && !h.measured)
+        ? { folder: folder || h.folder, file: file || h.file, empty: empty || h.empty, measured: h.measured || file > 0 }
+        : h,
+    );
+  });
+  /* `null` until the list has been measured: the first draw assumes a view as tall as the screen. */
+  const [view, setView] = useState<Window | null>(null);
+  /** Where the lines start down the scrolling list: under the tags `#` offers, when there are some. */
+  const baseOf = (list: HTMLElement, rows: HTMLElement) =>
+    rows.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
+  const syncView = useCallback(() => {
+    const list = listRef.current;
+    const rows = rowsRef.current;
+    if (!list || !rows) return;
+    const top = list.scrollTop - baseOf(list, rows);
+    setView((prev) => windowFor(offsetsRef.current, top, list.clientHeight, prev));
+  }, []);
+  useLayoutEffect(syncView, [offsets, syncView]);
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(syncView);
+    watch.observe(list);
+    return () => watch.disconnect();
+  }, [syncView]);
+
+  /** Scroll so line `i` shows — only when it does not already. */
+  const reveal = useCallback(
+    (i: number, block: "nearest" | "center") => {
+      const list = listRef.current;
+      const rows = rowsRef.current;
+      if (!list || !rows || i >= offsetsRef.current.length - 1) return;
+      const base = baseOf(list, rows);
+      const top = list.scrollTop - base;
+      const to = scrollFor(offsetsRef.current, i, top, list.clientHeight, block);
+      if (to !== top) list.scrollTop = to + base;
+      syncView();
+    },
+    [syncView],
+  );
+
+  /* The line the focus is on is drawn wherever the list is scrolled, so the focus is never lost to a
+     line going out of the DOM; and one asked to be focused before it was drawn is, once it is. */
+  const [focused, setFocused] = useState<number | null>(null);
+  const wanted = useRef<number | null>(null);
+  const lineButton = (i: number) =>
+    rowsRef.current?.querySelector<HTMLButtonElement>(`[data-dag-browser-line="${i}"] button`) ?? null;
+  const focusLine = useCallback(
+    (i: number) => {
+      reveal(i, "nearest");
+      const el = lineButton(i);
+      if (el) el.focus({ preventScroll: true });
+      else wanted.current = i;
+    },
+    [reveal],
+  );
+  useLayoutEffect(() => {
+    const i = wanted.current;
+    if (i === null) return;
+    wanted.current = null;
+    lineButton(i)?.focus({ preventScroll: true });
+  });
+
+  /* The lines the arrows stop at: a file's, but not an attachment's, which no arrow ever reached. */
+  const stops = useMemo(() => {
+    const out: number[] = [];
+    (lines ?? []).forEach((l, i) => {
+      if (l.type === "file" && l.entry.kind !== "file") out.push(i);
+    });
+    return out;
+  }, [lines]);
+
+  /*
+   * And it opens showing where you already are, centred: fifty-four boards is six screens of list,
+   * and a card that opens at the top makes a person scroll to find out where they are before they
+   * can decide where to go. `"center"` rather than `"nearest"`, which would leave the row flush
+   * against an edge with the rows around it out of view. Once, the first time the row is in the list
+   * — which on a vault still being listed is after the card opened — and not once the list has been
+   * scrolled: following `board` after that would pull the list from under somebody reading it.
+   */
+  const current = board ?? note ?? quiz ?? table ?? file;
+  const centred = useRef(false);
+  useLayoutEffect(() => {
+    // Not before a row has been measured: a guessed height puts the row somewhere else.
+    if (centred.current || !lines || tagged || !heights.measured) return;
+    const i = lines.findIndex((l) => l.type === "file" && l.entry.name === current);
+    if (i < 0) return;
+    centred.current = true;
+    if (!listRef.current?.scrollTop) reveal(i, "center");
+  }, [lines, current, tagged, reveal, heights.measured]);
+
   /** A tag picked from what `#` offered: it is the chip, and the box is the words again. */
   const pickTag = (name: string) => {
     setTag(name);
@@ -310,18 +419,32 @@ export function BoardBrowser({
     [query, sidebar, here, onClose],
   );
 
-  /** Move focus along the rendered rows. The DOM is the list, so nothing has to be kept in step. */
-  const step = useCallback((from: EventTarget | null, dir: 1 | -1) => {
-    const rows = Array.from(
-      listRef.current?.querySelectorAll<HTMLButtonElement>(
-        "[data-dag-search-tag-option],[data-dag-board],[data-dag-note],[data-dag-quiz],[data-dag-table],[data-dag-hit],[data-dag-hits-new-board],[data-dag-hits-new-note]",
-      ) ?? [],
-    );
-    if (rows.length === 0) return;
-    const i = rows.indexOf(from as HTMLButtonElement);
-    const next = i === -1 ? (dir === 1 ? 0 : rows.length - 1) : Math.min(Math.max(i + dir, 0), rows.length - 1);
-    rows[next]?.focus();
-  }, []);
+  /**
+   * Move focus along the rows: the tags `#` offers, the tree's files, the matches in the text and a
+   * miss's offers, in that order. Outside the tree the DOM is the list; in it, `stops` is, since the
+   * line after the last one drawn is not in the DOM until the list scrolls to it.
+   */
+  const step = useCallback(
+    (from: EventTarget | null, dir: 1 | -1) => {
+      const outside = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>(OUTSIDE) ?? []);
+      const before = outside.filter((el) => el.hasAttribute("data-dag-search-tag-option"));
+      const after = outside.filter((el) => !el.hasAttribute("data-dag-search-tag-option"));
+      const total = before.length + stops.length + after.length;
+      if (total === 0) return;
+      const el = from instanceof HTMLElement ? from : null;
+      const line = el?.closest("[data-dag-browser-line]");
+      let at = -1;
+      if (line) at = before.length + stops.indexOf(Number(line.getAttribute("data-dag-browser-line")));
+      else if (el && before.includes(el as HTMLButtonElement)) at = before.indexOf(el as HTMLButtonElement);
+      else if (el && after.includes(el as HTMLButtonElement))
+        at = before.length + stops.length + after.indexOf(el as HTMLButtonElement);
+      const next = at < 0 ? (dir === 1 ? 0 : total - 1) : Math.min(Math.max(at + dir, 0), total - 1);
+      if (next < before.length) before[next]?.focus();
+      else if (next < before.length + stops.length) focusLine(stops[next - before.length]!);
+      else after[next - before.length - stops.length]?.focus();
+    },
+    [stops, focusLine],
+  );
 
   const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
@@ -379,19 +502,34 @@ export function BoardBrowser({
 
   /**
    * One file. A board row is `data-dag-board`, as every spec that finds one expects, a note row
-   * `data-dag-note`, a quiz row `data-dag-quiz` and a table row `data-dag-table`; each but a board wears its mark before its
-   * name, and a board wears none, as it never has.
+   * `data-dag-note`, a quiz row `data-dag-quiz` and a table row `data-dag-table`. Under a tag and no
+   * words, a row also says its kind at its end, and the open file is not marked: the list is by title.
    */
   const renderFile = (entry: Entry) => {
     const { name, kind } = entry;
+    if (tagged)
+      return (
+        <div className="dag-board-row">
+          <button
+            {...{ [`data-dag-${kind}`]: name }}
+            className="dag-board"
+            onClick={() => open(entry)}
+            onAuxClick={middle(() => open(entry))}
+          >
+            <KindMark kind={kind} name={name} className="dag-board__kind" />
+            {labelOf(entry)}
+            <span className="dag-board__what">{tasks[name] ? "task" : events[name] ? "event" : kind}</span>
+          </button>
+        </div>
+      );
     const open_ = { board, note, quiz, table, file }[kind];
-    const current = name === open_;
+    const isCurrent = name === open_;
     return (
-      <div key={keyOf(entry)} className="dag-board-row">
+      <div className="dag-board-row">
         <button
           {...{ [`data-dag-${kind}`]: name }}
-          className={current ? "dag-board dag-board--on" : "dag-board"}
-          aria-current={current ? "true" : undefined}
+          className={isCurrent ? "dag-board dag-board--on" : "dag-board"}
+          aria-current={isCurrent ? "true" : undefined}
           title={kind === "board" ? name : `${name} (${kind})`}
           onClick={() => open(entry)}
           onAuxClick={middle(() => open(entry))}
@@ -409,32 +547,38 @@ export function BoardBrowser({
   };
 
   /**
-   * One folder and everything under it, recursively — the root included, which is the node with no
-   * heading and no indent.
+   * One line, placed at its offset and indented by its depth, with one guide rule per level — the
+   * rules the nested folders drew, so four levels of nesting are four lines a reader can walk back up.
    */
-  const renderFolder = (node: Tree): React.ReactNode => (
-    <section key={node.path || "."} className="dag-browser__group">
-      {node.path ? (
-        <div className="dag-folder-row">
-          <FolderIcon {...ICON} aria-hidden="true" />
-          {/* The leaf, not the path. `projects/201-notes/svg` spelled out on one line is
-              three levels of structure said at the one size in this card that is hardest to read,
-              above a board indented exactly as far as a board at the top level. The indent says
-              the rest. */}
-          <h2 className="dag-browser__folder" data-dag-folder={node.path} title={node.path}>
-            {node.name}
-          </h2>
-        </div>
-      ) : null}
-      <div className={node.path ? "dag-browser__children" : undefined}>
-        {node.folders.map(renderFolder)}
-        {node.files.map(renderFile)}
-        {node.path && node.folders.length === 0 && node.files.length === 0 ? (
+  const renderLine = (line: CardLine, i: number) => {
+    const style = {
+      "--depth": line.depth,
+      top: offsets[i],
+      height: offsets[i + 1]! - offsets[i]!,
+      paddingTop: line.gap ? GAP : undefined,
+    } as CSSProperties;
+    const key = line.type === "file" ? keyOf(line.entry) : `${line.type}:${line.path}`;
+    return (
+      <div key={key} className="dag-browser__line" style={style} data-dag-browser-line={i}>
+        {line.type === "file" ? (
+          renderFile(line.entry)
+        ) : line.type === "folder" ? (
+          <div className="dag-folder-row">
+            <FolderIcon {...ICON} aria-hidden="true" />
+            {/* The leaf, not the path: the indent says the rest. */}
+            <h2 className="dag-browser__folder" data-dag-folder={line.path} title={line.path}>
+              {line.name}
+            </h2>
+          </div>
+        ) : (
           <p className="dag-panel__empty dag-panel__empty--folder">empty</p>
-        ) : null}
+        )}
       </div>
-    </section>
-  );
+    );
+  };
+  const drawnLines = lines
+    ? drawn(view ?? windowFor(offsets, 0, window.innerHeight), lines.length, focused === null ? [] : [focused])
+    : [];
 
   return (
     /* The app's dialog frame (`ui/Dialog.tsx`): over the sidebar too, with the scrim every dialog
@@ -493,7 +637,7 @@ export function BoardBrowser({
         </button>
       </div>
 
-      <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey}>
+      <div className="dag-panel__list" ref={listRef} onKeyDown={onListKey} onScroll={syncView}>
         {picking ? (
           <section className="dag-hits" aria-label="Tags" data-dag-search-tags="">
             <h2 className="dag-hits__head">Tags</h2>
@@ -524,26 +668,20 @@ export function BoardBrowser({
           </p>
         ) : null}
 
-        {picking
-          ? null
-          : tagged
-            ? tagged.map((e) => (
-                <div key={keyOf(e)} className="dag-board-row">
-                  <button
-                    {...{ [`data-dag-${e.kind}`]: e.name }}
-                    className="dag-board"
-                    onClick={() => open(e)}
-                    onAuxClick={middle(() => open(e))}
-                  >
-                    <KindMark kind={e.kind} name={e.name} className="dag-board__kind" />
-                    {labelOf(e)}
-                    <span className="dag-board__what">{tasks[e.name] ? "task" : events[e.name] ? "event" : e.kind}</span>
-                  </button>
-                </div>
-              ))
-            : terms.length === 0 || shown.length > 0 || root.folders.length > 0
-              ? renderFolder(root)
-              : null}
+        {lines && lines.length > 0 ? (
+          <div
+            ref={rowsRef}
+            className="dag-browser__rows"
+            style={{ height: offsets[lines.length] }}
+            onFocus={(e) => {
+              const line = (e.target as HTMLElement).closest("[data-dag-browser-line]");
+              setFocused(line ? Number(line.getAttribute("data-dag-browser-line")) : null);
+            }}
+            onBlur={() => setFocused(null)}
+          >
+            {drawnLines.map((i) => renderLine(lines[i]!, i))}
+          </div>
+        ) : null}
 
         {terms.length > 0 && (split.hits.length > 0 || hits.length === 0) ? (
           <section className="dag-hits" aria-label={split.hits.length > 0 ? "In the text" : undefined} data-dag-hits="">
