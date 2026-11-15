@@ -55,6 +55,7 @@ import {
   Star,
   StarOff,
   Table2,
+  Tags,
   Trash2,
   TriangleAlert,
   Upload,
@@ -418,6 +419,7 @@ export function Sidebar({
   onPointerEnter,
   onPointerLeave,
   onDismiss,
+  onTags,
   sheet = false,
 }: {
   mode: "docked" | "overlay";
@@ -500,6 +502,8 @@ export function Sidebar({
   onPointerLeave?(): void;
   /** Close an overlay: after a row asks the page for a card, and on Escape. */
   onDismiss(): void;
+  /** *Tags…* on a text's row: the card that changes its tags, under the row (#327). */
+  onTags?(kind: TextKind, name: string, anchor: HTMLElement | null): void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>(null);
@@ -2049,6 +2053,10 @@ export function Sidebar({
               return pickFiles(where);
             }
             if (what === "rename" || what === "move" || what === "transfer") return setMode({ kind: what, key });
+            if (what === "tags" && menuLine.type === "file" && menuLine.entry.kind !== "file") {
+              setMode(null);
+              return onTags?.(menuLine.entry.kind, where, rowFor(key));
+            }
             settle(key);
             if (what === "copy-link" && menuLine.type === "file") void copyAppLink(menuLine.entry);
             else if (menuLine.type === "file" && (what === "favourite" || what === "unfavourite"))
@@ -2362,7 +2370,8 @@ type Pick =
   | "copy-link"
   | "transfer"
   | "download"
-  | "upload";
+  | "upload"
+  | "tags";
 
 /**
  * A row's menu: the `⋯`, a right-click, or `shift+F10` — the same menu by all three, because a
@@ -2528,6 +2537,10 @@ function RowMenu({
           {line.type === "file" ? item("duplicate", "Duplicate", <Copy {...ICON} aria-hidden="true" />) : null}
           {item("move", "Move to…", <FolderInput {...ICON} aria-hidden="true" />)}
           {elsewhere ? item("transfer", "Move to vault…", <ArrowRightLeft {...ICON} aria-hidden="true" />) : null}
+          {/* Every text's tags, in a card under the row; an attachment carries none. */}
+          {line.type === "file" && line.entry.kind !== "file"
+            ? item("tags", "Tags…", <Tags {...ICON} aria-hidden="true" />)
+            : null}
           {/* Into the trash, a folder with everything in it, and nothing asked. */}
           {item("delete", "Delete", <Trash2 {...ICON} aria-hidden="true" />, true)}
         </>

@@ -19,6 +19,7 @@ import {
   tagOf,
   tagProblem,
   tagsOf,
+  typedTag,
   withTags,
   type TagChange,
 } from "../src/note/tags";
@@ -100,12 +101,19 @@ describe("a name a person types", () => {
     expect(cleanTag(c.typed)).toBe(c.tag);
   });
 
+  it("writes a space as - while it is typed, and drops what a tag cannot hold", () => {
+    expect(typedTag("two ")).toBe("two-");
+    expect(typedTag("two words")).toBe("two-words");
+    expect(typedTag("#road")).toBe("road");
+    expect(typedTag("a,b!")).toBe("ab");
+  });
+
   it("splits a pasted list into one tag per item", () => {
     expect(pastedTags("a, b c,,#d")).toEqual(["a", "b", "c", "d"]);
   });
 
   it("refuses digits alone, with the fix", () => {
-    expect(tagProblem("2026")).toEqual({ message: "A tag needs a letter. Use q-2026?", fix: "q-2026" });
+    expect(tagProblem("2026")).toEqual({ message: "A tag needs a letter.", fix: "q-2026" });
     expect(tagProblem("q-2026")).toBeUndefined();
     expect(tagProblem("")).toBeUndefined();
   });
