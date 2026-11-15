@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**139 features, 0 gaps, 78 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
+**143 features, 0 gaps, 82 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
@@ -106,6 +106,10 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | Every tag, with its colour and how many documents carry it | `GET /__board/tags` | · | `tag_list` |
+| Add or remove tags on a note, task, event, board, quiz or table | `POST /__board/tags/apply` | · | `tag_apply` |
+| Rename a tag, or merge it into another, in every document | `POST /__board/tags/rename` | · | `tag_rename` |
+| Take a tag off every document, and out of the tag list | `POST /__board/tags/delete` | · | `tag_delete` |
+| Set a tag's colour, one of the ten hues, or reset it to the default | `POST /__board/tags/color` | · | `tag_color` |
 
 ## Quizzes
 

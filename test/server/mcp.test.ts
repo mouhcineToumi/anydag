@@ -314,3 +314,45 @@ describe("tags (#327)", () => {
     expect((await call(c, "task_list")).data.tasks[0].tags).toEqual(["meeting", "ops"]);
   });
 });
+
+describe("changing tags over MCP (#327)", () => {
+  it("tag_apply creates a tag the vault has never seen, registered as the app registers one", async () => {
+    fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [meeting]\n---\nbody\n");
+    const c = await connect();
+    const got = await call(c, "tag_apply", { name: "plan", add: ["roadmap", "meeting"], hue: "spruce" });
+    expect(got.data).toMatchObject({ tags: ["meeting", "roadmap"], created: ["roadmap"] });
+    const list = (await call(c, "tag_list")).data.tags;
+    expect(list.find((t: any) => t.name === "roadmap")).toMatchObject({ hue: "spruce", registered: true, count: 1 });
+    expect(list.find((t: any) => t.name === "meeting")).toMatchObject({ registered: false });
+  });
+
+  it("the create tools take `tags`", async () => {
+    const c = await connect();
+    const note = await call(c, "note_create", { title: "Plan", tags: ["ops"] });
+    expect(note.data.tags).toEqual(["ops"]);
+    const task = await call(c, "task_create", { title: "Ship it", tags: ["ops", "q4"] });
+    expect(task.data.tags).toEqual(["ops", "q4"]);
+    const event = await call(c, "event_create", { title: "Offsite", start: "2026-10-03", tags: ["team"] });
+    expect(event.data.tags).toEqual(["team"]);
+    expect((await call(c, "task_list")).data.tasks[0].tags).toEqual(["ops", "q4"]);
+  });
+
+  it("tag_rename, tag_color and tag_delete — the last only with `confirm`", async () => {
+    fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [old]\n---\nbody\n");
+    const c = await connect();
+    expect((await call(c, "tag_rename", { from: "old", to: "new" })).data).toMatchObject({ merged: false, missed: [] });
+    expect((await call(c, "tag_color", { tag: "new", hue: "coral" })).data).toEqual({
+      name: "new",
+      hue: "coral",
+      registered: true,
+    });
+    expect((await call(c, "tag_delete", { tag: "new" })).error).toMatch(/confirm/);
+    expect((await call(c, "tag_delete", { tag: "new", confirm: "new" })).data).toMatchObject({ hue: "coral", missed: [] });
+    expect(fs.readFileSync(path.join(env.root, "plan.md"), "utf8")).not.toContain("tags");
+  });
+
+  it("refuses every tag write when read only", async () => {
+    const c = await connect(true);
+    expect((await call(c, "tag_color", { tag: "x", hue: "coral" })).error).toMatch(/read-only/);
+  });
+});

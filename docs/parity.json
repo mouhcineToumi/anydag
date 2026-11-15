@@ -405,6 +405,38 @@
       "mcp": ["tag_list"]
     },
     {
+      "id": "tag.apply",
+      "area": "Tags",
+      "what": "Add or remove tags on a note, task, event, board, quiz or table",
+      "rest": ["POST /__board/tags/apply"],
+      "cli": {"admin": false},
+      "mcp": ["tag_apply"]
+    },
+    {
+      "id": "tag.rename",
+      "area": "Tags",
+      "what": "Rename a tag, or merge it into another, in every document",
+      "rest": ["POST /__board/tags/rename"],
+      "cli": {"admin": false},
+      "mcp": ["tag_rename"]
+    },
+    {
+      "id": "tag.delete",
+      "area": "Tags",
+      "what": "Take a tag off every document, and out of the tag list",
+      "rest": ["POST /__board/tags/delete"],
+      "cli": {"admin": false},
+      "mcp": ["tag_delete"]
+    },
+    {
+      "id": "tag.color",
+      "area": "Tags",
+      "what": "Set a tag's colour, one of the ten hues, or reset it to the default",
+      "rest": ["POST /__board/tags/color"],
+      "cli": {"admin": false},
+      "mcp": ["tag_color"]
+    },
+    {
       "id": "quiz.list",
       "area": "Quizzes",
       "what": "Every quiz, with how many questions each asks",

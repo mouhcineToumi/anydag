@@ -58,20 +58,26 @@ export function tagOf(raw: unknown): string | undefined {
  * write keeps.
  */
 export function tagsOf(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const tag of everyTagOf(text)) {
+    if (seen.has(tagKey(tag))) continue;
+    seen.add(tagKey(tag));
+    out.push(tag);
+  }
+  return out;
+}
+
+/** Every tag entry a text's frontmatter holds, in order, each spelling as written — repeats kept. */
+export function everyTagOf(text: string): string[] {
   const m = FRONT.exec(text);
   if (!m) return [];
   const lines = m[1]!.split(/\r?\n/);
   const at = lines.findIndex((l) => /^tags\s*:/.test(l));
   if (at < 0) return [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const entry of found(lines.slice(at, keyEnd(lines, at))).entries) {
-    const tag = tagOf(unquoted(entry));
-    if (!tag || seen.has(tagKey(tag))) continue;
-    seen.add(tagKey(tag));
-    out.push(tag);
-  }
-  return out;
+  return found(lines.slice(at, keyEnd(lines, at)))
+    .entries.map((e) => tagOf(unquoted(e)))
+    .filter((t): t is string => !!t);
 }
 
 /** Whether a document's text carries `tag`. */
@@ -175,7 +181,8 @@ function found(lines: readonly string[]): Found {
  * `text` with its frontmatter's tags changed as `change` asks, and every other byte as it was.
  *
  * An added tag the text already carries, in any case, is no change, and one it does not carry goes
- * at the end. A removed tag takes off every entry naming it. Taking the last entry off removes the
+ * at the end. A removed tag takes off every entry naming it, before anything is added — so removing
+ * `Pricing` and adding `pricing` respells it, and a block list stays one. Taking the last entry off removes the
  * line, and a block that leaves empty goes; a text with no frontmatter grows one, followed by a blank
  * line when `board` is set (`withTitle`'s rule: a board's frontmatter is apart from its body).
  */
@@ -201,7 +208,7 @@ export function withTags(text: string, change: TagChange, opts: { board?: boolea
   );
   for (const raw of change.add ?? []) {
     const tag = tagOf(raw);
-    if (!tag || has.has(tagKey(tag)) || remove.has(tagKey(tag))) continue;
+    if (!tag || has.has(tagKey(tag))) continue;
     has.add(tagKey(tag));
     entries.push(entryOf(tag));
   }
