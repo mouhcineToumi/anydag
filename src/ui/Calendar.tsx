@@ -36,15 +36,18 @@ import {
   CAL_LABEL,
   MAX_DAYS,
   VIEWS,
+  addMonths,
   blocks,
   calendarDate,
   clock,
+  dayWords,
   daysBetween,
   daysFrom,
   fieldsOf,
   itemsOf,
   lanes,
   momentAt,
+  monthDays,
   placeEvent,
   rangeOf,
   asAllDay,
@@ -76,7 +79,7 @@ import { withVault } from "@/vault/current";
 
 import { startDrag } from "./pointerDrag";
 import { TaskGlyph } from "./TaskGlyph";
-import { Switch } from "./controls";
+import { IconButton, Switch } from "./controls";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { collation } from "@/locale";
 
@@ -99,6 +102,10 @@ import { collation } from "@/locale";
  * the all-day row, by quarter hours and days in the hour grid. A press that does not move is still a
  * click that opens it. A note does not move — its day is the store's, the day it was made, and no
  * line of its file says it. Escape during the drag puts it back; a finger scrolls, as it always did.
+ *
+ * **A week or a run of days keeps a small month beside it** (`MiniMonth`): the month the view is on,
+ * today marked and the view's days tinted, a click that takes the view to a day, and arrows that move
+ * the small month alone.
  */
 
 /** How many lanes of bars a month's week shows before the rest are a count. */
@@ -486,15 +493,20 @@ export function CalendarView({
           onDay={(d) => onGo({ view: "days", day: d, count: 1 })}
         />
       ) : (
-        <Columns
-          days={daysFrom(first, last)}
-          today={today}
-          items={items}
-          onOpen={open}
-          onMenu={openMenu}
-          onAsk={ask}
-          onWrite={locked ? undefined : onWrite}
-        />
+        /* The week or the run of days, with a small month beside it: the whole month is what a week
+           does not say, and it stays while the grid scrolls. */
+        <div className="dag-calendar__body">
+          <Columns
+            days={daysFrom(first, last)}
+            today={today}
+            items={items}
+            onOpen={open}
+            onMenu={openMenu}
+            onAsk={ask}
+            onWrite={locked ? undefined : onWrite}
+          />
+          <MiniMonth day={day} first={first} last={last} today={today} weekStart={weekStart} onGo={(d) => onGo({ day: d })} />
+        </div>
       )}
       {making ? <NewEvent making={making} locked={locked} onMake={make} onClose={() => setMaking(null)} /> : null}
       {menu ? <ItemMenu menu={menu} locked={locked} onPick={pick} onClose={() => closeMenu(true)} /> : null}
@@ -644,6 +656,92 @@ function useToday(): string {
     return () => clearInterval(t);
   }, []);
   return dayOf(now);
+}
+
+/**
+ * A small month beside a week or a run of days: the month the view is on, today marked, the days the
+ * view shows tinted, and a click on a day that takes the view to it. **Its arrows move the month on
+ * its own** — the view and the address stay where they are until a day is picked, so looking three
+ * weeks ahead costs the week being read nothing.
+ *
+ * It opens on the view's month and follows it when the view moves to another; a month its arrows
+ * chose is kept while the view stays on the day it was asked from. It draws no events — out of the
+ * issue's scope — and does no date arithmetic of its own: the weeks are `monthDays`, the month view's
+ * own range, so *Weeks start on* reaches this grid as it reaches the one above, and today is the
+ * page's `useToday`, which reads the viewer's zone. Under 720px it is not drawn: a week's seven
+ * columns already have the phone's whole width.
+ */
+function MiniMonth({
+  day,
+  first,
+  last,
+  today,
+  weekStart,
+  onGo,
+}: {
+  /** The day the view is around: the month shown is its own, until the arrows say otherwise. */
+  day: string;
+  /** The days the view shows, which are tinted. */
+  first: string;
+  last: string;
+  today: string;
+  /** The day a week starts on, `0` for Sunday — the account's (`WEEK_START`). */
+  weekStart: number;
+  onGo(day: string): void;
+}) {
+  const here = startOfMonth(day);
+  /* The month the arrows chose, and the day the view was on when they did: a view that moves to
+     another day follows itself again. */
+  const [moved, setMoved] = useState<{ month: string; from: string } | null>(null);
+  const month = moved?.from === day ? moved.month : here;
+  const days = monthDays(month, weekStart);
+  const move = (by: number) => setMoved({ month: addMonths(month, by), from: day });
+  return (
+    <aside className="dag-cal-mini" data-dag-cal-mini={month.slice(0, 7)} aria-label="Month overview">
+      <div className="dag-cal-mini__head">
+        <h2 className="dag-cal-mini__title" data-dag-cal-mini-title="">
+          {MONTH.format(calendarDate(month))}
+        </h2>
+        <span className="dag-cal-mini__step">
+          <IconButton
+            size="sm"
+            aria-label="Previous month"
+            title="Previous month"
+            data-dag-cal-mini-prev=""
+            onClick={() => move(-1)}
+          >
+            <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
+          <IconButton size="sm" aria-label="Next month" title="Next month" data-dag-cal-mini-next="" onClick={() => move(1)}>
+            <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
+        </span>
+      </div>
+      <div className="dag-cal-mini__grid">
+        {days.slice(0, 7).map((d) => (
+          <span key={`name-${d}`} className="dag-cal-mini__name" aria-hidden="true">
+            {WEEKDAY.format(calendarDate(d)).slice(0, 2)}
+          </span>
+        ))}
+        {days.map((d) => (
+          <button
+            key={d}
+            type="button"
+            className="dag-cal-mini__day"
+            data-dag-cal-mini-day={d}
+            data-out={d.slice(0, 7) === month.slice(0, 7) ? undefined : ""}
+            data-today={d === today ? "" : undefined}
+            data-in-view={d >= first && d <= last ? "" : undefined}
+            aria-current={d === today ? "date" : undefined}
+            aria-label={d === today ? `${dayWords(d)}, today` : dayWords(d)}
+            onClick={() => onGo(d)}
+          >
+            {Number(d.slice(8, 10))}
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
 }
 
 /** Each kind's mark: a clock for an event, a page for a note, and a task's own status. */

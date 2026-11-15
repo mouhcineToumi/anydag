@@ -19,6 +19,7 @@ import {
   daysFrom,
   itemsOf,
   lanes,
+  monthDays,
   placeEvent,
   placeTask,
   rangeOf,
@@ -87,6 +88,17 @@ describe("views", () => {
     expect(step("month", "2026-10-31", 1, 3)).toBe("2026-11-30");
     expect(step("week", "2026-10-15", -1, 3)).toBe("2026-10-08");
     expect(step("days", "2026-10-15", 1, 5)).toBe("2026-10-20");
+  });
+
+  it("draws a month as whole weeks, from the week it starts in to the week it ends in", () => {
+    /* March 2031 begins on a Saturday and ends on a Monday, so it spills on both sides. */
+    expect(monthDays("2031-03-01", 1)).toEqual(daysFrom("2031-02-24", "2031-04-06"));
+    expect(monthDays("2031-03-18", 1)).toHaveLength(42);
+    /* Sunday first takes a day off the front and puts it on the end. */
+    expect(monthDays("2031-03-01", 0)[0]).toBe("2031-02-23");
+    expect(monthDays("2031-03-01", 0)).toHaveLength(42);
+    /* February 2027 starts on a Monday and ends on a Sunday: four weeks, and no day of another month. */
+    expect(monthDays("2027-02-10", 1)).toEqual(daysFrom("2027-02-01", "2027-02-28"));
   });
 });
 
