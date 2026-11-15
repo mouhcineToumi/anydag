@@ -228,6 +228,10 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
   await expect(page.locator(`[data-dag-cal-item="${stem}/event"]`)).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("[data-dag-cal-day-open]").first()).toBeVisible();
   await measure(page, "the calendar at 1440", [".dag-app--calendar"], 24);
+  /* The small month beside a week is a grid of day buttons: each one is a target too. */
+  await page.goto("/?calendar=week&date=2035-07-15");
+  await expect(page.locator("[data-dag-cal-mini]")).toBeVisible({ timeout: 15_000 });
+  await measure(page, "the calendar's small month at 1440", [".dag-cal-mini"], 24);
   /* The Show card holds a real `<select>`, which is a control too. */
   await page.locator("[data-dag-calendar-show]").click();
   await expect(page.locator("[data-dag-calendar-show-menu]")).toBeVisible();

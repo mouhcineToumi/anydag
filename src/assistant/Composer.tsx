@@ -9,6 +9,7 @@ import { currentVault } from "@/vault/current";
 import { loadVaults } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
 
+import { DocChip, type ChipDoc } from "./DocChip";
 import { scopeOf } from "./scope";
 import type { ChatMeta, Mode, Provider, ProviderModels } from "./types";
 
@@ -49,9 +50,13 @@ export interface ComposerProps {
   onGrant(choice: Choice, vault: string, mode: Mode | null): void;
   /** Focus the box when it appears, which a panel wants and a page with a history does not. */
   autofocus?: boolean;
+  /** The document the chat works on (#323), drawn as a chip above the field; `null` for the whole vault. */
+  subject?: ChipDoc | null;
+  /** The chip's remove button: the chat becomes about the whole vault. */
+  onDropSubject?(): void;
 }
 
-export function Composer({ meta, models, running, onSend, onStop, onGrant, autofocus }: ComposerProps) {
+export function Composer({ meta, models, running, onSend, onStop, onGrant, autofocus, subject, onDropSubject }: ComposerProps) {
   const pref = useSettings().assistant;
   const base = useMemo<Choice>(
     () => (meta ? { provider: meta.provider, model: meta.model, effort: meta.effort ?? "" } : defaultChoice(models, pref)),
@@ -96,6 +101,16 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
 
   return (
     <div className="dag-chat-composer" data-dag-chat-composer="">
+      {subject ? (
+        <div className="dag-chat-composer__docs">
+          <DocChip
+            doc={subject}
+            data-dag-chat-subject={subject.name}
+            onRemove={onDropSubject}
+            removeLabel={`Work on the whole vault, not only ${subject.title}`}
+          />
+        </div>
+      ) : null}
       <textarea
         ref={box}
         className={`dag-chat-composer__input${tall ? " dag-chat-composer__input--tall" : ""}`}

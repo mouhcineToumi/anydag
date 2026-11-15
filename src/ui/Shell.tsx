@@ -402,6 +402,14 @@ export function Shell({
     if (assistantOpen) return;
     setPanelDocument(place);
   }, [assistantOpen, place]);
+  /* The same document as the panel's chip shows it: a chat started beside it works on it (#323). */
+  const panelKind = FILE_KINDS.find((kind) => opened[kind] !== null);
+  const panelName = panelKind ? opened[panelKind] : null;
+  const panelTitle = panelName ? (titles[panelName] ?? leaf(panelName)) : "";
+  const panelDocument = useMemo(
+    () => (panelKind && panelName ? { kind: panelKind, name: panelName, title: panelTitle } : null),
+    [panelKind, panelName, panelTitle],
+  );
 
   /* How many questions are in Mistakes, for the count beside Quizzes. Asked here rather
      than in the column, which mounts again on every peek: this is up for as long as the window is. */
@@ -1042,7 +1050,9 @@ export function Shell({
             />
           ) : null}
           {children}
-          {panel.open && assistantOn && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {panel.open && assistantOn && !assistantOpen ? (
+            <AssistantPanel onOpen={open} onPage={openAssistant} beside={panelDocument} />
+          ) : null}
           {picker.open ? (
             <TemplatePicker
               folder={picker.folder ?? parentOf(board ?? note ?? quiz ?? table ?? file ?? "")}

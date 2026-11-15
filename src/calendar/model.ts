@@ -141,6 +141,12 @@ export function rangeOf(view: CalView, day: string, weekStart: number, count: nu
   return { first: day, last: addDays(day, Math.max(1, Math.min(MAX_DAYS, count)) - 1) };
 }
 
+/** The days a month grid draws around `day`: whole weeks, from the week it starts in to the week it ends in. */
+export function monthDays(day: string, weekStart: number): string[] {
+  const { first, last } = rangeOf("month", day, weekStart, 1);
+  return daysFrom(first, last);
+}
+
 /** Where the arrows go from `day`: a month, a week, or the run's own length either way. */
 export function step(view: CalView, day: string, by: number, count: number): string {
   if (view === "month") return addMonths(day, by);

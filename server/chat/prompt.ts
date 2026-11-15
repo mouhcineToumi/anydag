@@ -7,7 +7,7 @@
  * left in a resumed session (Claude's `--system-prompt-snapshot off`).
  */
 
-import type { ChatMeta, Mode, Step, Turn } from "./types";
+import type { ChatMeta, Mode, Step, Subject, Turn } from "./types";
 
 export interface Reach {
   id: string;
@@ -16,7 +16,31 @@ export interface Reach {
   home: boolean;
 }
 
-export function systemPrompt(o: { reach: Reach[]; others: { id: string; name: string }[] }): string {
+/** What a subject is called in a sentence. */
+const KIND_WORD: Record<Subject["kind"], string> = { board: "board", note: "note", quiz: "quiz", table: "table", file: "file" };
+
+/**
+ * The chat's subject (#323), said once: the document the person started the chat on, by its title,
+ * name and reference. It is the default meaning of "this" and the one document changed without
+ * asking — the second half is the guard's, which holds every other write for the person whatever
+ * this says, so the line tells the model what the server will do rather than asking it to behave.
+ */
+function subjectLines(s: Subject & { home: boolean }): string[] {
+  const where = s.home ? "" : ` in vault \`${s.vault}\``;
+  const ref = s.id ? `, cited as \`[${s.title}](dag:${s.id})\`` : "";
+  return [
+    "## This chat's subject",
+    `The person started this chat on the ${KIND_WORD[s.kind]} “${s.title}” (\`${s.name}\`, kind \`${s.kind}\`${where})${ref}. It is what "this", "it" and "here" mean, and the document you work on unless the person names others or asks about the whole vault. Read it before you answer.`,
+    "Change only this document unless the person asked for more: any change to another one — a new document included — waits for the person's approval, and if they say no, leave it.",
+    "",
+  ];
+}
+
+export function systemPrompt(o: {
+  reach: Reach[];
+  others: { id: string; name: string }[];
+  subject?: (Subject & { home: boolean }) | null;
+}): string {
   const home = o.reach.find((r) => r.home);
   const lines = [
     "You are the Assistant inside AnyDag, a local app that keeps a person's notes, boards (diagrams drawn from a DSL), tables, quizzes, tasks and attachments as plain files in vaults — folders on their machine.",
@@ -34,6 +58,7 @@ export function systemPrompt(o: { reach: Reach[]; others: { id: string; name: st
     "Pass `vault` to a tool only for a vault other than this chat's.",
     "A document is listed, read, made, written, renamed, copied, deleted and retitled with the `doc_*` tools and its `kind`; where a description names `note_read` or `board_write`, that is `doc_read` or `doc_write` with that kind.",
     "",
+    ...(o.subject ? subjectLines(o.subject) : []),
     "## Changing things",
     'You may change the vaults in reach that are not marked read only. Before each distinct group of changes, call `change_block` with a short title saying what the group does ("Draw the auth flow", "Move the meeting notes into 2026/") — the person undoes a block as one. Deleting, moving folders and emptying the trash wait for the person\'s approval; if they say no, do not try another way around it.',
     "A vault in reach marked read only cannot be changed; to change it, call `vault_request` with mode `edit`, and the person decides.",

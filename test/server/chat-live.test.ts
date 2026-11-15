@@ -243,7 +243,7 @@ describe("a reply that wrote its tool call as text", () => {
         const ended = new Promise<Turn>((resolve) => {
           a.listen(chat.id, (e) => e.type === "end" && resolve(e.turn));
         });
-        a.say(chat.id, "write me a small doc about merge queues", { provider });
+        await a.say(chat.id, "write me a small doc about merge queues", { provider });
         const turn = await ended;
 
         expect(turn.status).toBe("failed");
@@ -479,6 +479,113 @@ describe("the guard", () => {
       expect(Object.keys(file).filter((k) => k.startsWith("grant:"))).toEqual([]);
       expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat[`grant:${b.id}`].mode).toBe("ask");
     });
+  });
+});
+
+/* A chat started from the panel on an open document works on that document (#323): the turn is told
+   it, and the guard — not the prompt — holds a write to anything else for the person. */
+describe("a chat's subject", () => {
+  const write = (rel: string, text: string) => fs.writeFileSync(path.join(env.root, rel), text);
+  const read = (rel: string) => fs.readFileSync(path.join(env.root, rel), "utf8");
+  const answering = (chat: string, yes: boolean) => (s: Step) => {
+    if (s.kind === "approval" && s.answer === null) void api("POST", "/__board/chat/approve", { id: chat, step: s.id, yes });
+  };
+  const approvals = (t: Turn) => t.steps.filter((s): s is Extract<Step, { kind: "approval" }> => s.kind === "approval");
+
+  beforeEach(() => {
+    write("plan.md", "---\ntitle: The plan\n---\nmessy\n");
+    write("other.md", "other words\n");
+  });
+
+  it("reaches the turn: its reference and title are in the system prompt, and nothing is written to name it", async () => {
+    const before = read("plan.md");
+    const chat = await newChat();
+    const turn = await say(chat.id, "subject", { subject: { name: "plan", kind: "note" } });
+    const id = (await api("GET", "/__board/get?name=plan&kind=note")).json.id as string;
+    expect(id).toMatch(/^\w+$/);
+    expect(said(turn)).toContain(`[The plan](dag:${id})`);
+    expect(said(turn)).toContain("`plan`, kind `note`");
+    expect(runs[0]!.system).toContain("## This chat's subject");
+    expect(read("plan.md")).toBe(before);
+    const meta = (await api("GET", `/__board/chat?id=${chat.id}`)).json.chat as ChatMeta;
+    expect(meta.subject).toMatchObject({ vault: env.vault.id, kind: "note", name: "plan", id, title: "The plan" });
+  });
+
+  it("tells a chat with none that it has none", async () => {
+    const chat = await newChat();
+    expect(said(await say(chat.id, "subject"))).toBe("This chat has no subject.");
+    expect(runs[0]!.system).not.toContain("## This chat's subject");
+  });
+
+  it("changes the subject without asking, and holds a change to any other document for approval", async () => {
+    const chat = await newChat();
+    const own = await say(chat.id, "edit plan organised", { subject: { name: "plan", kind: "note" } });
+    expect(approvals(own)).toEqual([]);
+    expect(read("plan.md")).toBe("organised\n");
+    expect(own.blocks.flatMap((b) => b.ops.flatMap((op) => op.images.map((i) => i.rel)))).toEqual(["plan.md"]);
+
+    const no = await say(chat.id, "edit other changed\nnote fresh hi", {}, answering(chat.id, false));
+    expect(approvals(no)).toHaveLength(2);
+    /* The rewrite took the `title:` with it, and the next turn looked the subject up again. */
+    expect(approvals(no)[0]!.what).toBe("Change something other than “plan”?");
+    expect(approvals(no)[0]!.detail).toBe("Rewrite other");
+    expect(approvals(no)[1]!.detail).toBe("Make fresh");
+    expect(said(no)).toMatch(/Could not rewrite other: the person said no/);
+    expect(read("other.md")).toBe("other words\n");
+    expect(exists(env.root, "fresh.md")).toBe(false);
+    expect(no.blocks).toEqual([]);
+
+    const yes = await say(chat.id, "edit other changed", {}, answering(chat.id, true));
+    expect(approvals(yes).map((s) => s.answer)).toEqual(["yes"]);
+    expect(read("other.md")).toBe("changed\n");
+    /* An approved change lands in the turn's block like any other, and undoes with it. */
+    expect(yes.blocks.flatMap((b) => b.ops)).toHaveLength(1);
+  });
+
+  it("follows the subject through a rename, and keeps it on later turns", async () => {
+    const chat = await newChat();
+    await say(chat.id, "subject", { subject: { name: "plan", kind: "note" } });
+    expect((await api("POST", "/__board/rename", { name: "plan", kind: "note", to: "plans/plan" })).status).toBe(200);
+    const later = await say(chat.id, "subject\nedit plans/plan moved");
+    expect(said(later)).toContain("`plans/plan`, kind `note`");
+    expect(approvals(later)).toEqual([]);
+    expect(read("plans/plan.md")).toBe("moved\n");
+  });
+
+  it("is dropped by a null subject, and the chat writes vault-wide as before", async () => {
+    const chat = await newChat();
+    await say(chat.id, "edit plan tidy", { subject: { name: "plan", kind: "note" } });
+    const wide = await say(chat.id, "subject\nedit other wide", { subject: null });
+    expect(said(wide)).toContain("This chat has no subject.");
+    expect(approvals(wide)).toEqual([]);
+    expect(read("other.md")).toBe("wide\n");
+    expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat.subject).toBeNull();
+    /* And a later turn that says nothing keeps it dropped. */
+    expect(said(await say(chat.id, "subject"))).toContain("This chat has no subject.");
+  });
+
+  it("still asks before deleting the subject itself", async () => {
+    const chat = await newChat();
+    const turn = await say(chat.id, "delete plan", { subject: { name: "plan", kind: "note" } }, answering(chat.id, false));
+    expect(approvals(turn).map((s) => s.what)).toEqual(["Move a file to the trash?"]);
+    expect(exists(env.root, "plan.md")).toBe(true);
+  });
+
+  it("refuses a subject that is not there, or not a document", async () => {
+    const chat = await newChat();
+    const gone = await api("POST", "/__board/chat/turn", { id: chat.id, text: "hi", subject: { name: "nope", kind: "note" } });
+    expect(gone.status).toBe(404);
+    const odd = await api("POST", "/__board/chat/turn", { id: chat.id, text: "hi", subject: { name: "plan", kind: "folder" } });
+    expect(odd.status).toBe(400);
+    expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.turns).toEqual([]);
+  });
+
+  it("takes no subject without a subject's shape from chat.json", async () => {
+    const chat = await newChat();
+    const file = path.join(env.root, ".anydag", "chats", chat.id, "chat.json");
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf8")), subject: { name: 7 } }));
+    expect((await api("GET", `/__board/chat?id=${chat.id}`)).json.chat.subject).toBeUndefined();
+    expect(said(await say(chat.id, "subject"))).toBe("This chat has no subject.");
   });
 });
 
