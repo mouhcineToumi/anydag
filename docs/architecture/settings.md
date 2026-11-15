@@ -24,7 +24,7 @@ below.
 
 | Group | Tab | Holds |
 |---|---|---|
-| You | Appearance | the theme — the person's, in every vault (#191) |
+| You | Appearance | the theme, and the **text size** — the person's, in every vault (#191, #325) |
 | | AI | the AI features switches — a master switch and one per feature (#296, *Turning AI off* below) — then one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on — the person's, in every vault (#191) |
 | | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
@@ -57,6 +57,25 @@ second vault changed how the app looked, and the Assistant could start on anothe
 - **The MCP `generate` tool** reads `dag:ai` from the app's settings, and the vault's old `llm` only
   when that is absent. The `settings` tool lists `dag:theme` and `dag:ai` at the `app` level.
 - The old tab id `vault-ai` opens *AI* (`LEGACY_TABS`).
+
+**The text size is the person's too, and it is one step for two places (#325).** `dag:text-size`
+holds `small` or `large`, and an absent key is `default` — which is why the tab's reset removes the
+key rather than storing the word. It is in the person's half of `PREF_KEYS`, the same in every vault,
+and it follows them to another browser like the theme. `src/ui/textSize.ts` is the three steps, the
+read and the write, and the one place that puts `data-dag-text-size` on `<html>`: once from
+`main.tsx` after `pull()`, so the chrome never paints at the old step, and again whenever a
+preference changes. `chrome.css` reads the attribute as `--text-scale` and multiplies two families
+by it — the chrome's own steps (`--chrome-text-*`, the theme's `ui.text.*`) and a note's Markdown
+ramp (`--chrome-note-*`, the theme's `type.md*`, restated under `.dag-note-view`). **Nothing on the
+diagram surface is in that list**: a board's `.dag-md`, its cards and its edges read `--dag-type-*`
+and `--dag-metric-*` straight from the theme, and the canvas has its own zoom. Two surfaces added
+after the setting are chrome and follow it like the rest: the calendar's small month (#350) and the
+Assistant's subject chip (#323). A snapshot reads no
+preference, so its attribute is `default`; a printed note, and the PDF the print dialog makes, puts
+the scale back to 1 with `data-dag-printing`, so what someone keeps is not a picture of this window.
+`e2e/text-size.spec.ts` measures the three steps, the board that does not move, the reload, the
+snapshot, the two fixed-width surfaces above, and that the sidebar, a menu and every Settings tab it
+opens hold at *Large*.
 
 The headings and the words on the tabs are the scopes: *You*, *This computer*, *This vault* and
 *This board*. Each heading is ink, with one short line under it in slate saying what it means — under
@@ -99,7 +118,8 @@ Four things about the modal are load-bearing:
   modal announces each save once, so a screen reader hears one word rather than one per row. Each
   tab's Reset names its scope in its own text ("Reset Export to defaults") and resets what that tab
   shows and nothing else. A tab that now holds part of an old section splits the reset with it:
-  General's covers the settings object's `problems`, Appearance's the person's `THEME`, Files and
+  General's covers the settings object's `problems`, Appearance's the person's `THEME` and
+  `TEXT_SIZE`, Files and
   images' covers `paste`, `ATTACHMENTS`, `TEMPLATES` and `UPDATE_LINKS`, and Quizzes' writes the practice
   threshold back to its default through `setGraduate`. Before it resets it snapshots the values it
   will change, then raises the modal's toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes
@@ -256,6 +276,11 @@ access `dag-settings__client*` (`data-dag-agent-client`, `data-dag-agent-clients
 same argument `--inspector-w` makes.
 The phone layout added `dag-settings__feature*` (`data-dag-setting-ai-feature`,
 `data-dag-setting-ai-summary`, `data-dag-setting-ai-back`) and `dag-settings__featureBack`.
+The text size added the control's hook `data-dag-setting-text-size`, the root attribute
+`data-dag-text-size`, the storage key `dag:text-size`, and in `chrome.css` the scale `--text-scale`
+and the two families it multiplies: `--chrome-text-*` for the chrome and `--chrome-note-*` for a
+note. Those are not theme tokens, like `--board-flow-*` and `--inspector-w`: no theme has an opinion
+about how big one person reads.
 `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
@@ -284,7 +309,9 @@ the file's — `flow:` and `w=` — and a theme is not one of them, it is the re
 above); un-embedding the fonts from an export (the layout was measured against the
 theme's face, so a file without it is a different diagram); and the window keys — the library, the
 inspector's width and the Assistant panel's — which each have a control where they act, so they are
-not Settings rows. (There were five; the board list's went with the column.)
+not Settings rows. (There were five; the board list's went with the column.) The text size (#325) is
+three steps and no more: a free slider and a custom font are out, and so is a size for a board's
+diagram — the canvas has its own zoom, and a diagram's type is the theme's.
 
 ### *Turning AI off*
 

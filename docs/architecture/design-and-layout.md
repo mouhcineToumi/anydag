@@ -57,11 +57,13 @@ layers and shadows.
 by role: `control` (9) for buttons, fields, rows and tabs, `surface` (12) for cards, menus, popovers
 and docks, `dialog` (16), `pill` (999). What stays literal is a box too small for 9px (a checkbox, a key,
 swatch, inline code, a progress bar), the diagram's selection ring, and the `50%` circles.
-**Type moved last** (#206): every font size reads `--dag-ui-text-*` (11, 12, 13, 14, 16, 20, 26 px; 12.5 became 13,
-11.5 became 12, 10.5 became 11, 15 is 14 or, on a title, 16), a leading that goes with one reads `-leading-*`, and a weight is
-`regular` or `strong` (500 and 700 became 600). `button { font: inherit }` is in `base.css` once. What stays typed is
-not chrome type: the diagram's `--dag-type-*` on the pending, error and broken cards and a card's markdown, the lockup's
-`calc`, an `em`. `e2e/type.spec.ts` reads one size for `.dag-more__item` in three menus.
+**Type moved last** (#206): every font size reads `--chrome-text-*`, the theme's `--dag-ui-text-*`
+steps (11, 12, 13, 14, 16, 20, 26 px; 12.5 became 13, 11.5 became 12, 10.5 became 11, 15 is 14 or,
+on a title, 16) at the person's **Text size** (#325, `--text-scale`), a leading that goes with one
+reads `-leading-*`, and a weight is `regular` or `strong` (500 and 700 became 600).
+`button { font: inherit }` is in `base.css` once. What stays typed is not chrome type: the diagram's
+`--dag-type-*` on the pending, error and broken cards and a card's markdown, the lockup's `calc`,
+an `em`. `e2e/type.spec.ts` reads one size for `.dag-more__item` in three menus.
 Which of these a screen should use for what — colour roles with their measured contrast, the type
 scale, the controls, the layers, focus, motion, icons and the voice — is [`DESIGN.md`](../../DESIGN.md)
 at the root, held to the code by `check:design`.
@@ -94,7 +96,7 @@ corner, size, weight, fill and border, 16 to 37 px tall, and four kinds of prima
 accent border, pale, solid and round. Now there are four variants — `primary` (solid accent: the one
 action a card asks for), `secondary` (bordered, the default), `quiet` (no box) and `danger` — and
 three sizes, `sm` 24, `md` 30 and `touch` 44, from `--dag-ui-control-*`, with the corner
-`--dag-ui-radius-control` and the words `--dag-ui-text-*`. **Under 720px `md` is `touch` by
+`--dag-ui-radius-control` and the words `--chrome-text-*`. **Under 720px `md` is `touch` by
 itself**, in the stylesheet, so no screen has to remember to grow its buttons on a phone; `sm` was a
 choice and stays small. The classes are `dag-button--<variant>`, `dag-button--<size>`,
 `dag-icon--<size>` and `dag-icon--danger`; a bare `.dag-button` is still the secondary at `md`, for

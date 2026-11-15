@@ -23,7 +23,11 @@ and repository path named here in backticks has to exist, or the check fails.
   (`paper-dark`, *Dark*) and Neutral (`neutral`). They differ in `color` and `fonts`. The `ui` block
   is identical in all three.
 - **The chrome's CSS is `src/styles/chrome.css`**, the one file exempt from the no-literal rule. It
-  may type a length. It may not type a colour: every colour is `var(--dag-color-…)`.
+  may type a length. It may not type a colour: every colour is `var(--dag-color-…)`. **Every font
+  size reads a `--chrome-text-*` step**, the theme's `ui.text.*` multiplied by `--text-scale` — the
+  person's **Text size** in Settings → Appearance (#325) — and a note's Markdown reads
+  `--chrome-note-*`, the theme's `type.md*` at the same scale. The diagram surface is not in that;
+  it reads `type` and `metric` directly.
 - **The `ui` family is new (#205) and the chrome is moving onto it one screen at a time.**
   `scripts/check-literals.mjs` counts the rules in `chrome.css` that still type their own
   `font-size`, `border-radius`, `box-shadow`, `z-index` or `transition`, checks the count against
@@ -137,7 +141,10 @@ What the numbers say:
 type**: an id, a path, a key, a chord in `kbd`, a code. **Sans is for words someone wrote**: a file's
 title is sans even though it is also a file name.
 
-**The scale.** These are `ui.text.*` with their `ui.leading.*`, in px:
+**The scale.** These are `ui.text.*` with their `ui.leading.*`, in px. The px are the *Default*
+step: **Text size** (#325) multiplies every step on `<html>` — Small 0.9, Default 1, Large 1.15 —
+and line-heights that are set in px stay where they are, so a control's box does not grow with its
+words. A note's Markdown ramp is the same choice through `--chrome-note-*`.
 
 | Step | Size | Line | For |
 |---|---|---|---|
@@ -155,7 +162,7 @@ move onto the two tokens, not further steps to copy.
 
 **What ships.** The scale is newer than most of the CSS: at #218, 431 rules still typed a
 `font-size`, mostly 12px (155), 13px (96) and 11px (41). In-between sizes (12.5px, 11.5px, 13.5px)
-are legacy. A new rule reads `--dag-ui-text-*`. **Under 720px** rows, menu items and filter fields
+are legacy. A new rule reads `--chrome-text-*`. **Under 720px** rows, menu items and filter fields
 go up to 15px, read at arm's length on a phone.
 
 **No capitals**: nothing is set in all-caps except a badge. This is not fully true today. These

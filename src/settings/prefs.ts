@@ -32,6 +32,14 @@ import { markSaved } from "./saved";
  */
 export const THEME = "dag:theme";
 /**
+ * How big the words a person reads are: `"small"`, `"large"`, or absent for the default step (#325).
+ * **The person's, in every vault**, {@link THEME}'s reason: how somebody reads their notes and the
+ * app around them is theirs, and opening another vault should not change it. `src/ui/textSize.ts`
+ * owns the three steps and the root attribute; a board's diagram is not affected — its sizes are the
+ * theme's `type` and `metric`, and the canvas has its own zoom.
+ */
+export const TEXT_SIZE = "dag:text-size";
+/**
  * Which model each AI feature uses: the `llm` and `assistant` sections of the settings object, as one
  * JSON string. **The person's, in every vault** (#191), beside the keys and sign-ins, which were
  * always this computer's: a second vault no longer starts the Assistant on another provider.
@@ -174,6 +182,7 @@ export const ASSISTANT_WIDTH = "dag:assistant-w";
  */
 export const PREF_KEYS = [
   THEME,
+  TEXT_SIZE,
   AI,
   LIBRARY,
   INSPECTOR_WIDTH,
