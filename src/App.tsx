@@ -8,6 +8,9 @@ import {
   CircleSlash,
   CalendarX2,
   Plus,
+  ChevronUp,
+  ChevronDown,
+  PanelRight,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -67,7 +70,8 @@ import { Item } from "@/render/Item";
 import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
 import { FileProblem } from "@/ui/FileProblem";
-import { Button } from "@/ui/controls";
+import { Button, IconButton } from "@/ui/controls";
+import { stepOrder } from "@/ui/taskModel";
 import { Shell, useSidebar } from "@/ui/Shell";
 import {
   AssistantView,
@@ -96,7 +100,17 @@ import { NO_PROJECT, type ProjectFilter } from "@/ui/projectFilter";
 import { tagFilterOf, tagParam, type TagFilter } from "@/ui/tagFilter";
 import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
 import { rememberOpened } from "@/ui/recents";
-import { CALENDAR_VIEW, LIBRARY, TASKS_TAB, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
+import {
+  CALENDAR_VIEW,
+  LIBRARY,
+  TASK_PANEL,
+  TASKS_TAB,
+  TASKS_VIEW,
+  readFlag,
+  readPref,
+  writeFlag,
+  writeLocal,
+} from "@/settings/prefs";
 import { MAX_DAYS, VIEWS, type CalView } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
@@ -115,7 +129,8 @@ import { fileStem, saveFile } from "@/export/save";
 import { printAs } from "@/export/print";
 import { splitNote } from "@/note/format";
 import { folderOf, projectFolders, projectOf, within, type Project } from "@/note/project";
-import { STATUSES, taskOf, titleStem, type Task, type TaskStatus } from "@/note/task";
+import { collation } from "@/locale";
+import { compareTasks, STATUSES, taskOf, titleStem, type Task, type TaskStatus } from "@/note/task";
 import { tagsOf } from "@/note/tags";
 import { folderLabel, folderOfRun, folderQuizzes } from "@/quiz/folder";
 import { askable, parseQuiz, type Question } from "@/quiz/parse";
@@ -1685,6 +1700,36 @@ function NoteApp({
   /* And whether it is an event, which takes the place of *Make it a task* in the top bar. */
   const [event, setEventState] = useState<NoteEvent | undefined>(undefined);
   const noteId = useIndex().docs.find((d) => d.kind === "note" && d.name === name)?.id;
+  /* A task's properties: beside the text, or folded into a line above it — this browser's choice —
+     and whether the window has room for them beside it at all. */
+  const [panel, setPanel] = useState<"open" | "folded">(() => (readPref(TASK_PANEL) === "folded" ? "folded" : "open"));
+  const [panelRoom, setPanelRoom] = useState(true);
+  const togglePanel = useCallback(() => {
+    setPanel((was) => {
+      const next = was === "open" ? "folded" : "open";
+      writeLocal(TASK_PANEL, next);
+      return next;
+    });
+  }, []);
+  /* The projects a task can be moved into, and what the listing knows of this one. */
+  const projectChoices = useMemo(
+    () =>
+      [...projectFolders(list.projects).values()]
+        .map((n) => ({ name: n, project: list.projects[n]!, title: list.titles[n] ?? leaf(n) }))
+        .sort((a, b) => collation({ numeric: true }).compare(a.title, b.title)),
+    [list.projects, list.titles],
+  );
+  /* The task before and after this one, in the order the Tasks page last drew — or, opened from
+     anywhere else, the open tasks in the page's default order. */
+  const steps = useMemo(() => {
+    if (!task) return [];
+    return stepOrder(name, () => {
+      const rows = Object.entries(list.tasks).map(([n, t]) => ({ name: n, task: t, title: list.titles[n] ?? leaf(n) }));
+      const open = rows.filter((r) => r.task.status !== "done");
+      return (open.some((r) => r.name === name) ? open : rows).sort(compareTasks).map((r) => r.name);
+    });
+  }, [task, name, list.tasks, list.titles]);
+  const stepAt = steps.indexOf(name);
   /*
    * What the project holds, off the listing: every task under its folder, nested projects' too.
    * The listing is one round trip behind the page, so a note made a project a moment ago may not
@@ -1907,6 +1952,41 @@ function NoteApp({
               : []
           }
         >
+          {task && !problem && stepAt >= 0 && steps.length > 1 ? (
+            <span className="dag-taskstep" data-dag-taskstep="">
+              <span className="dag-taskstep__at" data-dag-taskstep-at="">
+                {stepAt + 1} of {steps.length}
+              </span>
+              <IconButton
+                aria-label="Previous task"
+                data-dag-taskstep-prev=""
+                disabled={stepAt === 0}
+                onClick={() => open("note", steps[stepAt - 1]!)}
+              >
+                <ChevronUp size={16} strokeWidth={2} aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                aria-label="Next task"
+                data-dag-taskstep-next=""
+                disabled={stepAt === steps.length - 1}
+                onClick={() => open("note", steps[stepAt + 1]!)}
+              >
+                <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
+              </IconButton>
+            </span>
+          ) : null}
+          {task && !problem ? (
+            <IconButton
+              aria-label={panel === "open" ? "Fold the properties into a line" : "Show the properties beside the text"}
+              tip={panelRoom ? undefined : "The window is too narrow for the properties beside the text"}
+              aria-pressed={panel === "open" && panelRoom}
+              disabled={!panelRoom}
+              data-dag-taskpanel-toggle={panel}
+              onClick={togglePanel}
+            >
+              <PanelRight size={16} strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          ) : null}
           <Backlinks id={noteId} />
           {noteId ? <ExportButton key={name} what="note" options={NOTE_EXPORTS} onExport={exportNote} /> : null}
         </Toolbar>
@@ -1923,6 +2003,11 @@ function NoteApp({
         onEvent={setEventState}
         members={members}
         onRenamed={renamed}
+        panel={panel}
+        onPanelRoom={setPanelRoom}
+        projects={projectChoices}
+        facts={list.tasks[name]}
+        noteId={noteId}
         onProblem={setProblem}
         onSearch={openBrowser}
         onTrash={openTrash}

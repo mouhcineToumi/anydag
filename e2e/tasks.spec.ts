@@ -336,7 +336,9 @@ test("a task's own page sets its status and its date through the note's save, an
   const bar = page.locator("[data-dag-taskbar]");
   await expect(bar).toHaveAttribute("data-dag-taskbar", "todo");
 
-  await bar.locator('[data-dag-taskbar-status="in-progress"]').click();
+  /* The status is a menu in the panel; the mark beside the title is the same checkbox as a row's. */
+  await bar.locator("[data-dag-taskbar-status]").click();
+  await page.locator('[data-dag-task-menu-status="in-progress"]').click();
   await expect
     .poll(() => read("own"))
     .toBe('---\ntitle: "Plan the launch"\nstatus: in-progress\n---\nThe launch plan.\n\n- [ ] book the room\n');
@@ -353,6 +355,52 @@ test("a task's own page sets its status and its date through the note's save, an
   await pageMore(page, "data-dag-note-make-task");
   await expect.poll(() => read("own")).toContain("\nstatus: todo\n---\n");
   await expect(page.locator('[data-dag-taskbar="todo"]')).toBeVisible();
+  await page.locator(".dag-note-view__mark [data-dag-task-status]").click();
+  await expect.poll(() => read("own")).toContain("\nstatus: done\n---\n");
+});
+
+test("a task's page: its properties beside the text, what links here, a project that moves the file, the panel folded, and the steps through the list", async ({
+  page,
+}) => {
+  write("step-a", "Alpha step", ["status: todo", `due: ${day(1)}`]);
+  const b = write("step-b", "Beta step", ["status: todo", `due: ${day(2)}`], "Why.\n\n- [x] one\n- [ ] two\n");
+  fs.mkdirSync(path.join(dir, "proj"), { recursive: true });
+  const project = `${folder}/proj/launch`;
+  fs.writeFileSync(path.join(dir, "proj", "launch.note.md"), '---\ntitle: "Launch"\nproject: active\nhue: moss\n---\n');
+  const id = await idOf(page, b);
+  write("linker", "Plans", [], `See [Beta](dag:${id}).\n`);
+
+  /* From the Tasks page, so the steps are the order it drew: Alpha, then Beta. */
+  await tasksPage(page, b);
+  await page.locator(`[data-dag-task-open="${b}"]`).click();
+  await ready(page);
+  await expect(page.locator("[data-dag-taskstep-at]")).toHaveText("2 of 2");
+  const panel = page.locator("aside[data-dag-taskbar]");
+  await expect(panel.locator('[data-dag-taskbar-items="1/2"]')).toContainText("1 of 2");
+  await expect(panel.locator("[data-dag-taskbar-distance]")).toHaveText("2 days left");
+  await expect(panel.locator("[data-dag-linked-from-row]")).toContainText("Plans", { timeout: 15_000 });
+
+  /* Folded into a line of pills, remembered, and back. */
+  await page.locator("[data-dag-taskpanel-toggle]").click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator(".dag-taskline-pills [data-dag-taskbar-status]")).toBeVisible();
+  await page.locator("[data-dag-taskpanel-toggle]").click();
+  await expect(panel).toBeVisible();
+
+  /* The step before is Alpha. */
+  await page.locator("[data-dag-taskstep-prev]").click();
+  await expect(page.locator("[data-dag-taskstep-at]")).toHaveText("1 of 2");
+  await expect(page).toHaveURL(/step-a/);
+
+  /* A project is a folder: choosing one moves the file into it, and the page follows. */
+  await page.locator("[data-dag-taskbar-project]").click();
+  await page.locator(`[data-dag-task-menu-project="${project}"]`).click();
+  const moved = path.join(dir, "proj", "step-a.note.md");
+  await expect.poll(() => fs.existsSync(moved)).toBe(true);
+  expect(fs.existsSync(noteFile("step-a"))).toBe(false);
+  await expect(page).toHaveURL(/proj%2Fstep-a|proj\/step-a/);
+  await expect(page.locator("[data-dag-taskbar-project]")).toHaveAttribute("data-dag-taskbar-project", project);
+  expect(fs.readFileSync(moved, "utf8")).toContain(`\nstatus: todo\ndue: ${day(1)}\n`);
 });
 
 test("a priority is set from the row's mark, from its menu's keys and from the task's page, and a plain note loses it", async ({

@@ -6318,6 +6318,99 @@ button.dag-task-pri:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-dangerText);
 }
 
+/* A task's own page (#311): the text in its column, the properties in a panel at the right edge,
+   sticky while the text scrolls. A narrow window, or the top bar's panel button, folds the panel
+   into one line of pills under the title (`TaskPropsLine`) — `NoteView` draws one or the other. */
+.dag-note-view[data-task-panel] { display: grid; grid-template-columns: minmax(0, 1fr) 272px; align-items: start; }
+.dag-note-view[data-task-panel] > .dag-note-view__page { grid-column: 1; grid-row: 1; width: 100%; }
+.dag-taskpanel {
+  position: sticky;
+  top: 0;
+  grid-column: 2;
+  grid-row: 1;
+  box-sizing: border-box;
+  min-height: 100%;
+  max-height: 100vh;
+  overflow: auto;
+  padding: 18px 16px 24px;
+  font-size: var(--chrome-text-md);
+  border-left: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-taskpanel__head { margin: 0 0 10px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-taskpanel__grid { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 2px 8px; }
+.dag-taskpanel__label { min-height: 32px; display: inline-flex; align-items: center; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-taskpanel__value { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; min-height: 32px; color: var(--dag-color-ink); }
+.dag-taskpanel__value .dag-tasks__bar-track { width: 96px; }
+.dag-taskpanel__muted { color: var(--dag-color-slate); }
+.dag-taskpanel__none { color: var(--dag-color-slate); }
+.dag-taskpanel__pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 6px;
+  margin-left: -6px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-taskpanel__pick:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-taskpanel__pick:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-taskpanel__pick:disabled { cursor: default; }
+.dag-taskpanel__chevron { color: var(--dag-color-slate); }
+.dag-taskpanel__pick:disabled .dag-taskpanel__chevron { display: none; }
+.dag-taskpanel__distance { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
+.dag-taskpanel__distance[data-late] { color: var(--dag-color-dangerText); font-weight: var(--dag-ui-weight-strong); }
+.dag-taskpanel__rule { margin: 14px 0; border: 0; border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-taskpanel__pick > .dag-project-chip { flex: none; max-width: 150px; }
+/* No rule under the last section when nothing links here. */
+.dag-taskpanel__rule:last-child { display: none; }
+.dag-taskpanel .dag-taskbar__clear { margin-left: 0; }
+/* The date inputs' own padding, taken back so their text starts on the values' edge. */
+.dag-taskpanel .dag-facts__date { margin-left: -9px; }
+.dag-taskpanel__problem { margin: 0 54px 16px; font-size: var(--chrome-text-sm); color: var(--dag-color-dangerText); }
+
+/* Folded: the properties as pills under the title, the New task dialog's. */
+.dag-taskline-pills { display: flex; margin: 0 54px 24px; padding-bottom: 16px; border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-taskline-pills .dag-tasks-pill:disabled { cursor: default; }
+.dag-taskline-pills .dag-tasks-pill[data-late] { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); border-color: var(--dag-color-dangerBorder); }
+.dag-taskline-pills .dag-tasks-pill[data-late] .dag-taskpanel__distance { color: inherit; }
+
+/* The status mark beside a task's title, in the gutter the text's blocks leave. */
+.dag-note-view__page--write { position: relative; }
+.dag-note-view__mark { position: absolute; left: 20px; top: 52px; }
+
+/* What links here, as a list at the panel's foot. */
+.dag-linked-from__head { margin: 0 0 6px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-linked-from__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 6px;
+  margin-left: -6px;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-decoration: none;
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-linked-from__row > svg { flex: none; color: var(--dag-color-slate); }
+.dag-linked-from__row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-linked-from__row:hover { background: var(--dag-color-paper100); }
+.dag-linked-from__row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* "2 of 13" and the arrows that step through the Tasks page's order, in a task's top bar. */
+.dag-taskstep { display: inline-flex; align-items: center; gap: 2px; }
+.dag-taskstep__at { margin-right: 6px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 719px) {
+  .dag-taskstep__at { display: none; }
+  .dag-note-view__mark { left: 0; }
+  .dag-taskline-pills { margin-inline: 20px; }
+}
+
 /* The New task row (#311): the list's first line. The `+` and the title, then the pills; `N` at
    the end while it is idle, and under it, while it holds the caret, what each key does. */
 .dag-tasks-new { border-bottom: 1px solid var(--dag-color-outlineSoft); }

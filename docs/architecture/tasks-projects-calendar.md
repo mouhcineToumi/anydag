@@ -23,11 +23,11 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
 | Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
 | the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **New task** row as the list's first line (`N` puts the caret in it) with pills for priority, project and due date — Enter makes the task and keeps the row open with the pills as they were, shift+Enter makes it and opens it, Tab walks the pills, Escape clears and leaves, a refusal says why and keeps the title, and the lock's notice answers while read only — and a `+` on each group heading that opens it with that group's status; a **New task dialog** (`C`, or the top bar's primary button) with a title, a description, the four pills and *Keep this open for the next one*; the board keeps a box at the foot of each column |
-| the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Priority* (the row's menu), *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
+| the task's own page | its status mark beside the title (the row's checkbox); its properties in a panel at the right — *Status*, *Priority* and *Project* as the row's menus, *Starts* and *Due* (with *7 days left* or *2 days late*), then *Check items* ticked of all and when it *Changed*, then *Linked from* — which the top bar's panel button, or a window too narrow for it, folds into one line of pills above the text; *2 of 13* and the arrows beside it step through the Tasks page's order; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
 | a board, or a note, embedding one | a card — status as a button, title, priority, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
 | `?view=1`, a snapshot, the PDF | the status, priority and date on a line above the text |
 
-Eleven things are load-bearing:
+Twelve things are load-bearing:
 
 - **Everything a note is, a task is**, because it is one: the file is `.note.md`, the kind is `note`,
   and the editor, the references in its description, backlinks, search, export
@@ -80,6 +80,15 @@ Eleven things are load-bearing:
   icons and keys. The task just made is tinted where it lands, for a moment, and scrolled into view.
   `N` and `C` are bare keys on the page, answered only when nothing is being typed into, no menu or
   dialog has the key, and the key does not follow the leader (space).
+- **A task's project on its page is a move** (#311). Choosing another project in the panel moves the
+  file into that project's folder (`moveBoard`, `NoteView`'s `moveTo`), and *No project* moves it to
+  the top level; the page follows the file to its new name without remounting the editor, as a
+  retitle does, since not a byte of the text changed. A move that is refused — a file there with its
+  name — says so under the title and leaves the task where it was. The panel or the line is drawn,
+  never both (`ResizeObserver` on the page, 900px), so each control is on the page once; folded is
+  `dag:task-panel`, this browser's. The steps (*2 of 13*) are the order the Tasks page last drew,
+  kept in `taskModel.ts` for this tab, or — opened from anywhere else — the open tasks in the page's
+  default order.
 - **The listing carries three facts that are never a line in the file**: `items`, the check items
   the body ticks of all it has (`- [ ]`, `1. [x]`, as remark's GFM reads one, and none inside a code
   fence); `body`, whether there is any text under the frontmatter; and `changed`, the file's own
@@ -127,7 +136,9 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `data-dag-task-toast`, `data-dag-task-undo`, `data-dag-task-items`, `data-dag-task-page`,
 `data-dag-task-changed`, `data-dag-task-more`, `dag-tasks-new*`, `dag-tasks-pill*`, `dag-task-dialog*`,
 `dag-tasks__new`, `dag-tasks__head-add`, `data-dag-task-new*`, `data-dag-task-dialog*`, `data-dag-tasks-new`,
-`data-dag-tasks-group-add`, `data-fresh` on a row, the keyframes `dag-tasks-fresh`, `data-dag-task-priority`, `data-dag-taskbar-priority`,
+`data-dag-tasks-group-add`, `data-fresh` on a row, the keyframes `dag-tasks-fresh`, `dag-taskpanel*`,
+`dag-taskline-pills`, `dag-taskstep*`, `dag-linked-from*`, `dag-note-view__mark`, `data-task-panel`,
+`data-dag-taskstep*`, `data-dag-taskpanel-toggle`, `data-dag-linked-from*`, the storage key `dag:task-panel`, `data-dag-task-priority`, `data-dag-taskbar-priority`,
 `data-dag-taskbar-priority-menu`, `data-dag-taskline-priority`, `data-dag-embed-priority`, `data-priority`
 on `.dag-task-priority`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
 `data-dag-tasks-look-done`, `data-today` on a due date, the storage keys `dag:tasks-view` and
@@ -211,7 +222,7 @@ every file through the ordinary write path, and creation where the tag is used.
 
 | Where | What it does with one |
 |---|---|
-| a note's, a task's or an event's own page | a *Tags* row with the other properties under the title (a plain note has one too): chips, and an editor that suggests tags and creates one inline |
+| a note's, a task's or an event's own page | a *Tags* row with the other properties under the title (a plain note has one too; a task's is the last row of its properties panel, or a bar under its line of pills while the panel is folded): chips, and an editor that suggests tags and creates one inline |
 | a board, a quiz, a table | *Tags…* in the top bar's `⋯`, which opens the editor in a popover |
 | the sidebar | *Tags…* in every document row's menu, the same popover |
 | Settings → This vault → Tags | the tag manager: every tag with its colour and count, *Unused* last; recolour, rename (a rename onto an existing tag merges), delete |

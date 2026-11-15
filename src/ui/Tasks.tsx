@@ -46,9 +46,10 @@ import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
 import { tagMatches, type TagFilter } from "./tagFilter";
 import { TagChips, TagSelect } from "./tags/TagFilter";
-import { DueLabel, PRIORITY_KEYS, PriorityMark, StatusButton, TaskGlyph } from "./TaskGlyph";
-import { compareRecent, countLine, onTab, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
-import { TasksMenu, under, type MenuRow } from "./TasksMenu";
+import { priorityRows, statusRows } from "./taskMenus";
+import { DueLabel, PriorityMark, StatusButton, TaskGlyph } from "./TaskGlyph";
+import { compareRecent, countLine, onTab, rememberOrder, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
+import { TasksMenu, under } from "./TasksMenu";
 import { blankDraft, NewTaskDialog, NewTaskRow, type NewTaskDraft } from "./NewTask";
 import { Toast, ToastName, ToastWords } from "./Toast";
 
@@ -386,6 +387,16 @@ export function TasksView({
   }, [scopedRows, tab, matches]);
   const total = Object.keys(list.tasks).length;
   const by = (status: TaskStatus) => rows.filter((r) => r.place.status === status);
+  /* The order the rows are drawn in, which a task's page steps through ("2 of 13"). */
+  useEffect(() => {
+    const drawn =
+      layout === "board"
+        ? STATUSES.flatMap((s) => rows.filter((r) => r.place.status === s))
+        : tab === "done"
+          ? [...rows].sort(compareRecent)
+          : LIST_ORDER.filter((s) => onTab(s, tab)).flatMap((s) => rows.filter((r) => r.place.status === s));
+    rememberOrder(drawn.map((r) => r.name));
+  }, [rows, layout, tab]);
   /* A task typed in while one project is showing is made in that project's folder. */
   const into = { folder: scoped ?? "", tag: tagFilter.kind === "tag" ? tagFilter.name : undefined };
   /* A row names its project, unless the page is already showing only that project's. */
@@ -578,19 +589,9 @@ export function TasksView({
           label={`${menu.row.title}: priority`}
           data={{ "data-dag-task-menu": menu.row.name }}
           onClose={() => setMenu(null)}
-          rows={PRIORITY_KEYS.map(
-            ({ priority, key, label }): MenuRow => ({
-              key: priority ?? "none",
-              label,
-              icon: <PriorityMark priority={priority ?? undefined} />,
-              hint: key,
-              checked: (menu.row.task.priority ?? null) === priority,
-              data: { "data-dag-task-menu-priority": priority ?? "none" },
-              onPick: () => {
-                if ((menu.row.task.priority ?? null) !== priority) onChange(menu.row, { priority });
-              },
-            }),
-          )}
+          rows={priorityRows(menu.row.task.priority ?? null, (priority) => {
+            if ((menu.row.task.priority ?? null) !== priority) onChange(menu.row, { priority });
+          })}
         />
       ) : menu ? (
         <TasksMenu
@@ -598,19 +599,9 @@ export function TasksView({
           label={`${menu.row.title}: status`}
           data={{ "data-dag-task-menu": menu.row.name }}
           onClose={() => setMenu(null)}
-          rows={STATUSES.map(
-            (s, i): MenuRow => ({
-              key: s,
-              label: STATUS_LABEL[s],
-              icon: <TaskGlyph status={s} />,
-              hint: String(i + 1),
-              checked: menu.row.task.status === s,
-              data: { "data-dag-task-menu-status": s },
-              onPick: () => {
-                if (s !== menu.row.task.status) onChange(menu.row, { status: s });
-              },
-            }),
-          )}
+          rows={statusRows(menu.row.task.status, (status) => {
+            if (status !== menu.row.task.status) onChange(menu.row, { status });
+          })}
         />
       ) : null}
       {asking ? (
