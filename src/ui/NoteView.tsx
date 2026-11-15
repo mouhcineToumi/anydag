@@ -906,7 +906,7 @@ export function NoteView({
           </>
         ) : null
       ) : opened ? (
-        <div className="dag-note-view__page">
+        <div className="dag-note-view__page dag-note-view__page--write">
           <NoteTitle
             title={title}
             editable={!locked && status.kind !== "conflict" && status.kind !== "deleted"}
@@ -950,6 +950,21 @@ export function NoteView({
                 label={title || name}
                 self={self}
                 editable={!locked && status.kind !== "conflict"}
+              />
+            ) : null}
+            {/* The strip the page has below the last block, filling what is left of the window: a
+                press in it is the gesture a note ending in a picture, a table or a code block has no
+                other way to make, and it writes the empty paragraph the editor holds until something
+                is typed in it — no bytes at all. Read-only, the page keeps its blank. */}
+            {ready ? (
+              <div
+                className="dag-note-view__tail"
+                data-dag-note-tail=""
+                onMouseDown={(e) => {
+                  if (e.button !== 0 || lockedRef.current || status.kind === "conflict") return;
+                  e.preventDefault();
+                  editor.current?.afterLast();
+                }}
               />
             ) : null}
           </div>

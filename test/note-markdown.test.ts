@@ -489,6 +489,14 @@ describe("the span map", () => {
       "Hello\n",
     );
   });
+
+  it("writes nothing for the empty paragraph a click below the last block leaves", async () => {
+    /* The line after the last block (#317): the editor holds it, and the file never learns of it. */
+    const md = "A paragraph.\n\n![a picture](picture.png)\n";
+    const { blocks, loaded } = load(md);
+    const doc = await hold(blocks);
+    expect(save(settle(loaded, doc), [...doc, { id: "below", type: "paragraph", content: [] }])).toBe(md);
+  });
 });
 
 describe("after a save", () => {
