@@ -951,3 +951,11 @@
   `Reader` now parses a chunk at a time and the worker says it is alive between chunks
   (`Reader.steps`, `{ alive }`), which resets the clock: a grammar stuck on one file is still ended,
   a big vault is not.
+- **A YAML block list may start at column 0, so a key's lines are not only the indented ones.**
+  `withKeys` (`src/note/task.ts`, every frontmatter writer's rule) took a key's line and the lines
+  indented under it as the key, which is right for a folded title and wrong for `tags:` followed by
+  `- a` at column 0 — the form Obsidian writes. Replacing or removing such a key left the `- a`
+  lines behind, under the new line or the key before it, which is YAML no reader here parses. Found
+  while designing tags (#327): a key's lines are now the line itself, the indented lines under it,
+  and the `- ` lines at column 0 that follow it, for every key. `test/fixtures/tags.json` and the
+  task and project fixtures hold it.

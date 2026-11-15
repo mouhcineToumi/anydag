@@ -121,20 +121,27 @@ export function daysFrom(first: string, last: string): string[] {
 
 /* -- views ------------------------------------------------------------------------------------ */
 
-export const VIEWS = ["month", "week", "days"] as const;
+export const VIEWS = ["month", "week", "rows", "days"] as const;
 export type CalView = (typeof VIEWS)[number];
 
 /** How many days a run of days may be — enough for a fortnight, few enough that a column stays readable. */
 export const MAX_DAYS = 14;
 
-/** The days a view covers around `day`: whole weeks for a month, one week, or `count` days from `day`. */
+/** The minutes in a day: what a time track's pixels are measured against, on either axis. */
+export const DAY_MINUTES = 1440;
+
+/**
+ * The days a view covers around `day`: whole weeks for a month, one week, `count` days from `day`,
+ * or the week again with one row to a day (`rows`).
+ */
 export function rangeOf(view: CalView, day: string, weekStart: number, count: number): { first: string; last: string } {
   if (view === "month") {
     const first = startOfWeek(startOfMonth(day), weekStart);
     const end = addDays(startOfMonth(addMonths(day, 1)), -1);
     return { first, last: addDays(startOfWeek(end, weekStart), 6) };
   }
-  if (view === "week") {
+  /* A week and the rows view are the same seven days; only the drawing turns them. */
+  if (view === "week" || view === "rows") {
     const first = startOfWeek(day, weekStart);
     return { first, last: addDays(first, 6) };
   }
@@ -147,11 +154,40 @@ export function monthDays(day: string, weekStart: number): string[] {
   return daysFrom(first, last);
 }
 
-/** Where the arrows go from `day`: a month, a week, or the run's own length either way. */
+/** Where the arrows go from `day`: a month, a week, the run's own length, or the rows' week. */
 export function step(view: CalView, day: string, by: number, count: number): string {
   if (view === "month") return addMonths(day, by);
-  if (view === "week") return addDays(day, 7 * by);
+  if (view === "week" || view === "rows") return addDays(day, 7 * by);
   return addDays(day, Math.max(1, Math.min(MAX_DAYS, count)) * by);
+}
+
+/* -- the hour track, whichever way it runs ---------------------------------------------------- */
+
+/**
+ * How many minutes into a day a point on a time track is. **The one piece of arithmetic the two
+ * hour grids share**: the week's day column is measured down its height, the rows view's day track
+ * across its width, and the rest — snapping, the ghost, what a drop writes — is the same code.
+ */
+export function minutesAt(
+  box: { left: number; top: number; width: number; height: number },
+  at: { x: number; y: number },
+  axis: "x" | "y",
+): number {
+  const size = axis === "x" ? box.width : box.height;
+  if (!(size > 0)) return 0;
+  const offset = axis === "x" ? at.x - box.left : at.y - box.top;
+  return Math.max(0, Math.min(DAY_MINUTES, (offset / size) * DAY_MINUTES));
+}
+
+/** A minute of the day rounded down to a whole `by` — the grid's quarter hour — and never before midnight. */
+export function snapMinute(minute: number, by: number): number {
+  return Math.max(0, Math.floor(minute / by) * by);
+}
+
+/** Minutes since midnight as a clock reads them — `09:30`; the day's last edge is `24:00`, the next midnight. */
+export function clockOf(minute: number): string {
+  const m = Math.max(0, Math.min(DAY_MINUTES, Math.round(minute)));
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
 /* -- items ------------------------------------------------------------------------------------ */
@@ -298,7 +334,7 @@ export function blocks(items: readonly CalItem[], day: string): Block[] {
      block after the change an hour off its label. A cut edge is the grid's own edge. */
   const wall = (t: number): number => {
     if (t <= open) return 0;
-    if (t >= close) return 1440;
+    if (t >= close) return DAY_MINUTES;
     const at = wallOf(t);
     return at.hour * 60 + at.minute + at.second / 60;
   };
@@ -493,8 +529,8 @@ export function shiftEvent(event: NoteEvent, days: number, minutes = 0, snap = 0
     const [h, m] = f.startTime.split(":").map(Number) as [number, number];
     let at = h * 60 + m + minutes;
     if (snap > 0) at = Math.round(at / snap) * snap;
-    const over = Math.floor(at / 1440);
-    at -= over * 1440;
+    const over = Math.floor(at / DAY_MINUTES);
+    at -= over * DAY_MINUTES;
     moved = withStart(
       event,
       addDays(f.startDay, days + over),
