@@ -14,6 +14,7 @@
  *     delete <name>              delete a note (waits for approval)
  *     read <name>                read a note and cite it
  *     subject                    say the chat's subject, as the system prompt names it
+ *     mentions                   say the documents the message names with `@`
  *     vault <id> [edit]          ask for another vault
  *     note@<vault> <name> <text…>   make a note in another vault
  *     wait                       hang until stopped
@@ -143,6 +144,16 @@ export function fakeHarness(provider: Provider): Harness {
                  chip reached the harness, through the route, the store and the prompt. */
               const line = o.system.split("\n").find((l) => l.startsWith("The person started this chat on"));
               said.push(line ?? "This chat has no subject.");
+              break;
+            }
+            case "mentions": {
+              /* The prompt's mention section, which says the page's chips reached the turn by their
+                 `dag:` references — through the route, the live turn and the system prompt. */
+              const lines = o.system.split("\n");
+              const at = lines.indexOf("## Documents mentioned in this message");
+              const got: string[] = [];
+              for (let i = at + 2; at >= 0 && i < lines.length && lines[i]!.trim(); i++) got.push(lines[i]!);
+              said.push(got.length ? got.join("\n") : "This message mentions no documents.");
               break;
             }
             case "vault": {

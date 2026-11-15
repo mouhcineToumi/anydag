@@ -1047,7 +1047,7 @@
     {
       "id": "chat.turn",
       "area": "Assistant",
-      "what": "Send a turn and follow the answer as it is written",
+      "what": "Send a turn, with the documents it names with `@`, and follow the answer as it is written",
       "rest": ["POST /__board/chat/turn", "GET /__board/chat/events"],
       "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}
