@@ -97,6 +97,7 @@ import { nameWhenOpened } from "@/ui/NoteTitle";
 import type { TasksLayout } from "@/ui/Tasks";
 import { tabOf, type TaskTab } from "@/ui/taskModel";
 import { NO_PROJECT, type ProjectFilter } from "@/ui/projectFilter";
+import { tagFilterOf, tagParam, type TagFilter } from "@/ui/tagFilter";
 import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
 import { rememberOpened } from "@/ui/recents";
 import {
@@ -130,6 +131,7 @@ import { splitNote } from "@/note/format";
 import { folderOf, projectFolders, projectOf, within, type Project } from "@/note/project";
 import { collation } from "@/locale";
 import { compareTasks, STATUSES, taskOf, titleStem, type Task, type TaskStatus } from "@/note/task";
+import { tagsOf } from "@/note/tags";
 import { folderLabel, folderOfRun, folderQuizzes } from "@/quiz/folder";
 import { askable, parseQuiz, type Question } from "@/quiz/parse";
 import { stampIds } from "@/quiz/write";
@@ -414,6 +416,7 @@ function pageQuery(kind: FileKind, target: string | null): Record<string, string
     file: null,
     tasks: null,
     project: null,
+    tag: null,
     quizzes: null,
     run: null,
     page: null,
@@ -629,6 +632,7 @@ export function App() {
       tasks={list.tasks}
       projects={list.projects}
       events={list.events}
+      tags={list.tags}
       quizzes={list.quizzes}
       questions={list.questions}
       tables={list.tables}
@@ -796,6 +800,9 @@ function usePageChrome({
           files={list.files}
           folders={list.folders}
           titles={list.titles}
+          tags={list.tags}
+          tasks={list.tasks}
+          events={list.events}
           board={null}
           note={null}
           quiz={quiz}
@@ -881,6 +888,9 @@ function TasksApp({
       setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
     [setQuery, list.ids],
   );
+  /* `tag=` is the tag's name: a tag has no id, and a rename rewrites every document anyway. */
+  const tagFilter = useMemo(() => tagFilterOf(query.get("tag")), [query]);
+  const chooseTag = useCallback((next: TagFilter) => setQuery("tag", tagParam(next)), [setQuery]);
 
   return (
     <div className="dag-app dag-app--tasks" data-snapshot={snapshot ? "1" : undefined}>
@@ -914,6 +924,8 @@ function TasksApp({
         onOpen={(name) => open("note", name)}
         scope={scope}
         onScope={chooseScope}
+        tagFilter={tagFilter}
+        onTagFilter={chooseTag}
         locked={locked}
         tab={tab}
         onTab={chooseTab}
@@ -994,10 +1006,10 @@ function readCalendarView(): { view: CalView; days: number } {
 
 /**
  * The Calendar page: tasks, events and notes on one timeline — `?calendar=`, whose value is
- * the view (`month`, `week`, `days`; `1` is this browser's last), with the day and the count beside
- * it (`date=`, `days=`) so a reload and a link land where they were, and `project=` the Tasks page's
- * filter, by the project note's id. **Not `view=`**, which is the read-only page's key: one name
- * meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
+ * the view (`month`, `week`, `rows`, `days`; `1` is this browser's last), with the day and the count
+ * beside it (`date=`, `days=`) so a reload and a link land where they were, and `project=` the Tasks
+ * page's filter, by the project note's id. **Not `view=`**, which is the read-only page's key: one
+ * name meaning two things is the hazard `docs/architecture/things-that-will-bite.md` records.
  *
  * A page without a canvas, for the Tasks page's reason. **What it shows and where a week starts are
  * the account's** (`CALENDAR_HIDE`, `WEEK_START`), read through `usePref` so the
@@ -1056,6 +1068,9 @@ function CalendarApp({
       setQuery("project", next.kind === "all" ? null : next.kind === "none" ? NO_PROJECT : (list.ids[next.name] ?? null)),
     [setQuery, list.ids],
   );
+  /* `tag=` is the tag's name: a tag has no id, and a rename rewrites every document anyway. */
+  const tagFilter = useMemo(() => tagFilterOf(query.get("tag")), [query]);
+  const chooseTag = useCallback((next: TagFilter) => setQuery("tag", tagParam(next)), [setQuery]);
 
   return (
     <div className="dag-app dag-app--calendar" data-snapshot={snapshot ? "1" : undefined}>
@@ -1070,6 +1085,8 @@ function CalendarApp({
         onHidden={onHidden}
         scope={scope}
         onScope={chooseScope}
+        tagFilter={tagFilter}
+        onTagFilter={chooseTag}
         onGo={onGo}
         onOpen={(name) => open("note", name)}
         onDuplicate={(name) => sidebar?.duplicate("note", name)}
@@ -1777,6 +1794,7 @@ function NoteApp({
     task?: Task;
     project?: Project;
     event?: NoteEvent;
+    tags: string[];
     body: string;
     ready(): void;
   } | null>(null);
@@ -1797,6 +1815,7 @@ function NoteApp({
           task: taskOf(text),
           project: projectOf(text),
           event: eventOf(text),
+          tags: tagsOf(text),
           body,
           ready: () => {
             printAs(heading ?? leaf(name));
@@ -1830,6 +1849,7 @@ function NoteApp({
             task: taskOf(text),
             project: projectOf(text),
             event: eventOf(text),
+            tags: tagsOf(text),
             body,
             ready: () => reply(heading ?? leaf(name)),
           });
@@ -2001,6 +2021,7 @@ function NoteApp({
           task={printing.task}
           project={printing.project}
           event={printing.event}
+          tags={printing.tags}
           body={printing.body}
           theme={paperTheme(theme)}
           onReady={printing.ready}
@@ -2012,6 +2033,9 @@ function NoteApp({
           notes={notes}
           folders={folders}
           titles={list.titles}
+          tags={list.tags}
+          tasks={list.tasks}
+          events={list.events}
           board={null}
           note={name}
           quizzes={list.quizzes}
@@ -3083,6 +3107,9 @@ function BoardApp({
             notes={notes}
             folders={folders}
             titles={list.titles}
+            tags={list.tags}
+            tasks={list.tasks}
+            events={list.events}
             board={boardName}
             quizzes={list.quizzes}
             files={list.files}

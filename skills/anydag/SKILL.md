@@ -55,10 +55,11 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `quiz_questions` · `quiz_answer` · `quiz_mistakes` · `quiz_threshold` | running one in the conversation: the questions as data, then **only the answers the person gave**; what is still in Mistakes; how many right in a row take one out |
 | `table_list` · `table_read` · `table_create` · `table_write` · `table_rename` · `table_duplicate` · `table_delete` · `table_title` · `table_check` | tables, the same way, and `table_check` for the `ET_`/`WT_` codes (with `text`, a draft's) |
 | `table_get` · `table_edit` | a table as data — every tab, column and row with its id, and each cell as written and as read — and edits to its cells, rows, columns and tabs by those ids, which never lose a person's edit to another row |
-| `task_list` · `task_create` · `task_set` | tasks — notes with a `status:` and maybe a `priority:`, a `due:` and a `start:` |
-| `event_list` · `event_create` · `event_set` | events — notes with a `start:` and maybe an `end:`; a time **as the person said it, with no offset** — the server puts their zone's on, and `whoami` says which zone that is |
+| `task_list` · `task_create` · `task_set` | tasks — notes with a `status:` and maybe a `priority:`, a `due:` and a `start:`; the list narrows to a `project`, a `status` or a `tag` |
+| `event_list` · `event_create` · `event_set` | events — notes with a `start:` and maybe an `end:`; a time **as the person said it, with no offset** — the server puts their zone's on, and `whoami` says which zone that is; the list narrows to days, a `project` or a `tag` |
 | `project_list` · `project_create` · `project_set` | projects — a folder whose note has a `project:` |
-| `search` · `refs` · `resolve` | the page's search over every board, note, quiz and table; references and backlinks; what a `dag:<id>` names |
+| `tag_list` · `tag_apply` · `tag_rename` · `tag_delete` · `tag_color` | tags — a frontmatter `tags:` on any document — with each one's colour and how many documents carry it (with `tag`, which ones); adding and taking them off one document (a tag the vault has never seen is created); renaming or merging one everywhere (**ask first before a merge**); deleting one everywhere, **only when asked**, with `confirm`; and a tag's colour, one of the ten hues. `note_create`, `task_create` and `event_create` take `tags` too |
+| `search` · `refs` · `resolve` | the page's search over every board, note, quiz and table — with a `tag`, only what carries it; references and backlinks; what a `dag:<id>` names |
 | `image_add` · `image_get` · `image_unused` · `image_sweep` | a picture beside a board (placed) or a note (kept) — **by `url` when it is on the web**, which the server fetches, rather than its bytes through the conversation; looking at one; the ones nothing names any more |
 | `file_upload` · `file_list` · `file_get` · `file_rename` · `file_duplicate` · `file_title` · `file_delete` | attachments: any file — a PDF, a picture, a sheet — kept beside the boards and notes and referred to by `dag:<id>` (see *Attachments*), given as base64 `data` or as an `https://` `url` the server fetches (a private address is refused) — and its `sha256` comes back, to prove the bytes arrived; `file_list` says what this vault accepts, `file_get` shows a picture or a text file, and `file_delete` moves it to the trash and says what used it |
 | `trash_list` · `trash_restore` · `trash_delete` · `trash_empty` | what was deleted: **every `*_delete` and `board_rmdir` moves a thing to the trash**, where it stays for `days` (thirty) and `trash_restore` puts it back with its id; `trash_delete` and `trash_empty` delete for good, each with a `confirm` — **ask the person first** |
@@ -500,6 +501,21 @@ one: a reference to a project's note links to it and does not enrol anything.
     hue: coral
     ---
     Why we are doing this, and where things are.
+
+**Any document can carry tags** — a note, a task, an event, a board, a quiz or a table — as a
+frontmatter `tags:` list, beside projects and independent of them:
+
+    ---
+    title: Q4 planning
+    tags: [meeting, pricing]
+    ---
+
+A tag is letters, digits, `_`, `-` and `/`, with at least one that is not a digit; case is ignored
+and a leading `#` is dropped. Only the frontmatter counts: a `#word` in the text is not a tag, and
+the singular `tag:` is not read. Each tag has one of the ten hues, kept with the vault's tag list in
+`.anydag/tags.json` — change tags through the tag tools (they register a new one with its colour,
+and a rename or a delete rewrites every document) rather than by editing that file. The Tasks
+page, the calendar and search each filter by one tag.
 
 One project note per folder; with two, the first by name is the folder's. A project note at the top
 level makes nothing a project. Nested projects are allowed, and a document's project is the

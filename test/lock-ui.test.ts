@@ -28,6 +28,7 @@ const LIST: BoardTree = {
   tasks: {},
   projects: {},
   events: {},
+  tags: {},
   created: {},
   ids: {},
   quizzes: [],

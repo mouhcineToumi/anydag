@@ -64,6 +64,11 @@ export interface BoardChange {
    */
   questions?: number | null;
   /**
+   * The text's tags after the change, `[]` for none — the listing's copy, carried for `title`'s
+   * reason so a row's chips redraw in place. Every text kind carries it; a template's is `[]`.
+   */
+  tags?: string[];
+  /**
    * Not one file's change: the channel was closed while the tab was hidden and has just been opened
    * again, so any file may have changed. `name` is `""` and `sha1` is `""` — never `null`,
    * which would read as a deletion — and a listener holding a file checks it with {@link concerns}.
@@ -95,6 +100,8 @@ const tableListeners = new Set<BoardListener>();
 const treeListeners = new Set<TreeListener>();
 /* The trash changed — kept where no watcher looks, so the store says so on the feed. */
 const trashListeners = new Set<TreeListener>();
+/* The vault's tag list changed — a tag created, recoloured or deleted, here or by sync. */
+const tagListeners = new Set<TreeListener>();
 /* A linked vault's sync status changed: `dag:vault-sync`, with a `SyncStatus`. Not
    `dag:sync`, which is the old preference sync's key. */
 const vaultSyncListeners = new Set<(status: SyncStatusPayload) => void>();
@@ -164,6 +171,9 @@ function open(): void {
   source.addEventListener("dag:trash", () => {
     for (const listen of [...trashListeners]) listen();
   });
+  source.addEventListener("dag:tags", () => {
+    for (const listen of [...tagListeners]) listen();
+  });
   source.addEventListener("dag:vault-sync", (e) => {
     let status: SyncStatusPayload;
     try {
@@ -197,6 +207,7 @@ function idle(): boolean {
     tableListeners.size === 0 &&
     treeListeners.size === 0 &&
     trashListeners.size === 0 &&
+    tagListeners.size === 0 &&
     vaultSyncListeners.size === 0
   );
 }
@@ -251,6 +262,7 @@ function wake(): void {
     for (const listen of [...set]) listen(change);
   for (const listen of [...treeListeners]) listen();
   for (const listen of [...trashListeners]) listen();
+  for (const listen of [...tagListeners]) listen();
 }
 
 /** Listen for board changes. Returns the unsubscribe. */
@@ -335,6 +347,23 @@ export function onTrash(listen: TreeListener): () => void {
   return () => {
     trashListeners.delete(listen);
     removeEventListener("dag:trash", viaWindow);
+    closeIfIdle();
+  };
+}
+
+/**
+ * Listen for the vault's tag list changing: `.anydag/tags.json` written by a tag route, by hand or
+ * by sync. Also fired on the window as a `dag:tags` `CustomEvent` by this tab's own tag calls,
+ * `onTrash`' rule. A document's own tags arrive with its change, in `BoardChange.tags`.
+ */
+export function onTags(listen: TreeListener): () => void {
+  tagListeners.add(listen);
+  open();
+  const viaWindow = () => listen();
+  addEventListener("dag:tags", viaWindow);
+  return () => {
+    tagListeners.delete(listen);
+    removeEventListener("dag:tags", viaWindow);
     closeIfIdle();
   };
 }

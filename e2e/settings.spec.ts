@@ -327,6 +327,7 @@ test("every tab says which scope it belongs to, under a heading that says what i
     ["providers", "This computer"],
     ["vault-general", "This vault"],
     ["vault-files", "This vault"],
+    ["tags", "This vault"],
     ["export", "This vault"],
     ["sync", "This vault"],
     ["agent-access", "This vault"],

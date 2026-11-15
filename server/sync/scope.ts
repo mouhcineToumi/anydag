@@ -3,8 +3,9 @@
  * all ask, so "does this path sync" has exactly one answer.
  *
  * The vault as the app lists it — every document, every attachment of a type the vault lists, a
- * legacy `<name>.assets/` picture — and four things under `.anydag/`: the attachments' ids
- * (`files/*.json`), the vault's settings, saved components and the trash. Never `vault.json`, which
+ * legacy `<name>.assets/` picture — and these under `.anydag/`: the attachments' ids
+ * (`files/*.json`), the vault's settings, its tag list (`tags.json`), saved components, the trash and
+ * the Assistant's chats. Never `vault.json`, which
  * a device adopts once when it links; never what the walk ignores; never a writer's temp file.
  */
 
@@ -19,7 +20,7 @@ const UNDO = /^u[0-9a-z]{17}\.json$/;
 
 const ALLOWED_IN_ANYDAG = (rest: string[]): boolean => {
   const [head, ...tail] = rest;
-  if (head === "settings.json") return tail.length === 0;
+  if (head === "settings.json" || head === "tags.json") return tail.length === 0;
   if (head === "files") return tail.length === 1 && tail[0]!.endsWith(".json");
   // An Assistant chat: its `chat.json`, its turns and its undos — every one but
   // `chat.json` written once — and nothing else that might be left in its folder.

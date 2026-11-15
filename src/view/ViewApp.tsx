@@ -8,6 +8,7 @@ import { pageTitle, splitNote } from "@/note/format";
 import { projectOf } from "@/note/project";
 import { eventOf } from "@/note/event";
 import { taskOf } from "@/note/task";
+import { tagsOf } from "@/note/tags";
 import { NoteTitleRead } from "@/ui/NoteTitle";
 import { drawnSettled } from "@/render/settled";
 import { parseQuiz, askable } from "@/quiz/parse";
@@ -15,6 +16,7 @@ import { Runner, Sheet } from "@/ui/quiz/Runner";
 import { ProjectLine } from "@/ui/ProjectBar";
 import { EventLine } from "@/ui/EventBar";
 import { TaskLine } from "@/ui/TaskGlyph";
+import { TagLine } from "@/ui/tags/TagChip";
 import { useTheme } from "@/theme/useTheme";
 import { Lockup } from "@/ui/Logo";
 import { PageBar } from "@/ui/PageBar";
@@ -265,6 +267,8 @@ function NoteFrame({ name, text, bar }: { name: string; text: string | null; bar
   const project = text === null ? undefined : projectOf(text);
   /* And when an event is, in the reader's own zone. */
   const event = text === null ? undefined : eventOf(text);
+  /* And its tags, as chips. */
+  const tags = text === null ? [] : tagsOf(text);
   return (
     <div className="dag-app dag-app--note dag-app--view" data-dag-view="note">
       {bar}
@@ -274,6 +278,7 @@ function NoteFrame({ name, text, bar }: { name: string; text: string | null; bar
         {note && project ? <ProjectLine project={project} /> : null}
         {note && task ? <TaskLine task={task} /> : null}
         {note && event ? <EventLine event={event} /> : null}
+        {note ? <TagLine tags={tags} /> : null}
         {note ? <NoteMarkdown name={name} body={note.body} components={refComponents()} /> : null}
       </main>
     </div>
