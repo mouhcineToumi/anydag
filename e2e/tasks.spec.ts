@@ -169,6 +169,32 @@ test("on the board, a card dragged into another column takes that status, and th
   await page.locator('[data-dag-tasks-layout="list"]').click();
 });
 
+test("a board card carries its priority, check items and due date, and the Order button orders each column", async ({ page }) => {
+  /* The order is a preference that follows the person: kept in this page (see the list's test). */
+  await page.route("**/api/settings", (route) =>
+    route.request().method() === "PUT" ? route.fulfill({ status: 200, body: "{}" }) : route.continue(),
+  );
+  const a = write("a", "Alpha", ["status: todo", "priority: low", `due: ${day(2)}`], "- [x] one\n- [ ] two\n");
+  const b = write("b", "Bravo", ["status: todo", "priority: urgent"]);
+  await tasksPage(page, a);
+  await page.locator('[data-dag-tasks-layout="board"]').click();
+  const card = page.locator(`[data-dag-task-card="${a}"]`);
+  await expect(card.locator("[data-dag-task-priority]")).toHaveAttribute("data-dag-task-priority", "low");
+  await expect(card.locator("[data-dag-task-items]")).toHaveAttribute("data-dag-task-items", "1/2");
+  await expect(card.locator(".dag-tasks__card-due")).not.toBeEmpty();
+  const column = () =>
+    page
+      .locator('[data-dag-tasks-column="todo"] [data-dag-task-card]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-dag-task-card")));
+  /* By due date, soonest first and the undated last, until the Order button says priority. */
+  await expect.poll(column).toEqual([a, b]);
+  await page.locator("[data-dag-tasks-order-button]").click();
+  await page.locator('[data-dag-tasks-order="priority"]').click();
+  await page.keyboard.press("Escape");
+  await expect.poll(column).toEqual([b, a]);
+  await page.locator('[data-dag-tasks-layout="list"]').click();
+});
+
 test("a group's + presets the New task row to that status, and the pills write their lines into the new file", async ({
   page,
 }, info) => {

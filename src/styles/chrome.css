@@ -6206,7 +6206,9 @@ body:has(.dag-tasks__bulk) .dag-toasts { bottom: 84px; }
 .dag-tasks__card[data-dag-task-dragging] { position: relative; z-index: 2; pointer-events: none; box-shadow: var(--dag-ui-elevation-overlay); }
 .dag-tasks__card-top { display: flex; align-items: flex-start; gap: 6px; }
 .dag-tasks__card-title { flex: 1; min-width: 0; padding-top: 2px; font-size: var(--chrome-text-md); line-height: 1.35; overflow-wrap: anywhere; }
-.dag-tasks__card-meta { display: flex; align-items: center; gap: 8px; padding-left: 28px; }
+.dag-tasks__card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-left: 28px; }
+/* The date at the card's right edge, where the eye goes down a column to find what is due. */
+.dag-tasks__card-due { margin-left: auto; }
 .dag-tasks__column .dag-tasks__add-row { padding: 4px 6px; }
 .dag-tasks__column .dag-tasks__add-problem { padding: 0 6px 4px 28px; }
 @media (max-width: 719px) {
