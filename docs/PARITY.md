@@ -255,7 +255,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | · | ✗ [27] |
 | Start a chat | `POST /__board/chat` | · | ✗ [27] |
 | A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | · | ✗ [27] |
-| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [27] |
+| Send a turn, with the documents it names with `@`, and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [27] |
 | Stop the turn that is answering | `POST /__board/chat/stop` | · | ✗ [27] |
 | Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | · | ✗ [27] |
 | Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | · | ✗ [27] |

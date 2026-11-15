@@ -249,6 +249,88 @@ test("a folder opens and shuts, and the tree walks on the keyboard", async ({ pa
   await expect(folderRow(page, `${folder}/inner`)).toHaveAttribute("aria-expanded", "true");
 });
 
+test("a kind hidden from the tree says so, keeps the folder and the open file, and is remembered", async ({ page }) => {
+  /* Not `@smoke`: the tier is the few checks that must never be red, and this is a feature's own
+     check. Everything the issue asks of the filter is here — the menu, several kinds at once, the
+     folder that stays, the open file that stays, the heading and the accent, and a reload. */
+  await fresh(page);
+  const heading = page.locator("#dag-sidebar-files");
+  const filter = page.locator("[data-dag-sidebar-filter]");
+  await expect(heading).toHaveText("Files");
+  await expect(fileRow(page, note())).toBeVisible();
+
+  await filter.click();
+  const menu = page.locator("[data-dag-sidebar-filter-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText("Show in Files");
+  /* One row per kind the tree tells apart, events included. */
+  await expect(menu.locator("[data-dag-sidebar-filter-kind]")).toHaveCount(8);
+  const notes = menu.locator('[data-dag-sidebar-filter-kind="note"]');
+  await expect(notes).toHaveAttribute("aria-checked", "true");
+  await expect(notes).toContainText("Notes");
+  /* The count is the vault's, and the suite shares one, so it is a number rather than a figure. */
+  await expect(notes).toHaveAttribute("aria-label", /^Notes, \d+ notes?$/);
+
+  await notes.click();
+  await expect(notes).toHaveAttribute("aria-checked", "false");
+  await expect(menu).toBeVisible();
+  await expect(fileRow(page, note())).toHaveCount(0);
+  /* The folder stays, so the tree keeps its shape; the heading and the button say what is hidden. */
+  await expect(folderRow(page, folder)).toBeVisible();
+  await expect(heading).toHaveText("Files · notes hidden");
+  await expect(filter).toHaveAttribute("data-dag-sidebar-filtered", "");
+  const colour = await filter.evaluate((el) => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--dag-color-accent)";
+    document.body.append(probe);
+    const accent = getComputedStyle(probe).color;
+    probe.remove();
+    return { accent, got: getComputedStyle(el).color };
+  });
+  expect(colour.got).toBe(colour.accent);
+
+  /* A second kind, and the open board stays while the other one goes. */
+  await menu.locator('[data-dag-sidebar-filter-kind="board"]').click();
+  await expect(menu).toBeVisible();
+  await expect(fileRow(page, board())).toBeVisible();
+  await expect(fileRow(page, other())).toHaveCount(0);
+  await expect(heading).toHaveText("Files · notes and boards hidden");
+
+  /* The keyboard walks the filtered rows — the hidden ones are not steps — and F2 still asks for a
+     name on one of them. Escape closes the menu first and puts the focus back on the button. */
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(filter).toBeFocused();
+  await folderRow(page, folder).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(folderRow(page, `${folder}/inner`)).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(fileRow(page, board())).toBeFocused();
+  await page.keyboard.press("F2");
+  await expect(page.locator("[data-dag-sidebar-name]")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-sidebar-name]")).toHaveCount(0);
+
+  /* The choice is this browser's and this vault's, and survives a reload. */
+  const kept = await vaultKey(page, "dag:sidebar-hidden");
+  expect(JSON.parse((await page.evaluate((k) => localStorage.getItem(k), kept)) ?? "[]")).toEqual(["note", "board"]);
+  await page.reload();
+  await ready(page);
+  await expect(heading).toHaveText("Files · notes and boards hidden");
+  await expect(fileRow(page, note())).toHaveCount(0);
+  await expect(fileRow(page, board())).toBeVisible();
+
+  /* Show everything ticks them all, and the key goes with nothing left to say. */
+  await filter.click();
+  await expect(menu).toBeVisible();
+  await menu.locator("[data-dag-sidebar-filter-all]").click();
+  await expect(fileRow(page, note())).toBeVisible();
+  await expect(fileRow(page, other())).toBeVisible();
+  await expect(heading).toHaveText("Files");
+  await expect(filter).not.toHaveAttribute("data-dag-sidebar-filtered");
+  expect(await page.evaluate((k) => localStorage.getItem(k), kept)).toBeNull();
+});
+
 test("opening a board or a note keeps the sidebar exactly where it was", async ({ page }) => {
   await fresh(page);
   /* A mark on the element itself. If opening a file rebuilt the column, this would be gone. */

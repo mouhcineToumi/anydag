@@ -46,6 +46,13 @@ export function isSubject(x: unknown): x is Subject {
   );
 }
 
+/**
+ * A document a message names with `@` (#324), resolved in the chat's vault when the turn starts.
+ * Unlike a subject it is not kept in `chat.json`: it is one message's, and the prompt is rebuilt
+ * for every turn.
+ */
+export type Mention = Subject;
+
 /** What another vault was granted. `null` is a grant taken back. */
 type Grant = { mode: Mode; at: string } | null;
 
