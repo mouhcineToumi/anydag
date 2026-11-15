@@ -18,6 +18,7 @@ import {
   CalendarDays,
   CalendarPlus,
   CalendarX2,
+  Check,
   ChevronRight,
   CircleArrowUp,
   CircleCheck,
@@ -41,6 +42,7 @@ import {
   Home,
   LayoutTemplate,
   Link as LinkMark,
+  ListFilter,
   ListTodo,
   MessageCircleWarning,
   MoreHorizontal,
@@ -55,6 +57,7 @@ import {
   Star,
   StarOff,
   Table2,
+  Tags,
   Trash2,
   TriangleAlert,
   Upload,
@@ -90,6 +93,7 @@ import {
   ancestors,
   between,
   counted,
+  emptyFolders,
   keyOf,
   labelOf,
   leaf,
@@ -104,6 +108,18 @@ import {
   type Row,
 } from "./tree";
 import { Button, IconButton } from "./controls";
+import {
+  filterByKind,
+  hiddenWords,
+  kindCounts,
+  parseHidden,
+  SHOWN_KINDS,
+  SHOWN_LABEL,
+  SHOWN_WORDS,
+  shownKind,
+  type Kinds,
+  type ShownKind,
+} from "./filter";
 import { VaultSwitcher } from "./Vaults";
 import { drawn, offsetsOf, scrollFor, windowFor, type Window } from "./virtual";
 import { statusTone, statusWords } from "@/sync/status";
@@ -111,7 +127,7 @@ import { useSyncStatus } from "@/sync/useSyncStatus";
 import { installUpdate, updateWaiting, useUpdates } from "./updates";
 import { LOCK_HINT, lockedAffordance, refuseLocked, useLocked } from "@/settings/lock";
 import { useFeatures } from "@/features";
-import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref } from "@/settings/prefs";
+import { ATTACHMENTS, CHANGED as PREFS_CHANGED, readPref, SIDEBAR_HIDDEN, writeLocal } from "@/settings/prefs";
 
 /** Lucide at one size and weight, stated once — the dock's rule. */
 const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -154,18 +170,38 @@ const KIND_ICON = { board: Workflow, note: FileText, quiz: GraduationCap, table:
 >;
 
 /**
+ * The mark beside each row of *Show in Files*. The same glyph the tree draws for that kind — the
+ * briefcase, the calendar clock, the graduation cap — except a task, whose row wears its status and
+ * whose menu row wears the box it is made with. A `Record` over `ShownKind`, so a kind added to the
+ * menu without a mark is a type error.
+ */
+const FILTER_ICON = {
+  note: FileText,
+  task: SquareCheckBig,
+  project: Briefcase,
+  event: CalendarClock,
+  board: Workflow,
+  quiz: GraduationCap,
+  table: Table2,
+  attachment: FileGlyph,
+} satisfies Record<ShownKind, LucideIcon>;
+
+/**
  * A file's mark: a board's, a note's, a quiz's — or, for a note that is a task, its status
- *, which is the one thing about a task worth seeing without opening it. A project's note
+ * *, which is the one thing about a task worth seeing without opening it. A project's note
  * wears a briefcase in the project's colour, before a status it may also carry, and an
  * event a calendar with a clock on it.
+ *
+ * `group` comes from `shownKind`, which is the same rule the filter uses, so the row that hides a
+ * file is always the row whose mark it wears.
  */
-function FileIcon({ entry, task, project, event }: { entry: Entry; task?: Task; project?: Project; event?: NoteEvent }) {
+function FileIcon({ entry, group, task, project }: { entry: Entry; group: ShownKind; task?: Task; project?: Project }) {
   /* An attachment wears its type's — a PDF, a spreadsheet, a video. */
   if (entry.kind === "file") return <AttachmentIcon name={entry.name} {...SMALL} />;
-  if (entry.kind === "note" && project)
+  if (group === "project" && project)
     return <Briefcase {...SMALL} className="dag-sidebar__project" style={hueVars(project.hue)} aria-hidden="true" />;
-  if (entry.kind === "note" && task) return <TaskGlyph status={task.status} />;
-  if (entry.kind === "note" && event) return <CalendarClock {...SMALL} className="dag-sidebar__event" aria-hidden="true" />;
+  if (group === "task" && task) return <TaskGlyph status={task.status} />;
+  if (group === "event") return <CalendarClock {...SMALL} className="dag-sidebar__event" aria-hidden="true" />;
   const Icon = KIND_ICON[entry.kind];
   return <Icon {...SMALL} aria-hidden="true" />;
 }
@@ -418,6 +454,7 @@ export function Sidebar({
   onPointerEnter,
   onPointerLeave,
   onDismiss,
+  onTags,
   sheet = false,
 }: {
   mode: "docked" | "overlay";
@@ -500,6 +537,8 @@ export function Sidebar({
   onPointerLeave?(): void;
   /** Close an overlay: after a row asks the page for a card, and on Escape. */
   onDismiss(): void;
+  /** *Tags…* on a text's row: the card that changes its tags, under the row (#327). */
+  onTags?(kind: TextKind, name: string, anchor: HTMLElement | null): void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>(null);
@@ -561,10 +600,39 @@ export function Sidebar({
   const features = useFeatures();
   const cloud = features?.cloud === true;
   const store = useAttachmentsFolder();
+  /*
+   * What the Files tree hides (#360): a list of kinds, **this browser's and this vault's**, kept
+   * under `dag:sidebar-hidden` the way `dag:sidebar-open` keeps the folders. Read once, because
+   * switching vault is a page load, and written with `writeLocal`, which wakes no sync: it is view
+   * state, not a preference that travels.
+   */
+  const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<ShownKind>>(() => parseHidden(readPref(SIDEBAR_HIDDEN)));
+  const saveHidden = useCallback((next: ReadonlySet<ShownKind>) => {
+    const kept = new Set(SHOWN_KINDS.filter((kind) => next.has(kind)));
+    setHiddenKinds(kept);
+    writeLocal(SIDEBAR_HIDDEN, kept.size ? JSON.stringify([...kept]) : null);
+  }, []);
+  const currentKey = board
+    ? keyOf({ kind: "board", name: board })
+    : note
+      ? keyOf({ kind: "note", name: note })
+      : quiz
+        ? keyOf({ kind: "quiz", name: quiz })
+        : table
+          ? keyOf({ kind: "table", name: table })
+          : file
+            ? keyOf({ kind: "file", name: file })
+            : null;
   const all = useMemo(() => tree(entries, folders, store), [entries, folders, store]);
+  const kinds = useMemo<Kinds>(() => ({ tasks, projects, events }), [tasks, projects, events]);
+  const counts = useMemo(() => kindCounts(entries, kinds), [entries, kinds]);
+  /* Which folders are empty in the vault — the question *Empty* asks, which a filtered tree can no
+     longer answer on its own: a folder whose every file is hidden is not an empty folder. */
+  const vacant = useMemo(() => emptyFolders(all), [all]);
+  const visible = useMemo(() => filterByKind(all, hiddenKinds, kinds, currentKey), [all, hiddenKinds, kinds, currentKey]);
   /* How many listed tasks are not done — the count beside Tasks. */
   const openTasks = useMemo(() => notes.filter((n) => tasks[n] && tasks[n]!.status !== "done").length, [notes, tasks]);
-  const lines = useMemo(() => rowsOf(all, openFolders), [all, openFolders]);
+  const lines = useMemo(() => rowsOf(visible, openFolders, 0, [], vacant), [visible, openFolders, vacant]);
   /* The rows' keys in the order they are drawn, and where each is: what the keyboard, a selection and
      the reveal ask of a row that may not be in the DOM, answered from the list and never from the page. */
   const order = useMemo(() => lines.map(rowKey), [lines]);
@@ -603,17 +671,6 @@ export function Sidebar({
     if (!sel.size && picking) setPicking(false);
   }, [sel, bulk, picking]);
 
-  const currentKey = board
-    ? keyOf({ kind: "board", name: board })
-    : note
-      ? keyOf({ kind: "note", name: note })
-      : quiz
-        ? keyOf({ kind: "quiz", name: quiz })
-        : table
-          ? keyOf({ kind: "table", name: table })
-          : file
-            ? keyOf({ kind: "file", name: file })
-            : null;
   /* The open file, whichever kind — where the New menu offers to make the next one. */
   const currentName = board ?? note ?? quiz ?? table ?? file;
   /* The favourites that still name something. One renamed elsewhere — by an agent, on disk, on
@@ -1289,6 +1346,7 @@ export function Sidebar({
   };
 
   const searchChord = chordFor("boards");
+  const hiddenSaid = hiddenWords(hiddenKinds);
   const menuLine = mode?.kind === "menu" ? lines.find((r) => rowKey(r) === mode.key) : undefined;
 
   return (
@@ -1480,7 +1538,7 @@ export function Sidebar({
                     onClick={() => onOpen(e.kind, e.name)}
                     {...pressed(ahead(e.kind, e.name, current))}
                   >
-                    <FileIcon entry={e} task={tasks[e.name]} project={projects[e.name]} event={events[e.name]} />
+                    <FileIcon entry={e} group={shownKind(e, kinds)} task={tasks[e.name]} project={projects[e.name]} />
                     <span className="dag-sidebar__name" title={labelOf(e)}>
                       {labelOf(e)}
                     </span>
@@ -1506,7 +1564,29 @@ export function Sidebar({
       ) : null}
 
       <div className="dag-sidebar__section">
-        <h2 id="dag-sidebar-files">Files</h2>
+        {/* What is hidden is said in the heading, so a filtered tree is never read as a vault that
+            holds nothing. The filter itself is the button beside the `+`, and it wears the accent
+            while anything is held back. */}
+        <h2 id="dag-sidebar-files">
+          Files
+          {hiddenSaid ? (
+            <span className="dag-sidebar__filtered" title={hiddenSaid}>
+              {" · "}
+              {hiddenSaid}
+            </span>
+          ) : null}
+        </h2>
+        <FilterButton
+          hidden={hiddenKinds}
+          counts={counts}
+          onHide={(kind, hide) => {
+            const next = new Set(hiddenKinds);
+            if (hide) next.add(kind);
+            else next.delete(kind);
+            saveHidden(next);
+          }}
+          onShowAll={() => saveHidden(new Set())}
+        />
         {/* One way to make anything, beside what it makes (the UI review): it was a row
             among the pages above, with a chevron, as though New were somewhere to go. It opens under
             the +, and says where the file will go — the open file's folder, which is where somebody
@@ -1900,7 +1980,12 @@ export function Sidebar({
                 >
                   <span className="dag-sidebar__indent" aria-hidden="true" />
                   <span className="dag-sidebar__chev" aria-hidden="true" />
-                  <FileIcon entry={line.entry} task={tasks[where]} project={projects[where]} event={events[where]} />
+                  <FileIcon
+                    entry={line.entry}
+                    group={shownKind(line.entry, kinds)}
+                    task={tasks[where]}
+                    project={projects[where]}
+                  />
                   <span className="dag-sidebar__name" title={name}>
                     {name}
                   </span>
@@ -2049,6 +2134,10 @@ export function Sidebar({
               return pickFiles(where);
             }
             if (what === "rename" || what === "move" || what === "transfer") return setMode({ kind: what, key });
+            if (what === "tags" && menuLine.type === "file" && menuLine.entry.kind !== "file") {
+              setMode(null);
+              return onTags?.(menuLine.entry.kind, where, rowFor(key));
+            }
             settle(key);
             if (what === "copy-link" && menuLine.type === "file") void copyAppLink(menuLine.entry);
             else if (menuLine.type === "file" && (what === "favourite" || what === "unfavourite"))
@@ -2127,6 +2216,173 @@ export function Sidebar({
 
       {place === "docked" ? <Grip onWidth={onWidth} /> : null}
     </nav>
+  );
+}
+
+/**
+ * The button beside *Files* and the menu it opens: one row per kind the tree tells apart, each with
+ * its mark and a count, and *Show everything* last. Any number may be hidden at once.
+ *
+ * **The menu stays open while kinds are switched** — the calendar's *Show* card's shape rather than a
+ * menu that closes on a press — because hiding three kinds should not mean opening it three times.
+ * It is placed at the button and nudged back inside the window (`NewMenu`'s reason), so the
+ * column's width never clips it. Escape closes it and puts the focus back on the button; a press
+ * anywhere else closes it without stealing the focus.
+ */
+function FilterButton({
+  hidden,
+  counts,
+  onHide,
+  onShowAll,
+}: {
+  hidden: ReadonlySet<ShownKind>;
+  counts: Readonly<Record<ShownKind, number>>;
+  onHide(kind: ShownKind, hide: boolean): void;
+  onShowAll(): void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState({ x: 0, y: 0 });
+  const box = useRef<HTMLDivElement>(null);
+  const close = useCallback((focus = false) => {
+    setOpen(false);
+    if (focus) requestAnimationFrame(() => box.current?.querySelector<HTMLElement>("[data-dag-sidebar-filter]")?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    /* Caught, and stopped, before the sidebar's own Escape — the innermost thing closes first. */
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+    };
+    addEventListener("pointerdown", away);
+    addEventListener("keydown", esc, true);
+    return () => {
+      removeEventListener("pointerdown", away);
+      removeEventListener("keydown", esc, true);
+    };
+  }, [open, close]);
+
+  const filtered = hidden.size > 0;
+  return (
+    <div className="dag-sidebar__filter" ref={box}>
+      <IconButton
+        size="sm"
+        className={
+          filtered
+            ? "dag-sidebar__tool dag-sidebar__filterbtn dag-sidebar__filterbtn--on"
+            : "dag-sidebar__tool dag-sidebar__filterbtn"
+        }
+        data-dag-sidebar-filter=""
+        data-dag-sidebar-filtered={filtered ? "" : undefined}
+        aria-label="Show in Files"
+        tip="Show in Files: choose which kinds the file tree shows"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? "dag-sidebar-filter-menu" : undefined}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setAt({ x: r.left, y: r.bottom + 4 });
+          setOpen((v) => !v);
+        }}
+      >
+        <ListFilter {...SMALL} aria-hidden="true" />
+      </IconButton>
+      {open ? (
+        <FilterMenu at={at} hidden={hidden} counts={counts} onHide={onHide} onShowAll={onShowAll} onClose={() => close(true)} />
+      ) : null}
+    </div>
+  );
+}
+
+/** The menu *Show in Files* itself, where it hangs and what each row does. */
+function FilterMenu({
+  at,
+  hidden,
+  counts,
+  onHide,
+  onShowAll,
+  onClose,
+}: {
+  at: { x: number; y: number };
+  hidden: ReadonlySet<ShownKind>;
+  counts: Readonly<Record<ShownKind, number>>;
+  onHide(kind: ShownKind, hide: boolean): void;
+  onShowAll(): void;
+  onClose(): void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState(at);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({
+      x: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)),
+      y: Math.max(8, Math.min(at.y, innerHeight - r.height - 8)),
+    });
+    el.querySelector<HTMLElement>("[role=checkbox]")?.focus();
+  }, [at]);
+
+  return (
+    <div
+      ref={ref}
+      id="dag-sidebar-filter-menu"
+      className="dag-sidebar__filter-menu"
+      role="dialog"
+      aria-labelledby="dag-sidebar-filter-title"
+      data-dag-sidebar-filter-menu=""
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <p className="dag-sidebar__filter-head" id="dag-sidebar-filter-title">
+        Show in Files
+      </p>
+      {SHOWN_KINDS.map((kind) => {
+        const Icon = FILTER_ICON[kind];
+        const on = !hidden.has(kind);
+        return (
+          <button
+            key={kind}
+            type="button"
+            role="checkbox"
+            aria-checked={on}
+            className="dag-sidebar__filter-row"
+            data-dag-sidebar-filter-kind={kind}
+            aria-label={`${SHOWN_LABEL[kind]}, ${counted(counts[kind], SHOWN_WORDS[kind])}`}
+            onClick={() => onHide(kind, on)}
+          >
+            <span className="dag-sidebar__filter-tick" aria-hidden="true">
+              {on ? <Check size={12} strokeWidth={2.5} aria-hidden="true" /> : null}
+            </span>
+            <Icon {...SMALL} aria-hidden="true" />
+            <span className="dag-sidebar__filter-word" aria-hidden="true">
+              {SHOWN_LABEL[kind]}
+            </span>
+            <span className="dag-sidebar__filter-count" aria-hidden="true">
+              {counts[kind]}
+            </span>
+          </button>
+        );
+      })}
+      <hr className="dag-vault__rule" />
+      <button
+        type="button"
+        className="dag-sidebar__filter-all"
+        data-dag-sidebar-filter-all=""
+        onClick={() => {
+          onShowAll();
+          onClose();
+        }}
+      >
+        Show everything
+      </button>
+    </div>
   );
 }
 
@@ -2362,7 +2618,8 @@ type Pick =
   | "copy-link"
   | "transfer"
   | "download"
-  | "upload";
+  | "upload"
+  | "tags";
 
 /**
  * A row's menu: the `⋯`, a right-click, or `shift+F10` — the same menu by all three, because a
@@ -2528,6 +2785,10 @@ function RowMenu({
           {line.type === "file" ? item("duplicate", "Duplicate", <Copy {...ICON} aria-hidden="true" />) : null}
           {item("move", "Move to…", <FolderInput {...ICON} aria-hidden="true" />)}
           {elsewhere ? item("transfer", "Move to vault…", <ArrowRightLeft {...ICON} aria-hidden="true" />) : null}
+          {/* Every text's tags, in a card under the row; an attachment carries none. */}
+          {line.type === "file" && line.entry.kind !== "file"
+            ? item("tags", "Tags…", <Tags {...ICON} aria-hidden="true" />)
+            : null}
           {/* Into the trash, a folder with everything in it, and nothing asked. */}
           {item("delete", "Delete", <Trash2 {...ICON} aria-hidden="true" />, true)}
         </>

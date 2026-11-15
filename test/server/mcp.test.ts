@@ -293,3 +293,99 @@ describe("the rest of the table", () => {
     expect(me.read_only).toBe(false);
   });
 });
+
+describe("tags (#327)", () => {
+  it("tag_list answers the tag list, and the list, read and task tools report a document's tags", async () => {
+    fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [meeting]\n---\nbody\n");
+    fs.writeFileSync(path.join(env.root, "chore.md"), "---\nstatus: todo\ntags: [meeting, ops]\n---\n");
+    fs.writeFileSync(path.join(env.root, "arch.board.md"), "---\ntags: [design]\n---\n\n```md {#one}\nhi\n```\n");
+    const c = await connect(true);
+    const list = await call(c, "tag_list");
+    expect(list.data.tags.map((t: any) => [t.name, t.count])).toEqual([
+      ["design", 1],
+      ["meeting", 2],
+      ["ops", 1],
+    ]);
+    const one = await call(c, "tag_list", { tag: "Meeting" });
+    expect(one.data.docs.map((d: any) => d.name)).toEqual(["chore", "plan"]);
+    expect((await call(c, "note_list")).data.tags).toEqual({ plan: ["meeting"], chore: ["meeting", "ops"] });
+    expect((await call(c, "board_list")).data.tags).toEqual({ arch: ["design"] });
+    expect((await call(c, "note_read", { name: "plan" })).data.tags).toEqual(["meeting"]);
+    expect((await call(c, "task_list")).data.tasks[0].tags).toEqual(["meeting", "ops"]);
+  });
+});
+
+describe("filtering by tag over MCP (#327)", () => {
+  it("task_list and event_list take a `tag`, any case, or `none`", async () => {
+    fs.writeFileSync(path.join(env.root, "a.md"), "---\nstatus: todo\ntags: [Pricing, q4]\n---\n");
+    fs.writeFileSync(path.join(env.root, "b.md"), "---\nstatus: done\ntags: [q4]\n---\n");
+    fs.writeFileSync(path.join(env.root, "c.md"), "---\nstatus: todo\n---\n");
+    fs.writeFileSync(path.join(env.root, "d.md"), "---\nstart: 2026-10-03\ntags: [pricing]\n---\n");
+    fs.writeFileSync(path.join(env.root, "e.md"), "---\nstart: 2026-10-04\n---\n");
+    const c = await connect(true);
+    const tasks = async (args: Record<string, unknown>) => (await call(c, "task_list", args)).data.tasks.map((t: any) => t.name);
+    expect(await tasks({ tag: "pricing" })).toEqual(["a"]);
+    expect((await tasks({ tag: "Q4" })).sort()).toEqual(["a", "b"]);
+    expect(await tasks({ tag: "none" })).toEqual(["c"]);
+    expect(await tasks({ tag: "q4", status: "done" })).toEqual(["b"]);
+    const events = async (args: Record<string, unknown>) =>
+      (await call(c, "event_list", args)).data.events.map((e: any) => e.name);
+    expect(await events({ tag: "PRICING" })).toEqual(["d"]);
+    expect(await events({ tag: "none" })).toEqual(["e"]);
+    expect(await events({ tag: "q4" })).toEqual([]);
+  });
+
+  it("search takes a `tag`, and with no words lists what carries it", async () => {
+    fs.writeFileSync(path.join(env.root, "a.md"), "---\ntitle: Plan\ntags: [Pricing]\n---\nSeat prices.\n");
+    fs.writeFileSync(path.join(env.root, "b.md"), "---\ntitle: Other\n---\nSeat counts.\n");
+    const c = await connect(true);
+    const both = (await call(c, "search", { q: "seat" })).data.hits.map((h: any) => h.name);
+    expect(both.sort()).toEqual(["a", "b"]);
+    const one = await call(c, "search", { q: "seat", tag: "pricing" });
+    expect(one.data.hits.map((h: any) => h.name)).toEqual(["a"]);
+    const all = await call(c, "search", { q: "", tag: "PRICING" });
+    expect(all.data.docs.map((d: any) => [d.name, d.kind])).toEqual([["a", "note"]]);
+  });
+});
+
+describe("changing tags over MCP (#327)", () => {
+  it("tag_apply creates a tag the vault has never seen, registered as the app registers one", async () => {
+    fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [meeting]\n---\nbody\n");
+    const c = await connect();
+    const got = await call(c, "tag_apply", { name: "plan", add: ["roadmap", "meeting"], hue: "spruce" });
+    expect(got.data).toMatchObject({ tags: ["meeting", "roadmap"], created: ["roadmap"] });
+    const list = (await call(c, "tag_list")).data.tags;
+    expect(list.find((t: any) => t.name === "roadmap")).toMatchObject({ hue: "spruce", registered: true, count: 1 });
+    expect(list.find((t: any) => t.name === "meeting")).toMatchObject({ registered: false });
+  });
+
+  it("the create tools take `tags`", async () => {
+    const c = await connect();
+    const note = await call(c, "note_create", { title: "Plan", tags: ["ops"] });
+    expect(note.data.tags).toEqual(["ops"]);
+    const task = await call(c, "task_create", { title: "Ship it", tags: ["ops", "q4"] });
+    expect(task.data.tags).toEqual(["ops", "q4"]);
+    const event = await call(c, "event_create", { title: "Offsite", start: "2026-10-03", tags: ["team"] });
+    expect(event.data.tags).toEqual(["team"]);
+    expect((await call(c, "task_list")).data.tasks[0].tags).toEqual(["ops", "q4"]);
+  });
+
+  it("tag_rename, tag_color and tag_delete — the last only with `confirm`", async () => {
+    fs.writeFileSync(path.join(env.root, "plan.md"), "---\ntags: [old]\n---\nbody\n");
+    const c = await connect();
+    expect((await call(c, "tag_rename", { from: "old", to: "new" })).data).toMatchObject({ merged: false, missed: [] });
+    expect((await call(c, "tag_color", { tag: "new", hue: "coral" })).data).toEqual({
+      name: "new",
+      hue: "coral",
+      registered: true,
+    });
+    expect((await call(c, "tag_delete", { tag: "new" })).error).toMatch(/confirm/);
+    expect((await call(c, "tag_delete", { tag: "new", confirm: "new" })).data).toMatchObject({ hue: "coral", missed: [] });
+    expect(fs.readFileSync(path.join(env.root, "plan.md"), "utf8")).not.toContain("tags");
+  });
+
+  it("refuses every tag write when read only", async () => {
+    const c = await connect(true);
+    expect((await call(c, "tag_color", { tag: "x", hue: "coral" })).error).toMatch(/read-only/);
+  });
+});

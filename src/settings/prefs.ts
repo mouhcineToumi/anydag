@@ -79,6 +79,14 @@ export const FAVOURITES = "dag:favourites";
  */
 export const SIDEBAR_FOLDERS = "dag:sidebar-open";
 /**
+ * Which kinds of file the Files tree hides — a JSON list of the hidden kinds (#360). The choice is
+ * view state, **this browser's and this vault's, and deliberately not in `PREF_KEYS`**, for
+ * {@link SIDEBAR_FOLDERS}'s reason: a laptop and a phone have no reason to agree on which rows
+ * somebody wants to see, and it is written with {@link writeLocal}, which wakes no sync. It is a
+ * list of what is hidden rather than what is shown, so a kind added later is shown by default.
+ */
+export const SIDEBAR_HIDDEN = "dag:sidebar-hidden";
+/**
  * The list of files as this browser last fetched it, per vault — a cache, never a
  * preference, and never in `PREF_KEYS`: the sidebar draws it the moment the page loads and the
  * fetch replaces it, so a refresh does not show an empty tree for as long as the listing takes. It
@@ -221,11 +229,20 @@ export const VAULT_STAMP = "dag:vault-prefs-at";
 
 /**
  * Every key this browser keeps a copy of **per vault**: the vault's preferences, the settings
- * object (`store.ts`'s `dag:settings`), which folders are open — they are the vault's folders —
- * the cached file list, Home's recent files, and the clock that dates them. They are stored as
- * `key@slug`, so two tabs in two vaults never read each other's favourites (`vault/current.ts`).
+ * object (`store.ts`'s `dag:settings`), which folders are open and which kinds its tree hides — they
+ * are the vault's folders and files — the cached file list, Home's recent files, and the clock that
+ * dates them. They are stored as `key@slug`, so two tabs in two vaults never read each other's
+ * favourites (`vault/current.ts`).
  */
-const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST, RECENT_FILES]);
+const PER_VAULT = new Set<string>([
+  ...VAULT_PREF_KEYS,
+  "dag:settings",
+  SIDEBAR_FOLDERS,
+  SIDEBAR_HIDDEN,
+  VAULT_STAMP,
+  FILE_LIST,
+  RECENT_FILES,
+]);
 
 /** Where `key` is kept in `localStorage` for this tab: scoped to the vault when it is a vault's. */
 export function storageKey(key: string): string {

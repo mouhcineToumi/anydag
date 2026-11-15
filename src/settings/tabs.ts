@@ -29,6 +29,7 @@ export type SettingsTab =
   | "providers"
   | "vault-general"
   | "vault-files"
+  | "tags"
   | "export"
   | "sync"
   | "agent-access"
@@ -55,7 +56,7 @@ export const BOARD_TABS: readonly SettingsTab[] = ["board-layout"];
 export const GROUPS: readonly TabGroup[] = [
   { group: "you", tabs: ["appearance", "ai", "calendar", "quizzes"] },
   { group: "computer", tabs: ["providers"] },
-  { group: "vault", tabs: ["vault-general", "vault-files", "export", "sync", "agent-access"] },
+  { group: "vault", tabs: ["vault-general", "vault-files", "tags", "export", "sync", "agent-access"] },
   { group: "board", tabs: BOARD_TABS },
 ];
 
@@ -87,6 +88,7 @@ const SCOPE_OF: Readonly<Record<SettingsTab, SettingsGroup>> = {
   providers: "computer",
   "vault-general": "vault",
   "vault-files": "vault",
+  tags: "vault",
   export: "vault",
   sync: "vault",
   "agent-access": "vault",
@@ -158,6 +160,7 @@ export const TAB_LABEL: Readonly<Record<SettingsTab, string>> = {
   providers: "AI providers",
   "vault-general": "General",
   "vault-files": "Files and images",
+  tags: "Tags",
   export: "Export",
   sync: "Sync",
   "agent-access": "Agent access",

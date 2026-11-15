@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**138 features, 0 gaps, 77 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
+**143 features, 0 gaps, 82 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
@@ -44,7 +44,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Hear each change as it happens | `GET /__board/events` | · | ✗ [8] |
 | What a permanent id names | `GET /__board/resolve` | · | `resolve` |
 | What refers to what: references and backlinks | `GET /__board/index` `GET /__board/refs` | · | `refs` |
-| Every place some words appear, ranked | `GET /__board/search` `GET /__board/corpus` | · | `search` |
+| Every place some words appear, ranked; or one tag's documents | `GET /__board/search` `GET /__board/corpus` | · | `search` |
 
 ## Boards
 
@@ -81,7 +81,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every task, with its status, due date and project | `GET /__board/list` | · | `task_list` |
+| Every task, with its status, due date, project and tags; one project, status or tag | `GET /__board/list` | · | `task_list` |
 | Make a task | `POST /__board/create` | · | `task_create` |
 | Change a task's status, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
 
@@ -89,7 +89,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every event, with when it starts and ends, soonest first | `GET /__board/list` | · | `event_list` |
+| Every event, with when it starts and ends, soonest first; one project or tag | `GET /__board/list` | · | `event_list` |
 | Make an event: a note with a start and an end | `POST /__board/create` | · | `event_create` |
 | Move an event, or make a note an event and back | `POST /__board/event` | · | `event_set` |
 
@@ -100,6 +100,16 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Every project, with its status, colour and task counts | `GET /__board/list` | · | `project_list` |
 | Make a folder a project | `GET /__board/list` `POST /__board/create` | · | `project_create` |
 | Change a project's status or colour, or make it a plain folder | `POST /__board/project` | · | `project_set` |
+
+## Tags
+
+| Feature | REST | CLI | MCP |
+|---|---|---|---|
+| Every tag, with its colour and how many documents carry it | `GET /__board/tags` | · | `tag_list` |
+| Add or remove tags on a note, task, event, board, quiz or table | `POST /__board/tags/apply` | · | `tag_apply` |
+| Rename a tag, or merge it into another, in every document | `POST /__board/tags/rename` | · | `tag_rename` |
+| Take a tag off every document, and out of the tag list | `POST /__board/tags/delete` | · | `tag_delete` |
+| Set a tag's colour, one of the ten hues, or reset it to the default | `POST /__board/tags/color` | · | `tag_color` |
 
 ## Quizzes
 
@@ -245,7 +255,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | · | ✗ [27] |
 | Start a chat | `POST /__board/chat` | · | ✗ [27] |
 | A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | · | ✗ [27] |
-| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [27] |
+| Send a turn, with the documents it names with `@`, and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [27] |
 | Stop the turn that is answering | `POST /__board/chat/stop` | · | ✗ [27] |
 | Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | · | ✗ [27] |
 | Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | · | ✗ [27] |

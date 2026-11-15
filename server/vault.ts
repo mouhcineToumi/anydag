@@ -116,6 +116,8 @@ export interface Tree {
   tasks: Record<string, Task>;
   projects: Record<string, Project>;
   events: Record<string, NoteEvent>;
+  /** Each document's tags, every kind but a file — a template's left out, as its task is. */
+  tags: Record<string, string[]>;
   created: Record<string, string>;
   /** Each quiz's question ids in file order, `null` for one with none yet. */
   questions: Record<string, (string | null)[]>;
@@ -163,9 +165,13 @@ export type Change =
       task?: Task | null;
       project?: Project | null;
       event?: NoteEvent | null;
+      /** A text's tags, `[]` for none — every kind but a file, so a row redraws in place. */
+      tags?: string[];
       questions?: number | null;
     }
   | { type: "tree" }
+  /** `.anydag/tags.json` changed — by sync, by hand or through a tag route: the feed's `dag:tags`. */
+  | { type: "tags" }
   | { type: "trash" }
   | { type: "gone" }
   /** A linked vault's sync status moved (`server/sync/loop.ts`): the feed's `dag:vault-sync`. */
@@ -203,6 +209,8 @@ interface Kept {
 
 /** Where the trash is kept: in the vault, so it travels with it, and out of every listing (a dot-folder). */
 const TRASH = ".anydag/trash";
+/** The vault's tag list and their colours (`server/tags.ts`): the watcher's `dag:tags`. */
+export const TAGS_FILE = ".anydag/tags.json";
 
 export interface VaultOptions {
   /** The extensions this vault lists as attachments. */
@@ -838,6 +846,7 @@ export class Vault {
       tasks: {},
       projects: {},
       events: {},
+      tags: {},
       created: {},
       questions: {},
       sizes: {},
@@ -868,6 +877,7 @@ export class Vault {
         if (f.front.task) t.tasks[d.name] = f.front.task;
         if (f.front.project) t.projects[d.name] = f.front.project;
         if (f.front.event) t.events[d.name] = f.front.event;
+        if (f.front.tags) t.tags[d.name] = f.front.tags;
       }
       if (f.front.asks) t.questions[d.name] = f.front.asks;
     };
@@ -2469,9 +2479,14 @@ export class Vault {
           }
         }
         let tree = false;
+        let tags = false;
         const seen = new Set<string>();
         for (const ev of events) {
           const rel = this.rel(ev.path);
+          if (rel === TAGS_FILE) {
+            tags = true;
+            continue;
+          }
           if (rel.startsWith(`${COMPONENTS}/`)) {
             const leaf = rel.slice(COMPONENTS.length + 1);
             if (leaf.toLowerCase().endsWith(SUFFIX.board)) {
@@ -2531,10 +2546,12 @@ export class Vault {
             ...(found.kind === "note"
               ? { task: (own && f.task) || null, project: (own && f.project) || null, event: (own && f.event) || null }
               : {}),
+            tags: (own && f.tags) || [],
             ...(found.kind === "quiz" ? { questions: f.asks?.length ?? 0 } : {}),
           });
         }
         if (tree) this.emit({ type: "tree" });
+        if (tags) this.emit({ type: "tags" });
       },
       { ignore: [".git", ".obsidian", ".trash", ".stversions", "node_modules", ".anydag/vault.json"] },
     );

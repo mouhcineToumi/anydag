@@ -873,7 +873,10 @@
   flex: none;
   margin: 12px 8px 4px 16px;
 }
-.dag-sidebar__section h2 { flex: 1; margin: 0; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-sidebar__section h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); text-overflow: ellipsis; white-space: nowrap; }
+/* What the filter holds back, after the heading's word: *Files · tasks hidden*. Regular weight, so
+   the section still reads as one heading at a glance. */
+.dag-sidebar__filtered { min-width: 0; overflow: hidden; font-weight: var(--dag-ui-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
 
 .dag-sidebar__tree {
   /* An open empty folder's *Empty* line, said once: the tree draws only the rows in view
@@ -1399,6 +1402,81 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 
 /* New, the + beside Files since the UI review. */
 .dag-sidebar__tool[aria-expanded="true"] { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
+/* Show in Files (#360): the filter button beside the + and the popover it opens. While a kind is
+   hidden the glyph is the accent — expanded, hovered or at rest — so a filtered tree is never
+   mistaken for a tree with nothing in it. The popover is fixed and placed by `FilterMenu`, the
+   `NewMenu` rule, so the column's width and its scroller never clip it. */
+.dag-sidebar__filter { display: inline-flex; flex: none; }
+.dag-sidebar__tool.dag-sidebar__filterbtn--on,
+.dag-sidebar__tool.dag-sidebar__filterbtn--on:hover,
+.dag-sidebar__tool.dag-sidebar__filterbtn--on[aria-expanded="true"] { color: var(--dag-color-accent); }
+.dag-sidebar__filter-menu {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 224px;
+  max-height: min(520px, calc(100vh - 16px));
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  scrollbar-width: thin;
+}
+.dag-sidebar__filter-head { margin: 2px 6px 4px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-sidebar__filter-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__filter-row:hover { background: var(--dag-color-paper100); }
+.dag-sidebar__filter-row:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__filter-row[aria-checked="false"] { color: var(--dag-color-slate); }
+.dag-sidebar__filter-row > svg { flex: none; color: var(--dag-color-slate); }
+/* A 14px box, so a square rather than the 9px control corner made into a circle. */
+.dag-sidebar__filter-tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 0;
+}
+.dag-sidebar__filter-row[aria-checked="true"] .dag-sidebar__filter-tick { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-sidebar__filter-word { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-sidebar__filter-count { flex: none; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+.dag-sidebar__filter-all {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__filter-all:hover { background: var(--dag-color-paper100); }
+.dag-sidebar__filter-all:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
 .dag-sidebar__menu--new { min-width: 232px; }
 /* Where the file will go, above what it will be — the header the creation flow was missing. */
 .dag-sidebar__menu-where {
@@ -1470,6 +1548,8 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-sidebar[data-sheet] .dag-sidebar__tools { display: flex; top: 0; background: transparent; }
 /* 44×44 each, even though the ⋯ and the + keep their 14px glyph (#209). */
 .dag-sidebar[data-sheet] .dag-sidebar__tool { width: 44px; height: 44px; }
+.dag-sidebar[data-sheet] .dag-sidebar__filter-row,
+.dag-sidebar[data-sheet] .dag-sidebar__filter-all { min-height: 44px; font-size: var(--chrome-text-lg); }
 .dag-sidebar[data-sheet] .dag-sidebar__row:has(+ .dag-sidebar__tools) { padding-right: 52px; }
 .dag-sidebar[data-sheet] .dag-sidebar__tool[data-dag-sidebar-add] { display: none; }
 .dag-sidebar[data-sheet] .dag-sidebar__name-input,
@@ -1829,6 +1909,13 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
 .dag-board--on { color: var(--dag-color-ink); background: var(--dag-color-paper200); font-weight: var(--dag-ui-weight-strong); }
 /* A file found by name and in its text: the row is its one entry, and this says the second half. */
 .dag-board__also { font-weight: var(--dag-ui-weight-regular); font-style: italic; }
+/* Under a tag and no words, a row says its kind at its end; a tag offered for `#` says its count. */
+.dag-board__what { float: right; margin-left: 12px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+/* The tag chip in the search box (#327): a read-only chip with its ×, before the words. */
+.dag-tag--x { padding-right: 0; }
+.dag-panel__search > svg { flex: none; }
+.dag-board > .dag-tag__dot { display: inline-block; vertical-align: 0; margin-right: 10px; }
+.dag-tag--x .dag-tag__remove.dag-icon { width: var(--dag-ui-control-sm); height: var(--dag-ui-control-sm); }
 
 /* Matches in the text of every board and note, under the names in the search card. Two
    lines a row, because a match is two facts: where it is, and the words around it. The words are
@@ -5515,20 +5602,368 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
-.dag-projectbar__hues { display: inline-flex; align-items: center; gap: 4px; }
-.dag-projectbar__hue {
-  width: 14px;
-  height: 14px;
+.dag-projectbar__hues { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.dag-projectbar__clear { align-self: flex-start; }
+
+/*
+ * The ten hues as swatches — `Palette` (`src/ui/Palette.tsx`), every colour choice in the chrome:
+ * a project's, a tag's, the strip under *Create tag* (#327). Each is a 24px hit box round a 16px dot,
+ * none overlapping, and a 44px one under 720px, where the strip wraps to two rows of five. Names
+ * grepped first: `dag-swatch` is the board panel's.
+ */
+.dag-palette { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0; }
+.dag-palette__hue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--dag-ui-control-sm);
+  height: var(--dag-ui-control-sm);
   padding: 0;
-  background: var(--dag-h);
+  background: transparent;
   border: none;
   border-radius: 50%;
   cursor: pointer;
 }
-.dag-projectbar__hue[aria-checked="true"] { box-shadow: 0 0 0 2px var(--dag-color-paper), 0 0 0 3px var(--dag-color-ink); }
-.dag-projectbar__hue:focus-visible { box-shadow: var(--focus-ring); }
-.dag-projectbar__hue:disabled { cursor: default; opacity: 0.6; }
-.dag-projectbar__clear { margin-left: 0; }
+.dag-palette__hue::before { content: ""; width: 16px; height: 16px; border-radius: 50%; background: var(--dag-h); }
+.dag-palette__hue[aria-checked="true"]::before { box-shadow: 0 0 0 2px var(--dag-color-card), 0 0 0 3.5px var(--dag-color-ink); }
+.dag-palette__hue:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+
+/*
+ * Tags (#327): the chip, a document's chips in a row, and the editor — a combobox whose list and
+ * swatches float on the popover layer, fixed to the window, so a property row, a top bar or a
+ * scrolling pane never clips them. A chip is `paper100` with `ink` words whatever its hue, so it reads
+ * in every theme without measuring each one; only the 8px dot carries the colour. Names grepped
+ * first: `dag-tag*`, `dag-tags*`, `dag-tagedit*` and `dag-tagpop*` were nobody's.
+ */
+.dag-tags { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.dag-tags > [role="listitem"] { display: inline-flex; }
+.dag-tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: var(--dag-ui-control-sm);
+  padding: 0 8px;
+  font-size: var(--chrome-text-sm);
+  line-height: var(--dag-ui-leading-sm);
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-pill);
+}
+.dag-tag__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-h); }
+.dag-tag--edit { padding: 0; }
+.dag-tag--edit .dag-tag__name { margin-left: -2px; }
+/* The dot is a button with a 24px hit box: 8px to the eye. */
+.dag-tag__pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--dag-ui-control-sm);
+  height: var(--dag-ui-control-sm);
+  margin: -1px 0 -1px -1px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.dag-tag__pick::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-h); }
+.dag-tag__pick[aria-expanded="true"]::before { box-shadow: 0 0 0 2px var(--dag-color-paper100), 0 0 0 3.5px var(--dag-color-ink); }
+.dag-tag__pick:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-tag__remove.dag-icon { margin: -1px -1px -1px 0; border-radius: var(--dag-ui-radius-pill); }
+.dag-tag__remove.dag-icon:hover { background: var(--dag-color-paper200); }
+.dag-tag__hues,
+.dag-tagedit__list,
+.dag-tagmore {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  overflow-y: auto;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-tag__hues { padding: 10px; }
+.dag-tag__reset { align-self: flex-start; }
+.dag-tagedit__list { gap: 4px; padding: 4px; }
+
+.dag-tagedit { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.dag-tagedit__field { display: inline-flex; }
+.dag-tagedit__input {
+  width: 148px;
+  height: 26px;
+  padding: 0 8px;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  outline: none;
+}
+.dag-tagedit__input:focus { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-tagedit__input::placeholder { color: var(--dag-color-slate); }
+.dag-tagedit__input[aria-invalid="true"] { border-color: var(--dag-color-danger); }
+.dag-tagedit__lb { display: flex; flex-direction: column; gap: 1px; }
+.dag-tagedit__opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: var(--chrome-text-md);
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tagedit__opt[aria-selected="true"] { background: var(--dag-color-paper100); }
+/* The create row after suggestions: apart from them by a rule, as it is apart from them in kind. */
+.dag-tagedit__opt[data-dag-tag-create]:not(:first-child) { position: relative; margin-top: 5px; }
+.dag-tagedit__opt[data-dag-tag-create]:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--dag-color-outlineSoft);
+}
+.dag-tagedit__opt mark { color: inherit; background: none; font-weight: var(--dag-ui-weight-strong); }
+.dag-tagedit__unused { margin-left: auto; padding-left: 12px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-tagedit__hues { padding: 0 4px 4px; }
+.dag-tagedit__why {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: var(--chrome-text-xs);
+  line-height: var(--dag-ui-leading-xs);
+  white-space: nowrap;
+  color: var(--dag-color-dangerText);
+  background: var(--dag-color-dangerSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-tagedit__fix {
+  height: var(--dag-ui-control-sm);
+  padding: 0 8px;
+  font: inherit;
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-dangerBorder);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tagedit__fix:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* *Tags…*: the editor in a card under the `⋯` or the row it was asked from. */
+.dag-tagpop {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: calc(100vw - 16px);
+  padding: 10px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  box-sizing: border-box;
+}
+.dag-tagpop__head { margin: 0 2px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-tagpop__problem { margin: 0 2px; font-size: var(--chrome-text-xs); color: var(--dag-color-dangerText); }
+.dag-tagedit--pop { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 8px; }
+.dag-tagedit--pop .dag-tags:empty { display: none; }
+.dag-tagedit--pop .dag-tagedit__input { width: 100%; height: 30px; box-sizing: border-box; }
+.dag-tagedit__opts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  margin: 0 -6px -6px;
+  padding: 4px 6px 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--dag-color-outlineSoft);
+}
+/* *+n* on a Tasks row: a button holding a chip, for the tags past the first two. The button is
+   the target and the chip the look, so under 720px the target grows to 44px and the chip does not. */
+.dag-tagmore__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--dag-ui-radius-pill);
+  cursor: pointer;
+}
+.dag-tag--more { justify-content: center; min-width: var(--dag-ui-control-sm); font-weight: var(--dag-ui-weight-strong); }
+.dag-tagmore__button:hover .dag-tag--more,
+.dag-tagmore__button[aria-expanded="true"] .dag-tag--more { background: var(--dag-color-paper200); }
+.dag-tagmore__button:focus-visible { outline: none; }
+.dag-tagmore__button:focus-visible .dag-tag--more { box-shadow: var(--focus-ring); }
+.dag-tagmore { max-width: 320px; padding: 8px; }
+.dag-tagmore .dag-tags { flex-wrap: wrap; gap: 6px; }
+.dag-tasks__card-meta { flex-wrap: wrap; }
+.dag-tasks__row .dag-tags { flex: none; flex-wrap: nowrap; }
+.dag-tasks__row .dag-tags ~ .dag-tasks__folder { flex: 0 1 auto; min-width: 0; }
+@media (max-width: 719px) {
+  .dag-tagmore__button {
+    min-width: var(--dag-ui-control-touch);
+    min-height: var(--dag-ui-control-touch);
+    margin: calc((var(--dag-ui-control-sm) - var(--dag-ui-control-touch)) / 2) 0;
+  }
+}
+/* Read only, the chips sit on the line above the text with the task's and the event's. */
+.dag-tagline .dag-tags { gap: 6px; }
+
+@media (max-width: 719px) {
+  /* Every swatch a finger's, two rows of five. */
+  .dag-palette { width: calc(var(--dag-ui-control-touch) * 5); }
+  .dag-palette__hue { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+  /* An editable chip is 44px, and a tap anywhere on it but its × opens the colour picker. */
+  .dag-tag--edit { height: var(--dag-ui-control-touch); }
+  .dag-tag--edit .dag-tag__pick {
+    position: absolute;
+    inset: -1px calc(var(--dag-ui-control-touch) - 1px) -1px -1px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    justify-content: flex-start;
+    padding-left: 13px;
+    border-radius: var(--dag-ui-radius-pill);
+  }
+  .dag-tag--edit .dag-tag__name { margin-left: 27px; pointer-events: none; }
+  .dag-tag--edit .dag-tag__remove.dag-icon { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+  .dag-tagedit__input { height: var(--dag-ui-control-touch); font-size: var(--chrome-text-lg); }
+  .dag-tagedit__opt { min-height: var(--dag-ui-control-touch); }
+  .dag-tagedit__fix { height: var(--dag-ui-control-touch); }
+}
+
+/*
+ * Settings → This vault → Tags (#327): a row per tag in the group's card — its colour, its name,
+ * which is a field while it is renamed, how many documents carry it, and a quiet `⋯`. A merge asks in
+ * the row itself; the colour card and the menu float on the popover layer.
+ */
+.dag-tags__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 9px 8px 8px;
+  box-sizing: border-box;
+}
+.dag-tags__none { margin: 0; padding: 14px 12px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-tags__swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: var(--dag-ui-control-sm);
+  padding: 0 6px 0 8px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tags__swatch:hover:not(:disabled),
+.dag-tags__swatch[aria-expanded="true"] { background: var(--dag-color-paper100); }
+.dag-tags__swatch:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-tags__swatch:disabled { cursor: default; }
+.dag-tags__swatch--still { cursor: default; }
+.dag-tags__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dag-h); }
+/* Never picked: the default colour as a ring, until someone chooses one. */
+.dag-tags__dot[data-default] { background: transparent; box-shadow: inset 0 0 0 3px var(--dag-h); }
+.dag-tags__name {
+  min-width: 0;
+  min-height: var(--dag-ui-control-sm);
+  margin-left: -4px;
+  padding: 0 8px;
+  overflow: hidden;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: text;
+}
+.dag-tags__name:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-tags__name:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-tags__name:disabled { cursor: default; }
+.dag-tags__rename { position: relative; display: inline-flex; flex-direction: column; min-width: 0; }
+.dag-tags__input {
+  width: 160px;
+  max-width: 100%;
+  height: var(--dag-ui-control-sm);
+  margin-left: -4px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+.dag-tags__input[aria-invalid="true"] { border-color: var(--dag-color-danger); }
+.dag-tags__problem { margin: 4px 0 0 -4px; font-size: var(--chrome-text-sm); color: var(--dag-color-danger); }
+.dag-tags__default { font-size: var(--chrome-text-sm); white-space: nowrap; color: var(--dag-color-slate); }
+.dag-tags__count {
+  margin-left: auto;
+  font-size: var(--chrome-text-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+}
+.dag-tags__count[data-none] { color: var(--dag-color-slate); }
+.dag-tags__ask { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 4px; font-size: var(--chrome-text-md); }
+.dag-tags__ask b { font-weight: var(--dag-ui-weight-strong); }
+.dag-tags__ask span { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-tags__menu {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+/* Undo and a partial change are told at the pane's foot, kept in view while it scrolls. */
+.dag-tags__pane > .dag-toast { position: sticky; bottom: var(--dag-ui-space-4); z-index: 2; margin: var(--dag-ui-space-4) auto 0; }
+@media (max-width: 719px) {
+  /* The ring and the swatch's name say *default*; the words would push the `⋯` off the line. */
+  .dag-tags__default { display: none; }
+  .dag-tags__row { padding-right: 4px; }
+  .dag-tags__swatch,
+  .dag-tags__name,
+  .dag-tags__input { min-height: var(--dag-ui-control-touch); }
+  .dag-tags__more.dag-icon { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+  .dag-tags__menu .dag-more__item { height: var(--dag-ui-control-touch); }
+}
 .dag-projectbar__counts { display: inline-flex; align-items: center; gap: 12px; color: var(--dag-color-slate); }
 .dag-projectbar__count { display: inline-flex; align-items: center; gap: 4px; }
 .dag-projectbar__why { color: var(--dag-color-slate); }
@@ -6509,14 +6944,16 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 /*
  * The Calendar: tasks, events and notes on one timeline. A month is a
  * grid of weeks whose rows are lanes of bars; a week or a run of days is an all-day row over an hour
- * grid. Every length an item's place depends on is a custom property the page paints — `--at` and
- * `--len` in minutes, `--col`/`--of` for overlapping events — and turned into pixels here against
- * `--hour`, so the page never measures a pixel it did not draw. Every colour is the theme's: an event
- * wears the accent's soft tint, a task the paper, a note nothing but its mark.
+ * grid; the rows view is the week turned, one day to a row with its hours across. Every length an
+ * item's place depends on is a custom property the page paints — `--at` and `--len` in minutes,
+ * `--col`/`--of` for overlapping events down a column, `--lane` for one stacked in a row — and turned
+ * into pixels here against `--hour`, so the page never measures a pixel it did not draw. Every colour
+ * is the theme's: an event wears the accent's soft tint, a task the paper, a note nothing but its mark.
  *
- * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-app--calendar`,
- * `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`,
- * `data-dag-cal-mini*`, `data-dag-eventbar*`,
+ * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-cal-rows*`,
+ * `dag-cal-row*`, `dag-app--calendar`, `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`,
+ * `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-cal-mini*`, `data-dag-cal-rows`,
+ * `data-dag-cal-row`, `data-dag-cal-start`, `data-dag-eventbar*`,
  * `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
  * `data-dag-sidebar-event`, `data-dag-note-make-event`, `dag-cal-menu*` and `data-dag-cal-menu*`, the
  * storage keys `dag:calendar-hide`, `dag:week-start` and `dag:calendar-view`, and the query keys
@@ -6565,7 +7002,8 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-calendar__show-menu .dag-calendar__kind { justify-content: flex-start; height: 30px; border: none; color: var(--dag-color-ink); background: transparent; }
 .dag-calendar__show-menu .dag-calendar__kind:hover { background: var(--dag-color-paper100); }
 .dag-calendar__show-menu .dag-calendar__kind[aria-pressed="false"] { color: var(--dag-color-slate); }
-.dag-calendar__show-menu .dag-tasks__project { margin: 0 4px 4px; }
+/* A column: the bar's `flex-basis` would be its height here. */
+.dag-calendar__show-menu .dag-tasks__project { flex: none; margin: 0 4px 4px; }
 .dag-calendar__tick {
   display: inline-flex;
   align-items: center;
@@ -6937,6 +7375,123 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   pointer-events: none;
 }
 .dag-cal-now::before { content: ""; position: absolute; top: -3px; left: -4px; width: 8px; height: 8px; background: var(--dag-color-danger); border-radius: 50%; }
+
+/* A week as rows: one day to a row, the day and its all-day things at the start of it, and the
+   hours of the day across the track. It reads the same `--at`/`--len` minutes as a day's column —
+   a left edge and a width here instead of a top and a height — and `--lane` is the stack row an
+   overlapping event takes, so a bar is 24px tall, the floor every control meets (#209). The row
+   grows for any all-day things at its start, and the whole grid scrolls when the week is taller
+   than the page. Names grepped first: `dag-cal-rows*`, `dag-cal-row*`, `data-dag-cal-rows`,
+   `data-dag-cal-row` and `data-dag-cal-start` were nobody's. */
+.dag-cal-rows {
+  --day: 96px;
+  --start: 168px;
+  --lane-h: 26px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-rows__head,
+.dag-cal-row { display: grid; grid-template-columns: var(--day) var(--start) minmax(0, 1fr); }
+.dag-cal-rows__head { position: sticky; top: 0; z-index: 1; background: var(--dag-color-paper); border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__corner { position: sticky; left: 0; z-index: 1; background: var(--dag-color-paper); border-right: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__allday { display: flex; align-items: center; justify-content: flex-end; padding: 0 8px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); border-right: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__hours { position: relative; height: 28px; }
+.dag-cal-rows__hour {
+  position: absolute;
+  top: 7px;
+  left: calc(var(--at) * 100% / 1440 + 4px);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dag-cal-row { border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-row:last-child { border-bottom: none; }
+.dag-cal-row__day {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper);
+  border-right: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-cal-row__n { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-row[data-today] .dag-cal-row__weekday,
+.dag-cal-row[data-today] .dag-cal-row__n { color: var(--dag-color-accent); }
+/* Where a row starts: its all-day things, one under another, and a day a drag across them can make
+   all day — the same `data-dag-cal-day` the week's all-day row and a month's cells wear. */
+.dag-cal-row__start {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px;
+  border-right: 1px solid var(--dag-color-outlineSoft);
+  cursor: cell;
+}
+.dag-cal-row__start[data-dag-cal-picked] { background: var(--dag-color-accentSoft); }
+.dag-cal-row__start > .dag-calendar__item { margin: 0; }
+/* The hours across the row: a line an hour, then the day's timed events on the clock. A bar's width
+   is the time it lasts; an end shorter than a press is drawn at the 24px floor so it can still be
+   taken hold of. Overlaps stack in `--lane`, which is what `blocks`' `col` says. */
+.dag-cal-row__track {
+  position: relative;
+  min-width: 0;
+  /* As tall as the stack of timed events in it, and never shorter than one 24px bar and its air. */
+  min-height: calc(var(--lanes, 1) * var(--lane-h) + 8px);
+  background-image: linear-gradient(to right, var(--dag-color-outlineSoft) 1px, transparent 1px);
+  background-size: calc(100% / 24) 100%;
+  cursor: cell;
+}
+.dag-cal-row__track > .dag-calendar__item {
+  position: absolute;
+  top: calc(4px + var(--lane) * var(--lane-h));
+  left: calc(var(--at) * 100% / 1440 + 1px);
+  width: calc(var(--len) * 100% / 1440 - 2px);
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  line-height: 22px;
+  border-left: 3px solid var(--dag-color-accent);
+}
+.dag-cal-row__track > .dag-calendar__item[data-kind="note"] { border-left-color: transparent; }
+.dag-cal-row__track > .dag-cal-ghost {
+  top: 4px;
+  left: calc(var(--at) * 100% / 1440);
+  right: auto;
+  width: calc(var(--len) * 100% / 1440);
+  min-width: 24px;
+  height: 24px;
+}
+.dag-cal-row__track > .dag-cal-ghost--move { z-index: 3; display: flex; align-items: center; gap: 4px; padding: 0 6px; line-height: 22px; overflow: hidden; white-space: nowrap; }
+.dag-cal-row__track > .dag-cal-now { top: 0; bottom: 0; right: auto; left: calc(var(--at) * 100% / 1440); width: 2px; height: auto; }
+.dag-cal-row__track > .dag-cal-now::before { top: -4px; left: -3px; }
+
+/* Narrower windows give the hours more room, then thin the scale to every fourth hour. Under 720px
+   the grid keeps a width a finger can read and scrolls sideways; the day stays at the start. */
+@media (max-width: 1100px) {
+  .dag-cal-rows { --day: 78px; --start: 132px; }
+  .dag-cal-rows__hour:nth-child(4n + 3) { display: none; }
+}
+@media (max-width: 719px) {
+  .dag-cal-rows { --day: 64px; --start: 112px; }
+  .dag-cal-rows__head,
+  .dag-cal-row { min-width: 720px; }
+  .dag-cal-rows__hour:not(:nth-child(4n + 1)) { display: none; }
+}
 
 /* The card that sets up what was drawn: its title, when it is, and what it is about. */
 .dag-calendar__new {
@@ -8128,14 +8683,32 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer__input::placeholder { color: var(--dag-color-slate); }
 .dag-chat-composer__why { margin: 0; font-size: var(--chrome-text-sm); color: var(--dag-color-dangerText); }
 /* The documents a message is about, above the field: the chat's subject (#323), and the `@` mentions
-   to come. A chip is a pill on the paper, quieter than the field it sits on; its remove button is the
+   (#324). A chip is a pill on the paper, quieter than the field it sits on; its remove button is the
    small icon button, with the chip's padding taken in on that side so the glyph sits centred. */
 .dag-chat-composer__docs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+/* The `@` list, above the field: one document a row, the one Enter would pick tinted. */
+.dag-chat-mentions { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: var(--dag-ui-layer-popover); max-height: 260px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); box-shadow: var(--dag-ui-elevation-overlay); }
+.dag-chat-mention { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 8px; font: inherit; font-size: var(--chrome-text-sm); text-align: left; color: var(--dag-color-ink); background: transparent; border: none; border-radius: var(--dag-ui-radius-control); cursor: pointer; }
+.dag-chat-mention > svg { flex: none; color: var(--dag-color-slate); }
+.dag-chat-mention:hover { background: var(--dag-color-paper100); }
+.dag-chat-mention[aria-selected="true"] { background: var(--dag-color-accentSoft); }
+.dag-chat-mention__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-chat-mention__where { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-chat-mention__none { margin: 0; padding: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
 .dag-chat-docchip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; height: 28px; padding: 0 10px; box-sizing: border-box; font-size: var(--chrome-text-sm); color: var(--dag-color-ink); background: var(--dag-color-paper100); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-pill); }
 .dag-chat-docchip > svg { flex: none; color: var(--dag-color-slate); }
 .dag-chat-docchip__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dag-chat-docchip:has(.dag-chat-docchip__remove) { padding-right: 2px; }
 .dag-chat-docchip__remove { flex: none; border-radius: var(--dag-ui-radius-pill); }
+/* The `@` list (#324), above the composer and as wide as it: the ranking is the reference picker's,
+   the rows are documents, and the active one is the accent's tint behind ink — never accent text. */
+.dag-chat-mentions { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: var(--dag-ui-layer-popover); max-height: 280px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--dag-color-card); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-surface); box-shadow: var(--dag-ui-elevation-overlay); }
+.dag-chat-mention { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 6px; font: inherit; font-size: var(--chrome-text-md); text-align: left; color: var(--dag-color-ink); background: transparent; border: none; border-radius: var(--dag-ui-radius-control); cursor: pointer; }
+.dag-chat-mention > svg { flex: none; color: var(--dag-color-slate); }
+.dag-chat-mention[aria-selected="true"], .dag-chat-mention:hover { background: var(--dag-color-accentSoft); }
+.dag-chat-mention__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-chat-mention__where { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-chat-mention__none { margin: 0; padding: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
 /* One row: scope, then model, effort, expand and Send pushed to the right. Each control can shrink and
    ellipsize rather than wrap, so a long vault or model name reads shorter instead of pushing Send onto
    a second line. `field-sizing` sizes a select to what it shows rather than its widest option, where

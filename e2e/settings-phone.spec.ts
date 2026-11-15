@@ -94,6 +94,7 @@ const READY: Record<SettingsTab, string> = {
   "vault-general": "[data-dag-setting-problems]",
   ai: '[data-dag-setting-ai-feature="diagrams"]',
   "vault-files": "[data-dag-setting-attachments]",
+  tags: "[data-dag-setting-tags]",
   export: "[data-dag-setting-export-scale]",
   sync: "[data-dag-sync-intro], [data-dag-sync-server-input], [data-dag-sync-state]",
   "agent-access": "[data-dag-setting-copy-value]",
