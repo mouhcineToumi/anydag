@@ -1,4 +1,14 @@
-import { CalendarPlus, FilePlus2, Pencil, SlidersHorizontal, Play, SquareCheckBig, CircleSlash, CalendarX2 } from "lucide-react";
+import {
+  CalendarPlus,
+  FilePlus2,
+  Pencil,
+  SlidersHorizontal,
+  Play,
+  SquareCheckBig,
+  CircleSlash,
+  CalendarX2,
+  Plus,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { contentBounds, placeItems } from "@/board/flow";
@@ -57,6 +67,7 @@ import { Item } from "@/render/Item";
 import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
 import { FileProblem } from "@/ui/FileProblem";
+import { Button } from "@/ui/controls";
 import { Shell, useSidebar } from "@/ui/Shell";
 import {
   AssistantView,
@@ -836,6 +847,8 @@ function TasksApp({
     writeLocal(TASKS_VIEW, next);
   }, []);
   const [tab, setTab] = useState<TaskTab>(() => tabOf(readPref(TASKS_TAB)));
+  /* The New task dialog: the top bar's button, and `C` on the page. */
+  const [asking, setAsking] = useState(false);
   /* A tab is the list's: pressed on the board, it goes back to the list on that tab. */
   const chooseTab = useCallback(
     (next: TaskTab) => {
@@ -873,6 +886,20 @@ function TasksApp({
           onBoards={openBrowser}
           lead={<TaskTabs tab={tab} list={list} board={layout === "board"} onTab={chooseTab} />}
         >
+          <Button
+            variant="primary"
+            size="sm"
+            className="dag-tasks__new"
+            data-dag-tasks-new=""
+            title={locked ? undefined : "New task (C)"}
+            onClick={() => (locked ? refuseLocked() : setAsking(true))}
+          >
+            <Plus size={14} strokeWidth={2} aria-hidden="true" />
+            New task
+            <kbd className="dag-tasks-kbd" aria-hidden="true">
+              C
+            </kbd>
+          </Button>
           <LayoutToggle layout={layout} onLayout={chooseLayout} />
         </Toolbar>
       )}
@@ -887,6 +914,8 @@ function TasksApp({
         locked={locked}
         tab={tab}
         onTab={chooseTab}
+        asking={asking}
+        onAsk={setAsking}
       />
       {cards}
     </div>

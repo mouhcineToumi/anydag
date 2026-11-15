@@ -7,7 +7,8 @@ import { afterQuickAdd, QuickAdd, TasksView, type QuickAddState } from "@/ui/Tas
 
 /**
  * The Tasks page's quick add. What was silent or looked like a button is the whole of issue 80:
- * one labelled control, a title that survives a refusal, and an empty state that points at it.
+ * one labelled control, a title that survives a refusal, and an empty state that points at it. The
+ * board's columns keep `QuickAdd`; the list has the New task row (`NewTask.tsx`, #311).
  */
 
 const EMPTY: BoardTree = {
@@ -60,10 +61,12 @@ describe("the New task box", () => {
     expect(html).toContain('data-dag-task-add="todo"');
   });
 
-  it("leaves the empty state pointing at that same control", () => {
+  it("leaves the empty state under the New task row, pointing at it", () => {
     const html = renderToStaticMarkup(createElement(TasksView, { list: EMPTY, layout: "list", onOpen: () => {} }));
+    /* The row comes first, so what the sentence points up at is there. */
+    expect(html.indexOf("data-dag-task-new")).toBeGreaterThan(-1);
+    expect(html.indexOf("data-dag-task-new")).toBeLessThan(html.indexOf("data-dag-tasks-empty"));
     const empty = /<p[^>]*data-dag-tasks-empty[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "";
-    expect(empty).toContain("+ New task");
-    expect(empty).toContain("press Enter");
+    expect(empty).toContain("Type a title above and press Enter");
   });
 });

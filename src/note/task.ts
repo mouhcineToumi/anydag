@@ -232,7 +232,7 @@ export function toggledStatus(status: TaskStatus): TaskStatus {
  * is not a frontmatter to any reader here, and would draw as two rules.
  */
 export function withTask(text: string, change: TaskChange): string {
-  return withKeys(text, change, ["status", "due", "start", "priority"]);
+  return withKeys(text, change, ["status", "priority", "due", "start"]);
 }
 
 /**

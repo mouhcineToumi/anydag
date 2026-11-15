@@ -49,6 +49,7 @@ import { TagChips, TagSelect } from "./tags/TagFilter";
 import { DueLabel, PRIORITY_KEYS, PriorityMark, StatusButton, TaskGlyph } from "./TaskGlyph";
 import { compareRecent, countLine, onTab, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
 import { TasksMenu, under, type MenuRow } from "./TasksMenu";
+import { blankDraft, NewTaskDialog, NewTaskRow, type NewTaskDraft } from "./NewTask";
 import { Toast, ToastName, ToastWords } from "./Toast";
 
 /**
@@ -75,6 +76,12 @@ const LIST_ORDER: readonly TaskStatus[] = ["in-progress", "todo", "done"];
 
 /** How long a row that was just checked stays where it was, and its toast with it. */
 const SETTLE_MS = 5000;
+/** How long a task just made is tinted where it landed. */
+const FRESH_MS = 1600;
+
+/** A key the Tasks page answers, `N` or `C`: bare, not typed into a field, and not the leader's next key. */
+const isTyping = (t: EventTarget | null): boolean =>
+  t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 interface Row {
   name: string;
@@ -208,6 +215,8 @@ export function TasksView({
   locked = false,
   tab = "open",
   onTab: chooseTab,
+  asking = false,
+  onAsk,
 }: {
   list: BoardTree;
   layout: TasksLayout;
@@ -220,6 +229,9 @@ export function TasksView({
   /** Which tab of the top bar is pressed: the list's statuses. */
   tab?: TaskTab;
   onTab?(next: TaskTab): void;
+  /** Whether the New task dialog is up — the top bar's button opens it, and `C` here. */
+  asking?: boolean;
+  onAsk?(open: boolean): void;
   /** Which tag's tasks to show — the URL's `tag=`. */
   tagFilter?: TagFilter;
   onTagFilter?(next: TagFilter): void;
@@ -230,6 +242,21 @@ export function TasksView({
   const [settling, setSettling] = useState<Settling | null>(null);
   /* A row's menu: its statuses, or its four priorities. */
   const [menu, setMenu] = useState<{ row: Row; at: Spot; of: "status" | "priority" } | null>(null);
+  /* The task the New task row is making, and the one just made, tinted where it landed. */
+  const [draft, setDraft] = useState<NewTaskDraft>(() => blankDraft(scope.kind === "project" ? scope.name : null));
+  const [fresh, setFresh] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement>(null);
+  /* A project filter is where a new task goes, until the person picks another. */
+  const scopedProject = scope.kind === "project" ? scope.name : null;
+  useEffect(() => setDraft((d) => ({ ...d, project: scopedProject })), [scopedProject]);
+  /* So is a tag filter: a task made while one tag is showing carries it, and stays in view. */
+  const shownTag = tagFilter.kind === "tag" ? tagFilter.name : null;
+  useEffect(() => setDraft((d) => ({ ...d, tags: shownTag ? [shownTag] : undefined })), [shownTag]);
+  useEffect(() => {
+    if (!fresh) return;
+    const t = setTimeout(() => setFresh(null), FRESH_MS);
+    return () => clearTimeout(t);
+  }, [fresh]);
 
   useEffect(() => {
     setPending((had) => {
@@ -366,6 +393,58 @@ export function TasksView({
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
   const live = locked ? undefined : onCheck;
 
+  const onMade = useCallback(
+    (name: string, open: boolean) => {
+      if (open) return onOpen(name);
+      setFresh(name);
+    },
+    [onOpen],
+  );
+  /* The New task row is the list's, on the tabs a new task lands on. */
+  const newRow = layout === "list" && tab !== "done";
+  /* A group's `+`: the New task row, with that group's value already chosen. */
+  const addTo = useCallback((status: TaskStatus) => {
+    setDraft((d) => ({ ...d, status }));
+    requestAnimationFrame(() => field.current?.focus());
+  }, []);
+  const ask = useCallback(() => {
+    if (locked) return void refuseLocked();
+    onAsk?.(true);
+  }, [locked, onAsk]);
+
+  /* `N` puts the caret in the New task row, `C` opens the dialog: bare keys, as the list's other
+     keys are, and never one typed into a field, aimed at a menu or a dialog, or after the leader. */
+  useEffect(() => {
+    let leader = false;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || isTyping(e.target) || (e.target as Element | null)?.closest?.("[role=menu], [data-dag-dialog]")) {
+        leader = false;
+        return;
+      }
+      if (e.key === " ") {
+        leader = !leader;
+        return;
+      }
+      const was = leader;
+      leader = false;
+      if (was || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      const key = e.key.toLowerCase();
+      if (key === "n" && newRow) {
+        e.preventDefault();
+        field.current?.focus();
+      } else if (key === "c" || (key === "n" && !newRow)) {
+        e.preventDefault();
+        ask();
+      }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [newRow, ask]);
+  /* A vault with no task yet: the caret is where the first one is typed. */
+  useEffect(() => {
+    if (total === 0 && newRow && !locked) field.current?.focus();
+  }, [total === 0, newRow, locked]);
+
   return (
     <main className="dag-tasks" data-dag-tasks={layout} data-dag-tasks-showing={layout === "list" ? tab : undefined}>
       <div className="dag-tasks__bar">
@@ -430,10 +509,13 @@ export function TasksView({
               )}
         </span>
       </div>
+      {newRow ? (
+        <NewTaskRow draft={draft} onDraft={setDraft} projects={projects} locked={locked} field={field} onMade={onMade} />
+      ) : null}
       {total === 0 ? (
         <p className="dag-tasks__intro" data-dag-tasks-empty="">
-          A task is a note with a status. Type a title in <strong>+ New task</strong> and press Enter, or give any note a status
-          from its own page.
+          No tasks yet. Type a title above and press Enter, or press <kbd className="dag-tasks-kbd">C</kbd> for one with a
+          description. Any note becomes a task when it is given a status on its own page.
         </p>
       ) : null}
       {layout === "board" ? (
@@ -459,15 +541,33 @@ export function TasksView({
             {[...rows]
               .sort((a, b) => compareRecent(a, b))
               .map((r) => (
-                <TaskRow key={r.name} row={r} chip={chip(r)} onOpen={onOpen} onCheck={live} onMenu={openMenu} />
+                <TaskRow
+                  key={r.name}
+                  row={r}
+                  chip={chip(r)}
+                  onOpen={onOpen}
+                  onCheck={live}
+                  onMenu={openMenu}
+                  fresh={fresh === r.name}
+                />
               ))}
           </div>
         </div>
       ) : (
         <div className="dag-tasks__groups">
           {LIST_ORDER.filter((s) => onTab(s, tab)).map((status) => (
-            <Group key={status} status={status} rows={by(status)} into={into} locked={locked}>
-              {(r) => <TaskRow key={r.name} row={r} chip={chip(r)} onOpen={onOpen} onCheck={live} onMenu={openMenu} />}
+            <Group key={status} status={status} rows={by(status)} onAdd={locked ? undefined : addTo}>
+              {(r) => (
+                <TaskRow
+                  key={r.name}
+                  row={r}
+                  chip={chip(r)}
+                  onOpen={onOpen}
+                  onCheck={live}
+                  onMenu={openMenu}
+                  fresh={fresh === r.name}
+                />
+              )}
             </Group>
           ))}
         </div>
@@ -512,6 +612,9 @@ export function TasksView({
             }),
           )}
         />
+      ) : null}
+      {asking ? (
+        <NewTaskDialog initial={{ ...draft, title: "" }} projects={projects} onClose={() => onAsk?.(false)} onMade={onMade} />
       ) : null}
       {settling ? (
         <Toast
@@ -580,6 +683,7 @@ function TaskRow({
   onOpen,
   onCheck,
   onMenu,
+  fresh = false,
 }: {
   row: Row;
   chip: Row["project"];
@@ -587,14 +691,22 @@ function TaskRow({
   /** Absent while the app is locked. */
   onCheck?(row: Row, to: TaskStatus): void;
   onMenu(row: Row, at: Spot, of?: "status" | "priority"): void;
+  /** Just made here: tinted for a moment, and brought into view. */
+  fresh?: boolean;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (fresh) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [fresh]);
   const items = r.task.items;
   const changed = r.task.changed;
   return (
     <div
+      ref={ref}
       className="dag-tasks__row"
       role="listitem"
       data-dag-task-row={r.name}
+      data-fresh={fresh ? "" : undefined}
       data-done={r.task.status === "done" ? "" : undefined}
       onContextMenu={(e: ReactMouseEvent) => {
         if (!onCheck) return;
@@ -689,14 +801,13 @@ function TaskRow({
 function Group({
   status,
   rows,
-  into,
-  locked,
+  onAdd,
   children,
 }: {
   status: TaskStatus;
   rows: Row[];
-  into: Into;
-  locked: boolean;
+  /** The heading's `+`: a new task in this group. Absent while the app is locked. */
+  onAdd?(status: TaskStatus): void;
   children(row: Row): ReactNode;
 }) {
   const [open, setOpen] = useState(status !== "done");
@@ -715,11 +826,21 @@ function Group({
           <span>{STATUS_LABEL[status]}</span>
           <span className="dag-tasks__n">{rows.length}</span>
         </button>
+        {onAdd ? (
+          <IconButton
+            size="sm"
+            className="dag-tasks__head-add"
+            aria-label={`New task in ${STATUS_LABEL[status]}`}
+            data-dag-tasks-group-add={status}
+            onClick={() => onAdd(status)}
+          >
+            <Plus size={14} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
+        ) : null}
       </h2>
       {open ? (
         <div className="dag-tasks__rows" role="list">
           {rows.map((r) => children(r))}
-          <QuickAdd status={status} into={into} locked={locked} />
         </div>
       ) : null}
     </section>

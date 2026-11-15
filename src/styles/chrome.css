@@ -6318,6 +6318,113 @@ button.dag-task-pri:focus-visible { box-shadow: var(--focus-ring); }
   color: var(--dag-color-dangerText);
 }
 
+/* The New task row (#311): the list's first line. The `+` and the title, then the pills; `N` at
+   the end while it is idle, and under it, while it holds the caret, what each key does. */
+.dag-tasks-new { border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-tasks-new__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px 0 22px;
+}
+.dag-tasks-new__row:focus-within { box-shadow: var(--focus-ring-inset); }
+.dag-tasks-new__label { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; color: var(--dag-color-slate); cursor: text; }
+.dag-tasks-new__title {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+}
+.dag-tasks-new__title::placeholder { color: var(--dag-color-slate); }
+.dag-tasks-new__title:focus { outline: none; }
+.dag-tasks-new__row[data-dag-readonly-blocked] .dag-tasks-new__label { opacity: 0.6; }
+.dag-tasks-new__row:focus-within .dag-tasks-new__key { display: none; }
+.dag-tasks-new__hint {
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0;
+  padding: 2px 16px 8px 44px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+}
+.dag-tasks-new__hint > span { display: inline-flex; align-items: center; gap: 4px; }
+.dag-tasks-new:focus-within .dag-tasks-new__hint { display: flex; }
+@container dag-tasks (max-width: 660px) {
+  .dag-tasks-new__row { flex-wrap: wrap; padding-block: 4px; }
+  .dag-tasks-new__label { flex-basis: 100%; }
+  .dag-tasks-new:focus-within .dag-tasks-new__hint { display: none; }
+}
+
+/* A property of a task being made: dashed while unset, solid once it says a value. */
+.dag-tasks-pills { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dag-tasks-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-tasks-pill[data-set] { color: var(--dag-color-ink); background: var(--dag-color-card); border-style: solid; }
+.dag-tasks-pill:hover { background: var(--dag-color-paper100); }
+.dag-tasks-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* The browser's date picker, opened by *Pick a date…*: there, under the pills, and not seen. */
+.dag-tasks-pills__date { position: absolute; right: 0; bottom: 0; width: 0; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+
+/* A task just made, where it landed: the accent's tint, fading. */
+.dag-tasks__row[data-fresh] { animation: dag-tasks-fresh 1.6s var(--dag-ui-motion-ease); }
+@keyframes dag-tasks-fresh {
+  from { background: var(--dag-color-accentSoft); }
+  to { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dag-tasks__row[data-fresh] { animation: none; background: var(--dag-color-accentSoft); }
+}
+
+/* A group heading's `+`, at the band's end. */
+.dag-tasks__head-add { flex: none; margin-right: 10px; }
+
+/* The top bar's New task: the primary button, its key inside it. */
+.dag-tasks__new { gap: 6px; }
+.dag-tasks__new .dag-tasks-kbd,
+.dag-task-dialog__foot .dag-button--primary .dag-tasks-kbd { color: inherit; background: transparent; border-color: currentColor; opacity: 0.8; }
+
+/* The New task dialog: a title, a description, the pills, and the footer. */
+.dag-task-dialog { width: 600px; padding: 0; }
+.dag-task-dialog__head { display: flex; align-items: center; padding: 12px 12px 0 18px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-task-dialog__body { display: flex; flex-direction: column; gap: 8px; padding: 4px 18px 16px; }
+.dag-task-dialog__title,
+.dag-task-dialog__description {
+  padding: 0;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  resize: none;
+}
+.dag-task-dialog__title { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+.dag-task-dialog__description { min-height: 60px; font-size: var(--chrome-text-md); line-height: 1.5; }
+.dag-task-dialog__title::placeholder,
+.dag-task-dialog__description::placeholder { color: var(--dag-color-slate); }
+.dag-task-dialog__title:focus,
+.dag-task-dialog__description:focus { outline: none; }
+.dag-task-dialog__body .dag-tasks__add-problem { padding: 0; }
+.dag-task-dialog__foot { align-items: center; gap: 8px; margin: 0; padding: 12px 18px; border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-task-dialog__keep { display: inline-flex; align-items: center; gap: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); cursor: pointer; }
+
 /* The board: three columns, a card per task. */
 .dag-tasks__columns { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; align-items: start; padding: 16px 24px 0; }
 .dag-tasks__column {

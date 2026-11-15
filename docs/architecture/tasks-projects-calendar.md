@@ -22,12 +22,12 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
 | Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
-| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
+| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **New task** row as the list's first line (`N` puts the caret in it) with pills for priority, project and due date — Enter makes the task and keeps the row open with the pills as they were, shift+Enter makes it and opens it, Tab walks the pills, Escape clears and leaves, a refusal says why and keeps the title, and the lock's notice answers while read only — and a `+` on each group heading that opens it with that group's status; a **New task dialog** (`C`, or the top bar's primary button) with a title, a description, the four pills and *Keep this open for the next one*; the board keeps a box at the foot of each column |
 | the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Priority* (the row's menu), *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
 | a board, or a note, embedding one | a card — status as a button, title, priority, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
 | `?view=1`, a snapshot, the PDF | the status, priority and date on a line above the text |
 
-Ten things are load-bearing:
+Eleven things are load-bearing:
 
 - **Everything a note is, a task is**, because it is one: the file is `.note.md`, the kind is `note`,
   and the editor, the references in its description, backlinks, search, export
@@ -70,6 +70,16 @@ Ten things are load-bearing:
   to press. A menu row's key picks it while the menu is open — `1`–`4`, and `0` for none.
   `POST /__board/task` takes `priority` (`null` takes it out), `task_create` and `task_set` take it
   (`"none"` takes it out), `task_list` says it, and *Not a task* takes it out with the status.
+- **A new task is one create with every line in it** (#311). The New task row and the dialog both
+  build the text with `newTaskText` (`src/ui/NewTask.tsx`) — the title, `status:`, `priority:` and
+  `due:` through `withTask`, the description as the body — and send one `POST /__board/create`, so a
+  task is never made and then written again. A project is where the file goes: the project pill
+  makes the task in that project's folder, and with a project filter on the pill starts on it. With
+  a tag filter on, the task is made carrying that tag (`withTags` on the same text), so it stays in
+  view. A pill is dashed while unset and solid once it says a value; its menu is the row's, with the same
+  icons and keys. The task just made is tinted where it lands, for a moment, and scrolled into view.
+  `N` and `C` are bare keys on the page, answered only when nothing is being typed into, no menu or
+  dialog has the key, and the key does not follow the leader (space).
 - **The listing carries three facts that are never a line in the file**: `items`, the check items
   the body ticks of all it has (`- [ ]`, `1. [x]`, as remark's GFM reads one, and none inside a code
   fence); `body`, whether there is any text under the frontmatter; and `changed`, the file's own
@@ -115,7 +125,9 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, `dag-tasks-menu*`,
 `dag-tasks-kbd`, `data-dag-task-menu*`, `data-dag-tasks-tab`, `data-dag-tasks-showing`,
 `data-dag-task-toast`, `data-dag-task-undo`, `data-dag-task-items`, `data-dag-task-page`,
-`data-dag-task-changed`, `data-dag-task-more`, `data-dag-task-priority`, `data-dag-taskbar-priority`,
+`data-dag-task-changed`, `data-dag-task-more`, `dag-tasks-new*`, `dag-tasks-pill*`, `dag-task-dialog*`,
+`dag-tasks__new`, `dag-tasks__head-add`, `data-dag-task-new*`, `data-dag-task-dialog*`, `data-dag-tasks-new`,
+`data-dag-tasks-group-add`, `data-fresh` on a row, the keyframes `dag-tasks-fresh`, `data-dag-task-priority`, `data-dag-taskbar-priority`,
 `data-dag-taskbar-priority-menu`, `data-dag-taskline-priority`, `data-dag-embed-priority`, `data-priority`
 on `.dag-task-priority`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
 `data-dag-tasks-look-done`, `data-today` on a due date, the storage keys `dag:tasks-view` and
