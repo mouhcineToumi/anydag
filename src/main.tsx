@@ -51,6 +51,7 @@ import { loadVaults } from "./vault/api";
 import { desktop } from "./vault/desktop";
 import { setLocale } from "./locale";
 import { settleVault, watchVault } from "./vault/current";
+import { installHistory } from "./ui/history";
 import { watchWindowInset } from "./ui/windowInset";
 import "./styles/base.css";
 import "./styles/chrome.css";
@@ -192,6 +193,11 @@ async function start(): Promise<void> {
   const Page: ComponentType | null = !account
     ? null
     : await (id ? topPage(new URLSearchParams(location.search).get("view") === "1") : noVaultPage()).catch(failed);
+
+  /* The window's history, marked before the first render so Back/Forward know where they are and
+     the desktop's keys are the first listener the window has. A read-only view is not the app's
+     history and draws no arrows. */
+  if (id && new URLSearchParams(location.search).get("view") !== "1") installHistory();
 
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

@@ -197,8 +197,8 @@ test("a click below the last block gives an empty paragraph, and leaving without
   await expect(last).toHaveText("");
   const id = await last.getAttribute("data-id");
   await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
-  /* Leaving without a letter typed writes not one byte — the empty paragraph is the editor's until
-     it holds words, and Markdown has no empty paragraph to write. */
+  /* Leaving without a letter typed writes not one byte — an empty paragraph after the last block is
+     the editor's until it holds words; only one between two blocks is written (#318). */
   await page.goto("about:blank");
   await page.waitForTimeout(400);
   expect(read()).toBe(md);
@@ -228,6 +228,59 @@ test("Arrow down at the end of a last paragraph gives an empty paragraph too", a
   await expect(blocks).toHaveCount(3);
   const id = await blocks.last().getAttribute("data-id");
   await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+});
+
+/*
+ * Empty lines between paragraphs (#318). Markdown has no empty paragraph, so Enter pressed twice
+ * between two paragraphs wrote nothing, and the lines were gone once the note was left and opened
+ * again. An empty line between two blocks is now `&nbsp;` on a line of its own.
+ */
+test("empty lines made between two paragraphs are still there after leaving the note and coming back", async ({ page }) => {
+  fs.writeFileSync(file, "The first paragraph.\n\nThe second paragraph.\n");
+  const other = path.join(DIR, `${name}-other.note.md`);
+  fs.writeFileSync(other, "Another note.\n");
+  made.push(other);
+  await open(page);
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(2);
+  await endOf(page, "The first paragraph.");
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Enter");
+  await expect(blocks).toHaveCount(5);
+  const lines = "The first paragraph.\n\n&nbsp;\n\n&nbsp;\n\n&nbsp;\n\nThe second paragraph.\n";
+  await expect.poll(read, { timeout: 5_000 }).toBe(lines);
+
+  /* Another note, from the list, and back the same way. */
+  await openBoards(page);
+  await page.fill(".dag-panel__input", name);
+  await page.locator(`[data-dag-note="${name}-other"]`).click();
+  await expect(block(page, "Another note.")).toBeVisible();
+  await openBoards(page);
+  await page.fill(".dag-panel__input", name);
+  await page.locator(`[data-dag-note="${name}"]`).click();
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(block(page, "The second paragraph.")).toBeVisible();
+  await expect(blocks).toHaveCount(5);
+  for (const i of [1, 2, 3]) await expect(blocks.nth(i)).toHaveText("");
+
+  /* A fresh page — what a restart reads — draws them too, and the file did not move. */
+  await open(page);
+  await expect(blocks).toHaveCount(5);
+  expect(read()).toBe(lines);
+});
+
+test("a note another tool wrote with several blank lines opens as its paragraphs and is not rewritten", async ({ page }) => {
+  const md = "# The plan\n\n\n\nThe first paragraph.\n\n\n\n\nThe second paragraph.\n\n\n";
+  fs.writeFileSync(file, md);
+  const before = fs.statSync(file).mtimeMs;
+  await open(page);
+  /* Blank lines are one break in Markdown, so they open as one, as every other page draws them. */
+  await expect(page.locator(".bn-block-outer")).toHaveCount(3);
+  await block(page, "The second paragraph.").click();
+  await page.waitForTimeout(800);
+  await page.goto("about:blank");
+  await page.waitForTimeout(400);
+  expect(read()).toBe(md);
+  expect(fs.statSync(file).mtimeMs).toBe(before);
 });
 
 test("the slash menu offers only what a Markdown file can say", async ({ page }) => {

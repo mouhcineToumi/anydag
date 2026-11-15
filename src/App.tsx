@@ -38,6 +38,19 @@ import { Shortcuts } from "@/edit/Shortcuts";
 import { WhichKey } from "@/edit/WhichKey";
 import { useSettingsOpen } from "@/settings/open";
 import type { LlmReason } from "@/settings/llmReason";
+import {
+  historyAt,
+  historyCanForward,
+  historyPlace,
+  installHistory,
+  markHistoryPlace,
+  pushHistory,
+  replaceHistory,
+  resolvePlace,
+  resolvePlaceId,
+  type HistoryPlace,
+  type PlaceAnswer,
+} from "@/ui/history";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor } from "@/edit/useEditor";
 import { Item } from "@/render/Item";
@@ -126,14 +139,128 @@ import { track } from "@/telemetry/client";
 /**
  * `?board=` picks the file, `?page=` the page, `?theme=` the look, `?snapshot=1` strips the chrome —
  * and `?note=` picks a note instead of a board, which is a different page altogether.
+ *
+ * **Opening something is a new history entry; changing the thing it is on is not.** A file or a
+ * page from the sidebar, the search or a reference is a `pushState`, so Back and Forward walk the
+ * documents this window visited (`ui/history.ts`); a theme, a tab, a run or a rename of the open
+ * file is a `replaceState`, because it is the same place under a new coat.
+ *
+ * **A history entry names a file, and carries its id.** The address has the name a person can
+ * read; the state has the id, so an entry whose file was renamed is followed to the name it has
+ * now, and one whose file was trashed is skipped — before the page renders a 404 for it.
  */
-function useQuery() {
+function useQuery(list: BoardTree) {
   const [q, setQ] = useState(() => new URLSearchParams(location.search));
+  /* The listing the pop handler reads: the app's own list is fetched above this, and a rename the
+     server has told it about is the whole answer a stale entry needs. */
+  const listing = useRef(list);
+  listing.current = list;
+  /* Where the window was at the last press, so a pop knows which way it went. */
+  const seen = useRef<number | null>(null);
+  /* A pop whose file cannot be checked until the listing lands; settled by the effect below. */
+  const waiting = useRef<{ next: URLSearchParams; place: HistoryPlace; direction: 1 | -1 } | null>(null);
+  /* A pop that is asking the server about a missing id; a second press must win over it. */
+  const asked = useRef(0);
+
+  /* Home, as a replacement: the entry was a file that is gone, so Back and Forward keep their
+     places and no new entry is made to say so. */
+  const settleHome = useCallback(() => {
+    const next = new URLSearchParams(location.search);
+    for (const k of PAGE_KEYS) next.delete(k);
+    next.delete("ref");
+    replaceHistory(`${location.pathname}?${next}`, null);
+    setQ(next);
+  }, []);
+
+  /* A dead entry is walked past in the direction the window was already going. At the end of the
+     history there is nowhere left to walk, and home is the one page that is never broken. */
+  const skip = useCallback(
+    (direction: 1 | -1) => {
+      if (direction < 0 && historyAt() > 0) history.back();
+      else if (direction > 0 && historyCanForward()) history.forward();
+      else settleHome();
+    },
+    [settleHome],
+  );
+
+  /* The entry's file under the name it has now, in the entry it is on: a rename is followed. */
+  const follow = useCallback((next: URLSearchParams, place: HistoryPlace) => {
+    const fixed = new URLSearchParams(next);
+    for (const kind of FILE_KINDS) fixed.delete(kind);
+    fixed.set(place.kind, place.name);
+    replaceHistory(`${location.pathname}?${fixed}${location.hash}`, place);
+    setQ(fixed);
+  }, []);
+
+  const settle = useCallback(
+    (next: URLSearchParams, place: HistoryPlace, direction: 1 | -1) => {
+      const run = ++asked.current;
+      const answer: PlaceAnswer = resolvePlace(place, listing.current);
+      if (answer.state === "wait") {
+        waiting.current = { next, place, direction };
+        return;
+      }
+      if (answer.state === "same") {
+        setQ(new URLSearchParams(next));
+        return;
+      }
+      if (answer.state === "moved") {
+        follow(next, answer.place);
+        return;
+      }
+      /* The listing says the file is gone. Ask the server by id before believing a list that may
+         be one round trip behind a rename made a moment ago; a 404 is the answer that skips. */
+      void (async () => {
+        if (place.id) {
+          try {
+            const found = await resolvePlaceId(place.id);
+            if (run !== asked.current) return;
+            if (found) return follow(next, { ...found, id: place.id });
+          } catch {
+            /* Not an answer about the file: show the page and let it say what the server said. */
+            if (run !== asked.current) return;
+            return void setQ(new URLSearchParams(next));
+          }
+        }
+        if (run !== asked.current) return;
+        skip(direction);
+      })();
+    },
+    [follow, skip],
+  );
+
+  /* A pop arrives with the correct address; the page only adopts it once the file it names is
+     known to be there, so a dead entry is walked past without drawing a broken page first. */
   useEffect(() => {
-    const onPop = () => setQ(new URLSearchParams(location.search));
+    installHistory();
+    seen.current = historyAt();
+    const onPop = () => {
+      const now = historyAt();
+      const was = seen.current;
+      seen.current = now;
+      asked.current += 1;
+      waiting.current = null;
+      const direction: 1 | -1 | 0 = was === null || now === was ? 0 : now > was ? 1 : -1;
+      const next = new URLSearchParams(location.search);
+      const place = historyPlace();
+      if (!place || direction === 0) {
+        setQ(next);
+        return;
+      }
+      settle(next, place, direction);
+    };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
-  }, []);
+  }, [settle]);
+
+  /* The listing arrived: the pop held for it can be decided now. */
+  useEffect(() => {
+    const held = waiting.current;
+    if (!held || !list.fresh) return;
+    waiting.current = null;
+    settle(held.next, held.place, held.direction);
+  }, [list.fresh, settle]);
+
   /* One key, or several in one go. Several matters: opening a board sets `board` and clears
      `page` together, and two `replaceState` calls would leave the URL holding the new board
      beside the old board's page for a render — which is exactly the state this is here to avoid. */
@@ -145,17 +272,31 @@ function useQuery() {
       else next.set(k, v);
     }
     /* The hash survives: it is the block or the item a reference named (`dag:<id>#^para`). */
-    history.replaceState(null, "", `${location.pathname}?${next}${location.hash}`);
+    replaceHistory(`${location.pathname}?${next}${location.hash}`);
     setQ(next);
   }, []);
-  /* A new place to be, as a new entry in the history: what following a reference is, so the
-     browser's Back returns to the document that named it, as it did when following one loaded a page.
-     Everything else the page does replaces the entry it is on. */
-  const go = useCallback((next: URLSearchParams) => {
-    history.pushState(null, "", `${location.pathname}?${next}`);
+  /* A new place to be, as a new entry in the history: what opening a document or a page is, and
+     what following a reference is, so Back returns to what was left. In one go, and with the hash
+     of a part a reference named. */
+  const go = useCallback((next: URLSearchParams, place: HistoryPlace | null = null) => {
+    const at = pushHistory(`${location.pathname}?${next}${location.hash}`, place);
+    seen.current = at;
     setQ(new URLSearchParams(next));
   }, []);
-  return [q, set, go] as const;
+  /* The same one or several keys as `set`, as a new entry — a listing page, a board's own page. */
+  const goSet = useCallback(
+    (key: string | Record<string, string | null>, value?: string | null) => {
+      const next = new URLSearchParams(location.search);
+      const pairs = typeof key === "string" ? { [key]: value ?? null } : key;
+      for (const [k, v] of Object.entries(pairs)) {
+        if (v === null) next.delete(k);
+        else next.set(k, v);
+      }
+      go(next);
+    },
+    [go],
+  );
+  return [q, set, go, goSet] as const;
 }
 
 /** Which file an id is, off the list — only a list the server has answered since the page loaded. */
@@ -226,6 +367,7 @@ const GROUP_HANDLES = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 const CONNECT_SIDES = ["n", "s", "e", "w"] as const;
 
 type SetQuery = ReturnType<typeof useQuery>[1];
+type GoPage = ReturnType<typeof useQuery>[3];
 
 /**
  * The query that opens one file of any kind: its own key set, and every other page's cleared.
@@ -272,7 +414,11 @@ const PAGE_KEYS = Object.keys(pageQuery("board", null));
  * `?note=` and `?board=` are exclusive: opening either clears the other.
  */
 export function App() {
-  const [query, setQuery, go] = useQuery();
+  /* One subscription to the list for the whole window, not one per page — the sidebar lives above
+     both pages and reads the same answer the search and the feedback card do. **Before the query**,
+     because a pop back to a renamed file is answered by the list. */
+  const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
+  const [query, setQuery, go, goSet] = useQuery(list);
   /* `?tasks=1` is the third page, and `?quizzes=1` and `?quiz=` the fourth and fifth
 : each exclusive with the others, as the first two are with each other. */
   const tasks = query.get("tasks") === "1";
@@ -295,28 +441,43 @@ export function App() {
   const file = listing || quiz || table ? null : query.get("file");
   const note = listing || quiz || table || file ? null : query.get("note");
   const board = listing || quiz || table || file || note ? null : query.get("board");
-  /* One subscription to the list for the whole window, not one per page — the sidebar lives above
-     both pages and reads the same answer the search and the feedback card do. */
-  const { tree: list, failed: listFailed, retry: retryList } = useBoardList(useAccount()?.uid ?? null);
   useFollowing(list, go);
   /* The pages and cards this one did not need (`ui/chunks.tsx`), fetched once it is drawn. */
   useEffect(() => {
     preloadChunks();
   }, []);
-  const open = useCallback((kind: FileKind, target: string | null) => setQuery(pageQuery(kind, target)), [setQuery]);
-  const openTasks = useCallback(() => setQuery({ ...pageQuery("board", null), tasks: "1" }), [setQuery]);
-  const openCalendar = useCallback(() => setQuery({ ...pageQuery("board", null), calendar: "1" }), [setQuery]);
-  const openTrash = useCallback(() => setQuery({ ...pageQuery("board", null), trash: "1" }), [setQuery]);
+  /*
+   * A document from the sidebar, the search or a reference. A new history entry, except for the
+   * file that is already open — a row pressed twice is not somewhere new — and for the operations
+   * that follow a rename or a delete of it, which are the same place under another name.
+   */
+  const open = useCallback(
+    (kind: FileKind, target: string | null, options?: { replace?: boolean }) => {
+      const pairs = pageQuery(kind, target);
+      const same = target !== null && query.get(kind) === target && FILE_KINDS.every((k) => k === kind || !query.get(k));
+      if (options?.replace || same) {
+        setQuery(pairs);
+        return;
+      }
+      const id = target ? list.ids[target] : undefined;
+      goSet(pairs);
+      if (target) markHistoryPlace(id ? { kind, name: target, id } : { kind, name: target });
+    },
+    [setQuery, goSet, query, list.ids],
+  );
+  const openTasks = useCallback(() => goSet({ ...pageQuery("board", null), tasks: "1" }), [goSet]);
+  const openCalendar = useCallback(() => goSet({ ...pageQuery("board", null), calendar: "1" }), [goSet]);
+  const openTrash = useCallback(() => goSet({ ...pageQuery("board", null), trash: "1" }), [goSet]);
   /* The Assistant page, on a chat; `1` is the newest one the vault has. */
   const openAssistantPage = useCallback(
-    (chat?: string | null) => setQuery({ ...pageQuery("board", null), chat: chat ?? "1" }),
-    [setQuery],
+    (chat?: string | null) => goSet({ ...pageQuery("board", null), chat: chat ?? "1" }),
+    [goSet],
   );
   /* The Quizzes page, or — with `run: "mistakes"` — the Mistakes run it starts, or with `folder:<path>`
      every quiz in a folder as one run. */
   const openQuizzes = useCallback(
-    (run?: QuizzesRun) => setQuery({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
-    [setQuery],
+    (run?: QuizzesRun) => goSet({ ...pageQuery("board", null), quizzes: "1", run: run ?? null }),
+    [goSet],
   );
   /* Home: no page open, so `Welcome` renders. Every page's key cleared — the vault, the theme and
      the rest of the address kept — as a new history entry, so Back returns to the page that was
@@ -341,6 +502,23 @@ export function App() {
     const name = kind ? opened[kind] : null;
     if (kind && name) rememberOpened(kind, name);
   }, [opened]);
+
+  /* The entry the window is on learns the file's id, and keeps up with its name: a cold address
+     has no id until the listing answers, and a file renamed while it is open is the same entry
+     under a new name. `resolvePlace` on a later pop is what reads it. */
+  useEffect(() => {
+    if (query.get("snapshot") === "1") return;
+    const kind = FILE_KINDS.find((k) => query.get(k) !== null);
+    const name = kind ? query.get(kind) : null;
+    /* A page that names no file — home, a listing — is no filed entry any more: a delete of the
+       open file replaces its entry with home, and that entry must not still point at the file. */
+    if (!kind || !name) {
+      markHistoryPlace(null);
+      return;
+    }
+    const id = list.ids[name];
+    markHistoryPlace(id ? { kind, name, id } : { kind, name });
+  }, [query, list.ids]);
 
   /* `?ref=<id>` is how a reference is followed: an id, never a name, so a link survives
      the target being renamed or moved. It is resolved once and replaced by the name it stands for
@@ -396,9 +574,18 @@ export function App() {
   ) : file ? (
     <FileApp name={file} query={query} setQuery={setQuery} list={list} open={open} />
   ) : note ? (
-    <NoteApp name={note} query={query} setQuery={setQuery} list={list} openTrash={openTrash} goHome={goHome} />
+    <NoteApp
+      name={note}
+      query={query}
+      setQuery={setQuery}
+      goSet={goSet}
+      list={list}
+      open={open}
+      openTrash={openTrash}
+      goHome={goHome}
+    />
   ) : (
-    <BoardApp query={query} setQuery={setQuery} list={list} openTrash={openTrash} goHome={goHome} />
+    <BoardApp query={query} setQuery={setQuery} goSet={goSet} list={list} open={open} openTrash={openTrash} goHome={goHome} />
   );
   /* A snapshot is a picture of a board, and a picture of a board is a fact about the file: no
      sidebar, and not even the shell around the page, so the 45 baselines see exactly the `.dag-app`
@@ -1404,14 +1591,19 @@ function NoteApp({
   name,
   query,
   setQuery,
+  goSet,
   list,
+  open,
   openTrash,
   goHome,
 }: {
   name: string;
   query: URLSearchParams;
   setQuery: SetQuery;
+  /** The Tasks and Calendar pages, from a project's bar: pages somebody went to, so entries. */
+  goSet: GoPage;
   list: BoardTree;
+  open(kind: FileKind, name: string | null, options?: { replace?: boolean }): void;
   openTrash(): void;
   goHome(): void;
 }) {
@@ -1444,10 +1636,10 @@ function NoteApp({
     const id = list.ids[name];
     return {
       counts,
-      onTasks: id ? () => setQuery({ ...pageQuery("board", null), tasks: "1", project: id }) : undefined,
-      onCalendar: id ? () => setQuery({ ...pageQuery("board", null), calendar: "1", project: id }) : undefined,
+      onTasks: id ? () => goSet({ ...pageQuery("board", null), tasks: "1", project: id }) : undefined,
+      onCalendar: id ? () => goSet({ ...pageQuery("board", null), calendar: "1", project: id }) : undefined,
     };
-  }, [project, name, list.projects, list.titles, list.tasks, list.ids, setQuery]);
+  }, [project, name, list.projects, list.titles, list.tasks, list.ids, goSet]);
   const sidebar = useSidebar();
 
   /*
@@ -1563,8 +1755,6 @@ function NoteApp({
     },
     [setTheme, query, setQuery],
   );
-
-  const open = useCallback((kind: FileKind, target: string | null) => setQuery(pageQuery(kind, target)), [setQuery]);
 
   usePageKeys(snapshot, { settings: settings.toggle, search: () => setBrowsing(true) });
   const locked = useLocked() && !snapshot;
@@ -1722,13 +1912,18 @@ function NoteApp({
 function BoardApp({
   query,
   setQuery,
+  goSet,
   list,
+  open,
   openTrash,
   goHome,
 }: {
   query: URLSearchParams;
   setQuery: SetQuery;
+  /** A board's own page, as a new history entry: the strip's tabs are pages somebody visits. */
+  goSet: GoPage;
   list: BoardTree;
+  open(kind: FileKind, name: string | null, options?: { replace?: boolean }): void;
   openTrash(): void;
   goHome(): void;
 }) {
@@ -1770,10 +1965,10 @@ function BoardApp({
      — `page-2` on a board that has one page is a blank canvas with no tab selected — so the two
      keys move together, in one `replaceState`. Renaming the open board is not this: it is the
      same document under a new name, and the page it was on is still the page it is on. */
-  const openBoard = useCallback((name: string | null) => setQuery(pageQuery("board", name)), [setQuery]);
-  const openNote = useCallback((name: string | null) => setQuery(pageQuery("note", name)), [setQuery]);
+  const openBoard = useCallback((name: string | null) => open("board", name), [open]);
+  const openNote = useCallback((name: string | null) => open("note", name), [open]);
   /* What an import just made, of whatever kind its name said (`importKind`). */
-  const openImported = useCallback((made: string, kind: FileKind = "board") => setQuery(pageQuery(kind, made)), [setQuery]);
+  const openImported = useCallback((made: string, kind: FileKind = "board") => open(kind, made), [open]);
 
   /* Declared before the theme, which now needs it: a snapshot reads no stored preference. */
   const snapshot = query.get("snapshot") === "1";
@@ -1883,7 +2078,7 @@ function BoardApp({
     onBoards: toggleBrowser,
     onSettings: settings.toggle,
     onOpenBoard: openImported,
-    onOpenPage: (p) => setQuery("page", p),
+    onOpenPage: (p) => goSet("page", p),
   });
   const { places, selected, editing, ctl } = editor;
 
@@ -2758,12 +2953,12 @@ function BoardApp({
             board={boardName}
             quizzes={list.quizzes}
             files={list.files}
-            onOpen={(kind, target) => setQuery(pageQuery(kind, target))}
+            onOpen={open}
             onOpenAt={(kind, target, part) => {
               /* The part goes into the hash first, so the page that opens finds it there — and the
                  board already open, which does not reopen, hears it through `dag:target`. */
               setTarget(part ?? null);
-              if (kind !== "board" || target !== boardName) setQuery(pageQuery(kind, target));
+              if (kind !== "board" || target !== boardName) open(kind, target);
             }}
             onClose={closeBrowser}
           />
@@ -2783,13 +2978,7 @@ function BoardApp({
         {/* Nothing open, so there is nothing to draw on and nothing to photograph: a snapshot of a
             board that is not there is a picture of this card, which is never what was asked for. */}
         {!snapshot && !boardName ? (
-          <Welcome
-            locked={locked}
-            list={list}
-            onStart={startFromHome}
-            onOpenFile={(kind, name) => setQuery(pageQuery(kind, name))}
-            onOpen={openBrowser}
-          />
+          <Welcome locked={locked} list={list} onStart={startFromHome} onOpenFile={open} onOpen={openBrowser} />
         ) : null}
         {/* Never under `?snapshot=1`: a picture of a board is a fact about the board, and this is
             a dialog that would be in it. The same rule the settings card and the dock follow. */}

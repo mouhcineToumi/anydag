@@ -155,7 +155,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | Where | What it does |
 |---|---|
 | the sidebar | **Calendar** opens the page; **New event** makes `untitled` at the next whole hour, an hour long, and names it in its title; an event's row wears a calendar clock; a row's menu makes a plain note an event, or an event a note |
-| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a right-click on one — or `shift+F10` — opens its menu, a drag or a click on empty time makes an event, a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
+| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a right-click on one — or `shift+F10` — opens its menu, a drag or a click on empty time opens a card for the event's title, start and end, all-day and description, and Enter makes it; a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
 | an event's own page | its properties under the title — all day, the start, the end and the zone they are shown in, each label acting on the value beside it; the top bar's `⋯` has *Not an event*, and a plain note's has *Make it an event* |
 | a task's own page | a *Starts* date beside *Due* |
 | a board | a placed event's card says *Event* and when |
@@ -189,8 +189,8 @@ Ten things are load-bearing:
   the viewer's zone and a step is `setDate` (see *Things that will bite*); `itemsOf` places every task,
   event and note of the kinds shown; `lanes` packs a run of days' bars lowest-lane-first; `blocks`
   cuts timed events to a day and splits overlapping ones into columns; `fieldsOf`, `eventFrom`,
-  `withStart` (which keeps an event's length), `withEnd` and `withAllDay` are what the event bar
-  writes.
+  `withStart` (which keeps an event's length), `withEnd` and `withAllDay` are what the event bar and
+  the creation card write.
 - **A timed event of a day or more goes in the all-day row**, as every calendar draws a trip; shorter,
   it is in the hour grid, cut at midnight into each day it touches. A month caps a week at four lanes
   and says how many more a day holds, which opens that day on its own. **A day's number is a 24px
@@ -199,8 +199,14 @@ Ten things are load-bearing:
   24px floor `e2e/touch-targets.spec.ts` holds.
 - **A drag on empty time makes an event, and a drag on an event or a task moves it**. A
   press anywhere but on an item starts a range, snapped to a quarter of an hour in the grid and to days
-  in the all-day row and a month, and a small card asks for the title; the file is named after it, in
-  the project's folder when the page shows one — the Tasks page's rule. **The title is the file's,
+  in the all-day row and a month, and a card asks for the event's details: its title, its start and its
+  end (prefilled from the range, each a date and — timed — a time), an all-day switch, and an optional
+  description. **Enter in the title still makes the event at once**, so the quick path stays one step;
+  the other fields are the event bar's, through the same writers (`withStart`, `withEnd`,
+  `withAllDay`), so a changed start keeps the length, an end that would come before the start is
+  moved an hour on, the switch moves the event to the all-day row, and every time is shown and
+  written in the viewer's zone. The description is the note's body, under its frontmatter. The file
+  is named after the title, in the project's folder when the page shows one — the Tasks page's rule. **The title is the file's,
   once**: `/create` names the file after the title and drops the `title:` line, so the event's own
   page reads the leaf of its name as its title (*Notes*), and the bar above agrees. A press on an
   item that does not move is a click that opens it (a real link, so a modifier opens a tab). One that

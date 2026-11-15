@@ -7,15 +7,21 @@
  * Electron shell, and prints one line per measurement. Nothing outside that temp folder is read or
  * written but the built bundles, and the folder is removed by its exact path when the run ends.
  *
- *   node scripts/bench.mjs [--quick] [--guard] [--sizes 100,1000,10000,50000] [--only <groups>]
- *                          [--json <file>] [--keep]
+ *   node scripts/bench.mjs [--quick] [--guard] [--release] [--save] [--sizes 100,1000,10000,50000]
+ *                          [--only <groups>] [--json <file>] [--keep]
  *
  *   --quick   small steps only (vaults of 100 and 1k files, boards of 10 and 100 items, diagrams of
  *             50 and 200 nodes, attachments of 1 and 10 MB): a few minutes; the whole run is ~25
  *   --guard   only the nightly guards, each against its ceiling in `scripts/bench-guard.json`;
  *             exit 1 when one is over (see *The guards* below)
+ *   --release one Markdown table of the fixed release rows, with the release before it beside them
+ *             (see *The release table* below); it needs a 1k-file vault and a 500-item board, so
+ *             `--quick` is the short run and the whole bench is the long one
+ *   --save    with --release, also write this run to `docs/bench/<VERSION>.json`, the file the next
+ *             release is compared with; refuses a row the run could not measure
  *   --sizes   the vault sizes, in files (default 100,1000,10000,50000)
- *   --only    a comma list of groups: vault, page, board, attach, leak, desktop (default all)
+ *   --only    a comma list of groups: vault, page, board, attach, leak, desktop (default all; with
+ *             --release, the four groups its rows come from)
  *   --json    also write every measurement, with the machine, to this file
  *   --keep    leave the temp folder in place and say where it is
  *
@@ -33,6 +39,15 @@
  * not finish inside its limit (that is a measurement: it is where something breaks). Units: `ms`,
  * `s`, `MB`, `%` (of one core, averaged over the window the note names), `count`. `--json` writes
  * `{ machine, started, args, results: [{ metric, value, unit, note }] }`.
+ *
+ * **The release table** (`--release`) is what a release carries (#328): the run ends with one
+ * Markdown table, ready to paste into the release notes, whose ten rows never change — startup to a
+ * drawn board, the page's first search, the server's memory at rest, the 1k-file vault's `/list`,
+ * `/index` and `/search` cold and warm, and a 500-item board to `data-dag-ready`. The previous
+ * release's numbers sit beside them, read from `docs/bench/<version>.json` (`--save` writes that
+ * file), so the comparison works offline and a change to a number is a diff in a pull request. The
+ * rows are in `scripts/bench-release.mjs`; the release step is in `docs/RELEASING.md`, and it is not
+ * run in CI: the numbers are the release machine's, and a runner's are not comparable.
  *
  * **What is measured, and how.**
  * - *vault.<n>*: the server started on a vault of n files (90% notes, 4% tasks among them, boards,
@@ -81,6 +96,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { missingReleaseRows, previousRelease, RELEASE_DIR, releaseTable, releaseValues, writeRelease } from "./bench-release.mjs";
 import { storageState } from "./session.mjs";
 
 const require = createRequire(import.meta.url);
@@ -104,16 +120,30 @@ const opt = (name, dflt) => {
 };
 const QUICK = argv.includes("--quick");
 const GUARD = argv.includes("--guard");
+const RELEASE = argv.includes("--release");
+const SAVE = argv.includes("--save");
 const KEEP = argv.includes("--keep");
 const JSON_OUT = opt("--json", null);
+if (SAVE && !RELEASE) {
+  console.error("bench: --save writes the release table's numbers — use it with --release");
+  process.exit(2);
+}
+if (RELEASE && GUARD) {
+  console.error("bench: --release prints the release table and --guard the nightly guards — run one at a time");
+  process.exit(2);
+}
 /** How long the vault group's server lets its grammar worker idle before ending it, in ms. */
 const REST_MS = 10_000;
 const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
   .split(",")
   .map(Number)
   .filter((n) => Number.isInteger(n) && n > 0);
-const ONLY = new Set(opt("--only", "vault,page,board,attach,leak,desktop").split(","));
+/* The release rows are made on a 1k-file vault and a 500-item board; a --sizes or --quick that
+   leaves either out gets it back, so the table always has the same ten rows to show. */
+if (RELEASE && !SIZES.includes(1000)) SIZES.push(1000);
+const ONLY = new Set((RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop")).split(","));
 const BOARD_ITEMS = QUICK ? [10, 100] : [10, 100, 500, 2000];
+if (RELEASE && !BOARD_ITEMS.includes(500)) BOARD_ITEMS.push(500);
 const DIAGRAM_NODES = QUICK ? [50, 200] : [50, 200, 500, 1000];
 const ATTACH_MB = QUICK ? [1, 10] : [1, 10, 100, 500];
 /** Any one step: past this it is `timeout`, which is where that thing breaks. */
@@ -1384,9 +1414,11 @@ async function main() {
   console.log(`# AnyDag bench · ${started}`);
   console.log(`# ${m.cpu} · ${m.cores} cores · ${m.memoryGB} GB · ${m.os} · ${m.arch} · Node ${m.node}`);
   console.log(`# temp: ${work}  (${m.disk})`);
+  if (RELEASE) console.log("# release: the table's ten rows, a 1k-file vault and a 500-item board");
   const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board");
   const b = wantBrowser ? await launchBrowser() : null;
-  if (b) console.log(`# Chromium ${b.browser.version()}`);
+  const chromiumVersion = b ? b.browser.version() : null;
+  if (b) console.log(`# Chromium ${chromiumVersion}`);
   let code = 0;
   try {
     if (GUARD) {
@@ -1410,6 +1442,44 @@ async function main() {
   if (JSON_OUT) {
     fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine: m, started, args: argv, results }, null, 2)}\n`);
     console.log(`# wrote ${JSON_OUT}`);
+  }
+  if (RELEASE) {
+    const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
+    const dir = path.join(root, RELEASE_DIR);
+    const previous = previousRelease(dir, version);
+    const machineLine = [
+      m.cpu,
+      `${m.cores} cores`,
+      `${m.memoryGB} GB`,
+      m.os,
+      m.arch,
+      `Node ${m.node}`,
+      chromiumVersion ? `Chromium ${chromiumVersion}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (SAVE) {
+      /* A baseline with a hole in it is worse than none: the next release would compare a number
+         with an em dash and nobody would know whether the app or the run was missing. */
+      const missing = missingReleaseRows(results);
+      if (missing.length) {
+        console.error(`bench: --save needs every release row measured; no value for ${missing.map((r) => r.metric).join(", ")}`);
+        code = 1;
+      } else {
+        const file = writeRelease(dir, { version, date: started, machine: machineLine, results });
+        console.log(`# wrote ${path.relative(root, file)} — commit it with the release`);
+      }
+    }
+    console.log("");
+    console.log(
+      releaseTable({
+        version,
+        machine: machineLine,
+        current: releaseValues(results),
+        previous: previous ? releaseValues(previous.results) : null,
+        previousVersion: previous?.version ?? null,
+      }),
+    );
   }
   return code;
 }

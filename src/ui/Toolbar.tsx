@@ -1,4 +1,4 @@
-import { Link as LinkMark, Lock, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Link as LinkMark, Lock, Pencil } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FileKind } from "@/board/useBoard";
@@ -6,8 +6,10 @@ import { AssistantToggle } from "@/assistant/Toggle";
 import { chordFor } from "@/edit/bindings";
 import { appLink } from "@/refs/link";
 import { LOCK_KEYS, toggleLock, useLocked } from "@/settings/lock";
+import { useHistoryControls, historyChords } from "@/ui/history";
 
 import { copyText } from "./clipboard";
+import { IconButton } from "./controls";
 import { LockButton } from "./Lock";
 import { Lockup } from "./Logo";
 import { PageMore, type MoreItem } from "./PageMore";
@@ -78,6 +80,8 @@ export function Toolbar({
 }) {
   const chord = chordFor("boards");
   const sidebar = useSidebar();
+  const history = useHistoryControls();
+  const chords = historyChords();
   const away = !sidebar?.docked;
   const crumbs = boardName ? ancestors(boardName) : [];
   /* With nothing open there is no title to show: the welcome card says what to do, and a title
@@ -171,6 +175,31 @@ export function Toolbar({
           <Lockup size={20} />
         </button>
       ) : null}
+
+      {/* The documents this window visited. Disabled at either end, so the two arrows say
+          where in the history the page is without a menu or a count. */}
+      <div className="dag-toolbar__history" role="group" aria-label="History">
+        <IconButton
+          data-dag-history-back=""
+          aria-label="Back"
+          tip="Back: the document you were on before"
+          shortcut={chords.back}
+          disabled={!history.canBack}
+          onClick={history.back}
+        >
+          <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
+        </IconButton>
+        <IconButton
+          data-dag-history-forward=""
+          aria-label="Forward"
+          tip="Forward: the document you went back from"
+          shortcut={chords.forward}
+          disabled={!history.canForward}
+          onClick={history.forward}
+        >
+          <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+        </IconButton>
+      </div>
 
       <div className="dag-toolbar__where">
         {sidebar && crumbs.length ? (

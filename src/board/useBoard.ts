@@ -769,10 +769,11 @@ export const blankTaskText = (status: TaskStatus = "todo", title: string = UNTIT
  * What an event made from the sidebar or the calendar starts as: a note titled as asked —
  * *Untitled* from the sidebar, which names it in its title field — with a `start:` and an `end:`, the
  * whole of what makes it an event. The times are written with their offset (`timeOf`); a date alone
- * is all day.
+ * is all day. `body` is the text under the frontmatter — the calendar's card puts a description
+ * there.
  */
-export const blankEventText = (start: string, end?: string, title: string = UNTITLED): string =>
-  `---\ntitle: ${titleScalar(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
+export const blankEventText = (start: string, end?: string, title: string = UNTITLED, body = ""): string =>
+  `---\ntitle: ${titleScalar(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n${body}`;
 
 export const createBoard = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? newBoardText(name) });

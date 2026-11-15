@@ -28,7 +28,7 @@ failed on both.
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Eighteen things are load-bearing:
+Nineteen things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
@@ -141,6 +141,14 @@ Eighteen things are load-bearing:
   `src/vault/current.ts`). And a window never shows an api path as a document: `will-navigate` and
   `window.open` to one download it instead. An SVG attachment can carry script; between the two, it
   can read at most.
+- **The mouse's back and forward buttons are the shell's to hear on Windows and Linux** (#320).
+  Chromium delivers them as app commands, not DOM events, so `createWindow` answers `app-command`'s
+  `browser-backward` and `browser-forward` by sending `history:go` to the page, and the preload
+  exposes it as `history.onCommand`. The page owns the history itself (`src/ui/history.ts`) and
+  only takes the direction; on macOS there is no app command and the page hears the two buttons as
+  `mouseup`. Alt+Left/Right (⌘[ / ⌘] on macOS) are the page's too, because there is no browser
+  chrome to answer them. The same listener is not in a browser: it already has all four, and taking
+  them in the page as well would move two entries for one press.
 - **The window is isolated and sandboxed with no Node**, no webviews, and only `http(s)://` and
   `mailto:` go to the OS (`shell.openExternal`): `file://`, `smb://` or a registered handler's
   scheme in a note is one click from running something, and a note is text anybody could write.

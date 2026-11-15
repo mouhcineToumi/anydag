@@ -2169,9 +2169,16 @@ export class Vault {
   // -- legacy pictures -------------------------------------------------------
 
   /** A path to a document's legacy picture, confined to its `.assets/` folders. */
+  /**
+   * A path inside a legacy `<name>.assets/` folder. Checked **after** it is normalised: the route
+   * decodes an `%2F` the router left alone, and `x.assets/../attachments/d.svg` named a folder that
+   * ends in `.assets` on its way to any file in the vault (#10).
+   */
   private assetPath(rel: string): string {
-    const clean = rel.replace(/\\/g, "/");
-    if (!clean.split("/").some((s) => s.endsWith(".assets"))) throw new Refused("not a picture of a document");
+    const clean = path.posix.normalize(rel.replace(/\\/g, "/"));
+    const parts = clean.split("/");
+    if (clean.startsWith("/") || parts.includes("..") || !parts.slice(0, -1).some((s) => s.endsWith(".assets")))
+      throw new Refused("not a picture of a document");
     return this.abs(clean);
   }
 

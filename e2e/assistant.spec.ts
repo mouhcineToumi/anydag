@@ -171,6 +171,31 @@ test("deleting a chat drops its row and lands on New chat", async ({ page }) => 
   await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toHaveCount(0);
 });
 
+test("an image from elsewhere in a reply is a link, and nothing is fetched until it is clicked", async ({ page }) => {
+  /* A reply is drawn as it streams, and an <img> loads with no click: an image URL the agent built
+     from what it read would carry the vault out of a chat that has no network of its own (#10). */
+  const asked: string[] = [];
+  await page.route("http://anydag-e2e.invalid/**", (route) => {
+    asked.push(route.request().url());
+    return route.fulfill({ status: 204 });
+  });
+  const url = `http://anydag-e2e.invalid/p.gif?d=${run}`;
+  await page.goto("/?chat=new");
+  await say(page, `![a chart](${url})`);
+  await chatId(page);
+  const turn = page.locator("[data-dag-chat-turn]");
+  await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  const said = turn.locator("[data-dag-chat-said]");
+  await expect(said.locator(`[data-dag-chat-image="${url}"]`)).toHaveText("a chart");
+  await expect(said.locator("img")).toHaveCount(0);
+
+  /* Reopened from the history, it is still a link. */
+  await page.reload();
+  await expect(page.locator(`[data-dag-chat-said] [data-dag-chat-image="${url}"]`)).toBeVisible();
+  await expect(page.locator("[data-dag-chat-said] img")).toHaveCount(0);
+  expect(asked).toEqual([]);
+});
+
 test("a turn makes a note and a block card; Undo takes it away and Redo brings it back", { tag: "@smoke" }, async ({ page }) => {
   const name = stem("make");
   await page.goto("/?chat=new");

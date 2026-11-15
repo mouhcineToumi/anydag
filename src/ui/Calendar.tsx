@@ -10,12 +10,14 @@ import {
   FileText,
   ListFilter,
   Lock,
+  Sun,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -53,6 +55,9 @@ import {
   startOfMonth,
   taskEdge,
   withEdge,
+  withAllDay,
+  withEnd,
+  withStart,
   step,
   whenWords,
   type Bar,
@@ -62,8 +67,8 @@ import {
 } from "@/calendar/model";
 import { menuKey, menuWithin } from "@/calendar/menu";
 import { useZone } from "@/calendar/usePrefs";
-import { dayOf, timeOf, type NoteEvent } from "@/note/event";
-import { wallOf } from "@/note/zone";
+import { dayOf, momentOf, timeOf, type NoteEvent } from "@/note/event";
+import { currentZone, wallOf, zoneName } from "@/note/zone";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { titleStem, type Task, type TaskChange } from "@/note/task";
 import { LOCK_HINT, refuseLocked, setLocked } from "@/settings/lock";
@@ -71,6 +76,7 @@ import { withVault } from "@/vault/current";
 
 import { startDrag } from "./pointerDrag";
 import { TaskGlyph } from "./TaskGlyph";
+import { Switch } from "./controls";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { collation } from "@/locale";
 
@@ -85,8 +91,9 @@ import { collation } from "@/locale";
  * is showing one project.
  *
  * **A drag on empty time makes an event**: in the hour grid a time, snapped to a quarter of an hour;
- * in the all-day row or a month's cell, days. The drag paints a ghost and nothing else, and a small
- * card asks for the title when it ends.
+ * in the all-day row or a month's cell, days. The drag paints a ghost and nothing else, and a card
+ * at the pointer then asks for its details — title, start and end, all day, description — with the
+ * title ready to type, so Enter makes it.
  *
  * **A drag on an event or a task moves it**, keeping how long it is: by days in a month and
  * the all-day row, by quarter hours and days in the hour grid. A press that does not move is still a
@@ -185,7 +192,7 @@ function idle(item: CalItem, next: Write): boolean {
   return !!item.task && sameTask(applied(item.task, next.task), item.task);
 }
 
-/** A range somebody drew, waiting for its title. */
+/** A range somebody drew, waiting for its details. */
 interface Making {
   start: string;
   end: string | null;
@@ -324,14 +331,16 @@ export function CalendarView({
   );
 
   /* A new event is made in the folder of the project the page is showing, as a task typed into the
-     Tasks page is. */
+     Tasks page is. The card hands over the event it settled on — its times already written in the
+     viewer's zone — and the words typed under them. */
   const into = scoped ?? "";
   const make = useCallback(
-    async (title: string, start: string, end: string | null) => {
+    async (title: string, when: NoteEvent, description: string) => {
       if (locked) return void refuseLocked();
       const t = title.trim() || "Untitled";
       const stem = titleStem(t) || "untitled";
-      await createNote(into ? `${into}/${stem}` : stem, blankEventText(start, end ?? undefined, t));
+      const body = description.trim();
+      await createNote(into ? `${into}/${stem}` : stem, blankEventText(when.start, when.end, t, body ? `${body}\n` : ""));
     },
     [into, locked],
   );
@@ -1541,10 +1550,18 @@ function DayColumn({
   );
 }
 
-/* -- the card that names what was drawn ------------------------------------------------------- */
+/* -- the card that sets up what was drawn ----------------------------------------------------- */
 
 /**
- * What a drawn range becomes: a title typed here, Enter to make the event, Escape to leave nothing.
+ * What a drawn range becomes: a title, its start and end, whether it is all day, and an optional
+ * description. Enter still makes the event at once, so the quick path is the one it was; Escape
+ * leaves nothing.
+ *
+ * The fields are the event bar's (`EventBar`): the same writers, so a time is shown and written in
+ * the viewer's zone, a start changed keeps how long it is (`withStart`), an end that would come
+ * before the start is moved an hour on (`withEnd`), and the switch takes the event to the all-day
+ * row and back (`withAllDay`). The title alone keeps its own field, focused, above them.
+ *
  * Placed where the drag ended and nudged back inside the window. It owns its own Escape and stops
  * it, the settings card's rule, so the window's handlers never see a key meant for it.
  */
@@ -1557,13 +1574,29 @@ function NewEvent({
   making: Making;
   /** The app is read-only: the card opens to say why, and nothing it offers can write. */
   locked?: boolean;
-  onMake(title: string, start: string, end: string | null): Promise<void>;
+  onMake(title: string, when: NoteEvent, description: string): Promise<void>;
   onClose(): void;
 }) {
   const ref = useRef<HTMLFormElement>(null);
+  const titleField = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
+  const [draft, setDraft] = useState<NoteEvent>(() =>
+    making.end ? { start: making.start, end: making.end } : { start: making.start },
+  );
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [pos, setPos] = useState({ x: making.x, y: making.y });
+  /* The zone is read below (`zoneName`), so a change of it draws the card again. */
+  useZone();
+  const f = fieldsOf(draft);
+  const zone = f.allDay ? "" : zoneName(momentOf(draft.start));
+  const id = useId();
+  const allDayId = `${id}all-day`;
+  const startDayId = `${id}start-day`;
+  const startTimeId = `${id}start-time`;
+  const endDayId = `${id}end-day`;
+  const endTimeId = `${id}end-time`;
+  const off = locked || busy;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -1573,7 +1606,7 @@ function NewEvent({
       x: Math.max(8, Math.min(making.x + 8, innerWidth - r.width - 8)),
       y: Math.max(8, Math.min(making.y + 8, innerHeight - r.height - 8)),
     });
-    el.querySelector<HTMLInputElement>("input")?.focus();
+    titleField.current?.focus();
   }, [making]);
 
   useEffect(() => {
@@ -1584,12 +1617,16 @@ function NewEvent({
     return () => document.removeEventListener("pointerdown", down, true);
   }, [onClose]);
 
-  const when = whenWords(making.end ? { start: making.start, end: making.end } : { start: making.start });
+  /* The event bar's writers: an end nobody has stays no line, not an empty one (`asEvent`). */
+  const setAllDay = (on: boolean) => setDraft((d) => asEvent(withAllDay(d, on)));
+  const setStart = (day: string, time?: string) => setDraft((d) => asEvent(withStart(d, day, time)));
+  const setEnd = (day: string, time?: string) => setDraft((d) => asEvent(withEnd(d, day, time)));
+
   const submit = async () => {
     if (locked) return void refuseLocked();
     if (busy) return;
     setBusy(true);
-    await onMake(title, making.start, making.end);
+    await onMake(title, draft, description);
     onClose();
   };
   return (
@@ -1609,9 +1646,32 @@ function NewEvent({
         }
       }}
     >
+      <input
+        ref={titleField}
+        type="text"
+        className="dag-calendar__new-field dag-calendar__new-title"
+        placeholder="New event"
+        aria-label="The event's title"
+        value={title}
+        disabled={busy}
+        readOnly={locked}
+        aria-disabled={locked || undefined}
+        title={locked ? LOCK_HINT : undefined}
+        data-dag-calendar-new-title=""
+        data-dag-readonly-blocked={locked ? "" : undefined}
+        onChange={(e) => setTitle(e.target.value)}
+      />
       <p className="dag-calendar__new-when" data-dag-calendar-new-when="">
         <CalendarClock size={14} strokeWidth={2} aria-hidden="true" />
-        <span>{when}</span>
+        <span>{whenWords(draft)}</span>
+        {zone ? (
+          <span
+            className="dag-calendar__new-zone"
+            title={`Shown in ${currentZone().replace(/_/g, " ")}, and written with its offset. Settings → Calendar changes the time zone.`}
+          >
+            {zone}
+          </span>
+        ) : null}
       </p>
       {locked ? (
         <p className="dag-calendar__new-locked" data-dag-calendar-new-locked="" title={LOCK_HINT}>
@@ -1627,18 +1687,81 @@ function NewEvent({
           </button>
         </p>
       ) : null}
-      <input
-        type="text"
-        placeholder="New event"
-        aria-label="The event's title"
-        value={title}
-        disabled={busy}
-        readOnly={locked}
-        aria-disabled={locked || undefined}
-        title={locked ? LOCK_HINT : undefined}
-        data-dag-calendar-new-title=""
-        data-dag-readonly-blocked={locked ? "" : undefined}
-        onChange={(e) => setTitle(e.target.value)}
+      <div className="dag-calendar__new-allday">
+        <label htmlFor={allDayId} className="dag-calendar__new-label">
+          <Sun size={14} strokeWidth={2} aria-hidden="true" />
+          All day
+        </label>
+        <Switch
+          id={allDayId}
+          checked={f.allDay}
+          disabled={off}
+          data-dag-calendar-new-allday=""
+          onChange={(e) => setAllDay(e.target.checked)}
+        />
+      </div>
+      <div className="dag-calendar__new-times">
+        <label htmlFor={startDayId}>Starts</label>
+        <input
+          id={startDayId}
+          type="date"
+          className="dag-calendar__new-field"
+          value={f.startDay}
+          disabled={off}
+          data-dag-calendar-new-start-day=""
+          onChange={(e) => e.target.value && setStart(e.target.value)}
+        />
+        {f.allDay ? (
+          <span aria-hidden="true" />
+        ) : (
+          <input
+            id={startTimeId}
+            type="time"
+            step={900}
+            className="dag-calendar__new-field"
+            value={f.startTime}
+            disabled={off}
+            aria-label="Start time"
+            data-dag-calendar-new-start-time=""
+            onChange={(e) => e.target.value && setStart(f.startDay, e.target.value)}
+          />
+        )}
+        <label htmlFor={endDayId}>Ends</label>
+        <input
+          id={endDayId}
+          type="date"
+          className="dag-calendar__new-field"
+          value={f.endDay}
+          min={f.startDay}
+          disabled={off}
+          data-dag-calendar-new-end-day=""
+          onChange={(e) => e.target.value && setEnd(e.target.value)}
+        />
+        {f.allDay ? (
+          <span aria-hidden="true" />
+        ) : (
+          <input
+            id={endTimeId}
+            type="time"
+            step={900}
+            className="dag-calendar__new-field"
+            value={f.endTime}
+            disabled={off}
+            aria-label="End time"
+            data-dag-calendar-new-end-time=""
+            onChange={(e) => e.target.value && setEnd(f.endDay, e.target.value)}
+          />
+        )}
+      </div>
+      <textarea
+        className="dag-calendar__new-field dag-calendar__new-description"
+        placeholder="Description (optional)"
+        aria-label="The event's description"
+        rows={2}
+        value={description}
+        disabled={off}
+        data-dag-calendar-new-description=""
+        onChange={(e) => setDescription(e.target.value)}
       />
       <div className="dag-calendar__new-acts">
         <button type="button" className="dag-calendar__new-cancel" onClick={onClose}>

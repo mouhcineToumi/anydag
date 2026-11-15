@@ -50,6 +50,12 @@ export interface AnyDagDesktopUpdates {
   install(): Promise<void>;
 }
 
+/** The mouse's back and forward buttons, which Windows and Linux deliver as app commands rather
+ *  than DOM events (`desktop/main.ts`). The page walks its own history; this only names the way. */
+export interface AnyDagDesktopHistory {
+  onCommand(listener: (to: "back" | "forward") => void): () => void;
+}
+
 export interface AnyDagDesktop {
   /** What the page puts on a write so the shell knows the page sent it (`desktop/main.ts`,
    *  `trusted`). Absent in a subframe and on any document that is not the page. */
@@ -64,6 +70,7 @@ export interface AnyDagDesktop {
   keys: AnyDagDesktopKeys;
   providerEnv: AnyDagDesktopProviderEnv;
   updates: AnyDagDesktopUpdates;
+  history: AnyDagDesktopHistory;
   readonly version: string;
   readonly platform: string;
   /** Whether the window is in full screen now. */
@@ -96,6 +103,15 @@ const api: AnyDagDesktop = {
     },
     set(name: string, value: string): Promise<boolean> {
       return ipcRenderer.invoke("providerEnv:set", name, value);
+    },
+  },
+  history: {
+    onCommand(listener: (to: "back" | "forward") => void): () => void {
+      const on = (_event: Electron.IpcRendererEvent, to: unknown) => {
+        if (to === "back" || to === "forward") listener(to);
+      };
+      ipcRenderer.on("history:go", on);
+      return () => ipcRenderer.removeListener("history:go", on);
     },
   },
   updates: {

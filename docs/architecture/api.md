@@ -23,7 +23,7 @@ start, never a build argument, and never a value in output.
 | `api/server/app.ts` | the Hono app: which path may ask, which feature is off, error mapping, per-route metrics |
 | `api/server/routes/service.ts` | `GET /v1` (what runs) and `GET /v1/ready` (the database answers) |
 | `api/server/routes/{pair,vaults,blobs,commit,changes}.ts` | sync's surface under `/v1`, gated by a device token |
-| `api/server/routes/logs.ts` | `POST /v1/logs`, the per-address and whole-server rates |
+| `api/server/routes/logs.ts` | `POST /v1/logs`, the per-address and whole-server rates, and the day file's cap (`ANYDAG_API_LOGS_DAY_MB`, 64 by default) |
 | `api/server/routes/feedback.ts` (#96) | `POST /v1/feedback`, stateless: no file, no row, no payload in logs |
 | `api/server/client.ts` → `routes/http.ts` | `clientAddress`: the client address, the proxy's word only when `ANYDAG_API_TRUST_PROXY` says so |
 | `api/server/meta/pg.ts`, `blobs/disk.ts` | the database (`Meta`) and the blob store (`DiskBlobs`) |
@@ -41,6 +41,12 @@ sync alone with logs and feedback off; nothing else in the server needs to know.
 matching the `503 ES_UNAVAILABLE` the route would answer (#50). `GET /v1/health` stays the
 liveness check. **`GET /v1/ready`** asks the database with one `SELECT`: it is the healthcheck
 the deploy stack watches, and 503 with nothing of the database's own words in the body.
+
+**The open logs route is bounded in bytes, not only in requests** (#10). A rate is per address,
+and addresses are cheap — one sender at its thirty a minute writes about 8 MB a minute — so a day's
+file stops at `ANYDAG_API_LOGS_DAY_MB` and a batch past it is answered `{accepted: 0}`: the logs
+never hold more than that times `ANYDAG_API_LOGS_DAYS`. A body with no `Content-Length` is cut
+off at the batch cap as it arrives (`bodyLimit`), never read whole before it is measured.
 
 **The client address is trusted only from a configured proxy.** `ANYDAG_API_TRUST_PROXY` is
 `off` by default — the socket's own address, so a forged `X-Forwarded-For` cannot move a rate
