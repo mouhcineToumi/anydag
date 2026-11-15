@@ -166,15 +166,32 @@ const pgliteParsers = {
   [OID.date]: (value: string): string => value,
 } satisfies { [pgType: number]: (value: string) => unknown };
 
-/** The PGlite half: a whole Postgres in this process, one connection, transactions queued. */
-export async function pgliteDb(dataDir?: string): Promise<Db> {
-  const db = new PGlite({ dataDir, parsers: pgliteParsers });
+/**
+ * The PGlite half: a whole Postgres in this process, one connection, transactions queued.
+ *
+ * `from` starts it from a `dumpPglite` dump rather than an empty cluster. Booting an empty one runs
+ * `initdb`, and with the migrations that is about a second; loading a dump is about a fifth of that.
+ * The api's tests start every harness from one migrated dump (`api/test/helpers.ts`), which took
+ * their files from forty seconds of the fast tier to a few (#258).
+ */
+export async function pgliteDb(dataDir?: string, from?: Blob): Promise<Db> {
+  const db = new PGlite({ dataDir, parsers: pgliteParsers, ...(from ? { loadDataDir: from } : {}) });
   await db.waitReady;
   return new PgliteDb(db);
 }
 
+/** A PGlite database's whole data directory, for `pgliteDb(undefined, dump)` to start another from. */
+export async function dumpPglite(db: Db): Promise<Blob> {
+  if (!(db instanceof PgliteDb)) throw new Error("dumpPglite: not a PGlite database");
+  return db.dump();
+}
+
 class PgliteDb implements Db {
   constructor(private readonly db: PGlite) {}
+
+  dump(): Promise<Blob> {
+    return this.db.dumpDataDir("none");
+  }
 
   async query<T = Row>(sql: string, params?: unknown[]): Promise<T[]> {
     const result = params === undefined ? await this.db.query(sql) : await this.db.query(sql, params);
