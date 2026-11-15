@@ -37,6 +37,8 @@ export type MenuRow =
   | { kind: "heading"; key: string; label: string }
   | { kind: "rule"; key: string };
 
+type Item = Exclude<MenuRow, { kind: "heading" | "rule" }>;
+
 export function TasksMenu({
   at,
   rows,
@@ -81,6 +83,14 @@ export function TasksMenu({
     if (e.key === "Escape" || e.key === "Tab") {
       e.preventDefault();
       return onClose();
+    }
+    /* A row's hint is the key that picks it: `1` in the status menu is To do, as it is after `S`. */
+    const hinted = rows.find((r): r is Item => r.kind !== "heading" && r.kind !== "rule" && !r.disabled && r.hint === e.key);
+    if (hinted && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      hinted.onPick();
+      if (!hinted.stay) onClose();
+      return;
     }
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
     const items = Array.from(ref.current?.querySelectorAll<HTMLElement>("[role^=menuitem]:not(:disabled)") ?? []);

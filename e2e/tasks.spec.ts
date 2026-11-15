@@ -135,6 +135,13 @@ test("a note with a status is on the Tasks page, in its group, and one click on 
   await page.locator('[data-dag-task-menu-status="in-progress"]').click();
   await expect.poll(() => read("late")).toContain("\nstatus: in-progress\n");
   await expect(page.locator(`[data-dag-tasks-group="in-progress"] [data-dag-task-row="${late}"]`)).toBeVisible();
+
+  /* And by the key each one shows: 1 is To do. */
+  await page.locator(`[data-dag-task-more="${late}"]`).click();
+  await expect(page.locator(`[data-dag-task-menu="${late}"]`)).toBeVisible();
+  await page.keyboard.press("1");
+  await expect.poll(() => read("late")).toContain("\nstatus: todo\n");
+  await expect(page.locator(`[data-dag-task-menu="${late}"]`)).toHaveCount(0);
 });
 
 test("on the board, a card dragged into another column takes that status, and the layout is remembered", async ({ page }) => {
