@@ -141,9 +141,10 @@ over MCP too: `project_list`, `project_create`, `project_set`.
 
 ## The calendar
 
-Tasks, events and notes on one timeline, at `?calendar=month`, `week`
+Tasks, events and notes on one timeline, at `?calendar=month`, `week`, `rows`
 or `days` — `1` for the view this browser used last — with `date=` and `days=` beside it. **Not
-`view=`**, which is the read-only page's key.
+`view=`**, which is the read-only page's key. **The week has two layouts**: down its columns, and
+*rows* — one row per day with the hours of the day across it.
 
     ---
     title: Team offsite
@@ -155,7 +156,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | Where | What it does |
 |---|---|
 | the sidebar | **Calendar** opens the page; **New event** makes `untitled` at the next whole hour, an hour long, and names it in its title; an event's row wears a calendar clock; a row's menu makes a plain note an event, or an event a note |
-| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid, with a small month beside it; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a right-click on one — or `shift+F10` — opens its menu, a drag or a click on empty time opens a card for the event's title, start and end, all-day and description, and Enter makes it; a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
+| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid, or the same week as rows — one day to a row with the hours across — with a small month beside it; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a right-click on one — or `shift+F10` — opens its menu, a drag or a click on empty time opens a card for the event's title, start and end, all-day and description, and Enter makes it; a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
 | an event's own page | its properties under the title — all day, the start, the end and the zone they are shown in, each label acting on the value beside it; the top bar's `⋯` has *Not an event*, and a plain note's has *Make it an event* |
 | a task's own page | a *Starts* date beside *Due* |
 | a board | a placed event's card says *Event* and when |
@@ -163,7 +164,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | `?view=1`, a snapshot, the PDF | the event's time on a line above the text, in the reader's zone |
 | Settings | *Weeks start on*, the person's |
 
-Eleven things are load-bearing:
+Twelve things are load-bearing:
 
 - **An event is a note with a `start:` and no `status:`.** A date is all day and a time is a time —
   there is no `all-day:` key, a second key that could disagree with the first. An all-day `end:` is
@@ -244,23 +245,34 @@ Eleven things are load-bearing:
   (`src/calendar/usePrefs.ts`) — the Calendar page and Settings' Calendar tab both — so either
   redraws a calendar that is open. Which view a bare `?calendar=1` opens is this browser's
   (`dag:calendar-view`).
-- **A week or a run of days keeps a small month beside it**, in a 240px side column right of the
-  grid (`.dag-calendar__body`). It is five things: **the view's month**, which it follows when the
-  view moves to another; **its own arrows**, which move the small month alone, so the view and the
-  address stay where they are until a day is picked; **the days the view shows**, in the accent's
-  tint, with today keeping the accent ring and a day of another month quieter; **a click**, which
-  takes the view to that day with `date=` following (the week, or the run's first day for a run);
-  and **no events or dots**, which is out of scope. It is the month view's own grid — `monthDays` is
-  `rangeOf("month")` + `daysFrom`, so *Weeks start on* reaches it — and today is the page's
-  `useToday`, which reads `dayOf` in the viewer's zone. Under 720px it is not drawn: a week's seven
-  columns already have the phone's whole width.
+- **The rows layout is the same week turned on its side.** One row a day, the day and its all-day
+  things at the start of the row, and the hours of the day across the track; an event's minutes
+  (`blocks`' `top` and `length`) are its left edge and width, overlaps take a lane down the row
+  (`col`), and a bar is 24px tall because the row is as tall as its lanes. **The drag and snap
+  arithmetic is the column's** — `minutesAt`, `snapMinute` and `clockOf` in `model.ts` read the
+  pointer down a column or across a row — so `useTimeDraw` and `useGrab` make, move and resize on
+  either axis, and what a drag previews is exactly what it writes. Its all-day cells carry
+  `data-dag-cal-day`, as a month's cells and the week's all-day row do, so a drag across them still
+  makes a multi-day event. The small month follows the week into this layout.
+- **A week, the rows view, or a run of days keeps a small month beside it**, in a 240px side column
+  right of the grid (`.dag-calendar__body`). It is five things: **the view's month**, which it
+  follows when the view moves to another; **its own arrows**, which move the small month alone, so
+  the view and the address stay where they are until a day is picked; **the days the view shows**, in
+  the accent's tint, with today keeping the accent ring and a day of another month quieter; **a
+  click**, which takes the view to that day with `date=` following (the week or the rows view, or the
+  run's first day for a run); and **no events or dots**, which is out of scope. It is the month
+  view's own grid — `monthDays` is `rangeOf("month")` + `daysFrom`, so *Weeks start on* reaches it —
+  and today is the page's `useToday`, which reads `dayOf` in the viewer's zone. Under 720px it is not
+  drawn: a week's seven columns already have the phone's whole width.
 - **The event bar writes through the note's own save**, `changeTask`'s path, and a time is shown and
   written in the chosen zone — so an event written in Paris and moved in New York is written in
   New York's offset, naming the moment the person saw.
 
-Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-app--calendar`,
+Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-cal-rows*`,
+`dag-cal-row*`, `dag-app--calendar`,
 `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`,
-`data-dag-cal-mini*`, `data-dag-eventbar*`,
+`data-dag-cal-mini*`, `data-dag-cal-rows`, `data-dag-cal-row`, `data-dag-cal-start`,
+`data-dag-eventbar*`,
 `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
 `data-dag-sidebar-event`, `data-dag-note-make-event`, `data-dag-projectbar-calendar`, and for the
 menu `dag-cal-menu*` and `data-dag-cal-menu*`, and for the drag `data-dag-cal-moving`,

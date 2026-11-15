@@ -6364,14 +6364,16 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 /*
  * The Calendar: tasks, events and notes on one timeline. A month is a
  * grid of weeks whose rows are lanes of bars; a week or a run of days is an all-day row over an hour
- * grid. Every length an item's place depends on is a custom property the page paints — `--at` and
- * `--len` in minutes, `--col`/`--of` for overlapping events — and turned into pixels here against
- * `--hour`, so the page never measures a pixel it did not draw. Every colour is the theme's: an event
- * wears the accent's soft tint, a task the paper, a note nothing but its mark.
+ * grid; the rows view is the week turned, one day to a row with its hours across. Every length an
+ * item's place depends on is a custom property the page paints — `--at` and `--len` in minutes,
+ * `--col`/`--of` for overlapping events down a column, `--lane` for one stacked in a row — and turned
+ * into pixels here against `--hour`, so the page never measures a pixel it did not draw. Every colour
+ * is the theme's: an event wears the accent's soft tint, a task the paper, a note nothing but its mark.
  *
- * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-app--calendar`,
- * `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`,
- * `data-dag-cal-mini*`, `data-dag-eventbar*`,
+ * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-cal-rows*`,
+ * `dag-cal-row*`, `dag-app--calendar`, `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`,
+ * `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-cal-mini*`, `data-dag-cal-rows`,
+ * `data-dag-cal-row`, `data-dag-cal-start`, `data-dag-eventbar*`,
  * `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
  * `data-dag-sidebar-event`, `data-dag-note-make-event`, `dag-cal-menu*` and `data-dag-cal-menu*`, the
  * storage keys `dag:calendar-hide`, `dag:week-start` and `dag:calendar-view`, and the query keys
@@ -6792,6 +6794,123 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
   pointer-events: none;
 }
 .dag-cal-now::before { content: ""; position: absolute; top: -3px; left: -4px; width: 8px; height: 8px; background: var(--dag-color-danger); border-radius: 50%; }
+
+/* A week as rows: one day to a row, the day and its all-day things at the start of it, and the
+   hours of the day across the track. It reads the same `--at`/`--len` minutes as a day's column —
+   a left edge and a width here instead of a top and a height — and `--lane` is the stack row an
+   overlapping event takes, so a bar is 24px tall, the floor every control meets (#209). The row
+   grows for any all-day things at its start, and the whole grid scrolls when the week is taller
+   than the page. Names grepped first: `dag-cal-rows*`, `dag-cal-row*`, `data-dag-cal-rows`,
+   `data-dag-cal-row` and `data-dag-cal-start` were nobody's. */
+.dag-cal-rows {
+  --day: 96px;
+  --start: 168px;
+  --lane-h: 26px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-rows__head,
+.dag-cal-row { display: grid; grid-template-columns: var(--day) var(--start) minmax(0, 1fr); }
+.dag-cal-rows__head { position: sticky; top: 0; z-index: 1; background: var(--dag-color-paper); border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__corner { position: sticky; left: 0; z-index: 1; background: var(--dag-color-paper); border-right: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__allday { display: flex; align-items: center; justify-content: flex-end; padding: 0 8px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); border-right: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__hours { position: relative; height: 28px; }
+.dag-cal-rows__hour {
+  position: absolute;
+  top: 7px;
+  left: calc(var(--at) * 100% / 1440 + 4px);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dag-cal-row { border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-row:last-child { border-bottom: none; }
+.dag-cal-row__day {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper);
+  border-right: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-cal-row__n { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-row[data-today] .dag-cal-row__weekday,
+.dag-cal-row[data-today] .dag-cal-row__n { color: var(--dag-color-accent); }
+/* Where a row starts: its all-day things, one under another, and a day a drag across them can make
+   all day — the same `data-dag-cal-day` the week's all-day row and a month's cells wear. */
+.dag-cal-row__start {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px;
+  border-right: 1px solid var(--dag-color-outlineSoft);
+  cursor: cell;
+}
+.dag-cal-row__start[data-dag-cal-picked] { background: var(--dag-color-accentSoft); }
+.dag-cal-row__start > .dag-calendar__item { margin: 0; }
+/* The hours across the row: a line an hour, then the day's timed events on the clock. A bar's width
+   is the time it lasts; an end shorter than a press is drawn at the 24px floor so it can still be
+   taken hold of. Overlaps stack in `--lane`, which is what `blocks`' `col` says. */
+.dag-cal-row__track {
+  position: relative;
+  min-width: 0;
+  /* As tall as the stack of timed events in it, and never shorter than one 24px bar and its air. */
+  min-height: calc(var(--lanes, 1) * var(--lane-h) + 8px);
+  background-image: linear-gradient(to right, var(--dag-color-outlineSoft) 1px, transparent 1px);
+  background-size: calc(100% / 24) 100%;
+  cursor: cell;
+}
+.dag-cal-row__track > .dag-calendar__item {
+  position: absolute;
+  top: calc(4px + var(--lane) * var(--lane-h));
+  left: calc(var(--at) * 100% / 1440 + 1px);
+  width: calc(var(--len) * 100% / 1440 - 2px);
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  line-height: 22px;
+  border-left: 3px solid var(--dag-color-accent);
+}
+.dag-cal-row__track > .dag-calendar__item[data-kind="note"] { border-left-color: transparent; }
+.dag-cal-row__track > .dag-cal-ghost {
+  top: 4px;
+  left: calc(var(--at) * 100% / 1440);
+  right: auto;
+  width: calc(var(--len) * 100% / 1440);
+  min-width: 24px;
+  height: 24px;
+}
+.dag-cal-row__track > .dag-cal-ghost--move { z-index: 3; display: flex; align-items: center; gap: 4px; padding: 0 6px; line-height: 22px; overflow: hidden; white-space: nowrap; }
+.dag-cal-row__track > .dag-cal-now { top: 0; bottom: 0; right: auto; left: calc(var(--at) * 100% / 1440); width: 2px; height: auto; }
+.dag-cal-row__track > .dag-cal-now::before { top: -4px; left: -3px; }
+
+/* Narrower windows give the hours more room, then thin the scale to every fourth hour. Under 720px
+   the grid keeps a width a finger can read and scrolls sideways; the day stays at the start. */
+@media (max-width: 1100px) {
+  .dag-cal-rows { --day: 78px; --start: 132px; }
+  .dag-cal-rows__hour:nth-child(4n + 3) { display: none; }
+}
+@media (max-width: 719px) {
+  .dag-cal-rows { --day: 64px; --start: 112px; }
+  .dag-cal-rows__head,
+  .dag-cal-row { min-width: 720px; }
+  .dag-cal-rows__hour:not(:nth-child(4n + 1)) { display: none; }
+}
 
 /* The card that sets up what was drawn: its title, when it is, and what it is about. */
 .dag-calendar__new {
