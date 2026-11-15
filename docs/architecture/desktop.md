@@ -212,6 +212,15 @@ Nineteen things are load-bearing:
   Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → This vault → Agent access writes the MCP lines with that absolute
   path.
 
+**Out, and why** (#267, measured in `limits.md`): **running the server as a `utilityProcess`**
+rather than a child spawned with Electron's binary as Node — the main process idles at 0.13% of a
+core and 220 MB, most of it Electron's own, and the server's memory is the vault's, which no change of
+process type moves; **dropping the local port for `anydag://` alone** — the CLI, MCP and `anydag
+serve` reach the same server over HTTP, the token and the `Host` are its security model, and the
+forward costs 0.7 ms a request; **a Tauri migration, or a platform layer kept ready for one** — none
+is planned, the server is already a plain Node bundle, and abstractions are not added for a move
+nobody is making.
+
 **Not yet, and why:** signing certificates, so the builds are unsigned and an unsigned Mac updates
 by hand (the release workflow signs and notarises the moment the secrets exist); Windows on arm64
 and Linux on arm64; a `.deb`; and registering

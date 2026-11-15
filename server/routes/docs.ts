@@ -28,11 +28,12 @@ import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../
 import { OPS_SHAPE } from "../handle";
 import { type Doc, grammar, type Over, type Parsed } from "../grammar";
 import type { Entry } from "../parsing";
+import { type Listed, listed, overOfVault } from "../upkeep";
 import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { paced } from "../pace";
 import { mimeOf } from "../uploads";
-import { Conflict, NotFound, Refused, byKind, textKey, type Tree } from "../vault";
+import { Conflict, NotFound, Refused, byKind, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
 import { readPrefs } from "./prefs";
 import { relinking } from "../relink";
@@ -45,33 +46,6 @@ export const fileAnswer = (name: string, id: string | null | undefined, title: s
   const ext = extOf(name);
   return { name, id: id ?? null, title: title ?? null, ext, mime: mimeOf(ext), bytes };
 };
-
-interface Listed {
-  key: string;
-  name: string;
-  kind: TextKind;
-  id: string;
-}
-
-/* Per tree, which a kept listing hands out again while nothing moved: sorting 50,000 names is not free. */
-const listedOf = new WeakMap<Tree, Listed[]>();
-
-/** Every listed text with an id, keyed the way `Vault.texts` keys them. Components are not listed. */
-function listed(tree: Tree): Listed[] {
-  let had = listedOf.get(tree);
-  if (!had) {
-    const docs: Listed[] = [];
-    for (const kind of ["board", "note", "quiz", "table"] as const) {
-      for (const name of byKind(tree)[kind]) {
-        const id = tree.ids[name];
-        if (id) docs.push({ key: textKey(name, kind), name, kind, id });
-      }
-    }
-    docs.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    listedOf.set(tree, (had = docs));
-  }
-  return had;
-}
 
 /* The texts an answer holds, per answer: `Parsed` hands the same one back while nothing moved. */
 const presentOf = new WeakMap<ReadonlyMap<string, Doc | null>, { all: Listed[]; docs: Listed[] }>();
@@ -239,25 +213,8 @@ async function indexAnswer(
   return out;
 }
 
-/**
- * What a corpus and a search are asked over: every listed text with an id — named, with its stamp
- * from the kept listing, its id and the title its listing gives it — and every attachment with an id.
- * Nothing here reads a text: the worker reads, parses and answers (`server/searching.ts`), and the
- * units and the engine stay there (#279).
- */
-async function overOf(s: Session): Promise<Over> {
-  const tree = await s.vault.tree();
-  const all = listed(tree);
-  const stamps = s.vault.textStamps(tree);
-  const over: Over = { entries: [], meta: [], files: [] };
-  await paced(all, (d) => {
-    const stamp = stamps?.get(d.key);
-    over.entries.push(stamp === undefined ? [d.key, d.name, d.kind] : [d.key, d.name, d.kind, stamp]);
-    over.meta.push([d.id, tree.titles[d.name] ?? null]);
-  });
-  for (const n of tree.files) if (tree.ids[n]) over.files.push([tree.ids[n], n, tree.titles[n] ?? null]);
-  return over;
-}
+/** What a corpus and a search are asked over, for this request's vault (`server/upkeep.ts`). */
+const overOf = (s: Session): Promise<Over> => overOfVault(s.vault);
 
 /**
  * `/__board/corpus`, streamed as the worker cuts it: its parts are the JSON of their docs already,

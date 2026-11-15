@@ -299,7 +299,7 @@ process.on("disconnect", () => process.exit(0));\n`,
   it("is a process that ends when it has been idle, and is started again by the next question", async () => {
     const w = fake();
     try {
-      const t = new WorkerProcess(w.file, 60_000, 100, 100);
+      const t = new WorkerProcess(w.file, 60_000, 100);
       const a = await ask(t);
       expect(a.pid).not.toBe(process.pid);
       expect(t.pid).toBe(a.pid);
@@ -312,14 +312,12 @@ process.on("disconnect", () => process.exit(0));\n`,
     }
   });
 
-  it("stays up longer after a search, for the engine it holds", async () => {
+  it("ends after a search as after any question: a search holds nothing it would build again (#267)", async () => {
     const w = fake();
     try {
-      const t = new WorkerProcess(w.file, 60_000, 50, 600);
+      const t = new WorkerProcess(w.file, 60_000, 50);
       const a = (await t.search(1, null, env.root, [], [], [], "q")).body as { pid: number };
-      await new Promise((r) => setTimeout(r, 250));
-      expect(t.pid).toBe(a.pid);
-      expect(await until(() => t.pid === null && !alive(a.pid))).toBe(true);
+      expect(await until(() => t.pid === null && !alive(a.pid), 2_000)).toBe(true);
     } finally {
       w.done();
     }
@@ -328,7 +326,7 @@ process.on("disconnect", () => process.exit(0));\n`,
   it("retired, answers the next question from a new process", async () => {
     const w = fake();
     try {
-      const t = new WorkerProcess(w.file, 60_000, 60_000, 60_000);
+      const t = new WorkerProcess(w.file, 60_000, 60_000);
       const a = await ask(t);
       t.retire();
       expect(await until(() => !alive(a.pid))).toBe(true);
@@ -345,7 +343,7 @@ process.on("disconnect", () => process.exit(0));\n`,
     process.env.ANYDAG_TEST_SECRET = "s";
     process.env.ANYDAG_TEST_TOKEN = "t";
     try {
-      const t = new WorkerProcess(w.file, 60_000, 50, 50);
+      const t = new WorkerProcess(w.file, 60_000, 50);
       const { env: names } = (await t.ask("POST", "/index", new URLSearchParams(), {})).body as { env: string[] };
       expect(names).not.toContain("ANYDAG_TEST_SECRET");
       expect(names).not.toContain("ANYDAG_TEST_TOKEN");

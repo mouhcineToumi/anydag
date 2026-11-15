@@ -34,7 +34,7 @@ import {
   Reader,
   type Want,
 } from "./parsing";
-import { caughtUp, corpusParts, SEARCH_IDLE_MS, searchOver } from "./searching";
+import { caughtUp, corpusParts, searchOver } from "./searching";
 
 /* -- the worker ---------------------------------------------------------------------------- */
 
@@ -95,8 +95,9 @@ interface Waiting {
 
 /**
  * The worker: **a process of its own**, started when a question needs it and **ended when it has
- * been idle** — `idleMs` after its last answer, or `searchIdleMs` after its last search when that is
- * later, for the engine it holds — and the next question starts another.
+ * been idle** — `idleMs` after its last answer — and the next question starts another. A search
+ * holds nothing it would have to build again (#267), so it keeps the worker up no longer than any
+ * other question.
  *
  * A process and not a thread, because ending it is how its memory comes back. V8 keeps the pages a
  * heap grew into after the garbage in them is collected, and keeps a worker thread's after the
@@ -109,7 +110,6 @@ export class WorkerProcess {
   private child: ChildProcess | null = null;
   private next = 1;
   private waiting = new Map<number, Waiting>();
-  private searched = 0;
   private timer: NodeJS.Timeout | null = null;
   private exits = new WeakMap<ChildProcess, Promise<void>>();
 
@@ -117,7 +117,6 @@ export class WorkerProcess {
     private readonly file: string,
     private readonly deadlineMs = DEADLINE_MS,
     private readonly idleMs = IDLE_MS,
-    private readonly searchIdleMs = SEARCH_IDLE_MS,
   ) {}
 
   /** The worker's pid while one is up — for the tests. */
@@ -208,12 +207,10 @@ export class WorkerProcess {
   /** Nothing outstanding: end the worker once it has been idle long enough. */
   private rest(c: ChildProcess): void {
     this.unrest();
-    const now = Date.now();
-    const until = Math.max(now + this.idleMs, this.searched + this.searchIdleMs);
     this.timer = setTimeout(() => {
       this.timer = null;
       if (this.child === c && !this.outWith(c)) this.end(c);
-    }, until - now);
+    }, this.idleMs);
     this.timer.unref();
   }
 
@@ -320,20 +317,29 @@ export class WorkerProcess {
     files: readonly FileMeta[],
     q: string,
     limit?: number,
-    retire = false,
     only?: readonly string[],
   ): Promise<DslResponse> {
-    this.searched = Date.now();
     const { c, id, answer } = this.open<DslResponse>("/search");
     answer.catch(() => undefined);
     const want: Want = {
       search: q,
       ...(limit !== undefined ? { limit } : {}),
-      ...(retire ? { retire } : {}),
       ...(only ? { only: [...only] } : {}),
     };
     await this.sendEntries(c, { read: id, parsed, home, root, question: "corpus", since: null }, entries, { meta, files, want });
     return answer;
+  }
+
+  /** The corpus `parsed` reads brought up to date in the background, nothing answered (`Want`'s `warm`). */
+  async warm(parsed: number, home: string | null, root: string, entries: readonly Entry[]): Promise<void> {
+    const { c, id, answer } = this.open<DslResponse>("/corpus");
+    answer.catch(() => undefined);
+    await this.sendEntries(c, { read: id, parsed, home, root, question: "corpus", since: null }, entries, {
+      meta: [],
+      files: [],
+      want: { warm: true },
+    });
+    await answer;
   }
 
   /**
@@ -395,6 +401,7 @@ export class WorkerProcess {
       if (at) {
         this.waiting.delete(id);
         clearTimeout(at.timer);
+        this.post(c, { abandon: id } satisfies ReadAsk);
         this.settle(c);
       }
     }
@@ -524,6 +531,9 @@ export class Parsed {
    */
   private since: { on: "worker" | "inline"; turn: number } | null = null;
   private turn: Promise<unknown> = Promise.resolve();
+  /** How many `of` are not answered yet, and when the last one was. */
+  private out = 0;
+  private answeredAt = 0;
   /** Its `Reader` when there is no worker, or when it was given its own parse. */
   private inline: Reader | null = null;
   private readonly number = ++parsedCount;
@@ -547,9 +557,25 @@ export class Parsed {
    * the second, waiting, finds the first's answer cached and parses nothing.
    */
   of(entries: readonly Entry[]): Promise<ReadonlyMap<string, Doc | null>> {
+    this.out++;
     const run = this.turn.then(() => this.ask(entries));
     this.turn = run.catch(() => undefined);
+    const done = () => {
+      this.out--;
+      this.answeredAt = Date.now();
+    };
+    run.then(done, done);
     return run;
+  }
+
+  /** Settles once every `of` asked so far has been answered. */
+  settled(): Promise<unknown> {
+    return this.turn;
+  }
+
+  /** How long nothing has been asked of this cache: 0 while an `of` is out, `Infinity` before the first. */
+  idleMs(): number {
+    return this.out ? 0 : this.answeredAt ? Date.now() - this.answeredAt : Number.POSITIVE_INFINITY;
   }
 
   /** The vault closed: let the worker drop what it kept. */
@@ -608,29 +634,39 @@ export class Parsed {
 
   /**
    * A query's hits over the vault — `{ query, hits }` as `GET /__board/search` answers — matched where
-   * the docs are. A worker that has just parsed many texts asks to be replaced first (`{ again }`), and
-   * a fresh one builds the engine from what the first kept on disk.
+   * the docs are: a lookup in the words index kept beside them (`server/words.ts`).
    */
   async search(over: Over, q: string, limit?: number, only?: readonly string[]): Promise<Doc> {
     const t = this.worker();
     if (t) {
       try {
-        const ask = (retire: boolean) =>
-          t.search(this.number, this.home, this.root, over.entries, over.meta, over.files, q, limit, retire, only);
-        let got = await ask(true);
-        if ((got.body as { again?: boolean } | null)?.again) {
-          t.retire();
-          got = await ask(false);
-        }
-        if (got.status === 200 && !(got.body as { again?: boolean }).again) return got.body as Doc;
+        const got = await t.search(this.number, this.home, this.root, over.entries, over.meta, over.files, q, limit, only);
+        if (got.status === 200) return got.body as Doc;
         throw new Error(`the worker answered ${got.status}`);
       } catch (e) {
         this.failed("searching", e);
       }
     }
     const reader = this.reader();
-    return searchOver(reader, caughtUp(reader, over.entries), over.entries, over.meta, over.files, q, limit, false, only)
-      .body as Doc;
+    return searchOver(reader, caughtUp(reader, over.entries), over.entries, over.meta, over.files, q, limit, only).body as Doc;
+  }
+
+  /**
+   * The corpus, and its words index with it, brought up to date with the vault, and nothing answered:
+   * the read a search starts with, on its own (`server/upkeep.ts`, #267). On the worker it is a read
+   * in the background, which gives way to every question on another reader.
+   */
+  async warm(over: Over): Promise<void> {
+    const t = this.worker();
+    if (t) {
+      try {
+        await t.warm(this.number, this.home, this.root, over.entries);
+        return;
+      } catch (e) {
+        this.failed("bringing up to date the search index of", e);
+      }
+    }
+    caughtUp(this.reader(), over.entries);
   }
 
   /** The corpus, as the JSON of its docs a part at a time — joined by commas, with none between parts. */

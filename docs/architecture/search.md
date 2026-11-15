@@ -1,6 +1,6 @@
 # Search
 
-> The corpus and the engine in the grammar's worker, what it parsed kept in the app's home, one query per request from the page, ranking and snippets.
+> The corpus in the grammar's worker, it and its words index (SQLite FTS5) kept in the app's home, one query per request from the page, ranking and snippets.
 
 ## Search
 
@@ -33,10 +33,10 @@ parsing every board and every note on every keystroke, which is the slowest thin
 on 50,000 files, 20 s to the first answer and 821 MB of the page's heap — in every window, kept for as
 long as the page lived (#282). So the work stays where the parsers are: `GET /__board/corpus` reads
 every text and cuts it into **units** in the grammar's worker (`server/searching.ts`),
-`GET /__board/search?q=` matches a query over them with one MiniSearch engine
-(`src/search/engine.ts`) and answers with the hits **and their snippets** (`Found`,
+`GET /__board/search?q=` looks a query up in an SQLite FTS5 index of their words, kept on disk beside
+them (`server/words.ts`, #267), and answers with the hits **and their snippets** (`Found`,
 `src/search/wire.ts`), and the page (`useSearch`, `ask.ts`) sends each query and draws the answer. The
-page never holds a document's text and does not import the engine, so nothing about the vault's
+page never holds a document's text and does not import the matching, so nothing about the vault's
 size is in its heap but the file names the card lists. The CLI and an agent over MCP ask the same
 route, so all three rank one query the same way.
 
@@ -56,7 +56,7 @@ word an agent wrote a moment ago is found on the next one.
 | a board item | its `#id` | an `md` or `note` as the words a person reads, code included; a caption; a prompt; a diagram's every title, meta, description, row, label, legend entry and category |
 | a note block | `^anchor` if it has one, else `L<line>` | a heading, a paragraph, a quote, code, a table a cell at a time — and each list item on its own |
 
-Seven things are load-bearing:
+Fifteen things are load-bearing:
 
 - **A result is a link, so a unit is only ever something with a name.** On a board that is an item:
   its `#id` is in the file, and the item is what the canvas can frame and select. A
@@ -100,11 +100,12 @@ Seven things are load-bearing:
   `/search` go to it; everything else stays inline, being quick. Measured on 5,000 notes, a cold
   `/index` is 14 s of parsing, and on the server's one thread it was every request waiting,
   `/api/auth/me` included; now `/api/auth/me` answers in 2 ms while it runs. **It ends 30 s after
-  its last answer, or 5 min after its last search** (`ANYDAG_GRAMMAR_IDLE_MS`,
-  `ANYDAG_SEARCH_IDLE_MS`), because ending it is the only way its memory comes back — see *Things that
-  will bite*; the next question starts another, which reads what the last one kept. It is run by the
-  server's own binary, is given none of the server's tokens, secrets or keys, and exits when its
-  channel closes. A question it has not answered in 60 s ends it (#9), and a long read says it is
+  its last answer** (`ANYDAG_GRAMMAR_IDLE_MS`), because ending it is the only way its memory comes
+  back — see *Things that will bite*; the next question starts another, which reads what the last one
+  kept. A search holds nothing it would have to build again, so it keeps the worker up no longer than
+  any other question (until #267 it kept it 5 min, for an engine that took seconds to build). It is
+  run by the server's own binary, is given none of the server's tokens, secrets or keys, and exits
+  when its channel closes. A question it has not answered in 60 s ends it (#9), and a long read says it is
   alive between chunks of 500 texts (`Reader.steps`), so that is 60 s for a chunk, not for the vault.
   The worker is built beside each bundle (`server/build.mjs`, `cli/build.mjs`), and where there is
   none (the unit suite, or `ANYDAG_GRAMMAR_INLINE=1`) the calls run inline. `Parsed.of` runs one call
@@ -121,20 +122,49 @@ Seven things are load-bearing:
   JSON of its docs, in parts the route hands on as the answer is read — the corpus of 50,000 notes is
   140 MB of JSON, none of it held on the server's thread — and `/search` as the hits. The server held
   the corpus of 10,000 files twice over (37 MB of units), for as long as it ran.
-- **A search keeps its engine while somebody is searching, and lets it go after.** Building
-  MiniSearch is the cost, 3 s over 10,000 files, and the query is not, so the worker keeps one engine
-  per vault, named by every text's sha1 and how it is listed, and builds another only when that
-  changes. The engine keeps where each unit is, not its words: a hit's snippet is cut from its
-  document's row, read when the hit is answered. Five minutes without a search and the worker ends,
-  engine and all; the next search builds it again from the rows, parsing nothing that has not changed.
-  A worker that has parsed 500 texts or more does not build it: it answers `{ again }`, is retired,
-  and a fresh one builds it from the rows, so the engine is not held on top of the room the parse's
-  garbage grew. The engine is the biggest thing the worker holds — 146 MB at 10,000 files, about
-  five times that at 50,000 — and #267 replaces it with an index on disk.
-- **Every word must match, and every word is a prefix** (`combineWith: "AND"`, `prefix: true`), so
-  the list narrows as it is typed, the way the names above it do, and `pay sett` finds "payments
-  settle". A word of five letters or more forgives one typo in five and a shorter one none; accents
-  and case are folded both ways. At most three hits come from one document and forty in all.
+- **A search is a lookup in an index kept on disk, not an engine built in memory** (#267). Beside the
+  corpus's rows in `parse.sqlite`, each vault has an FTS5 table of its units' words (`words_<set>`,
+  `server/words.ts`), written **in the transaction that writes the rows it is made from**, so the two
+  never disagree: a text parsed again has its old units taken out and its new ones put in, a text
+  gone takes its units with it. The table is contentless — a unit's rowid says where it is (unit `i`
+  of the text whose row is `r` is `r · 2^20 + i`, an attachment's names below zero), and a hit's
+  snippet is cut from its document's row, read when the hit is answered, forty rows at most. So a
+  worker started again — after an idle, or after the app was restarted — answers its first search
+  from the file, with nothing to build: MiniSearch, which this replaces, held every unit's words in
+  the worker (146 MB at 10,000 files, five times that at 50,000) and built them again after every
+  idle, 4 s at 10,000 files and 20 s at 50,000. **A set whose table is missing is emptied**, so it is
+  made again from the vault rather than answered from rows it does not cover; with `parse.sqlite`
+  deleted, the vault is parsed and indexed once, and nothing is lost but the time.
+- **It is kept up to date as the vault changes, not only when somebody searches** (`server/upkeep.ts`).
+  Every search starts with the read that brings the rows and the index up to date, reading and parsing
+  only the texts whose stamp moved, so a file an agent wrote a moment ago is in the very next answer.
+  While a vault is watched (`anydag serve`, and so the desktop app), the same read also runs on its
+  own: 3 s after the vault opens, and 1.5 s after the last change the watcher or a write reports
+  (`ANYDAG_SEARCH_FIRST_MS`, `ANYDAG_SEARCH_QUIET_MS`). On a home that holds the index that first read
+  only compares stamps; on a new home it makes the index, on the grammar's worker, before anybody
+  asks. The CLI's one-off session does not watch, and keeps the read a search starts with.
+- **That read in the background never makes the page wait.** It shares the grammar's worker with
+  `/index`, which the page is waiting on, and three rules keep it out of the way (`drive` in
+  `server/grammar-worker.ts`). It starts only once the references index has been answered and
+  `QUIET_MS` has gone by with no new ask of it, because the page asks again as an answer lands. It
+  parses 8 texts at a time and, before each 8, gives way while a question runs on another reader or
+  any read's entries are still arriving. A worker reads its channel only between two chunks, and at
+  50 texts a chunk the 400 kB of a warm `/index`'s entries took 740 ms to cross at 5,000 notes. And it
+  stops when a question waits for its own reader, a search or `/corpus`: the rows its chunks kept are
+  on the shelf, so the question goes on from there at a question's pace rather than waiting behind it.
+- **Every word must match, and every word is a prefix**, so the list narrows as it is typed, the way
+  the names above it do, and `pay sett` finds "payments settle". Each word asks the index for
+  `("w" OR "w" OR "w"* …)`, the words joined by `AND`: the whole word is named twice and the prefix
+  once, so a whole-word match ranks about three times a prefix one under `bm25`, the weight MiniSearch
+  gave the two. **Words are cut and folded in JavaScript, not by SQLite** (`wordsOf` in
+  `src/search/engine.ts`): a unit goes into the index as its folded words joined by spaces, under the
+  `ascii` tokenizer, which splits on nothing those words hold — so the index, the query and the
+  snippet split and fold one way. A word of five letters or more forgives one typo in five (two from
+  eight letters on) and a shorter one none: the vault's terms within that many edits of it join its
+  alternatives. They come from `terms_<set>`, every word the index was ever given, read into the
+  worker's memory once and added to as it writes; it is only ever added to, because a term no unit
+  holds any more is an alternative that matches nothing. Accents and case are folded both ways. At
+  most three hits come from one document and forty in all.
 - **The snippet marks exactly what matched**, by word, folded the way the index folds — so a
   prefix hit marks the whole word it matched and nothing else — in a window around the first match
   cut on word boundaries. The tokenizer and the snippet split on one character class; two would mark
@@ -158,7 +188,13 @@ the page still holds no text; it is not a unit, so searching the word *meeting* 
 every document tagged `meeting`. The card shows the filter as a chip beside the box, and MCP's
 `search` takes the same `tag`. See *Tags* in [`tasks-projects-calendar.md`](tasks-projects-calendar.md).
 
-**Out, and why:** a match inside a diagram opening on its card rather than on the diagram (a card's
+**Out, and why:** keeping MiniSearch and saving its index in the app's home, the alternative #267
+named — the engine would still be read into memory whole before its first answer, which is what made
+the first search after an idle take seconds, and FTS5 is in the SQLite the server already has; an
+index in the vault (`.anydag/`), because a sync tool copies a database while it is written and opening
+a vault writes nothing to it; SQLite's `spellfix1` or `trigram` for typos, which Node's SQLite does not
+build in or which would triple the index, where a typo is a few edits against the vault's terms; a
+match inside a diagram opening on its card rather than on the diagram (a card's
 id is the dialect's, and framing one needs the layout's box, which `App` has but a result cannot
 name without a grammar for it); an agent's search tool over MCP (`/__board/corpus` is there, and a
 tool is a decision about what an agent should read, not a mechanism); the read-only view framing an

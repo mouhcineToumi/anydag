@@ -66,13 +66,14 @@ earlier run):
 | the server alone, its peak (`peak`) | 174 MB | 389 MB | 575 MB |
 | at rest, the worker ended (`rest`) | 174 MB | 389 MB | 431 MB |
 
-What `used` still holds is the search engine (MiniSearch over every unit, in the worker while it is
-up); #267's on-disk index replaces it. Most of what `rest` holds over the 100 MB start is the listing's
+What `used` held until #267 was the search engine (MiniSearch over every unit, in the worker while it
+was up); the on-disk index that replaced it took `used` to 610 MB at 10k and 882 MB at 50k (*The
+search index* below). Most of what `rest` holds over the 100 MB start is the listing's
 worker thread (#288): 258 MB after the first `/list` on 10k files. A worker started again after it
 ended answers a warm `/index` in 0.16–0.33 s, parsing nothing whose stamp or sha1 did not move
-(`vault.*.index.after-idle`), but the first search after it rebuilds the engine from the rows: 1.3 s
-at 1k, 4 s at 10k, 20 s at 50k (`vault.*.search.after-idle`), where a warm search is 50–270 ms. Until
-#267, that is a search that hangs after a pause of more than 5 min. It is not a leak — 30 more rounds of list, index and search
+(`vault.*.index.after-idle`). Before #267 the first search after it rebuilt the engine from the rows:
+1.3 s at 1k, 4 s at 10k, 20 s at 50k (`vault.*.search.after-idle`); since, it is a lookup in the file,
+19 ms at 1k and 0.5 s at 50k. It is not a leak — 30 more rounds of list, index and search
 on 10k files hold it flat, and 100 change feeds opened and dropped add 4 MB. The page's own heap is
 13 MB on a note and 22–100 MB on a board; the search card's index is the page's biggest cost (#282).
 
@@ -107,6 +108,34 @@ are read, parsed and their links resolved again (`search.md`, `server.md`).
 | `/__board/search` cold · warm | 2.3 s · 53 ms | 22.6 s · 513 ms | 113 s · 2.8 s |
 | a note opened in the page, to `data-dag-ready` | 0.7 s | 1.1 s | 3.4 s |
 | the search card's first match · next query | 0.8 s · 18 ms | 4.2 s · 111 ms | 20.0 s · 221 ms |
+
+### The search index (#267)
+
+A search is a lookup in an FTS5 index kept in the home's `parse.sqlite` beside the corpus's rows,
+kept up to date as a watched vault changes (`search.md`). Measured with `node scripts/bench.mjs
+--only vault`, develop (`301f71b`) and the change on the same machine, one after the other:
+
+| `vault.*` | 1k | 5k | 10k | 50k |
+|---|---|---|---|---|
+| `search.warm` (median of 4) | 10.7 → 7.3 ms | 30.8 → 25.5 ms | 57 → 38.2 ms | 285 → 180 ms |
+| `search.warm.short` (`h`) | 15.2 → 9.3 ms | 51.7 → 31.1 ms | 110 → 60 ms | 561 → 289 ms |
+| `search.after-idle` (a worker started again) | 392 → 19.3 ms | 2.0 s → 53 ms | 3.9 s → 114 ms | 20.3 s → 543 ms |
+| `search.after-restart` (the app started again) | 561 → 154 ms | 2.1 s → 171 ms | 4.0 s → 218 ms | 19.6 s → 627 ms |
+| `search.after-burst` (200 writes, then `/index`, then a search) | 874 → 596 ms | 2.1 s → 641 ms | 4.1 s → 607 ms | 18.4 s → 725 ms |
+| `search.after-burst.quiet` (200 writes, 5 s quiet, a search) | 950 → 8.5 ms | 2.4 s → 17 ms | 4.3 s → 31 ms | 18.5 s → 164 ms |
+| `search.cold` (a new home: the vault parsed and indexed) | 2.5 → 2.3 s | 12.5 → 11.9 s | 28.2 → 24.3 s | 125 → 113 s |
+| `index.warm` · `index.after-burst` | 4.4 → 4 ms · 365 → 427 ms | 11.3 → 14.6 ms · 352 → 355 ms | 20 → 19 ms · 360 → 418 ms | 92 → 149 ms · 526 → 591 ms |
+| `server.rss.used` (server and worker) | 336 → 366 MB | 600 → 516 MB | 750 → 610 MB | 1.85 GB → 882 MB |
+| `home.size` after the burst | 2.8 → 8.9 MB | 14 → 23 MB | 23 → 41 MB | 100 → 167 MB |
+
+What it costs is disk: the words table and its terms are 1.7× the rows at 50k. What it does not cost
+is the references index: the background read that keeps the search index up to date waits for
+`/index` to go quiet, parses 8 texts at a time and gives way between them (`search.md`). With 50
+texts a time and no wait, a warm `/index` at 5k took 759 ms and one after a burst 605 ms, because
+`/index`'s own entries crossed to the worker a chunk at a time. `search.after-burst` stays at ~0.6 s
+because the bench asks `/index` and the search right after the burst. The background read waits
+for `/index` to go quiet, so the search reads the 200 texts itself; `.quiet` is the same burst
+with the background read let finish.
 
 ### Startup
 
@@ -193,9 +222,9 @@ package carries for a build from source, and the CLI's `meta.json`.
 - **`utilityProcess` would gain nothing measurable.** The main process idles at 0.13% of a core and
   220 MB, most of which is Electron's own; the server child is already out of it, and its memory is the
   vault's (#279), which no change of process type moves.
-- **Search at 5k notes:** between the 1k and 10k rows above, so by interpolation a cold server search
-  of about 11 s, a first answer in the page of about 2 s and a warm query of about 0.25 s — the warm
-  figure `search.md` already records. #282 and #267's index are the fix.
+- **Search at 5k notes:** measured since, in *The search index*: a warm search is 25 ms, the first
+  one after the app starts again 171 ms, and none of them reads the vault again. A cold server search
+  on a new home is still 12 s, the vault parsed once into the index.
 - **Lists at 10k files:** a 1,000-row folder was 18k DOM elements and 1.6 s to draw, a 5,000-row one
   90k and 6.7 s. The sidebar draws the rows in view and a margin since #281 (`sidebar.md`): 936 elements
   whatever the folder holds, and the rows are on the screen 47 ms (1,000 rows) and 180 ms (5,000) after

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEngine, fold, search, snippet, type SearchDoc } from "../src/search/engine";
+import { fold, snippet, type SearchDoc, wordsOf } from "../src/search/engine";
+import { searchDocs, typosFor, within } from "../server/words";
 
-/** Matching and marking. What the list shows is only as good as these two. */
+/** Matching and marking, over the FTS5 index a vault's search asks (`server/words.ts`). What the list shows is only as good as these two. */
 
 const DOCS: SearchDoc[] = [
   {
@@ -29,8 +30,7 @@ const DOCS: SearchDoc[] = [
   },
 ];
 
-const engine = buildEngine(DOCS);
-const where = (q: string) => search(engine, q).map((h) => `${h.doc.name}#${h.unit.part ?? ""}`);
+const where = (q: string) => searchDocs(DOCS, q).map((h) => `${h.doc.name}#${h.unit.part ?? ""}`);
 
 describe("search", () => {
   it("finds a word in notes and boards alike, in one list", () => {
@@ -61,11 +61,11 @@ describe("search", () => {
   });
 
   it("says nothing for an empty query", () => {
-    expect(search(engine, "   ")).toEqual([]);
+    expect(searchDocs(DOCS, "   ")).toEqual([]);
   });
 
   it("keeps a document from filling the list on its own", () => {
-    const many = buildEngine([
+    const many: SearchDoc[] = [
       {
         id: "c000000000",
         name: "long",
@@ -73,10 +73,39 @@ describe("search", () => {
         units: Array.from({ length: 10 }, (_, i) => ({ part: `L${i + 1}`, what: "paragraph", text: `alpha ${i}` })),
       },
       { id: "d000000000", name: "short", kind: "note", units: [{ part: "L1", what: "paragraph", text: "alpha too" }] },
-    ]);
-    const hits = search(many, "alpha");
+    ];
+    const hits = searchDocs(many, "alpha");
     expect(hits.filter((h) => h.doc.name === "long")).toHaveLength(3);
     expect(hits.some((h) => h.doc.name === "short")).toBe(true);
+  });
+});
+
+describe("ranking and the words it marks", () => {
+  it("ranks a whole-word match above a prefix of a longer word", () => {
+    const docs: SearchDoc[] = [
+      { id: "e000000000", name: "long", kind: "note", units: [{ part: "L1", what: "paragraph", text: "paymentsystem notes" }] },
+      { id: "f000000000", name: "exact", kind: "note", units: [{ part: "L1", what: "paragraph", text: "payment notes" }] },
+    ];
+    expect(searchDocs(docs, "payment").map((h) => h.doc.name)).toEqual(["exact", "long"]);
+  });
+
+  it("names the words each hit matched, folded, for the snippet to mark", () => {
+    const [hit] = searchDocs(DOCS, "pay STRI");
+    expect(hit!.terms.sort()).toEqual(["payments", "stripe"]);
+    const [typo] = searchDocs(DOCS, "espreso");
+    expect(typo!.terms).toEqual(["espresso"]);
+  });
+
+  it("cuts and folds a text one way for the index, the query and the snippet", () => {
+    expect(wordsOf("Orders API · FastAPI → Postgres\u0001x")).toEqual(["orders", "api", "fastapi", "postgres", "x"]);
+    expect(wordsOf("api-gateway Café")).toEqual(["api", "gateway", "cafe"]);
+  });
+
+  it("forgives one typo in five letters from five on, and counts them the way MiniSearch did", () => {
+    expect([4, 5, 7, 8, 12, 13, 40].map(typosFor)).toEqual([0, 1, 1, 2, 2, 3, 6]);
+    expect(within("espreso", "espresso", 1)).toBe(true);
+    expect(within("kitten", "sitting", 2)).toBe(false);
+    expect(within("kitten", "sitting", 3)).toBe(true);
   });
 });
 

@@ -7,6 +7,7 @@ import "./sqlite-shim";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -167,6 +168,17 @@ describe("the answer, streamed a doc at a time", () => {
   });
 });
 
+/** How many texts the corpus's rows on the shelf hold. */
+function corpusRows(): number {
+  const db = new DatabaseSync(path.join(env.homeDir, "parse.sqlite"), { readOnly: true });
+  try {
+    const q = "select count(*) n from texts t join sets s on s.id = t.set_id where s.question = 'corpus'";
+    return Number((db.prepare(q).get() as { n: number }).n);
+  } finally {
+    db.close();
+  }
+}
+
 describe("the index and the corpus on the grammar's worker", () => {
   let dir: string;
   beforeAll(async () => {
@@ -257,7 +269,7 @@ describe("the index and the corpus on the grammar's worker", () => {
     }
   }, 30_000);
 
-  it("asks to be replaced after parsing many texts, and a fresh worker answers the search from the rows", async () => {
+  it("answers a search from a fresh worker out of the index on disk, parsing nothing again (#267)", async () => {
     for (let i = 0; i < 520; i++)
       write(
         env.root,
@@ -267,13 +279,74 @@ describe("the index and the corpus on the grammar's worker", () => {
     const { entries, meta } = await entriesOf();
     const t = new WorkerProcess(path.join(dir, "grammar-worker.mjs"));
     try {
-      const first = await t.search(1, env.homeDir, env.root, entries, meta, [], "harbour", undefined, true);
-      expect(first.body).toEqual({ again: true });
+      const first = await t.search(1, env.homeDir, env.root, entries, meta, [], "harbour");
+      expect((first.body as { hits: unknown[] }).hits).toHaveLength(40);
       const pid = t.pid;
       t.retire();
-      const second = await t.search(1, env.homeDir, env.root, entries, meta, [], "harbour 7", undefined, true);
+      const second = await t.search(1, env.homeDir, env.root, entries, meta, [], "harbour 7");
       expect(t.pid).not.toBe(pid);
       expect((second.body as { hits: { name: string }[] }).hits.map((h) => h.name)).toContain("many/n7");
+      // The fresh worker read what the first kept: the read under the search parsed nothing.
+      const shelf = new DatabaseSync(path.join(env.homeDir, "parse.sqlite"), { readOnly: true });
+      try {
+        const set = shelf.prepare("select id from sets where question = 'corpus'").get() as { id: number };
+        const units = shelf.prepare(`select count(*) n from words_${set.id}`).get() as { n: number };
+        expect(Number(units.n)).toBeGreaterThan(520);
+      } finally {
+        shelf.close();
+      }
+    } finally {
+      await t.close();
+    }
+  }, 60_000);
+
+  it("brings the search index up to date in the background, giving way to /index while it runs (#267)", async () => {
+    for (let i = 0; i < 3000; i++)
+      write(
+        env.root,
+        `many/n${i}.md`,
+        `---\nid: ${(1000000000 + i).toString(36).padStart(10, "0").slice(-10)}\n---\n# N${i}\n\nharbour ${i} [[n${i + 1}]]\n`,
+      );
+    const { entries, meta } = await entriesOf();
+    const t = new WorkerProcess(path.join(dir, "grammar-worker.mjs"));
+    try {
+      const index = t.read(1, env.homeDir, env.root, "index", null, entries);
+      await new Promise((r) => setTimeout(r, 30));
+      const warm = t.warm(2, env.homeDir, env.root, entries);
+      expect((await index).fresh).toHaveLength(3000);
+      /* The background read gave way while /index parsed its six chunks: at most a few of its own small
+         chunks of the corpus are parsed while /index's entries and answer cross, where interleaving
+         them parses texts between each two of /index's chunks. */
+      expect(corpusRows()).toBeLessThanOrEqual(100);
+      await warm;
+      expect(corpusRows()).toBe(3000);
+      // And it left the index whole: a search parses nothing and finds every note.
+      const found = await t.search(2, env.homeDir, env.root, entries, meta, [], "harbour 59");
+      expect((found.body as { hits: { name: string }[] }).hits.map((h) => h.name)).toContain("many/n59");
+    } finally {
+      await t.close();
+    }
+  }, 60_000);
+
+  it("hands a background read's reader to a search asked meanwhile, which goes on from where it stopped (#267)", async () => {
+    for (let i = 0; i < 3000; i++)
+      write(
+        env.root,
+        `many/n${i}.md`,
+        `---\nid: ${(1000000000 + i).toString(36).padStart(10, "0").slice(-10)}\n---\n# N${i}\n\nharbour ${i}\n`,
+      );
+    const { entries, meta } = await entriesOf();
+    const t = new WorkerProcess(path.join(dir, "grammar-worker.mjs"));
+    try {
+      // How much of the corpus the background read had kept when it said it was done.
+      const warm = t.warm(2, env.homeDir, env.root, entries).then(corpusRows);
+      await new Promise((r) => setTimeout(r, 200));
+      const found = await t.search(2, env.homeDir, env.root, entries, meta, [], "harbour 2999");
+      // It stopped for the search, rather than finishing at its own pace while the search waited.
+      expect(await warm).toBeLessThan(3000);
+      // And the search read the rest: every note is in the index, the last one found.
+      expect((found.body as { hits: { name: string }[] }).hits.map((h) => h.name)).toContain("many/n2999");
+      expect(corpusRows()).toBe(3000);
     } finally {
       await t.close();
     }

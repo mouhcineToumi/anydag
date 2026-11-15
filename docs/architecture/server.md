@@ -20,6 +20,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on: a process, ended when idle |
 | `server/parsing.ts` · `pace.ts` | the texts of `/index` and `/corpus` read, parsed and kept where the grammar runs · a whole-vault loop in slices |
 | `server/parse-store.ts` · `searching.ts` | what the grammar parsed, kept in `<home>/parse.sqlite` · a vault's corpus and search, answered in the worker |
+| `server/words.ts` · `upkeep.ts` | the corpus's words, an FTS5 index beside its rows in `parse.sqlite` · that index kept up to date as a watched vault changes |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
@@ -32,8 +33,9 @@ Nine things are load-bearing:
   title and kind so the app, the CLI and MCP agree without walking the vault, and it is an index:
   delete it and the next open rebuilds it, losing practice records and each vault's saved tabs
   (`/api/tabs`, `sidebar.md`) and nothing else. Beside it,
-  `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1: delete it and the
-  next question parses the vault again. **SQLite is never in the vault**, because a sync tool copies
+  `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1, and the search's FTS5
+  index of their words (#267): delete it and the vault is parsed and indexed again, in the
+  background once a watched vault opens, or by the next question. **SQLite is never in the vault**, because a sync tool copies
   a database while it is written.
 - **Frontmatter wins.** Two files with one id — a copy made in a file manager — keep it for the
   older by created date, and the copy is given a new id, written into it. A file moved outside the
@@ -213,6 +215,17 @@ Eight things are load-bearing:
   among them since #191 (`settings.md`). `WORKSPACE_PREF_KEYS` is still the name of the split in `src/settings/`.
 - **A file keeps its id across a transfer**, and a reference from a file left behind stops resolving
   there: an id resolves within its vault.
+
+**Out, and why** (#267, each measured or read against the code first): **removing the local port**, or a
+second transport between the page and the server — `anydag serve`, the CLI and MCP reach this server
+over HTTP, the token and the `Host` are the whole security model, a second transport would double what
+has to be guarded, and the forward through `anydag://` costs 0.7 ms a request (`limits.md`);
+**SQLite indexes for what the Tasks, project and calendar views filter on** — those views filter the
+listing, which is kept in memory and changed where something moved (#280), so there is no query to
+index: every query the home does run is on a primary key or a unique index, every statement is
+prepared once (`Home.sql`, `Shelf.sql`, `SyncState.sql`), and bulk writes are already transactions;
+**caches in the vault** — a search index, graph positions — because opening a vault writes nothing
+to it and everything rebuildable lives in the app's home.
 
 **Out, and why:** collaborators and permissions (a vault is a folder; a person shares it the way they
 share any folder); references across vaults; and sync, which is the folder's — Syncthing, iCloud,
