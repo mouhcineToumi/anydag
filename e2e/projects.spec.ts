@@ -124,7 +124,8 @@ test("Open tasks shows only the project's tasks, and one typed in there is made 
   await expect.poll(() => read(`proj/${title}`)).toMatch(/^---\nstatus: todo\nid: [0-9a-z]{10}\n---\n$/);
 
   /* Every project: a row names its project with a chip, and one outside every project has none. */
-  await page.locator("[data-dag-tasks-project]").selectOption("");
+  await page.locator('[data-dag-tasks-chip-clear="project"]').click();
+  await expect(page).not.toHaveURL(/project=/);
   await page.locator("[data-dag-tasks-filter]").fill(folder);
   await expect(page.locator(`[data-dag-task-row="${inside}"] [data-dag-project-chip]`)).toHaveAttribute(
     "data-dag-project-chip",

@@ -22,7 +22,7 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
 | Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
-| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **New task** row as the list's first line (`N` puts the caret in it) with pills for priority, project and due date — Enter makes the task and keeps the row open with the pills as they were, shift+Enter makes it and opens it, Tab walks the pills, Escape clears and leaves, a refusal says why and keeps the title, and the lock's notice answers while read only — and a `+` on each group heading that opens it with that group's status; a **New task dialog** (`C`, or the top bar's primary button) with a title, a description, the four pills and *Keep this open for the next one*; the board keeps a box at the foot of each column |
+| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then priority, or a board of three columns a card is dragged between; a filter line — the words field, a chip for each filter in use, **Filter**, the count (*13 open, 2 overdue*), **Order** and **Display**; the list's keys and a bar for the selected tasks (below); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **New task** row as the list's first line (`N` puts the caret in it) with pills for priority, project and due date — Enter makes the task and keeps the row open with the pills as they were, shift+Enter makes it and opens it, Tab walks the pills, Escape clears and leaves, a refusal says why and keeps the title, and the lock's notice answers while read only — and a `+` on each group heading that opens it with that group's status; a **New task dialog** (`C`, or the top bar's primary button) with a title, a description, the four pills and *Keep this open for the next one*; the board keeps a box at the foot of each column |
 | the task's own page | its status mark beside the title (the row's checkbox); its properties in a panel at the right — *Status*, *Priority* and *Project* as the row's menus, *Starts* and *Due* (with *7 days left* or *2 days late*), then *Check items* ticked of all and when it *Changed*, then *Linked from* — which the top bar's panel button, or a window too narrow for it, folds into one line of pills above the text; *2 of 13* and the arrows beside it step through the Tasks page's order; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
 | a board, or a note, embedding one | a card — status as a button, title, priority, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
 | `?view=1`, a snapshot, the PDF | the status, priority and date on a line above the text |
@@ -119,6 +119,46 @@ searched and offers *Clear the filter* and, on *Open*, *Look in Done too*. `src/
 holds the rules with no drawing in them (`test/task-model.test.ts`), and `TasksMenu` is the page's
 one menu — the calendar's item menu written once.
 
+**Order, Display, Filter, selection and the keys** (#311). The rules are `src/ui/taskView.ts`, with
+no drawing in them (`test/task-view.test.ts`); the menus and the bar are `TasksBar.tsx`.
+
+- **Order** is a key — priority, due date, start date, project, last changed, title — a direction in
+  that key's words (*Highest first*, *Soonest first*, *A to Z*, *Newest first*) and a *Then by* for
+  ties; the title and then the name end every comparison so it is total. A task with no value for the
+  key goes last **either way**: *Lowest first* is low before urgent, not nothing before everything.
+  *Done* has an order of its own, most recently finished first, so choosing one for *Open* does not
+  reorder what was finished.
+- **Display** groups by status, priority, due date (*Overdue*, *Today*, *Next 7 days*, *Later*,
+  *No date*, and *Earlier* for a done task whose date has passed, which is never overdue), project,
+  or nothing, and switches the priority, check items, project and last-changed columns; the due date
+  is always drawn. A status always has its groups and a priority its five, empty or not, so a `+` is
+  there to make the first one — a `+` makes a task with its group's value (a status, a priority, a
+  project, today); a due date and a project show only the groups something is in. Order and Display
+  are one preference, `dag:tasks-display`, **in `PREF_KEYS` in the person's half** for
+  `dag:calendar-hide`'s reason, read leniently by `displayOf` and absent while it is the default; it
+  is never written to a vault file.
+- **Filter** offers status, priority, project and due date, each a menu of values with boxes and how
+  many tasks each would leave **with the other fields on and its own off**. A field in use is a chip
+  that opens its values and has its own clear; *Clear all* comes with two. Values in one field are
+  *or*, fields are *and*. The words field still reads titles, folders and projects. The filter is
+  this page's, not a preference, except that one project (or *No project* alone) is the URL's
+  `project=`, so the Projects page's *Open tasks* lands on it and a link to a project's tasks still
+  works; a project with no id leaves the URL alone rather than minting one. The *Tag* select (#327,
+  `tag=`) sits beside **Filter** and is not one of its fields: it narrows every task before the tab,
+  the fields and the words, so the counts are the tagged tasks', and a task made while it is on
+  carries the tag.
+- **Selection**: `X`, Shift with the arrows or `J`/`K`, Ctrl/Cmd-click or Shift-click (a run from
+  the last). While anything is selected a bar floats over the foot of the list — *Status*,
+  *Priority*, *Due date*, *Project*, *Move to trash* — and every change in it is one write per task,
+  each with its own `base`; *Project* moves the files, and *Move to trash* answers with an Undo that
+  restores each entry.
+- **The keys, while a row has the focus**: `J`/`K` or the arrows walk the open groups, `Enter` (the
+  title's own) opens, `Ctrl+Enter` checks off (or back), `S`, `P`, `D`, `M` open the status,
+  priority, date and project menus for the selection or the row — whose own keys pick, `1`–`3` and
+  `1`–`4` with `0` for none — `X` selects, and `Escape` lets go of the selection and then of the
+  filter. `J` from nowhere goes to the first row. Space is the leader's: nothing here hears it or
+  the key after it.
+
 **A template is not a task.** A note in the vault's templates folder (*Note templates*, [`notes.md`](notes.md))
 that carries a `status:`, a `project:` or a `start:` is a note to copy, not work to do, and is left out of
 `tasks`, `projects` and `events` in `/__board/list`, the feed and the index — so the Tasks page, the
@@ -142,7 +182,7 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `data-dag-taskbar-priority-menu`, `data-dag-taskline-priority`, `data-dag-embed-priority`, `data-priority`
 on `.dag-task-priority`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
 `data-dag-tasks-look-done`, `data-today` on a due date, the storage keys `dag:tasks-view` and
-`dag:tasks-tab`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
+`dag:tasks-tab`, the preference `dag:tasks-display`, `data-dag-tasks-grouped`, `data-hide-*` on `.dag-tasks`, `data-selected` on a row, `data-dag-tasks-chip*`, `data-dag-tasks-clear-all`, `data-dag-tasks-filter-button`, `data-dag-tasks-filter-field`, `data-dag-tasks-filter-value`, `data-dag-tasks-order*`, `data-dag-tasks-then*`, `data-dag-tasks-display-button`, `data-dag-tasks-group-by`, `data-dag-tasks-column-toggle`, `data-dag-tasks-twisty`, `data-dag-tasks-bulk*`, `data-dag-tasks-notice*`, `dag-tasks__chip*`, `dag-tasks__line-button`, `dag-tasks__bulk*`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
 `tasks`.
 
 **Out, and why:** assignees and reminders (each is a
@@ -173,7 +213,7 @@ tagging as a link only, and the note with a bar as the project's page.
 |---|---|
 | the sidebar | a project's folder wears a kanban folder in its hue (dimmed when paused or done), its note a briefcase; a plain folder's menu has *Make it a project*, a project's *Open project* and *Not a project* |
 | the project's own page | a bar under the title: the status as three choices, the colour, how many of its tasks are in each status, *Open tasks*, *Not a project* |
-| the Tasks page | a project filter — every project, one project, or none — carried as `project=<id>`, or `project=none`; a row names its project with a chip; a task typed in while filtered is made in the project's folder |
+| the Tasks page | the Filter button's *Project* — any number of projects, or none — and one project, or none alone, carried as `project=<id>` or `project=none`; a row names its project with a chip; a task typed in while filtered is made in the project's folder |
 | a board, a note's `@` | the placed card says *Project · Active*; the reference picker labels a project as one |
 | `?view=1`, a snapshot, the PDF | the status on a line above the text |
 
@@ -226,7 +266,7 @@ every file through the ordinary write path, and creation where the tag is used.
 | a board, a quiz, a table | *Tags…* in the top bar's `⋯`, which opens the editor in a popover |
 | the sidebar | *Tags…* in every document row's menu, the same popover |
 | Settings → This vault → Tags | the tag manager: every tag with its colour and count, *Unused* last; recolour, rename (a rename onto an existing tag merges), delete |
-| the Tasks page | a *Tag* filter beside the project filter, `tag=<name>` or `tag=none`; a row shows up to two chips and an accessible *+n* |
+| the Tasks page | a *Tag* filter beside **Filter**, `tag=<name>` or `tag=none`; a row shows up to two chips and an accessible *+n* |
 | the Calendar | the same filter, in its *Show* menu, over tasks, events and notes; no chips on items |
 | search | `tag=` keeps only hits in documents carrying the tag, and with no words lists them all; the card shows the filter as a chip |
 | `?view=1`, a snapshot, the PDF | the chips, read only, on the line above the text |

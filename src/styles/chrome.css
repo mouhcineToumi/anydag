@@ -6079,8 +6079,9 @@ button.dag-task-pri:focus-visible { box-shadow: var(--focus-ring); }
   top: 0;
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   min-height: 44px;
   padding: 6px 16px 6px 24px;
   background: var(--dag-color-paper);
@@ -6126,6 +6127,96 @@ button.dag-task-pri:focus-visible { box-shadow: var(--focus-ring); }
   .dag-tasks__bar > .dag-tasks__spacer { display: none; }
   .dag-tasks__count { flex-basis: 100%; }
 }
+/* The filter line's three quiet buttons — Filter, Order, Display — and a field in use as a chip
+   (#311): the chip opens the field's values, its × clears it. */
+.dag-tasks__line-button { flex: none; color: var(--dag-color-slate); }
+.dag-tasks__line-button:hover { color: var(--dag-color-ink); }
+.dag-tasks__chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 260px;
+  height: 24px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-accentSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-tasks__chip-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control) 0 0 var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tasks__chip-mark { display: inline-flex; flex: none; color: var(--dag-color-accent); }
+.dag-tasks__chip-field { flex: none; color: var(--dag-color-slate); }
+.dag-tasks__chip-words { min-width: 0; overflow: hidden; font-weight: var(--dag-ui-weight-strong); text-overflow: ellipsis; white-space: nowrap; }
+.dag-tasks__chip-clear {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: 0 var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0;
+  cursor: pointer;
+}
+.dag-tasks__chip-clear:hover { color: var(--dag-color-ink); }
+.dag-tasks__chip-open:focus-visible,
+.dag-tasks__chip-clear:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+
+/* A selected row is tinted with the accent, as a selection is everywhere in the app. */
+.dag-tasks__row[data-selected] { background: var(--dag-color-accentSoft); }
+.dag-tasks__row[data-selected]:hover { background: var(--dag-color-accentSoft); }
+.dag-tasks__row[data-selected]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--dag-color-accent);
+}
+
+/* The Display menu's columns, switched off: the cell goes, and the last change's cell keeps the row's menu. */
+.dag-tasks[data-hide-priority] .dag-tasks__pri,
+.dag-tasks[data-hide-items] .dag-tasks__cell--items,
+.dag-tasks[data-hide-project] .dag-tasks__cell--project,
+.dag-tasks[data-hide-changed] .dag-tasks__changed { display: none; }
+.dag-tasks[data-hide-changed] .dag-tasks__cell--changed { width: 28px; }
+
+/* The bar over the foot of the list while tasks are selected: sticky in the page, so it stays in its
+   column beside a docked sidebar, and the toasts stand above it. */
+.dag-tasks__bulk {
+  position: sticky;
+  bottom: 20px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin: 24px auto 0;
+  padding: 6px 6px 6px 14px;
+  overflow-x: auto;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-tasks__bulk-n { flex: none; margin-right: 8px; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); white-space: nowrap; }
+.dag-tasks__bulk .dag-button { flex: none; }
+body:has(.dag-tasks__bulk) .dag-toasts { bottom: 84px; }
+
 .dag-tasks__intro { margin: 16px 24px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
 
 .dag-tasks__groups { display: flex; flex-direction: column; }
