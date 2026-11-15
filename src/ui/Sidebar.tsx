@@ -77,6 +77,7 @@ import { projectFolders, type Project, type ProjectChange } from "@/note/project
 import type { Task, TaskChange } from "@/note/task";
 import { hueVars } from "@/render/hue";
 import { chordFor } from "@/edit/bindings";
+import { middle, type NewTab } from "./tabs/intent";
 import type { SettingsTab } from "@/settings/tabs";
 import { loadVaults } from "@/vault/api";
 import { currentVault } from "@/vault/current";
@@ -531,7 +532,8 @@ export function Sidebar({
   /** `kind:name` each, in the order they were added — the person's, through `PREF_KEYS`. */
   favourites?: readonly string[];
   files: SidebarFiles;
-  onOpen(kind: FileKind, name: string): void;
+  /** Open a file — in the tab in front, or in a new document tab behind it (`tab`). */
+  onOpen(kind: FileKind, name: string, tab?: NewTab): void;
   onWidth(w: number): void;
   onPointerEnter?(): void;
   onPointerLeave?(): void;
@@ -1536,6 +1538,8 @@ export function Sidebar({
                     aria-current={current ? "page" : undefined}
                     title={hintOf(e, questions, sizes)}
                     onClick={() => onOpen(e.kind, e.name)}
+                    /* A middle click opens it in a new tab, as a browser opens a link. */
+                    onAuxClick={middle(() => onOpen(e.kind, e.name, "behind"))}
                     {...pressed(ahead(e.kind, e.name, current))}
                   >
                     <FileIcon entry={e} group={shownKind(e, kinds)} task={tasks[e.name]} project={projects[e.name]} />
@@ -1975,6 +1979,9 @@ export function Sidebar({
                     if (dragged.current || select(e, key)) return;
                     onOpen(kind, where);
                   }}
+                  /* A middle click opens it in a new tab behind this one. Ctrl/⌘ and a click is the
+                     selection's here, which is why the row's menu says *Open in a new tab* too. */
+                  onAuxClick={middle(() => onOpen(kind, where, "behind"))}
                   {...common}
                   {...hover(ahead(kind, where, current))}
                 >
@@ -2143,6 +2150,7 @@ export function Sidebar({
             else if (menuLine.type === "file" && (what === "favourite" || what === "unfavourite"))
               files.favourite(menuLine.entry.kind, where, what === "favourite");
             else if (what === "duplicate" && menuLine.type === "file") files.duplicate(menuLine.entry.kind, where);
+            else if (what === "open-tab" && menuLine.type === "file") onOpen(menuLine.entry.kind, where, "behind");
             else if (what === "new-board") reportMake(files.newFile("board", where));
             else if (what === "new-note") reportMake(files.newFile("note", where));
             else if (what === "new-template") openTemplates({ folder: where });
@@ -2581,6 +2589,7 @@ function NewMenu({
 
 /** What a row's menu may still do while the app is locked: nothing in it changes a file. */
 const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>([
+  "open-tab",
   "favourite",
   "unfavourite",
   "copy-link",
@@ -2591,6 +2600,7 @@ const READ_PICKS: ReadonlySet<Pick> = new Set<Pick>([
 
 type Pick =
   | "new-in"
+  | "open-tab"
   | "rename"
   | "duplicate"
   | "move"
@@ -2745,6 +2755,8 @@ function RowMenu({
               <hr className="dag-vault__rule" />
             </>
           ) : null}
+          {/* The way to a new tab a finger and a keyboard have: on a row, Ctrl/⌘ and a click picks. */}
+          {line.type === "file" ? item("open-tab", "Open in a new tab", <ExternalLink {...ICON} aria-hidden="true" />) : null}
           {line.type === "file"
             ? favourite
               ? item("unfavourite", "Remove from favourites", <StarOff {...ICON} aria-hidden="true" />)

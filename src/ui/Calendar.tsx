@@ -88,6 +88,7 @@ import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { tagMatches, type TagFilter } from "./tagFilter";
 import { TagSelect } from "./tags/TagFilter";
 import { collation } from "@/locale";
+import { middle, type NewTab } from "./tabs/intent";
 
 /**
  * The Calendar page: tasks, events and notes on one timeline, as a
@@ -254,7 +255,8 @@ export function CalendarView({
   onTagFilter?(next: TagFilter): void;
   /** Go somewhere else: another view, another day, another count. `day: null` is today. */
   onGo(next: { view?: CalView; day?: string | null; count?: number }): void;
-  onOpen(name: string): void;
+  /** Open a note — here, or in a new document tab (`tab`). */
+  onOpen(name: string, tab?: NewTab): void;
   /** A copy of the item's file, beside it, opening nothing — `Shell`'s duplicate. */
   onDuplicate(name: string): void;
   /** Into the trash, with the notice whose Undo puts it back — `Shell`'s Delete. */
@@ -393,7 +395,8 @@ export function CalendarView({
          the item it was asked about on the glass to put the focus back on. */
       closeMenu(what === "duplicate");
       if (what === "open") onOpen(name);
-      else if (what === "new-tab") window.open(hrefOf(name), "_blank", "noopener,noreferrer");
+      /* Behind this page, as a document tab (#264): the calendar stays where it was. */ else if (what === "new-tab")
+        onOpen(name, "behind");
       else if (what === "duplicate") onDuplicate(name);
       else onTrash(name);
     },
@@ -874,10 +877,13 @@ function ItemLink({
           moved.current = false;
           return;
         }
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        /* Shift alone is the browser's new window; Ctrl/⌘ is a tab of this window, which `open`
+           hears from the press itself (`tabs/intent.ts`). */
+        if ((e.shiftKey && !(e.metaKey || e.ctrlKey)) || e.button !== 0) return;
         e.preventDefault();
         onOpen(item.name);
       }}
+      onAuxClick={middle(() => onOpen(item.name))}
       /* The browser's own menu off an item, and ours in its place. On empty time neither the
          calendar nor this answers one, so a right-drag there is still nothing at all. */
       onContextMenu={(e: ReactMouseEvent<HTMLAnchorElement>) => {

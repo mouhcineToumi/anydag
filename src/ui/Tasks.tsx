@@ -87,6 +87,7 @@ import {
 import { TasksMenu, under, type MenuRow } from "./TasksMenu";
 import { blankDraft, NewTaskDialog, NewTaskRow, type NewTaskDraft } from "./NewTask";
 import { Toast, ToastName, ToastWords } from "./Toast";
+import { middle } from "./tabs/intent";
 
 /**
  * The Tasks page: every note that is a task, as a list or as a board.
@@ -1148,6 +1149,7 @@ function TaskRow({
         data-dag-task-open={r.name}
         title={r.name}
         onClick={() => onOpen(r.name)}
+        onAuxClick={middle(() => onOpen(r.name))}
       >
         {r.title}
       </button>

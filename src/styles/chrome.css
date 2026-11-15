@@ -72,7 +72,7 @@
  * arrive wearing the browser's own black one. `:where()` keeps this at no specificity: every rule
  * below still wins, and a row that needs the inset ring says so itself.
  */
-:where(.dag-toolbar, .dag-sidebar, .dag-pagebar, .dag-dock, .dag-zoombar)
+:where(.dag-toolbar, .dag-sidebar, .dag-pagebar, .dag-doctabs, .dag-dock, .dag-zoombar)
   :where(button, a[href], input, select, textarea, summary):focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -666,6 +666,107 @@
   .dag-tab-wrap .dag-tab--on { padding-right: 50px; }
   .dag-tab__close { right: 2px; width: 44px; height: 44px; }
   .dag-tab__add { min-width: 44px; }
+}
+
+/*
+ * The document tabs (#264): the window's open documents, across the top of the page, as a browser's
+ * tabs are. Not the page tabs above, which are a board's pages along the bottom and own `dag-tab*`;
+ * every name here is `dag-doctabs*`, grepped first. The strip is drawn once there are two tabs, so
+ * a window with one document looks exactly as it did.
+ */
+.dag-doctabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: var(--dag-ui-space-1);
+  height: 40px;
+  padding: 0 var(--dag-ui-space-2) 0 var(--dag-ui-space-3);
+  background: var(--dag-color-paper100);
+  border-bottom: 1px solid var(--dag-color-outline);
+  font-size: var(--chrome-text-sm);
+}
+/* At the window's left edge — the column away — it keeps clear of the toggle and the traffic lights,
+   and the page's own bar under it no longer has to. */
+.dag-doctabs[data-dag-doctabs-edge] { padding-left: calc(var(--dag-ui-space-3) + var(--window-inset)); }
+.dag-doctabs > .dag-sidebar-toggle-slot { align-self: center; margin-right: var(--dag-ui-space-1); }
+.dag-docs:has(> .dag-doctabs) .dag-toolbar > .dag-sidebar-toggle-slot { display: none; }
+.dag-docs:has(> .dag-doctabs) .dag-toolbar[data-dag-toolbar-edge] { padding-left: 16px; }
+.dag-doctabs__scroll {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  padding-top: var(--dag-ui-space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.dag-doctabs__wrap { position: relative; display: inline-flex; align-items: stretch; flex: none; height: 32px; }
+.dag-doctabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* A minimum so a one-word title is still a target, a maximum so a sentence does not own the strip,
+     and one line: the title runs out in an ellipsis and the whole of it is the tooltip. */
+  min-width: 96px;
+  max-width: 220px;
+  padding: 0 30px 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dag-doctabs__tab:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-doctabs__tab > svg { flex: none; }
+.dag-doctabs__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The tab in front is lifted onto the page it opens, joined to it, with the accent as its cap — a
+   change of fill alone did not read as *the* document on the page strip either. */
+.dag-doctabs__wrap--on .dag-doctabs__tab {
+  color: var(--dag-color-ink);
+  font-weight: var(--dag-ui-weight-strong);
+  background: var(--dag-color-paper);
+  border-color: var(--dag-color-outline);
+  box-shadow: inset 0 2px 0 var(--dag-color-accent);
+  margin-bottom: -1px;
+}
+.dag-doctabs__tab:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-doctabs__wrap--on .dag-doctabs__tab:focus-visible { box-shadow: var(--focus-ring-inset), inset 0 2px 0 var(--dag-color-accent); }
+.dag-doctabs__close {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-doctabs__close:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-doctabs__close:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-doctabs__new { align-self: center; flex: none; }
+[data-dag-window] .dag-doctabs { -webkit-app-region: drag; }
+[data-dag-window] .dag-doctabs :is(button, [role]) { -webkit-app-region: no-drag; }
+/* A finger's strip: a tab, its close and the new-tab button are 44px on a phone. */
+@media (max-width: 719px) {
+  .dag-doctabs { height: 52px; padding-left: var(--dag-ui-space-1); }
+  .dag-doctabs[data-dag-doctabs-edge] { padding-left: calc(var(--dag-ui-space-1) + var(--window-inset)); }
+  .dag-doctabs > .dag-sidebar-toggle-slot { width: 44px; height: 44px; }
+  .dag-doctabs__wrap { height: 44px; }
+  .dag-doctabs__tab { padding-right: 48px; }
+  .dag-doctabs__close { right: 2px; width: 44px; height: 44px; }
+  .dag-docs:has(> .dag-doctabs) .dag-toolbar[data-dag-toolbar-edge] { padding-left: 4px; }
 }
 
 .dag-icon {
