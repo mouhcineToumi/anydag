@@ -21,7 +21,8 @@ import { expect, test, type Page } from "./fixture";
  * - **A timed block in a week or a day** (`.dag-cal-column > .dag-calendar__item`) is drawn at the
  *   event's duration on the hour grid. Its height *is* the time it lasts, and padding it to 24px
  *   would draw an event that ends later than the file says. This check walks the month, where every
- *   all-day bar is at least 24px and a day's number is 24px.
+ *   all-day bar is at least 24px and a day's number is 24px, and the rows view, where a bar is 24px
+ *   tall and drawn at least 24px wide.
  * - **A tick in a read-only table cell** (`.dag-grid__check`) is paint, not a control: the cell is
  *   the target, and it is 34px high. In edit mode the press is a cell gesture too, so the span has
  *   no box of its own to grow.
@@ -215,6 +216,10 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
   await page.setViewportSize({ width: 1440, height: 900 });
   fs.writeFileSync(path.join(dir, "task.note.md"), noteText("Touch task", ["status: todo", "due: 2035-07-12"]));
   fs.writeFileSync(path.join(dir, "event.note.md"), noteText("Touch event", ["start: 2035-07-12", "end: 2035-07-13"]));
+  fs.writeFileSync(
+    path.join(dir, "timed.note.md"),
+    noteText("Touch timed", ["start: 2035-07-12T09:00Z", "end: 2035-07-12T10:00Z"]),
+  );
   fs.writeFileSync(path.join(dir, "quiz.quiz.md"), QUIZ);
   fs.writeFileSync(path.join(dir, "table.table.md"), TABLE);
 
@@ -232,6 +237,12 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
   await page.goto("/?calendar=week&date=2035-07-15");
   await expect(page.locator("[data-dag-cal-mini]")).toBeVisible({ timeout: 15_000 });
   await measure(page, "the calendar's small month at 1440", [".dag-cal-mini"], 24);
+  /* The week as rows: the day, its all-day things and its hour track are one region. An all-day chip
+     is 24px tall, a timed bar's height is its lane and its width the time it lasts — as a column
+     block's height is — and every control in the view behind them is measured with them. */
+  await page.goto("/?calendar=rows&date=2035-07-12");
+  await expect(page.locator(`[data-dag-cal-item="${stem}/event"]`).first()).toBeVisible({ timeout: 15_000 });
+  await measure(page, "the calendar's rows at 1440", [".dag-app--calendar"], 24);
   /* The Show card holds a real `<select>`, which is a control too. */
   await page.locator("[data-dag-calendar-show]").click();
   await expect(page.locator("[data-dag-calendar-show-menu]")).toBeVisible();

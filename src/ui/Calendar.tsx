@@ -34,18 +34,21 @@ import { blankEventText, createNote, setEvent, setTask, type BoardTree } from "@
 import {
   CAL_KINDS,
   CAL_LABEL,
+  DAY_MINUTES,
   MAX_DAYS,
   VIEWS,
   addMonths,
   blocks,
   calendarDate,
   clock,
+  clockOf,
   dayWords,
   daysBetween,
   daysFrom,
   fieldsOf,
   itemsOf,
   lanes,
+  minutesAt,
   momentAt,
   monthDays,
   placeEvent,
@@ -55,6 +58,7 @@ import {
   placeTask,
   shiftEvent,
   shiftTask,
+  snapMinute,
   startOfMonth,
   taskEdge,
   withEdge,
@@ -85,7 +89,7 @@ import { collation } from "@/locale";
 
 /**
  * The Calendar page: tasks, events and notes on one timeline, as a
- * month, a week, or a run of days — `?calendar=1`.
+ * month, a week (down its columns, or as rows with the hours across), or a run of days — `?calendar=1`.
  *
  * Nothing here is a copy of anything. The items are `/__board/list`'s `tasks`, `events` and
  * `created`, kept current by the change feed, placed by `src/calendar/model.ts` in the viewer's zone;
@@ -115,11 +119,13 @@ const ALLDAY_LANES = 3;
 /** A drag in the hour grid lands on quarters of an hour; a click makes an hour on the half hour. */
 const SNAP = 15;
 const CLICK = 30;
-const DAY_MINUTES = 1440;
 /** Under this many minutes a block has room for one line, so its time and title share it. */
 const SHORT_BLOCK = 45;
 /** Where the hour grid opens, scrolled to: a working morning rather than midnight. */
 const FIRST_HOUR = 7.5;
+
+/** What each view is called in the switch. `Rows` is the week turned: a day to a row, its hours across. */
+const VIEW_LABEL: Readonly<Record<CalView, string>> = { month: "Month", week: "Week", rows: "Rows", days: "Days" };
 
 /* Days are calendar squares (`calendarDate`), read in UTC whatever zone the page shows times in. */
 const WEEKDAY = new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" });
@@ -158,9 +164,10 @@ type Edge = "start" | "end";
 /**
  * How a bar or a block is picked up: the press, what to call once it has become a drag — so the
  * click the release would send does not also open what was only being moved — and, when the press
- * was on one of its ends, which.
+ * was on one of its ends, which. `axis` says which way that end runs, so the cursor during a pull
+ * follows the item rather than the cell it sits in.
  */
-type Grab = (item: CalItem, e: ReactPointerEvent<HTMLElement>, dragged: () => void, edge?: Edge) => void;
+type Grab = (item: CalItem, e: ReactPointerEvent<HTMLElement>, dragged: () => void, edge?: Edge, axis?: "x" | "y") => void;
 
 /** Open an item's menu at a point on the glass, having been asked by that item. */
 type AskMenu = (item: CalItem, at: { x: number; y: number }, source: HTMLElement) => void;
@@ -436,7 +443,7 @@ export function CalendarView({
                   data-dag-calendar-view={v}
                   onClick={() => onGo({ view: v })}
                 >
-                  {v === "month" ? "Month" : v === "week" ? "Week" : "Days"}
+                  {VIEW_LABEL[v]}
                 </button>
               ))}
             </div>
@@ -493,18 +500,31 @@ export function CalendarView({
           onDay={(d) => onGo({ view: "days", day: d, count: 1 })}
         />
       ) : (
-        /* The week or the run of days, with a small month beside it: the whole month is what a week
-           does not say, and it stays while the grid scrolls. */
+        /* The week — down its columns, or across the rows view — or the run of days, with a small
+           month beside it: the whole month is what a week does not say, and it stays while the grid
+           scrolls. */
         <div className="dag-calendar__body">
-          <Columns
-            days={daysFrom(first, last)}
-            today={today}
-            items={items}
-            onOpen={open}
-            onMenu={openMenu}
-            onAsk={ask}
-            onWrite={locked ? undefined : onWrite}
-          />
+          {view === "rows" ? (
+            <Rows
+              days={daysFrom(first, last)}
+              today={today}
+              items={items}
+              onOpen={open}
+              onMenu={openMenu}
+              onAsk={ask}
+              onWrite={locked ? undefined : onWrite}
+            />
+          ) : (
+            <Columns
+              days={daysFrom(first, last)}
+              today={today}
+              items={items}
+              onOpen={open}
+              onMenu={openMenu}
+              onAsk={ask}
+              onWrite={locked ? undefined : onWrite}
+            />
+          )}
           <MiniMonth day={day} first={first} last={last} today={today} weekStart={weekStart} onGo={(d) => onGo({ day: d })} />
         </div>
       )}
@@ -814,7 +834,7 @@ function ItemLink({
         const edge = (e.target as HTMLElement).closest<HTMLElement>("[data-dag-cal-edge]")?.dataset.dagCalEdge as
           | Edge
           | undefined;
-        grab!(item, e, () => (moved.current = true), edge);
+        grab!(item, e, () => (moved.current = true), edge, axis);
       }}
       onClick={(e: ReactMouseEvent) => {
         if (moved.current) {
@@ -1224,34 +1244,33 @@ function useDayRange(host: RefObject<HTMLElement | null>, ask: (from: string, to
   );
 }
 
-/** Where the pointer is on a calendar: a day's cell — a month's, or the all-day row's — or a minute of a day in the hour grid. */
+/** Where the pointer is on a calendar: a day's cell — a month's, or a row's all-day start — or a minute of a day in an hour track. */
 interface Spot {
   day: string;
   minute?: number;
+  /** Which way the hour track the minute was read from runs; absent on a day cell, whose ends run across. */
+  axis?: "x" | "y";
 }
 
 /**
  * The spot under a point on the page, in `host` — read through whatever is drawn on top, a bar or a
- * block included, because the cells and the columns are under them.
+ * block included, because the cells and the tracks are under them. A day's column in the week runs
+ * its hours down, and a row's track runs them across; `minutesAt` is the one reading of either.
  */
 function spotAt(host: HTMLElement | null, x: number, y: number): Spot | undefined {
   for (const el of document.elementsFromPoint(x, y)) {
     if (!(el instanceof HTMLElement) || !host?.contains(el)) continue;
     if (el.dataset.dagCalDay) return { day: el.dataset.dagCalDay };
-    const day = el.dataset.dagCalColumn;
-    if (day) {
-      const r = el.getBoundingClientRect();
-      return { day, minute: Math.max(0, Math.min(DAY_MINUTES, ((y - r.top) / r.height) * DAY_MINUTES)) };
-    }
+    const column = el.dataset.dagCalColumn;
+    if (column) return { day: column, minute: minutesAt(el.getBoundingClientRect(), { x, y }, "y"), axis: "y" };
+    const row = el.dataset.dagCalRow;
+    if (row) return { day: row, minute: minutesAt(el.getBoundingClientRect(), { x, y }, "x"), axis: "x" };
   }
   return undefined;
 }
 
 /** A grid minute as the clock says it, snapped to the quarter hour below. */
-const quarter = (minute: number): string => {
-  const m = Math.min(DAY_MINUTES - SNAP, Math.floor(minute / SNAP) * SNAP);
-  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-};
+const quarter = (minute: number): string => clockOf(snapMinute(minute, SNAP));
 
 /** Minutes since midnight of a `HH:MM`. */
 const minutesOf = (hhmm: string): number => {
@@ -1281,7 +1300,7 @@ function useGrab(
   onGhost?: (g: Ghost | null) => void,
 ): Grab {
   return useCallback(
-    (item, e, dragged, edge) => {
+    (item, e, dragged, edge, axis) => {
       const from = spotAt(host.current, e.clientX, e.clientY);
       if (!from) return;
       const el = e.currentTarget;
@@ -1363,8 +1382,9 @@ function useGrab(
           if (first) {
             dragged();
             el.dataset.dagCalMoving = edge ?? "";
-            /* The resize cursor for as long as an end is held, wherever the pointer goes. */
-            if (edge) document.documentElement.dataset.dagCalPulling = inGrid ? "y" : "x";
+            /* The resize cursor for as long as an end is held, wherever the pointer goes: the
+               item's own axis, which is the days of a bar and the clock of a block on either grid. */
+            if (edge) document.documentElement.dataset.dagCalPulling = (axis ?? from.axis) === "y" ? "y" : "x";
             addEventListener("keydown", esc, true);
           }
           if (off) return;
@@ -1541,6 +1561,84 @@ interface Ghost {
   title: string;
 }
 
+/** A range a drag on empty time is drawing, in minutes from the day's midnight. */
+interface Range {
+  from: number;
+  to: number;
+}
+
+/** What a drag on empty time paints on a day's hour track. */
+function RangeGhost({ range }: { range: Range | null }) {
+  return range ? (
+    <div className="dag-cal-ghost" style={{ "--at": range.from, "--len": range.to - range.from } as CSSProperties} />
+  ) : null;
+}
+
+/** The ghost of an item being moved or pulled, saying the time it would start and end. */
+function MovingGhost({ moving }: { moving: Ghost | null }) {
+  return moving ? (
+    <div
+      className="dag-cal-ghost dag-cal-ghost--move"
+      data-dag-cal-moving-to={moving.label}
+      data-dag-cal-moving-end={moving.end}
+      style={{ "--at": moving.top, "--len": moving.len } as CSSProperties}
+    >
+      <span className="dag-calendar__time">
+        {moving.label} – {moving.end}
+      </span>{" "}
+      <span className="dag-calendar__name">{moving.title}</span>
+    </div>
+  ) : null;
+}
+
+/**
+ * The press that draws a new event on one day's hour track — down its column in the week, across
+ * its row in the rows view. **The arithmetic is the model's** (`minutesAt`, `snapMinute`,
+ * `clockOf`), so a drag lands on the same quarter hour whichever way the hours run, and a click
+ * makes the same hour on the half hour in both.
+ */
+function useTimeDraw(day: string, axis: "x" | "y", onAsk?: (start: string, end: string | null, x: number, y: number) => void) {
+  const [range, setRange] = useState<Range | null>(null);
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0 || !onAsk) return;
+      const box = e.currentTarget.getBoundingClientRect();
+      const minute = (x: number, y: number) => minutesAt(box, { x, y }, axis);
+      const from = snapMinute(minute(e.clientX, e.clientY), SNAP);
+      let span: Range = { from, to: from + SNAP };
+      let x = e.clientX;
+      let y = e.clientY;
+      /* A grid minute is a wall-clock reading here, so the drag writes the time its label says. */
+      const at = (m: number) => timeOf(momentAt(day, clockOf(m)));
+      e.preventDefault();
+      startDrag(e, {
+        onMove(ev) {
+          x = ev.clientX;
+          y = ev.clientY;
+          const m = snapMinute(minute(ev.clientX, ev.clientY), SNAP);
+          span = { from: Math.min(from, m), to: Math.max(from, m) + SNAP };
+          setRange(span);
+        },
+        onDrop() {
+          onAsk(at(span.from), at(Math.min(DAY_MINUTES, span.to)), x, y);
+        },
+        onClick() {
+          const start = snapMinute(minute(x, y), CLICK);
+          const to = Math.min(DAY_MINUTES, start + 60);
+          setRange({ from: start, to });
+          onAsk(at(start), at(to), x, y);
+        },
+        onEnd() {
+          /* Held for a moment after a click so the hour it made is seen, then let go. */
+          setTimeout(() => setRange(null), 150);
+        },
+      });
+    },
+    [day, axis, onAsk],
+  );
+  return { range, onPointerDown: onAsk ? onPointerDown : undefined };
+}
+
 /**
  * One day's hour grid: its timed events side by side where they overlap, the line that marks now,
  * and the drag that draws a new one — snapped to a quarter of an hour, and an hour on the half hour
@@ -1567,7 +1665,7 @@ function DayColumn({
   onAsk?(start: string, end: string | null, x: number, y: number): void;
 }) {
   const placed = useMemo(() => blocks(items, day), [items, day]);
-  const [ghost, setGhost] = useState<{ from: number; to: number } | null>(null);
+  const { range, onPointerDown } = useTimeDraw(day, "y", onAsk);
   const now = today
     ? (() => {
         const at = wallOf(Date.now());
@@ -1575,47 +1673,9 @@ function DayColumn({
       })()
     : null;
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || !onAsk) return;
-    const col = e.currentTarget;
-    const rect = col.getBoundingClientRect();
-    const minute = (y: number) => Math.max(0, Math.min(DAY_MINUTES, ((y - rect.top) / rect.height) * DAY_MINUTES));
-    const snap = (m: number, by: number) => Math.floor(m / by) * by;
-    const from = snap(minute(e.clientY), SNAP);
-    let span = { from, to: from + SNAP };
-    let x = e.clientX;
-    let y = e.clientY;
-    /* A grid minute is a wall-clock reading here, so the drag writes the time its label says. */
-    const at = (m: number) => timeOf(momentAt(day, `${Math.floor(m / 60)}:${m % 60}`));
-    e.preventDefault();
-    startDrag(e, {
-      onMove(ev) {
-        x = ev.clientX;
-        y = ev.clientY;
-        const m = snap(minute(ev.clientY), SNAP);
-        span = { from: Math.min(from, m), to: Math.max(from, m) + SNAP };
-        setGhost(span);
-      },
-      onDrop() {
-        onAsk(at(span.from), at(Math.min(DAY_MINUTES, span.to)), x, y);
-      },
-      onClick() {
-        const start = snap(minute(e.clientY), CLICK);
-        setGhost({ from: start, to: start + 60 });
-        onAsk(at(start), at(Math.min(DAY_MINUTES, start + 60)), x, y);
-      },
-      onEnd() {
-        /* Held for a moment after a click so the hour it made is seen, then let go. */
-        setTimeout(() => setGhost(null), 150);
-      },
-    });
-  };
-
   return (
     <div className="dag-cal-column" data-dag-cal-column={day} data-today={today ? "" : undefined} onPointerDown={onPointerDown}>
-      {ghost ? (
-        <div className="dag-cal-ghost" style={{ "--at": ghost.from, "--len": ghost.to - ghost.from } as CSSProperties} />
-      ) : null}
+      <RangeGhost range={range} />
       {placed.map((b) => (
         <ItemLink
           key={`${b.item.kind}:${b.item.name}`}
@@ -1630,20 +1690,157 @@ function DayColumn({
           onMenu={onMenu}
         />
       ))}
-      {moving ? (
-        <div
-          className="dag-cal-ghost dag-cal-ghost--move"
-          data-dag-cal-moving-to={moving.label}
-          data-dag-cal-moving-end={moving.end}
-          style={{ "--at": moving.top, "--len": moving.len } as CSSProperties}
-        >
-          <span className="dag-calendar__time">
-            {moving.label} – {moving.end}
-          </span>{" "}
-          <span className="dag-calendar__name">{moving.title}</span>
-        </div>
-      ) : null}
+      <MovingGhost moving={moving} />
       {now !== null ? <div className="dag-cal-now" style={{ "--at": now } as CSSProperties} aria-hidden="true" /> : null}
+    </div>
+  );
+}
+
+/* -- a week as rows --------------------------------------------------------------------------- */
+
+/**
+ * The week turned on its side: **one row to a day**, the day and its all-day things at the start of
+ * the row, and the hours of the day across it. It is the same seven days and the same items as
+ * `Columns`; only the drawing turns. A timed event is `blocks`' `top` and `length` — minutes into the
+ * day — read as a left edge and a width, and *side by side where they overlap* becomes lanes down the
+ * row, so an event is never shorter than the 24px floor.
+ *
+ * The gestures are the page's, not this file's second copy: `useTimeDraw` draws a new event, `useGrab`
+ * moves one and pulls its ends (the same `spotAt`, the same `minutesAt`), and `useDayRange` makes an
+ * all-day event across the days at the start of the rows.
+ */
+function Rows({
+  days,
+  today,
+  items,
+  onOpen,
+  onMenu,
+  onAsk,
+  onWrite,
+}: {
+  days: string[];
+  today: string;
+  items: CalItem[];
+  onOpen(name: string): void;
+  onMenu: AskMenu;
+  /** Absent while the app is locked, and with them the drags that make and move. */
+  onAsk?(start: string, end: string | null, x: number, y: number): void;
+  onWrite?(item: CalItem, next: Write): void;
+}) {
+  const cols = useRef<HTMLDivElement>(null);
+  const [moving, setMoving] = useState<Ghost | null>(null);
+  const grab = useGrab(cols, (item, next) => onWrite?.(item, next), setMoving);
+  return (
+    <div className="dag-cal-rows" ref={cols} data-dag-cal-rows="">
+      <div className="dag-cal-rows__head">
+        <span className="dag-cal-rows__corner" aria-hidden="true" />
+        <span className="dag-cal-rows__allday" aria-hidden="true">
+          All day
+        </span>
+        <div className="dag-cal-rows__hours" aria-hidden="true">
+          {Array.from({ length: 24 }, (_, h) => (
+            <span key={h} className="dag-cal-rows__hour" style={{ "--at": h * 60 } as CSSProperties}>
+              {h % 2 === 0 && h > 0 ? `${String(h).padStart(2, "0")}:00` : ""}
+            </span>
+          ))}
+        </div>
+      </div>
+      {days.map((d) => (
+        <DayRow
+          key={d}
+          day={d}
+          today={d === today}
+          items={items}
+          host={cols}
+          moving={moving?.day === d ? moving : null}
+          grab={onWrite ? grab : undefined}
+          onOpen={onOpen}
+          onMenu={onMenu}
+          onAsk={onAsk}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One day of the rows: its date and every all-day thing it holds at the start, then the day's track
+ * with the hours across. Overlapping timed events take a lane each, 26px apart, so each one is 24px
+ * tall; the row grows to hold them — and any all-day things — and the track fills it.
+ */
+function DayRow({
+  day,
+  today,
+  items,
+  host,
+  moving,
+  grab,
+  onOpen,
+  onMenu,
+  onAsk,
+}: {
+  day: string;
+  today: boolean;
+  items: CalItem[];
+  /** The rows view, which holds every day's start cell: a drag across days paints them all. */
+  host: RefObject<HTMLElement | null>;
+  moving: Ghost | null;
+  grab?: Grab;
+  onOpen(name: string): void;
+  onMenu: AskMenu;
+  onAsk?(start: string, end: string | null, x: number, y: number): void;
+}) {
+  const placed = useMemo(() => blocks(items, day), [items, day]);
+  /* Everything all day on this day — a trip shows on each day of it, as a day reads it. */
+  const allDay = useMemo(() => items.filter((i) => i.allDay && i.first <= day && day <= i.last), [items, day]);
+  const lanes = Math.max(1, ...placed.map((b) => b.col + 1));
+  const drawDays = useDayRange(host, (from, to, x, y) => onAsk?.(from, to === from ? null : to, x, y));
+  const { range, onPointerDown } = useTimeDraw(day, "x", onAsk);
+  const now = today
+    ? (() => {
+        const at = wallOf(Date.now());
+        return at.hour * 60 + at.minute;
+      })()
+    : null;
+  return (
+    <div className="dag-cal-row" data-today={today ? "" : undefined}>
+      <div className="dag-cal-row__day">
+        <span className="dag-cal-row__weekday">{WEEKDAY.format(calendarDate(day))}</span>
+        <span className="dag-cal-row__n">{Number(day.slice(8, 10))}</span>
+      </div>
+      <div
+        className="dag-cal-row__start"
+        data-dag-cal-day={day}
+        data-dag-cal-start={day}
+        onPointerDown={onAsk ? drawDays : undefined}
+      >
+        {allDay.map((item) => (
+          <ItemLink key={`${item.kind}:${item.name}`} item={item} grab={grab} axis="y" onOpen={onOpen} onMenu={onMenu} />
+        ))}
+      </div>
+      <div
+        className="dag-cal-row__track"
+        data-dag-cal-row={day}
+        style={{ "--lanes": lanes } as CSSProperties}
+        onPointerDown={onPointerDown}
+      >
+        <RangeGhost range={range} />
+        {placed.map((b) => (
+          <ItemLink
+            key={`${b.item.kind}:${b.item.name}`}
+            item={b.item}
+            before={b.before}
+            after={b.after}
+            style={{ "--at": b.top, "--len": b.length, "--lane": b.col } as CSSProperties}
+            grab={grab}
+            axis="x"
+            onOpen={onOpen}
+            onMenu={onMenu}
+          />
+        ))}
+        <MovingGhost moving={moving} />
+        {now !== null ? <div className="dag-cal-now" style={{ "--at": now } as CSSProperties} aria-hidden="true" /> : null}
+      </div>
     </div>
   );
 }

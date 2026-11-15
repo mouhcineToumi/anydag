@@ -1,6 +1,7 @@
 import { ArrowUp, ChevronDown, Layers, Square, UnfoldVertical } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
+import { readIndex, type IndexDoc } from "@/refs/useIndex";
 import { useSettings } from "@/settings/useSettings";
 import { EffortPicker } from "@/ui/EffortPicker";
 import { ModelPicker } from "@/ui/ModelPicker";
@@ -9,7 +10,8 @@ import { currentVault } from "@/vault/current";
 import { loadVaults } from "@/vault/api";
 import { useVaults } from "@/vault/useVaults";
 
-import { DocChip, type ChipDoc } from "./DocChip";
+import { DocChip, DocMark, type ChipDoc } from "./DocChip";
+import { mentionAt, mentionOptions, type ActiveMention, type MentionDoc } from "./mentions";
 import { scopeOf } from "./scope";
 import type { ChatMeta, Mode, Provider, ProviderModels } from "./types";
 
@@ -44,7 +46,8 @@ export interface ComposerProps {
   models: readonly ProviderModels[] | null;
   /** A turn is running here or in another tab, or one is being sent. */
   running: boolean;
-  onSend(text: string, choice: Choice): void;
+  /** Send the words, the model to run them on, and the documents the message names with `@`. */
+  onSend(text: string, choice: Choice, mentions: readonly MentionDoc[]): void;
   onStop(): void;
   /** Grant (or take back, with `null`) a vault — making the chat first when it has none yet. */
   onGrant(choice: Choice, vault: string, mode: Mode | null): void;
@@ -68,12 +71,27 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
   useEffect(() => setOver({}), [meta?.id, meta?.provider, meta?.model, meta?.effort]);
   const choice: Choice = { ...base, ...over };
   const [text, setText] = useState("");
+  const [mentions, setMentions] = useState<MentionDoc[]>([]);
+  const [mention, setMention] = useState<ActiveMention | null>(null);
+  const [active, setActive] = useState(0);
+  const [docs, setDocs] = useState<readonly IndexDoc[] | null>(null);
+  /* The `@` an Escape closed, so the same one does not reopen until the person types another. */
+  const closed = useRef<number | null>(null);
+  /* Where the last pick left the caret: Backspace there takes that chip, even with words before it. */
+  const picked = useRef<number | null>(null);
+  const composer = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const [tall, setTall] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (autofocus) box.current?.focus();
   }, [autofocus, meta?.id]);
   useEffect(() => setTall(false), [meta?.id]);
+  useEffect(() => {
+    setMention(null);
+    closed.current = null;
+    picked.current = null;
+  }, [meta?.id]);
   /* Grows with what is typed, to a ceiling the stylesheet sets — unless the person has expanded it,
      where the box is the expanded one and the ceiling is the stylesheet's other one. */
   useEffect(() => {
@@ -83,32 +101,196 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
     if (!tall) el.style.height = `${el.scrollHeight}px`;
   }, [text, tall]);
 
+  const open = mention !== null;
+  /* The vault is read when a list first opens, not when the composer mounts: an index is the whole
+     vault, and most messages never name a document. `readIndex` keeps it current for the next one. */
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void readIndex().then(
+      (index) => {
+        if (live) setDocs(index.docs);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [open]);
+  const options = useMemo(
+    () => (mention ? mentionOptions(docs ?? [], mention.query, new Set(mentions.map((m) => m.id))) : []),
+    [mention, docs, mentions],
+  );
+  useEffect(() => {
+    setActive((at) => (options.length ? Math.min(at, options.length - 1) : 0));
+  }, [options.length]);
+  useEffect(() => {
+    if (!open) return;
+    list.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [open, active]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!composer.current?.contains(e.target as Node)) setMention(null);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [open]);
+
   const at = models?.find((m) => m.provider === choice.provider);
   const unavailable = at && !at.available ? at : null;
   const can = text.trim() !== "" && !running && !unavailable;
 
   const send = () => {
     if (!can) return;
-    onSend(text.trim(), choice);
+    onSend(text.trim(), choice, mentions);
     setText("");
+    setMentions([]);
+    setMention(null);
+    closed.current = null;
+    picked.current = null;
     setTall(false);
   };
+
+  /** Take the `@query` out of the message and put the document's chip in its place. */
+  const pick = (doc: MentionDoc) => {
+    if (!mention) return;
+    const caret = mention.start;
+    const next = text.slice(0, mention.start) + text.slice(mention.start + 1 + mention.query.length);
+    setText(next);
+    setMentions((had) => (had.some((m) => m.id === doc.id) ? had : [...had, doc]));
+    setMention(null);
+    closed.current = null;
+    picked.current = caret;
+    box.current?.focus();
+  };
+
+  /* The `@` follows the caret as it moves or the words change; Escape closes one and leaves the
+     words where they are, until another `@` starts a query of its own. */
+  const look = (value: string, caret: number) => {
+    const found = mentionAt(value, caret);
+    if (!found) {
+      closed.current = null;
+      setMention(null);
+      return;
+    }
+    if (closed.current === found.start) {
+      setMention(null);
+      return;
+    }
+    closed.current = null;
+    setMention(found);
+    setActive(0);
+  };
+
+  const change = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const caret = e.target.selectionStart ?? value.length;
+    /* A new `@` is a new question, even at the index an Escape closed. */
+    if (value[Math.max(0, caret - 1)] === "@") closed.current = null;
+    setText(value);
+    picked.current = null;
+    look(value, caret);
+  };
+
+  const select = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    look(e.target.value, e.target.selectionStart ?? 0);
+  };
+
   const key = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mention) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActive((i) => (options.length ? (i + 1) % options.length : 0));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActive((i) => (options.length ? (i - 1 + options.length) % options.length : 0));
+        return;
+      }
+      if (e.key === "Escape") {
+        /* The list goes; the `@` and what was typed after it stay in the message. */
+        e.preventDefault();
+        e.stopPropagation();
+        closed.current = mention.start;
+        setMention(null);
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+        const doc = options[active];
+        if (doc) {
+          e.preventDefault();
+          pick(doc);
+          return;
+        }
+      }
+    }
+    /* A chip is one thing, so one Backspace takes the last of them when the caret is at its edge. */
+    const edge = e.currentTarget.selectionStart;
+    if (
+      e.key === "Backspace" &&
+      mentions.length &&
+      edge === e.currentTarget.selectionEnd &&
+      (edge === 0 || edge === picked.current)
+    ) {
+      e.preventDefault();
+      setMentions((had) => had.slice(0, -1));
+      picked.current = null;
+      return;
+    }
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
     e.preventDefault();
     send();
   };
 
   return (
-    <div className="dag-chat-composer" data-dag-chat-composer="">
-      {subject ? (
+    <div className="dag-chat-composer" data-dag-chat-composer="" ref={composer}>
+      {mention ? (
+        <div className="dag-chat-mentions" data-dag-chat-mentions="" role="listbox" aria-label="Mention a document" ref={list}>
+          {options.length ? (
+            options.map((doc, i) => (
+              <button
+                key={doc.id}
+                type="button"
+                role="option"
+                aria-selected={i === active}
+                className="dag-chat-mention"
+                data-dag-chat-mention-item={doc.name}
+                data-dag-chat-mention-active={i === active ? "" : undefined}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(doc)}
+              >
+                <DocMark kind={doc.kind} size={14} />
+                <span className="dag-chat-mention__title">{doc.title}</span>
+                {doc.name !== doc.title ? <span className="dag-chat-mention__where">{doc.name}</span> : null}
+              </button>
+            ))
+          ) : (
+            <p className="dag-chat-mention__none">{docs ? `No document matches “${mention.query}”.` : "Reading the vault…"}</p>
+          )}
+        </div>
+      ) : null}
+      {subject || mentions.length ? (
         <div className="dag-chat-composer__docs">
-          <DocChip
-            doc={subject}
-            data-dag-chat-subject={subject.name}
-            onRemove={onDropSubject}
-            removeLabel={`Work on the whole vault, not only ${subject.title}`}
-          />
+          {subject ? (
+            <DocChip
+              doc={subject}
+              data-dag-chat-subject={subject.name}
+              onRemove={onDropSubject}
+              removeLabel={`Work on the whole vault, not only ${subject.title}`}
+            />
+          ) : null}
+          {mentions.map((doc) => (
+            <DocChip
+              key={doc.id}
+              doc={doc}
+              data-dag-chat-mention={doc.name}
+              onRemove={() => setMentions((had) => had.filter((m) => m.id !== doc.id))}
+              removeLabel={`Remove ${doc.title} from the message`}
+            />
+          ))}
         </div>
       ) : null}
       <textarea
@@ -119,7 +301,8 @@ export function Composer({ meta, models, running, onSend, onStop, onGrant, autof
         value={text}
         placeholder="Ask for a change, or a question"
         aria-label="Message the Assistant"
-        onChange={(e) => setText(e.target.value)}
+        onChange={change}
+        onSelect={select}
         onKeyDown={key}
       />
       {unavailable ? (

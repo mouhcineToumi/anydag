@@ -59,6 +59,8 @@ export interface TurnAsk {
   effort?: string | null;
   /** The document the chat works on (#323): `null` drops the chat's, absent keeps it. */
   subject?: { name: string; kind: DocKind } | null;
+  /** The documents the message names with `@` (#324), resolved by the server for its prompt. */
+  mentions?: { name: string; kind: DocKind }[];
 }
 
 export const sayTurn = async (ask: TurnAsk): Promise<Turn> => (await call<{ turn: Turn }>("/__board/chat/turn", ask)).turn;
