@@ -17,6 +17,7 @@ const TREE: BoardTree = {
   tasks: { todo: { status: "todo" } },
   projects: {},
   events: {},
+  tags: {},
   created: {},
   ids: { plan: "id1", "work/arch": "id2", "work/notes": "id3", todo: "id4" },
   quizzes: [],

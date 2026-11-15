@@ -127,6 +127,9 @@ const EVENTS = new Set([
   "dag:guessed",
   /* A linked vault's sync status changed: the change feed's event, a `SyncStatus`. */
   "dag:vault-sync",
+  /* The vault's tag list changed: the change feed's event, and this tab's own after it creates,
+     recolours or deletes a tag — `onTags`, `onTrash`'s shape. */
+  "dag:tags",
 ]);
 
 describe("the preference list", () => {

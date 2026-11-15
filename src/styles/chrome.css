@@ -5590,20 +5590,224 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   border-radius: var(--dag-ui-radius-control);
   box-shadow: var(--dag-ui-elevation-overlay);
 }
-.dag-projectbar__hues { display: inline-flex; align-items: center; gap: 4px; }
-.dag-projectbar__hue {
-  width: 14px;
-  height: 14px;
+.dag-projectbar__hues { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.dag-projectbar__clear { align-self: flex-start; }
+
+/*
+ * The ten hues as swatches — `Palette` (`src/ui/Palette.tsx`), every colour choice in the chrome:
+ * a project's, a tag's, the strip under *Create tag* (#327). Each is a 24px hit box round a 16px dot,
+ * none overlapping, and a 44px one under 720px, where the strip wraps to two rows of five. Names
+ * grepped first: `dag-swatch` is the board panel's.
+ */
+.dag-palette { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0; }
+.dag-palette__hue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--dag-ui-control-sm);
+  height: var(--dag-ui-control-sm);
   padding: 0;
-  background: var(--dag-h);
+  background: transparent;
   border: none;
   border-radius: 50%;
   cursor: pointer;
 }
-.dag-projectbar__hue[aria-checked="true"] { box-shadow: 0 0 0 2px var(--dag-color-paper), 0 0 0 3px var(--dag-color-ink); }
-.dag-projectbar__hue:focus-visible { box-shadow: var(--focus-ring); }
-.dag-projectbar__hue:disabled { cursor: default; opacity: 0.6; }
-.dag-projectbar__clear { margin-left: 0; }
+.dag-palette__hue::before { content: ""; width: 16px; height: 16px; border-radius: 50%; background: var(--dag-h); }
+.dag-palette__hue[aria-checked="true"]::before { box-shadow: 0 0 0 2px var(--dag-color-card), 0 0 0 3.5px var(--dag-color-ink); }
+.dag-palette__hue:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+
+/*
+ * Tags (#327): the chip, a document's chips in a row, and the editor — a combobox whose list and
+ * swatches float on the popover layer, fixed to the window, so a property row, a top bar or a
+ * scrolling pane never clips them. A chip is `paper100` with `ink` words whatever its hue, so it reads
+ * in every theme without measuring each one; only the 8px dot carries the colour. Names grepped
+ * first: `dag-tag*`, `dag-tags*`, `dag-tagedit*` and `dag-tagpop*` were nobody's.
+ */
+.dag-tags { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.dag-tags > [role="listitem"] { display: inline-flex; }
+.dag-tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: var(--dag-ui-control-sm);
+  padding: 0 8px;
+  font-size: var(--chrome-text-sm);
+  line-height: var(--dag-ui-leading-sm);
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-pill);
+}
+.dag-tag__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-h); }
+.dag-tag--edit { padding: 0; }
+.dag-tag--edit .dag-tag__name { margin-left: -2px; }
+/* The dot is a button with a 24px hit box: 8px to the eye. */
+.dag-tag__pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--dag-ui-control-sm);
+  height: var(--dag-ui-control-sm);
+  margin: -1px 0 -1px -1px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.dag-tag__pick::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-h); }
+.dag-tag__pick[aria-expanded="true"]::before { box-shadow: 0 0 0 2px var(--dag-color-paper100), 0 0 0 3.5px var(--dag-color-ink); }
+.dag-tag__pick:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-tag__remove.dag-icon { margin: -1px -1px -1px 0; border-radius: var(--dag-ui-radius-pill); }
+.dag-tag__remove.dag-icon:hover { background: var(--dag-color-paper200); }
+.dag-tag__hues,
+.dag-tagedit__list {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  overflow-y: auto;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-tag__hues { padding: 10px; }
+.dag-tag__reset { align-self: flex-start; }
+.dag-tagedit__list { gap: 4px; padding: 4px; }
+
+.dag-tagedit { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.dag-tagedit__field { display: inline-flex; }
+.dag-tagedit__input {
+  width: 148px;
+  height: 26px;
+  padding: 0 8px;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  outline: none;
+}
+.dag-tagedit__input:focus { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-tagedit__input::placeholder { color: var(--dag-color-slate); }
+.dag-tagedit__input[aria-invalid="true"] { border-color: var(--dag-color-danger); }
+.dag-tagedit__lb { display: flex; flex-direction: column; gap: 1px; }
+.dag-tagedit__opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: var(--chrome-text-md);
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tagedit__opt[aria-selected="true"] { background: var(--dag-color-paper100); }
+/* The create row after suggestions: apart from them by a rule, as it is apart from them in kind. */
+.dag-tagedit__opt[data-dag-tag-create]:not(:first-child) { position: relative; margin-top: 5px; }
+.dag-tagedit__opt[data-dag-tag-create]:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--dag-color-outlineSoft);
+}
+.dag-tagedit__opt mark { color: inherit; background: none; font-weight: var(--dag-ui-weight-strong); }
+.dag-tagedit__unused { margin-left: auto; padding-left: 12px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-tagedit__hues { padding: 0 4px 4px; }
+.dag-tagedit__why {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: var(--chrome-text-xs);
+  line-height: var(--dag-ui-leading-xs);
+  white-space: nowrap;
+  color: var(--dag-color-dangerText);
+  background: var(--dag-color-dangerSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-tagedit__fix {
+  height: var(--dag-ui-control-sm);
+  padding: 0 8px;
+  font: inherit;
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-dangerBorder);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tagedit__fix:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* *Tags…*: the editor in a card under the `⋯` or the row it was asked from. */
+.dag-tagpop {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: calc(100vw - 16px);
+  padding: 10px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  box-sizing: border-box;
+}
+.dag-tagpop__head { margin: 0 2px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-tagpop__problem { margin: 0 2px; font-size: var(--chrome-text-xs); color: var(--dag-color-dangerText); }
+.dag-tagedit--pop { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 8px; }
+.dag-tagedit--pop .dag-tags:empty { display: none; }
+.dag-tagedit--pop .dag-tagedit__input { width: 100%; height: 30px; box-sizing: border-box; }
+.dag-tagedit__opts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  margin: 0 -6px -6px;
+  padding: 4px 6px 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--dag-color-outlineSoft);
+}
+/* Read only, the chips sit on the line above the text with the task's and the event's. */
+.dag-tagline .dag-tags { gap: 6px; }
+
+@media (max-width: 719px) {
+  /* Every swatch a finger's, two rows of five. */
+  .dag-palette { width: calc(var(--dag-ui-control-touch) * 5); }
+  .dag-palette__hue { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+  /* An editable chip is 44px, and a tap anywhere on it but its × opens the colour picker. */
+  .dag-tag--edit { height: var(--dag-ui-control-touch); }
+  .dag-tag--edit .dag-tag__pick {
+    position: absolute;
+    inset: -1px calc(var(--dag-ui-control-touch) - 1px) -1px -1px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    justify-content: flex-start;
+    padding-left: 13px;
+    border-radius: var(--dag-ui-radius-pill);
+  }
+  .dag-tag--edit .dag-tag__name { margin-left: 27px; pointer-events: none; }
+  .dag-tag--edit .dag-tag__remove.dag-icon { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+  .dag-tagedit__input { height: var(--dag-ui-control-touch); font-size: var(--chrome-text-lg); }
+  .dag-tagedit__opt { min-height: var(--dag-ui-control-touch); }
+  .dag-tagedit__fix { height: var(--dag-ui-control-touch); }
+}
 .dag-projectbar__counts { display: inline-flex; align-items: center; gap: 12px; color: var(--dag-color-slate); }
 .dag-projectbar__count { display: inline-flex; align-items: center; gap: 4px; }
 .dag-projectbar__why { color: var(--dag-color-slate); }

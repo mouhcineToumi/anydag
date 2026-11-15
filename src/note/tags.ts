@@ -252,6 +252,17 @@ export function cleanTag(typed: string): string {
     .replace(/[^\p{L}\p{M}\p{N}_/-]/gu, "");
 }
 
+/**
+ * A field's text as it is being typed: `cleanTag` without the trim, so the space a person types
+ * shows as the `-` it will be (`two words` reads `two-words` under their fingers), never later.
+ */
+export const typedTag = (typed: string): string =>
+  typed
+    .replace(/^\s+/, "")
+    .replace(/^#+/, "")
+    .replace(/\s/g, "-")
+    .replace(/[^\p{L}\p{M}\p{N}_/-]/gu, "");
+
 /** A pasted list, one tag per item: `a, b c` is three. */
 export const pastedTags = (text: string): string[] =>
   text
@@ -261,11 +272,11 @@ export const pastedTags = (text: string): string[] =>
 
 /**
  * Why a cleaned name is not a tag, with the fix a button fills in: a name of digits alone needs a
- * letter, so `2026` is offered as `q-2026`.
+ * letter, so `2026` is offered as `q-2026` — the field says the message, and its button `Use q-2026?`.
  */
 export function tagProblem(name: string): { message: string; fix: string } | undefined {
   if (name === "" || tagOf(name)) return undefined;
-  if (DIGITS.test(name)) return { message: `A tag needs a letter. Use q-${name}?`, fix: `q-${name}` };
+  if (DIGITS.test(name)) return { message: "A tag needs a letter.", fix: `q-${name}` };
   return { message: "A tag is letters, digits, _, - and /.", fix: cleanTag(name) };
 }
 

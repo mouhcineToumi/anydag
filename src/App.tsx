@@ -102,6 +102,7 @@ import { printAs } from "@/export/print";
 import { splitNote } from "@/note/format";
 import { folderOf, projectFolders, projectOf, within, type Project } from "@/note/project";
 import { STATUSES, taskOf, titleStem, type Task, type TaskStatus } from "@/note/task";
+import { tagsOf } from "@/note/tags";
 import { folderLabel, folderOfRun, folderQuizzes } from "@/quiz/folder";
 import { askable, parseQuiz, type Question } from "@/quiz/parse";
 import { stampIds } from "@/quiz/write";
@@ -601,6 +602,7 @@ export function App() {
       tasks={list.tasks}
       projects={list.projects}
       events={list.events}
+      tags={list.tags}
       quizzes={list.quizzes}
       questions={list.questions}
       tables={list.tables}
@@ -1684,6 +1686,7 @@ function NoteApp({
     task?: Task;
     project?: Project;
     event?: NoteEvent;
+    tags: string[];
     body: string;
     ready(): void;
   } | null>(null);
@@ -1704,6 +1707,7 @@ function NoteApp({
           task: taskOf(text),
           project: projectOf(text),
           event: eventOf(text),
+          tags: tagsOf(text),
           body,
           ready: () => {
             printAs(heading ?? leaf(name));
@@ -1737,6 +1741,7 @@ function NoteApp({
             task: taskOf(text),
             project: projectOf(text),
             event: eventOf(text),
+            tags: tagsOf(text),
             body,
             ready: () => reply(heading ?? leaf(name)),
           });
@@ -1868,6 +1873,7 @@ function NoteApp({
           task={printing.task}
           project={printing.project}
           event={printing.event}
+          tags={printing.tags}
           body={printing.body}
           theme={paperTheme(theme)}
           onReady={printing.ready}
