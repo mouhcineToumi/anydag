@@ -26,6 +26,7 @@ import {
 import { LOCKED } from "@/settings/lock";
 import { STORE } from "@/settings/store";
 import { RECENT_KEY } from "@/ui/modelList";
+import { SAVED_TABS, WINDOW_SEEN } from "@/ui/tabs/saved";
 import { LAST } from "@/vault/current";
 
 /**
@@ -158,6 +159,10 @@ describe("the preference list", () => {
       RECENT_KEY,
       /* The logs answer an off build holds for the first build that can carry it (#326). */
       TELEMETRY_PENDING,
+      /* A window's tabs, kept here only when the settings do not sync (#264). */
+      SAVED_TABS,
+      /* Whether this window has had the app in it: a session's, so a bare address is Home in it. */
+      WINDOW_SEEN,
     ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);
@@ -198,6 +203,9 @@ describe("the preference list", () => {
     /* Nor the logs answer an off build is holding for the first one that can carry it (#326): it is
        the install's answer in transit, not a preference that travels with the settings. */
     expect(PREF_KEYS as readonly string[]).not.toContain(TELEMETRY_PENDING);
+    /* Nor which documents a window had open: that is the window's, kept in the app's home or, with
+       sync off, here — never carried to another machine as a setting (#264). */
+    expect(PREF_KEYS as readonly string[]).not.toContain(SAVED_TABS);
   });
 
   it("splits into the account's half and the vault's, with nothing in both or neither", () => {

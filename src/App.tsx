@@ -11,6 +11,8 @@ import {
   ChevronUp,
   ChevronDown,
   PanelRight,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -80,6 +82,9 @@ import {
   type KeptScroll,
 } from "@/ui/tabs/keep";
 import { useTabKeys } from "@/ui/tabs/keys";
+import { flushTabs, noteFiles, reconcile, restoredTabs, saveTabs, tabFiles } from "@/ui/tabs/saved";
+import { Toast, ToastWords } from "@/ui/Toast";
+import { readTrash } from "@/ui/trashApi";
 import {
   PAGE_KEYS,
   addressOf,
@@ -717,6 +722,10 @@ export function App() {
     },
   });
 
+  /* The tabs kept for the next run, and the files they are on followed as they move
+     (`ui/tabs/saved.ts`). */
+  const closedTabs = useTabFiles({ tabs, list, snapshot, active: activeRef, swap, placeFor, closeDocTab });
+
   /* Home's recent list: the page that opened a file is what knows it did, and this is the one place
      every way of opening one passes through — a sidebar row, a reference, a link, a cold load. The
      name is written to this browser's storage for this vault and nowhere else; `recents.ts` owns the
@@ -854,9 +863,144 @@ export function App() {
           onNew={newDocTab}
         />
         {frames}
+        {closedTabs.note ? (
+          <Toast
+            icon={closedTabs.note.trashed ? Trash2 : X}
+            data-dag-doctabs-closed={closedTabs.note.trashed ? "trash" : "gone"}
+            title={closedTabs.note.text}
+            timeout={10_000}
+            onTimeout={closedTabs.dismiss}
+            onDismiss={closedTabs.dismiss}
+            actions={
+              closedTabs.note.trashed ? (
+                <Button
+                  data-dag-doctabs-closed-trash=""
+                  onClick={() => {
+                    closedTabs.dismiss();
+                    openTrash();
+                  }}
+                >
+                  View trash
+                </Button>
+              ) : undefined
+            }
+          >
+            <ToastWords>{closedTabs.note.text}</ToastWords>
+          </Toast>
+        ) : null}
       </div>
     </Shell>
   );
+}
+
+/**
+ * Keep the tabs for the next run, and keep each one on its file as the listing changes: a file
+ * renamed or moved takes its tabs with it; a tab behind the one in front whose file went to the
+ * trash, or is gone, is closed and says so; a tab restored on a file that is gone is dropped without
+ * a word. The tab in front is left to its page, which already says what became of its file — the
+ * sidebar's Undo, or the page's card.
+ */
+/** How long the page in front has to follow a rename of its own file before its tab is moved for it. */
+const FRONT_FOLLOW_MS = 1000;
+
+function useTabFiles({
+  tabs,
+  list,
+  snapshot,
+  active,
+  swap,
+  placeFor,
+  closeDocTab,
+}: {
+  tabs: Tabs;
+  list: BoardTree;
+  snapshot: boolean;
+  active: { readonly current: string };
+  swap(next: URLSearchParams, place: HistoryPlace | null, tab: string): void;
+  placeFor(place: string): HistoryPlace | null;
+  closeDocTab(id: string): void;
+}): { note: { text: string; trashed: boolean } | null; dismiss(): void } {
+  const [note, setNote] = useState<{ text: string; trashed: boolean } | null>(null);
+  const closed = useRef<string[]>([]);
+  const dismiss = useCallback(() => {
+    closed.current = [];
+    setNote(null);
+  }, []);
+  /* What each file was called, kept past the listing that no longer has it. */
+  const titles = useRef<Record<string, string>>({});
+  titles.current = { ...titles.current, ...list.titles };
+
+  useEffect(() => {
+    if (snapshot) return;
+    if (list.fresh) noteFiles(tabs, tabFiles, list.ids);
+    saveTabs(tabs, tabFiles);
+  }, [tabs, list, snapshot]);
+  useEffect(() => {
+    if (snapshot) return;
+    addEventListener("pagehide", flushTabs);
+    return () => removeEventListener("pagehide", flushTabs);
+  }, [snapshot]);
+
+  const moveTo = useCallback(
+    (id: string, place: string) => {
+      if (id === active.current) swap(addressOf(place, location.search), placeFor(place), id);
+      else changeTabs((t) => setPlace(t, id, place));
+    },
+    [active, swap, placeFor],
+  );
+
+  const checking = useRef(new Set<string>());
+  useEffect(() => {
+    if (snapshot || !list.fresh) return;
+    const restored = new Set(restoredTabs);
+    restoredTabs.clear();
+    const { follow, missing } = reconcile(tabsNow(), tabFiles, list, restored);
+    for (const f of follow) {
+      if (f.id !== active.current) {
+        moveTo(f.id, f.place);
+        continue;
+      }
+      /* The tab in front is first its page's to follow: a note renamed by its own title follows
+         itself, keeping its editor, and the listing can land before that answer does. Only an
+         address still on the old name a moment later — a rename made elsewhere — is moved here. */
+      const was = tabById(tabsNow(), f.id)?.place;
+      setTimeout(() => {
+        const now = tabById(tabsNow(), f.id);
+        if (now && now.place === was && active.current === f.id && placeOf(location.search) === was) moveTo(f.id, f.place);
+      }, FRONT_FOLLOW_MS);
+    }
+    for (const m of missing) {
+      const quiet = restored.has(m.id);
+      /* The tab in front is its page's to explain, unless nobody has seen it yet. */
+      if ((m.id === active.current && !quiet) || checking.current.has(m.id)) continue;
+      checking.current.add(m.id);
+      /* A fresh listing without the file under its name or its id: it is not in the vault. Whether
+         it is in the trash is the trash's to say. */
+      void (async () => {
+        const trashed = m.doc && !quiet ? !!(await readTrash())?.entries.some((e) => e.doc === m.doc) : false;
+        const tab = tabById(tabsNow(), m.id);
+        const file = tab ? fileOf(tab.place) : null;
+        if (tab && file && file.name === m.name) {
+          tabFiles.delete(m.id);
+          closeDocTab(m.id);
+          if (!quiet) {
+            closed.current = [...closed.current, titles.current[m.name] ?? leaf(m.name)];
+            const names = closed.current;
+            setNote({
+              trashed,
+              text:
+                names.length === 1
+                  ? `${names[0]} was closed: ${trashed ? "it was moved to the trash" : "its file is gone"}.`
+                  : `${names.length} tabs were closed: ${trashed ? "their files were moved to the trash" : "their files are gone"}.`,
+            });
+          }
+        }
+        checking.current.delete(m.id);
+      })();
+    }
+  }, [list, snapshot, moveTo, active, closeDocTab]);
+
+  return { note, dismiss };
 }
 
 /**

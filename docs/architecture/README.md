@@ -141,5 +141,6 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Versions and releases | [`gate-and-releases.md`](gate-and-releases.md) |
 | What a tab keeps while another is in front | [`sidebar.md`](sidebar.md) |
 | What the panel opens on, and what it opens with | [`editing.md`](editing.md) |
+| Where the tabs are kept, and their files | [`sidebar.md`](sidebar.md) |
 | Why it stopped being a column | [`sidebar.md`](sidebar.md) |
 | Wikilinks follow a rename | [`references.md`](references.md) |

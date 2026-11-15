@@ -20,6 +20,11 @@ export function tabsNow(place = ""): Tabs {
   return tabs;
 }
 
+/** Start from the tabs the window had (`saved.ts`, before the first render). */
+export function seedTabs(start: Tabs): void {
+  tabs = start;
+}
+
 /** Replace the set with what `change` makes of it; nothing is announced when it is the same set. */
 export function changeTabs(change: (was: Tabs) => Tabs): Tabs {
   const was = tabsNow();

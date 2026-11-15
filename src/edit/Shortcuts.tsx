@@ -101,6 +101,7 @@ const SECTIONS: { title: string; rows: [string, string[]][] }[] = [
       ["Next tab · the one before", ["⌃Tab", "⌃⇧Tab"]],
       ["Tab 1 to 8 · the last", ["⌃1…8", "⌃9"]],
       ["Reorder the tabs", ["drag a tab", "⇧← ⇧→"]],
+      ["Close the focused tab", ["Delete"]],
     ],
   },
   {

@@ -26,6 +26,7 @@ import {
   type Tabs,
 } from "@/ui/tabs/model";
 import { tabKey } from "@/ui/tabs/keys";
+import { noteFiles, parseTabs, reconcile, restore, savedForm, type TabFiles } from "@/ui/tabs/saved";
 
 /**
  * The document tabs (#264) as data: what a tab holds, and every change the strip, the shortcuts and
@@ -268,5 +269,102 @@ describe("the keys", () => {
     /* Redo on a Dvorak board, whose key is where T is on QWERTY. */
     expect(tabKey(press("y", { ctrlKey: true }, "KeyT"), false)).toBeNull();
     expect(tabKey(press("е", { ctrlKey: true }, "KeyT"), false)).toEqual({ do: "new" });
+  });
+});
+
+describe("the tabs kept between runs", () => {
+  const lists = (
+    over: Partial<Record<"boards" | "notes" | "quizzes" | "tables" | "files", string[]>>,
+    ids: Record<string, string>,
+  ) => ({
+    boards: [],
+    notes: [],
+    quizzes: [],
+    tables: [],
+    files: [],
+    ...over,
+    ids,
+  });
+
+  it("read back what parses, fold a second tab on one document, and say nothing is kept for nothing", () => {
+    const got = parseTabs({
+      list: [
+        { id: "t000000000001", place: "note=a&theme=dark", doc: "d1" },
+        { id: "bad", place: "note=b" },
+        { id: "t000000000002", place: "note=a" },
+        { id: "t000000000003", place: "board=b&page=p2" },
+        { id: "t000000000003", place: "note=c" },
+      ],
+      active: "t000000000003",
+    })!;
+    expect(got.tabs.list).toEqual([
+      { id: "t000000000001", place: "note=a" },
+      { id: "t000000000003", place: "board=b&page=p2" },
+    ]);
+    expect(got.tabs.active).toBe("t000000000003");
+    expect(got.files.get("t000000000001")).toEqual({ name: "a", doc: "d1" });
+    expect(parseTabs({ list: [], active: "x" })).toBeNull();
+    expect(parseTabs("nope")).toBeNull();
+  });
+
+  it("save each tab's file id only while it is on that file", () => {
+    const files: TabFiles = new Map([
+      ["ta", { name: "plan", doc: "d1" }],
+      ["tb", { name: "old", doc: "d2" }],
+    ]);
+    expect(savedForm(three(), files)).toEqual({
+      list: [
+        { id: "ta", place: "board=plan", doc: "d1" },
+        { id: "tb", place: "note=ideas" },
+        { id: "tc", place: "tasks=1" },
+      ],
+      active: "tb",
+    });
+  });
+
+  it("open on the tab that was in front, the tab holding a linked document, or a new one beside it", () => {
+    expect(restore(three(), "")).toEqual(three());
+    const held = restore(three(), "board=plan&page=p9");
+    expect(held.active).toBe("ta");
+    expect(held.list[0]!.place).toBe("board=plan&page=p9");
+    const fresh = restore(three(), "quiz=q");
+    expect(fresh.list.map((t) => t.place)).toEqual(["board=plan", "note=ideas", "quiz=q", "tasks=1"]);
+    expect(activeTab(fresh).place).toBe("quiz=q");
+  });
+
+  it("open a bare address on Home in a window already open, beside the tab that was in front", () => {
+    const home = restore(three(), "", false);
+    expect(home.list.map((t) => t.place)).toEqual(["board=plan", "note=ideas", "", "tasks=1"]);
+    expect(activeTab(home).place).toBe("");
+    /* A Home tab it has already is the one. */
+    expect(restore(home, "", false)).toEqual(home);
+    expect(restore({ ...home, active: "ta" }, "", false).active).toBe(home.active);
+  });
+
+  it("follow a file the listing has under another name, and give up one it has nowhere", () => {
+    const files: TabFiles = new Map([
+      ["ta", { name: "plan", doc: "d1" }],
+      ["tb", { name: "ideas", doc: "d2" }],
+    ]);
+    const list = lists({ boards: ["work/plan"] }, { "work/plan": "d1" });
+    expect(reconcile(three(), files, list)).toEqual({
+      follow: [{ id: "ta", place: "board=work%2Fplan" }],
+      missing: [{ id: "tb", doc: "d2", name: "ideas" }],
+    });
+  });
+
+  it("leave a tab on a file the listing has not seen yet, unless it was restored", () => {
+    const list = lists({}, {});
+    expect(reconcile(three(), new Map(), list)).toEqual({ follow: [], missing: [] });
+    expect(reconcile(three(), new Map(), list, new Set(["ta"])).missing).toEqual([{ id: "ta", doc: "", name: "plan" }]);
+    /* A tab moved to another file since its id was noted is not followed back to the first. */
+    const files: TabFiles = new Map([["tb", { name: "elsewhere", doc: "d2" }]]);
+    expect(reconcile(three(), files, lists({ notes: ["elsewhere"] }, { elsewhere: "d2" }))).toEqual({ follow: [], missing: [] });
+  });
+
+  it("note the files' ids as the listing gives them, and forget a closed tab's", () => {
+    const files: TabFiles = new Map([["gone", { name: "x", doc: "d0" }]]);
+    noteFiles(three(), files, { plan: "d1" });
+    expect([...files]).toEqual([["ta", { name: "plan", doc: "d1" }]]);
   });
 });
