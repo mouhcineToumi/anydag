@@ -392,8 +392,19 @@ function namesOf(tree: KindLists, kind: FileKind): string[] {
 export const everyFile = (tree: KindLists): { name: string; kind: FileKind }[] =>
   FILE_KINDS.flatMap((kind) => namesOf(tree, kind).map((name) => ({ name, kind })));
 
+/**
+ * Whether a change to a task is one a row would draw. *Last changed* is said to the minute at best
+ * ("now", "5m"), so a note typed in every quarter-second is not a redraw of the whole list each time:
+ * a `changed` under a minute on is the same.
+ */
 const sameTask = (a: Task | undefined, b: Task | undefined): boolean =>
-  a?.status === b?.status && a?.due === b?.due && a?.start === b?.start;
+  a?.status === b?.status &&
+  a?.due === b?.due &&
+  a?.start === b?.start &&
+  a?.body === b?.body &&
+  a?.items?.done === b?.items?.done &&
+  a?.items?.total === b?.items?.total &&
+  Math.abs((a?.changed ?? 0) - (b?.changed ?? 0)) < 60_000;
 const sameEvent = (a: NoteEvent | undefined, b: NoteEvent | undefined): boolean => a?.start === b?.start && a?.end === b?.end;
 const sameProject = (a: Project | undefined, b: Project | undefined): boolean => a?.status === b?.status && a?.hue === b?.hue;
 

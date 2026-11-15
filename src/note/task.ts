@@ -25,10 +25,24 @@ export const STATUS_LABEL: Readonly<Record<TaskStatus, string>> = { todo: "To do
  * What a task is, off its frontmatter. `due` is `YYYY-MM-DD`, and absent when there is none; so is
  * `start`, the day it begins — a task with both spans the days between on the calendar.
  */
-export interface Task {
+export interface Task extends TaskFacts {
   status: TaskStatus;
   due?: string;
   start?: string;
+}
+
+/**
+ * What the listing knows of a task beside its frontmatter, **and never a line in the file** (#311):
+ * how many check items its body ticks of how many it has, whether it has a body at all, and when
+ * the file last changed. The first two are counted from the text by {@link taskFactsOf}; `changed`
+ * is the file's own modified time, in ms, which only the server's stat knows. Each is absent when
+ * there is nothing to say — no check items, no body, a task the page made a moment ago — so a quick
+ * task is `{status, due}` and nothing more, and `withTask` never writes any of them.
+ */
+export interface TaskFacts {
+  items?: { done: number; total: number };
+  body?: true;
+  changed?: number;
 }
 
 /** What a write asks for: a key left out stays as it is, `null` takes its line out. */
@@ -97,6 +111,49 @@ export function taskOf(text: string): Task | undefined {
   return { status, ...(due ? { due } : {}), ...(start ? { start } : {}) };
 }
 
+/** A Markdown check item, `- [ ]` or `1. [x]`, as remark's GFM reads one: the box and the space after it. */
+const CHECK_ITEM = /^\s*(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\](?:\s|$)/;
+/** A code fence's opening line: what it opens with is what closes it. */
+const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
+
+/**
+ * What a task's text says beside its frontmatter: its check items, ticked of all, and whether it
+ * has a body. Counted, never stored — the Tasks page's progress bar and page mark, and the task
+ * page's *Check items*. A check item inside a code fence is an example, not a step, and is not counted.
+ */
+export function taskFactsOf(text: string): Pick<TaskFacts, "items" | "body"> {
+  const m = FRONT.exec(text);
+  const body = m ? text.slice(m[0].length) : text;
+  if (body.trim() === "") return {};
+  let done = 0;
+  let total = 0;
+  let fence: string | null = null;
+  for (const line of body.split(/\r?\n/)) {
+    const f = FENCE.exec(line);
+    if (f) {
+      if (fence === null) fence = f[1]!;
+      else if (f[1]!.startsWith(fence)) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    const c = CHECK_ITEM.exec(line);
+    if (!c) continue;
+    total++;
+    if (c[1] !== " ") done++;
+  }
+  return { body: true, ...(total ? { items: { done, total } } : {}) };
+}
+
+/**
+ * A task as the listing carries it: {@link taskOf} and {@link taskFactsOf} together, with the time
+ * the file last changed when the caller knows it. `undefined` for a note that is not a task.
+ */
+export function indexedTask(text: string, changed?: number | null): Task | undefined {
+  const task = taskOf(text);
+  if (!task) return undefined;
+  return { ...task, ...taskFactsOf(text), ...(changed ? { changed: Math.round(changed) } : {}) };
+}
+
 /**
  * The Tasks page's order, and `anydag task ls`'s: in progress, then to do, then done — within each,
  * the soonest due first and a task with no date after every one that has one, then by title.
@@ -123,9 +180,14 @@ export function overdue(task: Task, now: string = today()): boolean {
   return task.status !== "done" && task.due !== undefined && task.due < now;
 }
 
-/** What a click on a task's status moves it to: along the columns, and from done back to the start. */
-export function nextStatus(status: TaskStatus): TaskStatus {
-  return STATUSES[(STATUSES.indexOf(status) + 1) % STATUSES.length]!;
+/**
+ * What a click on a task's status mark does (#311): the mark is the task's checkbox, so a task that
+ * is not done is done, and a done one is to do again. In progress is one step further away — a
+ * row's menu, `S` on the Tasks page, the task's own page — because a click that meant three things
+ * in turn was a click nobody could make without looking.
+ */
+export function toggledStatus(status: TaskStatus): TaskStatus {
+  return status === "done" ? "todo" : "done";
 }
 
 /**

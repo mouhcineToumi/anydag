@@ -19,7 +19,7 @@ import { Worker } from "node:worker_threads";
 
 import { eventOf, type NoteEvent } from "../src/note/event";
 import { projectOf, type Project } from "../src/note/project";
-import { taskOf, type Task } from "../src/note/task";
+import { indexedTask, type Task } from "../src/note/task";
 import { parseQuiz } from "../src/quiz/parse";
 import { titleOf } from "../src/refs/extract";
 import { frontId } from "./ids";
@@ -56,7 +56,11 @@ export interface Listing extends Walked {
   found: Found[];
 }
 
-export function frontOf(kind: TextKind, text: string, stamp: string): Front {
+/**
+ * What one text's frontmatter says. `changed` is the file's modified time, in ms, when the caller
+ * has stat it — a task carries it as when it last changed, which is the file's and never a line in it.
+ */
+export function frontOf(kind: TextKind, text: string, stamp: string, changed: number | null = null): Front {
   let asks: (string | null)[] | undefined;
   if (kind === "quiz") {
     try {
@@ -69,7 +73,7 @@ export function frontOf(kind: TextKind, text: string, stamp: string): Front {
     stamp,
     id: frontId(text),
     title: titleOf(text),
-    task: kind === "note" ? taskOf(text) : undefined,
+    task: kind === "note" ? indexedTask(text, changed) : undefined,
     project: kind === "note" ? projectOf(text) : undefined,
     event: kind === "note" ? eventOf(text) : undefined,
     asks,
@@ -183,7 +187,7 @@ export function readFound(root: string, d: Listed, had: Front | undefined, insid
   } catch {
     return { ...none, born };
   }
-  return { front: frontOf(d.kind, text, stamp), size: null, born };
+  return { front: frontOf(d.kind, text, stamp, st.mtimeMs), size: null, born };
 }
 
 /** What says a text has not changed since it was read: its mtime, size and inode. */

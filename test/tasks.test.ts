@@ -7,7 +7,7 @@ import { indexTexts } from "@/refs/extract";
 import {
   compareTasks,
   dueOf,
-  nextStatus,
+  toggledStatus,
   overdue,
   STATUSES,
   statusOf,
@@ -63,10 +63,10 @@ describe("writing a task", () => {
 });
 
 describe("the parts", () => {
-  it("moves a status along the columns and from done back to the start", () => {
-    expect(nextStatus("todo")).toBe("in-progress");
-    expect(nextStatus("in-progress")).toBe("done");
-    expect(nextStatus("done")).toBe("todo");
+  it("a click on the mark is done, and a done one is to do again", () => {
+    expect(toggledStatus("todo")).toBe("done");
+    expect(toggledStatus("in-progress")).toBe("done");
+    expect(toggledStatus("done")).toBe("todo");
   });
 
   it("reads only strings", () => {

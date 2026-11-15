@@ -20,7 +20,7 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
 | Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
-| the Tasks page, `?tasks=1` | a list — *In progress*, *To do*, *Done*, each by due date then title — or a board of three columns a card is dragged between; a filter, and a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
+| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then title, or a board of three columns a card is dragged between; a filter line with the count (*13 open, 2 overdue*); a row is the status mark (the checkbox), the title, a page mark when it has a body, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
 | the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
 | a board, or a note, embedding one | a card — status as a button, title, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
 | `?view=1`, a snapshot, the PDF | the status and date on a line above the text |
@@ -51,6 +51,21 @@ Seven things are load-bearing:
   and `ids`, `task` on a note's `dag:note` event so a row is redrawn in place, and `task` on
   `/__board/index`'s docs, which is what a card reads. The vault keeps
   it in the stat-keyed cache the titles were already in.
+- **The status mark is the task's checkbox** (#311). One click marks a task that is not done done,
+  and a done one to do again — on the Tasks page, a card, an embed — and it is a `role="checkbox"`,
+  *mixed* while in progress. In progress is one step further away: the row's menu (a right-click,
+  its `⋯`, or `shift+F10`), the task's own page. On the Tasks page **the row stays where it was**,
+  struck through, until the toast that says so goes (five seconds, held while the pointer or the
+  focus is on it), so its Undo is where the click happened; a refused write puts it back by itself.
+  A click that meant three things in turn was a click nobody could make without looking.
+- **The listing carries three facts that are never a line in the file**: `items`, the check items
+  the body ticks of all it has (`- [ ]`, `1. [x]`, as remark's GFM reads one, and none inside a code
+  fence); `body`, whether there is any text under the frontmatter; and `changed`, the file's own
+  modified time. `taskFactsOf` counts the first two in `src/note/task.ts`, `indexedTask` puts them
+  beside `taskOf`'s answer, and the server adds `changed` from the stat it already made — in the
+  listing, the feed and `/__board/task`'s answer. `withTask` never writes any of them. A `changed` under
+  a minute on is no redraw (`sameTask` in `useBoard.ts`): a task typed in every quarter-second would
+  otherwise redraw the list each time for a column that says *now*.
 - **A card shows its own write at once** and takes what the server wrote when it answers: the index
   is a wait behind the change feed, and a button that sat on the old status for most of a second
   would read as a press that did not land. The Tasks page does the same with `pending`, let go of
@@ -61,9 +76,17 @@ Seven things are load-bearing:
   itself. **A card that only embeds a document opens no panel**: `place` opens the editor for an `md`
   because its body is prose, and a card's body is one line of `dag:` syntax.
 
-Which layout the Tasks page shows is `dag:tasks-view`, this browser's and not the app's — view
-state, like which folders are open — written with `writeLocal`. The list reads what is being worked
-on first and the board's columns run the way work moves, so the three statuses come in two orders.
+Which layout the Tasks page shows is `dag:tasks-view`, and which tab `dag:tasks-tab`, this browser's
+and not the app's — view state, like which folders are open — written with `writeLocal`. The list
+reads what is being worked on first and the board's columns run the way work moves, so the three
+statuses come in two orders. The tabs count every task the vault lists, whatever the filter line
+narrows the list to; the board shows every status, so there no tab is pressed and a press goes back
+to the list. *Done* is ordered by what changed last. When the page narrows its columns leave in this
+order — last changed, check items, project — and the due date stays (a container query on
+`.dag-tasks`, so a docked sidebar narrows it too). A filter that matches nothing says what it
+searched and offers *Clear the filter* and, on *Open*, *Look in Done too*. `src/ui/taskModel.ts`
+holds the rules with no drawing in them (`test/task-model.test.ts`), and `TasksMenu` is the page's
+one menu — the calendar's item menu written once.
 
 **A template is not a task.** A note in the vault's templates folder (*Note templates*, [`notes.md`](notes.md))
 that carries a `status:`, a `project:` or a `start:` is a note to copy, not work to do, and is left out of
@@ -77,8 +100,12 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `data-dag-tasks*`, `data-dag-taskbar*`, `data-dag-taskline`, `data-dag-task-add`,
 `data-dag-task-add-row`, `data-dag-task-add-problem`, `data-dag-embed-task`,
 `data-dag-sidebar-task`, `data-dag-sidebar-tasks`, `data-dag-sidebar-tasks-open`,
-`data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, the storage key
-`dag:tasks-view`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
+`data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, `dag-tasks-menu*`,
+`dag-tasks-kbd`, `data-dag-task-menu*`, `data-dag-tasks-tab`, `data-dag-tasks-showing`,
+`data-dag-task-toast`, `data-dag-task-undo`, `data-dag-task-items`, `data-dag-task-page`,
+`data-dag-task-changed`, `data-dag-task-more`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
+`data-dag-tasks-look-done`, `data-today` on a due date, the storage keys `dag:tasks-view` and
+`dag:tasks-tab`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
 `tasks`.
 
 **Out, and why:** assignees, priorities, labels and reminders (each is a

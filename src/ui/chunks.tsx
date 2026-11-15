@@ -41,6 +41,7 @@ export const BoardBrowser = part(search, (m) => m.BoardBrowser, "BoardBrowser");
 export const CalendarView = part(calendar, (m) => m.CalendarView, "CalendarView");
 export const TasksView = part(tasks, (m) => m.TasksView, "TasksView");
 export const LayoutToggle = part(tasks, (m) => m.LayoutToggle, "LayoutToggle");
+export const TaskTabs = part(tasks, (m) => m.TaskTabs, "TaskTabs");
 export const TrashView = part(trash, (m) => m.TrashView, "TrashView");
 export const AssistantView = part(assistant, (m) => m.AssistantView, "AssistantView");
 export const AssistantPanel = part(assistantPanel, (m) => m.AssistantPanel, "AssistantPanel");

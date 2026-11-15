@@ -90,33 +90,50 @@ async function idOf(page: Page, name: string): Promise<string> {
   return id!;
 }
 
-test("a note with a status is on the Tasks page, in its group, and its status moves on from there", { tag: "@smoke" }, async ({
-  page,
-}) => {
+test("a note with a status is on the Tasks page, in its group, and one click on its mark checks it off", {
+  tag: "@smoke",
+}, async ({ page }) => {
   const late = write("late", "Send the invoice", ["status: todo", `due: ${day(-2)}`]);
   const doing = write("doing", "Ship the pricing page", ["status: in-progress", `due: ${day(1)}`]);
-  const finished = write("finished", "Redraw the favicon", ["status: done"]);
+  const soon = write("soon", "Water the plants", ["status: todo", `due: ${day(0)}`]);
+  const finished = write("finished", "Redraw the favicon", ["status: done", `due: ${day(-5)}`]);
   const plain = write("plain", "Meeting notes");
   await tasksPage(page, late);
 
   await expect(page.locator(`[data-dag-tasks-group="in-progress"] [data-dag-task-row="${doing}"]`)).toBeVisible();
   const row = page.locator(`[data-dag-tasks-group="todo"] [data-dag-task-row="${late}"]`);
   await expect(row).toContainText("Send the invoice");
-  /* Past its date and not done, so its date says so. */
+  /* Past its date and not done, so its date says so; today's is marked too. */
   await expect(row.locator("[data-dag-task-due]")).toHaveAttribute("data-overdue", "");
-  /* Done starts shut, and says how many are in it. */
+  await expect(page.locator(`[data-dag-task-row="${soon}"] [data-dag-task-due]`)).toHaveAttribute("data-today", "");
+  /* The count line says how many the filter leaves of the open ones, and how many of those are late
+     (the vault holds the other tests' tasks too, so the total is whatever it is). */
+  await expect(page.locator("[data-dag-tasks-count]")).toHaveText(/^3 of \d+ open, 1 overdue$/);
+  /* Done is a tab of its own, and its date carries no emphasis. */
   await expect(page.locator(`[data-dag-task-row="${finished}"]`)).toHaveCount(0);
-  await expect(page.locator('[data-dag-tasks-group="done"] .dag-tasks__n')).toHaveText("1");
-  await page.locator('[data-dag-tasks-twisty="done"]').click();
-  await expect(page.locator(`[data-dag-task-row="${finished}"]`)).toBeVisible();
+  await page.locator('[data-dag-tasks-tab="done"]').click();
+  await expect(page.locator(`[data-dag-task-row="${finished}"] [data-dag-task-due]`)).not.toHaveAttribute("data-overdue", "");
+  await page.locator('[data-dag-tasks-tab="open"]').click();
   /* A plain note is not a task. */
   await expect(page.locator(`[data-dag-task-row="${plain}"]`)).toHaveCount(0);
 
-  /* The status button moves it on — to do, in progress — and writes that one line. */
+  /* One click on the mark is done, and writes that one line. */
   await row.locator("[data-dag-task-status]").click();
   await expect
     .poll(() => read("late"))
-    .toBe(`---\ntitle: "Send the invoice"\nstatus: in-progress\ndue: ${day(-2)}\n---\nWhat it is about.\n`);
+    .toBe(`---\ntitle: "Send the invoice"\nstatus: done\ndue: ${day(-2)}\n---\nWhat it is about.\n`);
+  /* The row stays where it was, struck through, until the toast goes — so Undo is where it happened. */
+  await expect(row).toHaveAttribute("data-done", "");
+  const toast = page.locator(`[data-dag-task-toast="${late}"]`);
+  await expect(toast).toContainText("Send the invoice");
+  await toast.locator("[data-dag-task-undo]").click();
+  await expect.poll(() => read("late")).toContain("\nstatus: todo\n");
+  await expect(row).not.toHaveAttribute("data-done", "");
+
+  /* The other statuses are in the row's menu, by a right-click. */
+  await row.click({ button: "right", position: { x: 200, y: 10 } });
+  await page.locator('[data-dag-task-menu-status="in-progress"]').click();
+  await expect.poll(() => read("late")).toContain("\nstatus: in-progress\n");
   await expect(page.locator(`[data-dag-tasks-group="in-progress"] [data-dag-task-row="${late}"]`)).toBeVisible();
 });
 

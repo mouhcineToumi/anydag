@@ -435,7 +435,7 @@ export class Vault {
     } catch {
       return null;
     }
-    const f = frontOf(listed.kind as TextKind, text, stamp);
+    const f = frontOf(listed.kind as TextKind, text, stamp, st.mtimeMs);
     this.fronts.set(listed.file, f);
     return f;
   }
@@ -2512,7 +2512,14 @@ export class Vault {
           } catch {
             continue;
           }
-          const f = frontOf(found.kind, text, "");
+          /* When it last changed is a task's too, and only the stat says it. */
+          let changed: number | null = null;
+          try {
+            changed = fs.statSync(ev.path).mtimeMs;
+          } catch {
+            /* Gone between the read and the stat: the next event says so. */
+          }
+          const f = frontOf(found.kind, text, "", changed);
           /* A template says nothing about being a task: the feed agrees with the list. */
           const own = !inTemplates(found.name, this.templatesFolder());
           this.emit({

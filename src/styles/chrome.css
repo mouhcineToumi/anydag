@@ -842,7 +842,9 @@
 .dag-sidebar__act span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The search chord as two keycaps, Space then O: one string in 10px mono read as "space 0". */
 .dag-sidebar__act .dag-sidebar__keys { flex: none; display: inline-flex; gap: 3px; }
-.dag-sidebar__keys kbd {
+/* And every keycap on the Tasks page: a menu row's key, the New task row's hints. */
+.dag-sidebar__keys kbd,
+.dag-tasks-kbd {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -5271,8 +5273,8 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
 /* ---------------------------------------------------------------------------------------------------
  * Tasks. A task is a note with a status, and these are the places one is
  * drawn as one: its glyph and due date wherever it appears, the bar on its own page, the Tasks page,
- * and the count beside Tasks in the sidebar. Every colour is the theme's: to do is muted, in progress
- * the warning hue, done the success hue, and a date that has passed the danger text — so a theme
+ * and the count beside Tasks in the sidebar. Every colour is the theme's: to do is slate, in progress
+ * the warning text, done the success text, and a date that has passed the danger text — so a theme
  * that makes those greys (`neutral`) draws tasks in greys, which is its business.
  *
  * Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-toolbar__make-task`,
@@ -5281,8 +5283,10 @@ html[data-dag-locked] .dag-connect-handle { display: none; }
  * `dag:tasks-view`, and the query key `tasks`.
  * ------------------------------------------------------------------------------------------------- */
 .dag-task-glyph { flex: none; }
-.dag-task-glyph[data-status="todo"] { color: var(--dag-color-muted); }
-.dag-task-glyph[data-status="in-progress"] { color: var(--dag-color-warning); }
+/* To do is slate and in progress the darker amber (#311): the mark is a checkbox, a control a person
+   has to find, and muted (2.5:1) and warning (1.9:1) were both under 3:1 on paper. */
+.dag-task-glyph[data-status="todo"] { color: var(--dag-color-slate); }
+.dag-task-glyph[data-status="in-progress"] { color: var(--dag-color-warningText); }
 .dag-task-glyph[data-status="done"] { color: var(--dag-color-successText); }
 
 .dag-task-status {
@@ -5305,6 +5309,7 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 
 .dag-task-due { flex: none; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
 .dag-task-due[data-overdue] { color: var(--dag-color-dangerText); font-weight: var(--dag-ui-weight-strong); }
+.dag-task-due[data-today] { color: var(--dag-color-ink); font-weight: var(--dag-ui-weight-strong); }
 
 /* The open count beside Tasks in the sidebar, and how many links the folded Shared row holds. */
 .dag-sidebar__act .dag-sidebar__badge,
@@ -5585,53 +5590,117 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tasks__layout-choice:focus-visible { box-shadow: var(--focus-ring-inset); }
 
 .dag-tasks {
+  /* The columns leave as the page narrows, by its own width rather than the window's: a docked
+     sidebar or the Assistant beside it narrow the page without narrowing the window. */
+  container: dag-tasks / inline-size;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 24px 32px 96px;
+  padding: 0 0 96px;
   background: var(--dag-color-paper);
   color: var(--dag-color-ink);
 }
-.dag-tasks[data-dag-tasks="list"] > * { max-width: 880px; margin-inline: auto; }
-.dag-tasks__bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.dag-tasks__filter {
-  flex: 0 1 280px;
-  min-width: 0;
+.dag-tasks__spacer { flex: 1; min-width: 12px; }
+
+/* The tabs in the top bar: Open, Done, All, each with its count. */
+.dag-tasks__tabs { display: flex; gap: 2px; flex: none; }
+.dag-tasks__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 30px;
   padding: 0 10px;
   font: inherit;
   font-size: var(--chrome-text-md);
-  color: var(--dag-color-ink);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tasks__tab:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-tasks__tab[aria-selected="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-tasks__tab:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-tasks__tab-n { font-size: var(--chrome-text-xs); color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+
+/* The filter line under the top bar: the field, the filters, the count, how the list is ordered and drawn. */
+.dag-tasks__bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 16px 6px 24px;
+  background: var(--dag-color-paper);
+  border-top: 1px solid var(--dag-color-outlineSoft);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-tasks__find {
+  display: inline-flex;
+  flex: 0 1 220px;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  height: 30px;
+  padding: 0 10px;
+  color: var(--dag-color-slate);
   background: var(--dag-color-card);
   border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-ui-radius-control);
+  cursor: text;
 }
-.dag-tasks__filter:focus-visible { box-shadow: var(--focus-ring); }
+.dag-tasks__find > svg { flex: none; }
+.dag-tasks__find:hover { border-color: var(--dag-color-mutedBorder); }
+.dag-tasks__find:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-tasks__filter {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+}
+.dag-tasks__filter:focus { outline: none; }
 .dag-tasks__filter::placeholder { color: var(--dag-color-slate); }
-.dag-tasks__count { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-tasks__count { flex: none; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
 /* On a phone the count goes under the filters, whole, rather than three words stacked beside them. */
 @media (max-width: 719px) {
-  .dag-tasks__bar { flex-wrap: wrap; row-gap: 6px; }
-  .dag-tasks__filter { flex: 1 1 140px; min-height: 40px; font-size: var(--chrome-text-lg); }
-  .dag-tasks__count { flex-basis: 100%; white-space: nowrap; }
+  .dag-tasks__bar { flex-wrap: wrap; row-gap: 6px; padding-inline: 16px; }
+  .dag-tasks__find { flex: 1 1 140px; min-height: 40px; }
+  .dag-tasks__filter { font-size: var(--chrome-text-lg); }
+  .dag-tasks__bar > .dag-tasks__spacer { display: none; }
+  .dag-tasks__count { flex-basis: 100%; }
 }
-.dag-tasks__intro { margin: 0 0 16px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-tasks__intro { margin: 16px 24px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
 
-.dag-tasks__groups { display: flex; flex-direction: column; gap: 20px; }
+.dag-tasks__groups { display: flex; flex-direction: column; }
 .dag-tasks__head {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 6px;
+  margin: 0;
   font-size: var(--chrome-text-md);
   font-weight: var(--dag-ui-weight-strong);
   color: var(--dag-color-ink);
 }
+/* A group's heading is a band across the page, the twisty its whole width. */
+.dag-tasks__groups .dag-tasks__head {
+  min-height: 36px;
+  padding: 0 16px 0 18px;
+  background: var(--dag-color-paper100);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
 .dag-tasks__twisty {
   display: inline-flex;
+  flex: 1;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  min-height: 30px;
   padding: 2px 6px 2px 2px;
   font: inherit;
   color: inherit;
@@ -5640,32 +5709,26 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
   border-radius: var(--dag-ui-radius-control);
   cursor: pointer;
 }
-.dag-tasks__twisty > svg:first-child { color: var(--dag-color-muted); transition: rotate var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
+.dag-tasks__twisty > svg:first-child { color: var(--dag-color-slate); transition: rotate var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
 .dag-tasks__twisty[aria-expanded="false"] > svg:first-child { rotate: -90deg; }
 .dag-tasks__twisty:focus-visible { box-shadow: var(--focus-ring-inset); }
 .dag-tasks__n { font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
-.dag-tasks__rows { display: flex; flex-direction: column; border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-tasks__rows { display: flex; flex-direction: column; }
+
+/* A row: the mark, the title, the page mark, then its columns, each a fixed width so they line up. */
 .dag-tasks__row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 0 6px;
+  min-height: 38px;
+  padding: 0 16px 0 18px;
   border-bottom: 1px solid var(--dag-color-outlineSoft);
 }
 .dag-tasks__row:hover { background: var(--dag-color-paper100); }
-.dag-tasks__meta { display: contents; }
-/* Two lines on a phone: the title whole, then where it is and when it is due. */
-@media (max-width: 719px) {
-  .dag-tasks__row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: start; padding: 10px 4px; }
-  .dag-tasks__row > .dag-task-status { grid-row: span 2; margin-top: 1px; }
-  .dag-tasks__row .dag-tasks__title { padding: 0; font-size: var(--chrome-text-lg); white-space: normal; }
-  .dag-tasks__meta { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
-  .dag-tasks__meta:empty { display: none; }
-  .dag-tasks__meta > .dag-task-due { margin-left: auto; }
-}
+.dag-tasks__row[data-done] .dag-tasks__title { color: var(--dag-color-slate); text-decoration: line-through; }
 .dag-tasks__title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   padding: 6px 0;
   overflow: hidden;
@@ -5681,15 +5744,99 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 }
 .dag-tasks__title:hover { text-decoration: underline; text-decoration-color: var(--dag-color-outline); }
 .dag-tasks__title:focus-visible { box-shadow: var(--focus-ring-inset); }
-.dag-tasks__row .dag-task-status[data-dag-task-status="done"] + .dag-tasks__title { color: var(--dag-color-slate); }
-.dag-tasks__folder { flex: none; max-width: 30%; overflow: hidden; font-size: var(--chrome-text-sm); text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-slate); }
+.dag-tasks__page { display: inline-flex; flex: none; color: var(--dag-color-slate); }
+.dag-tasks__cell { display: flex; flex: none; align-items: center; justify-content: flex-end; }
+.dag-tasks__cell--items { width: 84px; }
+.dag-tasks__cell--project { width: 116px; }
+.dag-tasks__cell--project .dag-project-chip { max-width: 100%; }
+.dag-tasks__cell--due { width: 88px; }
+.dag-tasks__cell--changed { position: relative; width: 50px; }
+.dag-tasks__items {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dag-tasks__bar-track { display: inline-block; width: 36px; height: 4px; overflow: hidden; background: var(--dag-color-paper200); border-radius: var(--dag-ui-radius-pill); }
+.dag-tasks__bar-fill { display: block; height: 100%; background: var(--dag-color-success); border-radius: var(--dag-ui-radius-pill); }
+.dag-tasks__changed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+.dag-tasks__changed > svg { flex: none; }
+/* The last column gives way to the row's menu under the pointer, or when the keyboard is in the row. */
+.dag-tasks__more { position: absolute; inset: 0; display: none; align-items: center; justify-content: flex-end; }
+.dag-tasks__row:hover .dag-tasks__more,
+.dag-tasks__row:focus-within .dag-tasks__more { display: flex; }
+.dag-tasks__row:hover .dag-tasks__changed,
+.dag-tasks__row:focus-within .dag-tasks__changed { visibility: hidden; }
+/* A narrow page drops the columns in this order — last changed, check items, project — and keeps the
+   due date. The menu is still there under the pointer, where the last column was. */
+@container dag-tasks (max-width: 760px) {
+  .dag-tasks__cell--changed { width: 28px; }
+  .dag-tasks__changed { display: none; }
+}
+@container dag-tasks (max-width: 660px) {
+  .dag-tasks__cell--items { display: none; }
+}
+@container dag-tasks (max-width: 540px) {
+  .dag-tasks__cell--project { display: none; }
+}
+@media (max-width: 719px) {
+  .dag-tasks__row { min-height: 44px; padding-inline: 12px 8px; }
+  .dag-tasks__title { font-size: var(--chrome-text-lg); }
+}
+
+/* A filter that matches nothing: what it searched, and the two ways out. */
+.dag-tasks__none { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 24px 0; text-align: center; }
+.dag-tasks__none-title { margin: 0; font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+.dag-tasks__none-text { margin: 0; max-width: 420px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-tasks__none-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+
+/* The Tasks page's menus: a status, and later a priority, a project, the order. The calendar's item
+   menu, written once for the page. Names grepped first: `dag-tasks-menu*` and `data-dag-task-menu*`
+   were nobody's. */
+.dag-tasks-menu {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-tasks-menu__item { width: 100%; font-size: var(--chrome-text-md); color: var(--dag-color-ink); }
+.dag-tasks-menu__item[aria-checked="true"] { background: var(--dag-color-paper100); }
+.dag-tasks-menu__item:disabled { cursor: default; opacity: 0.5; }
+.dag-tasks-menu__icon { display: inline-flex; flex: none; color: var(--dag-color-slate); }
+.dag-more__item.dag-tasks-menu__item > span { flex: none; }
+.dag-more__item.dag-tasks-menu__item > .dag-tasks-menu__label { flex: 1; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.dag-tasks-menu__hint { flex: none; }
+.dag-tasks-menu__tick { flex: none; color: var(--dag-color-accent); }
+.dag-tasks-menu__heading { margin: 6px 8px 2px; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-tasks-menu__rule { width: 100%; height: 1px; margin: 4px 0; background: var(--dag-color-outlineSoft); border: none; }
+.dag-tasks-menu__foot { margin: 4px 8px 2px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-tasks-menu__box { display: inline-flex; flex: none; color: var(--dag-color-slate); }
+.dag-tasks-menu__box[data-on] { color: var(--dag-color-accent); }
 
 .dag-tasks__add { display: flex; flex-direction: column; gap: 2px; }
 .dag-tasks__add-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 9px;
+  padding: 4px 9px 4px 22px;
   color: var(--dag-color-slate);
   cursor: text;
 }
@@ -5708,14 +5855,14 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tasks__add-row:focus-within { color: var(--dag-color-slate); box-shadow: var(--focus-ring-inset); }
 .dag-tasks__add-problem {
   margin: 0;
-  padding: 0 9px 4px 31px;
+  padding: 0 9px 4px 44px;
   font-size: var(--chrome-text-sm);
   line-height: 1.4;
   color: var(--dag-color-dangerText);
 }
 
 /* The board: three columns, a card per task. */
-.dag-tasks__columns { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; align-items: start; }
+.dag-tasks__columns { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; align-items: start; padding: 16px 24px 0; }
 .dag-tasks__column {
   display: flex;
   flex-direction: column;
@@ -5747,12 +5894,10 @@ button.dag-task-status:focus-visible { box-shadow: var(--focus-ring); }
 .dag-tasks__card-top { display: flex; align-items: flex-start; gap: 6px; }
 .dag-tasks__card-title { flex: 1; min-width: 0; padding-top: 2px; font-size: var(--chrome-text-md); line-height: 1.35; overflow-wrap: anywhere; }
 .dag-tasks__card-meta { display: flex; align-items: center; gap: 8px; padding-left: 28px; }
-.dag-tasks__card-meta .dag-tasks__folder { flex: 1; max-width: none; }
 .dag-tasks__column .dag-tasks__add-row { padding: 4px 6px; }
 .dag-tasks__column .dag-tasks__add-problem { padding: 0 6px 4px 28px; }
 @media (max-width: 719px) {
-  .dag-tasks { padding: 16px; }
-  .dag-tasks__columns { grid-template-columns: 1fr; }
+  .dag-tasks__columns { grid-template-columns: 1fr; padding: 16px; }
 }
 
 /* A task, embedded — on a board or in a note: its status as a button, its title, and a

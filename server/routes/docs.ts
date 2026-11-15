@@ -18,7 +18,7 @@ import { HUE_ORDER } from "../../src/dsl/ir";
 import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
-import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
+import { STATUSES, dueOf, indexedTask, statusOf, taskOf, withTask } from "../../src/note/task";
 import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
 import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/wikilinks";
@@ -581,7 +581,7 @@ export function docRoutes(app: Hono, s: Session): void {
       },
       "the status",
     );
-    return c.json({ name, task: taskOf(text) ?? null });
+    return c.json({ name, task: indexedTask(text, Date.now()) ?? null });
   });
 
   app.post("/__board/project", async (c) => {

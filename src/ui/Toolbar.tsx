@@ -65,6 +65,7 @@ export function Toolbar({
   kind,
   onBoards,
   more = [],
+  lead,
   children,
 }: {
   /** What is open. `null` before anything has been, which is where `Welcome` takes over. */
@@ -75,6 +76,8 @@ export function Toolbar({
   onBoards(): void;
   /** The page's rows for the `⋯`, above the bar's own. */
   more?: MoreItem[];
+  /** What sits right after the title — the Tasks page's tabs, which say which of its tasks it shows. */
+  lead?: ReactNode;
   /** What sits at the far end of the bar — the backlinks, the page's main action, Export. */
   children?: ReactNode;
 }) {
@@ -254,6 +257,7 @@ export function Toolbar({
             <span className="dag-toolbar__title">{shown}</span>
           </button>
         ) : null}
+        {lead}
       </div>
 
       <div className="dag-toolbar__end">
