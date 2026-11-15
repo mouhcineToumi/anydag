@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Palette,
   Sparkles,
+  Tags,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import { anyAiOn } from "./aiSwitch";
 import { useSettings } from "./useSettings";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
+import { TagsPane } from "./panes/Tags";
 import {
   SCOPE_LABEL,
   SECTIONS,
@@ -70,6 +72,7 @@ const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   "vault-general": Briefcase,
   ai: Sparkles,
   "vault-files": Images,
+  tags: Tags,
   export: PackageOpen,
   sync: RefreshCw,
   "agent-access": Plug,
@@ -290,6 +293,8 @@ export function Settings({
         return <GeneralPane />;
       case "vault-files":
         return <FilesPane boardName={boardName} />;
+      case "tags":
+        return <TagsPane />;
       case "export":
         return <ExportPane />;
       case "sync":
