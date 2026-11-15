@@ -226,6 +226,7 @@ async function indexAnswer(
       task: (own && f?.task) || null,
       project: (own && f?.project) || null,
       event: (own && f?.event) || null,
+      tags: (own && (f?.tags as string[] | undefined)) || null,
       questions: f?.questions ?? null,
       refs: resolveWikiRefs((f?.refs as Ref[] | undefined) ?? [], ix),
     };
@@ -379,6 +380,7 @@ function listOf(t: Tree, templates: string | null): Promise<string> {
     tasks: t.tasks,
     projects: t.projects,
     events: t.events,
+    tags: t.tags,
     templates,
     created: t.created,
     quizzes: t.quizzes,

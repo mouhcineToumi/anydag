@@ -90,6 +90,7 @@ async function before(): Promise<{ index: Record<string, unknown>[]; corpus: Rec
           task: f.task ?? null,
           project: f.project ?? null,
           event: f.event ?? null,
+          tags: f.tags ?? null,
           questions: f.questions ?? null,
           refs: resolveWikiRefs((f.refs as Ref[]) ?? [], named),
         };
