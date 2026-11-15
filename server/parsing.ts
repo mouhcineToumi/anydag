@@ -383,7 +383,7 @@ export type FileMeta = [id: string, name: string, title: string | null];
 export type Want =
   | { corpus: true }
   /** `retire`: a worker that has parsed many texts may ask to be replaced before it builds the engine (`{ again }`). */
-  | { search: string; limit?: number; retire?: boolean };
+  | { search: string; limit?: number; retire?: boolean; only?: string[] };
 
 /** What the server's thread sends the worker: the entries of a question in parts, the next part of an answer, a cache dropped. */
 export type ReadAsk =

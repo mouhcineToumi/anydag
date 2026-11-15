@@ -197,6 +197,8 @@ export function* searchSteps(
   q: string,
   limit: number = LIMIT,
   canAgain = false,
+  /** The names of the only documents a hit may be in — a search filtered to one tag. */
+  only?: readonly string[],
 ): Generator<void, { status: number; body: unknown }> {
   forgetEngines(Date.now());
   if (!q.trim()) return { status: 200, body: { query: q, hits: [] } };
@@ -212,10 +214,17 @@ export function* searchSteps(
       engines.delete(reader); // the old engine goes before the new one is built, not after
       engines.set(reader, (held = yield* build(reader, version, docs, files)));
     }
-    const hits = rank(held.mini, q, limit, (k) => {
-      const doc = held.docs[held.at[2 * k]!];
-      return doc ? { doc, i: held.at[2 * k + 1]! } : undefined;
-    });
+    const allowed = only ? new Set(only) : null;
+    const hits = rank(
+      held.mini,
+      q,
+      limit,
+      (k) => {
+        const doc = held.docs[held.at[2 * k]!];
+        return doc ? { doc, i: held.at[2 * k + 1]! } : undefined;
+      },
+      allowed ? (got) => allowed.has(got.doc.name) : undefined,
+    );
     let stale = false;
     const found = [];
     for (const h of hits) {

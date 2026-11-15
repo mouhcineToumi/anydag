@@ -44,7 +44,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Hear each change as it happens | `GET /__board/events` | · | ✗ [8] |
 | What a permanent id names | `GET /__board/resolve` | · | `resolve` |
 | What refers to what: references and backlinks | `GET /__board/index` `GET /__board/refs` | · | `refs` |
-| Every place some words appear, ranked | `GET /__board/search` `GET /__board/corpus` | · | `search` |
+| Every place some words appear, ranked; or one tag's documents | `GET /__board/search` `GET /__board/corpus` | · | `search` |
 
 ## Boards
 

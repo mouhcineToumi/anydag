@@ -41,14 +41,15 @@ export interface Answer {
 
 const NONE: Found[] = [];
 
-export function useSearch(query: string): Answer {
-  const [answer, setAnswer] = useState<{ query: string; hits: Found[] } | null>(null);
+/** `tag` narrows the hits to the documents carrying it (#327); the words are still what is searched. */
+export function useSearch(query: string, tag?: string | null): Answer {
+  const [answer, setAnswer] = useState<{ query: string; tag?: string; hits: Found[] } | null>(null);
   /* Bumped by the change feed: the same query, asked again. */
   const [changed, setChanged] = useState(0);
   const asking = useRef<Asker | null>(null);
 
   useEffect(() => {
-    const a = asker((q, hits) => setAnswer({ query: q, hits }));
+    const a = asker((q, hits, t) => setAnswer({ query: q, tag: t, hits }));
     asking.current = a;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const soon = () => {
@@ -69,13 +70,13 @@ export function useSearch(query: string): Answer {
   }, []);
 
   useEffect(() => {
-    if (query.trim()) asking.current?.ask(query);
+    if (query.trim()) asking.current?.ask(query, tag ?? undefined);
     else {
       asking.current?.stop();
       setAnswer(null);
     }
-  }, [query, changed]);
+  }, [query, tag, changed]);
 
   if (!answer || !query.trim()) return { hits: NONE, settled: false };
-  return { hits: answer.hits, settled: answer.query === query };
+  return { hits: answer.hits, settled: answer.query === query && answer.tag === (tag ?? undefined) };
 }
