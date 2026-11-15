@@ -169,36 +169,52 @@ test("on the board, a card dragged into another column takes that status, and th
   await page.locator('[data-dag-tasks-layout="list"]').click();
 });
 
-test("a title typed into a group is a task named after it, in that status", async ({ page }, info) => {
+test("a group's + presets the New task row to that status, and the pills write their lines into the new file", async ({
+  page,
+}, info) => {
   const anchor = write("anchor", "Something to wait for", ["status: todo"]);
   await tasksPage(page, anchor);
   const title = `Quick ${info.testId}`;
   /* A new note is a plain \`.md\`, called its title verbatim (decisions 7 and 14). */
   const file = path.join(BOARDS, `${title}.md`);
   made.push(file);
+  await page.locator('[data-dag-tasks-group-add="in-progress"]').click();
   const box = page.locator('[data-dag-task-add="in-progress"]');
+  await expect(box).toBeFocused();
+  await expect(page.locator('[data-dag-task-new-status="in-progress"]')).toBeVisible();
+
+  await page.locator("[data-dag-task-new-priority]").click();
+  await page.locator('[data-dag-task-menu-priority="urgent"]').click();
+  await page.locator("[data-dag-task-new-due]").click();
+  await page.locator('[data-dag-task-menu-due="tomorrow"]').click();
   await box.fill(title);
   await box.press("Enter");
   await expect
     .poll(() => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""))
-    .toMatch(/^---\nstatus: in-progress\nid: [0-9a-z]{10}\n---\n$/);
-  /* The box is empty for the next one, and the page is where it was. */
+    .toMatch(new RegExp(`^---\\nstatus: in-progress\\npriority: urgent\\ndue: ${day(1)}\\nid: [0-9a-z]{10}\\n---\\n$`));
+  /* The box is empty for the next one, the pills as they were, and the page is where it was. */
   await expect(box).toHaveValue("");
+  await expect(page.locator('[data-dag-task-new-priority="urgent"]')).toBeVisible();
   await expect(page).toHaveURL(/tasks=1/);
 });
 
-test("the New task row is one control: it focuses the box, Enter makes the task, Escape clears, and whitespace alone does nothing", async ({
+test("the New task row: N puts the caret in it, Enter makes the task and tints it where it lands, Escape clears, and whitespace does nothing", async ({
   page,
 }) => {
   const anchor = write("anchor", "Something to wait for", ["status: todo"]);
   await tasksPage(page, anchor);
   const row = page.locator('[data-dag-task-add-row="todo"]');
   const box = page.locator('[data-dag-task-add="todo"]');
-  await expect(box).toHaveAttribute("placeholder", "New task — type a title and press Enter");
-  await expect(box).toHaveAttribute("aria-label", "New task in To do — type a title and press Enter");
+  await expect(box).toHaveAttribute("placeholder", "New task");
+  await expect(box).toHaveAttribute("aria-label", "New task: type a title and press Enter");
 
   /* The `+` is inside the row's label, so pressing it focuses the box it belongs to. */
   await row.locator("svg").click();
+  await expect(box).toBeFocused();
+  /* Escape leaves it, and N comes back to it. */
+  await box.press("Escape");
+  await expect(box).not.toBeFocused();
+  await page.keyboard.press("n");
   await expect(box).toBeFocused();
 
   /* Whitespace alone is not a title. */
@@ -209,14 +225,15 @@ test("the New task row is one control: it focuses the box, Enter makes the task,
   const leaf = `quick-add-${Date.now()}`;
   const file = path.join(BOARDS, `${leaf}.md`);
   made.push(file);
+  /* The page was narrowed to this test's folder; a quick add makes at the top level, so widen it. */
+  await page.locator("[data-dag-tasks-filter]").fill("");
   await box.fill(leaf);
   await box.press("Enter");
   await expect
     .poll(() => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""))
     .toMatch(/^---\nstatus: todo\nid: [0-9a-z]{10}\n---\n$/);
   await expect(box).toHaveValue("");
-  /* The page was narrowed to this test's folder; a quick add makes at the top level, so widen it. */
-  await page.locator("[data-dag-tasks-filter]").fill("");
+  await expect(box).toBeFocused();
   await expect(page.locator(`[data-dag-tasks-group="todo"] [data-dag-task-row="${leaf}"]`)).toBeVisible();
 
   /* Escape clears what is in the box and makes nothing. */
@@ -225,6 +242,45 @@ test("the New task row is one control: it focuses the box, Enter makes the task,
   await box.press("Escape");
   await expect(box).toHaveValue("");
   expect(fs.existsSync(path.join(BOARDS, `${escaped}.md`))).toBe(false);
+});
+
+test("the New task dialog makes a task with a description, keeps itself open for the next one, and Create and open opens it", async ({
+  page,
+}, info) => {
+  const anchor = write("anchor", "Something to wait for", ["status: todo"]);
+  await tasksPage(page, anchor);
+  const first = `Dialog ${info.testId}`;
+  const second = `Opened ${info.testId}`;
+  for (const t of [first, second]) made.push(path.join(BOARDS, `${t}.md`));
+
+  /* C opens it, the caret in the title. */
+  await page.locator("[data-dag-tasks-filter]").evaluate((el) => (el as HTMLElement).blur());
+  await page.keyboard.press("c");
+  const dialog = page.locator("[data-dag-task-dialog]");
+  const title = page.locator("[data-dag-task-dialog-title]");
+  await expect(title).toBeFocused();
+  await title.fill(first);
+  await page.locator("[data-dag-task-dialog-description]").fill("Why it matters.\n\n- [ ] one step");
+  await page.locator("[data-dag-task-dialog-priority]").click();
+  await page.keyboard.press("2");
+  await expect(page.locator('[data-dag-task-dialog-priority="high"]')).toBeVisible();
+  await page.locator("[data-dag-task-dialog-keep]").check();
+  await title.press("Enter");
+  await expect
+    .poll(() =>
+      fs.existsSync(path.join(BOARDS, `${first}.md`)) ? fs.readFileSync(path.join(BOARDS, `${first}.md`), "utf8") : "",
+    )
+    .toMatch(/^---\nstatus: todo\npriority: high\nid: [0-9a-z]{10}\n---\nWhy it matters\.\n\n- \[ \] one step\n$/);
+  /* Kept open: the title and description are clean, the pills as they were. */
+  await expect(title).toHaveValue("");
+  await expect(page.locator("[data-dag-task-dialog-description]")).toHaveValue("");
+  await expect(page.locator('[data-dag-task-dialog-priority="high"]')).toBeVisible();
+
+  await title.fill(second);
+  await page.locator("[data-dag-task-dialog-open]").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/note=/);
+  await expect(page.locator("[data-dag-taskbar-priority]")).toHaveAttribute("data-dag-taskbar-priority", "high");
 });
 
 test("a refused create keeps the title, and the lock's pill is what says why", async ({ page }) => {

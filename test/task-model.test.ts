@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { indexedTask, taskFactsOf } from "@/note/task";
+import { blankDraft, newTaskName, newTaskText } from "@/ui/NewTask";
 import { dueText } from "@/ui/TaskGlyph";
 import { compareRecent, countLine, onTab, sinceText, tabOf } from "@/ui/taskModel";
 
@@ -122,5 +123,23 @@ describe("a due date in words", () => {
     expect(week).toMatch(/12/);
     expect(dueText("2026-11-25", "2026-11-15")).not.toMatch(/Wed/);
     expect(dueText("2027-01-03", "2026-11-15")).toMatch(/2027/);
+  });
+});
+
+describe("a task being made", () => {
+  it("is one text with every line it was given, and the description under them", () => {
+    const d = { ...blankDraft(), title: "  Ship it  ", priority: "high" as const, due: "2026-11-20" };
+    expect(newTaskText(d, "Why.\n\n- [ ] a\n\n")).toBe(
+      '---\ntitle: "Ship it"\nstatus: todo\npriority: high\ndue: 2026-11-20\n---\nWhy.\n\n- [ ] a\n',
+    );
+    expect(newTaskText({ ...blankDraft(null, "in-progress"), title: "Quick" })).toBe(
+      '---\ntitle: "Quick"\nstatus: in-progress\n---\n',
+    );
+  });
+
+  it("goes in its project's folder, named after its title", () => {
+    expect(newTaskName({ ...blankDraft(), title: "Book the room" })).toBe("book-the-room");
+    expect(newTaskName({ ...blankDraft("launch/launch"), title: "Book the room" })).toBe("launch/book-the-room");
+    expect(newTaskName({ ...blankDraft(), title: "!!!" })).toBe("untitled");
   });
 });
