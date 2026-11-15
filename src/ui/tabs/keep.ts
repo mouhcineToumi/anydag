@@ -106,36 +106,54 @@ function find(root: Element, path: readonly string[]): Element | null {
 
 /** How long a page that is still loading is given to grow tall enough to scroll back. */
 const RESTORE_MS = 3000;
+/**
+ * And how long a box put back is held there: a page's own first effects — a row scrolled into view,
+ * a field focused — run after the frame is mounted, and would otherwise move what was just restored.
+ */
+const SETTLE_MS = 600;
 
 /**
  * Put the boxes back where they were, as the page fills in: a page mounted again loads its file
- * first, so a box may not exist yet, or not be tall enough. Tries on every change under `root` until
- * each one is back, the time is up, or the person scrolls or presses something — what they do wins.
- * Returns the stop.
+ * first, so a box may not exist yet, or not be tall enough. Tries on every change under `root` and
+ * every frame until each one is back and has stayed back a moment, the time is up, or the person
+ * scrolls or presses something — what they do wins. Returns the stop.
  */
 export function restoreScroll(root: Element, kept: readonly KeptScroll[]): () => void {
-  let left = kept.slice();
-  if (!left.length) return () => {};
+  if (!kept.length) return () => {};
+  const began = performance.now();
+  let frame = 0;
   const attempt = () => {
-    left = left.filter((k) => {
+    let back = true;
+    for (const k of kept) {
       const el = find(root, k.path);
-      if (!el) return true;
-      el.scrollTop = k.top;
-      el.scrollLeft = k.left;
-      return Math.abs(el.scrollTop - k.top) > 1 || Math.abs(el.scrollLeft - k.left) > 1;
-    });
-    if (!left.length) stop();
+      if (!el) {
+        back = false;
+        continue;
+      }
+      if (el.scrollTop !== k.top) el.scrollTop = k.top;
+      if (el.scrollLeft !== k.left) el.scrollLeft = k.left;
+      if (Math.abs(el.scrollTop - k.top) > 1 || Math.abs(el.scrollLeft - k.left) > 1) back = false;
+    }
+    if (back && performance.now() - began > SETTLE_MS) stop();
+  };
+  const tick = () => {
+    attempt();
+    if (frame) frame = requestAnimationFrame(tick);
   };
   const watch = new MutationObserver(attempt);
   const timer = setTimeout(() => stop(), RESTORE_MS);
   const mine = { capture: true, passive: true } as const;
+  const asks = ["wheel", "pointerdown", "keydown", "touchstart"];
   function stop(): void {
     watch.disconnect();
     clearTimeout(timer);
-    for (const type of ["wheel", "pointerdown", "keydown", "touchstart"]) removeEventListener(type, stop, mine);
+    cancelAnimationFrame(frame);
+    frame = 0;
+    for (const type of asks) removeEventListener(type, stop, mine);
   }
-  for (const type of ["wheel", "pointerdown", "keydown", "touchstart"]) addEventListener(type, stop, mine);
+  for (const type of asks) addEventListener(type, stop, mine);
   watch.observe(root, { childList: true, subtree: true });
+  frame = requestAnimationFrame(tick);
   attempt();
   return stop;
 }
