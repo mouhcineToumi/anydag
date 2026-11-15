@@ -1,6 +1,6 @@
 # Tasks, projects and the calendar
 
-> A note with a `status:`, a folder with a `project:`, an event with a `start:`, and the calendar that draws them; the time-zone rules.
+> A note with a `status:`, a folder with a `project:`, a `tags:` on any document, an event with a `start:`, and the calendar that draws them; the time-zone rules.
 
 ## Tasks
 
@@ -81,8 +81,9 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `dag:tasks-view`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
 `tasks`.
 
-**Out, and why:** assignees, priorities, labels and reminders (each is a
-decision about who does what); a status set of a person's own (three fixed words are what the
+**Out, and why:** assignees, priorities and reminders (each is a
+decision about who does what); labels of a task's own (a task carries tags as every document does,
+*Tags* below, and a tag says what it is about, never who does it or how urgent it is); a status set of a person's own (three fixed words are what the
 columns are and what both parsers can be held to); sub-tasks as files (a check item in the
 description is one); and a manual order within a column (nothing stores one). Tasks are reached
 over MCP too: `task_list`, `task_create`, `task_set`.
@@ -134,10 +135,154 @@ Names claimed, grepped first: `dag-project*`, `dag-projectbar*`, `dag-sidebar__p
 `dag-tasks__project`, `data-dag-project*`, `data-dag-projectbar*`, `data-dag-projectline`,
 `data-dag-sidebar-project`, `data-dag-tasks-project`, and the query key `project`.
 
-**Out, and why:** tagging as membership (a reference links and does not enrol);
+**Out, and why:** tagging as membership (a reference links and does not enrol, and a tag — *Tags* below — groups documents without making any of them a project's);
 store-side folder metadata and a folder id (a note already is both); a project page beyond the note
 and its bar; and dates, owners and priorities. Projects are reached
 over MCP too: `project_list`, `project_create`, `project_set`.
+
+## Tags
+
+A **tag** is a word in a document's frontmatter `tags:` — a note, a task, an event, a board, a quiz
+or a table — with a colour, one of the ten hues. Tags group documents across folders, beside
+projects and independent of them (#327). Four design points: the frontmatter of every kind rather
+than a sidecar, one vault-wide tag list that holds the colours and syncs, a rename that rewrites
+every file through the ordinary write path, and creation where the tag is used.
+
+    ---
+    title: Q4 planning
+    tags: [meeting, pricing]
+    ---
+
+| Where | What it does with one |
+|---|---|
+| a note's, a task's or an event's own page | a *Tags* row with the other properties under the title (a plain note has one too): chips, and an editor that suggests tags and creates one inline |
+| a board, a quiz, a table | *Tags…* in the top bar's `⋯`, which opens the editor in a popover |
+| the sidebar | *Tags…* in every document row's menu, the same popover |
+| Settings → This vault → Tags | the tag manager: every tag with its colour and count, *Unused* last; recolour, rename (a rename onto an existing tag merges), delete |
+| the Tasks page | a *Tag* filter beside the project filter, `tag=<name>` or `tag=none`; a row shows up to two chips and an accessible *+n* |
+| the Calendar | the same filter, in its *Show* menu, over tasks, events and notes; no chips on items |
+| search | `tag=` keeps only hits in documents carrying the tag, and with no words lists them all; the card shows the filter as a chip |
+| `?view=1`, a snapshot, the PDF | the chips, read only, on the line above the text |
+
+Ten things are load-bearing:
+
+- **A tag is in the file, and only there.** Every kind already starts with a frontmatter block (a
+  board's `flow:` and `pages:`, a quiz's `shuffle:`), `parseBoard` ignores a key it does not know, and
+  the quiz and table parsers keep `front` byte for byte and never write it, so one key covers all
+  six. No SQLite table holds tags: a second copy would have to be reconciled with the files. A
+  sidecar per document (`.anydag/meta/<id>.json`) was turned down — tagging would mint an id first,
+  which is a write into the file anyway; a rename made outside the app would lose the link; sync
+  would carry two files; and `cat` would not show the tags. Attachments carry none.
+- **One parser reads tags and one writer changes them**, `tagsOf` and `withTags` in
+  `src/note/tags.ts` — no browser, no `@/` — which the page, the server, the CLI and the MCP tools
+  import, held to `test/fixtures/tags.json`. **Lenient, as Obsidian is:** a list in flow form
+  (`[a, b]`) or block form (`- a`, indented or at column 0), or a string split on commas and blanks
+  (`tags: a, b`, `tags: a b`); a leading `#` is dropped; a tag is letters, digits, `_`, `-` and `/`
+  with at least one that is not a digit (Obsidian's rule), and an entry that is not one is ignored.
+  **Case is ignored** — `Pricing` is `pricing` — and a `/` is a character, not a level: nested tags
+  are out. **The singular `tag:` is not read**: Obsidian dropped it, and reading it would be a second
+  key every write had to choose between. **An inline `#tag` in a note's text does not count**: a
+  rename would have to rewrite prose under the editor's one-block rule, and `#` is a heading, an
+  anchor, a hex colour and an issue number.
+- **A write touches the `tags:` line and the lines under it**, `withKeys`' rule, and every other
+  byte stays. A block list stays a block list at its indent; a flow list or a string is written as a
+  flow list, one line, which `merge3` can merge; a new key is a flow list; an entry YAML would read
+  as something other than a string (`yes`, `null`, `1e3`) is quoted; an entry that is not a valid tag
+  is kept byte for byte; nothing a write was not asked to remove is dropped. Taking the last tag off
+  removes the line, and a block that leaves empty goes. A board that gains a frontmatter keeps the
+  blank line after it (`withTitle`'s board rule).
+- **A colour is one of the ten theme hues**, the palette of a project's `hue:`, drawn as
+  `var(--dag-color-hues-<hue>)`, so a theme restyles tags and no literal is added. **A tag nobody
+  registered gets a default derived from its name** — a stable hash over `HUE_ORDER`
+  (`defaultHue`), the same on every device, in the CLI and over MCP — and nothing is written for it.
+- **`.anydag/tags.json` is the tag list**, `{"meeting": {"hue": "coral"}}`, keyed by the tag's
+  name as it was registered and read ignoring case. A tag **exists** when a document carries it or
+  the list registers it. It is **registered** when somebody creates it — typed as a new name in any
+  document's Tags, or a name the vault has never seen given to MCP `tag_apply` — or recolours it, and
+  it stays listed after the last document drops it, as *Unused*, sorted last. **The file is written
+  only then, so opening a vault writes nothing.** It syncs (`ALLOWED_IN_ANYDAG`) and merges by key
+  with `mergeKeys`, `.anydag/settings.json`'s rule, so two devices recolouring two tags keep both and
+  the same tag recoloured on both is the remote's. Every write to it is one function
+  (`server/tags.ts`) that reads the file, changes one key and writes back only while the file still
+  has the sha1 it read (`writeRawIf`), trying again on a mismatch, so a pull or a hand edit in
+  between is never overwritten. The watcher raises **`dag:tags`** when it changes, from anywhere, and
+  every page reads the list again. Turned down: `dag:tag-colors` in `.anydag/settings.json` (the page
+  writes that bundle whole with no base, so an open Settings tab could wipe a colour an agent had just
+  set, and a map under one key merges as one value), and the app home (colours would differ between
+  machines).
+- **The listing carries tags, as it carries `task`.** `frontOf` reads them for every text kind,
+  kept against the file's stamp; `Tree.tags` maps a name to its tags; the kept listing (#280) holds
+  them, so a warm listing costs only what changed. `/__board/list` answers `tags`, every document
+  event on the change feed carries them so a row redraws in place, and `/__board/index`'s docs carry
+  them — that answer is cached in `parse.sqlite` under the build that cut it, so an older build's
+  rows are dropped and parsed again, and nothing migrates. **`GET /__board/tags`** is the list:
+  `[{name, hue, registered, count, kinds}]`, every tag a document carries and every registered one
+  (`count: 0` is *Unused*); `name` is the registered spelling, else the most common one, and
+  `registered: false` means the hue is the default.
+- **A template's tags are the notes' it makes**, so a template is left out of counts and filters, as
+  it is left out of `tasks` — and a rename or delete still rewrites it, so a new note does not bring
+  the old tag back.
+- **A rename or a delete rewrites every file, and rolls nothing back.** `POST /__board/tags/rename
+  {from, to}` and `/delete {tag}` take the documents carrying the tag from the listing and rewrite
+  each with `recompute()`, `server/relink.ts`'s pattern: an ordinary write under the text's sha1, a
+  409 recomputed from the text that beat it, four tries. A file that keeps changing is answered in
+  `{files, missed}` — a rollback would be more writes that could meet a 409, undoing work that landed —
+  and until it is finished the vault honestly holds both tags. **Both are idempotent**: a file that
+  already has `to`, or no longer has `from`, needs nothing, so *Try again* sends the same request.
+  **Renaming onto a tag that exists merges them**, one entry per document, after the manager asks.
+  **The colour moves at the start**: `to` is registered with `from`'s hue unless it has its own,
+  which wins, so a partial rename does not repaint 41 documents in a default; `from`'s entry is
+  dropped once `missed` is empty, and so is a deleted tag's. **Deleting a tag no document carries**
+  rewrites nothing, drops the entry and offers *Undo*, which puts it back with its hue. The lock
+  refuses all of them; called from the Assistant they run inside the request, so the chat's undo
+  covers them (`chat/record.ts`), as it covers a relink.
+- **A tag is made where it is used.** The editor is an ARIA 1.2 combobox (`aria-expanded`,
+  `aria-controls`, `aria-activedescendant`): typing suggests tags with their dots, *Unused* ones last;
+  Enter takes the highlighted row, so an existing spelling wins; Backspace in an empty field removes
+  the last chip. A name that matches nothing ends the list with **Create tag "…"** — an `option`
+  named with its colour, *Create tag roadmap, colour Spruce, default* — over a `radiogroup` of the ten
+  swatches with the default selected: Enter creates it with the selected one, a click on a swatch
+  with that one, and either way the tag is added and registered at once, the field empties and keeps
+  the focus. **Names are prevented from going wrong rather than refused**: a typed space is written
+  as `-`, a pasted list is a tag per item, a leading `#` is dropped, and the one refusal left, a name
+  of digits only, offers the fix (*A tag needs a letter. Use q-2026?*). **A typo does not stick**: a
+  tag created and removed again in one editing session, and carried by no other document, is
+  unregistered. **A chip's dot recolours the tag**, through the same swatches and *Use the default
+  colour*. The suggestion list and every picker are on the popover layer, anchored to their field.
+- **Every swatch is one component**, a 16px dot in a 24px hit box, 44px under 720px where a strip
+  wraps to two rows of five — and `dag-projectbar__hue` moved onto it, so the project picker has the
+  same targets. A chip's 8px dot has a 24px hit area, and under 720px a tap anywhere on an editable
+  chip but its × opens the picker. *+n* on a Tasks row is a focusable chip named *2 more tags:
+  meeting, design* whose names are in the drawn `Tooltip`, never a `title`; under 720px it is a 44px
+  target that opens a popover listing them.
+
+A chip is a pill: `--dag-color-paper100` ground, `--dag-color-outlineSoft` border, `ink` text at
+`--chrome-text-sm` and the hue only in its dot, so its contrast passes in every theme without
+measuring ten hues. The manager has no *New tag* button — its hint says to create a tag where it is
+used — and each row is the dot (the picker), the name, the count or *Unused* in `slate`, and a quiet
+`⋯` with *Rename* (in place; onto an existing tag it asks *Merge into "pricing"?*) and *Delete…*,
+whose dialog says *Remove "meeting" from 12 documents? Each of the 12 documents keeps everything
+else; only "meeting" is taken off.* A partial result is the notice *Renamed in 41 of 42 documents.
+"Q4 plan" kept changing.* with **Try again**.
+
+Tags are reached over MCP: `tag_list` (`GET /__board/tags`, and with `tag` the documents carrying
+it), `tag_apply` (add and remove on one document of any kind; a name the vault has never seen is
+registered, with `hue` or its default), `tag_rename`, `tag_delete` (both answer `{files, missed}`) and
+`tag_color` (`null` resets to the default and keeps the tag registered; only `tag_delete` unregisters
+one). The `*_list` and `*_read` tools, `task_list` and `event_list` report `tags`; `task_list`,
+`event_list` and `search` take a `tag`; `note_create`, `task_create` and `event_create` take `tags`.
+There is no `anydag` command: a tag is finer than a whole file (*The command line*), and the CLI reads
+them back through `anydag ls --json` and `<kind> cat`.
+
+Names claimed, grepped first: `dag-tag*`, `dag-tags*`, `dag-tagedit*`, `dag-swatch*`,
+`data-dag-tag*`, `data-dag-tags*`, `data-dag-swatch*`, `data-dag-setting-tags*`, the Settings tab
+`tags`, the query key `tag`, and the event `dag:tags`. The icon is the existing `tags`.
+
+**Out, and why:** any change to projects (a tag never enrols a document in one, and #82 decides
+whether tags replace them); nested tags; an inline `#tag`; tags on attachments, on a quiz question or
+on a table row; choosing several tags in one filter (one, every or none, as the project filter);
+saved views and a tag filter on the Quizzes page; a colour per document; and tag dots on calendar
+items, which are too small for them.
 
 ## The calendar
 

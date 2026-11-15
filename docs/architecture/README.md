@@ -17,7 +17,7 @@ the file for that area, not to a new place.
 | [`things-that-will-bite.md`](things-that-will-bite.md) | The long list of traps found the hard way, each with the defect that found it. Read before touching the area it names. |
 | [`design-and-layout.md`](design-and-layout.md) | Design rules, the three ELK knobs and the six layouts that are not ELK's, what `data-dag-ready` means, and what was refused. |
 | [`notes.md`](notes.md) | The `.note.md` format, the block editor that never writes a byte, the two writers and the merge; TeX between dollars. |
-| [`tasks-projects-calendar.md`](tasks-projects-calendar.md) | A note with a `status:`, a folder with a `project:`, an event with a `start:`, and the calendar that draws them; the time-zone rules. |
+| [`tasks-projects-calendar.md`](tasks-projects-calendar.md) | A note with a `status:`, a folder with a `project:`, a `tags:` on any document, an event with a `start:`, and the calendar that draws them; the time-zone rules. |
 | [`quizzes.md`](quizzes.md) | The `.quiz.md` format, the runner, Mistakes and the practice record. |
 | [`tables.md`](tables.md) | The `.table.md` format: tabs, typed cells, the smallest-span writers, sort and filter, CSV. |
 | [`attachments.md`](attachments.md) | Any file kept in the vault: ids, previews, what the server serves inline, the zip export. |
@@ -112,6 +112,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The api server | [`api.md`](api.md) |
 | The bench | [`limits.md`](limits.md) |
 | Tables | [`tables.md`](tables.md) |
+| Tags | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Tasks | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Text emphasis | [`editing.md`](editing.md) |
 | The Assistant | [`assistant.md`](assistant.md) |

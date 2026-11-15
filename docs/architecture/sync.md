@@ -63,7 +63,9 @@ Seventeen things are load-bearing:
 - **A conflict is visible**: ours stays at the path and theirs is written beside it as
   `<stem> (conflict <device> <YYYY-MM-DD HH.mm>)<suffix>`, keeping its id unless ours has the same
   one. Text merges with `merge3` first; a merged board, quiz or table that would not parse is not a
-  merge; `.anydag/settings.json` merges by key (`src/settings/merge.ts`).
+  merge; `.anydag/settings.json` and `.anydag/tags.json` — the vault's tag list and their colours,
+  *Tags* in [`tasks-projects-calendar.md`](tasks-projects-calendar.md) — merge by key
+  (`src/settings/merge.ts`), so two devices recolouring two tags both keep their change.
 - **Two devices settle a duplicate id the same way**: the known path only in a vault that has never
   synced (`syncs:<vault>` in the index), else the earlier `created`, else the path in code-point
   order, so a file-manager copy made in its original's second is decided by path: a rule reading

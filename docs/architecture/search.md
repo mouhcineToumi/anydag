@@ -151,6 +151,13 @@ Names claimed, grepped first: `dag-hit*`, `dag-hits*`, `data-dag-hit*`, `data-da
 and `data-dag-hits-new-board` / `-note`, inside them, because `data-dag-new-note` is the notes' claim), `dag-board__also`, the event `dag:target` (in `test/prefs.test.ts`'s list of events, which is what caught
 it), and the highlight name `dag-found`.
 
+**A search can be filtered to one tag** (#327): `GET /__board/search?q=…&tag=<name>` keeps only
+the hits in documents carrying the tag, and `q` may be empty when a tag is given, which lists every
+document carrying it, by title. The filter is applied on the server from the listing's `tags`, so
+the page still holds no text; it is not a unit, so searching the word *meeting* does not turn up
+every document tagged `meeting`. The card shows the filter as a chip beside the box, and MCP's
+`search` takes the same `tag`. See *Tags* in [`tasks-projects-calendar.md`](tasks-projects-calendar.md).
+
 **Out, and why:** a match inside a diagram opening on its card rather than on the diagram (a card's
 id is the dialect's, and framing one needs the layout's box, which `App` has but a result cannot
 name without a grammar for it); an agent's search tool over MCP (`/__board/corpus` is there, and a
