@@ -554,6 +554,62 @@ test("a favourite is kept above the files, opens, follows a rename, and comes ou
   await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(0);
 });
 
+test("a favourite's row is a row, and one, two or five of them leave the section unscrolled", async ({ page }) => {
+  /* Five files to favourite: the three this file makes, and two more in the same folder. */
+  const extra = [`${folder}/four`, `${folder}/five`];
+  for (const name of extra) fs.writeFileSync(path.join(BOARDS, `${name}.board.md`), BOARD(name));
+  await fresh(page);
+
+  const favourite = (name: string) => page.locator(`[data-dag-sidebar-favourite="${name}"]`);
+  const all = page.locator("[data-dag-sidebar-favourite]");
+  const section = page.locator(".dag-sidebar__favs");
+
+  const mark = async (name: string) => {
+    await clickOnHover(page, `[data-dag-sidebar-file="${name}"]`, `[data-dag-sidebar-more="${name}"]`);
+    await page.locator('[data-dag-sidebar-menu-item="favourite"]').click();
+    await expect(favourite(name)).toHaveCount(1);
+  };
+  const unmark = async (name: string) => {
+    await clickOnHover(page, `[data-dag-sidebar-favourite="${name}"]`, `[data-dag-sidebar-unfavourite="${name}"]`);
+    await expect(favourite(name)).toHaveCount(0);
+  };
+
+  for (const name of [board(), other(), note(), ...extra]) await mark(name);
+  await expect(all).toHaveCount(5);
+
+  /*
+   * A row is 30px wherever the column draws one — the tree's row, and a favourite's. It is measured
+   * with the pointer on it, because the 24px remove button that lives in it is what used to hang
+   * below a 16px line and turn `.dag-sidebar__favs` into a scroll container (#319). One, two and
+   * five favourites all leave that section with no overflow.
+   */
+  const check = async (count: number) => {
+    await expect(all).toHaveCount(count);
+    await fileRow(page, board()).scrollIntoViewIfNeeded({ timeout: 1_000 });
+    const tree = (await fileRow(page, board()).boundingBox())!.height;
+
+    /* Away from the column, then on the row with a real move, so its own controls are up as a
+       person would see them — and the row is the same height in both states. */
+    await page.mouse.move(900, 600);
+    expect((await favourite(board()).boundingBox())!.height).toBe(tree);
+    const at = (await favourite(board()).boundingBox())!;
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await expect(page.locator(`[data-dag-sidebar-unfavourite="${board()}"]`)).toBeVisible();
+    expect((await favourite(board()).boundingBox())!.height).toBe(tree);
+    const { clientHeight, scrollHeight } = await section.evaluate((el) => ({
+      clientHeight: el.clientHeight,
+      scrollHeight: el.scrollHeight,
+    }));
+    expect(scrollHeight).toBe(clientHeight);
+  };
+
+  await check(5);
+  for (const name of [note(), ...extra]) await unmark(name);
+  await check(2);
+  await unmark(other());
+  await check(1);
+});
+
 test("the open file's row keeps its actions, and a favourite its star, without a hover", async ({ page }) => {
   await fresh(page);
   const more = (name: string) => page.locator(`[data-dag-sidebar-more="${name}"]`);
