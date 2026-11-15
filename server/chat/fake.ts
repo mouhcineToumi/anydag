@@ -13,6 +13,7 @@
  *     embed <note> <board>       embed a board in a note, on a line of its own at its foot
  *     delete <name>              delete a note (waits for approval)
  *     read <name>                read a note and cite it
+ *     subject                    say the chat's subject, as the system prompt names it
  *     vault <id> [edit]          ask for another vault
  *     note@<vault> <name> <text…>   make a note in another vault
  *     wait                       hang until stopped
@@ -135,6 +136,13 @@ export function fakeHarness(provider: Provider): Harness {
               const r = await call("note_read", "GET", `/__board/get?name=${encodeURIComponent(rest[0]!)}&kind=note`);
               const id = r.json?.id;
               said.push(r.ok ? `It says: ${String(r.json.text).trim()} — [${rest[0]}](dag:${id}).` : `No note ${rest[0]}.`);
+              break;
+            }
+            case "subject": {
+              /* What the turn was told the chat is about: a test of this is a test that the page's
+                 chip reached the harness, through the route, the store and the prompt. */
+              const line = o.system.split("\n").find((l) => l.startsWith("The person started this chat on"));
+              said.push(line ?? "This chat has no subject.");
               break;
             }
             case "vault": {

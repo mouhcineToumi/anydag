@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { AssistantError, answerStep, grantVault, makeChat, sayTurn, stopTurn, undoBlock } from "./api";
 import { Composer, type Choice } from "./Composer";
+import type { ChipDoc } from "./DocChip";
 import { BlockCard, Empty, Turns, type Actions } from "./Thread";
 import type { Mode } from "./types";
 import { useChat, useModels } from "./useChat";
@@ -22,6 +23,7 @@ export function ChatSurface({
   autofocus,
   changes,
   welcome,
+  beside,
 }: {
   id: string | null;
   chat: ReturnType<typeof useChat>;
@@ -33,6 +35,8 @@ export function ChatSurface({
   changes?: boolean;
   /** A page with no chat yet: greet the person and centre the composer, rather than show an empty thread. */
   welcome?: boolean;
+  /** The document open beside a panel: what a chat started here works on (#323). The page has none. */
+  beside?: ChipDoc | null;
 }) {
   const models = useModels();
   const [sending, setSending] = useState(false);
@@ -41,6 +45,23 @@ export function ChatSurface({
   const idRef = useRef(id);
   idRef.current = id;
   useEffect(() => setNotice(null), [id]);
+
+  /*
+   * The chat's subject (#323): the document a chat started here works on, shown as a chip above
+   * the field. A chat that exists says its own (`meta.subject`, which the server keeps); one that
+   * does not yet is about the document open beside the panel. Removing the chip is said with the
+   * next message — `subject: null`, the whole vault again — so it writes nothing on its own, and it
+   * carries over the first message making the chat, which is why it is forgotten only on a move to
+   * another chat, never on the move from none to the one just made.
+   */
+  const [dropped, setDropped] = useState(false);
+  const was = useRef(id);
+  useEffect(() => {
+    if (was.current !== null && was.current !== id) setDropped(false);
+    was.current = id;
+  }, [id]);
+  const kept = chat.meta?.subject ?? null;
+  const subject: ChipDoc | null = dropped ? null : id ? kept : (beside ?? null);
 
   const say = (e: unknown) => setNotice(e instanceof AssistantError || e instanceof Error ? e.message : "that did not work");
 
@@ -65,15 +86,24 @@ export function ChatSurface({
       setNotice(null);
       setSending(true);
       try {
+        const fresh = idRef.current === null;
         const to = await ensure(c);
-        await sayTurn({ id: to, text, provider: c.provider, model: c.model, effort: c.effort || null });
+        /* A new chat names the document it was started on; an old one says only a change. */
+        const about = fresh
+          ? beside
+            ? { subject: dropped ? null : { name: beside.name, kind: beside.kind } }
+            : {}
+          : dropped && kept
+            ? { subject: null }
+            : {};
+        await sayTurn({ id: to, text, provider: c.provider, model: c.model, effort: c.effort || null, ...about });
       } catch (e) {
         say(e);
       } finally {
         setSending(false);
       }
     },
-    [ensure],
+    [ensure, beside, dropped, kept],
   );
 
   const grant = useCallback(
@@ -150,6 +180,8 @@ export function ChatSurface({
       onSend={(t, c) => void send(t, c)}
       onStop={() => id && void stopTurn(id).catch(say)}
       onGrant={(c, v, m) => void grant(c, v, m)}
+      subject={subject}
+      onDropSubject={() => setDropped(true)}
     />
   );
   const column = (
@@ -161,7 +193,9 @@ export function ChatSurface({
       {first ? (
         <div className="dag-chat-welcome" data-dag-chat-welcome="">
           <h1 className="dag-chat-welcome__title">What can I help you with?</h1>
-          <p className="dag-chat-welcome__line">Ask about this vault, or ask for a change.</p>
+          <p className="dag-chat-welcome__line">
+            {subject ? `Ask about “${subject.title}”, or ask for a change.` : "Ask about this vault, or ask for a change."}
+          </p>
           {noticeLine}
           {composer}
         </div>

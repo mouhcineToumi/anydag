@@ -11,6 +11,7 @@ import { ExternalLink, MessageSquarePlus, X } from "lucide-react";
 
 import { startDrag } from "@/ui/pointerDrag";
 
+import type { ChipDoc } from "./DocChip";
 import { closeAssistant, showChat, usePanel } from "./panelState";
 import { NEW_CHAT } from "./Page";
 import { ChatSurface } from "./Surface";
@@ -39,9 +40,12 @@ const BIG_STEP = 64;
 export function AssistantPanel({
   onOpen,
   onPage,
+  beside,
 }: {
   onOpen(kind: "board" | "note" | "quiz" | "table", name: string): void;
   onPage(chat: string): void;
+  /** The document open beside the panel, which a chat started here works on (#323); `null` on a page that is not one. */
+  beside: ChipDoc | null;
 }) {
   const { chat: id } = usePanel();
   const chats = useChats();
@@ -176,7 +180,9 @@ export function AssistantPanel({
           <X {...ICON} aria-hidden="true" />
         </button>
       </header>
-      {chat.missing ? null : <ChatSurface id={id} chat={chat} onId={showChat} onOpen={onOpen} autofocus welcome={id === null} />}
+      {chat.missing ? null : (
+        <ChatSurface id={id} chat={chat} onId={showChat} onOpen={onOpen} autofocus welcome={id === null} beside={beside} />
+      )}
     </aside>
   );
 }

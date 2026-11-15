@@ -7850,6 +7850,15 @@ html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
 .dag-chat-composer__input--tall { min-height: 320px; max-height: 60vh; }
 .dag-chat-composer__input::placeholder { color: var(--dag-color-slate); }
 .dag-chat-composer__why { margin: 0; font-size: var(--dag-ui-text-sm); color: var(--dag-color-dangerText); }
+/* The documents a message is about, above the field: the chat's subject (#323), and the `@` mentions
+   to come. A chip is a pill on the paper, quieter than the field it sits on; its remove button is the
+   small icon button, with the chip's padding taken in on that side so the glyph sits centred. */
+.dag-chat-composer__docs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.dag-chat-docchip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; height: 28px; padding: 0 10px; box-sizing: border-box; font-size: var(--dag-ui-text-sm); color: var(--dag-color-ink); background: var(--dag-color-paper100); border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-pill); }
+.dag-chat-docchip > svg { flex: none; color: var(--dag-color-slate); }
+.dag-chat-docchip__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-chat-docchip:has(.dag-chat-docchip__remove) { padding-right: 2px; }
+.dag-chat-docchip__remove { flex: none; border-radius: var(--dag-ui-radius-pill); }
 /* One row: scope, then model, effort, expand and Send pushed to the right. Each control can shrink and
    ellipsize rather than wrap, so a long vault or model name reads shorter instead of pushing Send onto
    a second line. `field-sizing` sizes a select to what it shows rather than its widest option, where

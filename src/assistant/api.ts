@@ -4,7 +4,7 @@
  * it, and a chat is found by its id in whichever open vault holds it.
  */
 
-import type { ChatMeta, ChatRead, ChatRow, Mode, Provider, ProviderModels, Turn, UndoRecord } from "./types";
+import type { ChatMeta, ChatRead, ChatRow, DocKind, Mode, Provider, ProviderModels, Turn, UndoRecord } from "./types";
 
 /** A refused request, with the server's own words and its `code` when it gave one. */
 export class AssistantError extends Error {
@@ -57,6 +57,8 @@ export interface TurnAsk {
   model?: string;
   /** `null` is the harness's own; absent leaves what the chat had. */
   effort?: string | null;
+  /** The document the chat works on (#323): `null` drops the chat's, absent keeps it. */
+  subject?: { name: string; kind: DocKind } | null;
 }
 
 export const sayTurn = async (ask: TurnAsk): Promise<Turn> => (await call<{ turn: Turn }>("/__board/chat/turn", ask)).turn;
