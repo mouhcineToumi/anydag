@@ -30,7 +30,8 @@ Nine things are load-bearing:
   its frontmatter; an attachment's is `<vault>/.anydag/files/<id>.json`; a vault's own id and
   settings are in `<vault>/.anydag/`. The SQLite file in the app's home maps id → path, created,
   title and kind so the app, the CLI and MCP agree without walking the vault, and it is an index:
-  delete it and the next open rebuilds it, losing practice records and nothing else. Beside it,
+  delete it and the next open rebuilds it, losing practice records and each vault's saved tabs
+  (`/api/tabs`, `sidebar.md`) and nothing else. Beside it,
   `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1: delete it and the
   next question parses the vault again. **SQLite is never in the vault**, because a sync tool copies
   a database while it is written.

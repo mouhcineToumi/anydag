@@ -377,7 +377,7 @@ const NO_BOARDS: BoardTree = {
 export type KindLists = Pick<BoardTree, "boards" | "notes" | "quizzes" | "tables" | "files">;
 
 /** The names of one kind of file in a tree. The one place a kind picks its list. */
-function namesOf(tree: KindLists, kind: FileKind): string[] {
+export function namesOf(tree: KindLists, kind: FileKind): string[] {
   switch (kind) {
     case "board":
       return tree.boards;

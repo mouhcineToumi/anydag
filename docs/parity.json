@@ -109,6 +109,14 @@
       "mcp": ["settings"]
     },
     {
+      "id": "vault.tabs",
+      "area": "Vaults",
+      "what": "The window's document tabs in a vault, and which is in front — kept in the app's home, restored when the window opens",
+      "rest": ["GET /api/tabs", "PUT /api/tabs"],
+      "cli": {"admin": false},
+      "mcp": {"refused": "Which documents a window has open is the person's window; an agent opens a document by the url every document tool returns."}
+    },
+    {
       "id": "vault.transfer",
       "area": "Vaults",
       "what": "Move a file, or a folder whole, to another open vault",

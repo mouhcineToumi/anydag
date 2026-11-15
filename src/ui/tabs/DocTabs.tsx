@@ -105,6 +105,17 @@ export function DocTabs({ tabs, active, titles, onSwitch, onClose, onCloseOthers
       setMenu({ id, at: { x: r.left, y: r.bottom }, from: e.currentTarget });
       return;
     }
+    /* Delete closes the focused tab, the WAI pattern's key for a tab that can be closed; the focus
+       goes to the tab that takes its place. */
+    if (e.key === "Delete" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      /* Not the board's Delete as well, which would take its selection with it. */
+      e.preventDefault();
+      e.stopPropagation();
+      const after = tabs.list[at + 1] ?? tabs.list[at - 1];
+      onClose(id);
+      if (after) requestAnimationFrame(() => focusTab(after.id));
+      return;
+    }
     const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!dir) return;
     e.preventDefault();
@@ -195,11 +206,14 @@ export function DocTabs({ tabs, active, titles, onSwitch, onClose, onCloseOthers
                 <TabMark place={tab.place} />
                 <span className="dag-doctabs__label">{label}</span>
               </button>
+              {/* The pointer's way to close. A tablist may hold only tabs, so it is out of the
+                  accessibility tree and out of the Tab order: from the keyboard, Delete on the tab,
+                  Ctrl/⌘+W, or the tab's menu close it. */}
               <button
                 type="button"
                 className="dag-doctabs__close"
                 data-dag-doctab-close={tab.id}
-                aria-label={`Close ${label}`}
+                aria-hidden="true"
                 title={`Close ${label}`}
                 tabIndex={-1}
                 onClick={() => onClose(tab.id)}

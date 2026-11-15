@@ -52,6 +52,7 @@ import { desktop } from "./vault/desktop";
 import { setLocale } from "./locale";
 import { settleVault, watchVault } from "./vault/current";
 import { installHistory } from "./ui/history";
+import { openSavedTabs } from "./ui/tabs/saved";
 import { watchTextSize } from "./ui/textSize";
 import { watchWindowInset } from "./ui/windowInset";
 import "./styles/base.css";
@@ -198,6 +199,14 @@ async function start(): Promise<void> {
   const Page: ComponentType | null = !account
     ? null
     : await (id ? topPage(new URLSearchParams(location.search).get("view") === "1") : noVaultPage()).catch(failed);
+
+  /* The document tabs this window had in this vault, before the first render: the page drawn first
+     is the one that was in front, and in a new window a bare address takes its place
+     (`src/ui/tabs/saved.ts`). A snapshot and a read-only view are one page, and keep no tabs. */
+  {
+    const q = new URLSearchParams(location.search);
+    if (id && q.get("view") !== "1" && q.get("snapshot") !== "1") await openSavedTabs();
+  }
 
   /* The window's history, marked before the first render so Back/Forward know where they are and
      the desktop's keys are the first listener the window has. A read-only view is not the app's

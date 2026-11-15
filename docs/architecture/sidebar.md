@@ -66,9 +66,9 @@ Fifteen things are load-bearing:
   (`practice.ts`) — and `installUpdate` awaits `flushPending()` before it asks the shell to quit. A
   board's own edits commit when the gesture ends, and a card being typed in commits when the click
   on the button takes its focus. A click flushes, then calls `install()`, and the button says
-  *Restarting…* and cannot be pressed twice. The tabs and open documents come back because they are
-  the page's own `localStorage` and the vault's own files. `pagehide` is still the net under all of
-  it: each of those writers also sends what it holds as the window goes.
+  *Restarting…* and cannot be pressed twice. The tabs come back from where they are kept (*Where the
+  tabs are kept, and their files*) and the documents from the vault's own files. `pagehide` is still
+  the net under all of it: each of those writers also sends what it holds as the window goes.
 - **The tree is flat rows with a depth**, `rows()` in `src/ui/tree.ts`, rather than nested
   elements: `aria-level`, `aria-setsize` and `aria-posinset` are said on each row, the keyboard walks
   the rows in order (the WAI tree pattern: arrows, Home, End, → into a folder, ← to its parent, F2 to
@@ -667,6 +667,11 @@ is `TasksMenu`: *Close*, *Close others* and *Reopen closed tab*. Closing others 
 to the kept tab when it was not in front; each tab it closed comes back with Ctrl/⌘+Shift+T, the last
 closed first. Twenty closed tabs are remembered (`CLOSED_LIMIT`); a closed Home is not one of them.
 
+**A tablist holds only tabs**, so a tab's `×` is the pointer's alone: `aria-hidden` and out of the
+Tab order, beside the tab rather than in it. From the keyboard **Delete on the focused tab closes
+it**, the WAI pattern's key for a tab that can be closed, and the focus goes to the tab that takes
+its place; Ctrl/⌘+W and the menu's *Close* do the same. axe holds this wherever two tabs are open.
+
 ### What a tab keeps while another is in front
 
 `src/ui/tabs/keep.ts`, and `TabFrame` in `App`. **Two ways, by what the page costs to build again.**
@@ -699,3 +704,45 @@ return with no 409 to answer. `e2e/doctabs-state.spec.ts` holds all of this.
 to the front once, and compares the renderer's JS heap after a forced collection with one note's:
 22.2 MB → 25.3 MB, ×1.14, held at ×1.5. The DOM's node count goes ×2.5 (892 → 2236), the three
 editors kept behind. Closing a tab forgets what it kept.
+
+### Where the tabs are kept, and their files
+
+`src/ui/tabs/saved.ts`, the routes in `server/routes/meta.ts`, and `useTabFiles` in `App`.
+
+**In the app's home, never in the vault.** `GET`/`PUT /api/tabs` keep a vault's tabs in the home's
+`kv` as `tabs:<vault id>` (a 64 KB cap; `null` forgets them), and `rekeyVault` carries them when a
+copied folder is given a new id. The vault holds the person's documents and goes wherever a sync
+takes it; which of them one window had open is not one of them. **With the settings' sync off**
+(`dag:sync`) the page keeps nothing of its own in the home, and the tabs are kept in its own storage
+under the vault's key (`scopedKey("dag:tabs")`), as every preference is then — which is also why
+each e2e context starts with none. A snapshot and `?view=1` neither read nor keep them. The write is
+half a second after the last change and the same set is not written twice; `pagehide` sends what is
+waiting. **Switching tabs is a write to the home, never to a file.**
+
+**Opening the window.** `main.tsx` awaits `openSavedTabs()` before the history is installed and the
+first render, so the first page drawn is the one that was in front:
+
+- a reload is the tab that was in front, whose place the address already is;
+- a bare address in a **new window** — a launch, a new browser tab — is the tab that was in front,
+  and takes its place: the app carries on where it was left;
+- a bare address in a window the app is already in is **Home**, as it always was — the Home tab the
+  set has, or a new one beside the tab that was in front. A window is told apart by a mark in its
+  `sessionStorage` (`dag:tabs-window`), which a reload and a link keep and a new window has not;
+- a link to a document a tab holds brings that tab to the front;
+- a link to any other is a new tab beside the one that was in front, the rest kept.
+
+**A tab knows its file by id.** What is saved of a tab is its place and, when the listing gave one,
+its file's id (`TabFiles`; the index gives every listed file an id without writing it). On each
+fresh listing `reconcile` looks at every tab whose name the listing no longer has:
+
+| The listing has | The tab |
+|---|---|
+| its id, under another name of the same kind | **follows it**: the tab in front by `replaceState`, one behind by its place |
+| neither, and the tab was restored | is **dropped without a word** — it was never drawn this run |
+| neither, and the tab is behind | is **closed and says why**: a toast that names it, with *View trash* when the trash has it (`data-dag-doctabs-closed="trash"`) and *its file is gone* when not |
+| neither, and it is the tab in front | is left to its page, which already says the file is gone or trashed and offers the way back (`file-problem`) |
+
+The tab the address named is never dropped quietly, for the same reason: a link to a file that is
+gone draws the page that says so, not some other tab. No request is made to ask about a missing
+file, so a listing a round trip behind costs nothing; a tab whose file was never seen by id (one
+made a moment ago) is left alone until it has been. `e2e/doctabs-restore.spec.ts` holds this.

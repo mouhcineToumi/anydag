@@ -171,7 +171,10 @@ export class Home {
       this.sql("update docs set vault = ? where vault = ?").run(newId, oldId);
       this.sql("update practice set vault = ? where vault = ?").run(newId, oldId);
       this.sql("update vaults set id = ? where id = ?").run(newId, oldId);
-      // `digest:<vault>:<doc>` is the only kv key that embeds a vault id (`Vault.digestKey`).
+      // `tabs:<vault>` is the window's document tabs in that vault (`/api/tabs`): the same vault.
+      this.sql("delete from kv where key = ?").run(`tabs:${newId}`);
+      this.sql("update kv set key = ? where key = ?").run(`tabs:${newId}`, `tabs:${oldId}`);
+      // `digest:<vault>:<doc>` is the other kv key that embeds a vault id (`Vault.digestKey`).
       const keys = this.sql("select key from kv where key like ?").all(`digest:${oldId}:%`) as { key: string }[];
       for (const { key } of keys) {
         this.sql("update or replace kv set key = ? where key = ?").run(

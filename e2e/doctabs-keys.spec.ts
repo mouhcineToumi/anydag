@@ -140,4 +140,10 @@ test("a tab's menu closes the others, each of which can come back", async ({ pag
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(tab(page, "C")).toBeFocused();
+
+  /* Delete closes the focused tab, and the focus goes to the one that takes its place. */
+  await tab(page, "B").focus();
+  await page.keyboard.press("Delete");
+  await expect(tabs(page)).toHaveText(["A", "C"]);
+  await expect(tab(page, "C")).toBeFocused();
 });
