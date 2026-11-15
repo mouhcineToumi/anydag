@@ -81,7 +81,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every task, with its status, due date and project | `GET /__board/list` | · | `task_list` |
+| Every task, with its status, due date, project and tags; one project, status or tag | `GET /__board/list` | · | `task_list` |
 | Make a task | `POST /__board/create` | · | `task_create` |
 | Change a task's status, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
 
@@ -89,7 +89,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every event, with when it starts and ends, soonest first | `GET /__board/list` | · | `event_list` |
+| Every event, with when it starts and ends, soonest first; one project or tag | `GET /__board/list` | · | `event_list` |
 | Make an event: a note with a start and an end | `POST /__board/create` | · | `event_create` |
 | Move an event, or make a note an event and back | `POST /__board/event` | · | `event_set` |
 

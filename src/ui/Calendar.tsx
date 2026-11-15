@@ -81,6 +81,8 @@ import { startDrag } from "./pointerDrag";
 import { TaskGlyph } from "./TaskGlyph";
 import { IconButton, Switch } from "./controls";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
+import { tagMatches, type TagFilter } from "./tagFilter";
+import { TagSelect } from "./tags/TagFilter";
 import { collation } from "@/locale";
 
 /**
@@ -218,6 +220,8 @@ export function CalendarView({
   onHidden,
   scope,
   onScope,
+  tagFilter = { kind: "all" },
+  onTagFilter,
   onGo,
   onOpen,
   onDuplicate,
@@ -238,6 +242,9 @@ export function CalendarView({
   /** Which project's things to show — the address's `project=`, resolved to a name by the page. */
   scope: ProjectFilter;
   onScope(next: ProjectFilter): void;
+  /** Which tag's things to show — the address's `tag=`, over tasks, events and notes alike. */
+  tagFilter?: TagFilter;
+  onTagFilter?(next: TagFilter): void;
   /** Go somewhere else: another view, another day, another count. `day: null` is today. */
   onGo(next: { view?: CalView; day?: string | null; count?: number }): void;
   onOpen(name: string): void;
@@ -275,8 +282,9 @@ export function CalendarView({
   const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
   const inScope = useCallback(
     (name: string) =>
-      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
-    [scoped, owners],
+      (scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped)) &&
+      tagMatches(tagFilter, list.tags[name]),
+    [scoped, owners, tagFilter, list.tags],
   );
 
   /* What this page has moved and the list does not say yet, by name — the Tasks page's
@@ -464,6 +472,9 @@ export function CalendarView({
               scope={scope}
               scopeValue={scopeValue}
               onScope={onScope}
+              list={list}
+              tagFilter={tagFilter}
+              onTagFilter={(next) => onTagFilter?.(next)}
             />
           </span>
         </div>
@@ -538,6 +549,9 @@ function ShowMenu({
   scope,
   scopeValue,
   onScope,
+  list,
+  tagFilter,
+  onTagFilter,
 }: {
   hidden: ReadonlySet<CalKind>;
   onHidden(kind: CalKind, hide: boolean): void;
@@ -545,6 +559,9 @@ function ShowMenu({
   scope: ProjectFilter;
   scopeValue: string;
   onScope(next: ProjectFilter): void;
+  list: BoardTree;
+  tagFilter: TagFilter;
+  onTagFilter(next: TagFilter): void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -567,7 +584,9 @@ function ShowMenu({
       removeEventListener("keydown", esc, true);
     };
   }, [open]);
-  const held = hidden.size + (scope.kind === "all" ? 0 : 1);
+  const held = hidden.size + (scope.kind === "all" ? 0 : 1) + (tagFilter.kind === "all" ? 0 : 1);
+  /* The tags of what the calendar can draw: tasks, events and notes, whichever are on. */
+  const tagged = useMemo(() => list.notes.filter((n) => list.tags[n]?.length), [list.notes, list.tags]);
   return (
     <div className="dag-calendar__show" ref={box}>
       <button
@@ -636,6 +655,19 @@ function ShowMenu({
                 ))}
                 <option value={NO_PROJECT}>No project</option>
               </select>
+            </>
+          ) : null}
+          {tagged.length || tagFilter.kind !== "all" ? (
+            <>
+              <p className="dag-calendar__show-head">Tag</p>
+              <TagSelect
+                list={list}
+                names={tagged}
+                filter={tagFilter}
+                onFilter={onTagFilter}
+                label="Show the calendar tagged"
+                hook={{ "data-dag-calendar-tag": "" }}
+              />
             </>
           ) : null}
         </div>

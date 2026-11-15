@@ -12,11 +12,14 @@ import {
 import { createNote, setTask, type BoardTree } from "@/board/useBoard";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskChange, type TaskStatus } from "@/note/task";
+import { withTags } from "@/note/tags";
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
 import { startDrag } from "./pointerDrag";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
+import { tagMatches, type TagFilter } from "./tagFilter";
+import { TagChips, TagSelect } from "./tags/TagFilter";
 import { DueLabel, StatusButton, TaskGlyph } from "./TaskGlyph";
 import { collation } from "@/locale";
 
@@ -46,9 +49,19 @@ interface Row {
   folder: string;
   /** The project it is in, innermost first: its note's name, status and title. */
   project?: { name: string; project: Project; title: string };
+  /** Its frontmatter's tags, drawn as chips. */
+  tags: readonly string[];
 }
 
 const leaf = (name: string) => name.slice(name.lastIndexOf("/") + 1);
+const NO_TAGS: readonly string[] = [];
+const ALL_TAGS: TagFilter = { kind: "all" };
+
+/** Where a task typed into the page goes: the folder of the project shown, and the tag shown. */
+interface Into {
+  folder: string;
+  tag?: string;
+}
 const same = (a: Task | undefined, b: Task | undefined) => a?.status === b?.status && a?.due === b?.due;
 
 /** List or board, at the end of the top bar: a radiogroup of two, because it is one choice. */
@@ -77,8 +90,14 @@ export function LayoutToggle({ layout, onLayout }: { layout: TasksLayout; onLayo
   );
 }
 
-/** A task's text when it is typed into the Tasks page: its title, and the column it was typed into. */
-const taskText = (title: string, status: TaskStatus): string => `---\ntitle: ${JSON.stringify(title)}\nstatus: ${status}\n---\n`;
+/**
+ * A task's text when it is typed into the Tasks page: its title, the column it was typed into, and
+ * the tag the page is showing, if it shows one — a task typed in there stays in view.
+ */
+const taskText = (title: string, status: TaskStatus, tag?: string): string => {
+  const text = `---\ntitle: ${JSON.stringify(title)}\nstatus: ${status}\n---\n`;
+  return tag ? withTags(text, { add: [tag] }) : text;
+};
 
 export function TasksView({
   list,
@@ -86,6 +105,8 @@ export function TasksView({
   onOpen,
   scope = { kind: "all" },
   onScope,
+  tagFilter = ALL_TAGS,
+  onTagFilter,
   locked = false,
 }: {
   list: BoardTree;
@@ -96,6 +117,9 @@ export function TasksView({
   /** Which project's tasks to show — the URL's `project=`, resolved to a name by the page. */
   scope?: ProjectFilter;
   onScope?(next: ProjectFilter): void;
+  /** Which tag's tasks to show — the URL's `tag=`. */
+  tagFilter?: TagFilter;
+  onTagFilter?(next: TagFilter): void;
 }) {
   /* What this page has asked for and the list does not say yet, by name. */
   const [pending, setPending] = useState<Record<string, Task>>({});
@@ -126,9 +150,11 @@ export function TasksView({
   const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
   const inScope = useCallback(
     (name: string) =>
-      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
-    [scoped, owners],
+      (scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped)) &&
+      tagMatches(tagFilter, list.tags[name]),
+    [scoped, owners, tagFilter, list.tags],
   );
+  const taskNames = useMemo(() => Object.keys(list.tasks), [list.tasks]);
 
   const rows = useMemo(() => {
     const listed = new Set(list.notes);
@@ -141,11 +167,12 @@ export function TasksView({
           owner && list.projects[owner]
             ? { name: owner, project: list.projects[owner]!, title: list.titles[owner] ?? leaf(owner) }
             : undefined;
-        return { name, task, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project };
+        const tags = list.tags[name] ?? NO_TAGS;
+        return { name, task, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project, tags };
       })
       .filter((r) => words.every((w) => `${r.title} ${r.folder} ${r.project?.title ?? ""}`.toLowerCase().includes(w)))
       .sort(compareTasks);
-  }, [list.notes, list.tasks, list.titles, list.projects, owners, inScope, pending, filter]);
+  }, [list.notes, list.tasks, list.titles, list.projects, list.tags, owners, inScope, pending, filter]);
 
   const change = useCallback(async (row: Row, next: TaskChange) => {
     /* Built rather than spread: a `due: null` in the change is a task with no date, and an object
@@ -178,7 +205,7 @@ export function TasksView({
   const counted = Object.entries(list.tasks).filter(([name]) => inScope(name));
   const by = (status: TaskStatus) => rows.filter((r) => r.task.status === status);
   /* A task typed in while one project is showing is made in that project's folder. */
-  const into = scoped ?? "";
+  const into = { folder: scoped ?? "", tag: tagFilter.kind === "tag" ? tagFilter.name : undefined };
   /* A row names its project, unless the page is already showing only that project's. */
   const chip = (r: Row) => (r.project && !(scope.kind === "project" && scope.name === r.project.name) ? r.project : undefined);
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
@@ -219,6 +246,14 @@ export function TasksView({
             <option value={NO_PROJECT}>No project</option>
           </select>
         ) : null}
+        <TagSelect
+          list={list}
+          names={taskNames}
+          filter={tagFilter}
+          onFilter={(next) => onTagFilter?.(next)}
+          label="Show the tasks tagged"
+          hook={{ "data-dag-tasks-tag": "" }}
+        />
         <span className="dag-tasks__count" data-dag-tasks-count="">
           {total === 0 ? "No tasks yet" : `${counted.filter(([, t]) => t.status !== "done").length} open of ${counted.length}`}
         </span>
@@ -267,7 +302,7 @@ function Group({
   /** Absent while the app is locked. */
   onChange?(row: Row, next: TaskChange): void;
   chip(row: Row): Row["project"];
-  into: string;
+  into: Into;
   locked: boolean;
 }) {
   const [open, setOpen] = useState(status !== "done");
@@ -297,6 +332,7 @@ function Group({
               </button>
               {/* One box on a phone, where they are the row's second line; nothing on a wider window. */}
               <span className="dag-tasks__meta">
+                <TagChips tags={r.tags} />
                 {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
                 {r.folder && !chip(r) ? <span className="dag-tasks__folder">{r.folder}</span> : null}
                 <DueLabel task={r.task} />
@@ -342,7 +378,7 @@ export function afterQuickAdd(state: QuickAddState, answer: QuickAddAnswer): Qui
  * says what Enter does. A create that did not land keeps the title and says why — the server's own
  * words, or the top bar's *Read only* pill shaking when the app is locked.
  */
-export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: string; locked: boolean }) {
+export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: Into; locked: boolean }) {
   const [state, setState] = useState<QuickAddState>({ title: "", problem: null });
   const [busy, setBusy] = useState(false);
   const make = async () => {
@@ -356,7 +392,7 @@ export function QuickAdd({ status, into, locked }: { status: TaskStatus; into: s
     setBusy(true);
     setState((had) => ({ ...had, problem: null }));
     const stem = titleStem(t) || "untitled";
-    const made = await createNote(into ? `${into}/${stem}` : stem, taskText(t, status));
+    const made = await createNote(into.folder ? `${into.folder}/${stem}` : stem, taskText(t, status, into.tag));
     setBusy(false);
     setState((had) => afterQuickAdd(had, made));
   };
@@ -419,7 +455,7 @@ function Columns({
   /** Absent while the app is locked. */
   onChange?(row: Row, next: TaskChange): void;
   chip(row: Row): Row["project"];
-  into: string;
+  into: Into;
   locked: boolean;
 }) {
   const board = useRef<HTMLDivElement>(null);
@@ -492,8 +528,9 @@ function Columns({
                     />
                     <span className="dag-tasks__card-title">{r.title}</span>
                   </div>
-                  {r.folder || r.task.due || chip(r) ? (
+                  {r.folder || r.task.due || chip(r) || r.tags.length ? (
                     <div className="dag-tasks__card-meta">
+                      <TagChips tags={r.tags} />
                       {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
                       {r.folder && !chip(r) ? <span className="dag-tasks__folder">{r.folder}</span> : null}
                       <DueLabel task={r.task} />
