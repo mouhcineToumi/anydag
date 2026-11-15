@@ -9,7 +9,7 @@
 # share on an eight-core one, and it is 14 s and 31 s of CPU there now —
 # `tsc` incremental (its build info under `node_modules/.cache/tsc/`, so the second run checks what
 # changed), one expression that was half of `tsc`'s time rewritten, and the unit suite sharing
-# modules between files on two workers (`vitest.config.ts` says why both are safe).
+# modules between files on up to four workers (`vitest.config.ts` says why both are safe).
 #
 # One list, three readers: `scripts/gate.sh` runs it and then the slow half, `.githooks/pre-commit`
 # runs it and stops, and the `checks` job in `.github/workflows/ci.yml` runs it as one step. That
