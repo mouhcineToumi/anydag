@@ -105,6 +105,11 @@ export const RECENT_FILES = "dag:recent-files";
  * settings that travel every time they switch.
  */
 export const TASKS_VIEW = "dag:tasks-view";
+/**
+ * Which tab of the Tasks page is pressed — *Open*, *Done* or *All* (#311). `TASKS_VIEW`'s reason:
+ * which of their tasks somebody is looking at is view state, this browser's, not in `PREF_KEYS`.
+ */
+export const TASKS_TAB = "dag:tasks-tab";
 
 /**
  * Whether a run's *About this quiz* panel is folded away, `"0"` when it is. The Tasks

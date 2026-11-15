@@ -1,4 +1,15 @@
-import { ChevronDown, List, Plus, SquareKanban } from "lucide-react";
+import {
+  ChevronDown,
+  CircleCheck,
+  Circle,
+  FileText,
+  History,
+  List,
+  MoreHorizontal,
+  Plus,
+  Search,
+  SquareKanban,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -6,22 +17,38 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 
 import { createNote, setTask, type BoardTree } from "@/board/useBoard";
+import type { Spot } from "@/calendar/menu";
+import { collation } from "@/locale";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
-import { compareTasks, STATUS_LABEL, STATUSES, titleStem, type Task, type TaskChange, type TaskStatus } from "@/note/task";
+import {
+  compareTasks,
+  overdue,
+  STATUS_LABEL,
+  STATUSES,
+  titleStem,
+  type Task,
+  type TaskChange,
+  type TaskStatus,
+} from "@/note/task";
 import { withTags } from "@/note/tags";
 import { LOCK_HINT, refuseLocked } from "@/settings/lock";
 
+import { Button, IconButton } from "./controls";
 import { startDrag } from "./pointerDrag";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
 import { ProjectChip } from "./ProjectBar";
 import { tagMatches, type TagFilter } from "./tagFilter";
 import { TagChips, TagSelect } from "./tags/TagFilter";
 import { DueLabel, StatusButton, TaskGlyph } from "./TaskGlyph";
-import { collation } from "@/locale";
+import { compareRecent, countLine, onTab, sinceText, TAB_LABEL, TABS, type TaskTab } from "./taskModel";
+import { TasksMenu, under, type MenuRow } from "./TasksMenu";
+import { Toast, ToastName, ToastWords } from "./Toast";
 
 /**
  * The Tasks page: every note that is a task, as a list or as a board.
@@ -31,6 +58,10 @@ import { collation } from "@/locale";
  * made here is one `POST /__board/task` — the status and due lines of that file and nothing else.
  * A change shows at once and is let go of when the list agrees, or put back if the write was
  * refused; the file is the truth and this page is one round trip behind it, like the sidebar.
+ *
+ * **The status mark is the row's checkbox** (#311): one click marks a task done, or a done one to do
+ * again, and the row stays where it was — struck through — until the toast that says so goes, so a
+ * mis-click is undone where it happened. The three statuses are in the row's menu.
  */
 
 export type TasksLayout = "list" | "board";
@@ -41,9 +72,14 @@ export type TasksLayout = "list" | "board";
  */
 const LIST_ORDER: readonly TaskStatus[] = ["in-progress", "todo", "done"];
 
+/** How long a row that was just checked stays where it was, and its toast with it. */
+const SETTLE_MS = 5000;
+
 interface Row {
   name: string;
   task: Task;
+  /** Where the row is placed: the task as it was before a check whose toast is still up. */
+  place: Task;
   title: string;
   /** The folder it is in, which is what tells two tasks with one title apart. */
   folder: string;
@@ -91,6 +127,58 @@ export function LayoutToggle({ layout, onLayout }: { layout: TasksLayout; onLayo
 }
 
 /**
+ * How many tasks each tab holds, off every task the vault lists — the tabs say how many there are,
+ * whatever the filter line narrows the list to, so a filter never makes the tabs look emptier.
+ */
+function tabCounts(list: BoardTree): Record<TaskTab, number> {
+  const listed = new Set(list.notes);
+  const out: Record<TaskTab, number> = { open: 0, done: 0, all: 0 };
+  for (const [name, task] of Object.entries(list.tasks)) {
+    if (!listed.has(name)) continue;
+    out.all++;
+    out[task.status === "done" ? "done" : "open"]++;
+  }
+  return out;
+}
+
+/**
+ * Open, Done and All, in the top bar after the page's title, each with how many it holds. The board
+ * shows every status in its columns, so there none is pressed and a press goes back to the list on
+ * that tab.
+ */
+export function TaskTabs({
+  tab,
+  list,
+  board,
+  onTab: choose,
+}: {
+  tab: TaskTab;
+  list: BoardTree;
+  board: boolean;
+  onTab(next: TaskTab): void;
+}) {
+  const counts = useMemo(() => tabCounts(list), [list]);
+  return (
+    <div className="dag-tasks__tabs" role="tablist" aria-label="Which tasks">
+      {TABS.map((t) => (
+        <button
+          key={t}
+          type="button"
+          role="tab"
+          aria-selected={!board && tab === t}
+          className="dag-tasks__tab"
+          data-dag-tasks-tab={t}
+          onClick={() => choose(t)}
+        >
+          <span>{TAB_LABEL[t]}</span>
+          {t === "all" ? null : <span className="dag-tasks__tab-n">{counts[t]}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * A task's text when it is typed into the Tasks page: its title, the column it was typed into, and
  * the tag the page is showing, if it shows one — a task typed in there stays in view.
  */
@@ -98,6 +186,14 @@ const taskText = (title: string, status: TaskStatus, tag?: string): string => {
   const text = `---\ntitle: ${JSON.stringify(title)}\nstatus: ${status}\n---\n`;
   return tag ? withTags(text, { add: [tag] }) : text;
 };
+
+/** A row that was just checked: where it was, until its toast goes. */
+interface Settling {
+  name: string;
+  title: string;
+  was: Task;
+  to: TaskStatus;
+}
 
 export function TasksView({
   list,
@@ -108,6 +204,8 @@ export function TasksView({
   tagFilter = ALL_TAGS,
   onTagFilter,
   locked = false,
+  tab = "open",
+  onTab: chooseTab,
 }: {
   list: BoardTree;
   layout: TasksLayout;
@@ -117,6 +215,9 @@ export function TasksView({
   /** Which project's tasks to show — the URL's `project=`, resolved to a name by the page. */
   scope?: ProjectFilter;
   onScope?(next: ProjectFilter): void;
+  /** Which tab of the top bar is pressed: the list's statuses. */
+  tab?: TaskTab;
+  onTab?(next: TaskTab): void;
   /** Which tag's tasks to show — the URL's `tag=`. */
   tagFilter?: TagFilter;
   onTagFilter?(next: TagFilter): void;
@@ -124,6 +225,8 @@ export function TasksView({
   /* What this page has asked for and the list does not say yet, by name. */
   const [pending, setPending] = useState<Record<string, Task>>({});
   const [filter, setFilter] = useState("");
+  const [settling, setSettling] = useState<Settling | null>(null);
+  const [menu, setMenu] = useState<{ row: Row; at: Spot } | null>(null);
 
   useEffect(() => {
     setPending((had) => {
@@ -156,23 +259,39 @@ export function TasksView({
   );
   const taskNames = useMemo(() => Object.keys(list.tasks), [list.tasks]);
 
-  const rows = useMemo(() => {
+  const words = useMemo(() => filter.trim().toLowerCase().split(/\s+/).filter(Boolean), [filter]);
+  /* Every task in the scope, before the tab and the words: what the count line counts from. */
+  const scopedRows = useMemo(() => {
     const listed = new Set(list.notes);
-    const words = filter.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return Object.entries({ ...list.tasks, ...pending })
       .filter(([name]) => listed.has(name) && inScope(name))
-      .map(([name, task]): Row => {
+      .map(([name, mine]): Row => {
+        /* A pending write knows the status the page asked for; the list knows the rest. */
+        const task: Task = { ...list.tasks[name], ...mine };
         const owner = projectFor(name, owners);
         const project =
           owner && list.projects[owner]
             ? { name: owner, project: list.projects[owner]!, title: list.titles[owner] ?? leaf(owner) }
             : undefined;
+        const place = settling?.name === name ? settling.was : task;
         const tags = list.tags[name] ?? NO_TAGS;
-        return { name, task, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project, tags };
-      })
-      .filter((r) => words.every((w) => `${r.title} ${r.folder} ${r.project?.title ?? ""}`.toLowerCase().includes(w)))
-      .sort(compareTasks);
-  }, [list.notes, list.tasks, list.titles, list.projects, list.tags, owners, inScope, pending, filter]);
+        return { name, task, place, title: list.titles[name] ?? leaf(name), folder: folderOf(name), project, tags };
+      });
+  }, [list.notes, list.tasks, list.titles, list.projects, list.tags, owners, inScope, pending, settling]);
+  const matches = useCallback(
+    (r: Row) => words.every((w) => `${r.title} ${r.folder} ${r.project?.title ?? ""}`.toLowerCase().includes(w)),
+    [words],
+  );
+  /* The board shows every status; the list, the tab's. A row just checked keeps the tab it was on. */
+  const tabbed = useMemo(
+    () => (layout === "board" ? scopedRows : scopedRows.filter((r) => onTab(r.place.status, tab))),
+    [scopedRows, layout, tab],
+  );
+  const rows = useMemo(
+    () =>
+      tabbed.filter(matches).sort((a, b) => compareTasks({ task: a.place, title: a.title }, { task: b.place, title: b.title })),
+    [tabbed, matches],
+  );
 
   const change = useCallback(async (row: Row, next: TaskChange) => {
     /* Built rather than spread: a `due: null` in the change is a task with no date, and an object
@@ -190,38 +309,75 @@ export function TasksView({
       else delete out[row.name];
       return out;
     });
+    return got;
   }, []);
-  /* The columns and the groups take a handler that returns nothing; the status button's answer
-     arrives through `pending`. */
+  /* The columns and the groups take a handler that returns nothing; the answer arrives through `pending`. */
   const onChange = useCallback(
     (row: Row, next: TaskChange) => {
       void change(row, next);
     },
     [change],
   );
+  /* A click on the mark: done, or to do again — and the row stays put until the toast goes. */
+  const onCheck = useCallback(
+    (row: Row, to: TaskStatus) => {
+      setSettling((had) => ({ name: row.name, title: row.title, was: had?.name === row.name ? had.was : row.task, to }));
+      void change(row, { status: to }).then((got) => {
+        /* Refused: there is nothing to undo, and the row goes back by itself. */
+        if (got === undefined) setSettling((had) => (had?.name === row.name ? null : had));
+      });
+    },
+    [change],
+  );
+  const undo = useCallback(() => {
+    if (!settling) return;
+    const row = scopedRows.find((r) => r.name === settling.name);
+    setSettling(null);
+    if (row) onChange(row, { status: settling.was.status });
+  }, [settling, scopedRows, onChange]);
 
+  const openMenu = useCallback(
+    (row: Row, at: Spot) => {
+      if (!locked) setMenu({ row, at });
+    },
+    [locked],
+  );
+
+  const counted = useMemo(() => {
+    const listed = scopedRows.filter((r) => onTab(r.task.status, tab));
+    const shown = listed.filter(matches);
+    return { all: listed.length, shown: shown.length, late: shown.filter((r) => overdue(r.task)).length };
+  }, [scopedRows, tab, matches]);
   const total = Object.keys(list.tasks).length;
-  /* The count says what is in the scope, before the words filter it. */
-  const counted = Object.entries(list.tasks).filter(([name]) => inScope(name));
-  const by = (status: TaskStatus) => rows.filter((r) => r.task.status === status);
+  const by = (status: TaskStatus) => rows.filter((r) => r.place.status === status);
   /* A task typed in while one project is showing is made in that project's folder. */
   const into = { folder: scoped ?? "", tag: tagFilter.kind === "tag" ? tagFilter.name : undefined };
   /* A row names its project, unless the page is already showing only that project's. */
   const chip = (r: Row) => (r.project && !(scope.kind === "project" && scope.name === r.project.name) ? r.project : undefined);
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
+  const live = locked ? undefined : onCheck;
 
   return (
-    <main className="dag-tasks" data-dag-tasks={layout}>
+    <main className="dag-tasks" data-dag-tasks={layout} data-dag-tasks-showing={layout === "list" ? tab : undefined}>
       <div className="dag-tasks__bar">
-        <input
-          className="dag-tasks__filter"
-          type="search"
-          placeholder="Filter tasks"
-          aria-label="Filter tasks"
-          value={filter}
-          data-dag-tasks-filter=""
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        <label className="dag-tasks__find">
+          <Search size={14} strokeWidth={2} aria-hidden="true" />
+          <input
+            className="dag-tasks__filter"
+            type="search"
+            placeholder="Filter tasks"
+            aria-label="Filter tasks"
+            value={filter}
+            data-dag-tasks-filter=""
+            onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && filter) {
+                e.preventDefault();
+                setFilter("");
+              }
+            }}
+          />
+        </label>
         {projects.length || scope.kind !== "all" ? (
           <select
             className="dag-select dag-tasks__project"
@@ -254,8 +410,15 @@ export function TasksView({
           label="Show the tasks tagged"
           hook={{ "data-dag-tasks-tag": "" }}
         />
-        <span className="dag-tasks__count" data-dag-tasks-count="">
-          {total === 0 ? "No tasks yet" : `${counted.filter(([, t]) => t.status !== "done").length} open of ${counted.length}`}
+        <span className="dag-tasks__spacer" />
+        <span className="dag-tasks__count" data-dag-tasks-count="" aria-live="polite">
+          {total === 0
+            ? "No tasks yet"
+            : countLine(
+                layout === "board" ? "all" : tab,
+                layout === "board" ? boardCount(scopedRows, matches) : counted,
+                words.length > 0,
+              )}
         </span>
       </div>
       {total === 0 ? (
@@ -265,24 +428,210 @@ export function TasksView({
         </p>
       ) : null}
       {layout === "board" ? (
-        <Columns by={by} onOpen={onOpen} onChange={locked ? undefined : onChange} chip={chip} into={into} locked={locked} />
+        <Columns
+          by={by}
+          onOpen={onOpen}
+          onChange={locked ? undefined : onChange}
+          onCheck={live}
+          chip={chip}
+          into={into}
+          locked={locked}
+        />
+      ) : total > 0 && rows.length === 0 && tabbed.length > 0 ? (
+        <NoMatch
+          filter={filter}
+          tab={tab}
+          onClear={() => setFilter("")}
+          onAll={tab === "open" ? () => chooseTab?.("all") : undefined}
+        />
+      ) : tab === "done" ? (
+        <div className="dag-tasks__groups">
+          <div className="dag-tasks__rows" role="list" aria-label="Done" data-dag-tasks-group="done">
+            {[...rows]
+              .sort((a, b) => compareRecent(a, b))
+              .map((r) => (
+                <TaskRow key={r.name} row={r} chip={chip(r)} onOpen={onOpen} onCheck={live} onMenu={openMenu} />
+              ))}
+          </div>
+        </div>
       ) : (
         <div className="dag-tasks__groups">
-          {LIST_ORDER.map((status) => (
-            <Group
-              key={status}
-              status={status}
-              rows={by(status)}
-              onOpen={onOpen}
-              onChange={locked ? undefined : onChange}
-              chip={chip}
-              into={into}
-              locked={locked}
-            />
+          {LIST_ORDER.filter((s) => onTab(s, tab)).map((status) => (
+            <Group key={status} status={status} rows={by(status)} into={into} locked={locked}>
+              {(r) => <TaskRow key={r.name} row={r} chip={chip(r)} onOpen={onOpen} onCheck={live} onMenu={openMenu} />}
+            </Group>
           ))}
         </div>
       )}
+      {menu ? (
+        <TasksMenu
+          at={menu.at}
+          label={`${menu.row.title}: status`}
+          data={{ "data-dag-task-menu": menu.row.name }}
+          onClose={() => setMenu(null)}
+          rows={STATUSES.map(
+            (s, i): MenuRow => ({
+              key: s,
+              label: STATUS_LABEL[s],
+              icon: <TaskGlyph status={s} />,
+              hint: String(i + 1),
+              checked: menu.row.task.status === s,
+              data: { "data-dag-task-menu-status": s },
+              onPick: () => {
+                if (s !== menu.row.task.status) onChange(menu.row, { status: s });
+              },
+            }),
+          )}
+        />
+      ) : null}
+      {settling ? (
+        <Toast
+          icon={settling.to === "done" ? CircleCheck : Circle}
+          timeout={SETTLE_MS}
+          renew={settling}
+          onTimeout={() => setSettling(null)}
+          onDismiss={() => setSettling(null)}
+          title={`${STATUS_LABEL[settling.to]}: ${settling.title}`}
+          data-dag-task-toast={settling.name}
+          actions={
+            <Button size="sm" data-dag-task-undo="" onClick={undo}>
+              Undo
+            </Button>
+          }
+        >
+          <ToastWords>{`${STATUS_LABEL[settling.to]}: `}</ToastWords>
+          <ToastName text={settling.title} />
+        </Toast>
+      ) : null}
     </main>
+  );
+}
+
+/** What the count line says on the board, which shows every status: every task in the scope. */
+function boardCount(rows: Row[], matches: (r: Row) => boolean) {
+  const shown = rows.filter(matches);
+  return { all: rows.length, shown: shown.length, late: shown.filter((r) => overdue(r.task)).length };
+}
+
+/** A filter that matches nothing: what it searched, and the two ways out. */
+function NoMatch({ filter, tab, onClear, onAll }: { filter: string; tab: TaskTab; onClear(): void; onAll?(): void }) {
+  const what = tab === "open" ? "open task" : tab === "done" ? "done task" : "task";
+  return (
+    <div className="dag-tasks__none" data-dag-tasks-none="">
+      <h2 className="dag-tasks__none-title">
+        No {what} matches “{filter.trim()}”
+      </h2>
+      <p className="dag-tasks__none-text">
+        The filter reads titles, folders and projects.{tab === "open" ? " Done tasks are on their own tab." : ""}
+      </p>
+      <div className="dag-tasks__none-acts">
+        <Button data-dag-tasks-clear-filter="" onClick={onClear}>
+          Clear the filter
+        </Button>
+        {onAll ? (
+          <Button data-dag-tasks-look-done="" onClick={onAll}>
+            Look in Done too
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One task on the list: its status mark (the checkbox), its title (which opens it), a page mark when
+ * it has a body, then its columns — check items, project, due date and when it last changed — each
+ * in a column of its own so they line up down the list. The last column gives way to the row's menu
+ * under the pointer or the keyboard. A narrow window drops the columns in that order, last changed
+ * first; the due date stays (`chrome.css`, the container query on `.dag-tasks`).
+ */
+function TaskRow({
+  row: r,
+  chip,
+  onOpen,
+  onCheck,
+  onMenu,
+}: {
+  row: Row;
+  chip: Row["project"];
+  onOpen(name: string): void;
+  /** Absent while the app is locked. */
+  onCheck?(row: Row, to: TaskStatus): void;
+  onMenu(row: Row, at: Spot): void;
+}) {
+  const items = r.task.items;
+  const changed = r.task.changed;
+  return (
+    <div
+      className="dag-tasks__row"
+      role="listitem"
+      data-dag-task-row={r.name}
+      data-done={r.task.status === "done" ? "" : undefined}
+      onContextMenu={(e: ReactMouseEvent) => {
+        if (!onCheck) return;
+        e.preventDefault();
+        onMenu(r, { x: e.clientX, y: e.clientY });
+      }}
+    >
+      <StatusButton status={r.task.status} label={r.title} onStatus={onCheck ? (next) => onCheck(r, next) : undefined} />
+      <button
+        type="button"
+        className="dag-tasks__title"
+        data-dag-task-open={r.name}
+        title={r.name}
+        onClick={() => onOpen(r.name)}
+      >
+        {r.title}
+      </button>
+      {r.task.body ? (
+        <span className="dag-tasks__page" data-dag-task-page="" title="Has a description">
+          <FileText size={14} strokeWidth={2} aria-hidden="true" />
+        </span>
+      ) : null}
+      <TagChips tags={r.tags} />
+      <span className="dag-tasks__spacer" />
+      <span className="dag-tasks__cell dag-tasks__cell--items">
+        {items ? (
+          <span
+            className="dag-tasks__items"
+            data-dag-task-items={`${items.done}/${items.total}`}
+            title={`${items.done} of ${items.total} check items ticked`}
+          >
+            <span className="dag-tasks__bar-track" aria-hidden="true">
+              <span className="dag-tasks__bar-fill" style={{ width: `${(items.done / items.total) * 100}%` }} />
+            </span>
+            {items.done}/{items.total}
+          </span>
+        ) : null}
+      </span>
+      <span className="dag-tasks__cell dag-tasks__cell--project">
+        {chip ? <ProjectChip project={chip.project} title={chip.title} /> : null}
+      </span>
+      <span className="dag-tasks__cell dag-tasks__cell--due">
+        <DueLabel task={r.task} />
+      </span>
+      <span className="dag-tasks__cell dag-tasks__cell--changed">
+        {changed ? (
+          <span className="dag-tasks__changed" data-dag-task-changed="" title={`Changed ${new Date(changed).toLocaleString()}`}>
+            <History size={12} strokeWidth={2} aria-hidden="true" />
+            {sinceText(changed)}
+          </span>
+        ) : null}
+        {onCheck ? (
+          <span className="dag-tasks__more">
+            <IconButton
+              size="sm"
+              aria-label={`${r.title}: more`}
+              tip="Status"
+              data-dag-task-more={r.name}
+              onClick={(e) => onMenu(r, under(e.currentTarget))}
+            >
+              <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          </span>
+        ) : null}
+      </span>
+    </div>
   );
 }
 
@@ -290,20 +639,15 @@ export function TasksView({
 function Group({
   status,
   rows,
-  onOpen,
-  onChange,
-  chip,
   into,
   locked,
+  children,
 }: {
   status: TaskStatus;
   rows: Row[];
-  onOpen(name: string): void;
-  /** Absent while the app is locked. */
-  onChange?(row: Row, next: TaskChange): void;
-  chip(row: Row): Row["project"];
   into: Into;
   locked: boolean;
+  children(row: Row): ReactNode;
 }) {
   const [open, setOpen] = useState(status !== "done");
   return (
@@ -324,21 +668,7 @@ function Group({
       </h2>
       {open ? (
         <div className="dag-tasks__rows" role="list">
-          {rows.map((r) => (
-            <div key={r.name} className="dag-tasks__row" role="listitem" data-dag-task-row={r.name}>
-              <StatusButton status={r.task.status} onStatus={onChange ? (next) => onChange(r, { status: next }) : undefined} />
-              <button type="button" className="dag-tasks__title" data-dag-task-open={r.name} onClick={() => onOpen(r.name)}>
-                {r.title}
-              </button>
-              {/* One box on a phone, where they are the row's second line; nothing on a wider window. */}
-              <span className="dag-tasks__meta">
-                <TagChips tags={r.tags} />
-                {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
-                {r.folder && !chip(r) ? <span className="dag-tasks__folder">{r.folder}</span> : null}
-                <DueLabel task={r.task} />
-              </span>
-            </div>
-          ))}
+          {rows.map((r) => children(r))}
           <QuickAdd status={status} into={into} locked={locked} />
         </div>
       ) : null}
@@ -446,6 +776,7 @@ function Columns({
   by,
   onOpen,
   onChange,
+  onCheck,
   chip,
   into,
   locked,
@@ -454,6 +785,7 @@ function Columns({
   onOpen(name: string): void;
   /** Absent while the app is locked. */
   onChange?(row: Row, next: TaskChange): void;
+  onCheck?(row: Row, to: TaskStatus): void;
   chip(row: Row): Row["project"];
   into: Into;
   locked: boolean;
@@ -524,15 +856,15 @@ function Columns({
                   <div className="dag-tasks__card-top">
                     <StatusButton
                       status={r.task.status}
-                      onStatus={onChange ? (next) => onChange(r, { status: next }) : undefined}
+                      label={r.title}
+                      onStatus={onCheck ? (next) => onCheck(r, next) : undefined}
                     />
                     <span className="dag-tasks__card-title">{r.title}</span>
                   </div>
-                  {r.folder || r.task.due || chip(r) || r.tags.length ? (
+                  {r.task.due || chip(r) || r.tags.length ? (
                     <div className="dag-tasks__card-meta">
                       <TagChips tags={r.tags} />
                       {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
-                      {r.folder && !chip(r) ? <span className="dag-tasks__folder">{r.folder}</span> : null}
                       <DueLabel task={r.task} />
                     </div>
                   ) : null}

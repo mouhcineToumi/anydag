@@ -201,7 +201,8 @@ describe("note changes", () => {
     await sleep(100);
     await env.vault.write(name, "note", "---\nstatus: done\n---\n# N\n", null);
     const got = await doc(f, "n", (d) => !!d.task);
-    expect(got.task).toEqual({ status: "done" });
+    /* The feed carries what the listing counts beside the frontmatter: a body, and when it changed. */
+    expect(got.task).toEqual({ status: "done", body: true, changed: expect.any(Number) });
     expect(got.event).toBeNull();
     expect(got.project).toBeNull();
   });

@@ -64,6 +64,7 @@ import {
   CalendarView,
   FeedbackCard,
   LayoutToggle,
+  TaskTabs,
   QuizEditor,
   QuizzesView,
   Settings,
@@ -79,11 +80,12 @@ import { NoteView, type NoteHandle } from "@/ui/NoteView";
 import type { ProjectMembers } from "@/ui/ProjectBar";
 import { nameWhenOpened } from "@/ui/NoteTitle";
 import type { TasksLayout } from "@/ui/Tasks";
+import { tabOf, type TaskTab } from "@/ui/taskModel";
 import { NO_PROJECT, type ProjectFilter } from "@/ui/projectFilter";
 import { tagFilterOf, tagParam, type TagFilter } from "@/ui/tagFilter";
 import { EmptyBoard, Welcome, type StartKind } from "@/ui/Welcome";
 import { rememberOpened } from "@/ui/recents";
-import { CALENDAR_VIEW, LIBRARY, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
+import { CALENDAR_VIEW, LIBRARY, TASKS_TAB, TASKS_VIEW, readFlag, readPref, writeFlag, writeLocal } from "@/settings/prefs";
 import { MAX_DAYS, VIEWS, type CalView } from "@/calendar/model";
 import { useCalendarHidden, useWeekStart } from "@/calendar/usePrefs";
 import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
@@ -833,6 +835,16 @@ function TasksApp({
     setLayout(next);
     writeLocal(TASKS_VIEW, next);
   }, []);
+  const [tab, setTab] = useState<TaskTab>(() => tabOf(readPref(TASKS_TAB)));
+  /* A tab is the list's: pressed on the board, it goes back to the list on that tab. */
+  const chooseTab = useCallback(
+    (next: TaskTab) => {
+      setTab(next);
+      writeLocal(TASKS_TAB, next);
+      if (layout === "board") chooseLayout("list");
+    },
+    [layout, chooseLayout],
+  );
 
   /* `project=` is the id of the project's note, so a link to a project's tasks survives
      the project being renamed or moved; the page turns it into the name it is listed under now. */
@@ -855,7 +867,12 @@ function TasksApp({
   return (
     <div className="dag-app dag-app--tasks" data-snapshot={snapshot ? "1" : undefined}>
       {!snapshot && (
-        <Toolbar boardName={null} title="Tasks" onBoards={openBrowser}>
+        <Toolbar
+          boardName={null}
+          title="Tasks"
+          onBoards={openBrowser}
+          lead={<TaskTabs tab={tab} list={list} board={layout === "board"} onTab={chooseTab} />}
+        >
           <LayoutToggle layout={layout} onLayout={chooseLayout} />
         </Toolbar>
       )}
@@ -868,6 +885,8 @@ function TasksApp({
         tagFilter={tagFilter}
         onTagFilter={chooseTag}
         locked={locked}
+        tab={tab}
+        onTab={chooseTab}
       />
       {cards}
     </div>

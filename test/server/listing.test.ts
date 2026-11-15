@@ -92,7 +92,12 @@ describe("the listing's worker", () => {
       "work/twice",
     ]);
     expect(inline.titles["work/twice"]).toBe("The md one");
-    expect(inline.tasks["work/deep/task"]).toEqual({ status: "todo", due: "2026-01-02" });
+    expect(inline.tasks["work/deep/task"]).toEqual({
+      status: "todo",
+      due: "2026-01-02",
+      body: true,
+      changed: expect.any(Number),
+    });
     expect(inline.sizes["attachments/spec.pdf"]).toBe(PDF.length);
     expect(inline.folders).not.toContain("linked-folder");
     expect(inline.notes).not.toContain("link");

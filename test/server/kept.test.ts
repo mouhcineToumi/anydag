@@ -90,7 +90,7 @@ describe("the kept listing", () => {
     let t = await same();
     expect(t.folders).toEqual(expect.arrayContaining(["new", "new/inner", "moved", "empty"]));
     expect(t.notes).toContain("moved/task");
-    expect(t.tasks["moved/task"]).toEqual({ status: "todo", due: "2026-01-02" });
+    expect(t.tasks["moved/task"]).toEqual({ status: "todo", due: "2026-01-02", body: true, changed: expect.any(Number) });
     fs.rmSync(at("work"), { recursive: true });
     t = await same();
     expect(t.folders).not.toContain("work");

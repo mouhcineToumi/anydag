@@ -185,7 +185,7 @@ describe("POST /__board/from-template", () => {
     const task = (await (await post("/__board/from-template", { template: "Templates/Chore", title: "Do it" })).json()) as any;
     const event = (await (await post("/__board/from-template", { template: "Templates/Trip", title: "Go" })).json()) as any;
     const list = await get("/__board/list");
-    expect(list.tasks[task.name]).toEqual({ status: "todo", due: "2026-11-14" });
+    expect(list.tasks[task.name]).toEqual({ status: "todo", due: "2026-11-14", body: true, changed: expect.any(Number) });
     expect(list.events[event.name]).toEqual({ start: "2026-11-14" });
     expect(Object.keys(list.tasks)).toEqual([task.name]);
     expect(Object.keys(list.events)).toEqual([event.name]);
