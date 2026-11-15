@@ -42,6 +42,7 @@ npm run dev     # Vite + the local server on boards/local/ → http://localhost:
 | `npm run dev` | the app in a browser, with hot reload, on the development vault `boards/local/` |
 | `npm run desktop:dev` | the Electron app on the same code |
 | `npm run checks` | the **fast tier**: Biome lint and format check, knip, typechecks, the contract checks, parity, the unit tests. No browser, about half a minute. It is also the pre-commit hook |
+| `npm run lint:promises` | typescript-eslint's promise rules over everything, `e2e/` and `desktop/` included. About half a minute. The pre-push hook runs it |
 | `npm test` | the unit tests alone (`npm run test:watch` while you work) |
 | `npm run e2e:docker` | the browser suite in the same Playwright Docker image CI uses |
 | `npm run e2e:smoke` | the browser suite's `@smoke` tier, in the same image — the core of what CI runs on a pull request, beside the specs the change reaches |
@@ -187,6 +188,20 @@ Examples: `feat/231-table-csv-export`, `fix/142-note-title-focus`, `docs/contrib
    [`docs/architecture/things-that-will-bite.md`](docs/architecture/things-that-will-bite.md)).
 4. **Commit as you go** with [Conventional Commits](https://www.conventionalcommits.org/) messages.
    The pre-commit hook runs `npm run checks`; if it fails, fix the cause rather than skipping it.
+
+   **What must pass on your machine before a push** — the hooks run all of it, so with them installed
+   (`npm ci` does that) there is nothing to remember:
+
+   | Hook | Runs | About |
+   |---|---|---|
+   | pre-commit | the secret scan, then `npm run checks` | half a minute |
+   | pre-push | `npm run lint:promises` and the store's contracts over a watched vault (`ANYDAG_TEST_WATCH=1 npx vitest run test/server`), side by side; nothing for a push that only changes prose | half a minute |
+
+   The browser suite is not on that list: the pull request runs it (the `@smoke` tier plus the specs
+   your change reaches, sharded) and is green in about a minute and a half. Run it yourself first when
+   you changed what it checks closely — a spec, a screenshot, a gesture: `ANYDAG_PREPUSH_E2E=1 git push`
+   runs the pull request's selection before the push, or `npm run e2e:docker -- e2e/<name>.spec.ts`
+   one spec. Never `--no-verify` past a hook that failed; fix the cause.
 5. **Screenshots.** The visual baselines are compared against one pinned Chromium in Docker. They are
    updated only deliberately, with `--update-snapshots=all` inside the Docker runner, and every
    changed image is looked at and defended in the PR. A baseline that moves when you did not mean to
