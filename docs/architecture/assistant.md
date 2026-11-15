@@ -26,6 +26,15 @@ vault is there, and its row names that vault. `Assistant.locate` finds a chat by
 vault when the one this tab names does not hold it, which is what lets such a row open and keep
 working.
 
+**The panel opens on a new chat, not the vault's newest** (#321). A chat it made belongs to the
+document it was chosen on: closing the panel and opening it again on the same document keeps it,
+and moving to another document — another file, a list, Home — starts a new one. So the sparkle on a
+note cannot continue a conversation about another file by mistake, while the older chats stay one
+click away in the page's history, which is never filtered by document. **Opening the panel writes
+nothing**: the chat is made by its first message (or by a grant), so an empty one is never saved.
+What the panel holds lives in `src/assistant/panelState.ts` for this window only; a reload starts
+again on a new chat, and none of it is a preference (`test/prefs.test.ts`).
+
 The composer is one field and one row under it: the scope chip, the model — the provider's mark and
 the model's short name, the harness named only inside the open picker — the effort resolved to what
 it will be, `Automatic` when the chat keeps the harness's own, an expand toggle for the field, and
@@ -161,7 +170,8 @@ Codex's own default. A Codex whose catalog cannot be read is unavailable rather 
 Nothing here draws under `?snapshot=1`, and the canvas never learns a chat exists: a turn's writes
 reach an open board through the change feed like any other writer's. Deleting a chat emits a `gone`
 event on the chat stream, so every open history drops the row at once and a page on that chat goes to
-New chat; the panel's open state is not remembered across a reload, and Settings → AI holds the default engine and model.
+New chat; the panel's open state and the chat it holds are not remembered across a reload, and
+Settings → AI holds the default engine and model.
 
 Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`,
 the setting `assistant`, the leader binding `space A`, and the query key `chat`.

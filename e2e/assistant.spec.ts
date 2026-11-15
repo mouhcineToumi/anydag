@@ -353,6 +353,54 @@ test("space A opens the panel on a board and on a note, and again closes it", as
   await expect(panel).toBeVisible();
 });
 
+test("the panel opens on a new chat, keeps it on the same note, and leaves it behind on another", async ({ page, request }) => {
+  /* #321: the panel used to open on the vault's newest chat, even one about another document. */
+  const first = stem("panel-first");
+  const second = stem("panel-second");
+  fs.writeFileSync(noteFile(first), "---\ntitle: First note\n---\nfirst\n");
+  fs.writeFileSync(noteFile(second), "---\ntitle: Second note\n---\nsecond\n");
+  const vault = await suiteVaultId(page);
+  const rows = async () =>
+    ((await (await request.get(`/__board/chats?vault=${vault}`)).json()) as { chats: { id: string }[] }).chats;
+  const before = (await rows()).length;
+
+  await page.goto(`/?note=${first}`);
+  await expect(page.locator(`[data-dag-note-view="${first}"][data-dag-ready]`)).toBeVisible();
+  await openSidebar(page);
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("[data-dag-chat-welcome]")).toBeVisible();
+  await expect(panel.locator("[data-dag-chat-input]")).toBeFocused();
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", "new");
+  /* Opening is not a message: no empty chat is written until one is sent. */
+  expect((await rows()).length).toBe(before);
+
+  await say(page, "about the first note");
+  await expect(panel.locator("[data-dag-chat-turn]")).toHaveAttribute("data-dag-chat-status", "done");
+  const id = (await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!;
+  expect(id).toMatch(/^c[0-9a-z]+$/);
+  chats.push(id);
+
+  /* Closing and reopening on this note keeps the chat that was there. */
+  await panel.locator("[data-dag-assistant-panel-close]").click();
+  await expect(panel).toHaveCount(0);
+  await page.locator("[data-dag-assistant-toggle]").click();
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", id);
+  await expect(panel.locator("[data-dag-chat-asked]")).toHaveText("about the first note");
+
+  /* Another note — in this window, not a reload — starts a new chat, and the first is still in
+     the history. */
+  await panel.locator("[data-dag-assistant-panel-close]").click();
+  await page.locator(`[data-dag-sidebar-row][data-dag-sidebar-key="note:${second}"]`).click();
+  await expect(page.locator(`[data-dag-note-view="${second}"][data-dag-ready]`)).toBeVisible();
+  await page.locator("[data-dag-assistant-toggle]").click();
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", "new");
+  await expect(panel.locator("[data-dag-chat-welcome]")).toBeVisible();
+  await expect(panel.locator("[data-dag-chat-input]")).toBeFocused();
+  expect((await rows()).some((row) => row.id === id)).toBe(true);
+});
+
 test("the panel keeps the chat it opens onto the page", async ({ page }) => {
   await page.goto("/?tasks=1");
   await page.locator("[data-dag-assistant-toggle]").click();
