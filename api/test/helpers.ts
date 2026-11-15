@@ -21,7 +21,7 @@ import { PROTOCOL, PROTOCOL_HEADER } from "../protocol/wire";
 import { createApp } from "../server/app";
 import { DiskBlobs } from "../server/blobs/disk";
 import { configFrom, type Config } from "../server/config";
-import { pgDb, pgliteDb } from "../server/meta/db";
+import { dumpPglite, pgDb, pgliteDb } from "../server/meta/db";
 import { PgMeta } from "../server/meta/pg";
 import type { Db } from "../server/meta/types";
 import { mintPairCode } from "../server/routes/pair";
@@ -52,8 +52,27 @@ export interface Harness {
   close(): Promise<void>;
 }
 
+/**
+ * **Every PGlite harness starts from one migrated database, dumped once per worker.** A fresh
+ * cluster is `initdb` and every migration, about a second, and the api's files open one per test —
+ * forty seconds of the fast tier. Loading the dump is a fifth of that, and the database it gives is
+ * the same one: `harness` still calls `migrate()`, which finds every migration applied. The
+ * migrations themselves are still run from empty, here and in `meta.test.ts`.
+ */
+let migrated: Promise<Blob> | null = null;
+function migratedDump(): Promise<Blob> {
+  migrated ??= (async () => {
+    const db = await pgliteDb();
+    await new PgMeta(db).migrate();
+    const dump = await dumpPglite(db);
+    await db.close();
+    return dump;
+  })();
+  return migrated;
+}
+
 async function openDb(backend: Backend): Promise<{ db: Db; drop: () => Promise<void> }> {
-  if (backend === "pglite") return { db: await pgliteDb(), drop: async () => {} };
+  if (backend === "pglite") return { db: await pgliteDb(undefined, await migratedDump()), drop: async () => {} };
   const schema = `api_test_${process.pid}_${randomBytes(4).toString("hex")}`;
   const admin = pgDb(PG_URL);
   await admin.exec(`create schema ${schema}`);
