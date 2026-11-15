@@ -636,3 +636,36 @@ not, and would cost a row on every page (the e2e suite, which starts with the si
 also find every page a row lower). Closing the last tab is not possible; closing the second takes
 the strip away. While the sidebar is away the strip is the window's top-left corner and keeps the
 toggle's slot, as the toolbar does when the strip is not there.
+
+### What a tab keeps while another is in front
+
+`src/ui/tabs/keep.ts`, and `TabFrame` in `App`. **Two ways, by what the page costs to build again.**
+
+- **A note stays mounted.** Its editor holds what no file says — the caret, the selection,
+  ProseMirror's own undo — and is the dearest page to build. The `LIVE_NOTES` (3) notes most recently
+  in front stay in the DOM behind the page in front: `data-dag-docs-away`, laid out where the page is
+  (so their width, scroll and measures hold) but `visibility: hidden` and `inert`. A note pushed out
+  of the few is unmounted like any page — its pending write flushes as it goes — and comes back from
+  the file with its scroll, **but not its editor undo**, which lived in the editor.
+- **Every other page is unmounted**, and what it would lose is kept in memory by tab: a board's
+  undo and selection (`useEditor`'s `keep`; undo is versions of the file, so plain data), its view
+  per page (`Viewport`'s `keep`, put back only when somebody had placed it — an automatic fit is made
+  again), and any page's scroll, found again by the path of classes from the frame and put back as
+  the page fills in, until the person scrolls or presses something.
+
+**A page kept mounted behind is told so** (`TabFrameContext`, `useTabActive`). Whatever it listens
+for on the window or the document asks first, so only the page in front hears a key, a `dag:chrome`
+or `dag:export` request, the part named in the address, or raises `data-dag-ready`:
+`usePageKeys`, `useChromeRequests`, the note's `dag:export`, and in `NoteView` the locked-key
+refusal, `useTarget` and the ready signal. Its address is its own place (`useBehindTabs`): what it
+sets goes to its tab, never to the window.
+
+**Switching tabs writes nothing**, of a file or of the app home: no page is told to save by it. A
+note kept behind still writes what it was holding when its debounce is up, on the version it read,
+and still adopts a change made to its file while it is behind (`onNote`), so it shows the change on
+return with no 409 to answer. `e2e/doctabs-state.spec.ts` holds all of this.
+
+**Memory.** `e2e/doctabs-memory.spec.ts` opens ten notes of forty paragraphs in tabs, each brought
+to the front once, and compares the renderer's JS heap after a forced collection with one note's:
+22.2 MB → 25.3 MB, ×1.14, held at ×1.5. The DOM's node count goes ×2.5 (892 → 2236), the three
+editors kept behind. Closing a tab forgets what it kept.
