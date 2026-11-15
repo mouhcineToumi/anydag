@@ -65,6 +65,44 @@ describe("/v1/logs", () => {
     expect(await (await call(h, "POST", "/v1/logs", { json: batch([tidy]) })).json()).toEqual({ accepted: 1 });
   });
 
+  it("keeps a day's file to its cap, and drops what would pass it (#10)", async () => {
+    h = await harness("pglite", { ANYDAG_API_LOGS_DAY_MB: "1" });
+    /* As much as a batch can hold and still be kept whole: about 280 KB a batch once written. */
+    const error = {
+      name: "error",
+      at: tidy.at,
+      props: { where: "page", kind: "error", message: "word ".repeat(60), stack: "frame ".repeat(250) },
+    };
+    const big = batch(Array(130).fill(error));
+    const sent: number[] = [];
+    for (let i = 0; i < 6; i++)
+      sent.push(((await (await call(h, "POST", "/v1/logs", { json: big })).json()) as { accepted: number }).accepted);
+    expect(sent).toEqual([130, 130, 130, 0, 0, 0]);
+    const size = fs.statSync(path.join(h.root, "logs", "2026-11-06.jsonl")).size;
+    expect(size).toBeLessThanOrEqual(1024 * 1024);
+    /* A small batch that still fits is kept, and the next day starts empty. */
+    expect(await (await call(h, "POST", "/v1/logs", { json: batch([tidy]) })).json()).toEqual({ accepted: 1 });
+    h.clock.advance(86_400_000);
+    expect(await (await call(h, "POST", "/v1/logs", { json: big })).json()).toEqual({ accepted: 130 });
+  });
+
+  it("stops reading a body with no length at the cap, rather than reading it whole first (#10)", async () => {
+    h = await harness();
+    const chunk = new Uint8Array(64 * 1024).fill(0x20);
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(ctl) {
+        if (pulled >= 64 * chunk.byteLength) return ctl.close();
+        pulled += chunk.byteLength;
+        ctl.enqueue(chunk);
+      },
+    });
+    const res = await h.app.request("/v1/logs", { method: "POST", body, duplex: "half" } as RequestInit);
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ accepted: 0 });
+    expect(pulled).toBeLessThan(64 * chunk.byteLength);
+  });
+
   it("is not there when the server keeps no logs", async () => {
     h = await harness("pglite", { ANYDAG_API_LOGS: "off" });
     expect((await call(h, "POST", "/v1/logs", { json: batch([tidy]) })).status).toBe(404);

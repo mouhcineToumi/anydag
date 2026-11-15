@@ -57,6 +57,8 @@ export interface Config {
   feedbackRepo: string | null;
   /** How many days of logs are kept on disk, in `<data>/logs/`. */
   logsDays: number;
+  /** The most one day's log file may hold; a batch past it is dropped. */
+  logsDayBytes: number;
   /** Client address: `0` is the socket's own answer; `n` is how many hops  of the proxy chain to trust. */
   trustProxy: number;
   /** `NODE_ENV=production`, which decides how long a secret must be. */
@@ -158,6 +160,7 @@ export function configFrom(
 
   const maxBodyMb = int("ANYDAG_API_MAX_BODY_MB", 512, 1, 1024 * 1024);
   const logsDays = int("ANYDAG_API_LOGS_DAYS", 30, 1, 3650);
+  const logsDayMb = int("ANYDAG_API_LOGS_DAY_MB", 64, 1, 1024 * 1024);
 
   const trustRaw = (pick("ANYDAG_API_TRUST_PROXY") ?? "off").trim().toLowerCase();
   if (trustRaw !== "off" && trustRaw !== "0" && !/^[1-8]$/.test(trustRaw))
@@ -202,6 +205,7 @@ export function configFrom(
     feedbackToken: text("ANYDAG_API_FEEDBACK_GITHUB_TOKEN"),
     feedbackRepo,
     logsDays,
+    logsDayBytes: logsDayMb * 1024 * 1024,
     trustProxy: trustRaw === "off" ? 0 : Number(trustRaw),
     production,
   };
