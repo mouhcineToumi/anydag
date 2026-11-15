@@ -16,8 +16,11 @@ import path from "node:path";
 import type { Context, Next } from "hono";
 
 import { effortFor } from "../../plugins/generate/llm";
+import { titleOf } from "../../src/refs/extract";
 import type { Session } from "../context";
-import { err } from "../http";
+import { bodyOf, err, mustExist } from "../http";
+import { kindOf, leafOf } from "../names";
+import type { Vault } from "../vault";
 import type { Harness, HarnessEvent, McpCommand, Running } from "./harness";
 import { guessed, isUntitled, seeded, systemPrompt, titleFrom, UNTITLED, type Reach } from "./prompt";
 import { installFsHooks, record, undo, type Op } from "./record";
@@ -25,17 +28,23 @@ import { ChatStore, newId, validChatId } from "./store";
 import {
   blockUndone,
   grantsOf,
+  isSubject,
   type Block,
   type ChatEvent,
   type ChatMeta,
   type ChatRead,
   type ChatRow,
+  type DocKind,
   type Mode,
   type Provider,
   type Step,
+  type Subject,
   type Turn,
   type UndoRecord,
 } from "./types";
+
+/** What the approval card asks before a write outside the chat's subject. */
+const outside = (s: Subject): string => `Change something other than “${s.title}”?`;
 
 /** How long a write or a vault request waits for the person. Both harnesses' MCP timeouts are longer. */
 const APPROVAL_MS = 5 * 60_000;
@@ -91,6 +100,61 @@ const APPROVE: Record<string, string> = {
   "/__board/components/delete": "Delete a saved component?",
 };
 
+/** A document's name as the routes read it: `str` in `server/routes/docs.ts`, byte for byte. */
+const nameIn = (v: unknown): string => (typeof v === "string" ? v : v === undefined || v === null ? "" : String(v));
+
+/**
+ * The writes that change one document and nothing else, and which document each one names — read
+ * exactly as the route reads it, so the document the guard compares is the one the route writes.
+ * In a chat with a subject (#323) these, aimed at the subject, are the only writes made without
+ * asking: every other write, a new document included, waits for the person. A rename, a retitle
+ * (which relinks other documents) and a picture (which makes an attachment) are not here on purpose.
+ */
+const ONE_DOC: Record<
+  string,
+  (
+    q: (k: string) => string | undefined,
+    body: () => Promise<Record<string, unknown>>,
+  ) => Promise<{ name: string; kind: DocKind } | null>
+> = {
+  "/__board/put": async (q) => {
+    const kind = kindOf(q("kind"));
+    return kind ? { name: q("name") ?? "", kind } : null;
+  },
+  "/__board/patch": async (q) => ({ name: q("name") ?? "", kind: "board" }),
+  "/__board/task": async (_q, body) => ({ name: nameIn((await body()).name), kind: "note" }),
+  "/__board/project": async (_q, body) => ({ name: nameIn((await body()).name), kind: "note" }),
+  "/__board/event": async (_q, body) => ({ name: nameIn((await body()).name), kind: "note" }),
+  "/__board/table": async (_q, body) => ({ name: nameIn((await body()).name), kind: "table" }),
+  "/__board/quiz": async (_q, body) => ({ name: nameIn((await body()).name), kind: "quiz" }),
+};
+
+/** What a write outside a chat's subject would do, as the first word of its approval card's line. */
+const VERB: Record<string, string> = {
+  "/__board/create": "Make",
+  "/__board/put": "Rewrite",
+  "/__board/patch": "Edit",
+  "/__board/rename": "Rename",
+  "/__board/retitle": "Retitle",
+  "/__board/duplicate": "Copy",
+  "/__board/mkdir": "Make the folder",
+  "/__board/asset": "Add a picture to",
+  "/__board/upload": "Add a picture for",
+  "/__board/file": "Upload",
+  "/__board/table": "Edit",
+  "/__board/quiz": "Edit",
+  "/__board/trash/restore": "Restore",
+};
+
+/** A route whose body is the bytes of a file, which reading it as JSON would spend. */
+const STREAMED = new Set(["/__board/file"]);
+
+/** A subject's words as the prompt and the approval card say them: one line, and not a page of it. */
+const oneLine = (s: string, max = 120): string => {
+  const flat = s.replace(/\s+/g, " ").trim();
+  return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
+};
+
 interface Waiting {
   step: number;
   resolve: (yes: boolean | null) => void;
@@ -110,6 +174,11 @@ interface Live {
   session: string | null;
   /** Set when the turn must fail whatever the harness says: a tool call written into the reply. */
   broken?: string;
+  /**
+   * The document this turn works on, fixed when it starts: the guard asks before any write that
+   * does not change it alone. Nothing the agent does during the turn can move it.
+   */
+  subject: Subject | null;
 }
 
 export interface AssistantOptions {
@@ -205,6 +274,9 @@ export class Assistant {
     const meta = Object.fromEntries(Object.entries(file).filter(([k]) => !k.startsWith("grant:"))) as unknown as ChatMeta;
     meta.home = home;
     for (const [vault, g] of Object.entries(this.store.grants(file.id))) if (vault !== home) meta[`grant:${vault}`] = g;
+    /* A subject only ever narrows what a turn writes unasked, so the file's word is taken for it —
+       but one without a subject's shape is not a subject, and is not handed on. */
+    if (meta.subject !== undefined && meta.subject !== null && !isSubject(meta.subject)) delete meta.subject;
     return meta;
   }
 
@@ -294,21 +366,45 @@ export class Assistant {
 
   /* -- a turn ------------------------------------------------------------------------------ */
 
-  /** Start a turn. Answers the turn as it starts; the rest arrives on the stream. */
-  say(
+  /**
+   * Start a turn. Answers the turn as it starts; the rest arrives on the stream.
+   *
+   * `subject` is the document the page's chip shows (#323): a document of the page's vault to work
+   * on, `null` for a chip the person removed — the chat is about the whole vault again — and absent
+   * to keep what the chat had, looked up again by its id so a rename since is followed.
+   */
+  async say(
     chat: string,
     text: string,
-    o: { vault?: string | null; provider?: Provider; model?: string; effort?: string | null } = {},
-  ): Turn {
+    o: {
+      vault?: string | null;
+      provider?: Provider;
+      model?: string;
+      effort?: string | null;
+      subject?: { name: string; kind: DocKind } | null;
+    } = {},
+  ): Promise<Turn> {
     const words = text.trim();
     if (!words) throw err(400, "say something");
-    if (this.live.has(chat)) throw err(409, "the chat is already answering", { code: "running" });
+    const busy = () => {
+      if (this.live.has(chat)) throw err(409, "the chat is already answering", { code: "running" });
+    };
+    busy();
     if (!this.port && !this.opts.mcp)
       throw err(409, "the Assistant answers in the app's own server; start it (`anydag serve`) and ask there", {
         code: "no-server",
       });
-    const { root, vault: home } = this.locate(chat, o.vault);
+    const { root, vault: home, meta: was } = this.locate(chat, o.vault);
+    const subject =
+      o.subject === undefined
+        ? await this.refreshed(was.subject)
+        : o.subject === null
+          ? null
+          : await this.subjectOf(o.vault || home, o.subject.name, o.subject.kind);
+    /* Looking the subject up handed the thread back: another turn may have started meanwhile. */
+    busy();
     const file = this.store.update(root, chat, (m) => {
+      if (subject !== undefined) m.subject = subject;
       if (o.provider) m.provider = o.provider;
       if (o.model) m.model = o.model;
       if (o.effort !== undefined) {
@@ -336,7 +432,17 @@ export class Assistant {
       blocks: [],
       status: "running",
     };
-    const live: Live = { turn, root, meta, typing: "", running: null, stopping: false, waiting: new Map(), session: null };
+    const live: Live = {
+      turn,
+      root,
+      meta,
+      typing: "",
+      running: null,
+      stopping: false,
+      waiting: new Map(),
+      session: null,
+      subject: meta.subject ?? null,
+    };
     this.live.set(chat, live);
     this.emit(chat, { type: "turn", turn: this.snapshot(live) });
 
@@ -362,7 +468,10 @@ export class Assistant {
             chat,
             model: meta.model,
             ...(effort ? { effort } : {}),
-            system: systemPrompt(this.reach(meta)),
+            system: systemPrompt({
+              ...this.reach(meta),
+              subject: live.subject && { ...live.subject, home: live.subject.vault === meta.home },
+            }),
             prompt: seeded(unseen, words),
             ...(resume ? { resume } : { fresh }),
             mcp: this.mcpFor(chat),
@@ -379,6 +488,35 @@ export class Assistant {
     };
     run();
     return this.snapshot(live);
+  }
+
+  /** The document `name` of `kind` in `vault` as a chat's subject, or the 404 for it. Writes nothing. */
+  private async subjectOf(vault: string, name: string, kind: DocKind): Promise<Subject> {
+    const v = this.s.pick(vault).vault;
+    await mustExist(v, name, kind);
+    return { vault: v.id, kind, name, id: await v.peekId(name, kind), title: oneLine(await this.titleIn(v, name, kind)) };
+  }
+
+  /** What the page calls a document: its title, else the last part of its name. */
+  private async titleIn(v: Vault, name: string, kind: DocKind): Promise<string> {
+    if (kind === "file") return (await v.fileInfo(name))?.title || leafOf(name);
+    return titleOf((await v.read(name, kind))?.text ?? "") || leafOf(name);
+  }
+
+  /**
+   * The chat's subject as it is now: found again by its id, so a rename or a move since is followed.
+   * One that cannot be found — its vault closed, the document gone — is kept as it was, still the
+   * subject: a write to anything else still asks.
+   */
+  private async refreshed(had: Subject | null | undefined): Promise<Subject | null | undefined> {
+    if (!had?.id) return had;
+    try {
+      const v = this.s.pick(had.vault).vault;
+      const found = await v.resolve(had.id);
+      return found ? await this.subjectOf(had.vault, found.name, found.kind) : had;
+    } catch {
+      return had;
+    }
   }
 
   private reach(meta: ChatMeta): { reach: Reach[]; others: { id: string; name: string }[] } {
@@ -594,9 +732,11 @@ export class Assistant {
     }
     return this.s.within(vault, async () => {
       if (reads) return next();
-      const what = APPROVE[p];
+      const what =
+        APPROVE[p] ?? (live.subject && !(await this.onSubject(c, live.subject, vault)) ? outside(live.subject) : undefined);
       if (what) {
-        const detail = await this.detailOf(c);
+        /* Outside the subject, the card says what the write would do: any write route can be one. */
+        const detail = APPROVE[p] ? await this.detailOf(c) : `${VERB[p] ?? "Change"} ${await this.detailOf(c)}`;
         const yes = await this.ask(live, { kind: "approval", id: newId("b", this.store.device), what, detail, answer: null });
         if (!yes)
           throw err(
@@ -624,10 +764,30 @@ export class Assistant {
     return g.mode;
   }
 
+  /**
+   * Whether a write changes the chat's subject and nothing else: a route of `ONE_DOC`, in the
+   * subject's vault, naming the file the subject is. Runs inside the vault's scope.
+   */
+  private async onSubject(c: Context, subject: Subject, vault: string): Promise<boolean> {
+    if (vault !== subject.vault) return false;
+    const read = ONE_DOC[c.req.path];
+    if (!read) return false;
+    const target = await read(
+      (k) => c.req.query(k),
+      () => bodyOf(c).catch(() => ({})),
+    );
+    if (!target || !target.name) return false;
+    try {
+      return this.s.vault.fileOf(target.name, target.kind) === this.s.vault.fileOf(subject.name, subject.kind);
+    } catch {
+      return false;
+    }
+  }
+
   private async detailOf(c: Context): Promise<string> {
-    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = STREAMED.has(c.req.path) ? {} : ((await c.req.json().catch(() => ({}))) as Record<string, unknown>);
     const at = (k: string) => (typeof body[k] === "string" && body[k] ? (body[k] as string) : null);
-    const what = at("name") ?? at("folder") ?? at("from") ?? at("id");
+    const what = at("name") ?? at("folder") ?? at("from") ?? at("id") ?? (c.req.query("name") || null);
     const to = at("to");
     // A transfer's `to` is a vault id, which says nothing to a person; a move's is a folder.
     const where = to && c.req.path !== "/__board/transfer" ? ` → ${to}` : "";
