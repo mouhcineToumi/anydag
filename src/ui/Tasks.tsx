@@ -6,6 +6,7 @@ import {
   FileText,
   History,
   List,
+  ListChecks,
   MoreHorizontal,
   Plus,
   Search,
@@ -29,7 +30,6 @@ import type { Spot } from "@/calendar/menu";
 import { collation } from "@/locale";
 import { folderOf, projectFolders, projectFor, type Project } from "@/note/project";
 import {
-  compareTasks,
   overdue,
   PRIORITY_LABEL,
   STATUS_LABEL,
@@ -397,8 +397,9 @@ export function TasksView({
   const filtered = words.length > 0 || inUse.length > 0;
 
   /* The list's order and its headings: the Done tab keeps its own order, most recently finished first. */
-  const order = tab === "done" ? display.done : display.order;
-  const then = tab === "done" ? display.doneTie : display.tie;
+  const doneOrder = layout === "list" && tab === "done";
+  const order = doneOrder ? display.done : display.order;
+  const then = doneOrder ? display.doneTie : display.tie;
   const groups = useMemo(() => {
     const all = groupRows(rows.map(placed), display.group, compareRows(order, then), now);
     const onIt = display.group === "status" ? all.filter((g) => onTab(g.key as TaskStatus, tab)) : all;
@@ -537,10 +538,14 @@ export function TasksView({
     return { all: tabbed.length, shown: shown.length, late: shown.filter((r) => overdue(r.task)).length };
   }, [rows, tabbed]);
   const total = Object.keys(list.tasks).length;
+  /* A board column is in the Order button's order, as a group of the list is (#311). */
+  const boardOrder = compareRows(order, then);
   const by = (status: TaskStatus) =>
     rows
       .filter((r) => r.place.status === status)
-      .sort((a, b) => compareTasks({ task: a.place, title: a.title }, { task: b.place, title: b.title }));
+      .map(placed)
+      .sort(boardOrder)
+      .map((p) => p.row);
   /* The order the rows are drawn in, which a task's page steps through ("2 of 13"). */
   useEffect(() => {
     const drawn =
@@ -757,7 +762,7 @@ export function TasksView({
         );
       case "order":
         return orderRows(order, then, (o, t) =>
-          setDisplay(tab === "done" ? { ...display, done: o, doneTie: t } : { ...display, order: o, tie: t }),
+          setDisplay(doneOrder ? { ...display, done: o, doneTie: t } : { ...display, order: o, tie: t }),
         );
       case "display":
         return displayRows(
@@ -875,11 +880,9 @@ export function TasksView({
         <span className="dag-tasks__count" data-dag-tasks-count="" aria-live="polite">
           {total === 0 ? "No tasks yet" : countLine(layout === "board" ? "all" : tab, counted, filtered)}
         </span>
+        <LineButton kind="order" label="Order" onOpen={(el) => setMenu({ of: "order", at: at(el) })} />
         {layout === "list" ? (
-          <>
-            <LineButton kind="order" label="Order" onOpen={(el) => setMenu({ of: "order", at: at(el) })} />
-            <LineButton kind="display" label="Display" onOpen={(el) => setMenu({ of: "display", at: at(el) })} />
-          </>
+          <LineButton kind="display" label="Display" onOpen={(el) => setMenu({ of: "display", at: at(el) })} />
         ) : null}
       </div>
       {newRow ? (
@@ -1440,7 +1443,7 @@ function Columns({
                     />
                     <span className="dag-tasks__card-title">{r.title}</span>
                   </div>
-                  {r.task.due || r.task.priority || chip(r) || r.tags.length ? (
+                  {r.task.due || r.task.priority || r.task.items || chip(r) || r.tags.length ? (
                     <div className="dag-tasks__card-meta">
                       {r.task.priority ? (
                         <span
@@ -1453,7 +1456,19 @@ function Columns({
                       ) : null}
                       <TagChips tags={r.tags} />
                       {chip(r) ? <ProjectChip project={chip(r)!.project} title={chip(r)!.title} /> : null}
-                      <DueLabel task={r.task} />
+                      {r.task.items ? (
+                        <span
+                          className="dag-tasks__items"
+                          data-dag-task-items={`${r.task.items.done}/${r.task.items.total}`}
+                          title={`${r.task.items.done} of ${r.task.items.total} check items ticked`}
+                        >
+                          <ListChecks size={12} strokeWidth={2} aria-hidden="true" />
+                          {r.task.items.done}/{r.task.items.total}
+                        </span>
+                      ) : null}
+                      <span className="dag-tasks__card-due">
+                        <DueLabel task={r.task} />
+                      </span>
                     </div>
                   ) : null}
                 </div>
