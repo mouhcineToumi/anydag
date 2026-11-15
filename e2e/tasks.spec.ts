@@ -136,7 +136,8 @@ test("a note with a status is on the Tasks page, in its group, and one click on 
   await expect.poll(() => read("late")).toContain("\nstatus: in-progress\n");
   await expect(page.locator(`[data-dag-tasks-group="in-progress"] [data-dag-task-row="${late}"]`)).toBeVisible();
 
-  /* And by the key each one shows: 1 is To do. */
+  /* And by the key each one shows: 1 is To do. The row's `⋯` is there under the pointer. */
+  await page.locator(`[data-dag-task-row="${late}"]`).hover();
   await page.locator(`[data-dag-task-more="${late}"]`).click();
   await expect(page.locator(`[data-dag-task-menu="${late}"]`)).toBeVisible();
   await page.keyboard.press("1");
