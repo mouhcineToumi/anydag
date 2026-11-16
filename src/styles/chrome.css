@@ -1459,7 +1459,9 @@ html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
  */
 .dag-vault__form { display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; padding: 4px 8px 6px; text-align: left; }
 .dag-vault__form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
-.dag-vault__form .dag-sidebar__name-input { height: 30px; font-family: var(--dag-font-sans); font-size: var(--chrome-text-md); }
+/* `flex: none`: a label is a column, and the field's own `flex: 1` there is a basis of 0 high, which
+   beat `height` and left the name field at its text's height (#384). A row (below) turns it back on. */
+.dag-vault__form .dag-sidebar__name-input { flex: none; height: 30px; font-family: var(--dag-font-sans); font-size: var(--chrome-text-md); }
 .dag-vault__field-row { display: flex; align-items: center; gap: 6px; }
 .dag-vault__field-row > .dag-sidebar__name-input { flex: 1; min-width: 0; }
 .dag-vault__form-acts { display: flex; gap: 6px; justify-content: flex-end; }

@@ -493,6 +493,8 @@ test(
     await expect(page.locator("[data-dag-vault-open-form] label")).toContainText("Folder to open");
     await expect(page.locator("[data-dag-vault-open-go]")).toHaveClass(/dag-button--primary/);
     await expect(page.locator("[data-dag-vault-open-go]")).toBeDisabled();
+    /* A field in a column of the form is a field's height, not the height of its text (#384). */
+    await expect.poll(async () => (await page.locator("[data-dag-vault-open-path]").boundingBox())?.height).toBe(30);
     await page.locator("[data-dag-vault-open-form]").getByRole("button", { name: "Cancel" }).click();
 
     /* The create half says what it is, and puts its labels above their fields, left-aligned. */
@@ -515,6 +517,11 @@ test(
     const labelBox = await form.locator("label").first().locator("span").first().boundingBox();
     const fieldBox = await name.boundingBox();
     expect(labelBox!.y + labelBox!.height).toBeLessThanOrEqual(fieldBox!.y);
+    /* #384: the name field, in a column, was as tall as its text; it is as tall as the folder field beside Browse. */
+    const parentBox = await page.locator("[data-dag-vault-create-parent]").boundingBox();
+    expect(fieldBox!.height).toBe(30);
+    expect(fieldBox!.height).toBe(parentBox!.height);
+    expect(fieldBox!.width).toBeGreaterThan(200);
     await expect(create).toHaveText("Create");
     await expect(create).toBeDisabled();
     await expect(create).toHaveClass(/dag-button--primary/);
