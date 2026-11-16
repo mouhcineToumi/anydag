@@ -99,12 +99,13 @@ for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))
 }
 
 /* 4. The chrome's scale (#205). In `chrome.css`, a font size, a corner, a shadow, a layer or a
-      duration reads `--dag-ui-*`. The chrome had none of these and typed its own (26 font sizes,
-      28 shadows, 19 z-indexes) or borrowed the diagram's (`--dag-metric-radius-chip` as every
-      button's corner, which counts as a literal here: it is the diagram's number, not the
-      chrome's). The rules that still type one are counted per property against
-      `scripts/chrome-literals.json`, and the count may only go down: a new literal fails, and a
-      migration that removes some lowers the file in the same commit. */
+      duration reads `--dag-ui-*`. A font size reads `--chrome-text-*` instead: the theme's
+      `ui.text.*` steps at the person's text size (#325), composed in `chrome.css`'s head. The chrome
+      had none of these and typed its own (26 font sizes, 28 shadows, 19 z-indexes) or borrowed the
+      diagram's (`--dag-metric-radius-chip` as every button's corner, which counts as a literal
+      here: it is the diagram's number, not the chrome's). The rules that still type one are counted
+      per property against `scripts/chrome-literals.json`, and the count may only go down: a new
+      literal fails, and a migration that removes some lowers the file in the same commit. */
 const CHROME = "src/styles/chrome.css";
 const CHROME_ALLOW = "scripts/chrome-literals.json";
 const STRUCTURAL = {
@@ -143,7 +144,7 @@ for (const m of chromeText.matchAll(
 )) {
   const prop = m[1] === "animation" ? "transition" : m[1];
   const value = m[2].trim().replace(/\s*!important$/, "");
-  if (value.includes("var(--dag-ui-")) continue;
+  if (value.includes("var(--dag-ui-") || value.includes("var(--chrome-")) continue;
   if (STRUCTURAL[prop].test(value)) continue;
   if (prop === "box-shadow" && isRing(value)) continue;
   chromeCounts[prop] += 1;

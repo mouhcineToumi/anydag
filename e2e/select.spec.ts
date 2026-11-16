@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
-import { lead } from "./keys";
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
 
 /**
  * Editing on the canvas: select, move together, delete, duplicate, copy and paste, add, type, undo.
@@ -312,6 +312,21 @@ test("typing on a card writes its body as Markdown, and escape closes it", async
   /* The whole run of typing is one undo. */
   await page.keyboard.press("Control+z");
   await expect.poll(read, { timeout: 5_000 }).toBe(BOARD);
+});
+
+test("Enter in a card's list makes the next item, and the file says it in Markdown", async ({ page }) => {
+  await open(page);
+  await clickItem(page, "one");
+  await page.keyboard.press("Enter");
+  const text = page.locator('[data-dag-card-text="one"] [contenteditable="true"]');
+  await expect(text).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("- apples");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("pears");
+  await expect(page.locator('[data-dag-card-text="one"] .bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(2);
+  await expect.poll(read, { timeout: 5_000 }).toContain("```md {#one}\n- apples\n- pears\n```");
+  expect(read()).toContain("```md {#two}\nThe second item.\n```");
 });
 
 test("a card's text opened and left writes nothing, and a press outside closes it", async ({ page }) => {

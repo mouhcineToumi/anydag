@@ -18,7 +18,8 @@ import { HUE_ORDER } from "../../src/dsl/ir";
 import { isDay, eventOf, withEvent } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
-import { STATUSES, dueOf, statusOf, taskOf, withTask } from "../../src/note/task";
+import { tagKey, tagOf } from "../../src/note/tags";
+import { PRIORITIES, STATUSES, dueOf, indexedTask, priorityOf, statusOf, taskOf, withTask } from "../../src/note/task";
 import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
 import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/wikilinks";
@@ -27,11 +28,12 @@ import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../
 import { OPS_SHAPE } from "../handle";
 import { type Doc, grammar, type Over, type Parsed } from "../grammar";
 import type { Entry } from "../parsing";
+import { type Listed, listed, overOfVault } from "../upkeep";
 import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { paced } from "../pace";
 import { mimeOf } from "../uploads";
-import { Conflict, NotFound, Refused, byKind, textKey, type Tree } from "../vault";
+import { Conflict, NotFound, Refused, byKind, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
 import { readPrefs } from "./prefs";
 import { relinking } from "../relink";
@@ -44,33 +46,6 @@ export const fileAnswer = (name: string, id: string | null | undefined, title: s
   const ext = extOf(name);
   return { name, id: id ?? null, title: title ?? null, ext, mime: mimeOf(ext), bytes };
 };
-
-interface Listed {
-  key: string;
-  name: string;
-  kind: TextKind;
-  id: string;
-}
-
-/* Per tree, which a kept listing hands out again while nothing moved: sorting 50,000 names is not free. */
-const listedOf = new WeakMap<Tree, Listed[]>();
-
-/** Every listed text with an id, keyed the way `Vault.texts` keys them. Components are not listed. */
-function listed(tree: Tree): Listed[] {
-  let had = listedOf.get(tree);
-  if (!had) {
-    const docs: Listed[] = [];
-    for (const kind of ["board", "note", "quiz", "table"] as const) {
-      for (const name of byKind(tree)[kind]) {
-        const id = tree.ids[name];
-        if (id) docs.push({ key: textKey(name, kind), name, kind, id });
-      }
-    }
-    docs.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    listedOf.set(tree, (had = docs));
-  }
-  return had;
-}
 
 /* The texts an answer holds, per answer: `Parsed` hands the same one back while nothing moved. */
 const presentOf = new WeakMap<ReadonlyMap<string, Doc | null>, { all: Listed[]; docs: Listed[] }>();
@@ -226,6 +201,7 @@ async function indexAnswer(
       task: (own && f?.task) || null,
       project: (own && f?.project) || null,
       event: (own && f?.event) || null,
+      tags: (own && (f?.tags as string[] | undefined)) || null,
       questions: f?.questions ?? null,
       refs: resolveWikiRefs((f?.refs as Ref[] | undefined) ?? [], ix),
     };
@@ -237,25 +213,8 @@ async function indexAnswer(
   return out;
 }
 
-/**
- * What a corpus and a search are asked over: every listed text with an id — named, with its stamp
- * from the kept listing, its id and the title its listing gives it — and every attachment with an id.
- * Nothing here reads a text: the worker reads, parses and answers (`server/searching.ts`), and the
- * units and the engine stay there (#279).
- */
-async function overOf(s: Session): Promise<Over> {
-  const tree = await s.vault.tree();
-  const all = listed(tree);
-  const stamps = s.vault.textStamps(tree);
-  const over: Over = { entries: [], meta: [], files: [] };
-  await paced(all, (d) => {
-    const stamp = stamps?.get(d.key);
-    over.entries.push(stamp === undefined ? [d.key, d.name, d.kind] : [d.key, d.name, d.kind, stamp]);
-    over.meta.push([d.id, tree.titles[d.name] ?? null]);
-  });
-  for (const n of tree.files) if (tree.ids[n]) over.files.push([tree.ids[n], n, tree.titles[n] ?? null]);
-  return over;
-}
+/** What a corpus and a search are asked over, for this request's vault (`server/upkeep.ts`). */
+const overOf = (s: Session): Promise<Over> => overOfVault(s.vault);
 
 /**
  * `/__board/corpus`, streamed as the worker cuts it: its parts are the JSON of their docs already,
@@ -379,6 +338,7 @@ function listOf(t: Tree, templates: string | null): Promise<string> {
     tasks: t.tasks,
     projects: t.projects,
     events: t.events,
+    tags: t.tags,
     templates,
     created: t.created,
     quizzes: t.quizzes,
@@ -430,13 +390,35 @@ export function docRoutes(app: Hono, s: Session): void {
 
   app.get("/__board/corpus", async (c) => corpusAnswer(c, s));
 
+  /* `tag=` keeps the hits in documents carrying that tag (#327), from the listing's tags — so a
+     template is left out, as it is from every filter — and with no words lists those documents, by
+     title. It narrows what is ranked, before `limit` counts. */
   app.get("/__board/search", async (c) => {
     const q = c.req.query("q") ?? "";
-    if (!q.trim()) return c.json({ query: q, hits: [] });
+    const asked = c.req.query("tag");
+    const tag = asked ? tagOf(asked) : undefined;
+    if (asked && !tag) throw err(400, `\`${asked}\` is not a tag: letters, digits, \`_\`, \`-\` and \`/\`, with a letter`);
     const raw = c.req.query("limit");
     const limit = raw === undefined ? undefined : Number(raw);
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) throw err(400, "`limit` is a whole number above zero");
-    return c.json(await s.corpus.search(await overOf(s), q, limit));
+    if (!tag) {
+      if (!q.trim()) return c.json({ query: q, hits: [] });
+      return c.json(await s.corpus.search(await overOf(s), q, limit));
+    }
+    const tree = await s.vault.tree();
+    const names = Object.keys(tree.tags).filter((n) => tree.tags[n]!.some((t) => tagKey(t) === tagKey(tag)));
+    if (q.trim()) return c.json({ ...(await s.corpus.search(await overOf(s), q, limit, names)), tag });
+    const carrying = new Set(names);
+    const docs: { id: string | null; name: string; kind: TextKind; title: string | null }[] = [];
+    for (const kind of ["board", "note", "quiz", "table"] as const)
+      for (const name of byKind(tree)[kind])
+        if (carrying.has(name)) docs.push({ id: tree.ids[name] ?? null, name, kind, title: tree.titles[name] ?? null });
+    const label = (d: (typeof docs)[number]) => d.title ?? leafOf(d.name);
+    docs.sort(
+      (a, b) =>
+        label(a).localeCompare(label(b), undefined, { numeric: true, sensitivity: "base" }) || a.name.localeCompare(b.name),
+    );
+    return c.json({ query: q, tag, hits: [], docs: limit ? docs.slice(0, limit) : docs, count: docs.length });
   });
 
   app.get("/__board/resolve", async (c) => {
@@ -568,20 +550,26 @@ export function docRoutes(app: Hono, s: Session): void {
       if (day === undefined) throw err(400, `\`${str(raw)}\` is not a date: write it YYYY-MM-DD`);
       change[key] = day;
     }
-    if (!Object.keys(change).length) throw err(400, "expected `status`, `due` or `start`");
+    if ("priority" in body) {
+      const raw = body.priority;
+      const priority = raw === null ? null : (priorityOf(raw) ?? undefined);
+      if (priority === undefined) throw err(400, `\`${str(raw)}\` is not a priority: ${PRIORITIES.join(", ")}`);
+      change.priority = priority;
+    }
+    if (!Object.keys(change).length) throw err(400, "expected `status`, `due`, `start` or `priority`");
     const text = await recompute(
       s.vault,
       name,
       "note",
       (t) => {
         const next = withTask(t, change);
-        if ((change.due || change.start) && !taskOf(next))
-          throw err(400, `\`${name}\` is not a task: give it a status as well as a date`);
+        if ((change.due || change.start || change.priority) && !taskOf(next))
+          throw err(400, `\`${name}\` is not a task: give it a status as well as a date or a priority`);
         return next;
       },
       "the status",
     );
-    return c.json({ name, task: taskOf(text) ?? null });
+    return c.json({ name, task: indexedTask(text, Date.now()) ?? null });
   });
 
   app.post("/__board/project", async (c) => {

@@ -24,7 +24,7 @@ export interface ChatState {
   gone: boolean;
 }
 
-const EMPTY: ChatState = {
+export const EMPTY: ChatState = {
   meta: null,
   vault: "",
   turns: [],
@@ -46,7 +46,24 @@ const union = <T extends { id: string }>(a: readonly T[], b: readonly T[]): T[] 
   return [...by.values()].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
 };
 
-function reduce(s: ChatState, a: Act): ChatState {
+/**
+ * The turn in flight as a read and the stream both have it. The read is asked for as the stream
+ * opens, and the two answer on different connections in no set order: a step the stream brought
+ * after the server took the read's snapshot can arrive first, and taking the read whole dropped it —
+ * an approval card asked in a new chat's first moments was never drawn, and the turn waited on an
+ * answer nobody was shown (#323). So the steps the read has are the read's, and any the stream has
+ * past them are kept; the same for the blocks, by how many writes they hold.
+ */
+function merged(read: Turn, held: Turn | null): Turn {
+  if (!held || held.id !== read.id) return read;
+  const steps = held.steps.length > read.steps.length ? [...read.steps, ...held.steps.slice(read.steps.length)] : read.steps;
+  const ops = (t: Turn) => t.blocks.reduce((n, b) => n + b.ops.length, 0);
+  const blocks = ops(held) > ops(read) ? held.blocks : read.blocks;
+  return steps === read.steps && blocks === read.blocks ? read : { ...read, steps, blocks };
+}
+
+/** What the page holds of a chat, after one thing happened to it. Exported for its tests. */
+export function reduce(s: ChatState, a: Act): ChatState {
   switch (a.t) {
     case "reset":
       return EMPTY;
@@ -57,7 +74,8 @@ function reduce(s: ChatState, a: Act): ChatState {
       const done = new Set(turns.map((t) => t.id));
       /* The read's turn in flight is newer than what the stream built before it answered; a turn the
          stream already ended is in `turns` and is not in flight any more. */
-      const live = a.read.live && !done.has(a.read.live.id) ? a.read.live : s.live && !done.has(s.live.id) ? s.live : null;
+      const live =
+        a.read.live && !done.has(a.read.live.id) ? merged(a.read.live, s.live) : s.live && !done.has(s.live.id) ? s.live : null;
       return {
         meta: a.read.chat,
         vault: a.read.vault,

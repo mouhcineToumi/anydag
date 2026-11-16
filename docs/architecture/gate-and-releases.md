@@ -82,8 +82,8 @@ browser suite.
 fails on a file it would change, so run `npm run format` before committing (or let your editor's
 Biome extension do it). A whole-tree reformat is its own commit, listed in `.git-blame-ignore-revs`. `npm run lint:promises` is typescript-eslint's
 three promise rules (`no-floating-promises`, `no-misused-promises`, `await-thenable`) over one program
-that includes `e2e/` and `desktop/`, which no `tsc` step checks — about 40 s, so it is CI's `promises`
-job and not in the hook. Biome's own promise rules are not used: they infer types without `tsc`, and
+that includes `e2e/` and `desktop/`, which no `tsc` step checks — about 27 s, so it is CI's `promises`
+job and the pre-push hook's, not the commit hook's. Biome's own promise rules are not used: they infer types without `tsc`, and
 missed an unawaited `fs.readFile()` while flagging correct code. **knip** (`knip.jsonc`) holds the count
 of unused files, exports and dependencies at zero; each exception in it says why.
 
@@ -105,7 +105,7 @@ its published sha256 (`.github/actions/gitleaks/`). GitHub's own secret scanning
 on for the repository too (Settings → Code security). If a secret gets through: revoke it first
 (`SECURITY.md`, *If a secret was committed*).
 
-`.githooks/pre-commit` runs the secret scan and then the fast tier, and `npm run prepare` installs the hooks with
+`.githooks/pre-commit` runs the secret scan and then the fast tier, `.githooks/pre-push` the two cheap checks CI used to be first to run (see *What runs where* below), and `npm run prepare` installs the hooks with
 `git config core.hooksPath .githooks` — relative on purpose, so one setting serves every worktree.
 `prepare` is `scripts/hooks.mjs`, which does nothing without git or a repository, because `npm ci`
 runs it where there may be neither — and is Node, because npm runs a script line with `cmd.exe` on
@@ -124,12 +124,19 @@ produces a valid one.** `npm run e2e:local` is the host's own browser and compar
 (`ANYDAG_NO_SNAPSHOTS=1` is set for it): the `neutral` theme is `system-ui`, so its cards are measured
 by whatever fonts the machine has, and a host's layout is not the image's.
 
+**Every spec imports `test` from `e2e/fixture.ts`**, which pins every page it opens, and every
+request it makes itself, to the suite's vault (`test/e2e-fixture.test.ts` refuses the package's own `test`). One server serves the whole run, and `vaults.spec.ts` and `sync.spec.ts` move its default as the
+point of their checks; a page that names no vault would pin whichever vault was opened last. A check
+that is *about* the default — a bare `/`, a link to a vault that is not open — passes `onServerDefault`
+beside its title and gets no pin. See *A page that names no vault lands in the server's default* in
+[`things-that-will-bite.md`](things-that-will-bite.md).
+
 **CI is a handful of workflows, and each required check always reports.**
 
 | Workflow | Runs | On |
 |---|---|---|
-| `ci.yml` → `CI passed` | the fast tier and `promises` (`checks.yml`); the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
-| `e2e.yml` → `e2e` | the `@smoke` tier on a pull request; the whole suite sharded four ways on a push, with the shards' reports merged into one | the same branches; `workflow_call` with `scope: smoke \| full` |
+| `ci.yml` → `CI passed` | the fast tier (`checks.yml`: `fast tier` — `checks.sh static` —, `unit` and the watched store contracts, as three jobs side by side) and `promises`; the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
+| `e2e.yml` → `e2e` | on a pull request, what the change can reach (`scope: changed`: the `@smoke` tier plus the specs `scripts/e2e-plan.mjs` names), sharded three ways; the whole suite sharded four ways on a push, one run at a time per branch with only the newest push waiting; the shards' reports merged into one, off the path to `e2e` | the same branches; `workflow_call` with `scope: smoke \| full` |
 | `ci.yml` → `secrets` (in `CI passed`) | gitleaks over the commits the pull request or push adds; the selftest first | the same events as `ci.yml` |
 | `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
 | `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
@@ -142,19 +149,47 @@ them is skipped, and a workflow with `paths-ignore` never starts, and either lea
 something owed did not pass. `scripts/e2e-plan.mjs` decides what the browser can see (prose, CI config,
 unit tests and the desktop shell are nothing to it; `boards/` is a fixture, not prose).
 
+**The path from a push to a green pull request is the `e2e` chain, and it was cut to its fixed cost**
+(#258, which has the numbers). A shard pays about 47 s before its first test — pulling the image,
+`npm ci`, starting the dev server — so the pull request's selection is split three ways rather than
+run on one job, and `e2e` does not wait for the merged report. A pull request's shards each ask
+`e2e-plan.mjs` for the selection after `npm ci`, because only there can it ask Playwright's
+`--only-changed` which specs a change under `e2e/` reaches; the `plan` job, which has no
+`node_modules`, only decides whether anything runs. **A push to `develop` runs the whole suite once
+for the tip, not once a merge**: the push runs share one concurrency group per branch, which lets one
+run finish and keeps only the newest waiting. Ten merges in ninety seconds had started forty
+four-minute shards and queued every open pull request for up to four and a half minutes. A red push
+run is bisected among the merges since the last green one; the nightly runs the whole suite again.
+
 **The `@smoke` tag** (`test("…", { tag: "@smoke" }, …)`) is a promise about *breadth*: a new surface gets
 one fast test in it. Tag a test that touches a surface nothing tagged touches; do not tag a second test
 for a surface that has one — the tier is under a minute on purpose.
 
-**`pre-push` runs only what the push can have changed.** Nothing new on the push (every sha is already on
-a remote) → no tests, one line saying so. Otherwise `scripts/e2e-plan.mjs` reads the diff against
-`origin/develop` (else `origin/main`, else the whole suite) and answers with a `--grep`: docs, CI config
-and unit tests run nothing; application code the `@smoke` tier; what can move pixels (`boards/`,
-`icons/`, the drawing layers of `src/`) also `reference.spec.ts`; `api/` and `server/sync/` also `sync.spec.ts`; and a
-change under `e2e/` the specs Playwright's `--only-changed` traces it to. It runs in the image when
-Docker answers, else on the host with no screenshots, and says which. The number of browsers comes from
-the machine (`scripts/e2e-lib.sh`: cores − 2 and free memory at 600 MB a worker, clamped to 1..6) and the
-run prints why; `ANYDAG_E2E_WORKERS` overrides.
+**What runs where** (#258 measured it; the numbers are on the issue):
+
+| Where | Runs | About |
+|---|---|---|
+| pre-commit | the secret scan, then `npm run checks` (`checks.sh`: static half, then the unit suite) | 28 s on twelve cores |
+| pre-push | `npm run lint:promises` and the store's contracts over a watched vault, side by side; the browser selection only with `ANYDAG_PREPUSH_E2E=1` | 30 s |
+| pull request | all of the above again (CI is the authority: hooks can be skipped and machines are dirty), the desktop app on Linux, and the browser selection below, sharded three ways | the required checks green in about a minute and a half |
+| push to `develop` | the fast tier and the whole browser suite, once for the newest push of a burst | |
+| nightly, release | everything, with the api's Postgres suites and the desktop app on three systems | |
+
+**`pre-push` runs the two cheap checks that only CI used to run, and the browser suite only when
+asked.** Those two were what went red on pull requests; together they are about half a minute, so they
+belong before the push. The browser suite was the same `@smoke` grep in the same image that the pull
+request runs a minute later, a minute of every push spent repeating CI, so it moved to the pull request
+(`scope: changed`) and is opt-in here. Nothing new on the push (every sha is already on a remote) → no
+checks, one line saying so; only prose changed (a `.md` outside `boards/`, or `docs/`) → no checks.
+
+**The browser selection** is `scripts/e2e-plan.mjs`'s answer for the diff against `origin/develop` (else
+`origin/main`, else the whole suite), one `--grep`: docs, CI config and unit tests run nothing;
+application code the `@smoke` tier; what can move pixels (`boards/`, `icons/`, the drawing layers of
+`src/`) also `reference.spec.ts`; `api/` and `server/sync/` also `sync.spec.ts`; and a change under
+`e2e/` the specs Playwright's `--only-changed` traces it to. A pull request's shards run it; so does
+`ANYDAG_PREPUSH_E2E=1 git push`, in the image when Docker answers, else on the host with no screenshots,
+and it says which. The number of browsers comes from the machine (`scripts/e2e-lib.sh`: cores − 2 and
+free memory at 600 MB a worker, clamped to 1..6) and the run prints why; `ANYDAG_E2E_WORKERS` overrides.
 
 **`playwright.config.ts` sets `retries: 1`.** A check that passes on its second try is reported as
 `flaky` on Playwright's summary line; one that fails twice is a failure. Under `CI` it also sets

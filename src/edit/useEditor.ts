@@ -672,6 +672,19 @@ interface Options {
   onOpenBoard?(name: string, kind?: FileKind): void;
   /** Show a page — the one an add just made, or the survivor after a delete. */
   onOpenPage?(id: string): void;
+  /**
+   * What outlives the editor: a document tab keeps its board's undo and selection while another
+   * tab is in front and the board is unmounted (`src/ui/tabs/keep.ts`). Mounted again on the same
+   * board, the editor takes them back rather than starting clean.
+   */
+  keep?: EditorKeep;
+}
+
+/** The editor's state a document tab keeps. `board` is the board it belongs to. */
+export interface EditorKeep {
+  board?: string;
+  history?: History;
+  selected?: ReadonlySet<string>;
 }
 
 export function useEditor({
@@ -690,8 +703,13 @@ export function useEditor({
   onSettings,
   onOpenBoard,
   onOpenPage,
+  keep,
 }: Options): Editor {
-  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  /* The board a kept state belongs to, until the board it was kept for has loaded — or another has. */
+  const restoring = useRef(keep?.history ? keep.board : undefined);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() =>
+    restoring.current !== undefined && keep?.selected ? keep.selected : new Set(),
+  );
   const [editing, setEditing] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
   /* The link picked on the canvas. Not part of `selected`: a link is not an item — it cannot be
@@ -740,7 +758,13 @@ export function useEditor({
   const [overrides, setOverrides] = useState<Map<string, Override>>(new Map());
   const [tick, setTick] = useState(0);
 
-  const history = useRef(new History()).current;
+  const history = useRef(keep ? (keep.history ??= new History()) : new History()).current;
+  /* Kept as it changes: the editor may go at any moment, and an unmount reads no state. */
+  useEffect(() => {
+    if (!keep || !board) return;
+    keep.board = board.name;
+    keep.selected = selected;
+  }, [keep, board, selected]);
 
   /* Everything a gesture or a key reads, as of *now* rather than as of the render that created
      the handler. `ctl` never changes identity, so it cannot close over state. */
@@ -4022,8 +4046,15 @@ export function useEditor({
     });
   }, [history]);
 
-  /* A new board is a new document; what was undoable on the last one is not on this one. */
+  /* A new board is a new document; what was undoable on the last one is not on this one. A board
+     mounted again in its tab is the same document, and keeps what the tab kept until another opens. */
   useEffect(() => {
+    if (restoring.current !== undefined) {
+      if (!board) return;
+      const same = board.name === restoring.current;
+      restoring.current = undefined;
+      if (same) return;
+    }
     history.clear();
     setSelected(new Set());
     setEditing(null);
@@ -4186,10 +4217,14 @@ export function useEditor({
          itself rather than on a control — so without this an arrow or a Delete pressed there moved
          or deleted what is selected on the board behind it. Its Escape and `ctrl+,` are its own.
          Every dialog in the app's frame (`ui/Dialog.tsx`) and every toast (`ui/Toast.tsx`) is the
-         same rule: a key aimed at one of their controls must not reach the board. */
+         same rule: a key aimed at one of their controls must not reach the board. The Assistant
+         panel's grip is here for its arrows: it is focusable and a separator, so it is not
+         `typing()`, and Left/Right must move the panel's edge rather than a selected item. */
       if (
         e.target instanceof Element &&
-        e.target.closest("[data-dag-settings],[data-dag-dialog],[data-dag-toast],[data-dag-telemetry-ask],[data-dag-feedback]")
+        e.target.closest(
+          "[data-dag-settings],[data-dag-dialog],[data-dag-toast],[data-dag-telemetry-ask],[data-dag-feedback],[data-dag-assistant-grip]",
+        )
       )
         return;
       if (typing(e.target)) {

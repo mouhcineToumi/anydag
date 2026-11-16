@@ -489,6 +489,107 @@ describe("the span map", () => {
       "Hello\n",
     );
   });
+
+  it("writes nothing for the empty paragraph a click below the last block leaves", async () => {
+    /* The line after the last block (#317): the editor holds it, and the file never learns of it. */
+    const md = "A paragraph.\n\n![a picture](picture.png)\n";
+    const { blocks, loaded } = load(md);
+    const doc = await hold(blocks);
+    expect(save(settle(loaded, doc), [...doc, { id: "below", type: "paragraph", content: [] }])).toBe(md);
+  });
+});
+
+/*
+ * Empty lines between paragraphs (#318). Markdown has no empty paragraph, so an Enter pressed twice
+ * between two paragraphs wrote nothing and was gone the next time the note opened. An empty line
+ * between two blocks is now `&nbsp;` on a line of its own; one at either end is still the editor's.
+ */
+describe("empty lines", () => {
+  const p = (text: string): NoteBlock => ({ type: "paragraph", content: text ? [{ type: "text", text, styles: {} }] : [] });
+  const words = (blocks: NoteBlock[]) =>
+    blocks.map((b) => (Array.isArray(b.content) ? b.content.map((c) => (c.type === "text" ? c.text : "?")).join("") : "?"));
+
+  it("writes an empty paragraph between two blocks as &nbsp;, and reads it back as one", async () => {
+    const md = blocksToMd([p("First."), p(""), p(""), p(""), p("Second.")]);
+    expect(md).toBe("First.\n\n&nbsp;\n\n&nbsp;\n\n&nbsp;\n\nSecond.");
+    const back = await hold(mdToBlocks(md));
+    expect(back.map((b) => b.type)).toEqual(["paragraph", "paragraph", "paragraph", "paragraph", "paragraph"]);
+    expect(words(back)).toEqual(["First.", "", "", "", "Second."]);
+    /* Held by the real editor and written again, it is the same bytes. */
+    expect(blocksToMd(back)).toBe(md);
+  });
+
+  it("draws the empty line it writes, as an empty paragraph", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReactMarkdown, { remarkPlugins: [remarkGfm] }, "First.\n\n&nbsp;\n\nSecond."),
+    );
+    expect(html.replace(/\n/g, "")).toBe("<p>First.</p><p>\u00a0</p><p>Second.</p>");
+  });
+
+  it("keeps the empty lines a person made through a save and a reopen", async () => {
+    /* The issue's steps: two paragraphs, Enter three times at the end of the first, leave, come back. */
+    const md = "First.\n\nSecond.\n";
+    const { blocks, loaded } = load(md);
+    const doc = await hold(blocks);
+    const typed = [doc[0], { id: "e1", ...p("") }, { id: "e2", ...p("") }, { id: "e3", ...p("") }, doc[1]];
+    const after = saved(settle(loaded, doc), typed);
+    expect(after.body).toBe("First.\n\n&nbsp;\n\n&nbsp;\n\n&nbsp;\n\nSecond.\n");
+    /* Saved again with nothing more done, it is the same bytes. */
+    expect(save(after.loaded, typed)).toBe(after.body);
+    /* Reopened — after leaving the note, or a restart, which is the same read of the same file. */
+    const again = load(after.body);
+    const reopened = await hold(again.blocks);
+    expect(words(reopened)).toEqual(["First.", "", "", "", "Second."]);
+    expect(save(settle(again.loaded, reopened), reopened)).toBe(after.body);
+    /* One of them deleted: the others stay, and so does every byte around them. */
+    expect(
+      save(
+        settle(again.loaded, reopened),
+        reopened.filter((_, i) => i !== 2),
+      ),
+    ).toBe("First.\n\n&nbsp;\n\n&nbsp;\n\nSecond.\n");
+  });
+
+  it("writes nothing for an empty line at either end, which is the editor's", async () => {
+    expect(blocksToMd([p(""), p("Only."), p(""), p("")])).toBe("Only.");
+    const md = "Only.\n";
+    const { blocks, loaded } = load(md);
+    const doc = await hold(blocks);
+    expect(save(settle(loaded, doc), [{ id: "above", ...p("") }, ...doc, { id: "below", ...p("") }])).toBe(md);
+  });
+
+  it("leaves a file another tool wrote with several blank lines byte for byte, and opens it as its paragraphs", async () => {
+    const md = "# Plan\n\n\n\nFirst.\n\n\n\n\nSecond.\n\nThird.\n\n\n";
+    const { blocks, loaded } = load(md);
+    const doc = await hold(blocks);
+    /* Blank lines are never counted: three of them are one break, as everywhere else draws them. */
+    expect(words(doc)).toEqual(["Plan", "First.", "Second.", "Third."]);
+    const settled = settle(loaded, doc);
+    expect(save(settled, doc)).toBe(md);
+    /* An edit to the last paragraph keeps every blank line it did not reach; its own gap is the house form's. */
+    const edited = doc.map((b, i) => (i === 3 ? { ...b, content: [{ type: "text" as const, text: "Third!", styles: {} }] } : b));
+    expect(save(settled, edited)).toBe("# Plan\n\n\n\nFirst.\n\n\n\n\nSecond.\n\nThird!\n");
+  });
+
+  it("keeps a file's own &nbsp; lines, at the end too, when nothing reached them", async () => {
+    const md = "First.\n\n&nbsp;\n\nSecond.\n\n&nbsp;\n";
+    const { blocks, loaded } = load(md);
+    const doc = await hold(blocks);
+    expect(words(doc)).toEqual(["First.", "", "Second.", ""]);
+    const settled = settle(loaded, doc);
+    expect(save(settled, doc)).toBe(md);
+    const edited = doc.map((b, i) => (i === 0 ? { ...b, content: [{ type: "text" as const, text: "First!", styles: {} }] } : b));
+    expect(save(settled, edited)).toBe(md.replace("First.", "First!"));
+  });
+
+  it("keeps an empty line a person made between two items' nested blocks, and drops one at their end", () => {
+    const item: NoteBlock = {
+      type: "bulletListItem",
+      content: [{ type: "text", text: "a", styles: {} }],
+      children: [p("x"), p(""), p("y"), p("")],
+    };
+    expect(blocksToMd([item])).toBe("- a\n\n  x\n\n  &nbsp;\n\n  y");
+  });
 });
 
 describe("after a save", () => {

@@ -1,6 +1,6 @@
 import { Check, ChevronRight, CircleAlert, FileText, Redo2, Shield, Undo2, Wrench } from "lucide-react";
-import { memo, useMemo, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import { memo, useMemo, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { remarkCallouts } from "@/note/callout";
@@ -9,14 +9,29 @@ import { providerName } from "@/settings/providerNames";
 
 import type { Block, Step, Turn, UndoRecord } from "./types";
 import { blockUndone } from "./types";
-import { clock, conflictLines, oneLine, openable, targetOf, touched, undoable, verbOf, waiting } from "./words";
+import { clock, conflictLines, oneLine, openable, remoteImage, targetOf, touched, undoable, verbOf, waiting } from "./words";
 
 const ICON = { size: 14, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 const PLUGINS = [remarkGfm, remarkCallouts];
 /* One object for the page's life: these are component types to React, and a fresh set on every
    render would unmount every reference under them (`refComponents` says why). */
-const MD = refComponents({ boards: false, placed: true });
+const REFS = refComponents({ boards: false, placed: true });
+const RefImg = REFS.img as ComponentType<ComponentProps<"img"> & ExtraProps>;
+const MD: Components = {
+  ...REFS,
+  /* An image from elsewhere is a link the person may follow, never a request made for them:
+     `remoteImage` says why. */
+  img: (props) => {
+    const { src, alt } = props;
+    if (typeof src !== "string" || !remoteImage(src, window.location.href)) return <RefImg {...props} />;
+    return (
+      <a href={src} target="_blank" rel="noopener noreferrer" data-dag-chat-image={src}>
+        {alt || src}
+      </a>
+    );
+  },
+};
 
 /** The agent's words, as Markdown, with `dag:` citations drawn as the references they are. */
 const Said = memo(function Said({ text }: { text: string }) {

@@ -22,4 +22,10 @@ button { font: inherit; }
 /* The window: the sidebar, then the page. `?snapshot=1` renders no shell at all, so a
    picture of a board is the bare `.dag-app` above, exactly as it always was. */
 .dag-shell { position: relative; display: flex; height: 100%; }
-.dag-shell > .dag-app { flex: 1; min-width: 0; }
+/* The page's column: the document tabs, when there are two, over the page in front. A note behind
+   it stays in the DOM only while it is kept mounted (`src/ui/tabs/keep.ts`): laid out where the
+   page is, so its width, its scroll and its editor's measures hold, but not seen and not reached. */
+.dag-docs { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dag-docs__page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dag-docs__page > .dag-app { flex: 1; min-height: 0; height: auto; }
+.dag-docs__page[data-dag-docs-away] { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+
 import { BOARDS } from "./boards";
+import { expect, test } from "./fixture";
 
 /* The fourteen reference boards, inside whichever account the suite signed in as. */
 const DIR = path.join(BOARDS, "reference");

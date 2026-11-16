@@ -24,18 +24,19 @@ below.
 
 | Group | Tab | Holds |
 |---|---|---|
-| You | Appearance | the theme — the person's, in every vault (#191) |
+| You | Appearance | the theme, and the **text size** — the person's, in every vault (#191, #325) |
 | | AI | the AI features switches — a master switch and one per feature (#296, *Turning AI off* below) — then one searchable model picker and one effort scale, shared by the prompt cards, Rewrite, Generate flashcards, and what a new Assistant chat starts on — the person's, in every vault (#191) |
 | | Calendar | the time zone times are shown and written in, where a week starts, and which kinds the calendar shows — the Calendar page's own switches, through one hook |
 | | Quizzes | the quiz practice threshold, kept with the practice records in the app's home and written through `/api/practice` |
 | This computer | AI providers | every provider in its own row, with its logo, a status pill (Ready, Needs a key, Not signed in, Not installed, Needs an address…) and what it takes to set it up: in the desktop app a key field, and for OpenAI-compatible its address and model too; in a browser, the variable the server reads. *Save and test* stores, waits for the server, then makes one short call. *Check again* asks afresh. The tab carries a dot when a provider in use cannot answer |
 | This vault | General | the vault's name, location and facts, "When a board has an error", the trash's retention, and Close vault — never deleting the folder |
 | | Files and images | the attachments folder, the **templates folder** (`dag:templates`, empty is `Templates` when that exists — see *Note templates* in [`notes.md`](notes.md)), whether a rename updates the `[[wikilinks]]` to it, how a pasted image lands, and the open board's unused images |
+| | Tags | the vault's tags (#327): each with its colour (the dot opens the swatches), its name, how many documents carry it or *Unused*, and a quiet `⋯` to rename — onto an existing tag, a merge — or delete. No *New tag*: a tag is created where it is used. Kept in `.anydag/tags.json`, written through the tag routes and never through `PUT /api/vault/settings`; see *Tags* in [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | | Export | the export's PNG detail, paper and margin, where importing is, and the largest attachment and its types this server takes (read-only) |
 | | Sync | the vault's link to a sync server — only when the build's `cloud` switch is on |
 | | Agent access | the command that connects Claude Code, Claude Desktop or another MCP client to this vault, with a **Read only** switch that adds the server's own `--read-only` |
 | This board | Layout | the open board's row width and spacing, written to its frontmatter's `flow:` — drawn only while a board is open and editable |
-| *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. Exists only when the build's `cloud` switch is on ([`server.md`](server.md)) |
+| *the foot* | Privacy | whether this install sends anonymous logs, where to, and what they hold — the server's answer, see *Logs*. **Drawn in every build**: with the `cloud` switch off it is the toggle and one line saying logs are not sent from this version yet, and the choice is kept for the first build that can send them (#326) |
 | | Keyboard shortcuts | the shortcut sheet's list (`ShortcutList`, one component in both places) |
 | | About | the build's `VERSION` and the server's; in the desktop app, also **Updates**: what the check found, when it last got an answer, *Check for updates*, and, when a check failed, a sentence about what to do (`desktop/updates.ts`; [`desktop.md`](desktop.md)). Not drawn in a browser, or in a desktop run with nothing packaged |
 
@@ -57,6 +58,25 @@ second vault changed how the app looked, and the Assistant could start on anothe
 - **The MCP `generate` tool** reads `dag:ai` from the app's settings, and the vault's old `llm` only
   when that is absent. The `settings` tool lists `dag:theme` and `dag:ai` at the `app` level.
 - The old tab id `vault-ai` opens *AI* (`LEGACY_TABS`).
+
+**The text size is the person's too, and it is one step for two places (#325).** `dag:text-size`
+holds `small` or `large`, and an absent key is `default` — which is why the tab's reset removes the
+key rather than storing the word. It is in the person's half of `PREF_KEYS`, the same in every vault,
+and it follows them to another browser like the theme. `src/ui/textSize.ts` is the three steps, the
+read and the write, and the one place that puts `data-dag-text-size` on `<html>`: once from
+`main.tsx` after `pull()`, so the chrome never paints at the old step, and again whenever a
+preference changes. `chrome.css` reads the attribute as `--text-scale` and multiplies two families
+by it — the chrome's own steps (`--chrome-text-*`, the theme's `ui.text.*`) and a note's Markdown
+ramp (`--chrome-note-*`, the theme's `type.md*`, restated under `.dag-note-view`). **Nothing on the
+diagram surface is in that list**: a board's `.dag-md`, its cards and its edges read `--dag-type-*`
+and `--dag-metric-*` straight from the theme, and the canvas has its own zoom. Two surfaces added
+after the setting are chrome and follow it like the rest: the calendar's small month (#350) and the
+Assistant's subject chip (#323). A snapshot reads no
+preference, so its attribute is `default`; a printed note, and the PDF the print dialog makes, puts
+the scale back to 1 with `data-dag-printing`, so what someone keeps is not a picture of this window.
+`e2e/text-size.spec.ts` measures the three steps, the board that does not move, the reload, the
+snapshot, the two fixed-width surfaces above, and that the sidebar, a menu and every Settings tab it
+opens hold at *Large*.
 
 The headings and the words on the tabs are the scopes: *You*, *This computer*, *This vault* and
 *This board*. Each heading is ink, with one short line under it in slate saying what it means — under
@@ -99,7 +119,8 @@ Four things about the modal are load-bearing:
   modal announces each save once, so a screen reader hears one word rather than one per row. Each
   tab's Reset names its scope in its own text ("Reset Export to defaults") and resets what that tab
   shows and nothing else. A tab that now holds part of an old section splits the reset with it:
-  General's covers the settings object's `problems`, Appearance's the person's `THEME`, Files and
+  General's covers the settings object's `problems`, Appearance's the person's `THEME` and
+  `TEXT_SIZE`, Files and
   images' covers `paste`, `ATTACHMENTS`, `TEMPLATES` and `UPDATE_LINKS`, and Quizzes' writes the practice
   threshold back to its default through `setGraduate`. Before it resets it snapshots the values it
   will change, then raises the modal's toast, `✓ <scope> reset · Undo`, for six seconds; Undo writes
@@ -256,6 +277,11 @@ access `dag-settings__client*` (`data-dag-agent-client`, `data-dag-agent-clients
 same argument `--inspector-w` makes.
 The phone layout added `dag-settings__feature*` (`data-dag-setting-ai-feature`,
 `data-dag-setting-ai-summary`, `data-dag-setting-ai-back`) and `dag-settings__featureBack`.
+The text size added the control's hook `data-dag-setting-text-size`, the root attribute
+`data-dag-text-size`, the storage key `dag:text-size`, and in `chrome.css` the scale `--text-scale`
+and the two families it multiplies: `--chrome-text-*` for the chrome and `--chrome-note-*` for a
+note. Those are not theme tokens, like `--board-flow-*` and `--inspector-w`: no theme has an opinion
+about how big one person reads.
 `dag-settings__*` is also the vocabulary of other cards (the rewrite
 dialog, the delete questions), so a change to one of its rules is a change to all of them.
 The CSS is chrome and lives in `chrome.css`; it asks the theme for one thing only — `--dag-color-shadow`,
@@ -282,9 +308,11 @@ a config file the server reads (it would put a person's preference into every vi
 `src/board/` could not read one anyway); a per-board preferences store (the board's own settings are
 the file's — `flow:` and `w=` — and a theme is not one of them, it is the reader's, see *Settings*
 above); un-embedding the fonts from an export (the layout was measured against the
-theme's face, so a file without it is a different diagram); and the window keys — the library and
-the inspector's mode and width — which each have a control where they act. (There were five; the
-board list's went with the column.)
+theme's face, so a file without it is a different diagram); and the window keys — the library, the
+inspector's width and the Assistant panel's — which each have a control where they act, so they are
+not Settings rows. (There were five; the board list's went with the column.) The text size (#325) is
+three steps and no more: a free slider and a custom font are out, and so is a size for a board's
+diagram — the canvas has its own zoom, and a diagram's type is the theme's.
 
 ### *Turning AI off*
 

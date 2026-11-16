@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, onServerDefault, test, type Page, type Route } from "./fixture";
 import { openSettings, openSidebar } from "./sidebar";
 
 /**
@@ -14,10 +14,12 @@ import { openSettings, openSidebar } from "./sidebar";
  * temp directory and puts them away afterwards (close and forget — **never the folder**, which is the
  * test's to remove).
  *
- * **Opening a vault makes it the server's default**, and the rest of the suite loads pages with no
- * `vault=` and so lands wherever the default is. So every vault opened here is followed at once by
- * opening the suite's own vault again, and a click that opens one through the page is answered
- * through a route that does the same before the page hears back.
+ * **Opening a vault makes it the server's default**, and a page that names no vault lands there.
+ * Every other spec's pages are pinned to the suite's own vault (`e2e/fixture.ts`), so the default is
+ * this file's business alone: the few checks that are *about* it opt out with `onServerDefault`, and
+ * every vault opened here is followed at once by opening the suite's own again, and a click that
+ * opens one through the page is answered through a route that does the same before the page hears
+ * back — so those checks find the suite's vault rather than whichever one ran beside them.
  */
 
 const BOARD = (title: string) => `---\ntitle: ${title}\n---\n\n\`\`\`md {#a x=0 y=0 w=320}\n${title}\n\`\`\`\n`;
@@ -110,6 +112,34 @@ async function keepDefault(page: Page): Promise<void> {
   });
 }
 
+/**
+ * **Hold the page's vault list until the suite's own vault is the server's default again**, then hand
+ * the page the real answer.
+ *
+ * The checks below are the only pages not pinned by `e2e/fixture.ts` — they are *about* the default —
+ * and every vault this file opens is the default until the suite's own is put back a request later.
+ * Ten copies of this file beside the suite (`--repeat-each`) make that window wide enough for one to
+ * settle into a vault another copy is about to close, which is a page of 404s. Waiting here keeps the
+ * check on the real default and takes the race out of it: the page reads the answer the server gives
+ * once the suite's vault is the one opened last.
+ */
+async function waitForSuiteDefault(page: Page): Promise<() => Promise<void>> {
+  const answer = async (route: Route) => {
+    for (let i = 0; i < 100; i++) {
+      const response = await route.fetch();
+      const body = (await response.json()) as { vaults: { path: string; default: boolean }[] };
+      if (body.vaults.some((v) => v.path === HOME && v.default)) {
+        await route.fulfill({ response, json: body });
+        return;
+      }
+      await restore(page);
+    }
+    await route.continue();
+  };
+  await page.route("**/api/vaults", answer);
+  return () => page.unroute("**/api/vaults", answer);
+}
+
 const current = (page: Page) => page.locator("[data-dag-vault-current]");
 const fileRow = (page: Page, name: string) => page.locator(`[data-dag-sidebar-file="${name}"]`);
 
@@ -122,44 +152,50 @@ async function openSwitcher(page: Page): Promise<void> {
   }).toPass({ timeout: 15_000 });
 }
 
-test("a tab names its vault in the address and in every request, and each vault has its own files", async ({ page }) => {
-  const heard = listen(page);
-  const other = await vault(page);
-  fixture(other.dir, `away-${id}`, "Away");
-  fixture(BOARDS, `home-${id}`, "Home");
-  const home = await homeId(page);
-  const asked: string[] = [];
-  page.on("request", (r) => {
-    const u = new URL(r.url());
-    if (u.pathname.startsWith("/__board/")) asked.push(u.pathname + u.search);
-  });
+test(
+  "a tab names its vault in the address and in every request, and each vault has its own files",
+  onServerDefault,
+  async ({ page }) => {
+    const heard = listen(page);
+    const other = await vault(page);
+    fixture(other.dir, `away-${id}`, "Away");
+    fixture(BOARDS, `home-${id}`, "Home");
+    const home = await homeId(page);
+    const asked: string[] = [];
+    page.on("request", (r) => {
+      const u = new URL(r.url());
+      if (u.pathname.startsWith("/__board/")) asked.push(u.pathname + u.search);
+    });
 
-  /* No `vault=` in the link: the tab takes the server's default and writes it into the address. */
-  await page.goto(`/?board=home-${id}`);
-  await ready(page);
-  await expect(page).toHaveURL((u) => u.searchParams.get("vault") === home);
+    /* No `vault=` in the link: the tab takes the server's default and writes it into the address. */
+    const release = await waitForSuiteDefault(page);
+    await page.goto(`/?board=home-${id}`);
+    await ready(page);
+    await expect(page).toHaveURL((u) => u.searchParams.get("vault") === home);
+    await release();
 
-  await page.goto(`/?vault=${other.id}&board=away-${id}`);
-  await ready(page);
-  await openSidebar(page);
-  await expect(current(page)).toHaveText(`vault-${id}`);
-  await expect(fileRow(page, `away-${id}`)).toBeVisible();
-  await expect(fileRow(page, `home-${id}`)).toHaveCount(0);
-  /* The stream, the list, the board: every one of them named the vault. */
-  expect(asked.length).toBeGreaterThan(2);
-  expect(asked.filter((u) => !u.includes(`vault=${other.id}`) && !u.includes(`vault=${home}`))).toEqual([]);
-  expect(asked.filter((u) => u.includes(`vault=${other.id}`)).length).toBeGreaterThan(2);
+    await page.goto(`/?vault=${other.id}&board=away-${id}`);
+    await ready(page);
+    await openSidebar(page);
+    await expect(current(page)).toHaveText(`vault-${id}`);
+    await expect(fileRow(page, `away-${id}`)).toBeVisible();
+    await expect(fileRow(page, `home-${id}`)).toHaveCount(0);
+    /* The stream, the list, the board: every one of them named the vault. */
+    expect(asked.length).toBeGreaterThan(2);
+    expect(asked.filter((u) => !u.includes(`vault=${other.id}`) && !u.includes(`vault=${home}`))).toEqual([]);
+    expect(asked.filter((u) => u.includes(`vault=${other.id}`)).length).toBeGreaterThan(2);
 
-  /* Switching is a page load into the other vault, and the server's default is not what decides it. */
-  await openSwitcher(page);
-  await expect(page.locator(`[data-dag-vault="${other.id}"]`)).toHaveAttribute("aria-checked", "true");
-  await page.locator(`[data-dag-vault="${home}"]`).click();
-  await expect(page).toHaveURL((u) => u.searchParams.get("vault") === home);
-  await openSidebar(page);
-  await expect(fileRow(page, `home-${id}`)).toBeVisible();
-  await expect(fileRow(page, `away-${id}`)).toHaveCount(0);
-  expect(heard).toEqual([]);
-});
+    /* Switching is a page load into the other vault, and the server's default is not what decides it. */
+    await openSwitcher(page);
+    await expect(page.locator(`[data-dag-vault="${other.id}"]`)).toHaveAttribute("aria-checked", "true");
+    await page.locator(`[data-dag-vault="${home}"]`).click();
+    await expect(page).toHaveURL((u) => u.searchParams.get("vault") === home);
+    await openSidebar(page);
+    await expect(fileRow(page, `home-${id}`)).toBeVisible();
+    await expect(fileRow(page, `away-${id}`)).toHaveCount(0);
+    expect(heard).toEqual([]);
+  },
+);
 
 test("two vaults whose names start alike wear different monograms, and each is found by its name", async ({ page }) => {
   const one = await vault(page, `Terra one ${id}`);
@@ -193,7 +229,7 @@ test("a folder opened from the switcher is the vault the tab goes to, and the ty
   fixture(folder, `typed-board-${id}`, "Typed");
   await keepDefault(page);
 
-  await page.goto(`/?board=nothing-${id}`);
+  await page.goto("/");
   await openSwitcher(page);
   await page.locator("[data-dag-vault-open]").click();
   const field = page.locator("[data-dag-vault-open-path]");
@@ -223,7 +259,7 @@ test("a vault made from the switcher is opened, and the next board is filed in i
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), "anydag-e2e-vault-"));
   parents.push(parent);
   await keepDefault(page);
-  await page.goto(`/?board=nothing-${id}`);
+  await page.goto("/");
   await openSwitcher(page);
 
   await page.locator("[data-dag-vault-create]").click();
@@ -366,41 +402,70 @@ test("a tab whose vault is closed somewhere else goes to another one, and says n
   expect(heard).toEqual([]);
 });
 
-test("a link to a vault that is not open opens the default one", async ({ page }) => {
+test("a page that names no vault is the suite's, not whichever vault the default points at", async ({ page }) => {
+  /* The default moves under the rest of the suite, and a page that starts inside the window pins
+     that vault for good — its own file is in the suite's, so every request answers 404. The fixture
+     names the suite's vault in the address instead; here the page's own vault list is made to say
+     another one is the default, and the page must stay in the suite's. */
+  const heard = listen(page);
+  const other = await vault(page);
+  fixture(BOARDS, `home-${id}`, "Home");
+  await page.route("**/api/vaults", async (route) => {
+    const answer = await route.fetch();
+    const body = (await answer.json()) as { vaults: { id: string; default: boolean }[] };
+    body.vaults = body.vaults.map((v) => ({ ...v, default: v.id === other.id }));
+    await route.fulfill({ response: answer, json: body });
+  });
+  const home = await homeId(page);
+
+  await page.goto(`/?board=home-${id}`);
+  await ready(page);
+  await expect(page).toHaveURL((u) => u.searchParams.get("vault") === home);
+  await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
+  expect(heard).toEqual([]);
+});
+
+test("a link to a vault that is not open opens the default one", onServerDefault, async ({ page }) => {
   fixture(BOARDS, `home-${id}`, "Home");
   const home = await homeId(page);
+  const release = await waitForSuiteDefault(page);
   await page.goto(`/?vault=gone${id}&board=home-${id}`);
   await ready(page);
   await expect(page).toHaveURL((u) => u.searchParams.get("vault") === home && u.searchParams.get("board") === `home-${id}`);
+  await release();
 });
 
-test("with no vault open the page is the picker: open a folder, create a vault, or choose a recent one", async ({ page }) => {
-  const heard = listen(page);
-  const recent = {
-    id: "r1",
-    name: "Recent one",
-    path: "/nowhere/recent-one",
-    opened: "2026-01-01T00:00:00Z",
-    open: false,
-    default: false,
-    missing: false,
-  };
-  await page.route("**/api/vaults", (route) =>
-    route.fulfill({ json: { vaults: [recent, { ...recent, id: "r2", name: "Lost", missing: true }], home: "/home/someone" } }),
-  );
-  await page.goto("/");
+test(
+  "with no vault open the page is the picker: open a folder, create a vault, or choose a recent one",
+  onServerDefault,
+  async ({ page }) => {
+    const heard = listen(page);
+    const recent = {
+      id: "r1",
+      name: "Recent one",
+      path: "/nowhere/recent-one",
+      opened: "2026-01-01T00:00:00Z",
+      open: false,
+      default: false,
+      missing: false,
+    };
+    await page.route("**/api/vaults", (route) =>
+      route.fulfill({ json: { vaults: [recent, { ...recent, id: "r2", name: "Lost", missing: true }], home: "/home/someone" } }),
+    );
+    await page.goto("/");
 
-  await expect(page.locator("[data-dag-novault]")).toBeVisible();
-  await expect(page.locator("[data-dag-welcome-open-folder]")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Recent one", exact: true })).toBeEnabled();
-  await expect(page.locator(`[data-dag-vault="r1"]`)).toBeEnabled();
-  await expect(page.locator(`[data-dag-vault="r2"]`)).toBeDisabled();
-  await expect(page.locator(`[data-dag-vault="r2"]`)).toContainText("not found");
+    await expect(page.locator("[data-dag-novault]")).toBeVisible();
+    await expect(page.locator("[data-dag-welcome-open-folder]")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Recent one", exact: true })).toBeEnabled();
+    await expect(page.locator(`[data-dag-vault="r1"]`)).toBeEnabled();
+    await expect(page.locator(`[data-dag-vault="r2"]`)).toBeDisabled();
+    await expect(page.locator(`[data-dag-vault="r2"]`)).toContainText("not found");
 
-  await page.locator("[data-dag-welcome-create-vault]").click();
-  await expect(page.locator("[data-dag-vault-create-parent]")).toHaveValue("/home/someone");
-  expect(heard).toEqual([]);
-});
+    await page.locator("[data-dag-welcome-create-vault]").click();
+    await expect(page.locator("[data-dag-vault-create-parent]")).toHaveValue("/home/someone");
+    expect(heard).toEqual([]);
+  },
+);
 
 /**
  * What the first screen says about the form it is showing, and which action finishes it.
@@ -410,76 +475,87 @@ test("with no vault open the page is the picker: open a folder, create a vault, 
  * tell them where to type or which button completes the job. The error's line is reserved in the
  * form so a refusal from the server does not move the actions under the pointer.
  */
-test("the first-run card names the form it shows, and only its submit is the filled action", async ({ page }) => {
-  const heard = listen(page);
-  await page.route("**/api/vaults", (route) => route.fulfill({ json: { vaults: [], home: "/home/someone" } }));
-  await page.goto("/");
-  const card = page.locator("[data-dag-novault]");
-  const title = card.locator("h1");
-  await expect(title).toHaveText("Open a vault");
+test(
+  "the first-run card names the form it shows, and only its submit is the filled action",
+  onServerDefault,
+  async ({ page }) => {
+    const heard = listen(page);
+    await page.route("**/api/vaults", (route) => route.fulfill({ json: { vaults: [], home: "/home/someone" } }));
+    await page.goto("/");
+    const card = page.locator("[data-dag-novault]");
+    const title = card.locator("h1");
+    await expect(title).toHaveText("Open a vault");
 
-  /* The open half keeps the heading, and offers one filled action: Open. */
-  await page.locator("[data-dag-welcome-open-folder]").click();
-  await expect(page.locator("[data-dag-vault-open-form]")).toBeVisible();
-  await expect(title).toHaveText("Open a vault");
-  await expect(page.locator("[data-dag-vault-open-form] label")).toContainText("Folder to open");
-  await expect(page.locator("[data-dag-vault-open-go]")).toHaveClass(/dag-button--primary/);
-  await expect(page.locator("[data-dag-vault-open-go]")).toBeDisabled();
-  await page.locator("[data-dag-vault-open-form]").getByRole("button", { name: "Cancel" }).click();
+    /* The open half keeps the heading, and offers one filled action: Open. */
+    await page.locator("[data-dag-welcome-open-folder]").click();
+    await expect(page.locator("[data-dag-vault-open-form]")).toBeVisible();
+    await expect(title).toHaveText("Open a vault");
+    await expect(page.locator("[data-dag-vault-open-form] label")).toContainText("Folder to open");
+    await expect(page.locator("[data-dag-vault-open-go]")).toHaveClass(/dag-button--primary/);
+    await expect(page.locator("[data-dag-vault-open-go]")).toBeDisabled();
+    /* A field in a column of the form is a field's height, not the height of its text (#384). */
+    await expect.poll(async () => (await page.locator("[data-dag-vault-open-path]").boundingBox())?.height).toBe(30);
+    await page.locator("[data-dag-vault-open-form]").getByRole("button", { name: "Cancel" }).click();
 
-  /* The create half says what it is, and puts its labels above their fields, left-aligned. */
-  await page.locator("[data-dag-welcome-create-vault]").click();
-  await expect(page.locator("[data-dag-vault-create-form]")).toBeVisible();
-  await expect(title).toHaveText("Create a vault");
-  await expect(card.locator(".dag-welcome__hint")).toContainText("Give it a name");
-  const form = page.locator("[data-dag-vault-create-form]");
-  const name = page.locator("[data-dag-vault-create-name]");
-  const create = page.locator("[data-dag-vault-create-go]");
-  const cancel = form.getByRole("button", { name: "Cancel" });
-  await expect(form.locator("label").first()).toContainText("Name");
-  await expect(form.locator("label").nth(1)).toContainText("In the folder");
-  expect(
-    await form
-      .locator("label")
-      .first()
-      .evaluate((el) => getComputedStyle(el).textAlign),
-  ).toBe("left");
-  const labelBox = await form.locator("label").first().locator("span").first().boundingBox();
-  const fieldBox = await name.boundingBox();
-  expect(labelBox!.y + labelBox!.height).toBeLessThanOrEqual(fieldBox!.y);
-  await expect(create).toHaveText("Create");
-  await expect(create).toBeDisabled();
-  await expect(create).toHaveClass(/dag-button--primary/);
-  await expect(create).toHaveClass(/dag-button/);
-  await expect(cancel).toHaveClass(/dag-button/);
-  await expect(cancel).not.toHaveClass(/dag-button--primary/);
+    /* The create half says what it is, and puts its labels above their fields, left-aligned. */
+    await page.locator("[data-dag-welcome-create-vault]").click();
+    await expect(page.locator("[data-dag-vault-create-form]")).toBeVisible();
+    await expect(title).toHaveText("Create a vault");
+    await expect(card.locator(".dag-welcome__hint")).toContainText("Give it a name");
+    const form = page.locator("[data-dag-vault-create-form]");
+    const name = page.locator("[data-dag-vault-create-name]");
+    const create = page.locator("[data-dag-vault-create-go]");
+    const cancel = form.getByRole("button", { name: "Cancel" });
+    await expect(form.locator("label").first()).toContainText("Name");
+    await expect(form.locator("label").nth(1)).toContainText("In the folder");
+    expect(
+      await form
+        .locator("label")
+        .first()
+        .evaluate((el) => getComputedStyle(el).textAlign),
+    ).toBe("left");
+    const labelBox = await form.locator("label").first().locator("span").first().boundingBox();
+    const fieldBox = await name.boundingBox();
+    expect(labelBox!.y + labelBox!.height).toBeLessThanOrEqual(fieldBox!.y);
+    /* #384: the name field, in a column, was as tall as its text; it is as tall as the folder field beside Browse. */
+    const parentBox = await page.locator("[data-dag-vault-create-parent]").boundingBox();
+    expect(fieldBox!.height).toBe(30);
+    expect(fieldBox!.height).toBe(parentBox!.height);
+    expect(fieldBox!.width).toBeGreaterThan(200);
+    await expect(create).toHaveText("Create");
+    await expect(create).toBeDisabled();
+    await expect(create).toHaveClass(/dag-button--primary/);
+    await expect(create).toHaveClass(/dag-button/);
+    await expect(cancel).toHaveClass(/dag-button/);
+    await expect(cancel).not.toHaveClass(/dag-button--primary/);
 
-  /* Both fields filled is what makes the one action available. */
-  await name.fill(`First run ${id}`);
-  await expect(create).toBeEnabled();
+    /* Both fields filled is what makes the one action available. */
+    await name.fill(`First run ${id}`);
+    await expect(create).toBeEnabled();
 
-  /* Enter from a field submits; a refusal lands under the form and the actions stay put. */
-  await page.route("**/api/vaults/create", (route) =>
-    route.fulfill({ status: 400, json: { error: "That folder already holds a vault." } }),
-  );
-  const acts = form.locator(".dag-vault__form-acts");
-  const before = await acts.boundingBox();
-  await name.press("Enter");
-  await expect(page.locator("[data-dag-vault-problem]")).toContainText("already holds a vault");
-  const after = await acts.boundingBox();
-  expect(Math.abs(after!.y - before!.y)).toBeLessThan(0.5);
-  expect(Math.abs(after!.height - before!.height)).toBeLessThan(0.5);
+    /* Enter from a field submits; a refusal lands under the form and the actions stay put. */
+    await page.route("**/api/vaults/create", (route) =>
+      route.fulfill({ status: 400, json: { error: "That folder already holds a vault." } }),
+    );
+    const acts = form.locator(".dag-vault__form-acts");
+    const before = await acts.boundingBox();
+    await name.press("Enter");
+    await expect(page.locator("[data-dag-vault-problem]")).toContainText("already holds a vault");
+    const after = await acts.boundingBox();
+    expect(Math.abs(after!.y - before!.y)).toBeLessThan(0.5);
+    expect(Math.abs(after!.height - before!.height)).toBeLessThan(0.5);
 
-  /* Escape lets go of the form, and the card goes back to its chooser title. */
-  await name.focus();
-  await page.keyboard.press("Escape");
-  await expect(page.locator("[data-dag-vault-create-form]")).toHaveCount(0);
-  await expect(title).toHaveText("Open a vault");
-  /* Chromium prints any 4xx; the one here is the refusal this check asked for. */
-  expect(heard.filter((line) => !line.includes("/api/vaults/create"))).toEqual([]);
-});
+    /* Escape lets go of the form, and the card goes back to its chooser title. */
+    await name.focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-dag-vault-create-form]")).toHaveCount(0);
+    await expect(title).toHaveText("Open a vault");
+    /* Chromium prints any 4xx; the one here is the refusal this check asked for. */
+    expect(heard.filter((line) => !line.includes("/api/vaults/create"))).toEqual([]);
+  },
+);
 
-test("the create form tabs through its fields, Browse, Cancel, then Create", async ({ page }) => {
+test("the create form tabs through its fields, Browse, Cancel, then Create", onServerDefault, async ({ page }) => {
   await page.addInitScript(() => {
     window.anydagDesktop = { pickFolder: async () => null };
   });
@@ -529,7 +605,7 @@ test("the desktop shell's folder dialog is used when there is one", async ({ pag
     };
   }, folder);
 
-  await page.goto(`/?board=nothing-${id}`);
+  await page.goto("/");
   await openSwitcher(page);
   await page.locator("[data-dag-vault-open]").click();
   await expect(page.locator("[data-dag-vault-open-path]")).toHaveCount(0);
@@ -543,7 +619,7 @@ test("the desktop shell's folder dialog is used when there is one", async ({ pag
 });
 
 test("the Agent access tab gives the lines that connect Claude Code and Claude Desktop to this vault", async ({ page }) => {
-  await page.goto(`/?board=nothing-${id}`);
+  await page.goto("/");
   await openSettings(page, "agent-access");
   await expect(page.locator('[data-dag-setting-copy-value="mcp-claude-code"]')).toContainText(
     `claude mcp add anydag -- anydag mcp --vault ${HOME}`,

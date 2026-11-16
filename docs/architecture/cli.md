@@ -46,8 +46,9 @@ Six things are load-bearing:
   the skill's `anydag …` lines to `anydag help --json` and every command group to being named, so the
   skill cannot keep teaching a command that was removed.
 - **The picture is the page's.** `snapshot`, `tidy`, `board export --format svg|png` and `note export
-  --format pdf` open the page in Playwright with the token as its cookie under `?snapshot=1`, the way
-  `scripts/snapshot.mjs` does. Export goes through `dag:export`, a document event whose
+  --format pdf` open the page in Playwright under `?snapshot=1`, let in through `/?token=…` — the
+  server answers with its cookie on a secret path and a redirect that hands the page that path
+  (`server/app.ts`) — the way `scripts/snapshot.mjs` does through `enter()`. Export goes through `dag:export`, a document event whose
   `detail.reply` gets the SVG's text or the PNG as a data URL. A note's PDF replies with a title and
   Chromium's `page.pdf()` prints it. Playwright is `external` in the bundle and imported only there.
 - **Stdin is read when it is named, never because it is not a terminal.** The usual shortcut hangs for
@@ -66,6 +67,12 @@ rm` went on saying *never recursive* about a thing the app did. It is `folder rm
 **`anydag mcp --vault <folder>`** is the MCP server (`server/mcp/`) over stdio, on the same door: the
 running app's server through `server.json`, or one in this process. It speaks on stdout, so it takes no
 `--json`. See *Parity*.
+
+**Tags have no command** (#327). A tag is finer than a whole file, so adding, renaming, recolouring
+and deleting one are the page's and MCP's (`tag_list`, `tag_apply`, `tag_rename`, `tag_delete`,
+`tag_color`), and their features in `docs/parity.json` say `{"admin": false}`. The CLI reads them
+back without a line of its own: `anydag ls --json` is the list route's answer, `tags` included, and
+`<kind> cat` prints the frontmatter that holds them.
 
 **Out, and why:** every gesture inside a document and every feature of the app beyond administering a
 vault (MCP has them); undo; `login`/`logout` (no account); `share` (nothing to reach); `feedback`

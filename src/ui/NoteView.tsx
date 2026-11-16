@@ -1,18 +1,21 @@
-import { AlertCircle, Calendar, CalendarDays, GitMerge, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { AlertCircle, GitMerge, Tag, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 
 import { useBlockEditor, type NoteEditor } from "@/blocks";
 import { concerns, onNote } from "@/board/events";
 import { openDoc } from "@/board/prefetch";
-import { retitleFile, type LoadProblem } from "@/board/useBoard";
+import { moveBoard, retitleFile, type LoadProblem } from "@/board/useBoard";
 import { joinNote, pageTitle, splitNote } from "@/note/format";
 import { blockAt, load, plan, saved, settle, type Loaded, type NoteBlock } from "@/note/markdown";
 import { anchorsOf } from "@/note/anchors";
 import { eventOf, withEvent, type EventChange, type NoteEvent } from "@/note/event";
 import { clearTarget, useTarget } from "@/refs/target";
+import { useTabActive } from "@/ui/tabs/keep";
 import { merge3 } from "@/note/merge";
-import { projectOf, withProject, type Project, type ProjectChange } from "@/note/project";
-import { STATUS_LABEL, STATUSES, taskOf, withTask, type Task, type TaskChange, overdue } from "@/note/task";
+import { folderOf, projectFolders, projectFor, projectOf, withProject, type Project, type ProjectChange } from "@/note/project";
+import { taskOf, withTask, type Task, type TaskChange, type TaskFacts } from "@/note/task";
+import { tagsOf, withTags, type TagChange } from "@/note/tags";
+import type { Hue } from "@/dsl/ir";
 import { NoteMarkdown, resolverFor } from "@/view/NoteRead";
 import { refComponents } from "@/refs/Ref";
 import { useIndex } from "@/refs/useIndex";
@@ -28,8 +31,13 @@ import { FileProblem } from "./FileProblem";
 import { NoteTitle, NoteTitleRead, takeNaming } from "./NoteTitle";
 import { registerPendingWrites } from "./pendingWrites";
 import { ProjectBar, ProjectLine, type ProjectMembers } from "./ProjectBar";
-import { TaskGlyph, TaskLine } from "./TaskGlyph";
+import { StatusButton, TaskLine } from "./TaskGlyph";
+import type { ProjectChoice } from "./taskMenus";
+import { TaskPanel, TaskPropsLine, type TaskProps } from "./TaskPanel";
 import { Toast } from "./Toast";
+import { TagLine } from "./tags/TagChip";
+import { TagEditor } from "./tags/TagEditor";
+import { colorTag } from "./tags/tagStore";
 
 /**
  * Whether a block editor has come up on this page before. The first one BlockNote builds in a page's
@@ -160,6 +168,9 @@ async function putNote(name: string, text: string, base: string, leaving = false
 }
 
 /** What the page around a note may ask of it — the Export menu, which saves the note. */
+/** How wide the page must be for a task's properties to sit beside its text rather than above it. */
+const PANEL_ROOM = 900;
+
 export interface NoteHandle {
   /**
    * The note's whole text, frontmatter and all, as it is on screen: anything waiting to be saved is
@@ -219,6 +230,11 @@ export function NoteView({
   onTrash,
   onHome,
   handle,
+  panel = "open",
+  onPanelRoom,
+  projects = [],
+  facts,
+  noteId,
 }: {
   name: string;
   scheme: "light" | "dark";
@@ -250,6 +266,15 @@ export function NoteView({
   onTrash?(): void;
   onHome?(): void;
   handle?: MutableRefObject<NoteHandle | null>;
+  /** A task's properties: beside the text, or folded into a line above it (the top bar's button). */
+  panel?: "open" | "folded";
+  /** Whether the window has room for the panel beside the text, whenever that changes. */
+  onPanelRoom?(room: boolean): void;
+  /** The projects a task can be moved into, from the listing. */
+  projects?: readonly ProjectChoice[];
+  /** What the listing knows of this task beside its frontmatter. */
+  facts?: TaskFacts;
+  noteId?: string | null;
 }) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   /* Bumped by *Try again*, so the read that opens the note can be asked for again at once. */
@@ -290,6 +315,13 @@ export function NoteView({
   const tellEvent = useCallback((next: NoteEvent | undefined) => {
     setEventState(next);
     onEventRef.current?.(next);
+  }, []);
+  /* And its tags, off the same frontmatter for the same reason — the same list kept while they do not
+     change, so the row is not drawn again for every keystroke's save. */
+  const [tags, setTags] = useState<string[]>(NO_TAGS);
+  const tellTags = useCallback((front: string) => {
+    const next = tagsOf(front);
+    setTags((was) => (was.length === next.length && was.every((t, i) => t === next[i]) ? was : next));
   }, []);
   /* The title the file has, for the field at the top of the page and for the toolbar. */
   const [title, setTitleState] = useState<string | undefined>(undefined);
@@ -353,8 +385,9 @@ export function NoteView({
       tell(taskOf(f.front));
       tellProject(projectOf(f.front));
       tellEvent(eventOf(f.front));
+      tellTags(f.front);
     },
-    [named, tell, tellProject, tellEvent],
+    [named, tell, tellProject, tellEvent, tellTags],
   );
 
   useEffect(() => {
@@ -432,8 +465,9 @@ export function NoteView({
       tell(taskOf(f.front));
       tellProject(projectOf(f.front));
       tellEvent(eventOf(f.front));
+      tellTags(f.front);
     },
-    [named, tell, tellProject, tellEvent],
+    [named, tell, tellProject, tellEvent, tellTags],
   );
 
   /* One write at a time: a second one against the base the first is about to move is a 409 by construction. */
@@ -555,6 +589,7 @@ export function NoteView({
             tell(taskOf(f.front));
             tellProject(projectOf(f.front));
             tellEvent(eventOf(f.front));
+            tellTags(f.front);
           } else if (got?.ok && !timer.current && editor.current) adopt(got.text, got.base);
           else named(next);
           ok = true;
@@ -568,8 +603,61 @@ export function NoteView({
       );
       return ok;
     },
-    [flush, serial, adopt, named, tell, tellProject, tellEvent],
+    [flush, serial, adopt, named, tell, tellProject, tellEvent, tellTags],
   );
+
+  /**
+   * Put the task in another project (#311): a project is the folder its note is in, so this is a
+   * move of the file — into that project's folder, or out to the top level for none. `retitle`'s
+   * path: what is waiting to be saved goes first, the move waits its turn, and the page follows the
+   * file to its new name without remounting the editor, since not a byte of the text changed.
+   */
+  const [moveFailed, setMoveFailed] = useState<string | null>(null);
+  const moveTo = useCallback(
+    async (folder: string) => {
+      if (lockedRef.current) return void refuseLocked();
+      await flush(false);
+      await serial(async () => {
+        const from = nameRef.current;
+        if (!held.current) return;
+        movingFrom.current = from;
+        try {
+          const to = await moveBoard(from, folder, "note");
+          if (!to) {
+            setMoveFailed("The task could not be moved into that project. A file there may have its name.");
+            return;
+          }
+          setMoveFailed(null);
+          nameRef.current = to;
+          if (to !== from) onRenamedRef.current?.(from, to);
+        } finally {
+          movingFrom.current = null;
+        }
+      });
+    },
+    [flush, serial],
+  );
+  const current = task
+    ? projectFor(name, projectFolders(Object.fromEntries(projects.map((p) => [p.name, p.project]))))
+    : undefined;
+  const onProjectPick = useCallback((to: string | null) => void moveTo(to ? folderOf(to) : ""), [moveTo]);
+
+  /* Whether there is room for the panel beside the text: a narrow window folds it by itself. */
+  const view = useRef<HTMLElement>(null);
+  const [room, setRoom] = useState(true);
+  const onRoomRef = useRef(onPanelRoom);
+  onRoomRef.current = onPanelRoom;
+  useEffect(() => {
+    const el = view.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(([entry]) => {
+      const next = (entry?.contentRect.width ?? 0) >= PANEL_ROOM;
+      setRoom(next);
+      onRoomRef.current?.(next);
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [opened !== null]);
 
   /**
    * The task's lines changed from this page: the frontmatter the page holds is rewritten and the note
@@ -621,6 +709,25 @@ export function NoteView({
       void flush(false);
     },
     [flush, tellEvent],
+  );
+
+  /**
+   * The tags changed from the Tags row: `changeTask`'s path, for `tags:` — so a tag change and typing
+   * are one write. A tag the row made is registered with the colour chosen, at once.
+   */
+  const changeTags = useCallback(
+    (change: TagChange, created?: { name: string; hue: Hue }): Promise<void> | undefined => {
+      if (lockedRef.current) return void refuseLocked();
+      const h = held.current;
+      if (!h) return;
+      const front = withTags(h.front, change);
+      if (front === h.front) return;
+      held.current = { ...h, front };
+      tellTags(front);
+      if (created) void colorTag(created.name, created.hue);
+      return flush(false);
+    },
+    [flush, tellTags],
   );
 
   useEffect(() => {
@@ -728,8 +835,11 @@ export function NoteView({
    * and is answered with the notice rather than with nothing. Looked at after every listener has had
    * the key, so `space O` — which the page's own keys take — is not mistaken for typing.
    */
+  /* A note kept mounted behind the tab in front (`ui/tabs/keep.ts`) hears no key, reads no part from
+     the address and says nothing about being ready: those are the front page's. */
+  const active = useTabActive();
   useEffect(() => {
-    if (!locked || snapshot) return;
+    if (!locked || snapshot || !active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
       if (e.key.length !== 1 && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "Enter") return;
@@ -740,7 +850,7 @@ export function NoteView({
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [locked, snapshot]);
+  }, [locked, snapshot, active]);
   /* A file dropped on a locked note is not kept, and not opened by the browser in place of the app. */
   const refuseFiles = useCallback(async () => {
     refuseLocked();
@@ -780,6 +890,22 @@ export function NoteView({
   const problem = status.kind === "problem" ? status.problem : null;
   const settled = done || problem !== null;
 
+  /* A task's properties: the panel beside the text when there is room and it is not folded, the
+     line of pills above it otherwise. Never both, so each control is on the page once. */
+  const sidePanel = !!task && !snapshot && opened !== null && panel === "open" && room;
+  const taskProps: TaskProps | null = task
+    ? {
+        task,
+        editable: !locked && ready && status.kind !== "conflict",
+        onChange: changeTask,
+        projects,
+        project: current ?? null,
+        onProject: onProjectPick,
+        facts,
+        id: noteId,
+      }
+    : null;
+
   /* A note just made from the sidebar or the welcome card is named here, in its own title, rather
      than in its sidebar row — once, when it opens. */
   useEffect(() => {
@@ -795,7 +921,7 @@ export function NoteView({
    */
   const target = useTarget();
   useEffect(() => {
-    if (!ready || !target || snapshot) return;
+    if (!ready || !target || snapshot || !active) return;
     const ed = editor.current;
     const l = loaded.current;
     const h = held.current;
@@ -810,12 +936,12 @@ export function NoteView({
       if (id) ed.reveal(id);
     }
     clearTarget();
-  }, [ready, target, snapshot, body]);
+  }, [ready, target, snapshot, body, active]);
 
   /* The same signal a board raises when it is finished, on the same element, so `snapshot.mjs` and
      the suite wait for a note exactly as they wait for a board: the text loaded and the editor up. */
   useEffect(() => {
-    if (!settled) return;
+    if (!settled || !active) return;
     /* And its equations drawn by KaTeX, in the editor as on the read-only page. */
     let live = true;
     void drawnSettled().then(() => {
@@ -825,7 +951,7 @@ export function NoteView({
       live = false;
       delete document.documentElement.dataset.dagReady;
     };
-  }, [settled]);
+  }, [settled, active]);
 
   /* Nothing to draw and nothing coming: one card, the same every kind draws. A note that was opened
      before and then failed a later read keeps what it has — this only takes the page when there is
@@ -846,8 +972,35 @@ export function NoteView({
     );
   }
 
+  /* The Tags row, the last of the note's properties (#327): its chips and *Add tag*. Read only, with
+     no tags, there is no row; while the editor is still coming up it is the label alone, so the page
+     does not move under the reader when it is ready. */
+  const tagsEditable = !locked && ready && status.kind !== "conflict" && status.kind !== "deleted";
+  const tagEditor: ReactNode =
+    locked && !tags.length ? null : <TagEditor tags={tags} editable={tagsEditable} variant="row" onChange={changeTags} />;
+  const tagRow: ReactNode = tagEditor ? (
+    <>
+      <span className="dag-facts__label">
+        <Tag size={14} strokeWidth={2} aria-hidden="true" />
+        Tags
+      </span>
+      <span className="dag-facts__value" data-dag-note-tags="">
+        {tagEditor}
+      </span>
+    </>
+  ) : null;
+  /* A task's tags are its panel's last row; folded, the tag bar under the line of pills. An event
+     that is a task has them in its own bar. */
+  const taskTags = task && !event ? tagEditor : null;
+
   return (
-    <main className="dag-note-view" data-dag-note-view={name} data-dag-ready={settled ? "" : undefined}>
+    <main
+      ref={view}
+      className="dag-note-view"
+      data-dag-note-view={name}
+      data-dag-ready={settled ? "" : undefined}
+      data-task-panel={sidePanel ? "" : undefined}
+    >
       {/* The note's states that last, in the app's one toast stack (#208): each stays for as long
           as it is true, and the conflict until it is answered. */}
       {status.kind === "deleted" ? (
@@ -902,11 +1055,22 @@ export function NoteView({
             {project ? <ProjectLine project={project} /> : null}
             {task ? <TaskLine task={task} /> : null}
             {event ? <EventLine event={event} /> : null}
+            <TagLine tags={tags} />
             <NoteMarkdown name={name} body={body} components={refComponents()} />
           </>
         ) : null
       ) : opened ? (
-        <div className="dag-note-view__page">
+        <div className="dag-note-view__page dag-note-view__page--write">
+          {task ? (
+            <span className="dag-note-view__mark">
+              <StatusButton
+                status={task.status}
+                size={18}
+                label={title || "This task"}
+                onStatus={!locked && ready && status.kind !== "conflict" ? (next) => changeTask({ status: next }) : undefined}
+              />
+            </span>
+          ) : null}
           <NoteTitle
             title={title}
             editable={!locked && status.kind !== "conflict" && status.kind !== "deleted"}
@@ -921,11 +1085,32 @@ export function NoteView({
               members={members}
               onChange={changeProject}
               editable={!locked && ready && status.kind !== "conflict"}
-            />
+            >
+              {task || event ? null : tagRow}
+            </ProjectBar>
           ) : null}
-          {task ? <TaskBar task={task} onChange={changeTask} editable={!locked && ready && status.kind !== "conflict"} /> : null}
+          {taskProps && !sidePanel ? <TaskPropsLine {...taskProps} /> : null}
+          {taskTags && !sidePanel ? (
+            <div className="dag-taskbar dag-facts dag-tagbar" data-dag-tagbar="">
+              {tagRow}
+            </div>
+          ) : null}
+          {moveFailed ? (
+            <p className="dag-taskpanel__problem" role="alert" data-dag-taskbar-move-problem="">
+              {moveFailed}
+            </p>
+          ) : null}
           {event ? (
-            <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"} />
+            <EventBar event={event} onChange={changeEvent} editable={!locked && ready && status.kind !== "conflict"}>
+              {tagRow}
+            </EventBar>
+          ) : null}
+          {/* A plain note's properties are its tags alone: the row, with *Add tag* — and nothing,
+              read only, when it has none. */}
+          {!task && !event && !project && tagRow ? (
+            <div className="dag-taskbar dag-facts dag-tagbar" data-dag-tagbar="">
+              {tagRow}
+            </div>
           ) : null}
           {/* The text first, read-only, while the editor's chunk loads and BlockNote builds itself:
               on a first open, about 120 ms on a fast machine and 450 at a quarter of its CPU (#120). The editor
@@ -952,135 +1137,27 @@ export function NoteView({
                 editable={!locked && status.kind !== "conflict"}
               />
             ) : null}
+            {/* The strip the page has below the last block, filling what is left of the window: a
+                press in it is the gesture a note ending in a picture, a table or a code block has no
+                other way to make, and it writes the empty paragraph the editor holds until something
+                is typed in it — no bytes at all. Read-only, the page keeps its blank. */}
+            {ready ? (
+              <div
+                className="dag-note-view__tail"
+                data-dag-note-tail=""
+                onMouseDown={(e) => {
+                  if (e.button !== 0 || lockedRef.current || status.kind === "conflict") return;
+                  e.preventDefault();
+                  editor.current?.afterLast();
+                }}
+              />
+            ) : null}
           </div>
         </div>
       ) : null}
+      {sidePanel && taskProps ? <TaskPanel {...taskProps} tags={taskTags} /> : null}
     </main>
   );
 }
 
-/**
- * The bar at the top of a task's own page: its status as three choices, its due date, and
- * the way back to being a plain note. Notion's properties, cut to the two a task has.
- *
- * A radiogroup rather than the list's click-to-move-on button, because here there is room to show
- * all three and a person on the page has come to set one, not to step through them. The date is the
- * browser's own date input, which is the one that already knows the person's locale and keyboard.
- */
-function TaskBar({ task, onChange, editable }: { task: Task; onChange(change: TaskChange): void; editable: boolean }) {
-  return (
-    <div className="dag-taskbar dag-facts" data-dag-taskbar={task.status}>
-      <span className="dag-facts__label">
-        <TaskGlyph status={task.status} />
-        Status
-      </span>
-      <span className="dag-facts__value">
-        <span className="dag-taskbar__status" role="radiogroup" aria-label="Status">
-          {STATUSES.map((status) => (
-            <button
-              key={status}
-              type="button"
-              role="radio"
-              aria-checked={task.status === status}
-              className="dag-taskbar__choice"
-              data-dag-taskbar-status={status}
-              disabled={!editable}
-              onClick={() => onChange({ status })}
-            >
-              <TaskGlyph status={status} />
-              <span>{STATUS_LABEL[status]}</span>
-            </button>
-          ))}
-        </span>
-      </span>
-      {/* The day it begins: the calendar spans a task from here to its due date. */}
-      <span className="dag-facts__label">
-        <CalendarDays size={14} strokeWidth={2} aria-hidden="true" />
-        Starts
-      </span>
-      <span className="dag-facts__value">
-        <DateField
-          value={task.start}
-          max={task.due}
-          editable={editable}
-          hook="data-dag-taskbar-start"
-          label="Start date"
-          onChange={(start) => onChange({ start })}
-        />
-      </span>
-      <span className="dag-facts__label">
-        <Calendar size={14} strokeWidth={2} aria-hidden="true" />
-        Due
-      </span>
-      <span className="dag-facts__value">
-        <DateField
-          value={task.due}
-          editable={editable}
-          hook="data-dag-taskbar-due"
-          label="Due date"
-          late={overdue(task)}
-          onChange={(due) => onChange({ due })}
-        />
-        {task.due ? (
-          <button
-            type="button"
-            className="dag-taskbar__clear"
-            data-dag-taskbar-clear-due=""
-            aria-label="Take the due date off"
-            disabled={!editable}
-            onClick={() => onChange({ due: null })}
-          >
-            <X size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
-        ) : null}
-      </span>
-    </div>
-  );
-}
-
-/**
- * A date in a properties list: the browser's own date input, which knows the person's locale
- * and keyboard — but an empty one says *Empty*, as Notion's does, rather than `mm/dd/yyyy` in the
- * colour of a value. The date is not repeated beside it in other words, as it was; an overdue one is
- * marked in the input itself.
- */
-function DateField({
-  value,
-  max,
-  min,
-  editable,
-  hook,
-  label,
-  late,
-  onChange,
-}: {
-  value?: string | null;
-  max?: string;
-  min?: string;
-  editable: boolean;
-  hook: string;
-  label: string;
-  late?: boolean;
-  onChange(next: string | null): void;
-}) {
-  return (
-    <span className={value ? "dag-facts__date" : "dag-facts__date dag-facts__date--empty"} data-late={late ? "" : undefined}>
-      <input
-        type="date"
-        value={value ?? ""}
-        max={max}
-        min={min}
-        disabled={!editable}
-        aria-label={label}
-        title={late ? "Overdue" : undefined}
-        {...{ [hook]: "" }}
-        onChange={(e) => onChange(e.target.value || null)}
-      />
-      {value ? null : (
-        <span className="dag-facts__empty" aria-hidden="true">
-          Empty
-        </span>
-      )}
-    </span>
-  );
-}
+const NO_TAGS: string[] = [];

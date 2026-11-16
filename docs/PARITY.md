@@ -2,7 +2,7 @@
 
 Generated from `docs/parity.json` by `npm run parity` — edit that file, never this one.
 
-**138 features, 0 gaps, 77 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
+**144 features, 0 gaps, 83 outside the admin CLI.** Each row is one thing the backend can do, and what reaches it
 through each of the three ways in: a route the page calls, an `anydag` command, an MCP tool. A name is
 done; ↳ is covered by something more general in that interface; ✗ is refused on purpose; · is outside the
 admin CLI — `anydag` administers vaults, files as whole documents, the trash, sync, logs, pictures and
@@ -34,6 +34,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Run the MCP server over stdio for a vault — what Claude Code and Claude Desktop connect to | ✗ [4] | `mcp` | ✗ [5] |
 | Serve a vault and the page to a browser on this machine, behind a token printed once | ✗ [6] | `serve` | ✗ [7] |
 | A vault's preferences — the settings card's vault half, the favourites, the attachments folder | `GET /api/vault/settings` `PUT /api/vault/settings` | `settings` | `settings` |
+| The window's document tabs in a vault, and which is in front — kept in the app's home, restored when the window opens | `GET /api/tabs` `PUT /api/tabs` | · | ✗ [8] |
 | Move a file, or a folder whole, to another open vault | `POST /__board/transfer` | `vault transfer` | `board_transfer` |
 
 ## Files
@@ -41,10 +42,10 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | Every board, note, quiz, table, attachment and folder, with titles, ids, tasks and projects | `GET /__board/list` | `ls` | `board_list` `note_list` `quiz_list` `table_list` |
-| Hear each change as it happens | `GET /__board/events` | · | ✗ [8] |
+| Hear each change as it happens | `GET /__board/events` | · | ✗ [9] |
 | What a permanent id names | `GET /__board/resolve` | · | `resolve` |
 | What refers to what: references and backlinks | `GET /__board/index` `GET /__board/refs` | · | `refs` |
-| Every place some words appear, ranked | `GET /__board/search` `GET /__board/corpus` | · | `search` |
+| Every place some words appear, ranked; or one tag's documents | `GET /__board/search` `GET /__board/corpus` | · | `search` |
 
 ## Boards
 
@@ -60,7 +61,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Call a board something, and let its name follow | `POST /__board/retitle` | · | `board_title` |
 | What is wrong with a board's text — or a draft's — as codes | `GET /__board/diagnostics` `POST /__board/diagnostics` | `board diagnose` | `board_diagnose` |
 | What items are on a board, without its whole text | `GET /__board/fences` | · | `board_fences` |
-| Bring a `.board.md` file in as a new board | `POST /__board/create` `POST /__board/asset` | · | ↳ `board_create` `image_add` [9] |
+| Bring a `.board.md` file in as a new board | `POST /__board/create` `POST /__board/asset` | · | ↳ `board_create` `image_add` [10] |
 
 ## Notes
 
@@ -81,15 +82,15 @@ above must say so. The one switch today is `cloud`, and no release build says it
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every task, with its status, due date and project | `GET /__board/list` | · | `task_list` |
+| Every task, with its status, priority, due date, project and tags; one project, status or tag | `GET /__board/list` | · | `task_list` |
 | Make a task | `POST /__board/create` | · | `task_create` |
-| Change a task's status, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
+| Change a task's status, priority, due date or start date, or make a note a task and back | `POST /__board/task` | · | `task_set` |
 
 ## Events
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| Every event, with when it starts and ends, soonest first | `GET /__board/list` | · | `event_list` |
+| Every event, with when it starts and ends, soonest first; one project or tag | `GET /__board/list` | · | `event_list` |
 | Make an event: a note with a start and an end | `POST /__board/create` | · | `event_create` |
 | Move an event, or make a note an event and back | `POST /__board/event` | · | `event_set` |
 
@@ -101,6 +102,16 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Make a folder a project | `GET /__board/list` `POST /__board/create` | · | `project_create` |
 | Change a project's status or colour, or make it a plain folder | `POST /__board/project` | · | `project_set` |
 
+## Tags
+
+| Feature | REST | CLI | MCP |
+|---|---|---|---|
+| Every tag, with its colour and how many documents carry it | `GET /__board/tags` | · | `tag_list` |
+| Add or remove tags on a note, task, event, board, quiz or table | `POST /__board/tags/apply` | · | `tag_apply` |
+| Rename a tag, or merge it into another, in every document | `POST /__board/tags/rename` | · | `tag_rename` |
+| Take a tag off every document, and out of the tag list | `POST /__board/tags/delete` | · | `tag_delete` |
+| Set a tag's colour, one of the ten hues, or reset it to the default | `POST /__board/tags/color` | · | `tag_color` |
+
 ## Quizzes
 
 | Feature | REST | CLI | MCP |
@@ -110,7 +121,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Make a quiz | `POST /__board/create` | `quiz new` | `quiz_create` |
 | Replace a quiz's whole text | `POST /__board/put` | `quiz write` | `quiz_write` |
 | Write, remove or move one question by its id, and no other byte of the quiz | `POST /__board/quiz` | · | `quiz_question_set` `quiz_question_remove` `quiz_question_move` |
-| Ask a model for flashcards from a topic or a note, and add the ones kept | `POST /__board/generate` `POST /__board/quiz` | · | ↳ `generate` `quiz_question_set` [10] |
+| Ask a model for flashcards from a topic or a note, and add the ones kept | `POST /__board/generate` `POST /__board/quiz` | · | ↳ `generate` `quiz_question_set` [11] |
 | Rename or move a quiz | `POST /__board/rename` | `quiz mv` | `quiz_rename` |
 | Copy a quiz | `POST /__board/duplicate` | · | `quiz_duplicate` |
 | Move a quiz to the trash | `POST /__board/delete` | `quiz rm` | `quiz_delete` |
@@ -135,8 +146,8 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | What is wrong with a table — or a draft — as codes | `GET /__board/diagnostics` `POST /__board/diagnostics` | `table check` | `table_check` |
 | A table's tabs, columns and rows as data, each addressed by id | `GET /__board/table` | · | `table_get` |
 | Set cells; add, remove, move and size rows and columns; add, rename, sort, filter, remove and move tabs | `POST /__board/table` | · | `table_edit` |
-| A CSV as a new table, or as a new tab of one | `POST /__board/create` `POST /__board/table` | · | ↳ `table_create` `table_edit` [11] |
-| A tab as CSV | `GET /__board/get` | · | ↳ `table_get` [12] |
+| A CSV as a new table, or as a new tab of one | `POST /__board/create` `POST /__board/table` | · | ↳ `table_create` `table_edit` [12] |
+| A tab as CSV | `GET /__board/get` | · | ↳ `table_get` [13] |
 
 ## Folders
 
@@ -160,26 +171,26 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | Whether a vault syncs to a sync server, and how it is going † | `GET /api/sync` | `sync status` | `sync_status` |
-| Pair a vault with a sync server, with a one-time code † | `POST /api/sync/pair` | `sync pair` | ✗ [13] |
-| The remote vaults the paired account holds † | `GET /api/sync/remotes` | `sync remotes` | ✗ [14] |
-| Link a vault: upload it as a new remote, download a remote into an empty vault, or merge the two † | `POST /api/sync/link` | `sync link` | ✗ [13] |
-| Stop syncing a vault, keeping its files and the remote † | `POST /api/sync/unlink` | `sync unlink` | ✗ [15] |
+| Pair a vault with a sync server, with a one-time code † | `POST /api/sync/pair` | `sync pair` | ✗ [14] |
+| The remote vaults the paired account holds † | `GET /api/sync/remotes` | `sync remotes` | ✗ [15] |
+| Link a vault: upload it as a new remote, download a remote into an empty vault, or merge the two † | `POST /api/sync/link` | `sync link` | ✗ [14] |
+| Stop syncing a vault, keeping its files and the remote † | `POST /api/sync/unlink` | `sync unlink` | ✗ [16] |
 | Pull and push now † | `POST /api/sync/now` | `sync now` | `sync_now` |
-| The devices paired into the sync account † | `GET /api/sync/devices` | `sync devices` | ✗ [16] |
-| Sign a device out of the sync account † | `POST /api/sync/devices/revoke` | `sync devices revoke` | ✗ [17] |
+| The devices paired into the sync account † | `GET /api/sync/devices` | `sync devices` | ✗ [17] |
+| Sign a device out of the sync account † | `POST /api/sync/devices/revoke` | `sync devices revoke` | ✗ [18] |
 
 ## Inside a board
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | One item's fence line and body | `GET /__board/get` | · | `board_read` |
-| Duplicate, restack, group, rename, convert or re-lay-out items | `POST /__board/patch` `POST /__board/put` | · | ↳ `board_patch` `board_write` [18] |
-| A board's pages: list, add, rename, remove, reorder | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [19] |
-| Lines between items: list, add, change, remove | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [20] |
-| The cards inside one diagram | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [18] |
-| The edges inside one diagram | `POST /__board/patch` | · | ↳ `board_patch` [18] |
-| A card's rows: columns, members | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [18] |
-| A chart's own statements: form, legend, scale, categories | `POST /__board/patch` | · | ↳ `board_patch` [18] |
+| Duplicate, restack, group, rename, convert or re-lay-out items | `POST /__board/patch` `POST /__board/put` | · | ↳ `board_patch` `board_write` [19] |
+| A board's pages: list, add, rename, remove, reorder | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [20] |
+| Lines between items: list, add, change, remove | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [21] |
+| The cards inside one diagram | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [19] |
+| The edges inside one diagram | `POST /__board/patch` | · | ↳ `board_patch` [19] |
+| A card's rows: columns, members | `GET /__board/get` `POST /__board/patch` | · | ↳ `board_patch` [19] |
+| A chart's own statements: form, legend, scale, categories | `POST /__board/patch` | · | ↳ `board_patch` [19] |
 
 ## Images
 
@@ -207,8 +218,8 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
 | The person's saved components | `GET /__board/components` | · | `library` |
-| Keep items as a component | `POST /__board/create` | · | ↳ `board_create` [21] |
-| Put a saved component on a board | `GET /__board/components` `POST /__board/patch` | · | ↳ `library` `board_patch` [22] |
+| Keep items as a component | `POST /__board/create` | · | ↳ `board_create` [22] |
+| Put a saved component on a board | `GET /__board/components` `POST /__board/patch` | · | ↳ `library` `board_patch` [23] |
 | Delete a saved component | `POST /__board/components/delete` | · | `component_delete` |
 
 ## Grammar
@@ -226,34 +237,34 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Which model providers could answer | `GET /__board/llm` | · | `llm` |
 | Make one short call to a provider, to see that it really answers | `POST /__board/llm/test` | · | `llm` |
 | Ask a model to draw a diagram | `POST /__board/generate` | · | `generate` |
-| Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [23] |
-| Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [24] |
+| Run a prompt card on a board | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [24] |
+| Ask a model to rewrite one diagram | `POST /__board/generate` `POST /__board/patch` | · | ↳ `generate` `board_patch` [25] |
 
 ## Pictures
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| A picture of a board, with what is wrong with the drawing | ✗ [25] | `snapshot` | ✗ [26] |
-| Tidy a board's layout | ✗ [25] | `tidy` | ✗ [26] |
-| A board as SVG or PNG, a note as PDF | ✗ [25] | `board export` `note export` | ✗ [26] |
+| A picture of a board, with what is wrong with the drawing | ✗ [26] | `snapshot` | ✗ [27] |
+| Tidy a board's layout | ✗ [26] | `tidy` | ✗ [27] |
+| A board as SVG or PNG, a note as PDF | ✗ [26] | `board export` `note export` | ✗ [27] |
 
 ## Assistant
 
 | Feature | REST | CLI | MCP |
 |---|---|---|---|
-| The chats in a vault, newest first | `GET /__board/chats` | · | ✗ [27] |
-| The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | · | ✗ [27] |
-| Start a chat | `POST /__board/chat` | · | ✗ [27] |
-| A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | · | ✗ [27] |
-| Send a turn and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [27] |
-| Stop the turn that is answering | `POST /__board/chat/stop` | · | ✗ [27] |
-| Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | · | ✗ [27] |
-| Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | · | ✗ [27] |
-| Take back, or put back, one block of changes a turn made | `POST /__board/chat/undo` `POST /__board/chat/redo` | · | ✗ [27] |
-| Give a chat a title | `POST /__board/chat/rename` | · | ✗ [27] |
-| Delete a chat and its turns | `POST /__board/chat/delete` | · | ✗ [27] |
-| The chat's own recorder: group the writes that follow into one undoable block | `POST /__board/chat/block` | ✗ [28] | ✗ [29] |
-| The chat's own request to reach another vault, put to the person | `POST /__board/chat/access` | ✗ [30] | ✗ [31] |
+| The chats in a vault, newest first | `GET /__board/chats` | · | ✗ [28] |
+| The providers, models and effort levels a chat can run on | `GET /__board/chat/models` | · | ✗ [28] |
+| Start a chat | `POST /__board/chat` | · | ✗ [28] |
+| A chat read whole: its turns, steps, changes and undo history | `GET /__board/chat` | · | ✗ [28] |
+| Send a turn, with the documents it names with `@`, and follow the answer as it is written | `POST /__board/chat/turn` `GET /__board/chat/events` | · | ✗ [28] |
+| Stop the turn that is answering | `POST /__board/chat/stop` | · | ✗ [28] |
+| Answer a write or a vault request the assistant is waiting on | `POST /__board/chat/approve` | · | ✗ [28] |
+| Let a chat reach another vault, or take the grant back | `POST /__board/chat/grant` | · | ✗ [28] |
+| Take back, or put back, one block of changes a turn made | `POST /__board/chat/undo` `POST /__board/chat/redo` | · | ✗ [28] |
+| Give a chat a title | `POST /__board/chat/rename` | · | ✗ [28] |
+| Delete a chat and its turns | `POST /__board/chat/delete` | · | ✗ [28] |
+| The chat's own recorder: group the writes that follow into one undoable block | `POST /__board/chat/block` | ✗ [29] | ✗ [30] |
+| The chat's own request to reach another vault, put to the person | `POST /__board/chat/access` | ✗ [31] | ✗ [32] |
 
 ## Why
 
@@ -264,27 +275,28 @@ above must say so. The one switch today is `cloud`, and no release build says it
 5. It is the MCP server itself.
 6. It is the server the routes are answered by.
 7. An agent is already connected to a server; starting another is the person's.
-8. A change feed is a stream a page holds open, and a stateless tool call answers once. The `base` every read returns is how an agent knows a document moved.
-9. Importing is reading a file off the disk the CLI runs on; an agent hands the text to `board_create` and each picture to `image_add`.
-10. `generate` with `kind: "flashcards"` answers the cards, each read by the quiz parser, and `quiz_question_set` adds each kept one by its `markdown`.
-11. Importing is reading a file off the disk the CLI runs on; an agent hands the CSV's text to `table_edit`'s `importCsv` op, on a table `table_create` made or one that exists.
-12. CSV is a file for a spreadsheet on somebody's disk; `table_get` answers every row and cell as data, which is what an agent reads and writes out in whatever shape it needs.
-13. A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either.
-14. It is the list a link chooses from, and linking is the person's: a passphrase is the person's.
-15. Undoing a link is the person's, as making one is: a passphrase is the person's, and so is the decision to stop using it.
-16. The account's devices are the person's to manage, beside the passphrase that is theirs.
-17. Signing a device out is the person's, beside the passphrase that is theirs.
-18. An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal.
-19. Pages are the frontmatter's `pages:` and each item's `page=`: `board_patch`'s `{meta}` op and `{id, attrs}` op write them.
-20. A link is a line of a page's `edges` fence: `board_patch` rewrites that fence's body, or inserts one.
-21. A component is a board under `components/`: `board_create` with that name keeps one, with the text of the items to keep.
-22. `library` answers every saved component's text, and `board_patch`'s `{insert}` places it.
-23. `generate` answers the draft and `board_patch` puts it where the card was: `{insert}` after it, `{remove}` on it.
-24. `generate` with `source` answers the rewritten body, and `board_patch`'s `{id, body}` lands it on the item.
-25. Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright.
-26. A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead.
-27. An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer.
-28. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: nothing outside a running turn has a block to start.
-29. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `change_block` (server/mcp/chat.ts), which is not one of this server's tools.
-30. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: the person answers it with `chat approve`, and grants a vault up front with `chat grant`.
-31. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `vault_request` (server/mcp/chat.ts), which is not one of this server's tools.
+8. Which documents a window has open is the person's window; an agent opens a document by the url every document tool returns.
+9. A change feed is a stream a page holds open, and a stateless tool call answers once. The `base` every read returns is how an agent knows a document moved.
+10. Importing is reading a file off the disk the CLI runs on; an agent hands the text to `board_create` and each picture to `image_add`.
+11. `generate` with `kind: "flashcards"` answers the cards, each read by the quiz parser, and `quiz_question_set` adds each kept one by its `markdown`.
+12. Importing is reading a file off the disk the CLI runs on; an agent hands the CSV's text to `table_edit`'s `importCsv` op, on a table `table_create` made or one that exists.
+13. CSV is a file for a spreadsheet on somebody's disk; `table_get` answers every row and cell as data, which is what an agent reads and writes out in whatever shape it needs.
+14. A passphrase is the person's: pairing and linking take a one-time code and a passphrase they type, in Settings → Sync or a terminal, and an agent is never handed either.
+15. It is the list a link chooses from, and linking is the person's: a passphrase is the person's.
+16. Undoing a link is the person's, as making one is: a passphrase is the person's, and so is the decision to stop using it.
+17. The account's devices are the person's to manage, beside the passphrase that is theirs.
+18. Signing a device out is the person's, beside the passphrase that is theirs.
+19. An agent writes the DSL itself: `board_patch` changes one item's fence line or body, `board_write` the whole file. The CLI's version computes the same edit with the page's TypeScript for a person at a terminal.
+20. Pages are the frontmatter's `pages:` and each item's `page=`: `board_patch`'s `{meta}` op and `{id, attrs}` op write them.
+21. A link is a line of a page's `edges` fence: `board_patch` rewrites that fence's body, or inserts one.
+22. A component is a board under `components/`: `board_create` with that name keeps one, with the text of the items to keep.
+23. `library` answers every saved component's text, and `board_patch`'s `{insert}` places it.
+24. `generate` answers the draft and `board_patch` puts it where the card was: `{insert}` after it, `{remove}` on it.
+25. `generate` with `source` answers the rewritten body, and `board_patch`'s `{id, body}` lands it on the item.
+26. Drawn by the page: the layout runs in a browser against the real webfonts, and ELK reaches it through a specifier only Vite resolves, so there is no server route to call. The CLI drives the page in Playwright.
+27. A picture, a tidy and an SVG, PNG or PDF are made by the page laid out in a browser, in the real webfonts, and this server has none. Every tool that names a document returns the `url` a person opens instead.
+28. An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer.
+29. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: nothing outside a running turn has a block to start.
+30. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `change_block` (server/mcp/chat.ts), which is not one of this server's tools.
+31. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. It is not a command: the person answers it with `chat approve`, and grants a vault up front with `chat grant`.
+32. Only a chat's own MCP server calls this: it answers a request carrying `X-AnyDag-Chat` for a turn that is running, and 403s anything else. A chat's own MCP server offers it as `vault_request` (server/mcp/chat.ts), which is not one of this server's tools.

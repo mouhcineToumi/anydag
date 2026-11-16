@@ -22,13 +22,42 @@ export type TaskStatus = (typeof STATUSES)[number];
 export const STATUS_LABEL: Readonly<Record<TaskStatus, string>> = { todo: "To do", "in-progress": "In progress", done: "Done" };
 
 /**
+ * How much a task matters, most first (#311). No `priority:` line is none — the default, and what
+ * most tasks are — so there is no fifth word for it in the file.
+ */
+export const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+
+export const PRIORITY_LABEL: Readonly<Record<Priority, string>> = {
+  urgent: "Urgent",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+/**
  * What a task is, off its frontmatter. `due` is `YYYY-MM-DD`, and absent when there is none; so is
  * `start`, the day it begins — a task with both spans the days between on the calendar.
  */
-export interface Task {
+export interface Task extends TaskFacts {
   status: TaskStatus;
   due?: string;
   start?: string;
+  priority?: Priority;
+}
+
+/**
+ * What the listing knows of a task beside its frontmatter, **and never a line in the file** (#311):
+ * how many check items its body ticks of how many it has, whether it has a body at all, and when
+ * the file last changed. The first two are counted from the text by {@link taskFactsOf}; `changed`
+ * is the file's own modified time, in ms, which only the server's stat knows. Each is absent when
+ * there is nothing to say — no check items, no body, a task the page made a moment ago — so a quick
+ * task is `{status, due}` and nothing more, and `withTask` never writes any of them.
+ */
+export interface TaskFacts {
+  items?: { done: number; total: number };
+  body?: true;
+  changed?: number;
 }
 
 /** What a write asks for: a key left out stays as it is, `null` takes its line out. */
@@ -36,6 +65,7 @@ export interface TaskChange {
   status?: TaskStatus | null;
   due?: string | null;
   start?: string | null;
+  priority?: Priority | null;
 }
 
 /** The frontmatter pattern `splitNote` and `titleOf` use: a block at the very start of the text. */
@@ -57,6 +87,18 @@ export function statusOf(raw: unknown): TaskStatus | undefined {
     .replace(/[\s_]+/g, "-");
   if (s === "to-do") return "todo";
   return (STATUSES as readonly string[]).includes(s) ? (s as TaskStatus) : undefined;
+}
+
+/**
+ * A `priority:` value, or `undefined` for none — which is what any other value is read as, and the
+ * line is left as it is in the file: a note saying `priority: P1` or `priority: 3` is not refused,
+ * only drawn with none until someone picks one. Lenient in case and surrounding space only, as
+ * {@link statusOf} is.
+ */
+export function priorityOf(raw: unknown): Priority | undefined {
+  if (typeof raw !== "string") return undefined;
+  const s = raw.trim().toLowerCase();
+  return (PRIORITIES as readonly string[]).includes(s) ? (s as Priority) : undefined;
 }
 
 /**
@@ -88,13 +130,57 @@ export function taskOf(text: string): Task | undefined {
     return undefined;
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
-  const fields = data as { status?: unknown; due?: unknown; start?: unknown };
+  const fields = data as { status?: unknown; due?: unknown; start?: unknown; priority?: unknown };
   const status = statusOf(fields.status);
   if (!status) return undefined;
   /* A task's start is a day, as its due date is: a timed `start:` is no start date. */
   const due = dueOf(fields.due);
   const start = dueOf(fields.start);
-  return { status, ...(due ? { due } : {}), ...(start ? { start } : {}) };
+  const priority = priorityOf(fields.priority);
+  return { status, ...(due ? { due } : {}), ...(start ? { start } : {}), ...(priority ? { priority } : {}) };
+}
+
+/** A Markdown check item, `- [ ]` or `1. [x]`, as remark's GFM reads one: the box and the space after it. */
+const CHECK_ITEM = /^\s*(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\](?:\s|$)/;
+/** A code fence's opening line: what it opens with is what closes it. */
+const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
+
+/**
+ * What a task's text says beside its frontmatter: its check items, ticked of all, and whether it
+ * has a body. Counted, never stored — the Tasks page's progress bar and page mark, and the task
+ * page's *Check items*. A check item inside a code fence is an example, not a step, and is not counted.
+ */
+export function taskFactsOf(text: string): Pick<TaskFacts, "items" | "body"> {
+  const m = FRONT.exec(text);
+  const body = m ? text.slice(m[0].length) : text;
+  if (body.trim() === "") return {};
+  let done = 0;
+  let total = 0;
+  let fence: string | null = null;
+  for (const line of body.split(/\r?\n/)) {
+    const f = FENCE.exec(line);
+    if (f) {
+      if (fence === null) fence = f[1]!;
+      else if (f[1]!.startsWith(fence)) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    const c = CHECK_ITEM.exec(line);
+    if (!c) continue;
+    total++;
+    if (c[1] !== " ") done++;
+  }
+  return { body: true, ...(total ? { items: { done, total } } : {}) };
+}
+
+/**
+ * A task as the listing carries it: {@link taskOf} and {@link taskFactsOf} together, with the time
+ * the file last changed when the caller knows it. `undefined` for a note that is not a task.
+ */
+export function indexedTask(text: string, changed?: number | null): Task | undefined {
+  const task = taskOf(text);
+  if (!task) return undefined;
+  return { ...task, ...taskFactsOf(text), ...(changed ? { changed: Math.round(changed) } : {}) };
 }
 
 /**
@@ -123,13 +209,18 @@ export function overdue(task: Task, now: string = today()): boolean {
   return task.status !== "done" && task.due !== undefined && task.due < now;
 }
 
-/** What a click on a task's status moves it to: along the columns, and from done back to the start. */
-export function nextStatus(status: TaskStatus): TaskStatus {
-  return STATUSES[(STATUSES.indexOf(status) + 1) % STATUSES.length]!;
+/**
+ * What a click on a task's status mark does (#311): the mark is the task's checkbox, so a task that
+ * is not done is done, and a done one is to do again. In progress is one step further away — a
+ * row's menu, `S` on the Tasks page, the task's own page — because a click that meant three things
+ * in turn was a click nobody could make without looking.
+ */
+export function toggledStatus(status: TaskStatus): TaskStatus {
+  return status === "done" ? "todo" : "done";
 }
 
 /**
- * `text` with its frontmatter's `status:`, `due:` and `start:` set as `change` asks — one line each,
+ * `text` with its frontmatter's `status:`, `due:`, `start:` and `priority:` set as `change` asks — one line each,
  * and every other byte as it was.
  *
  * `with_title`'s rule, because a frontmatter is carried byte for byte by the note editor
@@ -141,7 +232,21 @@ export function nextStatus(status: TaskStatus): TaskStatus {
  * is not a frontmatter to any reader here, and would draw as two rules.
  */
 export function withTask(text: string, change: TaskChange): string {
-  return withKeys(text, change, ["status", "due", "start"]);
+  return withKeys(text, change, ["status", "priority", "due", "start"]);
+}
+
+/**
+ * Where the key on `lines[at]` ends: the line after its last. A key's lines are its own, the lines
+ * indented under it (a folded title, an indented list), and — when the key's line holds no value —
+ * the `- ` lines at column 0 after it, which is a block list as Obsidian writes one (`tags:\n- a`).
+ * Taking only the indented lines left such a list behind as YAML no reader parses (*Things that will
+ * bite*).
+ */
+export function keyEnd(lines: readonly string[], at: number): number {
+  const bare = /^[^:]*:\s*(#.*)?$/.test(lines[at]!);
+  let end = at + 1;
+  while (end < lines.length && (/^[ \t]/.test(lines[end]!) || (bare && /^-(\s|$)/.test(lines[end]!)))) end++;
+  return end;
 }
 
 /**
@@ -161,8 +266,7 @@ export function withKeys(text: string, change: object, keys: readonly string[]):
     /* An object rather than a record, so an interface — `TaskChange`, `ProjectChange` — is one. */
     const value = (change as Record<string, string | null | undefined>)[key];
     const at = lines.findIndex((raw) => new RegExp(`^${key}\\s*:`).test(raw));
-    let end = at + 1;
-    if (at >= 0) while (end < lines.length && /^[ \t]/.test(lines[end]!)) end++;
+    const end = at >= 0 ? keyEnd(lines, at) : at + 1;
     if (value === null || value === undefined) {
       if (at >= 0) {
         lines.splice(at, end - at);

@@ -20,6 +20,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/grammar.ts` · `grammar-worker.ts` | the grammar as function calls, its parse caches, and the worker the whole-vault parses run on: a process, ended when idle |
 | `server/parsing.ts` · `pace.ts` | the texts of `/index` and `/corpus` read, parsed and kept where the grammar runs · a whole-vault loop in slices |
 | `server/parse-store.ts` · `searching.ts` | what the grammar parsed, kept in `<home>/parse.sqlite` · a vault's corpus and search, answered in the worker |
+| `server/words.ts` · `upkeep.ts` | the corpus's words, an FTS5 index beside its rows in `parse.sqlite` · that index kept up to date as a watched vault changes |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
@@ -30,15 +31,30 @@ Nine things are load-bearing:
   its frontmatter; an attachment's is `<vault>/.anydag/files/<id>.json`; a vault's own id and
   settings are in `<vault>/.anydag/`. The SQLite file in the app's home maps id → path, created,
   title and kind so the app, the CLI and MCP agree without walking the vault, and it is an index:
-  delete it and the next open rebuilds it, losing practice records and nothing else. Beside it,
-  `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1: delete it and the
-  next question parses the vault again. **SQLite is never in the vault**, because a sync tool copies
+  delete it and the next open rebuilds it, losing practice records and each vault's saved tabs
+  (`/api/tabs`, `sidebar.md`) and nothing else. Beside it,
+  `parse.sqlite` is what the grammar made of each text, a cache by stat and sha1, and the search's FTS5
+  index of their words (#267): delete it and the vault is parsed and indexed again, in the
+  background once a watched vault opens, or by the next question. **SQLite is never in the vault**, because a sync tool copies
   a database while it is written.
 - **Frontmatter wins.** Two files with one id — a copy made in a file manager — keep it for the
   older by created date, and the copy is given a new id, written into it. A file moved outside the
   app keeps its id and the index learns the new path from the watcher.
-- **The token and the `Host` are the whole security model**, and both are checked on every request —
-  see *Things that will bite*. `server.json` is written mode `0600`.
+- **The token and the `Host` are the whole security model**, and both are checked on every request
+  to the API — see *Things that will bite*. `server.json` is written mode `0600`. The API answers
+  twice: at the root it takes **only the header**, which the shell, the CLI, MCP and the Vite proxy
+  send; under `/s/<secret>/` — a path `createApp` mints per launch and tells only the page that
+  opened `/?token=…`, in the redirect's fragment — it takes `anydag serve`'s cookie too, whose `Path`
+  is that prefix, because a cookie on `/` reaches every port of `127.0.0.1` and whoever listens there
+  (#339). The prefix is taken off before routing, and is in no route, log, error or `server.json`.
+  **The gate denies by default**: the routes answer only a request one of those two branches handed
+  them after checking its credential, and refuse any other; the API spelled any way but the one the
+  routes are written in (`/%61pi/…`, `//api/…`, `/API/…`, `/api%2F…`) is a `400` whatever it carries;
+  and every other path goes to an app of its own that serves the built page's files and nothing
+  else — a `404` with no page.
+  A write that carries the token only as the cookie must also come from the page's own origin
+  (#336). The page and its assets at `/` need no credential: they hold no data
+  (`test/server/gate.test.ts`, `e2e/credential.spec.ts`).
 - **One server, several vaults.** Each vault has its own change feed, and `/__board/transfer` moves
   a document or a folder between two open vaults with its id and created date.
 - **Nothing the store may do may block sync**: no single shared index file in
@@ -147,6 +163,14 @@ The switch is read as follows, from one function (`cloudOn`):
   one line — *Sync is not available in this build.* — and are out of `anydag --help` when the CLI's
   own build says off.
 
+**One exception to #103's rule (#326): Settings → Privacy is drawn in every build.** Off, it is the
+anonymous-logs toggle and one sentence saying logs are not sent from this version yet. The toggle
+records the choice in the browser (`dag:telemetry-pending`), makes no request and sends nothing; the
+first build whose switch is on carries that choice to the app's home (`PUT /api/telemetry`) before
+it asks anything, so the choice made in an off build is the one an on build starts with. No other
+server-backed surface follows it: Sync, Send feedback and the first-run logs question stay hidden.
+This is the only component mount that ignores the switch.
+
 Nothing is deleted when the switch is off. A vault that was linked keeps its `key` and `pair.json`
 in the app's home, a consent answer keeps its place in `kv`, and turning the switch on
 (`ANYDAG_CLOUD=on` on any build) resumes them: the loop starts at the next vault open, the next
@@ -202,6 +226,17 @@ Eight things are load-bearing:
   among them since #191 (`settings.md`). `WORKSPACE_PREF_KEYS` is still the name of the split in `src/settings/`.
 - **A file keeps its id across a transfer**, and a reference from a file left behind stops resolving
   there: an id resolves within its vault.
+
+**Out, and why** (#267, each measured or read against the code first): **removing the local port**, or a
+second transport between the page and the server — `anydag serve`, the CLI and MCP reach this server
+over HTTP, the token and the `Host` are the whole security model, a second transport would double what
+has to be guarded, and the forward through `anydag://` costs 0.7 ms a request (`limits.md`);
+**SQLite indexes for what the Tasks, project and calendar views filter on** — those views filter the
+listing, which is kept in memory and changed where something moved (#280), so there is no query to
+index: every query the home does run is on a primary key or a unique index, every statement is
+prepared once (`Home.sql`, `Shelf.sql`, `SyncState.sql`), and bulk writes are already transactions;
+**caches in the vault** — a search index, graph positions — because opening a vault writes nothing
+to it and everything rebuildable lives in the app's home.
 
 **Out, and why:** collaborators and permissions (a vault is a folder; a person shares it the way they
 share any folder); references across vaults; and sync, which is the folder's — Syncthing, iCloud,

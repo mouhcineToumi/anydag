@@ -51,6 +51,10 @@ import { loadVaults } from "./vault/api";
 import { desktop } from "./vault/desktop";
 import { setLocale } from "./locale";
 import { settleVault, watchVault } from "./vault/current";
+import { takeSecret } from "./vault/secret";
+import { installHistory } from "./ui/history";
+import { openSavedTabs } from "./ui/tabs/saved";
+import { watchTextSize } from "./ui/textSize";
 import { watchWindowInset } from "./ui/windowInset";
 import "./styles/base.css";
 import "./styles/chrome.css";
@@ -145,12 +149,15 @@ async function start(): Promise<void> {
   /* Before anything is drawn, so every date and every sorted list follows the system rather than
      the desktop app's locale pack (`src/locale.ts`). A browser has no bridge and needs none. */
   setLocale(desktop()?.locale);
+  /* Before the first request: the secret path `anydag serve` handed this page in the address's
+     fragment, kept for this origin and taken off the address (`src/vault/secret.ts`, #339). */
+  takeSecret();
   /* Before the first request, so that every one of them says which vault it is about. */
   watchVault();
   /* Before the first paint, so the top row never draws under the macOS traffic lights. */
   watchWindowInset();
 
-  const [, account, features] = await Promise.all([
+  const [, account] = await Promise.all([
     facesLoaded().catch(() => undefined),
     me()
       .then((account) => {
@@ -158,9 +165,10 @@ async function start(): Promise<void> {
         return account;
       })
       .catch(() => null),
-    /* What this build may show of the server-backed features — sync, the logs, Send feedback. One
-       unscoped call at boot, with the page's opinion of it coming only from here
-       (`src/features.ts`). Nothing waits for it alone: it lands with the fonts and the session. */
+    /* What this build may show of the server-backed features — sync, the logs question and the
+       sending, Send feedback. One unscoped call at boot, with the page's opinion of it coming only
+       from here (`src/features.ts`). Nothing waits for it alone: it lands with the fonts and the
+       session. */
     loadFeatures(),
   ]);
   let id = "";
@@ -178,17 +186,36 @@ async function start(): Promise<void> {
     if (id) await pull();
     /* The account's time zone is read before anything draws a time. */
     watchZone();
-    /* Whether this install sends logs, asked once; the first page asks the person when nobody has
-       answered (`telemetry/Prompt.tsx`) — and never when the build's `cloud` switch is off
-       (`server/features.ts` says so through `/api/health`): no request at all. Not awaited. */
-    if (id && features?.cloud) void startTelemetry();
   }
+  /* Whether this install sends logs, read once; the first page asks the person when nobody has
+     answered (`telemetry/Prompt.tsx`) — and a build whose `cloud` switch is off asks nothing at all:
+     Settings → Privacy still reads the answer held in this browser and records a new one (#326).
+     Called with no vault open too, because the answer is the install's and Privacy is drawn on
+     Home. Not awaited. */
+  if (account) void startTelemetry();
+  /* The person's reading size, on `<html>` before anything is drawn. After `pull()`, so the step is
+     the account's rather than this browser's cache of it, and before the first render, so the
+     chrome never paints at the old one. A snapshot reads no preference and gets the default. */
+  watchTextSize();
 
   /* The page itself, which `preload()` has been fetching since the session answered: drawn in the
      first render, never behind a `Suspense`. With no session there is no page — `Gate` says so. */
   const Page: ComponentType | null = !account
     ? null
     : await (id ? topPage(new URLSearchParams(location.search).get("view") === "1") : noVaultPage()).catch(failed);
+
+  /* The document tabs this window had in this vault, before the first render: the page drawn first
+     is the one that was in front, and in a new window a bare address takes its place
+     (`src/ui/tabs/saved.ts`). A snapshot and a read-only view are one page, and keep no tabs. */
+  {
+    const q = new URLSearchParams(location.search);
+    if (id && q.get("view") !== "1" && q.get("snapshot") !== "1") await openSavedTabs();
+  }
+
+  /* The window's history, marked before the first render so Back/Forward know where they are and
+     the desktop's keys are the first listener the window has. A read-only view is not the app's
+     history and draws no arrows. */
+  if (id && new URLSearchParams(location.search).get("view") !== "1") installHistory();
 
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

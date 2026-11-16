@@ -1,4 +1,4 @@
-import { Link as LinkMark, Lock, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Link as LinkMark, Lock, Pencil, Tags } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FileKind } from "@/board/useBoard";
@@ -6,8 +6,10 @@ import { AssistantToggle } from "@/assistant/Toggle";
 import { chordFor } from "@/edit/bindings";
 import { appLink } from "@/refs/link";
 import { LOCK_KEYS, toggleLock, useLocked } from "@/settings/lock";
+import { useHistoryControls, historyChords } from "@/ui/history";
 
 import { copyText } from "./clipboard";
+import { IconButton } from "./controls";
 import { LockButton } from "./Lock";
 import { Lockup } from "./Logo";
 import { PageMore, type MoreItem } from "./PageMore";
@@ -63,6 +65,7 @@ export function Toolbar({
   kind,
   onBoards,
   more = [],
+  lead,
   children,
 }: {
   /** What is open. `null` before anything has been, which is where `Welcome` takes over. */
@@ -73,11 +76,15 @@ export function Toolbar({
   onBoards(): void;
   /** The page's rows for the `⋯`, above the bar's own. */
   more?: MoreItem[];
+  /** What sits right after the title — the Tasks page's tabs, which say which of its tasks it shows. */
+  lead?: ReactNode;
   /** What sits at the far end of the bar — the backlinks, the page's main action, Export. */
   children?: ReactNode;
 }) {
   const chord = chordFor("boards");
   const sidebar = useSidebar();
+  const history = useHistoryControls();
+  const chords = historyChords();
   const away = !sidebar?.docked;
   const crumbs = boardName ? ancestors(boardName) : [];
   /* With nothing open there is no title to show: the welcome card says what to do, and a title
@@ -134,6 +141,17 @@ export function Toolbar({
       split: more.length > 0 && !id,
       disabled: locked,
     });
+  /* *Tags…* on a board, a quiz or a table — a note has its Tags row under its title (#327). The card
+     hangs from the `⋯` the row was in. */
+  if (sidebar && boardName && (kind === "board" || kind === "quiz" || kind === "table"))
+    rows.push({
+      key: "tags",
+      label: "Tags…",
+      icon: Tags,
+      hook: "data-dag-toolbar-tags",
+      onSelect: (from) => sidebar.editTags(kind, boardName, from ?? null),
+      disabled: locked,
+    });
   /* The lock's switch lives here while the page is editable (the UI review): an open padlock in the
      bar said nothing about which state it was in. Locked, the bar says *Read only* in so many words. */
   if (sidebar && !locked)
@@ -171,6 +189,31 @@ export function Toolbar({
           <Lockup size={20} />
         </button>
       ) : null}
+
+      {/* The documents this window visited. Disabled at either end, so the two arrows say
+          where in the history the page is without a menu or a count. */}
+      <div className="dag-toolbar__history" role="group" aria-label="History">
+        <IconButton
+          data-dag-history-back=""
+          aria-label="Back"
+          tip="Back: the document you were on before"
+          shortcut={chords.back}
+          disabled={!history.canBack}
+          onClick={history.back}
+        >
+          <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
+        </IconButton>
+        <IconButton
+          data-dag-history-forward=""
+          aria-label="Forward"
+          tip="Forward: the document you went back from"
+          shortcut={chords.forward}
+          disabled={!history.canForward}
+          onClick={history.forward}
+        >
+          <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+        </IconButton>
+      </div>
 
       <div className="dag-toolbar__where">
         {sidebar && crumbs.length ? (
@@ -225,6 +268,7 @@ export function Toolbar({
             <span className="dag-toolbar__title">{shown}</span>
           </button>
         ) : null}
+        {lead}
       </div>
 
       <div className="dag-toolbar__end">

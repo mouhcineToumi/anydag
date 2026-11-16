@@ -83,3 +83,28 @@ export function Backlinks({ id }: { id: string | null | undefined }) {
     </div>
   );
 }
+
+/**
+ * What links here as a list rather than a count: the *Linked from* section of a task's properties
+ * (#311), the same backlinks the bar's count opens. Nothing while nothing links here.
+ */
+export function LinkedFrom({ id }: { id: string | null | undefined }) {
+  const index = useIndex();
+  if (!id || !index.loaded) return null;
+  const from = backlinksOf(index, id);
+  if (from.length === 0) return null;
+  return (
+    <section className="dag-linked-from" data-dag-linked-from={from.length}>
+      <h3 className="dag-linked-from__head">Linked from</h3>
+      {from.map((d) => {
+        const Icon = KIND_ICON[d.kind];
+        return (
+          <a key={d.id} className="dag-linked-from__row" href={hrefFor(d.id)} title={d.name} data-dag-linked-from-row={d.id}>
+            <Icon size={14} strokeWidth={2} aria-hidden="true" />
+            <span>{titleOf(d)}</span>
+          </a>
+        );
+      })}
+    </section>
+  );
+}

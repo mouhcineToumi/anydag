@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type APIRequestContext, type Page } from "./fixture";
 import { openSidebar } from "./sidebar";
 
 /**
@@ -171,6 +171,31 @@ test("deleting a chat drops its row and lands on New chat", async ({ page }) => 
   await expect(page.locator(`[data-dag-chat-row="${id}"]`)).toHaveCount(0);
 });
 
+test("an image from elsewhere in a reply is a link, and nothing is fetched until it is clicked", async ({ page }) => {
+  /* A reply is drawn as it streams, and an <img> loads with no click: an image URL the agent built
+     from what it read would carry the vault out of a chat that has no network of its own (#10). */
+  const asked: string[] = [];
+  await page.route("http://anydag-e2e.invalid/**", (route) => {
+    asked.push(route.request().url());
+    return route.fulfill({ status: 204 });
+  });
+  const url = `http://anydag-e2e.invalid/p.gif?d=${run}`;
+  await page.goto("/?chat=new");
+  await say(page, `![a chart](${url})`);
+  await chatId(page);
+  const turn = page.locator("[data-dag-chat-turn]");
+  await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  const said = turn.locator("[data-dag-chat-said]");
+  await expect(said.locator(`[data-dag-chat-image="${url}"]`)).toHaveText("a chart");
+  await expect(said.locator("img")).toHaveCount(0);
+
+  /* Reopened from the history, it is still a link. */
+  await page.reload();
+  await expect(page.locator(`[data-dag-chat-said] [data-dag-chat-image="${url}"]`)).toBeVisible();
+  await expect(page.locator("[data-dag-chat-said] img")).toHaveCount(0);
+  expect(asked).toEqual([]);
+});
+
 test("a turn makes a note and a block card; Undo takes it away and Redo brings it back", { tag: "@smoke" }, async ({ page }) => {
   const name = stem("make");
   await page.goto("/?chat=new");
@@ -233,7 +258,7 @@ test("a fresh chat writes with no switch to flip", async ({ page }) => {
 /**
  * A second vault for a grant test: made under a temp directory, with the suite's own put back as the
  * server's default at once (`e2e/vaults.spec.ts` is the pattern) — **opening a vault makes it the
- * default**, and the rest of the suite loads pages with no `vault=` and would land wherever that is.
+ * default**, and a page that names no vault lands there, so it is put back for the checks that are.
  */
 let parents: string[] = [];
 const made: string[] = [];
@@ -353,6 +378,54 @@ test("space A opens the panel on a board and on a note, and again closes it", as
   await expect(panel).toBeVisible();
 });
 
+test("the panel opens on a new chat, keeps it on the same note, and leaves it behind on another", async ({ page, request }) => {
+  /* #321: the panel used to open on the vault's newest chat, even one about another document. */
+  const first = stem("panel-first");
+  const second = stem("panel-second");
+  fs.writeFileSync(noteFile(first), "---\ntitle: First note\n---\nfirst\n");
+  fs.writeFileSync(noteFile(second), "---\ntitle: Second note\n---\nsecond\n");
+  const vault = await suiteVaultId(page);
+  const rows = async () =>
+    ((await (await request.get(`/__board/chats?vault=${vault}`)).json()) as { chats: { id: string }[] }).chats;
+  const before = (await rows()).length;
+
+  await page.goto(`/?note=${first}`);
+  await expect(page.locator(`[data-dag-note-view="${first}"][data-dag-ready]`)).toBeVisible();
+  await openSidebar(page);
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("[data-dag-chat-welcome]")).toBeVisible();
+  await expect(panel.locator("[data-dag-chat-input]")).toBeFocused();
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", "new");
+  /* Opening is not a message: no empty chat is written until one is sent. */
+  expect((await rows()).length).toBe(before);
+
+  await say(page, "about the first note");
+  await expect(panel.locator("[data-dag-chat-turn]")).toHaveAttribute("data-dag-chat-status", "done");
+  const id = (await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!;
+  expect(id).toMatch(/^c[0-9a-z]+$/);
+  chats.push(id);
+
+  /* Closing and reopening on this note keeps the chat that was there. */
+  await panel.locator("[data-dag-assistant-panel-close]").click();
+  await expect(panel).toHaveCount(0);
+  await page.locator("[data-dag-assistant-toggle]").click();
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", id);
+  await expect(panel.locator("[data-dag-chat-asked]")).toHaveText("about the first note");
+
+  /* Another note — in this window, not a reload — starts a new chat, and the first is still in
+     the history. */
+  await panel.locator("[data-dag-assistant-panel-close]").click();
+  await page.locator(`[data-dag-sidebar-row][data-dag-sidebar-key="note:${second}"]`).click();
+  await expect(page.locator(`[data-dag-note-view="${second}"][data-dag-ready]`)).toBeVisible();
+  await page.locator("[data-dag-assistant-toggle]").click();
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", "new");
+  await expect(panel.locator("[data-dag-chat-welcome]")).toBeVisible();
+  await expect(panel.locator("[data-dag-chat-input]")).toBeFocused();
+  expect((await rows()).some((row) => row.id === id)).toBe(true);
+});
+
 test("the panel keeps the chat it opens onto the page", async ({ page }) => {
   await page.goto("/?tasks=1");
   await page.locator("[data-dag-assistant-toggle]").click();
@@ -390,8 +463,16 @@ test("a board the Assistant makes and embeds in the open note is drawn there, li
   await page.route("**/__board/list*", (route) => (dropped.list++ === 0 ? route.abort() : route.continue()));
   await page.route("**/__board/index*", (route) => (dropped.index++ === 0 ? route.abort() : route.continue()));
   await say(page, `block Add a diagram\nboard ${board} a --> b\nembed ${note} ${board}`);
+  /* The note is the chat's subject (#323): a new board is outside it, and waits for the person. The
+     embed that follows changes the note itself, and does not. */
+  const card = panel.locator("[data-dag-chat-approval]");
+  await expect(card).toContainText("Change something other than “Merge queues”?");
+  await expect(card).toContainText(`Make ${board}`);
+  await panel.locator("[data-dag-chat-allow]").click();
+  await expect(card).toHaveAttribute("data-dag-chat-answer", "yes");
   const turn = panel.locator("[data-dag-chat-turn]");
   await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  await expect(panel.locator("[data-dag-chat-approval]")).toHaveCount(1);
   /* The panel's chat is named on its surface rather than in the address. */
   await expect(panel.locator("[data-dag-chat]")).not.toHaveAttribute("data-dag-chat", "new");
   chats.push((await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!);
@@ -507,4 +588,151 @@ test("the composer's controls sit on one row, name the model, and the box can be
   /* The chat the panel is now on is this run's to delete (the page never sees its id). */
   const made = await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat");
   if (made && made !== "new") chats.push(made);
+});
+
+/** Open the panel beside a note this run made, on a new chat. */
+async function panelOnNote(page: Page, name: string) {
+  await page.goto(`/?note=${name}`);
+  await expect(page.locator(`[data-dag-note-view="${name}"][data-dag-ready]`)).toBeVisible();
+  await page.locator("[data-dag-assistant-toggle]").click();
+  const panel = page.locator("[data-dag-assistant-panel]");
+  await expect(panel.locator("[data-dag-chat]")).toHaveAttribute("data-dag-chat", "new");
+  return panel;
+}
+
+test("a chat started on a note works on it: the chip names it, the turn is told it, and another note waits", async ({ page }) => {
+  /* #323: "organise this" in a note's panel reorganised other notes, when the person meant this one. */
+  const subject = stem("subject");
+  const other = stem("subject-other");
+  fs.writeFileSync(noteFile(subject), "---\ntitle: Subject note\n---\nmessy\n");
+  fs.writeFileSync(noteFile(other), "---\ntitle: Other note\n---\nleave me\n");
+  const panel = await panelOnNote(page, subject);
+
+  const chip = panel.locator(`[data-dag-chat-subject="${subject}"]`);
+  await expect(chip).toBeVisible();
+  await expect(chip).toContainText("Subject note");
+  await expect(chip).toHaveAttribute("data-dag-chat-docchip", "note");
+  await expect(panel.locator("[data-dag-chat-welcome]")).toContainText("Ask about “Subject note”");
+
+  /* The turn is told the note by its reference and title, and changes it without asking. */
+  await say(page, `subject\nedit ${subject} organised`);
+  const first = panel.locator("[data-dag-chat-turn]").last();
+  await expect(first).toHaveAttribute("data-dag-chat-status", "done");
+  const id = (await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!;
+  chats.push(id);
+  await expect(first.locator("[data-dag-chat-said]").last()).toContainText("“Subject note”");
+  await expect(first.locator("[data-dag-chat-said]").last()).toContainText("dag:");
+  await expect(first.locator("[data-dag-chat-approval]")).toHaveCount(0);
+  expect(fs.readFileSync(noteFile(subject), "utf8")).toBe("organised\n");
+
+  /* Any other note is held for the person, and Deny leaves it as it was. */
+  await say(page, `edit ${other} changed`);
+  const card = panel.locator("[data-dag-chat-approval]");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("Change something other than");
+  await expect(card).toContainText(other);
+  expect(fs.readFileSync(noteFile(other), "utf8")).toBe("---\ntitle: Other note\n---\nleave me\n");
+  await panel.locator("[data-dag-chat-deny]").click();
+  await expect(card).toHaveAttribute("data-dag-chat-answer", "no");
+  await expect(panel.locator("[data-dag-chat-turn]").last()).toHaveAttribute("data-dag-chat-status", "done");
+  expect(fs.readFileSync(noteFile(other), "utf8")).toBe("---\ntitle: Other note\n---\nleave me\n");
+  /* The chat still says what it is about. */
+  await expect(panel.locator(`[data-dag-chat-subject="${subject}"]`)).toBeVisible();
+});
+
+test("typing @ lists the vault's documents, and the picked one reaches the turn as its reference", async ({ page }) => {
+  /* #324: a message can name a file, so the agent reads exactly that one rather than guessing by a
+     title typed into prose. */
+  const mention = stem("mention");
+  const title = `Mention note ${run}`;
+  fs.writeFileSync(noteFile(mention), `---\ntitle: ${title}\n---\nread me\n`);
+  await page.goto("/?chat=new");
+  await expect(page.locator("[data-dag-chat-welcome]")).toBeVisible();
+  const input = page.locator("[data-dag-chat-input]");
+  const list = page.locator("[data-dag-chat-mentions]");
+
+  /* An @ inside a word — an email address — does not open a list. */
+  await input.fill("mail me at a@b.com");
+  await expect(list).toHaveCount(0);
+
+  /* After a space it does, and what follows narrows it to this run's note. */
+  await input.fill("@");
+  await expect(list).toBeVisible();
+  await input.pressSequentially(mention);
+  const option = list.locator(`[data-dag-chat-mention-item="${mention}"]`);
+  await expect(option).toBeVisible();
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(list).toHaveCount(0);
+  const chip = page.locator(`[data-dag-chat-mention="${mention}"]`);
+  await expect(chip).toBeVisible();
+  await expect(chip).toContainText(title);
+  await expect(chip).toHaveAttribute("data-dag-chat-docchip", "note");
+
+  /* One Backspace takes the whole chip. */
+  await input.fill("");
+  await input.press("Backspace");
+  await expect(chip).toHaveCount(0);
+
+  /* Escape closes the list and leaves what was typed where it is. */
+  await input.fill("@");
+  await input.pressSequentially(mention);
+  await expect(list).toBeVisible();
+  await input.press("Escape");
+  await expect(list).toHaveCount(0);
+  await expect(input).toHaveValue(`@${mention}`);
+
+  /* The pointer picks too; the message then says `mentions`, which the fake repeats back with the
+     references the turn was given. */
+  await input.fill("@");
+  await input.pressSequentially(mention);
+  await expect(option).toBeVisible();
+  await option.click();
+  await expect(chip).toBeVisible();
+  await input.pressSequentially("mentions");
+  await input.press("Enter");
+  const turn = page.locator("[data-dag-chat-turn]").last();
+  await expect(turn).toHaveAttribute("data-dag-chat-status", "done");
+  chats.push((await page.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!);
+  const answer = turn.locator("[data-dag-chat-said]").last();
+  await expect(answer).toContainText(title);
+  await expect(answer.locator("[data-dag-ref]")).toHaveCount(1);
+});
+
+test("removing the chip makes the chat about the whole vault, before the first message and after it", async ({ page }) => {
+  const subject = stem("chipless");
+  const other = stem("chipless-other");
+  fs.writeFileSync(noteFile(subject), "---\ntitle: Chipless note\n---\nhere\n");
+  fs.writeFileSync(noteFile(other), "elsewhere\n");
+
+  /* Before the first message: the new chat is made with no subject. */
+  let panel = await panelOnNote(page, subject);
+  await panel.locator("[data-dag-chat-docchip-remove]").click();
+  await expect(panel.locator("[data-dag-chat-subject]")).toHaveCount(0);
+  await expect(panel.locator("[data-dag-chat-welcome]")).toContainText("Ask about this vault");
+  await say(page, "subject");
+  await expect(panel.locator("[data-dag-chat-turn]").last()).toHaveAttribute("data-dag-chat-status", "done");
+  chats.push((await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!);
+  await expect(panel.locator("[data-dag-chat-said]").last()).toHaveText("This chat has no subject.");
+  await expect(panel.locator("[data-dag-chat-subject]")).toHaveCount(0);
+
+  /* After it: a chat that had the note drops it with the next message, and writes vault-wide. */
+  await panel.locator("[data-dag-assistant-panel-new]").click();
+  panel = page.locator("[data-dag-assistant-panel]");
+  await expect(panel.locator(`[data-dag-chat-subject="${subject}"]`)).toBeVisible();
+  await say(page, "subject");
+  await expect(panel.locator("[data-dag-chat-turn]").last()).toHaveAttribute("data-dag-chat-status", "done");
+  chats.push((await panel.locator("[data-dag-chat]").getAttribute("data-dag-chat"))!);
+  await expect(panel.locator("[data-dag-chat-said]").last()).toContainText("“Chipless note”");
+  await expect(panel.locator(`[data-dag-chat-subject="${subject}"]`)).toBeVisible();
+
+  await panel.locator("[data-dag-chat-docchip-remove]").click();
+  await expect(panel.locator("[data-dag-chat-subject]")).toHaveCount(0);
+  await say(page, `subject\nedit ${other} wide`);
+  const last = panel.locator("[data-dag-chat-turn]").last();
+  await expect(last).toHaveAttribute("data-dag-chat-status", "done");
+  await expect(last.locator("[data-dag-chat-said]").last()).toContainText("This chat has no subject.");
+  await expect(last.locator("[data-dag-chat-approval]")).toHaveCount(0);
+  expect(fs.readFileSync(noteFile(other), "utf8")).toBe("wide\n");
+  await expect(panel.locator("[data-dag-chat-subject]")).toHaveCount(0);
 });

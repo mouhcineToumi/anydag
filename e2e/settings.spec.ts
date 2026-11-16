@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
-import { exportAs, openExport } from "./export";
-import { openSettings, settingsTab, type SettingsTab } from "./sidebar";
+
 import { BOARDS, ROOT } from "./boards";
+import { exportAs, openExport } from "./export";
+import { expect, test, type Page } from "./fixture";
+import { openSettings, settingsTab, type SettingsTab } from "./sidebar";
 
 /**
  * Settings — what the app does, as opposed to what a board says. A modal of tabs.
@@ -326,6 +327,7 @@ test("every tab says which scope it belongs to, under a heading that says what i
     ["providers", "This computer"],
     ["vault-general", "This vault"],
     ["vault-files", "This vault"],
+    ["tags", "This vault"],
     ["export", "This vault"],
     ["sync", "This vault"],
     ["agent-access", "This vault"],

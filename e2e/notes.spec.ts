@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS, openBoards } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
 import { newFile, openSidebar } from "./sidebar";
 
@@ -155,6 +155,134 @@ test("opening a note and looking at it writes nothing", async ({ page }) => {
   expect(fs.statSync(file).mtimeMs).toBe(before);
 });
 
+/*
+ * The line after the last block (#317). A note ending in a picture, a table or a code block had no
+ * way to write after it: the empty space below the text was the page's, and ArrowDown at the end was
+ * taken by the editor and did nothing. Both now leave the caret in an empty paragraph — which the
+ * bridge writes no bytes for, so a click and a leave is the file it was.
+ */
+const PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120"><rect width="320" height="120" fill="#888888"/></svg>`;
+
+/** A note whose last block is a picture, and the picture beside it. */
+function pictureNote(): string {
+  const assets = path.join(DIR, `${name}.assets`);
+  fs.mkdirSync(assets, { recursive: true });
+  fs.writeFileSync(path.join(assets, "picture.svg"), PICTURE);
+  const md = `---\ntitle: A note\n---\n# The plan\n\n![a picture](${name}.assets/picture.svg)\n`;
+  fs.writeFileSync(file, md);
+  return md;
+}
+
+/** The block the caret is in, and whether the editor has the focus. */
+function caret(page: Page) {
+  return page.evaluate(() => {
+    const node = getSelection()?.anchorNode;
+    const el = node instanceof Element ? node : node?.parentElement;
+    return {
+      block: el?.closest(".bn-block-outer")?.getAttribute("data-id") ?? null,
+      editor: !!document.activeElement?.closest(".bn-editor"),
+    };
+  });
+}
+
+test("a click below the last block gives an empty paragraph, and leaving without typing writes nothing", async ({ page }) => {
+  const md = pictureNote();
+  await open(page);
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(2);
+  await page.locator("[data-dag-note-tail]").click();
+  await expect(blocks).toHaveCount(3);
+  const last = blocks.last();
+  await expect(last.locator(".bn-block-content")).toHaveAttribute("data-content-type", "paragraph");
+  await expect(last).toHaveText("");
+  const id = await last.getAttribute("data-id");
+  await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+  /* Leaving without a letter typed writes not one byte — an empty paragraph after the last block is
+     the editor's until it holds words; only one between two blocks is written (#318). */
+  await page.goto("about:blank");
+  await page.waitForTimeout(400);
+  expect(read()).toBe(md);
+});
+
+test("Arrow down from a picture at the end gives an empty paragraph after it", async ({ page }) => {
+  const md = pictureNote();
+  await open(page);
+  await page.locator(".bn-block-content[data-content-type=image]").click();
+  await page.keyboard.press("ArrowDown");
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(3);
+  const id = await blocks.last().getAttribute("data-id");
+  await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+  await page.keyboard.type("After the picture.");
+  await expect.poll(read, { timeout: 5_000 }).toBe(md.replace(/\n$/, "\n\nAfter the picture.\n"));
+});
+
+test("Arrow down at the end of a last paragraph gives an empty paragraph too", async ({ page }) => {
+  /* The editor's own trailing block takes ArrowDown here and stops, which is the half no picture
+     covers: a note whose last words are a paragraph had no line under them either. */
+  fs.writeFileSync(file, "# The plan\n\nThe last paragraph.\n");
+  await open(page);
+  await endOf(page, "The last paragraph.");
+  await page.keyboard.press("ArrowDown");
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(3);
+  const id = await blocks.last().getAttribute("data-id");
+  await expect.poll(() => caret(page)).toEqual({ block: id, editor: true });
+});
+
+/*
+ * Empty lines between paragraphs (#318). Markdown has no empty paragraph, so Enter pressed twice
+ * between two paragraphs wrote nothing, and the lines were gone once the note was left and opened
+ * again. An empty line between two blocks is now `&nbsp;` on a line of its own.
+ */
+test("empty lines made between two paragraphs are still there after leaving the note and coming back", async ({ page }) => {
+  fs.writeFileSync(file, "The first paragraph.\n\nThe second paragraph.\n");
+  const other = path.join(DIR, `${name}-other.note.md`);
+  fs.writeFileSync(other, "Another note.\n");
+  made.push(other);
+  await open(page);
+  const blocks = page.locator(".bn-block-outer");
+  await expect(blocks).toHaveCount(2);
+  await endOf(page, "The first paragraph.");
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Enter");
+  await expect(blocks).toHaveCount(5);
+  const lines = "The first paragraph.\n\n&nbsp;\n\n&nbsp;\n\n&nbsp;\n\nThe second paragraph.\n";
+  await expect.poll(read, { timeout: 5_000 }).toBe(lines);
+
+  /* Another note, from the list, and back the same way. */
+  await openBoards(page);
+  await page.fill(".dag-panel__input", name);
+  await page.locator(`[data-dag-note="${name}-other"]`).click();
+  await expect(block(page, "Another note.")).toBeVisible();
+  await openBoards(page);
+  await page.fill(".dag-panel__input", name);
+  await page.locator(`[data-dag-note="${name}"]`).click();
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(block(page, "The second paragraph.")).toBeVisible();
+  await expect(blocks).toHaveCount(5);
+  for (const i of [1, 2, 3]) await expect(blocks.nth(i)).toHaveText("");
+
+  /* A fresh page — what a restart reads — draws them too, and the file did not move. */
+  await open(page);
+  await expect(blocks).toHaveCount(5);
+  expect(read()).toBe(lines);
+});
+
+test("a note another tool wrote with several blank lines opens as its paragraphs and is not rewritten", async ({ page }) => {
+  const md = "# The plan\n\n\n\nThe first paragraph.\n\n\n\n\nThe second paragraph.\n\n\n";
+  fs.writeFileSync(file, md);
+  const before = fs.statSync(file).mtimeMs;
+  await open(page);
+  /* Blank lines are one break in Markdown, so they open as one, as every other page draws them. */
+  await expect(page.locator(".bn-block-outer")).toHaveCount(3);
+  await block(page, "The second paragraph.").click();
+  await page.waitForTimeout(800);
+  await page.goto("about:blank");
+  await page.waitForTimeout(400);
+  expect(read()).toBe(md);
+  expect(fs.statSync(file).mtimeMs).toBe(before);
+});
+
 test("the slash menu offers only what a Markdown file can say", async ({ page }) => {
   await open(page);
   await endOf(page, "The last paragraph.");
@@ -207,6 +335,39 @@ test("a Markdown shortcut makes a block, and the file says it in Markdown", asyn
   await page.keyboard.press("Enter");
   await page.keyboard.type("[] ship it");
   await expect.poll(read, { timeout: 5_000 }).toContain("- [ ] ship it");
+  expect(read().startsWith(NOTE.trimEnd())).toBe(true);
+});
+
+/* #385: Enter in a list made a paragraph, because the editor's schema was built from specs that had
+   already been built once and so had lost the keyboard of a list. */
+test("Enter at the end of a bullet makes the next bullet, and Enter on an empty one leaves the list", async ({ page }) => {
+  await open(page);
+  await endOf(page, "The last paragraph.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- first");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await page.keyboard.press("Enter");
+  /* The DOM first: the file is one round trip behind it. The note's own two bullets, then ours and the empty one. */
+  await expect(page.locator('.bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(5);
+  await page.keyboard.press("Enter");
+  await expect(page.locator('.bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(4);
+  await page.keyboard.type("after the list");
+  await expect.poll(read, { timeout: 5_000 }).toContain("- first\n- second\n\nafter the list");
+  expect(read().startsWith(NOTE.trimEnd())).toBe(true);
+});
+
+test("Enter at the end of a numbered item makes the next number", async ({ page }) => {
+  await open(page);
+  await endOf(page, "The last paragraph.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("1. one");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("three");
+  await expect(page.locator('.bn-block-content[data-content-type="numberedListItem"]')).toHaveCount(3);
+  await expect.poll(read, { timeout: 5_000 }).toContain("1. one\n2. two\n3. three");
   expect(read().startsWith(NOTE.trimEnd())).toBe(true);
 });
 
@@ -445,14 +606,16 @@ test("space O opens the list while the caret is not in the text, and is a space 
  * A task's page is a note's page, so a task has the title too — above its status and date,
  * as Notion puts a page's properties under its name.
  */
-test("a task's title sits above its bar, with Untitled as its placeholder", async ({ page }) => {
+test("a task's title has Untitled as its placeholder, and its properties are beside it or under it", async ({ page }) => {
   fs.writeFileSync(file, "---\ntitle: Untitled\nstatus: todo\n---\n");
   await open(page);
   const title = page.locator("textarea[data-dag-note-title]");
   await expect(title).toHaveValue("");
   await expect(title).toHaveAttribute("placeholder", "Untitled");
-  const bar = page.locator("[data-dag-taskbar]");
-  expect((await title.boundingBox())!.y).toBeLessThan((await bar.boundingBox())!.y);
+  /* Beside the text in a panel when the window has room (#311), and a line under the title when not. */
+  const at = (await title.boundingBox())!;
+  const bar = (await page.locator("[data-dag-taskbar]").boundingBox())!;
+  expect(bar.x >= at.x + at.width || bar.y > at.y).toBe(true);
 });
 
 test("an image pasted into a note is stored beside it and written as Markdown", async ({ page }) => {

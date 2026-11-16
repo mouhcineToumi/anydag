@@ -13,6 +13,46 @@ export const PROVIDERS: readonly Provider[] = ["claude", "opencode", "codex"];
 /** What a vault was granted: read it, or change it too. */
 export type Mode = "ask" | "edit";
 
+/** What a document is, as a chat names one: the kinds of `server/names.ts`, kept here so this file imports nothing. */
+export type DocKind = "board" | "note" | "quiz" | "table" | "file";
+export const DOC_KINDS: readonly DocKind[] = ["board", "note", "quiz", "table", "file"];
+
+/**
+ * The document a chat works on (#323): the one open when it was started from the panel. The agent
+ * is told it, and a write to anything else waits for the person. `id` is the reference the listing
+ * gives it — `null` only for a document the index could not name — and `name` and `title` are what
+ * they were when the chat last looked, refreshed from the id at the start of every turn.
+ */
+export interface Subject {
+  vault: string;
+  kind: DocKind;
+  name: string;
+  id: string | null;
+  title: string;
+}
+
+/** Whether `x` has a subject's shape, as one read back from `chat.json` must. */
+export function isSubject(x: unknown): x is Subject {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  return (
+    typeof o.vault === "string" &&
+    !!o.vault &&
+    typeof o.name === "string" &&
+    !!o.name &&
+    DOC_KINDS.includes(o.kind as DocKind) &&
+    (o.id === null || typeof o.id === "string") &&
+    typeof o.title === "string"
+  );
+}
+
+/**
+ * A document a message names with `@` (#324), resolved in the chat's vault when the turn starts.
+ * Unlike a subject it is not kept in `chat.json`: it is one message's, and the prompt is rebuilt
+ * for every turn.
+ */
+export type Mention = Subject;
+
 /** What another vault was granted. `null` is a grant taken back. */
 type Grant = { mode: Mode; at: string } | null;
 
@@ -37,6 +77,13 @@ export interface ChatMeta {
   model: string;
   /** The app's effort word, mapped per harness by `effortFor`; absent for the model's own. */
   effort?: string;
+  /**
+   * The document this chat works on, when it was started on one and the person kept the chip;
+   * absent for a chat about the whole vault. It only ever narrows what a turn may write unasked, so
+   * unlike a grant it can live in the vault's file and follow the chat to another machine. `null` is
+   * a chip the person removed — a value rather than a missing key, because sync merges by key.
+   */
+  subject?: Subject | null;
   [grant: `grant:${string}`]: Grant;
 }
 

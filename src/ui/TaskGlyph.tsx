@@ -1,6 +1,17 @@
 import { Circle, CircleCheck, Contrast } from "lucide-react";
 
-import { nextStatus, overdue, STATUS_LABEL, today, type Task, type TaskStatus } from "@/note/task";
+import { locale } from "@/locale";
+import {
+  overdue,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  STATUS_LABEL,
+  today,
+  toggledStatus,
+  type Priority,
+  type Task,
+  type TaskStatus,
+} from "@/note/task";
 
 /**
  * How a task's status and due date are drawn, wherever one is: a row in the sidebar, the
@@ -30,8 +41,11 @@ export function TaskGlyph({ status, size = 14 }: { status: TaskStatus; size?: nu
 }
 
 /**
- * The status as a button that moves the task on — to do, in progress, done, and back to the start —
- * or as the glyph alone where nothing may change it (`onStatus` absent).
+ * The status as the task's checkbox (#311): a click on a task that is not done marks it done, and
+ * on a done one marks it to do again — or the glyph alone where nothing may change it (`onStatus`
+ * absent). It is a `role="checkbox"`, checked when done and mixed while in progress, so a screen
+ * reader hears what a sighted person sees. In progress is one step further away: a row's menu, the
+ * task's own page.
  *
  * The press is stopped, because every place this sits is inside something else a press means:
  * a row that opens the task, a card on a board that selects the item and would start a drag.
@@ -40,10 +54,13 @@ export function StatusButton({
   status,
   onStatus,
   size = 14,
+  label,
 }: {
   status: TaskStatus;
   onStatus?(next: TaskStatus): void;
   size?: number;
+  /** What the task is called, so the checkbox is named after it. */
+  label?: string;
 }) {
   if (!onStatus) {
     return (
@@ -52,15 +69,18 @@ export function StatusButton({
       </span>
     );
   }
-  const next = nextStatus(status);
+  const next = toggledStatus(status);
   const stop = (e: { stopPropagation(): void }) => e.stopPropagation();
+  const what = next === "done" ? "Mark as done" : "Mark as not done";
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={status === "done" ? true : status === "in-progress" ? "mixed" : false}
       className="dag-task-status"
       data-dag-task-status={status}
-      aria-label={`${STATUS_LABEL[status]}: mark as ${STATUS_LABEL[next].toLowerCase()}`}
-      title={`${STATUS_LABEL[status]} — click for ${STATUS_LABEL[next].toLowerCase()}`}
+      aria-label={label ? `${label}: ${STATUS_LABEL[status].toLowerCase()}` : STATUS_LABEL[status]}
+      title={`${STATUS_LABEL[status]}: ${what.toLowerCase()}`}
       onPointerDown={stop}
       onDoubleClick={stop}
       onClick={(e) => {
@@ -74,42 +94,107 @@ export function StatusButton({
   );
 }
 
-const FORMAT_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
-const FORMAT_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+/** How many of the four bars each priority fills: urgent all of them, low one. */
+const FILLED: Readonly<Record<Priority, number>> = { urgent: 4, high: 3, medium: 2, low: 1 };
 
 /**
- * A due date as a person reads it: *Today*, *Tomorrow*, *Yesterday*, *Oct 3*, or *Oct 3, 2027*
- * when it is not this year. Read in UTC because the date is a calendar day, not an instant: in any
- * other zone `2026-10-03` at midnight is sometimes the second.
+ * A task's priority (#311): four bars rising left to right, as many filled as it matters — four for
+ * urgent, one for low — and none filled for a task with no priority, so the column keeps its place
+ * and a row without one reads as *not set* rather than as a gap. The filled bars take the level's
+ * colour from `chrome.css` (`[data-priority]`: the danger hue, the warning text, the accent, slate);
+ * the others are the outline. Drawn on the row, the task's page, the New task row and a card.
  */
-function dueText(due: string, now: string = today()): string {
+export function PriorityMark({ priority, size = 16 }: { priority?: Priority; size?: number }) {
+  const on = priority ? FILLED[priority] : 0;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      className="dag-task-priority"
+      data-priority={priority ?? "none"}
+      aria-hidden="true"
+    >
+      {[0, 1, 2, 3].map((i) => (
+        <rect
+          key={i}
+          x={1 + i * 3.75}
+          y={11 - i * 3}
+          width={2.5}
+          height={4 + i * 3}
+          rx={0.75}
+          data-on={i < on ? "" : undefined}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** The levels a menu offers, most first, with the key that picks each (`P` then `1`–`4`, `0` for none). */
+export const PRIORITY_KEYS: readonly { priority: Priority | null; key: string; label: string }[] = [
+  ...PRIORITIES.map((priority, i) => ({ priority, key: String(i + 1), label: PRIORITY_LABEL[priority] })),
+  { priority: null, key: "0", label: "No priority" },
+];
+
+/* Made once per locale: a list of a hundred dates would otherwise build a formatter for each. */
+const formats = new Map<string, Intl.DateTimeFormat>();
+function format(kind: "week" | "day" | "year"): Intl.DateTimeFormat {
+  const key = `${locale() ?? ""}|${kind}`;
+  let f = formats.get(key);
+  if (!f) {
+    const parts: Intl.DateTimeFormatOptions =
+      kind === "week"
+        ? { weekday: "short", month: "short", day: "numeric" }
+        : kind === "day"
+          ? { month: "short", day: "numeric" }
+          : { month: "short", day: "numeric", year: "numeric" };
+    formats.set(key, (f = new Intl.DateTimeFormat(locale(), { ...parts, timeZone: "UTC" })));
+  }
+  return f;
+}
+
+/**
+ * A due date as a person reads it, in their locale: *Today*, *Tomorrow*, *Yesterday*; the weekday
+ * and the day within a week either side (*Thu 12 Nov*), the day alone further off (*25 Nov*), and
+ * the year when it is not this one. Read in UTC because the date is a calendar day, not an instant:
+ * in any other zone `2026-10-03` at midnight is sometimes the second.
+ */
+export function dueText(due: string, now: string = today()): string {
   const day = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
   const diff = Math.round((day(due) - day(now)) / 86_400_000);
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
   if (diff === -1) return "Yesterday";
   const at = new Date(day(due));
-  return due.slice(0, 4) === now.slice(0, 4) ? FORMAT_DAY.format(at) : FORMAT_YEAR.format(at);
+  if (due.slice(0, 4) !== now.slice(0, 4)) return format("year").format(at);
+  return format(Math.abs(diff) < 7 ? "week" : "day").format(at);
 }
 
-/** The due date, marked when it has passed and the task is not done. Nothing when there is none. */
+/**
+ * The due date: bold in the danger text when it has passed and the task is not done, bold ink when
+ * it is today and not done, and plain otherwise — a done task's date says when and nothing more.
+ * Nothing when there is none.
+ */
 export function DueLabel({ task }: { task: Task }) {
   if (!task.due) return null;
-  const late = overdue(task);
+  const now = today();
+  const late = overdue(task, now);
+  const soon = !late && task.status !== "done" && task.due === now;
   return (
     <span
       className="dag-task-due"
       data-dag-task-due={task.due}
       data-overdue={late ? "" : undefined}
+      data-today={soon ? "" : undefined}
       title={late ? `Overdue: due ${task.due}` : `Due ${task.due}`}
     >
-      {dueText(task.due)}
+      {dueText(task.due, now)}
     </span>
   );
 }
 
 /**
- * A task's status and date, read-only, above its text wherever it is drawn with nothing to change
+ * A task's status, priority and date, read-only, above its text wherever it is drawn with nothing to change
  * it with: `?view=1`, a share link, `?snapshot=1`, and the PDF. The bar on the task's own page is
  * the editable twin, in `NoteView`.
  */
@@ -118,6 +203,13 @@ export function TaskLine({ task }: { task: Task }) {
     <p className="dag-taskbar dag-taskbar--read" data-dag-taskline={task.status}>
       <TaskGlyph status={task.status} />
       <span>{STATUS_LABEL[task.status]}</span>
+      {task.priority ? (
+        <>
+          <span aria-hidden="true">·</span>
+          <PriorityMark priority={task.priority} size={14} />
+          <span data-dag-taskline-priority={task.priority}>{PRIORITY_LABEL[task.priority]}</span>
+        </>
+      ) : null}
       {task.due ? (
         <>
           <span aria-hidden="true">·</span>

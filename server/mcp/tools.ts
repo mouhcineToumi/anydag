@@ -15,11 +15,12 @@
 
 import { z } from "zod";
 
-import { HUE_ORDER } from "../../src/dsl/ir";
+import { HUE_ORDER, type Hue } from "../../src/dsl/ir";
 import { eventOf, isDay } from "../../src/note/event";
 import { cleanTitle } from "../../src/note/format";
 import { PROJECT_STATUSES, hueOf, projectFolders, projectFor, withProject, type Project } from "../../src/note/project";
-import { STATUSES, dueOf, titleStem, withTask } from "../../src/note/task";
+import { tagKey, tagsOf } from "../../src/note/tags";
+import { PRIORITIES, STATUSES, dueOf, titleStem, withTask } from "../../src/note/task";
 import { withEvent } from "../../src/note/event";
 import { FetchRefused, fetchFile, type Fetched } from "../fetch";
 import { endsBeforeItStarts, placed, withTitle } from "../frontmatter";
@@ -270,6 +271,7 @@ async function docList(
     folders: shown.folders,
     titles: only(got.titles),
     ids: only(got.ids),
+    tags: only(got.tags),
     total: shown.total,
     next_cursor: shown.next_cursor,
   };
@@ -283,17 +285,48 @@ async function docList(
   return out;
 }
 
-const docRead = async (kit: Kit, kind: string, name: string, v?: string) => ({
-  ...(await kit.api("GET", "/__board/get", { vault: v, query: { name, kind } })),
-  url: await kit.url(name, kind, v),
-});
+async function docRead(kit: Kit, kind: string, name: string, v?: string) {
+  const got = await kit.api("GET", "/__board/get", { vault: v, query: { name, kind } });
+  return { ...got, ...(typeof got?.text === "string" ? { tags: tagsOf(got.text) } : {}), url: await kit.url(name, kind, v) };
+}
 
-async function docCreate(kit: Kit, kind: string, name: string, text: string, title: string | undefined, v?: string) {
+async function docCreate(
+  kit: Kit,
+  kind: string,
+  name: string,
+  text: string,
+  title: string | undefined,
+  v?: string,
+  tags?: string[],
+) {
   kit.needWrite(`make a ${kind}`);
   const body = { name, text: blank(kind, title, text, !!name), kind };
   const got = await kit.api("POST", "/__board/create", { vault: v, body });
-  return { name: got.name, id: got.id, base: got.base, url: await kit.url(got.name, kind, v) };
+  if (!tags?.length) return { name: got.name, id: got.id, base: got.base, url: await kit.url(got.name, kind, v) };
+  const now = await tagNew(kit, got.name, kind, tags, v);
+  const read = await kit.api("GET", "/__board/get", { vault: v, query: { name: got.name, kind } });
+  return { name: got.name, id: got.id, base: read.base, tags: now, url: await kit.url(got.name, kind, v) };
 }
+
+/** `tags` for a document just made: `/tags/apply`, which creates a tag the vault has never seen. */
+async function tagNew(kit: Kit, name: string, kind: string, tags: string[] | undefined, v?: string): Promise<string[]> {
+  if (!tags?.length) return [];
+  const got = await kit.api("POST", "/__board/tags/apply", { vault: v, body: { name, kind, add: tags } });
+  return got.tags as string[];
+}
+
+/** The `tags` a create tool takes. */
+/** `tag` on a listing: one tag, any case, or `none` for the documents carrying none. */
+const tagInput = z.string().optional().describe("Only what carries this tag, ignoring case — or `none` for what carries no tag.");
+const tagged = (tag: string | undefined, tags: readonly string[] | undefined): boolean =>
+  tag === undefined || (tag === "none" ? !tags?.length : !!tags?.some((t) => tagKey(t) === tagKey(tag)));
+
+const tagsInput = z
+  .array(z.string())
+  .optional()
+  .describe(
+    "Tags for the new document — its frontmatter `tags:`; a tag the vault has never seen is created in its default colour",
+  );
 
 async function docWrite(kit: Kit, kind: string, name: string, text: string, base: string | undefined, v?: string) {
   kit.needWrite(`write a ${kind}`);
@@ -357,8 +390,11 @@ function kindTools(
       name: `${kind}_create`,
       description: withNote(lines.create),
       write: true,
-      input: createArgs,
-      run: ({ name, text, title, vault: v }, kit) => docCreate(kit, kind, name, text, title, v),
+      input: kind === "note" ? { ...createArgs, tags: tagsInput } : createArgs,
+      run: (
+        { name, text, title, vault: v, ...more }: { name: string; text: string; title?: string; vault?: string; tags?: string[] },
+        kit,
+      ) => docCreate(kit, kind, name, text, title, v, more.tags),
     }),
     tool({
       name: `${kind}_write`,
@@ -906,12 +942,12 @@ const taskTools: Tool[] = [
   tool({
     name: "task_list",
     description: withNote(
-      "Every task — a note whose frontmatter has a `status:` — with its title, status, due date, start date and the project it is in, in the Tasks page's order: in progress, to do, done, each by due date then title. A task with a start and a due date spans the days between on the calendar.\n\n" +
-        "`project` narrows to one project, named by its folder or its note, subfolders included — or `none` for the tasks in no project. `status` narrows to one status.",
+      "Every task — a note whose frontmatter has a `status:` — with its title, status, priority (`urgent`, `high`, `medium`, `low`, or null for none), due date, start date and the project it is in, in the Tasks page's order: in progress, to do, done, each by due date then title. A task with a start and a due date spans the days between on the calendar.\n\n" +
+        "`project` narrows to one project, named by its folder or its note, subfolders included — or `none` for the tasks in no project. `status` narrows to one status. `tag` narrows to the tasks carrying one tag, ignoring case — or `none` for those carrying none.",
     ),
     write: false,
-    input: { project: z.string().optional(), status: z.enum(STATUSES).optional(), vault },
-    run: async ({ project, status, vault: v }, kit) => {
+    input: { project: z.string().optional(), status: z.enum(STATUSES).optional(), tag: tagInput, vault },
+    run: async ({ project, status, tag, vault: v }, kit) => {
       const got = await kit.api("GET", "/__board/list", { vault: v });
       const folders = projectFolders(got.projects);
       const want = project ? projectArg(project, got) : null;
@@ -921,13 +957,16 @@ const taskTools: Tool[] = [
         if (want?.only && !name.startsWith(`${want.only}/`)) continue;
         if (want?.none && home !== null) continue;
         if (status && task.status !== status) continue;
+        if (!tagged(tag, got.tags?.[name])) continue;
         tasks.push({
           name,
           title: got.titles[name] ?? null,
           status: task.status,
+          priority: task.priority ?? null,
           due: task.due ?? null,
           start: task.start ?? null,
           project: home,
+          tags: got.tags?.[name] ?? [],
         });
       }
       tasks.sort(
@@ -942,51 +981,56 @@ const taskTools: Tool[] = [
   tool({
     name: "task_create",
     description: withNote(
-      "Make a task: a note titled `title`, with a `status:` and, if given, a `due:` date and a `start:` date (`YYYY-MM-DD` each). Its file is named after the title, in `folder` if given — a project's folder puts it in that project. Its description is the note's body: write it with `note_write`.",
+      "Make a task: a note titled `title`, with a `status:` and, if given, a `priority:` (`urgent`, `high`, `medium` or `low`), a `due:` date and a `start:` date (`YYYY-MM-DD` each). Its file is named after the title, in `folder` if given — a project's folder puts it in that project. Its description is the note's body: write it with `note_write`.",
     ),
     write: true,
     input: {
       title: z.string(),
       folder: z.string().optional(),
       status: z.enum(STATUSES).default("todo"),
+      priority: z.enum(PRIORITIES).optional(),
       due: z.string().optional(),
       start: z.string().optional(),
+      tags: tagsInput,
       vault,
     },
-    run: async ({ title, folder, status, due, start, vault: v }, kit) => {
+    run: async ({ title, folder, status, priority, due, start, tags, vault: v }, kit) => {
       kit.needWrite("make a task");
       for (const day of [due, start])
         if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
-      const dates = { ...(due ? { due } : {}), ...(start ? { start } : {}) };
+      const dates = { ...(priority ? { priority } : {}), ...(due ? { due } : {}), ...(start ? { start } : {}) };
       const text = withTask(withTitle("", cleanTitle(title) ?? title, "note"), { status, ...dates });
       const name = inFolder(folder, titleStem(title) || "untitled");
       const got = await kit.api("POST", "/__board/create", { vault: v, body: { name, text, kind: "note" } });
-      return { name: got.name, id: got.id, task: { status, ...dates }, url: await kit.url(got.name, "note", v) };
+      const tagged = await tagNew(kit, got.name, "note", tags, v);
+      return { name: got.name, id: got.id, task: { status, ...dates }, tags: tagged, url: await kit.url(got.name, "note", v) };
     },
   }),
   tool({
     name: "task_set",
     description: withNote(
-      "Change a task's status, due date or start date — or make a plain note a task by giving it a status.\n\n" +
-        '`status: "none"` makes it a plain note again, taking all three lines out. `due` and `start` are `YYYY-MM-DD`, or `"none"` to take that date off. Only those lines of the note change.',
+      "Change a task's status, priority, due date or start date — or make a plain note a task by giving it a status.\n\n" +
+        '`status: "none"` makes it a plain note again, taking all four lines out. `priority` is `urgent`, `high`, `medium` or `low`, or `"none"` to take it off. `due` and `start` are `YYYY-MM-DD`, or `"none"` to take that date off. Only those lines of the note change.',
     ),
     write: true,
     input: {
       name: z.string(),
       status: z.enum([...STATUSES, "none"]).optional(),
+      priority: z.enum([...PRIORITIES, "none"]).optional(),
       due: z.string().optional(),
       start: z.string().optional(),
       vault,
     },
-    run: ({ name, status, due, start, vault: v }, kit) => {
+    run: ({ name, status, priority, due, start, vault: v }, kit) => {
       kit.needWrite("change a task");
       const body: Record<string, unknown> = { name };
-      if (status === "none") Object.assign(body, { status: null, due: null, start: null });
+      if (status === "none") Object.assign(body, { status: null, due: null, start: null, priority: null });
       else if (status !== undefined) body.status = status;
       if (due !== undefined && status !== "none") body.due = due === "none" ? null : due;
       if (start !== undefined && status !== "none") body.start = start === "none" ? null : start;
+      if (priority !== undefined && status !== "none") body.priority = priority === "none" ? null : priority;
       if (Object.keys(body).length === 1)
-        throw new ToolError("say what to change: a `status`, a `due` date, a `start` date, or more than one");
+        throw new ToolError("say what to change: a `status`, a `priority`, a `due` date, a `start` date, or more than one");
       return kit.api("POST", "/__board/task", { vault: v, body });
     },
   }),
@@ -997,11 +1041,17 @@ const eventTools: Tool[] = [
     name: "event_list",
     description: withNote(
       "Every event — a note whose frontmatter has a `start:` and no `status:` — soonest first, with its title, `start`, `end`, whether it is `all_day`, and the project it is in.\n\n" +
-        "A date is all day, and an all-day `end` is the last day, inclusive; a time carries its offset, and a timed `end` is the moment it stops. `time_zone` is the one a time with no offset is written in. `since` and `until` (`YYYY-MM-DD`, both inclusive) keep the events that touch those days, reading a time's day as it is written. `project` narrows to one project, by its folder or its note, or `none` for no project. The description is the note's body: read it with `note_read`.",
+        "A date is all day, and an all-day `end` is the last day, inclusive; a time carries its offset, and a timed `end` is the moment it stops. `time_zone` is the one a time with no offset is written in. `since` and `until` (`YYYY-MM-DD`, both inclusive) keep the events that touch those days, reading a time's day as it is written. `project` narrows to one project, by its folder or its note, or `none` for no project. `tag` narrows to the events carrying one tag, ignoring case, or `none` for those carrying none. The description is the note's body: read it with `note_read`.",
     ),
     write: false,
-    input: { since: z.string().optional(), until: z.string().optional(), project: z.string().optional(), vault },
-    run: async ({ since, until, project, vault: v }, kit) => {
+    input: {
+      since: z.string().optional(),
+      until: z.string().optional(),
+      project: z.string().optional(),
+      tag: tagInput,
+      vault,
+    },
+    run: async ({ since, until, project, tag, vault: v }, kit) => {
       for (const day of [since, until])
         if (day !== undefined && dueOf(day) === undefined) throw new ToolError(`\`${day}\` is not a date: write it YYYY-MM-DD`);
       const got = await kit.api("GET", "/__board/list", { vault: v });
@@ -1012,6 +1062,7 @@ const eventTools: Tool[] = [
         const home = projectFor(name, folders) ?? null;
         if (want?.only && !name.startsWith(`${want.only}/`)) continue;
         if (want?.none && home !== null) continue;
+        if (!tagged(tag, got.tags?.[name])) continue;
         const [first, last] = eventDays(event);
         if ((since && last < since) || (until && first > until)) continue;
         events.push({
@@ -1021,6 +1072,7 @@ const eventTools: Tool[] = [
           end: event.end ?? null,
           all_day: isDay(event.start),
           project: home,
+          tags: got.tags?.[name] ?? [],
           url: await kit.url(name, "note", v),
         });
       }
@@ -1040,8 +1092,15 @@ const eventTools: Tool[] = [
         "All day is a date — `start: 2026-10-12`, `end: 2026-10-14` is three days. A time is `2026-10-03T09:00`, **read in the vault's time zone** (`whoami` says which) — so write the wall-clock time they asked for and no offset; one with an offset, `+02:00` or `Z`, is the moment it names. Its `end` is the moment it stops, and without one the calendar gives it an hour. Its file is named after the title, in `folder` if given — a project's folder puts it in that project. Its description is the note's body: write it with `note_write`.",
     ),
     write: true,
-    input: { title: z.string(), start: z.string(), end: z.string().optional(), folder: z.string().optional(), vault },
-    run: async ({ title, start, end, folder, vault: v }, kit) => {
+    input: {
+      title: z.string(),
+      start: z.string(),
+      end: z.string().optional(),
+      folder: z.string().optional(),
+      tags: tagsInput,
+      vault,
+    },
+    run: async ({ title, start, end, folder, tags, vault: v }, kit) => {
       kit.needWrite("make an event");
       const zone = await zoneOf(kit, v);
       const change: Record<string, string> = {};
@@ -1059,7 +1118,8 @@ const eventTools: Tool[] = [
         throw new ToolError(`\`${change.end}\` is before \`${change.start}\`: an event ends after it starts`);
       const name = inFolder(folder, titleStem(title) || "untitled");
       const got = await kit.api("POST", "/__board/create", { vault: v, body: { name, text, kind: "note" } });
-      return { name: got.name, id: got.id, event: change, url: await kit.url(got.name, "note", v) };
+      const tagged = await tagNew(kit, got.name, "note", tags, v);
+      return { name: got.name, id: got.id, event: change, tags: tagged, url: await kit.url(got.name, "note", v) };
     },
   }),
   tool({
@@ -1171,15 +1231,91 @@ const projectTools: Tool[] = [
   }),
 ];
 
+const tagTools: Tool[] = [
+  tool({
+    name: "tag_list",
+    description: withNote(
+      "Every tag in the vault — each one a document carries in its frontmatter `tags:`, and each one registered in the vault's tag list — with its `hue` (one of the ten theme hues), whether it is `registered` (when not, the hue is the default its name hashes to), how many documents carry it (`count`; `0` is unused) and the `kinds` that do. Templates are not counted.\n\n" +
+        "With `tag`, also the documents carrying it, as `docs`: each one's `name`, `kind` and `title`. Tags are compared ignoring case.",
+    ),
+    write: false,
+    input: { tag: z.string().optional(), vault },
+    run: ({ tag, vault: v }, kit) => kit.api("GET", "/__board/tags", { vault: v, query: tag === undefined ? {} : { tag } }),
+  }),
+  tool({
+    name: "tag_apply",
+    description: withNote(
+      "Add tags to one document and take tags off it — a note, a task, an event, a board, a quiz or a table, its frontmatter `tags:` and no other byte. A tag is letters, digits, `_`, `-` and `/`, with a letter among them; a leading `#` is dropped, and case is ignored when comparing.\n\n" +
+        "A tag the vault has never seen is **created**: registered in the vault's tag list with `hue` (one of the ten) or the default its name hashes to, as typing a new name in the app creates one. `created` says which were. To recolour a tag that exists, use `tag_color`.",
+    ),
+    write: true,
+    input: {
+      name: z.string(),
+      kind: z.enum(["board", "note", "quiz", "table"]).default("note"),
+      add: z.array(z.string()).optional(),
+      remove: z.array(z.string()).optional(),
+      hue: z.enum(HUE_ORDER as [Hue, ...Hue[]]).optional(),
+      vault,
+    },
+    run: ({ name, kind, add, remove, hue, vault: v }, kit) => {
+      kit.needWrite("change a document's tags");
+      return kit.api("POST", "/__board/tags/apply", { vault: v, body: { name, kind, add, remove, ...(hue ? { hue } : {}) } });
+    },
+  }),
+  tool({
+    name: "tag_rename",
+    description: withNote(
+      "Rename a tag in every document that carries it, templates included — or, onto a tag that already exists, merge the two, which leaves each document one entry (`merged` says so). **A merge cannot be told apart afterwards: ask the person first.** The tag keeps its colour.\n\n" +
+        "Each document is an ordinary write under its own base. One that kept changing is listed in `missed` and still carries the old tag; nothing is rolled back. Calling it again with the same `from` and `to` finishes the rest.",
+    ),
+    write: true,
+    input: { from: z.string(), to: z.string(), vault },
+    run: ({ from, to, vault: v }, kit) => {
+      kit.needWrite("rename a tag");
+      return kit.api("POST", "/__board/tags/rename", { vault: v, body: { from, to } });
+    },
+  }),
+  tool({
+    name: "tag_delete",
+    description: withNote(
+      "Take a tag off every document that carries it, and out of the vault's tag list. Each document keeps everything else. **Only when the person asked, and pass `confirm` as the tag's name** — `tag_list` with `tag` says which documents carry it.\n\n" +
+        "A document that kept changing is listed in `missed` and still carries the tag, which then stays listed; calling it again finishes the rest. The answer's `hue` is the colour it had, for `tag_color` to put back.",
+    ),
+    write: true,
+    input: { tag: z.string(), confirm: z.string().default(""), vault },
+    run: ({ tag, confirm, vault: v }, kit) => {
+      kit.needWrite("delete a tag");
+      if (confirm.replace(/^#/, "").toLowerCase() !== tag.replace(/^#/, "").toLowerCase())
+        throw new ToolError(
+          `deleting \`${tag}\` takes it off every document: ask the person, and pass \`confirm\` as \`${tag}\``,
+        );
+      return kit.api("POST", "/__board/tags/delete", { vault: v, body: { tag } });
+    },
+  }),
+  tool({
+    name: "tag_color",
+    description: withNote(
+      "Set a tag's colour: one of the ten theme hues, which registers the tag in the vault's tag list — or `null` for the default its name hashes to, keeping it registered. Only `tag_delete` takes a tag off the list.",
+    ),
+    write: true,
+    input: { tag: z.string(), hue: z.enum(HUE_ORDER as [Hue, ...Hue[]]).nullable(), vault },
+    run: ({ tag, hue, vault: v }, kit) => {
+      kit.needWrite("recolour a tag");
+      return kit.api("POST", "/__board/tags/color", { vault: v, body: { tag, hue } });
+    },
+  }),
+];
+
 const findTools: Tool[] = [
   tool({
     name: "search",
     description: withNote(
-      "Every place the words appear in the vault's boards, notes and quizzes, ranked — the page's own search. Every word must appear, every word is a prefix, a long word forgives a typo. A hit names its document and the `part` — an item id, a `^anchor` or `L<line>` — and its snippet marks the matched words with `**`.",
+      "Every place the words appear in the vault's boards, notes and quizzes, ranked — the page's own search. Every word must appear, every word is a prefix, a long word forgives a typo. A hit names its document and the `part` — an item id, a `^anchor` or `L<line>` — and its snippet marks the matched words with `**`.\n\n" +
+        "`tag` keeps only the hits in documents carrying that tag, ignoring case; with a `tag` and an empty `q`, the answer's `docs` is every document carrying it, by title.",
     ),
     write: false,
-    input: { q: z.string(), limit: z.number().int().optional(), vault },
-    run: ({ q, limit, vault: v }, kit) => kit.api("GET", "/__board/search", { vault: v, query: { q, limit } }),
+    input: { q: z.string(), limit: z.number().int().optional(), tag: z.string().optional(), vault },
+    run: ({ q, limit, tag, vault: v }, kit) => kit.api("GET", "/__board/search", { vault: v, query: { q, limit, tag } }),
   }),
   tool({
     name: "refs",
@@ -1795,6 +1931,7 @@ export const TOOLS: Tool[] = [
   ...taskTools,
   ...eventTools,
   ...projectTools,
+  ...tagTools,
   ...findTools,
   ...imageTools,
   ...fileTools,

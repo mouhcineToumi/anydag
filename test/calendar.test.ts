@@ -4,8 +4,12 @@ import {
   addDays,
   addMonths,
   blocks,
+  clockOf,
+  DAY_MINUTES,
   eventFrom,
   fieldsOf,
+  minutesAt,
+  snapMinute,
   withAllDay,
   withEnd,
   withStart,
@@ -19,6 +23,7 @@ import {
   daysFrom,
   itemsOf,
   lanes,
+  monthDays,
   placeEvent,
   placeTask,
   rangeOf,
@@ -87,6 +92,24 @@ describe("views", () => {
     expect(step("month", "2026-10-31", 1, 3)).toBe("2026-11-30");
     expect(step("week", "2026-10-15", -1, 3)).toBe("2026-10-08");
     expect(step("days", "2026-10-15", 1, 5)).toBe("2026-10-20");
+  });
+
+  it("turns the week into rows without changing which seven days it covers", () => {
+    expect(rangeOf("rows", "2026-10-15", 1, 3)).toEqual({ first: "2026-10-12", last: "2026-10-18" });
+    expect(rangeOf("rows", "2026-10-15", 0, 3)).toEqual({ first: "2026-10-11", last: "2026-10-17" });
+    expect(step("rows", "2026-10-15", 1, 3)).toBe("2026-10-22");
+    expect(step("rows", "2026-10-15", -1, 3)).toBe("2026-10-08");
+  });
+
+  it("draws a month as whole weeks, from the week it starts in to the week it ends in", () => {
+    /* March 2031 begins on a Saturday and ends on a Monday, so it spills on both sides. */
+    expect(monthDays("2031-03-01", 1)).toEqual(daysFrom("2031-02-24", "2031-04-06"));
+    expect(monthDays("2031-03-18", 1)).toHaveLength(42);
+    /* Sunday first takes a day off the front and puts it on the end. */
+    expect(monthDays("2031-03-01", 0)[0]).toBe("2031-02-23");
+    expect(monthDays("2031-03-01", 0)).toHaveLength(42);
+    /* February 2027 starts on a Monday and ends on a Sunday: four weeks, and no day of another month. */
+    expect(monthDays("2027-02-10", 1)).toEqual(daysFrom("2027-02-01", "2027-02-28"));
   });
 });
 
@@ -283,6 +306,40 @@ describe("the hour grid", () => {
         ["late", 1380, 60],
       ]);
     }
+  });
+});
+
+describe("a day's hour track, whichever way it runs", () => {
+  /* The week's column and the rows view's track read a pointer with these; there is one
+     implementation, so these are the shared part. */
+  const box = { left: 100, top: 40, width: 960, height: 480 };
+
+  it("reads a point as minutes into the day, down a column or across a row", () => {
+    expect(minutesAt(box, { x: 100, y: 40 }, "y")).toBe(0);
+    expect(minutesAt(box, { x: 100, y: 280 }, "y")).toBe(720);
+    expect(minutesAt(box, { x: 100, y: 40 }, "x")).toBe(0);
+    expect(minutesAt(box, { x: 580, y: 40 }, "x")).toBe(720);
+    /* Clamped to the day at either end, and an empty box is its start rather than a NaN. */
+    expect(minutesAt(box, { x: 100, y: 900 }, "y")).toBe(DAY_MINUTES);
+    expect(minutesAt(box, { x: 0, y: 0 }, "y")).toBe(0);
+    expect(minutesAt({ ...box, width: 0 }, { x: 500, y: 40 }, "x")).toBe(0);
+  });
+
+  it("snaps to a whole step below, and never before midnight", () => {
+    expect(snapMinute(614, 15)).toBe(600);
+    expect(snapMinute(600, 15)).toBe(600);
+    expect(snapMinute(0, 15)).toBe(0);
+    expect(snapMinute(-1, 15)).toBe(0);
+    expect(snapMinute(DAY_MINUTES, 15)).toBe(DAY_MINUTES);
+    expect(snapMinute(95, 30)).toBe(90);
+  });
+
+  it("writes a minute as the clock does, the day's last edge at the next midnight", () => {
+    expect(clockOf(0)).toBe("00:00");
+    expect(clockOf(570)).toBe("09:30");
+    expect(clockOf(DAY_MINUTES - 1)).toBe("23:59");
+    expect(clockOf(DAY_MINUTES)).toBe("24:00");
+    expect(clockOf(-30)).toBe("00:00");
   });
 });
 

@@ -109,6 +109,14 @@
       "mcp": ["settings"]
     },
     {
+      "id": "vault.tabs",
+      "area": "Vaults",
+      "what": "The window's document tabs in a vault, and which is in front — kept in the app's home, restored when the window opens",
+      "rest": ["GET /api/tabs", "PUT /api/tabs"],
+      "cli": {"admin": false},
+      "mcp": {"refused": "Which documents a window has open is the person's window; an agent opens a document by the url every document tool returns."}
+    },
+    {
       "id": "vault.transfer",
       "area": "Vaults",
       "what": "Move a file, or a folder whole, to another open vault",
@@ -151,7 +159,7 @@
     {
       "id": "files.search",
       "area": "Files",
-      "what": "Every place some words appear, ranked",
+      "what": "Every place some words appear, ranked; or one tag's documents",
       "rest": ["GET /__board/search", "GET /__board/corpus"],
       "cli": {"admin": false},
       "mcp": ["search"]
@@ -327,7 +335,7 @@
     {
       "id": "task.list",
       "area": "Tasks",
-      "what": "Every task, with its status, due date and project",
+      "what": "Every task, with its status, priority, due date, project and tags; one project, status or tag",
       "rest": ["GET /__board/list"],
       "cli": {"admin": false},
       "mcp": ["task_list"]
@@ -343,7 +351,7 @@
     {
       "id": "task.set",
       "area": "Tasks",
-      "what": "Change a task's status, due date or start date, or make a note a task and back",
+      "what": "Change a task's status, priority, due date or start date, or make a note a task and back",
       "rest": ["POST /__board/task"],
       "cli": {"admin": false},
       "mcp": ["task_set"]
@@ -351,7 +359,7 @@
     {
       "id": "event.list",
       "area": "Events",
-      "what": "Every event, with when it starts and ends, soonest first",
+      "what": "Every event, with when it starts and ends, soonest first; one project or tag",
       "rest": ["GET /__board/list"],
       "cli": {"admin": false},
       "mcp": ["event_list"]
@@ -395,6 +403,46 @@
       "rest": ["POST /__board/project"],
       "cli": {"admin": false},
       "mcp": ["project_set"]
+    },
+    {
+      "id": "tag.list",
+      "area": "Tags",
+      "what": "Every tag, with its colour and how many documents carry it",
+      "rest": ["GET /__board/tags"],
+      "cli": {"admin": false},
+      "mcp": ["tag_list"]
+    },
+    {
+      "id": "tag.apply",
+      "area": "Tags",
+      "what": "Add or remove tags on a note, task, event, board, quiz or table",
+      "rest": ["POST /__board/tags/apply"],
+      "cli": {"admin": false},
+      "mcp": ["tag_apply"]
+    },
+    {
+      "id": "tag.rename",
+      "area": "Tags",
+      "what": "Rename a tag, or merge it into another, in every document",
+      "rest": ["POST /__board/tags/rename"],
+      "cli": {"admin": false},
+      "mcp": ["tag_rename"]
+    },
+    {
+      "id": "tag.delete",
+      "area": "Tags",
+      "what": "Take a tag off every document, and out of the tag list",
+      "rest": ["POST /__board/tags/delete"],
+      "cli": {"admin": false},
+      "mcp": ["tag_delete"]
+    },
+    {
+      "id": "tag.color",
+      "area": "Tags",
+      "what": "Set a tag's colour, one of the ten hues, or reset it to the default",
+      "rest": ["POST /__board/tags/color"],
+      "cli": {"admin": false},
+      "mcp": ["tag_color"]
     },
     {
       "id": "quiz.list",
@@ -1047,7 +1095,7 @@
     {
       "id": "chat.turn",
       "area": "Assistant",
-      "what": "Send a turn and follow the answer as it is written",
+      "what": "Send a turn, with the documents it names with `@`, and follow the answer as it is written",
       "rest": ["POST /__board/chat/turn", "GET /__board/chat/events"],
       "cli": {"admin": false},
       "mcp": {"refused": "An MCP client is itself an agent. A chat is a person's conversation, driven from the page or the CLI; an agent driving another model's chat through the person's own subscription is not something to offer."}

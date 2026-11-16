@@ -312,11 +312,21 @@ export function findOpencode(env: Env): { ok: true; bin: string } | Failure {
 /**
  * The environment an `opencode` child runs in: the server's, less the desktop shell's business and
  * anything that would point it at a config other than the one `opencodeComplete` hands it.
+ *
+ * **Project config off.** Every run's directory is made under the OS temp dir, and OpenCode looks
+ * for `opencode.json`, `.opencode/` and `AGENTS.md` in every folder above it, up to `/` — through
+ * a shared `/tmp`, where another local user may have put them. OpenCode 2.3, run the way these runs
+ * are, loaded both and ran a plugin from that `.opencode/` as the person (#10).
+ * `OPENCODE_DISABLE_PROJECT_CONFIG` turns that walk off (the config handed in
+ * `OPENCODE_CONFIG_CONTENT` is still read), and `OPENCODE_DISABLE_CLAUDE_CODE` the same walk for
+ * `.claude/`.
  */
 export function opencodeEnv(env: Env): Env {
   const out: Env = { ...env };
   for (const k of ["ELECTRON_RUN_AS_NODE", "ANYDAG_TOKEN", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"])
     delete out[k];
+  out.OPENCODE_DISABLE_PROJECT_CONFIG = "1";
+  out.OPENCODE_DISABLE_CLAUDE_CODE = "1";
   return out;
 }
 

@@ -28,7 +28,7 @@ failed on both.
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
 | `src/vault/desktop.ts` | the page's side of the bridge — every use optional, so a browser on `anydag serve` works without it |
 
-Eighteen things are load-bearing:
+Nineteen things are load-bearing:
 
 - **The server is a child run by Electron's own binary as Node** (`ELECTRON_RUN_AS_NODE=1`), so the
   app ships one runtime. Its bundle and its one native module, `@parcel/watcher`, are unpacked from
@@ -120,7 +120,9 @@ Eighteen things are load-bearing:
   whose `pid` and `token` are this launch's (`desktop/launch.ts`) — because the home is shared with
   `anydag serve`, and a file an earlier one left behind names a port anybody may hold now. The page,
   its `localStorage` and its `EventSource` live on one stable origin, `anydag://app`, and no script
-  in it ever sees the token.
+  in it ever sees the token. The forwarder sends the root paths with the header, which the server
+  takes there; the secret path and the cookie `anydag serve` hands a browser (#339) are not the
+  desktop's — it sets no cookie, the page stores no secret, and `scopeUrl` adds no prefix.
 - **The page's requests go to the server over `node:http`, never `net.fetch`** (`desktop/forward.ts`,
   #123). `net.fetch` is Chromium's network stack, which holds six HTTP/1.1 connections to a host and
   queues the rest — and a page holds three streams that never end (the change feed, the
@@ -141,6 +143,20 @@ Eighteen things are load-bearing:
   `src/vault/current.ts`). And a window never shows an api path as a document: `will-navigate` and
   `window.open` to one download it instead. An SVG attachment can carry script; between the two, it
   can read at most.
+- **The mouse's back and forward buttons are the shell's to hear on Windows and Linux** (#320).
+  Chromium delivers them as app commands, not DOM events, so `createWindow` answers `app-command`'s
+  `browser-backward` and `browser-forward` by sending `history:go` to the page, and the preload
+  exposes it as `history.onCommand`. The page owns the history itself (`src/ui/history.ts`) and
+  only takes the direction; on macOS there is no app command and the page hears the two buttons as
+  `mouseup`. Alt+Left/Right (⌘[ / ⌘] on macOS) are the page's too, because there is no browser
+  chrome to answer them. The same listener is not in a browser: it already has all four, and taking
+  them in the page as well would move two entries for one press.
+- **Ctrl/⌘+W is the page's, not the window menu's** (#264). The menu Electron gives every window
+  binds it to *close the window*, and a menu accelerator wins over a page's key handler. The page
+  has document tabs, and in a desktop app that has them the chord closes the tab in front: so
+  `createWindow` takes the press in `before-input-event` (Ctrl, or ⌘ alone on macOS; not with Shift
+  or Alt), prevents it, and sends `tabs:close`, which the preload exposes as `tabs.onClose` and
+  `src/ui/tabs/keys.ts` answers. The window still closes from its title bar and the app menu's item.
 - **The window is isolated and sandboxed with no Node**, no webviews, and only `http(s)://` and
   `mailto:` go to the OS (`shell.openExternal`): `file://`, `smb://` or a registered handler's
   scheme in a note is one click from running something, and a note is text anybody could write.
@@ -197,6 +213,15 @@ Eighteen things are load-bearing:
   none: that path is gone next launch. `~/.local/bin` is not on a Mac's PATH and
   Windows has no such folder, so the page is told where the shim is (`cli:path`) and Settings → This vault → Agent access writes the MCP lines with that absolute
   path.
+
+**Out, and why** (#267, measured in `limits.md`): **running the server as a `utilityProcess`**
+rather than a child spawned with Electron's binary as Node — the main process idles at 0.13% of a
+core and 220 MB, most of it Electron's own, and the server's memory is the vault's, which no change of
+process type moves; **dropping the local port for `anydag://` alone** — the CLI, MCP and `anydag
+serve` reach the same server over HTTP, the token and the `Host` are its security model, and the
+forward costs 0.7 ms a request; **a Tauri migration, or a platform layer kept ready for one** — none
+is planned, the server is already a plain Node bundle, and abstractions are not added for a move
+nobody is making.
 
 **Not yet, and why:** signing certificates, so the builds are unsigned and an unsigned Mac updates
 by hand (the release workflow signs and notarises the moment the secrets exist); Windows on arm64

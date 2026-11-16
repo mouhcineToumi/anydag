@@ -12,7 +12,7 @@ import { streamSSE } from "hono/streaming";
 
 import type { Assistant } from "../chat/live";
 import { modelsFor } from "../chat/models";
-import { PROVIDERS, type ChatEvent, type Mode, type Provider } from "../chat/types";
+import { DOC_KINDS, PROVIDERS, type ChatEvent, type DocKind, type Mode, type Provider } from "../chat/types";
 import { bodyOf, err } from "../http";
 
 const str = (v: unknown, what: string): string => {
@@ -28,6 +28,28 @@ const mode = (v: unknown): Mode | undefined => {
   if (v === undefined || v === null || v === "") return undefined;
   if (v !== "ask" && v !== "edit") throw err(400, "`mode` is `ask` or `edit`");
   return v;
+};
+
+/** A turn's `subject`: absent keeps the chat's, `null` drops it, `{name, kind}` names a document of this vault. */
+const subject = (v: unknown): { name: string; kind: DocKind } | null | undefined => {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  const o = v as { name?: unknown; kind?: unknown };
+  if (!o || typeof o !== "object" || typeof o.name !== "string" || !o.name || !DOC_KINDS.includes(o.kind as DocKind))
+    throw err(400, "`subject` is `{name, kind}` or null");
+  return { name: o.name, kind: o.kind as DocKind };
+};
+
+/** A turn's `mentions`: absent or `[]` is none, and each is a document of this vault. */
+const mentions = (v: unknown): { name: string; kind: DocKind }[] | undefined => {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v) || v.length > 20) throw err(400, "`mentions` is a list of at most 20 `{name, kind}`");
+  return v.map((x) => {
+    const o = x as { name?: unknown; kind?: unknown };
+    if (!o || typeof o !== "object" || typeof o.name !== "string" || !o.name || !DOC_KINDS.includes(o.kind as DocKind))
+      throw err(400, "each mention is `{name, kind}`");
+    return { name: o.name, kind: o.kind as DocKind };
+  });
 };
 
 /** Requests from a chat's MCP server: the reach, the approvals, the recorder. Registered
@@ -69,11 +91,13 @@ export function chatRoutes(app: Hono, a: Assistant): void {
 
   app.post("/__board/chat/turn", async (c) => {
     const b = await bodyOf(c);
-    const turn = a.say(str(b.id, "id"), str(b.text, "text"), {
+    const turn = await a.say(str(b.id, "id"), str(b.text, "text"), {
       vault: c.req.query("vault"),
       provider: provider(b.provider),
       model: typeof b.model === "string" && b.model ? b.model : undefined,
       effort: b.effort === null ? null : typeof b.effort === "string" ? b.effort : undefined,
+      subject: subject(b.subject),
+      mentions: mentions(b.mentions),
     });
     return c.json({ turn });
   });

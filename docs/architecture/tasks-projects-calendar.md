@@ -1,17 +1,19 @@
 # Tasks, projects and the calendar
 
-> A note with a `status:`, a folder with a `project:`, an event with a `start:`, and the calendar that draws them; the time-zone rules.
+> A note with a `status:`, a folder with a `project:`, a `tags:` on any document, an event with a `start:`, and the calendar that draws them; the time-zone rules.
 
 ## Tasks
 
 A **task** is a note whose frontmatter has a `status:` — `todo`, `in-progress` or `done` — with an
-optional `due:` date, `YYYY-MM-DD`. Nothing else marks one. Three
+optional `due:` date, `YYYY-MM-DD`, and an optional `priority:` — `urgent`, `high`, `medium` or
+`low`. Nothing else marks one. Three
 design points: a task is a note with a status rather than a third kind of file, its card
 on a board changes the task's file, and a sidebar row dropped on the canvas places it.
 
     ---
     title: Ship the pricing page
     status: in-progress
+    priority: high
     due: 2026-10-03
     ---
     The copy is in [Pricing draft](dag:7q2m9xk4tb).
@@ -20,12 +22,12 @@ on a board changes the task's file, and a sidebar row dropped on the canvas plac
 |---|---|
 | the sidebar | **Tasks** (with the open count) opens the Tasks page; **New task** makes `untitled` with `status: todo` and names it in its title; a task's row wears its status; a row's menu makes a note a task, marks it done or to do, or makes it a note again |
 | Home | **Due soon** lists the tasks that are not done and due by the end of the coming week, off the same `/__board/list` answer; a row opens its note |
-| the Tasks page, `?tasks=1` | a list — *In progress*, *To do*, *Done*, each by due date then title — or a board of three columns a card is dragged between; a filter, and a **+ New task** row in every group that makes a task named after what is typed — Enter makes it, a refusal says why and keeps the title, Escape clears it, and the lock's notice answers while read only |
-| the task's own page | its title at the top, then its properties as a list over the text — status as three choices, *Starts*, *Due*, an empty date saying *Empty*; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
-| a board, or a note, embedding one | a card — status as a button, title, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
-| `?view=1`, a snapshot, the PDF | the status and date on a line above the text |
+| the Tasks page, `?tasks=1` | tabs in the top bar — *Open*, *Done*, *All*, each with its count — over a list grouped *In progress*, *To do* (and *Done* on *All*), each by due date then priority, or a board of three columns a card is dragged between — a card carries its priority, tags, project, check items and due date, and each column is in the Order button's order; a filter line — the words field, a chip for each filter in use, **Filter**, the count (*13 open, 2 overdue*), **Order** and **Display**; the list's keys and a bar for the selected tasks (below); a row is the priority mark (a menu of the four and none), the status mark (the checkbox), the title, a page mark when it has a body, its tags, its check items ticked of all, its project, its due date — bold on the day, bold red once late, plain when done — and when it last changed; a **New task** row as the list's first line (`N` puts the caret in it) with pills for priority, project and due date — Enter makes the task and keeps the row open with the pills as they were, shift+Enter makes it and opens it, Tab walks the pills, Escape clears and leaves, a refusal says why and keeps the title, and the lock's notice answers while read only — and a `+` on each group heading that opens it with that group's status; a **New task dialog** (`C`, or the top bar's primary button) with a title, a description, the four pills and *Keep this open for the next one*; the board keeps a box at the foot of each column |
+| the task's own page | its status mark beside the title (the row's checkbox); its properties in a panel at the right — *Status*, *Priority* and *Project* as the row's menus, *Starts* and *Due* (with *7 days left* or *2 days late*), then *Check items* ticked of all and when it *Changed*, then *Linked from* — which the top bar's panel button, or a window too narrow for it, folds into one line of pills above the text; *2 of 13* and the arrows beside it step through the Tasks page's order; the top bar's `⋯` has *Not a task*, and a plain note's has *Make it a task* |
+| a board, or a note, embedding one | a card — status as a button, title, priority, due date — that writes the task's file; on a board, the one fixed-size card every placed document is, with a button that opens the task; read-only under `?view=1` and a snapshot |
+| `?view=1`, a snapshot, the PDF | the status, priority and date on a line above the text |
 
-Seven things are load-bearing:
+Twelve things are load-bearing:
 
 - **Everything a note is, a task is**, because it is one: the file is `.note.md`, the kind is `note`,
   and the editor, the references in its description, backlinks, search, export
@@ -45,12 +47,56 @@ Seven things are load-bearing:
   rewrites the frontmatter `NoteView` already holds and saves through the note's `put`, so the page
   is never an outside writer to itself and a status change and a paragraph being typed are one
   write. Everywhere else — the Tasks page, a card, a row's menu, the CLI — it is
-  `POST /__board/task {name, status?, due?}`, which recomputes from the text that beat it on a
+  `POST /__board/task {name, status?, due?, start?, priority?}`, which recomputes from the text that beat it on a
   conflict, as `/retitle` does.
 - **The list, the feed and the index carry it**, as they carry a title: `/__board/list`'s `tasks`
   and `ids`, `task` on a note's `dag:note` event so a row is redrawn in place, and `task` on
   `/__board/index`'s docs, which is what a card reads. The vault keeps
   it in the stat-keyed cache the titles were already in.
+- **The status mark is the task's checkbox** (#311). One click marks a task that is not done done,
+  and a done one to do again — on the Tasks page, a card, an embed — and it is a `role="checkbox"`,
+  *mixed* while in progress. In progress is one step further away: the row's menu (a right-click,
+  its `⋯`, or `shift+F10`), the task's own page. On the Tasks page **the row stays where it was**,
+  struck through, until the toast that says so goes (five seconds, held while the pointer or the
+  focus is on it), so its Undo is where the click happened; a refused write puts it back by itself.
+  A click that meant three things in turn was a click nobody could make without looking.
+- **Priority is four words and no line** (#311). `priorityOf` reads `urgent`, `high`, `medium` and
+  `low`, lenient in case and space only; no `priority:` is none, the default, so there is no fifth
+  word for it in the file. **Any other value is read as none and left as it is**: a note saying
+  `priority: P1` is not refused or rewritten, only drawn with none until someone picks a level, and
+  picking one replaces that line where it is. It is drawn as four bars, as many filled as it matters
+  (four for urgent, one for low), in the danger hue, the darker amber, the accent and slate; a row
+  with none shows a blank cell, and the empty bars under the pointer or the focus, which is where
+  to press. A menu row's key picks it while the menu is open — `1`–`4`, and `0` for none.
+  `POST /__board/task` takes `priority` (`null` takes it out), `task_create` and `task_set` take it
+  (`"none"` takes it out), `task_list` says it, and *Not a task* takes it out with the status.
+- **A new task is one create with every line in it** (#311). The New task row and the dialog both
+  build the text with `newTaskText` (`src/ui/NewTask.tsx`) — the title, `status:`, `priority:` and
+  `due:` through `withTask`, the description as the body — and send one `POST /__board/create`, so a
+  task is never made and then written again. A project is where the file goes: the project pill
+  makes the task in that project's folder, and with a project filter on the pill starts on it. With
+  a tag filter on, the task is made carrying that tag (`withTags` on the same text), so it stays in
+  view. A pill is dashed while unset and solid once it says a value; its menu is the row's, with the same
+  icons and keys. The task just made is tinted where it lands, for a moment, and scrolled into view.
+  `N` and `C` are bare keys on the page, answered only when nothing is being typed into, no menu or
+  dialog has the key, and the key does not follow the leader (space).
+- **A task's project on its page is a move** (#311). Choosing another project in the panel moves the
+  file into that project's folder (`moveBoard`, `NoteView`'s `moveTo`), and *No project* moves it to
+  the top level; the page follows the file to its new name without remounting the editor, as a
+  retitle does, since not a byte of the text changed. A move that is refused — a file there with its
+  name — says so under the title and leaves the task where it was. The panel or the line is drawn,
+  never both (`ResizeObserver` on the page, 900px), so each control is on the page once; folded is
+  `dag:task-panel`, this browser's. The steps (*2 of 13*) are the order the Tasks page last drew,
+  kept in `taskModel.ts` for this tab, or — opened from anywhere else — the open tasks in the page's
+  default order.
+- **The listing carries three facts that are never a line in the file**: `items`, the check items
+  the body ticks of all it has (`- [ ]`, `1. [x]`, as remark's GFM reads one, and none inside a code
+  fence); `body`, whether there is any text under the frontmatter; and `changed`, the file's own
+  modified time. `taskFactsOf` counts the first two in `src/note/task.ts`, `indexedTask` puts them
+  beside `taskOf`'s answer, and the server adds `changed` from the stat it already made — in the
+  listing, the feed and `/__board/task`'s answer. `withTask` never writes any of them. A `changed` under
+  a minute on is no redraw (`sameTask` in `useBoard.ts`): a task typed in every quarter-second would
+  otherwise redraw the list each time for a column that says *now*.
 - **A card shows its own write at once** and takes what the server wrote when it answers: the index
   is a wait behind the change feed, and a button that sat on the old status for most of a second
   would read as a press that did not land. The Tasks page does the same with `pending`, let go of
@@ -61,9 +107,66 @@ Seven things are load-bearing:
   itself. **A card that only embeds a document opens no panel**: `place` opens the editor for an `md`
   because its body is prose, and a card's body is one line of `dag:` syntax.
 
-Which layout the Tasks page shows is `dag:tasks-view`, this browser's and not the app's — view
-state, like which folders are open — written with `writeLocal`. The list reads what is being worked
-on first and the board's columns run the way work moves, so the three statuses come in two orders.
+Which layout the Tasks page shows is `dag:tasks-view`, and which tab `dag:tasks-tab`, this browser's
+and not the app's — view state, like which folders are open — written with `writeLocal`. The list
+reads what is being worked on first and the board's columns run the way work moves, so the three
+statuses come in two orders. The tabs count every task the vault lists, whatever the filter line
+narrows the list to; the board shows every status, so there no tab is pressed and a press goes back
+to the list. *Done* is ordered by what changed last. When the page narrows its columns leave in this
+order — last changed, check items, project — and the due date stays (a container query on
+`.dag-tasks`, so a docked sidebar narrows it too). A filter that matches nothing says what it
+searched and offers *Clear the filter* and, on *Open*, *Look in Done too*. `src/ui/taskModel.ts`
+holds the rules with no drawing in them (`test/task-model.test.ts`), and `TasksMenu` is the page's
+one menu — the calendar's item menu written once.
+
+**Order, Display, Filter, selection and the keys** (#311). The rules are `src/ui/taskView.ts`, with
+no drawing in them (`test/task-view.test.ts`); the menus and the bar are `TasksBar.tsx`.
+
+- **Order** is a key — priority, due date, start date, project, last changed, title — a direction in
+  that key's words (*Highest first*, *Soonest first*, *A to Z*, *Newest first*) and a *Then by* for
+  ties; the title and then the name end every comparison so it is total. A task with no value for the
+  key goes last **either way**: *Lowest first* is low before urgent, not nothing before everything.
+  *Done* has an order of its own, most recently finished first, so choosing one for *Open* does not
+  reorder what was finished. The board's columns take *Open*'s order; it has no Display menu, since
+  its columns are its grouping.
+- **Display** groups by status, priority, due date (*Overdue*, *Today*, *Next 7 days*, *Later*,
+  *No date*, and *Earlier* for a done task whose date has passed, which is never overdue), project,
+  or nothing, and switches the priority, check items, project and last-changed columns; the due date
+  is always drawn. A status always has its groups and a priority its five, empty or not, so a `+` is
+  there to make the first one — a `+` makes a task with its group's value (a status, a priority, a
+  project, today); a due date and a project show only the groups something is in. Order and Display
+  are one preference, `dag:tasks-display`, **in `PREF_KEYS` in the person's half** for
+  `dag:calendar-hide`'s reason, read leniently by `displayOf` and absent while it is the default; it
+  is never written to a vault file.
+- **Filter** offers status, priority, project and due date, each a menu of values with boxes and how
+  many tasks each would leave **with the other fields on and its own off**. A field in use is a chip
+  that opens its values and has its own clear; *Clear all* comes with two. Values in one field are
+  *or*, fields are *and*. The words field still reads titles, folders and projects. The filter is
+  this page's, not a preference, except that one project (or *No project* alone) is the URL's
+  `project=`, so the Projects page's *Open tasks* lands on it and a link to a project's tasks still
+  works; a project with no id leaves the URL alone rather than minting one. The *Tag* select (#327,
+  `tag=`) sits beside **Filter** and is not one of its fields: it narrows every task before the tab,
+  the fields and the words, so the counts are the tagged tasks', and a task made while it is on
+  carries the tag.
+- **Selection**: `X`, Shift with the arrows or `J`/`K`, Ctrl/Cmd-click or Shift-click (a run from
+  the last). While anything is selected a bar floats over the foot of the list — *Status*,
+  *Priority*, *Due date*, *Project*, *Move to trash* — and every change in it is one write per task,
+  each with its own `base`; *Project* moves the files, and *Move to trash* answers with an Undo that
+  restores each entry.
+- **The keys, while a row has the focus**: `J`/`K` or the arrows walk the open groups, `Enter` (the
+  title's own) opens, `Ctrl+Enter` checks off (or back), `S`, `P`, `D`, `M` open the status,
+  priority, date and project menus for the selection or the row — whose own keys pick, `1`–`3` and
+  `1`–`4` with `0` for none — `X` selects, and `Escape` lets go of the selection and then of the
+  filter. `J` from nowhere goes to the first row. Space is the leader's: nothing here hears it or
+  the key after it.
+- **A long list draws only the rows in view** (#267). A group, or the whole list when it is not
+  grouped, of more than 100 rows draws the rows in view of the page's scroller and a margin
+  (`TaskRows`, with the sidebar's `virtual.ts`). Every row is one height, measured off a drawn one,
+  and placed by its offset. Two thousand tasks were 73,000 elements and 0.93 s before the first
+  row showed; they are 2,100 and 0.34 s. Nothing above depends on a row being in the DOM. The keys
+  walk the rows by name, and `focusRow` scrolls to a row that is not drawn and focuses it once it
+  is. The focused row and the one just made stay drawn wherever the list is scrolled, so a menu has
+  its row and *scrolled into view* has its target. Up to 100 rows, every row is drawn, as before.
 
 **A template is not a task.** A note in the vault's templates folder (*Note templates*, [`notes.md`](notes.md))
 that carries a `status:`, a `project:` or a `start:` is a note to copy, not work to do, and is left out of
@@ -77,12 +180,26 @@ Names claimed, grepped first: `dag-task-*`, `dag-tasks*`, `dag-taskbar*`, `dag-e
 `data-dag-tasks*`, `data-dag-taskbar*`, `data-dag-taskline`, `data-dag-task-add`,
 `data-dag-task-add-row`, `data-dag-task-add-problem`, `data-dag-embed-task`,
 `data-dag-sidebar-task`, `data-dag-sidebar-tasks`, `data-dag-sidebar-tasks-open`,
-`data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, the storage key
-`dag:tasks-view`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
+`data-dag-sidebar-new-task`, `data-dag-note-make-task`, `data-dag-drop-file`, `dag-tasks-menu*`,
+`dag-tasks-kbd`, `data-dag-task-menu*`, `data-dag-tasks-tab`, `data-dag-tasks-showing`,
+`data-dag-task-toast`, `data-dag-task-undo`, `data-dag-task-items`, `data-dag-task-page`,
+`data-dag-task-changed`, `data-dag-task-more`, `dag-tasks-new*`, `dag-tasks-pill*`, `dag-task-dialog*`,
+`dag-tasks__new`, `dag-tasks__head-add`, `data-dag-task-new*`, `data-dag-task-dialog*`, `data-dag-tasks-new`,
+`data-dag-tasks-group-add`, `data-fresh` on a row, the keyframes `dag-tasks-fresh`, `dag-taskpanel*`,
+`dag-taskline-pills`, `dag-taskstep*`, `dag-linked-from*`, `dag-note-view__mark`, `data-task-panel`,
+`data-dag-taskstep*`, `data-dag-taskpanel-toggle`, `data-dag-linked-from*`, the storage key `dag:task-panel`, `data-dag-task-priority`, `data-dag-taskbar-priority`,
+`data-dag-taskbar-priority-menu`, `data-dag-taskline-priority`, `data-dag-embed-priority`, `data-priority`
+on `.dag-task-priority`, `data-dag-tasks-none`, `data-dag-tasks-clear-filter`,
+`data-dag-tasks-look-done`, `data-today` on a due date, the storage keys `dag:tasks-view` and
+`dag:tasks-tab`, the preference `dag:tasks-display`, `data-dag-tasks-grouped`, `data-hide-*` on `.dag-tasks`, `data-selected` on a row, `data-dag-tasks-chip*`, `data-dag-tasks-clear-all`, `data-dag-tasks-filter-button`, `data-dag-tasks-filter-field`, `data-dag-tasks-filter-value`, `data-dag-tasks-order*`, `data-dag-tasks-then*`, `data-dag-tasks-display-button`, `data-dag-tasks-group-by`, `data-dag-tasks-column-toggle`, `data-dag-tasks-twisty`, `data-dag-tasks-bulk*`, `data-dag-tasks-notice*`, `dag-tasks__chip*`, `dag-tasks__line-button`, `dag-tasks__card-due`, `dag-tasks__bulk*`, the event `dag:place-file` (in `test/prefs.test.ts`'s list), and the query key
 `tasks`.
 
-**Out, and why:** assignees, priorities, labels and reminders (each is a
-decision about who does what); a status set of a person's own (three fixed words are what the
+**Out, and why:** assignees and reminders (each is a
+decision about who does what); priority was out on that ground too, and is in since #311: the
+maintainer decided that a task list a person runs alone still has to say what comes first, and four
+fixed words are what both the menu and the parser can be held to, as the three statuses are; labels
+of a task's own (a task carries tags as every document does, *Tags* below, and a tag says what it is
+about, never who does it or how urgent it is); a status set of a person's own (three fixed words are what the
 columns are and what both parsers can be held to); sub-tasks as files (a check item in the
 description is one); and a manual order within a column (nothing stores one). Tasks are reached
 over MCP too: `task_list`, `task_create`, `task_set`.
@@ -105,7 +222,7 @@ tagging as a link only, and the note with a bar as the project's page.
 |---|---|
 | the sidebar | a project's folder wears a kanban folder in its hue (dimmed when paused or done), its note a briefcase; a plain folder's menu has *Make it a project*, a project's *Open project* and *Not a project* |
 | the project's own page | a bar under the title: the status as three choices, the colour, how many of its tasks are in each status, *Open tasks*, *Not a project* |
-| the Tasks page | a project filter — every project, one project, or none — carried as `project=<id>`, or `project=none`; a row names its project with a chip; a task typed in while filtered is made in the project's folder |
+| the Tasks page | the Filter button's *Project* — any number of projects, or none — and one project, or none alone, carried as `project=<id>` or `project=none`; a row names its project with a chip; a task typed in while filtered is made in the project's folder |
 | a board, a note's `@` | the placed card says *Project · Active*; the reference picker labels a project as one |
 | `?view=1`, a snapshot, the PDF | the status on a line above the text |
 
@@ -134,16 +251,162 @@ Names claimed, grepped first: `dag-project*`, `dag-projectbar*`, `dag-sidebar__p
 `dag-tasks__project`, `data-dag-project*`, `data-dag-projectbar*`, `data-dag-projectline`,
 `data-dag-sidebar-project`, `data-dag-tasks-project`, and the query key `project`.
 
-**Out, and why:** tagging as membership (a reference links and does not enrol);
+**Out, and why:** tagging as membership (a reference links and does not enrol, and a tag — *Tags* below — groups documents without making any of them a project's);
 store-side folder metadata and a folder id (a note already is both); a project page beyond the note
 and its bar; and dates, owners and priorities. Projects are reached
 over MCP too: `project_list`, `project_create`, `project_set`.
 
+## Tags
+
+A **tag** is a word in a document's frontmatter `tags:` — a note, a task, an event, a board, a quiz
+or a table — with a colour, one of the ten hues. Tags group documents across folders, beside
+projects and independent of them (#327). Four design points: the frontmatter of every kind rather
+than a sidecar, one vault-wide tag list that holds the colours and syncs, a rename that rewrites
+every file through the ordinary write path, and creation where the tag is used.
+
+    ---
+    title: Q4 planning
+    tags: [meeting, pricing]
+    ---
+
+| Where | What it does with one |
+|---|---|
+| a note's, a task's or an event's own page | a *Tags* row with the other properties under the title (a plain note has one too; a task's is the last row of its properties panel, or a bar under its line of pills while the panel is folded): chips, and an editor that suggests tags and creates one inline |
+| a board, a quiz, a table | *Tags…* in the top bar's `⋯`, which opens the editor in a popover |
+| the sidebar | *Tags…* in every document row's menu, the same popover |
+| Settings → This vault → Tags | the tag manager: every tag with its colour and count, *Unused* last; recolour, rename (a rename onto an existing tag merges), delete |
+| the Tasks page | a *Tag* filter beside **Filter**, `tag=<name>` or `tag=none`; a row shows up to two chips and an accessible *+n* |
+| the Calendar | the same filter, in its *Show* menu, over tasks, events and notes; no chips on items |
+| search | `tag=` keeps only hits in documents carrying the tag, and with no words lists them all; the card shows the filter as a chip |
+| `?view=1`, a snapshot, the PDF | the chips, read only, on the line above the text |
+
+Ten things are load-bearing:
+
+- **A tag is in the file, and only there.** Every kind already starts with a frontmatter block (a
+  board's `flow:` and `pages:`, a quiz's `shuffle:`), `parseBoard` ignores a key it does not know, and
+  the quiz and table parsers keep `front` byte for byte and never write it, so one key covers all
+  six. No SQLite table holds tags: a second copy would have to be reconciled with the files. A
+  sidecar per document (`.anydag/meta/<id>.json`) was turned down — tagging would mint an id first,
+  which is a write into the file anyway; a rename made outside the app would lose the link; sync
+  would carry two files; and `cat` would not show the tags. Attachments carry none.
+- **One parser reads tags and one writer changes them**, `tagsOf` and `withTags` in
+  `src/note/tags.ts` — no browser, no `@/` — which the page, the server, the CLI and the MCP tools
+  import, held to `test/fixtures/tags.json`. **Lenient, as Obsidian is:** a list in flow form
+  (`[a, b]`) or block form (`- a`, indented or at column 0), or a string split on commas and blanks
+  (`tags: a, b`, `tags: a b`); a leading `#` is dropped; a tag is letters, digits, `_`, `-` and `/`
+  with at least one that is not a digit (Obsidian's rule), and an entry that is not one is ignored.
+  **Case is ignored** — `Pricing` is `pricing` — and a `/` is a character, not a level: nested tags
+  are out. **The singular `tag:` is not read**: Obsidian dropped it, and reading it would be a second
+  key every write had to choose between. **An inline `#tag` in a note's text does not count**: a
+  rename would have to rewrite prose under the editor's one-block rule, and `#` is a heading, an
+  anchor, a hex colour and an issue number.
+- **A write touches the `tags:` line and the lines under it**, `withKeys`' rule, and every other
+  byte stays. A block list stays a block list at its indent; a flow list or a string is written as a
+  flow list, one line, which `merge3` can merge; a new key is a flow list; an entry YAML would read
+  as something other than a string (`yes`, `null`, `1e3`) is quoted; an entry that is not a valid tag
+  is kept byte for byte; nothing a write was not asked to remove is dropped. Taking the last tag off
+  removes the line, and a block that leaves empty goes. A board that gains a frontmatter keeps the
+  blank line after it (`withTitle`'s board rule).
+- **A colour is one of the ten theme hues**, the palette of a project's `hue:`, drawn as
+  `var(--dag-color-hues-<hue>)`, so a theme restyles tags and no literal is added. **A tag nobody
+  registered gets a default derived from its name** — a stable hash over `HUE_ORDER`
+  (`defaultHue`), the same on every device, in the CLI and over MCP — and nothing is written for it.
+- **`.anydag/tags.json` is the tag list**, `{"meeting": {"hue": "coral"}}`, keyed by the tag's
+  name as it was registered and read ignoring case. A tag **exists** when a document carries it or
+  the list registers it. It is **registered** when somebody creates it — typed as a new name in any
+  document's Tags, or a name the vault has never seen given to MCP `tag_apply` — or recolours it, and
+  it stays listed after the last document drops it, as *Unused*, sorted last. **The file is written
+  only then, so opening a vault writes nothing.** It syncs (`ALLOWED_IN_ANYDAG`) and merges by key
+  with `mergeKeys`, `.anydag/settings.json`'s rule, so two devices recolouring two tags keep both and
+  the same tag recoloured on both is the remote's. Every write to it is one function
+  (`server/tags.ts`) that reads the file, changes one key and writes back only while the file still
+  has the sha1 it read (`writeRawIf`), trying again on a mismatch, so a pull or a hand edit in
+  between is never overwritten. The watcher raises **`dag:tags`** when it changes, from anywhere, and
+  every page reads the list again. Turned down: `dag:tag-colors` in `.anydag/settings.json` (the page
+  writes that bundle whole with no base, so an open Settings tab could wipe a colour an agent had just
+  set, and a map under one key merges as one value), and the app home (colours would differ between
+  machines).
+- **The listing carries tags, as it carries `task`.** `frontOf` reads them for every text kind,
+  kept against the file's stamp; `Tree.tags` maps a name to its tags; the kept listing (#280) holds
+  them, so a warm listing costs only what changed. `/__board/list` answers `tags`, every document
+  event on the change feed carries them so a row redraws in place, and `/__board/index`'s docs carry
+  them — that answer is cached in `parse.sqlite` under the build that cut it, so an older build's
+  rows are dropped and parsed again, and nothing migrates. **`GET /__board/tags`** is the list:
+  `[{name, hue, registered, count, kinds}]`, every tag a document carries and every registered one
+  (`count: 0` is *Unused*); `name` is the registered spelling, else the most common one, and
+  `registered: false` means the hue is the default.
+- **A template's tags are the notes' it makes**, so a template is left out of counts and filters, as
+  it is left out of `tasks` — and a rename or delete still rewrites it, so a new note does not bring
+  the old tag back.
+- **A rename or a delete rewrites every file, and rolls nothing back.** `POST /__board/tags/rename
+  {from, to}` and `/delete {tag}` take the documents carrying the tag from the listing and rewrite
+  each with `recompute()`, `server/relink.ts`'s pattern: an ordinary write under the text's sha1, a
+  409 recomputed from the text that beat it, four tries. A file that keeps changing is answered in
+  `{files, missed}` — a rollback would be more writes that could meet a 409, undoing work that landed —
+  and until it is finished the vault honestly holds both tags. **Both are idempotent**: a file that
+  already has `to`, or no longer has `from`, needs nothing, so *Try again* sends the same request.
+  **Renaming onto a tag that exists merges them**, one entry per document, after the manager asks.
+  **The colour moves at the start**: `to` is registered with `from`'s hue unless it has its own,
+  which wins, so a partial rename does not repaint 41 documents in a default; `from`'s entry is
+  dropped once `missed` is empty, and so is a deleted tag's. **Deleting a tag no document carries**
+  rewrites nothing, drops the entry and offers *Undo*, which puts it back with its hue. The lock
+  refuses all of them; called from the Assistant they run inside the request, so the chat's undo
+  covers them (`chat/record.ts`), as it covers a relink.
+- **A tag is made where it is used.** The editor is an ARIA 1.2 combobox (`aria-expanded`,
+  `aria-controls`, `aria-activedescendant`): typing suggests tags with their dots, *Unused* ones last;
+  Enter takes the highlighted row, so an existing spelling wins; Backspace in an empty field removes
+  the last chip. A name that matches nothing ends the list with **Create tag "…"** — an `option`
+  named with its colour, *Create tag roadmap, colour Spruce, default* — over a `radiogroup` of the ten
+  swatches with the default selected: Enter creates it with the selected one, a click on a swatch
+  with that one, and either way the tag is added and registered at once, the field empties and keeps
+  the focus. **Names are prevented from going wrong rather than refused**: a typed space is written
+  as `-`, a pasted list is a tag per item, a leading `#` is dropped, and the one refusal left, a name
+  of digits only, offers the fix (*A tag needs a letter. Use q-2026?*). **A typo does not stick**: a
+  tag created and removed again in one editing session, and carried by no other document, is
+  unregistered. **A chip's dot recolours the tag**, through the same swatches and *Use the default
+  colour*. The suggestion list and every picker are on the popover layer, anchored to their field.
+- **Every swatch is one component**, `Palette` (`src/ui/Palette.tsx`), a 16px dot in a 24px hit box, 44px under 720px where a strip
+  wraps to two rows of five — and `dag-projectbar__hue` moved onto it, so the project picker has the
+  same targets. A chip's 8px dot has a 24px hit area, and under 720px a tap anywhere on an editable
+  chip but its × opens the picker. *+n* on a Tasks row is a focusable chip named *2 more tags:
+  meeting, design* whose names are in the drawn `Tooltip`, never a `title`; under 720px it is a 44px
+  target that opens a popover listing them.
+
+A chip is a pill: `--dag-color-paper100` ground, `--dag-color-outlineSoft` border, `ink` text at
+`--chrome-text-sm` and the hue only in its dot, so its contrast passes in every theme without
+measuring ten hues. The manager has no *New tag* button — its hint says to create a tag where it is
+used — and each row is the dot (the picker), the name, the count or *Unused* in `slate`, and a quiet
+`⋯` with *Rename* (in place; onto an existing tag it asks *Merge into "pricing"?*) and *Delete…*,
+whose dialog says *Remove "meeting" from 12 documents? Each of the 12 documents keeps everything
+else; only "meeting" is taken off.* A partial result is the notice *Renamed in 41 of 42 documents.
+"Q4 plan" kept changing.* with **Try again**.
+
+Tags are reached over MCP: `tag_list` (`GET /__board/tags`, and with `tag` the documents carrying
+it), `tag_apply` (add and remove on one document of any kind; a name the vault has never seen is
+registered, with `hue` or its default), `tag_rename`, `tag_delete` (both answer `{files, missed}`) and
+`tag_color` (`null` resets to the default and keeps the tag registered; only `tag_delete` unregisters
+one). The `*_list` and `*_read` tools, `task_list` and `event_list` report `tags`; `task_list`,
+`event_list` and `search` take a `tag`; `note_create`, `task_create` and `event_create` take `tags`.
+There is no `anydag` command: a tag is finer than a whole file (*The command line*), and the CLI reads
+them back through `anydag ls --json` and `<kind> cat`.
+
+Names claimed, grepped first: `dag-tag*`, `dag-tags*`, `dag-tagedit*`, `dag-palette*`
+(`dag-swatch` is the board panel's),
+`data-dag-tag*`, `data-dag-tags*`, `data-dag-palette*`, `data-dag-setting-tags*`, the Settings tab
+`tags`, the query key `tag`, and the event `dag:tags`. The icon is the existing `tags`.
+
+**Out, and why:** any change to projects (a tag never enrols a document in one, and #82 decides
+whether tags replace them); nested tags; an inline `#tag`; tags on attachments, on a quiz question or
+on a table row; choosing several tags in one filter (one, every or none, as the project filter);
+saved views and a tag filter on the Quizzes page; a colour per document; and tag dots on calendar
+items, which are too small for them.
+
 ## The calendar
 
-Tasks, events and notes on one timeline, at `?calendar=month`, `week`
+Tasks, events and notes on one timeline, at `?calendar=month`, `week`, `rows`
 or `days` — `1` for the view this browser used last — with `date=` and `days=` beside it. **Not
-`view=`**, which is the read-only page's key.
+`view=`**, which is the read-only page's key. **The week has two layouts**: down its columns, and
+*rows* — one row per day with the hours of the day across it.
 
     ---
     title: Team offsite
@@ -155,7 +418,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | Where | What it does |
 |---|---|
 | the sidebar | **Calendar** opens the page; **New event** makes `untitled` at the next whole hour, an hour long, and names it in its title; an event's row wears a calendar clock; a row's menu makes a plain note an event, or an event a note |
-| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a drag or a click on empty time makes an event, a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
+| the Calendar page | a month of week rows whose bars span days, or a week or a run of 1–14 days as an all-day row over an hour grid, or the same week as rows — one day to a row with the hours across — with a small month beside it; Tasks, Events and Notes switched on and off; the Tasks page's project filter; a click opens a thing, a right-click on one — or `shift+F10` — opens its menu, a drag or a click on empty time opens a card for the event's title, start and end, all-day and description, and Enter makes it; a drag on an event or a task moves it, pulls one of its ends, or takes it between the all-day row and the hour grid |
 | an event's own page | its properties under the title — all day, the start, the end and the zone they are shown in, each label acting on the value beside it; the top bar's `⋯` has *Not an event*, and a plain note's has *Make it an event* |
 | a task's own page | a *Starts* date beside *Due* |
 | a board | a placed event's card says *Event* and when |
@@ -163,7 +426,7 @@ or `days` — `1` for the view this browser used last — with `date=` and `days
 | `?view=1`, a snapshot, the PDF | the event's time on a line above the text, in the reader's zone |
 | Settings | *Weeks start on*, the person's |
 
-Nine things are load-bearing:
+Twelve things are load-bearing:
 
 - **An event is a note with a `start:` and no `status:`.** A date is all day and a time is a time —
   there is no `all-day:` key, a second key that could disagree with the first. An all-day `end:` is
@@ -189,8 +452,8 @@ Nine things are load-bearing:
   the viewer's zone and a step is `setDate` (see *Things that will bite*); `itemsOf` places every task,
   event and note of the kinds shown; `lanes` packs a run of days' bars lowest-lane-first; `blocks`
   cuts timed events to a day and splits overlapping ones into columns; `fieldsOf`, `eventFrom`,
-  `withStart` (which keeps an event's length), `withEnd` and `withAllDay` are what the event bar
-  writes.
+  `withStart` (which keeps an event's length), `withEnd` and `withAllDay` are what the event bar and
+  the creation card write.
 - **A timed event of a day or more goes in the all-day row**, as every calendar draws a trip; shorter,
   it is in the hour grid, cut at midnight into each day it touches. A month caps a week at four lanes
   and says how many more a day holds, which opens that day on its own. **A day's number is a 24px
@@ -199,8 +462,14 @@ Nine things are load-bearing:
   24px floor `e2e/touch-targets.spec.ts` holds.
 - **A drag on empty time makes an event, and a drag on an event or a task moves it**. A
   press anywhere but on an item starts a range, snapped to a quarter of an hour in the grid and to days
-  in the all-day row and a month, and a small card asks for the title; the file is named after it, in
-  the project's folder when the page shows one — the Tasks page's rule. **The title is the file's,
+  in the all-day row and a month, and a card asks for the event's details: its title, its start and its
+  end (prefilled from the range, each a date and — timed — a time), an all-day switch, and an optional
+  description. **Enter in the title still makes the event at once**, so the quick path stays one step;
+  the other fields are the event bar's, through the same writers (`withStart`, `withEnd`,
+  `withAllDay`), so a changed start keeps the length, an end that would come before the start is
+  moved an hour on, the switch moves the event to the all-day row, and every time is shown and
+  written in the viewer's zone. The description is the note's body, under its frontmatter. The file
+  is named after the title, in the project's folder when the page shows one — the Tasks page's rule. **The title is the file's,
   once**: `/create` names the file after the title and drops the `title:` line, so the event's own
   page reads the leaf of its name as its title (*Notes*), and the bar above agrees. A press on an
   item that does not move is a click that opens it (a real link, so a modifier opens a tab). One that
@@ -220,20 +489,56 @@ Nine things are load-bearing:
   picked up, so the phone's week is as it was. Escape while it is held puts it back. The page shows
   the change at once and lets go once the list agrees (`pending`, the Tasks page's), because the
   change feed is a wait behind the write.
+- **An item's menu is the sidebar's menu control**: a right-click on an item, the context-menu key or
+  `shift+F10` on it opens `ItemMenu` in `Calendar.tsx` — `role="menu"`, `dag-more__item` rows walked
+  by the arrows, the popover layer, Escape or a press elsewhere to shut it — at the pointer, or under
+  the item when the keyboard asked. It offers **Open**, **Open in new tab**, **Duplicate** and
+  **Move to trash**. **Empty time has no menu**: the handler is on the item alone, so a right-drag
+  there still draws nothing. **Duplicate opens nothing** — it is the sidebar's `/duplicate` route
+  (`duplicateBoard`, named as the sidebar names a copy: `trip 2`), but without the sidebar's
+  follow-up of opening and naming it, because a copy made to keep is not somewhere to go.
+  **Move to trash is the sidebar's Delete**, through `Shell`'s `trash`, so the notice's Undo puts it
+  back and an open file lets go; the item leaves the page at once through `guess`, as a row does.
+  Read only, the two rows that change a file give way to the lock's sentence. `menuKey` and
+  `menuWithin` in `src/calendar/menu.ts` are the two rules with no drawing in them
+  (`test/calendar-menu.test.ts`).
 - **The toggles and the week start are the person's**, `dag:calendar-hide` (what is *off*, so a new
   kind is shown) and `dag:week-start` in `PREF_KEYS`, read through `useWeekStart`/`useCalendarHidden`
   (`src/calendar/usePrefs.ts`) — the Calendar page and Settings' Calendar tab both — so either
   redraws a calendar that is open. Which view a bare `?calendar=1` opens is this browser's
   (`dag:calendar-view`).
+- **The rows layout is the same week turned on its side.** One row a day, the day and its all-day
+  things at the start of the row, and the hours of the day across the track; an event's minutes
+  (`blocks`' `top` and `length`) are its left edge and width, overlaps take a lane down the row
+  (`col`), and a bar is 24px tall because the row is as tall as its lanes. **The drag and snap
+  arithmetic is the column's** — `minutesAt`, `snapMinute` and `clockOf` in `model.ts` read the
+  pointer down a column or across a row — so `useTimeDraw` and `useGrab` make, move and resize on
+  either axis, and what a drag previews is exactly what it writes. Its all-day cells carry
+  `data-dag-cal-day`, as a month's cells and the week's all-day row do, so a drag across them still
+  makes a multi-day event. The small month follows the week into this layout.
+- **A week, the rows view, or a run of days keeps a small month beside it**, in a 240px side column
+  right of the grid (`.dag-calendar__body`). It is five things: **the view's month**, which it
+  follows when the view moves to another; **its own arrows**, which move the small month alone, so
+  the view and the address stay where they are until a day is picked; **the days the view shows**, in
+  the accent's tint, with today keeping the accent ring and a day of another month quieter; **a
+  click**, which takes the view to that day with `date=` following (the week or the rows view, or the
+  run's first day for a run); and **no events or dots**, which is out of scope. It is the month
+  view's own grid — `monthDays` is `rangeOf("month")` + `daysFrom`, so *Weeks start on* reaches it —
+  and today is the page's `useToday`, which reads `dayOf` in the viewer's zone. Under 720px it is not
+  drawn: a week's seven columns already have the phone's whole width.
 - **The event bar writes through the note's own save**, `changeTask`'s path, and a time is shown and
   written in the chosen zone — so an event written in Paris and moved in New York is written in
   New York's offset, naming the moment the person saw.
 
-Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-app--calendar`, `dag-eventbar*`,
-`dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-eventbar*`,
+Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-cal-rows*`,
+`dag-cal-row*`, `dag-app--calendar`,
+`dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`, `data-dag-calendar*`, `data-dag-cal-*`,
+`data-dag-cal-mini*`, `data-dag-cal-rows`, `data-dag-cal-row`, `data-dag-cal-start`,
+`data-dag-eventbar*`,
 `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
 `data-dag-sidebar-event`, `data-dag-note-make-event`, `data-dag-projectbar-calendar`, and for the
-drag `data-dag-cal-moving`, `data-dag-cal-moving-to`, `data-dag-cal-moving-end`, `dag-cal-ghost--move`,
+menu `dag-cal-menu*` and `data-dag-cal-menu*`, and for the drag `data-dag-cal-moving`,
+`data-dag-cal-moving-to`, `data-dag-cal-moving-end`, `dag-cal-ghost--move`,
 `dag-calendar__edge`, `data-dag-cal-edge`, `data-dag-cal-pulling` on the root, and `data-movable` and
 `data-axis` on an item,
 `data-dag-setting-week-start`, the storage keys `dag:calendar-hide`, `dag:week-start` and

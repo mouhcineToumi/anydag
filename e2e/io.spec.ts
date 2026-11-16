@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
-import { openMore } from "./more";
-import { exportAs } from "./export";
-import { BOARDS } from "./boards";
-import { vaultKey } from "./vault";
+
 import { openId } from "../src/board/envelope";
+import { BOARDS } from "./boards";
+import { exportAs } from "./export";
+import { expect, test, type Page } from "./fixture";
+import { openMore } from "./more";
+import { vaultKey } from "./vault";
 
 /**
  * Import and export.

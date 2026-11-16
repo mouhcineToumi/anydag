@@ -66,9 +66,9 @@ Fifteen things are load-bearing:
   (`practice.ts`) — and `installUpdate` awaits `flushPending()` before it asks the shell to quit. A
   board's own edits commit when the gesture ends, and a card being typed in commits when the click
   on the button takes its focus. A click flushes, then calls `install()`, and the button says
-  *Restarting…* and cannot be pressed twice. The tabs and open documents come back because they are
-  the page's own `localStorage` and the vault's own files. `pagehide` is still the net under all of
-  it: each of those writers also sends what it holds as the window goes.
+  *Restarting…* and cannot be pressed twice. The tabs come back from where they are kept (*Where the
+  tabs are kept, and their files*) and the documents from the vault's own files. `pagehide` is still
+  the net under all of it: each of those writers also sends what it holds as the window goes.
 - **The tree is flat rows with a depth**, `rows()` in `src/ui/tree.ts`, rather than nested
   elements: `aria-level`, `aria-setsize` and `aria-posinset` are said on each row, the keyboard walks
   the rows in order (the WAI tree pattern: arrows, Home, End, → into a folder, ← to its parent, F2 to
@@ -87,8 +87,9 @@ Fifteen things are load-bearing:
   known from the list, so a prefix sum is all the library would have added. Five things hold it up:
   - **Every line is `position: absolute` at its offset** inside a `role="tree"` as tall as the whole list,
     so a row's place never depends on the rows before it being drawn, which is what lets a pinned row stay
-    put while the rows around it come and go. A row's height is the stylesheet's — `--sidebar-row` (30px, the
-    sheet's 44px) and `--sidebar-empty` on `.dag-sidebar__tree` — **read from the computed style, not repeated
+    put while the rows around it come and go. A row's height is the stylesheet's — `--sidebar-row` on
+    `.dag-sidebar` (30px, the sheet's 44px), so the tree and the favourites above it draw the same row, and
+    `--sidebar-empty` on `.dag-sidebar__tree` — **read from the computed style, not repeated
     in the component**, so the phone's rows are CSS's to say. A line with its box open is nominally a row's
     height (`.dag-sidebar__line--ask` has no vertical padding on the sheet, for that); a mistake of a few
     pixels moves where the *next* window starts, never what is drawn.
@@ -218,6 +219,33 @@ Fifteen things are load-bearing:
   it has shown. `e2e/folders.spec.ts` holds it (*a file somebody else makes does not bring the list
   back to the open board*), and the glide's own check passed under load only after it.
 
+**The tree can be filtered by kind (#360).** *Files* carries a filter button to the left of its `+`,
+and the menu it opens — *Show in Files* — is one row per kind the tree already tells apart by its
+mark: Notes, Tasks, Projects, Events, Boards, Quizzes, Tables and Attachments, each with that mark
+and the count in the vault, with *Show everything* last. **Events have a row of their own** rather
+than counting as notes, because a row already wears a calendar clock for one and a *Notes* row would
+then hide a file wearing a mark the row does not carry. The note-shaped kinds are read in
+`FileIcon`'s order — project, then task, then event, then a note — so the row that hides a file is
+the row whose mark it wears, and the same order is `shownKind` in `src/ui/filter.ts`. Any number of
+kinds may be hidden at once.
+
+While anything is hidden the button is drawn in the accent and the heading says what, *Files · tasks
+hidden* (or *notes and boards hidden*, or *3 kinds hidden*), so a filtered tree is never mistaken
+for an empty vault. **A folder stays even when everything in it is hidden**, so the tree keeps its
+shape, and *Empty* is still read off the vault's own tree rather than the filtered one — a folder
+holding only hidden tasks is not empty. **The open file's row stays** whatever its kind, so the
+column never hides where somebody is. The rule is `filterByKind` in `src/ui/filter.ts`, with no DOM
+in it (`test/filter.test.ts`); the sidebar draws its rows from the filtered tree, so `rows()` — and
+with it the virtual window, the keyboard walk, rename and every drop target — sees exactly what is
+on screen. Search, links, backlinks, the Tasks page and the calendar read the list, not this, and are
+unaffected.
+
+The choice is view state, **this browser's and this vault's**: `dag:sidebar-hidden` is a JSON list of
+the hidden kinds, written with `writeLocal` and in `PER_VAULT` the way `dag:sidebar-open` keeps the
+folders. It is not in `PREF_KEYS`, so it travels nowhere, and opening a vault still writes no byte of
+it. Storing what is hidden rather than what is shown is what makes a kind added later visible by
+default.
+
 **A phone's shell is finger-sized.** Under 720px the sheet's acts, its rows, the Settings row and each
 row's `⋯` are 44×44; the `⋯` keeps its 14px glyph inside a 44px box, because a phone has no
 right-click and that button is the only way to rename, move or delete. The page tabs' close and the
@@ -227,7 +255,7 @@ floors, at 390×844 and 1440×900.
 
 Names claimed, grepped first: `dag-shell`, `dag-sidebar*`, `data-dag-sidebar*`, `data-dag-crumb`,
 `dag-toolbar__crumb*`, `data-dag-toolbar-home`, `data-dag-sidebar-sheet-home`, the storage keys
-`dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open` and
+`dag:sidebar`, `dag:sidebar-w`, `dag:sidebar-open`, `dag:sidebar-hidden` and
 `dag:favourites`, and the event `dag:chrome` — and for the folder-delete modal `dag-purge*`, `data-dag-purge*`
 and `data-dag-sidebar-dialog` — and for the drag ghost and the cached list `dag-sidebar-ghost`, `data-dag-sidebar-ghost`,
 `data-dag-sidebar-lifted`, `data-dag-sidebar-loading`, `dag-sidebar__failed*`, `dag-sidebar__retry`,
@@ -294,7 +322,8 @@ folder. Six things about it:
   Escape does.
 
 Names claimed, grepped first: `dag-sidebar__bulk*`, `data-dag-sidebar-bulk*`, `data-dag-sidebar-picked`
-(and `data-dag-bulk-delete*`, gone with its modal).
+(and `data-dag-bulk-delete*`, gone with its modal) — and the filter's `dag-sidebar__filter*`,
+`dag-sidebar__filtered` and `data-dag-sidebar-filter*`; the diagram owns none of them either.
 
 **The suite runs with it put away.** `e2e/global-setup.ts` seeds `dag:sidebar=0`, because a column
 open by default would move the canvas under every check that measures `.dag-viewport`, for a reason
@@ -377,21 +406,28 @@ with three levels on disk it printed `WORK/PLANNING/DESIGN` above boards indente
 as far as a board at the top level. Sorting by path put the descendants next to their ancestor and
 left it at that.
 
-`tree()`, `prune()` and `flatten()` in `src/ui/BoardBrowser.tsx` are the answer, and five things
+`tree()`, `prune()`, `flatten()` and `cardLines()` in `src/ui/tree.ts` are the answer, and six things
 about it are load-bearing:
 
 - **A folder heading says its leaf and nothing else**, in the same mono at the same size as the
   board names it governs, in `ink` at 600 with the folder mark beside it. The contrast against a
   row is weight and colour rather than a different alphabet, and the indent says what the path
   used to. The whole path is the `title`, for the one case where the leaf is ambiguous.
-- **One rule per level, at the horizontal centre of the mark above it.** `margin-left: 15px` is
-  the row's 8px of padding plus half a 14px icon, and the 9px of `padding-left` after it is what
-  puts the line *between* the mark's column and the rows. Four levels of nesting are four lines a
-  reader can walk back up.
+- **One rule per level, at the horizontal centre of the mark above it.** 15px is the row's 8px of
+  padding plus half a 14px icon, and a level is 25px, which puts the rule *between* the mark's
+  column and the rows. Four levels of nesting are four lines a reader can walk back up.
+- **Only the lines in view are drawn** (#267). With nothing typed the card lists every name in the
+  vault: 50,000 names were 400,000 elements and 3.8 s before the first row showed. The tree is
+  `cardLines()`, flat, each line with its depth, placed by its offset the way the sidebar's rows
+  are (`virtual.ts`). The heights are measured off the lines that are drawn, so a phone's taller
+  rows need no second number. A line's indent and its rules are drawn on the line itself
+  (`.dag-browser__line`), because there are no nested folders left to draw them. The arrows walk
+  the files in the model rather than the DOM, scrolling a line into view before focusing it, and
+  the focused line stays drawn wherever the list is scrolled.
 - **`.dag-panel__folder` stopped being shared.** The component library still wants micro-caps —
   `Generate`, `Shapes`, `Charts` are half a dozen prose headings, which is the treatment's job —
-  and a tree is what it is bad at. `.dag-browser__folder`, `.dag-browser__group` and
-  `.dag-browser__children` are the browser's; the search row, the list, the empty line and the
+  and a tree is what it is bad at. `.dag-browser__folder`, `.dag-browser__rows` and
+  `.dag-browser__line` are the browser's; the search row, the list, the empty line and the
   count stay `dag-panel__*`, because those really are the same thing in both.
 - **Folders before boards at every level, numerically.** Every file browser's order, and it is
   what puts the structure on screen rather than under twenty loose boards. `localeCompare(…,
@@ -556,3 +592,164 @@ Four things about it:
   drag-and-drop, for the reason the library's drag already gives.
 - **Shift and an arrow reorder from the keyboard**, and a plain arrow roves the tablist. That is
   the WAI pattern, and the only way this is reachable without a pointer.
+
+## The document tabs
+
+`src/ui/tabs/`, across the top of the page: the window's documents, as a browser's tabs are (#264).
+Every kind of document has one — board, note, quiz, table, attachment — and so do Tasks, the
+Calendar, Quizzes, the Trash, the Assistant and Home, which is what a new tab shows. **The search is
+not a tab**: it stays the dialog it was, over whichever tab is in front. Which page a tab is, its
+label and its mark are each a `switch` ending in `assertNever` (`kindOf`, `tabLabel`, `identity` in
+`model.ts`).
+
+**Not the page tabs.** A board's pages are `PageBar` along the bottom and own `dag-tab*` and
+`data-dag-page*`. These are `dag-doctabs*`, `data-dag-doctab*` and `dag-docs` (the column the strip
+and the page share), grepped first; the diagram owns none of them.
+
+**The tab list is the app's, and the address is always the tab in front's.** A tab is an id and a
+*place* — the page half of the query (`PAGE_KEYS` and `ref`, in one order); the window's own keys
+(`vault`, `theme`, `snapshot`, `view`, `ws`) stay in the address and belong to no tab. So a deep
+link, a reload, `?view=1` and `?snapshot=1` read the address as they always did, and a snapshot is
+one page with no strip and reads no preference. Each history entry's `dagHistory` state carries the
+tab it was made in (`src/ui/history.ts`):
+
+- **Switching tabs is a `pushState`** of the tab's place, so Back after a switch is the tab you came
+  from. That is the one rule a browser does not have — its Back is per tab — and it is the reason
+  this design was chosen over a history per tab: the window has one history, the desktop's
+  Alt+Left and mouse buttons drive it, and a second one beside it would be a second Back that only
+  the page could see.
+- **Popping to an entry brings its tab to the front** with that place (`adopt`). An entry whose tab
+  has been closed, or one made before there were tabs, goes to the tab in front: **Back never
+  makes a tab.**
+- **Closing the tab in front is a `replaceState`** to its neighbour, because the closed tab is not
+  somewhere Back should go.
+
+**One tab per document or page.** Opening something another tab already holds goes to that tab
+rather than opening it twice (`holding`); a board's tab is the board on any of its pages, a calendar's
+on any date. Home is the exception: two Home tabs are two places to start from.
+
+**How one opens.** A middle click, or Ctrl/⌘ and a click, on anything that opens a document — a
+search hit, a row on Home, a calendar item, a link in a note — opens it **behind** the tab
+in front, as a browser opens a link; Shift as well opens it in front. Successive tabs opened behind
+one tab line up after it in the order they were opened. None of those places was written to pass a
+modifier along, so `intent.ts` notes the press in the capture phase and `visit` in `App` asks while
+the same event is dispatched; a middle click is an `auxclick`, which each opener answers with
+`onAuxClick={middle(…)}`. **The sidebar and the Tasks page keep Ctrl/⌘-click for their multi-row
+selection**, so a row there opens a tab by a middle click — or, in the sidebar, its menu's *Open in
+a new tab*; the calendar's item menu says the same and does the same. The strip's `+` opens Home in front.
+
+**It is drawn from two tabs**, for the page strip's reason: one tab says nothing a sidebar row does
+not, and would cost a row on every page (the e2e suite, which starts with the sidebar away, would
+also find every page a row lower). Closing the last tab is not possible; closing the second takes
+the strip away. While the sidebar is away the strip is the window's top-left corner and keeps the
+toggle's slot, as the toolbar does when the strip is not there.
+
+### The tabs' keys, their order and their menu
+
+`src/ui/tabs/keys.ts` (`tabKey` is the pure part, tested in `test/doctabs.test.ts`):
+
+| Keys | Does |
+|---|---|
+| Ctrl/⌘+T · Ctrl/⌘+W | a new tab on Home, in front · close the tab in front |
+| Ctrl/⌘+Shift+T | open the last closed tab again, where it was, in front |
+| Ctrl+Tab · Ctrl+Shift+Tab, Ctrl+PageDown · Ctrl+PageUp | the next tab · the one before, round the ends (Ctrl on a Mac too, as in its browsers) |
+| Ctrl/⌘+1 … 8 · 9 | the tab at that place · the last |
+
+**They are the desktop app's.** A browser keeps every one of these chords for its own tabs and never
+lets the page hear them, so in `anydag serve` they do what the browser does. The page listens anyway,
+in the capture phase ahead of a board's and a note's own keys, and has them wherever a browser lets
+one through. In the desktop app the window menu Electron gives every window holds Ctrl/⌘+W for
+*close the window*, and a menu accelerator wins over the page: the shell takes the chord in
+`before-input-event` and sends `tabs:close` instead (`desktop.md`). A window of one Home tab has
+nothing to close, and the chord does nothing there; the window closes from its title bar or the
+app menu. The letter is read off the key a person typed, as a browser reads it — Ctrl+Y on a Dvorak
+board is redo, though its key is where T is on QWERTY — and off the key's place only when it typed no
+Latin letter. Nothing else in the app binds these: the editors' chords with a digit carry Alt or
+Shift. The shortcut sheet lists them under *Document tabs*.
+
+**Reordering** is the page strip's: a drag along the strip (`startDrag`, the tab under the pointer,
+a bar where it would land, no click after the drop) or Shift and an arrow on the focused tab, which
+keeps the focus. **A tab's menu** — a right click, or Shift+F10 or the menu key on the focused tab —
+is `TasksMenu`: *Close*, *Close others* and *Reopen closed tab*. Closing others is a `replaceState`
+to the kept tab when it was not in front; each tab it closed comes back with Ctrl/⌘+Shift+T, the last
+closed first. Twenty closed tabs are remembered (`CLOSED_LIMIT`); a closed Home is not one of them.
+
+**A tablist holds only tabs**, so a tab's `×` is the pointer's alone: `aria-hidden` and out of the
+Tab order, beside the tab rather than in it. From the keyboard **Delete on the focused tab closes
+it**, the WAI pattern's key for a tab that can be closed, and the focus goes to the tab that takes
+its place; Ctrl/⌘+W and the menu's *Close* do the same. axe holds this wherever two tabs are open.
+
+### What a tab keeps while another is in front
+
+`src/ui/tabs/keep.ts`, and `TabFrame` in `App`. **Two ways, by what the page costs to build again.**
+
+- **A note stays mounted.** Its editor holds what no file says — the caret, the selection,
+  ProseMirror's own undo — and is the dearest page to build. The `LIVE_NOTES` (3) notes most recently
+  in front stay in the DOM behind the page in front: `data-dag-docs-away`, laid out where the page is
+  (so their width, scroll and measures hold) but `visibility: hidden` and `inert`. A note pushed out
+  of the few is unmounted like any page — its pending write flushes as it goes — and comes back from
+  the file with its scroll, **but not its editor undo**, which lived in the editor.
+- **Every other page is unmounted**, and what it would lose is kept in memory by tab: a board's
+  undo and selection (`useEditor`'s `keep`; undo is versions of the file, so plain data), its view
+  per page (`Viewport`'s `keep`, put back only when somebody had placed it — an automatic fit is made
+  again), and any page's scroll, found again by the path of classes from the frame and put back as
+  the page fills in, until the person scrolls or presses something.
+
+**A page kept mounted behind is told so** (`TabFrameContext`, `useTabActive`). Whatever it listens
+for on the window or the document asks first, so only the page in front hears a key, a `dag:chrome`
+or `dag:export` request, the part named in the address, or raises `data-dag-ready`:
+`usePageKeys`, `useChromeRequests`, the note's `dag:export`, and in `NoteView` the locked-key
+refusal, `useTarget` and the ready signal. Its address is its own place (`useBehindTabs`): what it
+sets goes to its tab, never to the window.
+
+**Switching tabs writes nothing**, of a file or of the app home: no page is told to save by it. A
+note kept behind still writes what it was holding when its debounce is up, on the version it read,
+and still adopts a change made to its file while it is behind (`onNote`), so it shows the change on
+return with no 409 to answer. `e2e/doctabs-state.spec.ts` holds all of this.
+
+**Memory.** `e2e/doctabs-memory.spec.ts` opens ten notes of forty paragraphs in tabs, each brought
+to the front once, and compares the renderer's JS heap after a forced collection with one note's:
+22.2 MB → 25.3 MB, ×1.14, held at ×1.5. The DOM's node count goes ×2.5 (892 → 2236), the three
+editors kept behind. Closing a tab forgets what it kept.
+
+### Where the tabs are kept, and their files
+
+`src/ui/tabs/saved.ts`, the routes in `server/routes/meta.ts`, and `useTabFiles` in `App`.
+
+**In the app's home, never in the vault.** `GET`/`PUT /api/tabs` keep a vault's tabs in the home's
+`kv` as `tabs:<vault id>` (a 64 KB cap; `null` forgets them), and `rekeyVault` carries them when a
+copied folder is given a new id. The vault holds the person's documents and goes wherever a sync
+takes it; which of them one window had open is not one of them. **With the settings' sync off**
+(`dag:sync`) the page keeps nothing of its own in the home, and the tabs are kept in its own storage
+under the vault's key (`scopedKey("dag:tabs")`), as every preference is then — which is also why
+each e2e context starts with none. A snapshot and `?view=1` neither read nor keep them. The write is
+half a second after the last change and the same set is not written twice; `pagehide` sends what is
+waiting. **Switching tabs is a write to the home, never to a file.**
+
+**Opening the window.** `main.tsx` awaits `openSavedTabs()` before the history is installed and the
+first render, so the first page drawn is the one that was in front:
+
+- a reload is the tab that was in front, whose place the address already is;
+- a bare address in a **new window** — a launch, a new browser tab — is the tab that was in front,
+  and takes its place: the app carries on where it was left;
+- a bare address in a window the app is already in is **Home**, as it always was — the Home tab the
+  set has, or a new one beside the tab that was in front. A window is told apart by a mark in its
+  `sessionStorage` (`dag:tabs-window`), which a reload and a link keep and a new window has not;
+- a link to a document a tab holds brings that tab to the front;
+- a link to any other is a new tab beside the one that was in front, the rest kept.
+
+**A tab knows its file by id.** What is saved of a tab is its place and, when the listing gave one,
+its file's id (`TabFiles`; the index gives every listed file an id without writing it). On each
+fresh listing `reconcile` looks at every tab whose name the listing no longer has:
+
+| The listing has | The tab |
+|---|---|
+| its id, under another name of the same kind | **follows it**: the tab in front by `replaceState`, one behind by its place |
+| neither, and the tab was restored | is **dropped without a word** — it was never drawn this run |
+| neither, and the tab is behind | is **closed and says why**: a toast that names it, with *View trash* when the trash has it (`data-dag-doctabs-closed="trash"`) and *its file is gone* when not |
+| neither, and it is the tab in front | is left to its page, which already says the file is gone or trashed and offers the way back (`file-problem`) |
+
+The tab the address named is never dropped quietly, for the same reason: a link to a file that is
+gone draws the page that says so, not some other tab. No request is made to ask about a missing
+file, so a listing a round trip behind costs nothing; a tab whose file was never seen by id (one
+made a moment ago) is left alone until it has been. `e2e/doctabs-restore.spec.ts` holds this.

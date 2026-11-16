@@ -57,6 +57,10 @@ export function eventRoutes(app: Hono, s: Session): void {
           await stream.writeSSE({ event: "dag:vault-sync", data: JSON.stringify(ch.status) });
           continue;
         }
+        if (ch.type === "tags") {
+          await stream.writeSSE({ event: "dag:tags", data: "null" });
+          continue;
+        }
         if (ch.type === "tree") {
           await stream.writeSSE({ event: "dag:boards", data: "null" });
           continue;
@@ -70,6 +74,7 @@ export function eventRoutes(app: Hono, s: Session): void {
         if (ch.kind === "note")
           Object.assign(said, { task: ch.task ?? null, project: ch.project ?? null, event: ch.event ?? null });
         if (ch.kind === "quiz") said.questions = ch.questions ?? null;
+        if (ch.tags) said.tags = ch.tags;
         await stream.writeSSE({ event: EVENT[ch.kind], data: JSON.stringify(said) });
       }
     }),

@@ -17,13 +17,13 @@ the file for that area, not to a new place.
 | [`things-that-will-bite.md`](things-that-will-bite.md) | The long list of traps found the hard way, each with the defect that found it. Read before touching the area it names. |
 | [`design-and-layout.md`](design-and-layout.md) | Design rules, the three ELK knobs and the six layouts that are not ELK's, what `data-dag-ready` means, and what was refused. |
 | [`notes.md`](notes.md) | The `.note.md` format, the block editor that never writes a byte, the two writers and the merge; TeX between dollars. |
-| [`tasks-projects-calendar.md`](tasks-projects-calendar.md) | A note with a `status:`, a folder with a `project:`, an event with a `start:`, and the calendar that draws them; the time-zone rules. |
+| [`tasks-projects-calendar.md`](tasks-projects-calendar.md) | A note with a `status:`, a folder with a `project:`, a `tags:` on any document, an event with a `start:`, and the calendar that draws them; the time-zone rules. |
 | [`quizzes.md`](quizzes.md) | The `.quiz.md` format, the runner, Mistakes and the practice record. |
 | [`tables.md`](tables.md) | The `.table.md` format: tabs, typed cells, the smallest-span writers, sort and filter, CSV. |
 | [`attachments.md`](attachments.md) | Any file kept in the vault: ids, previews, what the server serves inline, the zip export. |
 | [`trash.md`](trash.md) | Nothing is deleted at once: the vault's trash, restore, expiry, and its routes. |
 | [`references.md`](references.md) | Document ids, `dag:` references, embeds, backlinks, the references index, `?view=1`, and wikilinks following a rename. |
-| [`search.md`](search.md) | The corpus on the server, the index in the page, ranking and snippets. |
+| [`search.md`](search.md) | The corpus on the server, its FTS5 words index in the app's home, ranking and snippets. |
 | [`cli.md`](cli.md) | `anydag`, the MCP server, and the manifest that holds routes, commands and tools in step. |
 | [`lock.md`](lock.md) | Read-only mode, in two layers, and what it keeps. |
 | [`links.md`](links.md) | Links between items, the rule for when a diagram has a header, and drawing a link with the pointer. |
@@ -32,7 +32,7 @@ the file for that area, not to a new place.
 | [`getting-around.md`](getting-around.md) | Pan, zoom and the pan modifier. |
 | [`settings.md`](settings.md) | Preferences, the Settings modal, and why a snapshot reads none of them. |
 | [`prompt-cards.md`](prompt-cards.md) | A model writes the DSL: the card, the providers (Claude Code, OpenCode, Codex, HTTP), the fix loop, rewriting an existing diagram, and flashcards for a quiz. |
-| [`sidebar.md`](sidebar.md) | The shell, the file tree and its operations, selection, the search dialog, folders and the page tabs. |
+| [`sidebar.md`](sidebar.md) | The shell, the file tree and its operations, selection, the search dialog, folders, the page tabs and the document tabs. |
 | [`icons.md`](icons.md) | Four vocabularies behind one `icon=` attribute, and where the art lives. |
 | [`editing.md`](editing.md) | Every gesture is a write to the board file: the table of gestures, the leader key, picking inside a diagram, the controls and text emphasis. |
 | [`editing-drag.md`](editing-drag.md) | What a drop means in each dialect, the controls the file needed, and converting a Mermaid paste. |
@@ -112,6 +112,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The api server | [`api.md`](api.md) |
 | The bench | [`limits.md`](limits.md) |
 | Tables | [`tables.md`](tables.md) |
+| Tags | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Tasks | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | Text emphasis | [`editing.md`](editing.md) |
 | The Assistant | [`assistant.md`](assistant.md) |
@@ -119,6 +120,8 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The command line | [`cli.md`](cli.md) |
 | The desktop app | [`desktop.md`](desktop.md) |
 | The dock's tooltip | [`getting-around.md`](getting-around.md) |
+| The document tabs | [`sidebar.md`](sidebar.md) |
+| The tabs' keys, their order and their menu | [`sidebar.md`](sidebar.md) |
 | The free canvas | [`free-canvas.md`](free-canvas.md) |
 | The layers, and what each may not know | [`layers.md`](layers.md) |
 | The leader key | [`editing.md`](editing.md) |
@@ -136,6 +139,8 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Vaults | [`server.md`](server.md) |
 | What the server cannot forge | [`sync.md`](sync.md) |
 | Versions and releases | [`gate-and-releases.md`](gate-and-releases.md) |
+| What a tab keeps while another is in front | [`sidebar.md`](sidebar.md) |
 | What the panel opens on, and what it opens with | [`editing.md`](editing.md) |
+| Where the tabs are kept, and their files | [`sidebar.md`](sidebar.md) |
 | Why it stopped being a column | [`sidebar.md`](sidebar.md) |
 | Wikilinks follow a rename | [`references.md`](references.md) |

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { pageMore } from "./more";
 import { newFile, openSettings, openSidebar } from "./sidebar";
 
@@ -79,7 +79,9 @@ async function calendar(page: Page, query: string, expectItem?: string) {
   const project = write("project", "Calendar check", ["project: active"]);
   const id = await idOf(page, project);
   await page.goto(`/?project=${id}&${query}`);
-  await expect(page.locator("[data-dag-calendar]")).toBeVisible();
+  /* The page's first paint waits for its fonts, so a cold dev server on a loaded machine can take
+     longer than Playwright's five seconds — the items below already allow fifteen. */
+  await expect(page.locator("[data-dag-calendar]")).toBeVisible({ timeout: 15_000 });
   if (expectItem) await expect(page.locator(`[data-dag-cal-item="${expectItem}"]`).first()).toBeVisible({ timeout: 15_000 });
 }
 
@@ -151,16 +153,95 @@ test("the week starts on the day Settings says, Monday until then", async ({ pag
   write("x", "Something", ["start: 2031-03-12"]);
   await calendar(page, "calendar=week&date=2031-03-12");
   await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-10");
+  /* The small month starts its weeks on the same day: March 2031 opens on Saturday the 1st, so the
+     grid starts on Monday the 24th of February — Sunday the 23rd once Settings says Sunday. */
+  await expect(page.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-24");
+  await expect(page.locator(".dag-cal-mini__name").first()).toHaveText("Mo");
   await openSettings(page, "calendar");
   await page.locator("[data-dag-setting-week-start]").selectOption("0");
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-09");
   await expect(page.locator(".dag-cal-cols__weekday").first()).toHaveText("Sun");
+  await expect(page.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-23");
+  await expect(page.locator(".dag-cal-mini__name").first()).toHaveText("Su");
   /* And back, so the next test to run in this browser profile starts on Monday. */
   await openSettings(page, "calendar");
   await page.locator("[data-dag-setting-week-start]").selectOption("1");
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-10");
+  await expect(page.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-24");
+});
+
+test("a week keeps a small month beside it, marking the week, and a click takes the week there", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=week&date=2031-03-12", trip);
+
+  const mini = page.locator("[data-dag-cal-mini]");
+  await expect(mini).toBeVisible();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-03");
+  await expect(page.locator("[data-dag-cal-mini-title]")).toHaveText("March 2031");
+
+  /* Whole weeks, Monday first: March 2031 begins on a Saturday and ends on a Monday. */
+  await expect(mini.locator("[data-dag-cal-mini-day]")).toHaveCount(42);
+  await expect(mini.locator("[data-dag-cal-mini-day]").first()).toHaveAttribute("data-dag-cal-mini-day", "2031-02-24");
+  await expect(mini.locator("[data-dag-cal-mini-day]").last()).toHaveAttribute("data-dag-cal-mini-day", "2031-04-06");
+  await expect(mini.locator(".dag-cal-mini__name")).toHaveText(["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]);
+
+  /* The week the view shows is tinted; the days either side of it are not. */
+  for (const day of ["2031-03-10", "2031-03-11", "2031-03-12", "2031-03-13", "2031-03-14", "2031-03-15", "2031-03-16"])
+    await expect(mini.locator(`[data-dag-cal-mini-day="${day}"]`)).toHaveAttribute("data-in-view", "");
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-09"]')).not.toHaveAttribute("data-in-view", "");
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-17"]')).not.toHaveAttribute("data-in-view", "");
+  /* A day of another month is quieter. */
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-02-24"]')).toHaveAttribute("data-out", "");
+
+  /* A click on a day takes the week to it, and the address says which day. */
+  await mini.locator('[data-dag-cal-mini-day="2031-03-26"]').click();
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-24");
+  await expect(page.locator('[data-dag-cal-column="2031-03-26"]')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("date")).toBe("2031-03-26");
+  /* The tint moved with the week. */
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-24"]')).toHaveAttribute("data-in-view", "");
+  await expect(mini.locator('[data-dag-cal-mini-day="2031-03-23"]')).not.toHaveAttribute("data-in-view", "");
+});
+
+test("the small month's arrows move it alone, and today is marked where it is", async ({ page }) => {
+  write("anchor", "Anchor", [`start: ${today()}`]);
+  await calendar(page, "calendar=week", `${folder}/anchor`);
+
+  const mini = page.locator("[data-dag-cal-mini]");
+  const now = today();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", now.slice(0, 7));
+  const marked = mini.locator(`[data-dag-cal-mini-day="${now}"]`);
+  await expect(marked).toHaveAttribute("data-today", "");
+  await expect(marked).toHaveAttribute("aria-current", "date");
+  await expect(marked).toHaveAttribute("data-in-view", "");
+  await expect(marked).toHaveAccessibleName(/, today$/);
+
+  /* A run of days three weeks on: the arrows move the small month and nothing else — not the page,
+     and not the address. */
+  await page.goto(page.url().replace("calendar=week", "calendar=days&days=3&date=2031-03-11"));
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-03", { timeout: 15_000 });
+  const where = () => {
+    const url = new URL(page.url());
+    return { view: url.searchParams.get("calendar"), date: url.searchParams.get("date"), days: url.searchParams.get("days") };
+  };
+  const was = where();
+  await page.locator("[data-dag-cal-mini-next]").click();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-04");
+  await expect(page.locator("[data-dag-cal-mini-title]")).toHaveText("April 2031");
+  await page.locator("[data-dag-cal-mini-prev]").click();
+  await page.locator("[data-dag-cal-mini-prev]").click();
+  await expect(mini).toHaveAttribute("data-dag-cal-mini", "2031-02");
+  await expect(page.locator("[data-dag-cal-mini-title]")).toHaveText("February 2031");
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-11");
+  expect(where()).toEqual(was);
+
+  /* A day of the month it was moved to takes the run to it, and the address follows. */
+  await mini.locator('[data-dag-cal-mini-day="2031-02-17"]').click();
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-02-17");
+  await expect(page.locator('[data-dag-cal-column="2031-02-17"]')).toBeVisible();
+  expect(where()).toEqual({ view: "days", date: "2031-02-17", days: "3" });
 });
 
 test("times are shown and written in the time zone Settings says", async ({ page }) => {
@@ -278,6 +359,83 @@ test("a drag in the hour grid makes an event with that start and end, in the pro
     .poll(() => read("Planning"))
     .toMatch(/^---\nstart: 2031-03-12T10:00[+-]\d{2}:\d{2}\nend: 2031-03-12T11:30[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/);
   await expect(page.locator(`[data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+});
+
+test("the card's times are the drag's, and editing them changes the event it makes", async ({ page }) => {
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=week&date=2031-03-12", `${folder}/anchor`);
+  /* A drag from 10:00 to 11:30 on the Wednesday, as the test above makes one. */
+  const column = page.locator('[data-dag-cal-column="2031-03-12"]');
+  const b = (await column.boundingBox())!;
+  const minute = b.height / 1440;
+  const x = b.x + b.width / 2;
+  await page.mouse.move(x, b.y + 600 * minute + 2);
+  await page.mouse.down();
+  await page.mouse.move(x, b.y + 680 * minute, { steps: 4 });
+  await page.mouse.up();
+
+  const card = page.locator("[data-dag-calendar-new]");
+  const startDay = card.locator("[data-dag-calendar-new-start-day]");
+  const startTime = card.locator("[data-dag-calendar-new-start-time]");
+  const endDay = card.locator("[data-dag-calendar-new-end-day]");
+  const endTime = card.locator("[data-dag-calendar-new-end-time]");
+  await expect(startDay).toHaveValue("2031-03-12");
+  await expect(startTime).toHaveValue("10:00");
+  await expect(endDay).toHaveValue("2031-03-12");
+  await expect(endTime).toHaveValue("11:30");
+
+  /* A start moved keeps the length, as the event bar does, and the end is set afterwards. */
+  await startTime.fill("14:15");
+  await expect(endTime).toHaveValue("15:45");
+  await endTime.fill("16:30");
+  await endDay.fill("2031-03-13");
+  await endTime.fill("09:45");
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("14:15 – ");
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("09:45");
+
+  await card.locator("[data-dag-calendar-new-description]").fill("Bring the roadmap.");
+  await card.locator("[data-dag-calendar-new-title]").fill("Planning");
+  await card.locator("[data-dag-calendar-new-title]").press("Enter");
+  await expect(card).toHaveCount(0);
+
+  /* Enter still makes it in one step, with the times the card settled on and the description under
+     them — every time carrying this zone's offset. */
+  await expect
+    .poll(() => read("Planning"))
+    .toMatch(
+      /^---\nstart: 2031-03-12T14:15[+-]\d{2}:\d{2}\nend: 2031-03-13T09:45[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\nBring the roadmap\.\n$/,
+    );
+  await expect(page.locator(`[data-dag-cal-column="2031-03-12"] [data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-cal-column="2031-03-13"] [data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+});
+
+test("the all-day switch takes the new event to the all-day row", async ({ page }) => {
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=week&date=2031-03-12", `${folder}/anchor`);
+  const column = page.locator('[data-dag-cal-column="2031-03-12"]');
+  const b = (await column.boundingBox())!;
+  const minute = b.height / 1440;
+  const x = b.x + b.width / 2;
+  await page.mouse.move(x, b.y + 600 * minute + 2);
+  await page.mouse.down();
+  await page.mouse.move(x, b.y + 680 * minute, { steps: 4 });
+  await page.mouse.up();
+
+  const card = page.locator("[data-dag-calendar-new]");
+  await expect(card.locator("[data-dag-calendar-new-start-time]")).toHaveValue("10:00");
+  await card.locator("[data-dag-calendar-new-allday]").check();
+  /* No time to set on an all-day event: the two fields go and the summary says the day. */
+  await expect(card.locator("[data-dag-calendar-new-start-time]")).toHaveCount(0);
+  await expect(card.locator("[data-dag-calendar-new-end-time]")).toHaveCount(0);
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("Wed, Mar 12, 2031");
+
+  await card.locator("[data-dag-calendar-new-title]").fill("Offsite");
+  await card.locator("[data-dag-calendar-new-make]").click();
+  await expect(card).toHaveCount(0);
+
+  await expect.poll(() => read("Offsite")).toMatch(/^---\nstart: 2031-03-12\nid: [0-9a-z]{10}\n---\n$/);
+  await expect(page.locator(`[data-dag-cal-allday] [data-dag-cal-item="${folder}/Offsite"]`)).toBeVisible();
+  await expect(page.locator(`.dag-cal-column [data-dag-cal-item="${folder}/Offsite"]`)).toHaveCount(0);
 });
 
 test("a click on a month's day asks for an all-day event on it, and Escape leaves nothing", async ({ page }) => {
@@ -564,4 +722,254 @@ test("a timed event let go on the all-day row is all day there, and an all-day o
     await expect(page.locator('[data-dag-cal-column="2031-03-15"] [data-dag-cal-moving-to="14:00"]')).toBeVisible();
   });
   await expect.poll(() => read("trip")).toMatch(/start: 2031-03-15T14:00[+-]\d{2}:\d{2}\nend: 2031-03-15T15:00[+-]\d{2}:\d{2}\n/);
+});
+
+/*
+ * The item menu. A right-click on an item, the context-menu key, or `shift+F10` opens the sidebar's
+ * menu control over the calendar: open it here or in a tab, copy it, or trash it. The menu is the
+ * calendar's, so empty time still has none — a right-drag there is nothing, as it always was.
+ */
+
+test("right-clicking an item offers open, open in a new tab, duplicate and move to trash", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=month&date=2031-03-15", trip);
+  await page.locator(`[data-dag-cal-item="${trip}"]`).first().click({ button: "right" });
+
+  const menu = page.locator("[data-dag-cal-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("[data-dag-cal-menu-item]")).toHaveCount(4);
+  await expect(menu.locator('[data-dag-cal-menu-item="open"]')).toHaveText("Open");
+  await expect(menu.locator('[data-dag-cal-menu-item="new-tab"]')).toHaveText("Open in new tab");
+  await expect(menu.locator('[data-dag-cal-menu-item="duplicate"]')).toHaveText("Duplicate");
+  await expect(menu.locator('[data-dag-cal-menu-item="trash"]')).toHaveText("Move to trash");
+
+  /* Open goes to the note, as a click on the item does. */
+  await menu.locator('[data-dag-cal-menu-item="open"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(trip);
+  expect(new URL(page.url()).searchParams.get("calendar")).toBeNull();
+});
+
+test("duplicate copies the file beside it and opens nothing, and trash leaves the calendar with an Undo", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=month&date=2031-03-15", trip);
+  const bar = page.locator(`[data-dag-cal-item="${trip}"]`).first();
+
+  /* A copy, named as the sidebar's Duplicate names one, and the page stays where it was. */
+  await bar.click({ button: "right" });
+  const menu = page.locator("[data-dag-cal-menu]");
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-dag-cal-menu-item="duplicate"]').click();
+  await expect(menu).toHaveCount(0);
+  await expect.poll(() => fs.existsSync(path.join(dir, "trip 2.note.md"))).toBe(true);
+  expect(new URL(page.url()).searchParams.get("note")).toBeNull();
+  await expect(page.locator(`[data-dag-cal-item="${folder}/trip 2"]`)).toBeVisible({ timeout: 15_000 });
+
+  /* Into the trash through the sidebar's own delete: the notice offers the way back. */
+  await bar.click({ button: "right" });
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-dag-cal-menu-item="trash"]').click();
+  await expect(page.locator(`[data-dag-cal-item="${trip}"]`)).toHaveCount(0);
+  await expect(page.locator("[data-dag-trash-notice]")).toBeVisible();
+  await expect.poll(() => fs.existsSync(path.join(dir, "trip.note.md"))).toBe(false);
+
+  await page.locator("[data-dag-trash-undo]").click();
+  await expect(page.locator(`[data-dag-cal-item="${trip}"]`)).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => fs.existsSync(path.join(dir, "trip.note.md"))).toBe(true);
+});
+
+test("shift+F10 opens the menu on a focused item, and Open in new tab leaves this page where it was", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=month&date=2031-03-15", trip);
+  const bar = page.locator(`[data-dag-cal-item="${trip}"]`).first();
+  await bar.focus();
+  await page.keyboard.press("Shift+F10");
+
+  const menu = page.locator("[data-dag-cal-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('[data-dag-cal-menu-item="open"]')).toBeFocused();
+
+  /* A tab of this window, behind the calendar (#264): the strip appears with the note in it, and
+     the calendar is still the page in front. */
+  await menu.locator('[data-dag-cal-menu-item="new-tab"]').click();
+  await expect(page.locator('[data-dag-doctab-kind="note"]')).toHaveCount(1);
+  await expect(page.locator('[data-dag-doctab-kind="calendar"]')).toHaveAttribute("aria-selected", "true");
+  expect(new URL(page.url()).searchParams.get("note")).toBeNull();
+  await expect(menu).toHaveCount(0);
+
+  /* Escape shuts the menu and puts the focus back on the item that asked for it. */
+  await bar.focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(bar).toBeFocused();
+});
+
+test("the menu is not opened on empty time, and a right-drag there still makes nothing", async ({ page }) => {
+  const anchor = write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=month&date=2031-03-15", anchor);
+  const cell = async (d: string) => (await page.locator(`.dag-cal-month [data-dag-cal-day="${d}"]`).boundingBox())!;
+  const from = await cell("2031-03-19");
+  const at = { x: from.x + from.width / 2, y: from.y + from.height - 10 };
+
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await expect(page.locator("[data-dag-cal-menu]")).toHaveCount(0);
+
+  const to = await cell("2031-03-21");
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height - 10, { steps: 6 });
+  await page.mouse.up({ button: "right" });
+  await expect(page.locator("[data-dag-calendar-new]")).toHaveCount(0);
+  expect(fs.readdirSync(dir).sort()).toEqual(["anchor.note.md", "project.note.md"]);
+});
+
+/*
+ * The rows view: the same week as the columns, turned. A row a day, its all-day things at the start,
+ * and the hours across. The gestures are the week's — one implementation behind both — so these
+ * checks are about the drawing landing where the data says, and about the switch remembering it.
+ */
+
+test("the week can be drawn as rows from the switch, and the choice is remembered", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=week&date=2031-03-12", trip);
+
+  /* The switch is the week's radio group, with Rows beside Week. */
+  const rows = page.locator('[data-dag-calendar-view="rows"]');
+  await expect(rows).toHaveText("Rows");
+  await rows.click();
+  await expect(page).toHaveURL(/calendar=rows/);
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar", "rows");
+  await expect(page.locator(".dag-cal-row")).toHaveCount(7);
+  await expect(page.locator("[data-dag-cal-row]").first()).toHaveAttribute("data-dag-cal-row", "2031-03-10");
+
+  /* The small month sits beside it, as beside the week, and takes the rows with it. */
+  await expect(page.locator("[data-dag-cal-mini]")).toBeVisible();
+  await page.locator('[data-dag-cal-mini-day="2031-03-26"]').click();
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar-first", "2031-03-24");
+  await expect(page.locator('[data-dag-cal-row="2031-03-24"]')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("date")).toBe("2031-03-26");
+
+  /* `?calendar=1` opens the view this browser used last. */
+  await page.goto(page.url().replace("calendar=rows", "calendar=1"));
+  await expect(page.locator("[data-dag-calendar]")).toHaveAttribute("data-dag-calendar", "rows", { timeout: 15_000 });
+  /* And back to the first view, so the next test in this browser profile is where it expects. */
+  await page.evaluate(() => localStorage.removeItem("dag:calendar-view"));
+});
+
+test("a row a day puts a timed event at its hour, all-day things at the start, and overlaps in lanes", async ({ page }) => {
+  const talk = write("talk", "Keynote", ["start: 2031-03-13T09:00Z", "end: 2031-03-13T10:30Z"]);
+  const standup = write("standup", "Standup", ["start: 2031-03-13T10:00Z", "end: 2031-03-13T11:00Z"]);
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=rows&date=2031-03-12", talk);
+
+  /* The timed events are in the 13th's track, at their hour and as long as they last. */
+  const row = page.locator('[data-dag-cal-row="2031-03-13"]');
+  const bar = row.locator(`[data-dag-cal-item="${talk}"]`);
+  await expect(bar).toBeVisible();
+  const at = await page.evaluate(
+    () => new Date("2031-03-13T09:00Z").getHours() * 60 + new Date("2031-03-13T09:00Z").getMinutes(),
+  );
+  expect(await bar.getAttribute("style")).toContain(`--at: ${at}`);
+  expect(await bar.getAttribute("style")).toContain("--len: 90");
+
+  /* Two events that overlap in time take a lane each down the row, and the row grows to hold them. */
+  const other = row.locator(`[data-dag-cal-item="${standup}"]`);
+  await expect(other).toBeVisible();
+  const lane = async (locator: typeof bar) => Number((await locator.getAttribute("style"))!.match(/--lane: (\d+)/)![1]);
+  expect(new Set([await lane(bar), await lane(other)]).size).toBe(2);
+  /* The track is as tall as the two lanes, so neither bar covers the other. */
+  expect(await page.locator('[data-dag-cal-row="2031-03-13"]').getAttribute("style")).toContain("--lanes: 2");
+
+  /* An all-day thing is at the start of every day it touches, and in no track; a timed one is the
+     other way round. */
+  for (const d of ["2031-03-12", "2031-03-13", "2031-03-14"])
+    await expect(page.locator(`[data-dag-cal-start="${d}"] [data-dag-cal-item="${trip}"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-cal-start="2031-03-13"] [data-dag-cal-item="${talk}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-dag-cal-row="2031-03-13"] [data-dag-cal-item="${trip}"]`)).toHaveCount(0);
+
+  /* A click still opens it. */
+  await bar.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("note")).toBe(talk);
+});
+
+test("a drag on a row's empty hours makes an event with that start and end", async ({ page }) => {
+  write("anchor", "Anchor", ["start: 2031-03-12"]);
+  await calendar(page, "calendar=rows&date=2031-03-12", `${folder}/anchor`);
+  /* From 10:00 to 11:30, the same drag as the week's grid, across the row instead of down it. */
+  const row = page.locator('[data-dag-cal-row="2031-03-12"]');
+  const b = (await row.boundingBox())!;
+  const minute = b.width / 1440;
+  const y = b.y + b.height / 2;
+  await page.mouse.move(b.x + 600 * minute + 2, y);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 650 * minute, y, { steps: 4 });
+  await page.mouse.move(b.x + 680 * minute, y, { steps: 4 });
+  await page.mouse.up();
+
+  const card = page.locator("[data-dag-calendar-new]");
+  await expect(card).toBeVisible();
+  await expect(card.locator("[data-dag-calendar-new-when]")).toContainText("10:00 – 11:30");
+  await card.locator("[data-dag-calendar-new-title]").fill("Planning");
+  await card.locator("[data-dag-calendar-new-title]").press("Enter");
+  await expect(card).toHaveCount(0);
+
+  await expect
+    .poll(() => read("Planning"))
+    .toMatch(/^---\nstart: 2031-03-12T10:00[+-]\d{2}:\d{2}\nend: 2031-03-12T11:30[+-]\d{2}:\d{2}\nid: [0-9a-z]{10}\n---\n$/);
+  await expect(page.locator(`[data-dag-cal-row="2031-03-12"] [data-dag-cal-item="${folder}/Planning"]`)).toBeVisible();
+});
+
+test("a drag moves a timed event along its row and down another, and an end is pulled", async ({ page }) => {
+  const talk = write("talk", "Keynote", ["start: 2031-03-12T09:00Z", "end: 2031-03-12T10:30Z"]);
+  await calendar(page, "calendar=rows&date=2031-03-12", talk);
+  const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
+  const track = (d: string) => box(`[data-dag-cal-row="${d}"]`);
+  const t12 = await track("2031-03-12");
+  const t13 = await track("2031-03-13");
+  const hour = t12.width / 24;
+  const bar = await box(`[data-dag-cal-row="2031-03-12"] [data-dag-cal-item="${talk}"]`);
+  const from = { x: bar.x + bar.width / 2, y: bar.y + 8 };
+
+  /* A day on and an hour and a quarter later, the ghost saying when it would start. */
+  const wall = (iso: string) => page.evaluate((at) => new Date(at).toTimeString().slice(0, 5), iso);
+  const starts = await wall("2031-03-13T10:15Z");
+  const ends = await wall("2031-03-13T11:45Z");
+  await drag(page, from, hour * 1.25, t13.y - t12.y, async () => {
+    await expect(page.locator(`[data-dag-cal-row="2031-03-13"] [data-dag-cal-moving-to="${starts}"]`)).toBeVisible();
+  });
+  await expect
+    .poll(() => read("talk"))
+    .toMatch(new RegExp(`start: 2031-03-13T${starts}[+-]\\d{2}:\\d{2}\nend: 2031-03-13T${ends}[+-]\\d{2}:\\d{2}\n`));
+  await expect(page.locator(`[data-dag-cal-row="2031-03-13"] [data-dag-cal-item="${talk}"]`)).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("note")).toBeNull();
+
+  /* The end pulled half an hour to the right, the start kept. */
+  const pulled = await wall("2031-03-13T12:15Z");
+  const edge = await box(`[data-dag-cal-row="2031-03-13"] [data-dag-cal-item="${talk}"] [data-dag-cal-edge="end"]`);
+  await drag(page, { x: edge.x + edge.width / 2, y: edge.y + edge.height / 2 }, hour / 2, 0, async () => {
+    await expect(page.locator(`[data-dag-cal-row="2031-03-13"] [data-dag-cal-moving-end="${pulled}"]`)).toBeVisible();
+  });
+  await expect
+    .poll(() => read("talk"))
+    .toMatch(new RegExp(`start: 2031-03-13T${starts}[+-]\\d{2}:\\d{2}\nend: 2031-03-13T${pulled}[+-]\\d{2}:\\d{2}\n`));
+});
+
+test("an all-day thing at the start of a row moves down the days there", async ({ page }) => {
+  const trip = write("trip", "Conference", ["start: 2031-03-12", "end: 2031-03-14"]);
+  await calendar(page, "calendar=rows&date=2031-03-12", trip);
+  const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
+  const from = await box('[data-dag-cal-start="2031-03-12"]');
+  const to = await box('[data-dag-cal-start="2031-03-13"]');
+  const bar = await box(`[data-dag-cal-start="2031-03-12"] [data-dag-cal-item="${trip}"]`);
+
+  /* A trip is on each day of it, at the start. Pulling it down a row moves it a day, keeping its
+     length; the days it would land on wear the mark a range does. */
+  await drag(page, { x: bar.x + 12, y: bar.y + bar.height / 2 }, 0, to.y - from.y, async () => {
+    await expect(page.locator('[data-dag-cal-start="2031-03-13"][data-dag-cal-picked]')).toHaveCount(1);
+  });
+  await expect.poll(() => read("trip")).toContain("start: 2031-03-13\nend: 2031-03-15\n");
+  await expect(page.locator(`[data-dag-cal-start="2031-03-15"] [data-dag-cal-item="${trip}"]`)).toBeVisible();
+  await expect(page.locator(`[data-dag-cal-start="2031-03-11"] [data-dag-cal-item="${trip}"]`)).toHaveCount(0);
 });

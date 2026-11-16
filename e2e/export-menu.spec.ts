@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS, boardId } from "./boards";
 import { exportAs, openExport } from "./export";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * Export at the top right, and a note saved as a PDF.

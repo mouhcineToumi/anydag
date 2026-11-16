@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Palette,
   Sparkles,
+  Tags,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import { anyAiOn } from "./aiSwitch";
 import { useSettings } from "./useSettings";
 import { PrivacyPane } from "./panes/Privacy";
 import { SyncPane } from "./panes/Sync";
+import { TagsPane } from "./panes/Tags";
 import {
   SCOPE_LABEL,
   SECTIONS,
@@ -70,6 +72,7 @@ const TAB_ICON: Record<SettingsTab, LucideIcon> = {
   "vault-general": Briefcase,
   ai: Sparkles,
   "vault-files": Images,
+  tags: Tags,
   export: PackageOpen,
   sync: RefreshCw,
   "agent-access": Plug,
@@ -143,9 +146,10 @@ export function Settings({
 }) {
   const boardOpen = board !== null && editable;
   const [tab, setTabState] = useState<SettingsTab>(() => asked ?? lastTab(boardOpen));
-  /* What the server says this build may show (`src/features.ts`): Privacy (only the logs hold it)
-     and Sync are its tabs. A person reads no sign a server exists on a build without them — nor,
-     while the answer is on its way, which is why the unknown hides them too. */
+  /* What the server says this build may show (`src/features.ts`): Sync is its tab. Privacy is drawn
+     in every build (#326) — off, its toggle records the choice in this browser and one line says
+     logs are not sent from this version yet. A person reads no sign a server exists on a build
+     without the rest: nor, while the answer is on its way, which is why the unknown hides Sync. */
   const features = useFeatures();
   const cloud = features?.cloud === true;
   /* With every AI feature off (#296) there is nothing for a provider to answer, so its tab goes. */
@@ -289,6 +293,8 @@ export function Settings({
         return <GeneralPane />;
       case "vault-files":
         return <FilesPane boardName={boardName} />;
+      case "tags":
+        return <TagsPane />;
       case "export":
         return <ExportPane />;
       case "sync":

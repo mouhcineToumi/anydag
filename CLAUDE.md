@@ -44,7 +44,8 @@ the app's home).
 - `ANYDAG_CLOUD_BUILD=on|off` and `ANYDAG_CLOUD=on|off` — the build's feature switch (`server/features.ts`,
   see *Feature switches* in `docs/architecture/server.md`): whether the app carries the features that talk to
   an AnyDag server (sync, anonymous logs, feedback). Off unless a build says on — no release does — and the
-  run-time override wins. Dev and the test suites run on.
+  run-time override wins. Dev and the test suites run on. The Settings → Privacy toggle is drawn in every
+  build (#326): with the switch off it records the choice with no request.
 - `npm run e2e:smoke` / `npm run e2e:docker` — the Playwright suite's smoke tier / all of it, in the
   pinned Playwright Docker image, screenshots compared. `npm run e2e:local` is the host browser and
   compares none (see *Gate* below).
@@ -121,8 +122,10 @@ One line each; the full account with the defect that found it is in
   a host, filled by streams nobody let go of, froze every request (`desktop/forward.ts`, #123).
 - **A process keeps the memory its V8 heap grew into**, even collected, even a worker thread's after
   it ends: work whose memory must come back runs in a process that exits (the grammar's worker, #279).
-- **The token and the `Host` are the whole security model** — both checked on every request; a script
-  that `fetch`es the server needs `authed()` from `scripts/session.mjs`.
+- **The token and the `Host` are the whole security model** — both checked on every API request; a
+  browser on `anydag serve` gets the cookie bound to a per-launch secret path (`/s/<secret>/`, #339),
+  never on `/`, since a cookie reaches every port; a script that `fetch`es the server needs
+  `authed()` from `scripts/session.mjs`.
 - **The repository is public, so a committed secret is a published one.** Secrets live in the
   environment or a git-ignored `*.local`/`.env.*`; `scripts/secrets.sh` (gitleaks) refuses them in the
   hook and CI. If one is pushed, revoke it first ([`SECURITY.md`](SECURITY.md)).
@@ -174,10 +177,11 @@ card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/`
 The pre-commit hook first runs `scripts/secrets.sh` (gitleaks over the staged change; CI's `secrets`
 job and the nightly run it too). `npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
 `check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `test/parity.test.ts`,
-vitest). It needs no browser and is the pre-commit hook; CI also runs `npm run lint:promises`. The
+vitest). It needs no browser and is the pre-commit hook. Pre-push runs `npm run lint:promises` and the
+store's contracts over a watched vault (about 30 s, the two checks only CI used to run). The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)
-and in CI (`e2e.yml`: `@smoke` on a pull request, everything on a push); pre-push runs only what the
-push can have changed. Update baselines only deliberately, and read them. The required checks are
+and in CI (`e2e.yml`: on a pull request the `@smoke` tier plus the specs the change reaches, everything on
+a push); `ANYDAG_PREPUSH_E2E=1 git push` runs a pull request's selection before the push. Update baselines only deliberately, and read them. The required checks are
 `CI passed`, `e2e`, `PR title`, `PR target` and `Linked issue`. Hooks never stash; do not `--no-verify` past a failure, fix the cause. Details: [`gate-and-releases.md`](docs/architecture/gate-and-releases.md).
 
 ## Working on a change

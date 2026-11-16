@@ -12,9 +12,13 @@ import {
   RECENT_FILES,
   SETTINGS_TAB,
   SIDEBAR_FOLDERS,
+  SIDEBAR_HIDDEN,
   STAMP,
   SYNC,
+  TASKS_TAB,
+  TASK_PANEL,
   TASKS_VIEW,
+  TELEMETRY_PENDING,
   WEEK_START,
   VAULT_PREF_KEYS,
   VAULT_STAMP,
@@ -22,6 +26,8 @@ import {
 import { LOCKED } from "@/settings/lock";
 import { STORE } from "@/settings/store";
 import { RECENT_KEY } from "@/ui/modelList";
+import { SAVED_TABS, WINDOW_SEEN } from "@/ui/tabs/saved";
+import { SECRET } from "@/vault/secret";
 import { LAST } from "@/vault/current";
 
 /**
@@ -125,6 +131,9 @@ const EVENTS = new Set([
   "dag:guessed",
   /* A linked vault's sync status changed: the change feed's event, a `SyncStatus`. */
   "dag:vault-sync",
+  /* The vault's tag list changed: the change feed's event, and this tab's own after it creates,
+     recolours or deletes a tag — `onTags`, `onTrash`'s shape. */
+  "dag:tags",
 ]);
 
 describe("the preference list", () => {
@@ -136,7 +145,10 @@ describe("the preference list", () => {
       STAMP,
       SYNC,
       SIDEBAR_FOLDERS,
+      SIDEBAR_HIDDEN,
       TASKS_VIEW,
+      TASKS_TAB,
+      TASK_PANEL,
       QUIZ_ABOUT,
       SETTINGS_TAB,
       CALENDAR_VIEW,
@@ -146,6 +158,15 @@ describe("the preference list", () => {
       RECENT_FILES,
       LOCKED,
       RECENT_KEY,
+      /* The logs answer an off build holds for the first build that can carry it (#326). */
+      TELEMETRY_PENDING,
+      /* A window's tabs, kept here only when the settings do not sync (#264). */
+      SAVED_TABS,
+      /* Whether this window has had the app in it: a session's, so a bare address is Home in it. */
+      WINDOW_SEEN,
+      /* `anydag serve`'s secret path, this origin's alone and never a preference: syncing it would
+         carry it to another machine, where it opens nothing, and out of the origin it guards (#339). */
+      SECRET,
     ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);
@@ -160,6 +181,8 @@ describe("the preference list", () => {
     expect(PREF_KEYS as readonly string[]).not.toContain(STORE);
     /* Which folders are unfolded is this browser's view, like a scroll position. */
     expect(PREF_KEYS as readonly string[]).not.toContain(SIDEBAR_FOLDERS);
+    /* Nor which kinds of file its tree hides — the same view state, for the same reason (#360). */
+    expect(PREF_KEYS as readonly string[]).not.toContain(SIDEBAR_HIDDEN);
     /* Nor is whether the Tasks page is a list or a board. */
     expect(PREF_KEYS as readonly string[]).not.toContain(TASKS_VIEW);
     /* Nor whether a run's About panel is folded away. */
@@ -181,6 +204,12 @@ describe("the preference list", () => {
     /* Nor the five models this browser picked last: a quick choice here need not become a list on
        every other machine, and the picker works without it. */
     expect(PREF_KEYS as readonly string[]).not.toContain(RECENT_KEY);
+    /* Nor the logs answer an off build is holding for the first one that can carry it (#326): it is
+       the install's answer in transit, not a preference that travels with the settings. */
+    expect(PREF_KEYS as readonly string[]).not.toContain(TELEMETRY_PENDING);
+    /* Nor which documents a window had open: that is the window's, kept in the app's home or, with
+       sync off, here — never carried to another machine as a setting (#264). */
+    expect(PREF_KEYS as readonly string[]).not.toContain(SAVED_TABS);
   });
 
   it("splits into the account's half and the vault's, with nothing in both or neither", () => {
@@ -191,6 +220,13 @@ describe("the preference list", () => {
     expect([...VAULT_PREF_KEYS].sort()).toEqual(["dag:attachments", "dag:favourites", "dag:templates", "dag:update-links"]);
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:theme");
     expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:ai");
+    /* The Assistant's panel width is how this person reads beside a page, like the inspector's:
+       it travels with them, and another vault does not have its own. */
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:assistant-w");
+    expect(VAULT_PREF_KEYS as readonly string[]).not.toContain("dag:assistant-w");
+    /* How big this person reads their notes and the app is theirs too, in every vault (#325). */
+    expect(ACCOUNT_PREF_KEYS as readonly string[]).toContain("dag:text-size");
+    expect(VAULT_PREF_KEYS as readonly string[]).not.toContain("dag:text-size");
   });
 
   it("has no duplicates, because a key adopted twice is a key written twice", () => {

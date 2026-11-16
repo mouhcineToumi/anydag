@@ -320,6 +320,11 @@ export interface BoardTree {
    */
   events: Readonly<Record<string, NoteEvent>>;
   /**
+   * Each text's tags, by name — its frontmatter's `tags:`, every kind but an attachment, a template's
+   * left out. What a row's chips and the Tasks page's filter read.
+   */
+  tags: Readonly<Record<string, readonly string[]>>;
+  /**
    * The folder the vault's note templates are in — the setting, or `Templates` when that exists — or
    * `null` for none. What the calendar leaves out: a template is a note to copy, not one written on
    * the day it was made. The server already leaves a template out of `tasks`, `projects` and `events`.
@@ -357,6 +362,7 @@ const NO_BOARDS: BoardTree = {
   tasks: {},
   projects: {},
   events: {},
+  tags: {},
   templates: null,
   created: {},
   ids: {},
@@ -371,7 +377,7 @@ const NO_BOARDS: BoardTree = {
 export type KindLists = Pick<BoardTree, "boards" | "notes" | "quizzes" | "tables" | "files">;
 
 /** The names of one kind of file in a tree. The one place a kind picks its list. */
-function namesOf(tree: KindLists, kind: FileKind): string[] {
+export function namesOf(tree: KindLists, kind: FileKind): string[] {
   switch (kind) {
     case "board":
       return tree.boards;
@@ -392,9 +398,23 @@ function namesOf(tree: KindLists, kind: FileKind): string[] {
 export const everyFile = (tree: KindLists): { name: string; kind: FileKind }[] =>
   FILE_KINDS.flatMap((kind) => namesOf(tree, kind).map((name) => ({ name, kind })));
 
+/**
+ * Whether a change to a task is one a row would draw. *Last changed* is said to the minute at best
+ * ("now", "5m"), so a note typed in every quarter-second is not a redraw of the whole list each time:
+ * a `changed` under a minute on is the same.
+ */
 const sameTask = (a: Task | undefined, b: Task | undefined): boolean =>
-  a?.status === b?.status && a?.due === b?.due && a?.start === b?.start;
+  a?.status === b?.status &&
+  a?.priority === b?.priority &&
+  a?.due === b?.due &&
+  a?.start === b?.start &&
+  a?.body === b?.body &&
+  a?.items?.done === b?.items?.done &&
+  a?.items?.total === b?.items?.total &&
+  Math.abs((a?.changed ?? 0) - (b?.changed ?? 0)) < 60_000;
 const sameEvent = (a: NoteEvent | undefined, b: NoteEvent | undefined): boolean => a?.start === b?.start && a?.end === b?.end;
+const sameTags = (a: readonly string[] | undefined, b: readonly string[] | undefined): boolean =>
+  (a?.length ?? 0) === (b?.length ?? 0) && (a ?? []).every((t, i) => t === b?.[i]);
 const sameProject = (a: Project | undefined, b: Project | undefined): boolean => a?.status === b?.status && a?.hue === b?.hue;
 
 /** A listing as the server sent it, or as this browser kept it, with every field it lacks made empty. */
@@ -409,6 +429,7 @@ function treeOf(d: Partial<BoardTree>, fresh: boolean): BoardTree {
     tasks: d.tasks ?? {},
     projects: d.projects ?? {},
     events: d.events ?? {},
+    tags: d.tags ?? {},
     templates: d.templates ?? null,
     created: d.created ?? {},
     ids: d.ids ?? {},
@@ -560,17 +581,21 @@ export function useBoardList(who: string | null = null): BoardList {
       if (kind === "note" && change.event === undefined) return load();
       /* And a quiz's how many questions it asks, for the same reason. */
       if (kind === "quiz" && typeof change.questions !== "number") return load();
+      /* And every text's tags, for the same reason. */
+      if (kind !== "file" && change.tags === undefined) return load();
       const title = change.title ?? undefined;
       const task = kind === "note" ? (change.task ?? undefined) : undefined;
       const project = kind === "note" ? (change.project ?? undefined) : undefined;
       const event = kind === "note" ? (change.event ?? undefined) : undefined;
       const asks = kind === "quiz" ? (change.questions as number) : undefined;
+      const tags = kind !== "file" && change.tags?.length ? change.tags : undefined;
       if (
         t.titles[change.name] === title &&
         sameTask(t.tasks[change.name], task) &&
         sameProject(t.projects[change.name], project) &&
         sameEvent(t.events[change.name], event) &&
-        t.questions[change.name] === asks
+        t.questions[change.name] === asks &&
+        sameTags(t.tags[change.name], tags)
       )
         return;
       setTree((was) => {
@@ -589,7 +614,10 @@ export function useBoardList(who: string | null = null): BoardList {
         const questions = { ...was.questions };
         if (asks === undefined) delete questions[change.name];
         else questions[change.name] = asks;
-        return { ...was, titles, tasks, projects, events, questions };
+        const tagged = { ...was.tags };
+        if (tags === undefined) delete tagged[change.name];
+        else tagged[change.name] = tags;
+        return { ...was, titles, tasks, projects, events, questions, tags: tagged };
       });
       /* A list already on its way was asked before this change, and would put the old title back. */
       lister.stale();
@@ -769,10 +797,11 @@ export const blankTaskText = (status: TaskStatus = "todo", title: string = UNTIT
  * What an event made from the sidebar or the calendar starts as: a note titled as asked —
  * *Untitled* from the sidebar, which names it in its title field — with a `start:` and an `end:`, the
  * whole of what makes it an event. The times are written with their offset (`timeOf`); a date alone
- * is all day.
+ * is all day. `body` is the text under the frontmatter — the calendar's card puts a description
+ * there.
  */
-export const blankEventText = (start: string, end?: string, title: string = UNTITLED): string =>
-  `---\ntitle: ${titleScalar(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n`;
+export const blankEventText = (start: string, end?: string, title: string = UNTITLED, body = ""): string =>
+  `---\ntitle: ${titleScalar(title)}\nstart: ${start}\n${end ? `end: ${end}\n` : ""}---\n${body}`;
 
 export const createBoard = async (name: string, text?: string): Promise<Made> =>
   made("create", { name, text: text ?? newBoardText(name) });

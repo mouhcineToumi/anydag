@@ -251,7 +251,9 @@
   literally.** The panel's remembered width is `--inspector-w` for exactly that reason: no theme has
   an opinion about how wide somebody dragged their editor, and naming it `--dag-inspector-w` demanded
   a key in all three themes. Same argument as `chrome.css` itself. `--canvas-x` and `--canvas-w`
-  are the second pair to be named this way, for the same reason.
+  are the second pair to be named this way, for the same reason; `--text-scale`,
+  `--chrome-text-*` and `--chrome-note-*` (#325) are the third, because how big a person reads is
+  no theme's decision.
 - **`.dag-body` is not the canvas, and five floating things were positioned as though it were.**
   The dock, the selection bar, the problems dock, the which-key strip and the zoom cluster are
   `position: absolute` inside `.dag-body` — right, because it keeps them out of the flex tree and
@@ -330,7 +332,12 @@
   **the session deleted after**, by the id its events carry, because a standalone run still writes
   one into the person's history — 1.x runs left a dozen behind. The thinking level is `model#variant`
   now. `opencodeComplete` in `plugins/generate/llm.ts` is all of it, `test/llm.test.ts` holds each,
-  and `opencodeReady` refuses a 1.x with "upgrade" rather than half-working.
+  and `opencodeReady` refuses a 1.x with "upgrade" rather than half-working. A sixth, for safety
+  rather than for the run: **`OPENCODE_DISABLE_PROJECT_CONFIG=1`** (and `OPENCODE_DISABLE_CLAUDE_CODE=1`),
+  set by `opencodeEnv`. The throwaway directory is under the OS temp dir, and OpenCode reads
+  `opencode.json`, `.opencode/` and `AGENTS.md` in every folder above it up to `/` — a shared
+  `/tmp`, where 2.3 loaded another user's `opencode.json` and ran a plugin from their `.opencode/` as
+  the person (#10). The config in `OPENCODE_CONFIG_CONTENT` is still read with the walk off.
 - **A stub is a claim about another module, and a wrong one passes every test.** The MCP tests
   stubbed the grammar once with a `{sheets: [...]}` shape `GET /dsl` had never returned, and a
   resource raised on every call while nineteen tests agreed it was fine. The rule is not "do
@@ -341,8 +348,9 @@
   channel is one `EventSource` per page, and an `<img src>` pointing at an attachment is another
   request no script dresses. In the desktop app the main process adds the header to every request
   on its scheme, so neither notices; in a browser it is the `anydag_token` cookie, which rides on
-  both with no client change. A token in the query string would be a credential in every log there
-  is, which is why `/?token=` is accepted once and then taken out of the address.
+  both — bound to the secret path `/s/<secret>/` that `scopeUrl` puts every API URL under (#339,
+  see *The token is a header from a shell…* below). A token in the query string would be a credential
+  in every log there is, which is why `/?token=` is accepted once and then taken out of the address.
 - **A `server.json` names a port, it does not prove who holds it.** The app home is shared with
   `anydag serve`, and a file an earlier one left behind — a closed terminal, before `SIGHUP` was
   handled, or a crash — names a port that another local user may be listening on now. The desktop
@@ -352,8 +360,10 @@
 - **`?snapshot=1` strips the chrome, never the token.** Every Playwright check and both scripts
   open a board that way, and an exemption would be a query string any page on the machine could
   load. `scripts/session.mjs`, `e2e/global-setup.ts` and the CLI's `snapshot` find the token
-  (`ANYDAG_TOKEN`, else `server.json` in `ANYDAG_HOME`, `.dev-home/` or `~/.anydag`) and hand the
-  browser the `anydag_token` cookie.
+  (`ANYDAG_TOKEN`, else `server.json` in `ANYDAG_HOME`, `.dev-home/` or `~/.anydag`). Against
+  `anydag serve` a browser context is let in by opening `/?token=…` once, as a person is
+  (`enter()` in `scripts/session.mjs`, the CLI's `openPage`): a cookie seeded on `/` is no
+  credential there any more. Behind Vite the proxy adds the header and nothing is opened.
 - **A context made through Playwright's `browser` fixture inherits everything in `use`.** Not just
   `baseURL` — `storageState` too. So `browser.newContext()` in a test that wanted a browser which
   had never been here before arrived with the suite's stored state, the very mechanism it was
@@ -362,6 +372,16 @@
   is written on a debounce; toggle the library and reload inside it and the older copy is what
   gets adopted, which reads as a click that did not register rather than as a sync. The bundle
   carries `at` and the browser keeps its own, and the newer one wins — `settings/sync.ts`.
+- **A preference written inside a state updater is written while React renders.** React runs an
+  updater again in the render that applies it as soon as a second update is waiting on the
+  component — the eager computation at dispatch is skipped then — so `Shell`'s
+  `writeFlag(SIDEBAR, …)` in `setDocked`'s updater fired `dag:prefs` during `Shell`'s render. The
+  sidebar's own listener (`useAttachmentsFolder`) answered with `setAt`, and React logged *Cannot
+  update a component (`Sidebar`) while rendering a different component (`Shell`)*; the e2e specs
+  count console output, so a run failed now and then (#352). **An updater is pure**: what follows a
+  change goes in an effect keyed on it (`usePersisted` in `Shell.tsx`) or after the call returns.
+  `test/shell-updaters.test.ts` refuses a `writePref`, `writeFlag` or `writeLocal` inside a `set…`
+  updater.
 - **Every span writer moves the key it rewrites to the end of the statement.** `writeModifier` cuts
   the old span and splices the new one at `insertAt`, so `x=0 y=0 w=120 h=48` rewritten on the x
   axis comes back `y=0 h=48 x=0 w=240`. It is uniform, it is stable after the first write, and it is
@@ -513,13 +533,22 @@
   (`settleVault`), so the file its test wrote is in another one: every document request answers 404,
   the page says *Nothing open*, and Chromium prints each 404 on the console, which the suite counts as
   a failure (two `Failed to load resource` lines, from a `tables.spec.ts` run, are what it looks like).
-  A spec that loads a page and cannot afford that uses `vaulted(page, url)` from `e2e/vault.ts`, which
-  names the suite's vault in the address as a settled tab does; `tables.spec.ts`, `folders.spec.ts`,
-  `export.spec.ts` and `tidy.spec.ts` do, and the rest of the suite is exposed to it still.
-  **Such a page never reports `data-dag-ready`**: the board it asked for is in another vault, the
-  fetch answers 404, `board` stays `null` and no item reports a size — so a check that waits on ready
-  times out at its own line, with no 404 in its own output (which is how `tidy.spec.ts` failed once,
-  #40). The trace is what says which vault the page pinned.
+  **Every spec imports `test` from `e2e/fixture.ts`, never from `@playwright/test`**: a context init
+  script writes the suite's vault (`suiteVault`, `e2e/vault.ts`) into an address that names none,
+  before the page's own scripts run, so `settleVault` reads it off the URL and never asks which vault
+  is the default. A request a spec makes itself (`page.request`, the `request` fixture) to a document
+  route with no `vault=` is answered by the default too (`s.within` in `server/app.ts`), so the same
+  fixture adds the suite's vault to those, by the page's own rule (`scopeUrl`). A check that is *about* the default — a bare `/`, a link to a vault that is not
+  open — passes `onServerDefault` beside its title and gets no pin; `vaults.spec.ts` is the only file
+  that should, and a spec that imports from the package has no pin and no symptom until a loaded
+  machine widens the window, which is why `test/e2e-fixture.test.ts` refuses that import. Those checks also wait for the suite's vault to be the default again
+  before the page reads its vault list (`vaults.spec.ts`'s `waitForSuiteDefault`): under
+  `--repeat-each` beside the suite the default is another copy's vault for a moment, and a page that
+  settles there is a page the copy closes under it. **Such a page never reports `data-dag-ready`**:
+  the board it asked for is in another vault, the fetch answers 404, `board` stays `null` and no item
+  reports a size — so a check that waits on ready times out at its own line, with no 404 in its own
+  output (which is how `tidy.spec.ts` failed once, #40). The trace is what says which vault the page
+  pinned.
 - **Parking the canvas by writing its transform is not moving the view.** `export.spec.ts` set
   `.dag-layer`'s style and `data-zoom` by hand to get the item at 1:1. That paints the glass and not
   the `Viewport`'s record of it: `touched` stays false, so a later `fit()` — any change of the
@@ -725,16 +754,54 @@
   by port. The CLI's launcher checks its own bundle's inputs on every run (`cli/dist/meta.json`);
   the server's does not.
 - **The token is a header from a shell and a cookie for a browser, and never a value in page
-  script.** Every request carries the per-launch token (`x-anydag-token`, or the `anydag_token`
-  cookie), and the `Host` must be `127.0.0.1`, `localhost` or `[::1]` — anything else is a `421`,
-  because a page on `evil.example` resolved to `127.0.0.1` still says its own name. Both checks are
-  needed: a "simple" `POST` from any website the person has open needs no preflight, so without the
-  token any site could write into a vault. The desktop shell adds the header in the main process;
-  `anydag serve` prints `/?token=…` once and swaps it for an `httpOnly`, `SameSite=Strict` cookie and
-  a redirect; Vite's proxy adds the header in development, after refusing anything that is not this
-  page. `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script
-  that `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401`
-  as an empty list.
+  script.** Every request to the API carries the per-launch token (`x-anydag-token`, or the
+  `anydag_token` cookie), and the `Host` must be `127.0.0.1`, `localhost` or `[::1]` — anything else
+  is a `421`, because a page on `evil.example` resolved to `127.0.0.1` still says its own name. Both
+  checks are needed: a "simple" `POST` from any website the person has open needs no preflight, so
+  without the token any site could write into a vault. The desktop shell adds the header in the main
+  process, and Vite's proxy adds it in development, after refusing anything that is not this page.
+  `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script that
+  `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401` as
+  an empty list.
+
+  **A cookie is not bound to a port** (#339). Every `http://127.0.0.1:<port>` is the same site, so a
+  cookie on `/` is sent to whoever listens on any other port — another OS user — who reads it and
+  replays it as the header; a page on another site that sends the tab to that port, which then loads
+  an image from itself, is enough. `Path`, the cookie's name, another loopback address and `__Host-`
+  are none of them port-bound, and a separate session value is replayed as easily as the token. So
+  `anydag serve` binds the cookie to a **secret path** instead (`server/app.ts`): it mints a secret
+  per launch, serves the API both at the root — **the header only** — and under `/s/<secret>/`,
+  where the cookie counts too, and answers `/?token=…` with the cookie set with `Path=/s/<secret>/`
+  and a `302` to the same address with `#s=<secret>`. The fragment is never sent to a server; the
+  page takes it at boot, before its first request, keeps it in `localStorage` (per origin, port
+  included) and cleans the address (`src/vault/secret.ts`), and `scopeUrl` puts every `/__board` and
+  `/api` URL — `fetch`, both `EventSource`s, every `<img src>` and download — under it. The page
+  holds a path, not the token: the token is still only in the `HttpOnly` cookie. The prefix is taken
+  off before routing, by an outer app calling the routes on the rewritten URL — Hono's
+  `app.route('/s/:secret', …)` would leave it in `c.req.path` and the log's route template — so the
+  secret is in no route, log, error body or `server.json`, and `Referrer-Policy: no-referrer` keeps
+  an address under it out of every `Referer`. A wrong secret is a `401` like any other. The shell
+  and its assets at `/` answer with no credential: they hold no data. With no secret and a `401`,
+  the page says to open the address `anydag serve` printed, not that the server is not answering.
+
+  **What is left.** The cookie still reaches every port of `127.0.0.1` the browser is asked for a
+  path under the secret: only the secret keeps it from being sent there. A secret that leaks — out
+  of this origin's `localStorage`, the browser's history, a screen share of an attachment opened at
+  its address — reopens the attack until the server restarts and mints another. Because a page on
+  another port that learned it could also write, a write the cookie alone vouches for must still say
+  it came from this page's own origin (`Sec-Fetch-Site`, else `Origin`), or it is a `403` (#10).
+  `e2e/credential.spec.ts` replays the issue's table against a real `anydag serve`.
+- **A gate that reads the path must read it the way the router does, and deny what it does not
+  recognise.** The router decodes a path before it matches, so the first cut of the secret-path gate
+  (#339), which told the API from the page by a string test on the raw path and handed everything
+  else to the app that held the routes, let `/%61pi/vaults` and `/_%5Fboard/list` through to
+  `/api/vaults` and `/__board/list` — and their writes — with no credential at all, in every mode.
+  Now `kindOf` (`server/app.ts`) reads the path percent-decoded, slashes collapsed and in any case;
+  the API spelled any way but its own is a `400`; the routes refuse a request the gate did not hand
+  them; and the fall-through is an app with no route but the built page's files, served only from
+  inside its folder by real path (a neighbouring folder whose name begins the same was reachable
+  through `startsWith(root)`). `test/server/gate.test.ts` tries every spelling, at the root and under
+  the secret path, with a page and without.
 - **Opening a vault never writes a byte of it.** An existing `.md` with no `id:` is given one only
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
@@ -760,6 +827,14 @@
   or the label is text a paste reads back into the block. A node view that puts DOM of its own
   beside a `contentDOM` names it in `ignoreMutation`, or ProseMirror reads the block back off the DOM
   every time that DOM changes — a tick replacing a copy icon redrew the block, button and all.
+
+- **A spec handed to `BlockNoteSchema.create` twice comes out with BlockNote's default keyboard.**
+  `create` reads a spec's `experimental_keyboard` and writes `keyboard` in its place, and the second
+  time there is nothing to read. The editors built `BlockNoteSchema.create({ blockSpecs:
+  { ...noteSchema.blockSpecs, … } })`, so Enter in a bullet made a paragraph, a numbered list never
+  went on to 2., and an empty item did not end its list — in a note, on a board's `md` card and in a
+  quiz's field alike, with nothing failing (#385). Every schema is made from `noteBlockSpecs()`,
+  which returns specs nothing has built, each call fresh; `test/note-keyboard.test.ts` holds it.
 
 - **BlockNote registers the extensions a *block* spec carries, and drops an inline spec's without a
   word.** `createReactInlineContentSpec` takes an extensions argument and documents it as "mirroring
@@ -926,6 +1001,17 @@
   started again parses nothing that did not move. Measure a change to it with the worker's RSS
   counted (`serverMem` in `scripts/bench.mjs`), at rest as well as just after the work. To see the
   first half, allocate three million small objects, drop them, call `gc()`, and read `VmRSS`.
+- **FTS5 numbers its own rows past 2^53, and `node:sqlite` throws on any statement that reports one.**
+  Every `run()` answers the connection's `lastInsertRowid`, and once the search index (#267) has
+  written to its shadow tables that is a segment id FTS5 builds from bit fields — 9,007,474,132,647,936
+  in the first test that wrote one. As a JavaScript number it throws *Value is too large to be
+  represented*, from the next `run()` of *any* statement on that connection, an `update` of another
+  table included; the `Reader` took it for a shelf that failed and fell back to memory, so the rows on
+  disk stopped following the vault. Every statement on `parse.sqlite` reads integers as bigints
+  (`setReadBigInts(true)` in `Shelf.sql` and `WordIndex.sql`) and makes numbers where it reads them.
+- **SQLite's `bm25` is zero for an FTS5 table that keeps no positions.** `detail=none` and
+  `detail=column` store no term counts, so every hit ranks the same and the list comes back in rowid
+  order; the words index keeps `detail=full`.
 - **A deadline over work that grows with the vault is a deadline per step, not per question.** The
   grammar's worker is ended after 60 s without an answer (#9), and a cold `/index` of 50,000 notes is
   minutes of parsing: before #279 it was ended every time, the caller fell back to parsing
@@ -933,3 +1019,11 @@
   `Reader` now parses a chunk at a time and the worker says it is alive between chunks
   (`Reader.steps`, `{ alive }`), which resets the clock: a grammar stuck on one file is still ended,
   a big vault is not.
+- **A YAML block list may start at column 0, so a key's lines are not only the indented ones.**
+  `withKeys` (`src/note/task.ts`, every frontmatter writer's rule) took a key's line and the lines
+  indented under it as the key, which is right for a folded title and wrong for `tags:` followed by
+  `- a` at column 0 — the form Obsidian writes. Replacing or removing such a key left the `- a`
+  lines behind, under the new line or the key before it, which is YAML no reader here parses. Found
+  while designing tags (#327): a key's lines are now the line itself, the indented lines under it,
+  and the `- ` lines at column 0 that follow it, for every key. `test/fixtures/tags.json` and the
+  task and project fixtures hold it.

@@ -429,6 +429,23 @@ function createWindow(vaultId: string, search: string): BrowserWindow {
   /* Full screen hides the traffic lights, so the room the page keeps for them goes too. */
   win.on("enter-full-screen", () => win.webContents.send("window:full-screen", true));
   win.on("leave-full-screen", () => win.webContents.send("window:full-screen", false));
+  /* The mouse's back and forward buttons on Windows and Linux arrive here, not in the DOM. The
+     page walks its own history (`src/ui/history.ts`); this only says which way. macOS has no
+     app-command and the page hears the two buttons itself. */
+  win.on("app-command", (_event, command) => {
+    if (command === "browser-backward") win.webContents.send("history:go", "back");
+    else if (command === "browser-forward") win.webContents.send("history:go", "forward");
+  });
+  /* Ctrl/⌘+W closes the window in the menu Electron gives every window, and a menu's accelerator
+     wins over the page. The page's tabs own it (`src/ui/tabs/keys.ts`): taken here before the menu
+     sees it, and sent on. Closing the window stays where it was, in the title bar and the app menu. */
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown" || input.alt || input.shift) return;
+    const mod = process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta;
+    if (!mod || input.key.toLowerCase() !== "w") return;
+    event.preventDefault();
+    win.webContents.send("tabs:close");
+  });
   win.on("closed", () => {
     if (windows.get(vaultId) === win) windows.delete(vaultId);
   });

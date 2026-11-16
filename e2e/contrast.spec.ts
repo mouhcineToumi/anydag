@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS, boardId, openBoards } from "./boards";
 import { auditContrast, type ContrastAudit } from "./contrast";
-import { vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
 
 /**
  * Text in the chrome, measured rather than eyeballed.
@@ -113,20 +112,20 @@ test("chrome text meets contrast on the six pages in Paper and Paper dark", asyn
   failures.length = 0;
   for (const theme of ["paper", "paper-dark"]) {
     /* Home: the welcome card and the shell around it. */
-    await page.goto(await vaulted(page, `/?theme=${theme}`));
+    await page.goto(`/?theme=${theme}`);
     await expect(page.locator("[data-dag-welcome]")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await check(page, ".dag-shell", `${theme} / home`);
 
     /* A board: the toolbar, the dock and the page's own chrome; the drawing is skipped. */
-    await page.goto(await vaulted(page, `/?board=${board()}&theme=${theme}`));
+    await page.goto(`/?board=${board()}&theme=${theme}`);
     await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
     await settle(page, theme);
     await check(page, ".dag-shell", `${theme} / board`);
 
     /* A note: the title, the editor's prose and the backlink strip. */
-    await page.goto(await vaulted(page, `/?note=${note()}&theme=${theme}`));
+    await page.goto(`/?note=${note()}&theme=${theme}`);
     await expect(page.locator("[data-dag-note-view]")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -139,7 +138,7 @@ test("chrome text meets contrast on the six pages in Paper and Paper dark", asyn
     await check(page, "[data-dag-boards]", `${theme} / search`, { placeholders: true });
 
     /* Tasks: the groups, their counts, every row and the quick-add row. */
-    await page.goto(await vaulted(page, `/?tasks=1&theme=${theme}`));
+    await page.goto(`/?tasks=1&theme=${theme}`);
     await page.locator("[data-dag-tasks-filter]").fill(folder);
     await expect(page.locator(`[data-dag-task-row="${folder}/task"]`)).toBeVisible({ timeout: 15_000 });
     await page.evaluate(() => document.fonts.ready);
@@ -148,7 +147,7 @@ test("chrome text meets contrast on the six pages in Paper and Paper dark", asyn
 
     /* The calendar: day names, the hour gutter, the Show menu and the items on the week. */
     const id = await boardId(page, project());
-    await page.goto(await vaulted(page, `/?project=${id}&calendar=week&date=2031-03-15&theme=${theme}`));
+    await page.goto(`/?project=${id}&calendar=week&date=2031-03-15&theme=${theme}`);
     await expect(page.locator("[data-dag-calendar]")).toBeVisible();
     await expect(page.locator(`[data-dag-cal-item="${event()}"]`).first()).toBeVisible({ timeout: 15_000 });
     await page.locator("[data-dag-calendar-show]").click();

@@ -42,7 +42,7 @@ import { LayoutDashboard, Sigma } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { load, saved, settle, type Loaded, type NoteBlock } from "@/note/markdown";
-import { noteSchema } from "@/note/schema";
+import { noteBlockSpecs, noteSchema } from "@/note/schema";
 import { readIndex } from "@/refs/useIndex";
 
 import { codeBlock } from "./code";
@@ -55,22 +55,23 @@ import { syntaxColours } from "./syntax";
 const inlineContentSpecs = { ...noteSchema.inlineContentSpecs, ref: refInline, math: mathInline };
 
 const cardSchema = BlockNoteSchema.create({
-  blockSpecs: { ...noteSchema.blockSpecs, codeBlock: codeBlock(), embed: embedBlock(), equation: equationBlock() },
+  blockSpecs: { ...noteBlockSpecs(), codeBlock: codeBlock(), embed: embedBlock(), equation: equationBlock() },
   inlineContentSpecs,
   styleSpecs: noteSchema.styleSpecs,
 });
 
 const lineSchema = BlockNoteSchema.create({
-  blockSpecs: { paragraph: noteSchema.blockSpecs.paragraph },
+  blockSpecs: { paragraph: noteBlockSpecs().paragraph },
   inlineContentSpecs,
   styleSpecs: noteSchema.styleSpecs,
 });
 
 const own: Record<string, unknown> = { codeBlock: codeBlock(), embed: embedBlock(), equation: equationBlock() };
+const fieldSpecs = noteBlockSpecs();
 const blockSchema = BlockNoteSchema.create({
   blockSpecs: Object.fromEntries(
-    FIELD_BLOCKS.map((t) => [t, own[t] ?? noteSchema.blockSpecs[t as keyof typeof noteSchema.blockSpecs]]),
-  ) as unknown as typeof noteSchema.blockSpecs,
+    FIELD_BLOCKS.map((t) => [t, own[t] ?? fieldSpecs[t as keyof typeof fieldSpecs]]),
+  ) as unknown as ReturnType<typeof noteBlockSpecs>,
   inlineContentSpecs,
   styleSpecs: noteSchema.styleSpecs,
 });

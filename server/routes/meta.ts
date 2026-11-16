@@ -24,6 +24,9 @@ import { validId } from "../ids";
 import { aliveOf, answersOf, counts, graduateOf, GRADUATE_MAX, GRADUATE_MIN, pool, PracticeRefused, statsOf } from "../practice";
 import { readPrefs, SETTINGS_MAX, writePrefs, type Scope } from "./prefs";
 
+/** A window's tabs, saved: a few hundred tabs' places is far less. */
+const TABS_MAX = 64 * 1024;
+
 const PROMPT_MAX = 4000;
 const SOURCE_MAX = 16000;
 /** A note made into flashcards: larger than a diagram's source, since a page of revision notes is the point. */
@@ -93,6 +96,37 @@ export function metaRoutes(app: Hono, s: Session): void {
   };
   prefs("app");
   prefs("vault");
+
+  /* -- the window's document tabs (#264) ---------------------------------------------------- */
+
+  /* Which documents the window had open in this vault, and which was in front: kept in the app's
+     home, keyed by the vault's id — never in the vault, whose bytes are the person's documents and
+     which a sync would carry to a machine whose window has other tabs. Opaque here, as preferences
+     are: `src/ui/tabs/saved.ts` reads it back and drops what does not parse. */
+  const tabsKey = () => `tabs:${s.vault.id}`;
+  app.get("/api/tabs", (c) => {
+    const raw = s.home.get(tabsKey());
+    let tabs: unknown = null;
+    try {
+      tabs = raw ? (JSON.parse(raw) as unknown) : null;
+    } catch {
+      tabs = null;
+    }
+    return c.json({ tabs });
+  });
+  app.put("/api/tabs", async (c) => {
+    const body = await bodyOf(c);
+    const value = body.tabs;
+    if (value === null) {
+      s.home.set(tabsKey(), null);
+      return c.json({ tabs: null });
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw err(400, "expected `tabs` to be an object or null");
+    const text = JSON.stringify(value);
+    if (text.length > TABS_MAX) throw err(413, `tabs are at most ${TABS_MAX} bytes`);
+    s.home.set(tabsKey(), text);
+    return c.json({ tabs: value });
+  });
 
   /* -- saved components -------------------------------------------------------------------- */
 

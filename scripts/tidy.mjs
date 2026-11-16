@@ -21,7 +21,7 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-import { signIn, storageState } from "./session.mjs";
+import { signIn, enter } from "./session.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -112,8 +112,8 @@ exit 0 done · 3 not tidy (--check) · 5 not ready · 6 no server`);
   const browser = await launch(chromium);
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1200 },
-    storageState: storageState(session.cookie),
   });
+  await enter(context, origin, session.cookie);
   const page = await context.newPage();
   const q = new URLSearchParams({ board, snapshot: "1" });
   if (theme) q.set("theme", theme);

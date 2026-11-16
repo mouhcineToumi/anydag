@@ -1,7 +1,23 @@
-import { CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, ListFilter, Lock } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  FileText,
+  ListFilter,
+  Lock,
+  Sun,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -18,17 +34,23 @@ import { blankEventText, createNote, setEvent, setTask, type BoardTree } from "@
 import {
   CAL_KINDS,
   CAL_LABEL,
+  DAY_MINUTES,
   MAX_DAYS,
   VIEWS,
+  addMonths,
   blocks,
   calendarDate,
   clock,
+  clockOf,
+  dayWords,
   daysBetween,
   daysFrom,
   fieldsOf,
   itemsOf,
   lanes,
+  minutesAt,
   momentAt,
+  monthDays,
   placeEvent,
   rangeOf,
   asAllDay,
@@ -36,9 +58,13 @@ import {
   placeTask,
   shiftEvent,
   shiftTask,
+  snapMinute,
   startOfMonth,
   taskEdge,
   withEdge,
+  withAllDay,
+  withEnd,
+  withStart,
   step,
   whenWords,
   type Bar,
@@ -46,9 +72,10 @@ import {
   type CalKind,
   type CalView,
 } from "@/calendar/model";
+import { menuKey, menuWithin } from "@/calendar/menu";
 import { useZone } from "@/calendar/usePrefs";
-import { dayOf, timeOf, type NoteEvent } from "@/note/event";
-import { wallOf } from "@/note/zone";
+import { dayOf, momentOf, timeOf, type NoteEvent } from "@/note/event";
+import { currentZone, wallOf, zoneName } from "@/note/zone";
 import { folderOf, projectFolders, projectFor, within, type Project } from "@/note/project";
 import { titleStem, type Task, type TaskChange } from "@/note/task";
 import { LOCK_HINT, refuseLocked, setLocked } from "@/settings/lock";
@@ -56,12 +83,16 @@ import { withVault } from "@/vault/current";
 
 import { startDrag } from "./pointerDrag";
 import { TaskGlyph } from "./TaskGlyph";
+import { IconButton, Switch } from "./controls";
 import { NO_PROJECT, type ProjectFilter } from "./projectFilter";
+import { tagMatches, type TagFilter } from "./tagFilter";
+import { TagSelect } from "./tags/TagFilter";
 import { collation } from "@/locale";
+import { middle, type NewTab } from "./tabs/intent";
 
 /**
  * The Calendar page: tasks, events and notes on one timeline, as a
- * month, a week, or a run of days — `?calendar=1`.
+ * month, a week (down its columns, or as rows with the hours across), or a run of days — `?calendar=1`.
  *
  * Nothing here is a copy of anything. The items are `/__board/list`'s `tasks`, `events` and
  * `created`, kept current by the change feed, placed by `src/calendar/model.ts` in the viewer's zone;
@@ -70,13 +101,18 @@ import { collation } from "@/locale";
  * is showing one project.
  *
  * **A drag on empty time makes an event**: in the hour grid a time, snapped to a quarter of an hour;
- * in the all-day row or a month's cell, days. The drag paints a ghost and nothing else, and a small
- * card asks for the title when it ends.
+ * in the all-day row or a month's cell, days. The drag paints a ghost and nothing else, and a card
+ * at the pointer then asks for its details — title, start and end, all day, description — with the
+ * title ready to type, so Enter makes it.
  *
  * **A drag on an event or a task moves it**, keeping how long it is: by days in a month and
  * the all-day row, by quarter hours and days in the hour grid. A press that does not move is still a
  * click that opens it. A note does not move — its day is the store's, the day it was made, and no
  * line of its file says it. Escape during the drag puts it back; a finger scrolls, as it always did.
+ *
+ * **A week or a run of days keeps a small month beside it** (`MiniMonth`): the month the view is on,
+ * today marked and the view's days tinted, a click that takes the view to a day, and arrows that move
+ * the small month alone.
  */
 
 /** How many lanes of bars a month's week shows before the rest are a count. */
@@ -86,11 +122,13 @@ const ALLDAY_LANES = 3;
 /** A drag in the hour grid lands on quarters of an hour; a click makes an hour on the half hour. */
 const SNAP = 15;
 const CLICK = 30;
-const DAY_MINUTES = 1440;
 /** Under this many minutes a block has room for one line, so its time and title share it. */
 const SHORT_BLOCK = 45;
 /** Where the hour grid opens, scrolled to: a working morning rather than midnight. */
 const FIRST_HOUR = 7.5;
+
+/** What each view is called in the switch. `Rows` is the week turned: a day to a row, its hours across. */
+const VIEW_LABEL: Readonly<Record<CalView, string>> = { month: "Month", week: "Week", rows: "Rows", days: "Days" };
 
 /* Days are calendar squares (`calendarDate`), read in UTC whatever zone the page shows times in. */
 const WEEKDAY = new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" });
@@ -129,9 +167,22 @@ type Edge = "start" | "end";
 /**
  * How a bar or a block is picked up: the press, what to call once it has become a drag — so the
  * click the release would send does not also open what was only being moved — and, when the press
- * was on one of its ends, which.
+ * was on one of its ends, which. `axis` says which way that end runs, so the cursor during a pull
+ * follows the item rather than the cell it sits in.
  */
-type Grab = (item: CalItem, e: ReactPointerEvent<HTMLElement>, dragged: () => void, edge?: Edge) => void;
+type Grab = (item: CalItem, e: ReactPointerEvent<HTMLElement>, dragged: () => void, edge?: Edge, axis?: "x" | "y") => void;
+
+/** Open an item's menu at a point on the glass, having been asked by that item. */
+type AskMenu = (item: CalItem, at: { x: number; y: number }, source: HTMLElement) => void;
+
+/** What a right-click on a calendar item offers. */
+type MenuAction = "open" | "new-tab" | "duplicate" | "trash";
+
+/** An item's menu, open at the point it was asked for. */
+interface OpenMenu {
+  item: CalItem;
+  at: { x: number; y: number };
+}
 
 /** What a drag writes: an event's two lines, or a task's dates. */
 type Write = { event: { start: string; end: string | null } } | { task: Pick<TaskChange, "start" | "due"> };
@@ -158,7 +209,7 @@ function idle(item: CalItem, next: Write): boolean {
   return !!item.task && sameTask(applied(item.task, next.task), item.task);
 }
 
-/** A range somebody drew, waiting for its title. */
+/** A range somebody drew, waiting for its details. */
 interface Making {
   start: string;
   end: string | null;
@@ -177,8 +228,12 @@ export function CalendarView({
   onHidden,
   scope,
   onScope,
+  tagFilter = { kind: "all" },
+  onTagFilter,
   onGo,
   onOpen,
+  onDuplicate,
+  onTrash,
   locked = false,
 }: {
   list: BoardTree;
@@ -195,9 +250,17 @@ export function CalendarView({
   /** Which project's things to show — the address's `project=`, resolved to a name by the page. */
   scope: ProjectFilter;
   onScope(next: ProjectFilter): void;
+  /** Which tag's things to show — the address's `tag=`, over tasks, events and notes alike. */
+  tagFilter?: TagFilter;
+  onTagFilter?(next: TagFilter): void;
   /** Go somewhere else: another view, another day, another count. `day: null` is today. */
   onGo(next: { view?: CalView; day?: string | null; count?: number }): void;
-  onOpen(name: string): void;
+  /** Open a note — here, or in a new document tab (`tab`). */
+  onOpen(name: string, tab?: NewTab): void;
+  /** A copy of the item's file, beside it, opening nothing — `Shell`'s duplicate. */
+  onDuplicate(name: string): void;
+  /** Into the trash, with the notice whose Undo puts it back — `Shell`'s Delete. */
+  onTrash(name: string): void;
   /** Read only: nothing is made by a drag or a click on empty time, and nothing is moved. */
   locked?: boolean;
 }) {
@@ -228,8 +291,9 @@ export function CalendarView({
   const scoped = scope.kind === "project" ? folderOf(scope.name) : scope.kind === "none" ? null : undefined;
   const inScope = useCallback(
     (name: string) =>
-      scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped),
-    [scoped, owners],
+      (scoped === undefined ? true : scoped === null ? projectFor(name, owners) === undefined : within(name, scoped)) &&
+      tagMatches(tagFilter, list.tags[name]),
+    [scoped, owners, tagFilter, list.tags],
   );
 
   /* What this page has moved and the list does not say yet, by name — the Tasks page's
@@ -291,20 +355,54 @@ export function CalendarView({
   );
 
   /* A new event is made in the folder of the project the page is showing, as a task typed into the
-     Tasks page is. */
+     Tasks page is. The card hands over the event it settled on — its times already written in the
+     viewer's zone — and the words typed under them. */
   const into = scoped ?? "";
   const make = useCallback(
-    async (title: string, start: string, end: string | null) => {
+    async (title: string, when: NoteEvent, description: string) => {
       if (locked) return void refuseLocked();
       const t = title.trim() || "Untitled";
       const stem = titleStem(t) || "untitled";
-      await createNote(into ? `${into}/${stem}` : stem, blankEventText(start, end ?? undefined, t));
+      const body = description.trim();
+      await createNote(into ? `${into}/${stem}` : stem, blankEventText(when.start, when.end, t, body ? `${body}\n` : ""));
     },
     [into, locked],
   );
 
   const ask = useCallback((start: string, end: string | null, x: number, y: number) => setMaking({ start, end, x, y }), []);
   const open = useCallback((name: string) => onOpen(name), [onOpen]);
+
+  /* The item menu: where the pointer or the keyboard asked for it, and what it is about. The
+     element that asked keeps the focus to come back to — a keyboard's menu that closed onto nothing
+     would leave the page's next Tab starting from the top. */
+  const [menu, setMenu] = useState<OpenMenu | null>(null);
+  const askedBy = useRef<HTMLElement | null>(null);
+  const openMenu = useCallback<AskMenu>((item, at, source) => {
+    askedBy.current = source;
+    setMenu({ item, at });
+  }, []);
+  const closeMenu = useCallback((back: boolean) => {
+    setMenu(null);
+    const source = askedBy.current;
+    askedBy.current = null;
+    if (back && source?.isConnected) source.focus();
+  }, []);
+  const pick = useCallback(
+    (what: MenuAction) => {
+      if (!menu) return;
+      const name = menu.item.name;
+      /* The menu shuts before the action runs, as every menu here does — and only Duplicate leaves
+         the item it was asked about on the glass to put the focus back on. */
+      closeMenu(what === "duplicate");
+      if (what === "open") onOpen(name);
+      /* Behind this page, as a document tab (#264): the calendar stays where it was. */ else if (what === "new-tab")
+        onOpen(name, "behind");
+      else if (what === "duplicate") onDuplicate(name);
+      else onTrash(name);
+    },
+    [menu, closeMenu, onOpen, onDuplicate, onTrash],
+  );
+
   const scopeValue = scope.kind === "project" ? scope.name : scope.kind === "none" ? NO_PROJECT : "";
 
   return (
@@ -356,7 +454,7 @@ export function CalendarView({
                   data-dag-calendar-view={v}
                   onClick={() => onGo({ view: v })}
                 >
-                  {v === "month" ? "Month" : v === "week" ? "Week" : "Days"}
+                  {VIEW_LABEL[v]}
                 </button>
               ))}
             </div>
@@ -384,12 +482,24 @@ export function CalendarView({
               scope={scope}
               scopeValue={scopeValue}
               onScope={onScope}
+              list={list}
+              tagFilter={tagFilter}
+              onTagFilter={(next) => onTagFilter?.(next)}
             />
           </span>
         </div>
       </div>
       {view === "month" && phone ? (
-        <DotMonth first={first} last={last} month={day.slice(0, 7)} around={day} today={today} items={items} onOpen={open} />
+        <DotMonth
+          first={first}
+          last={last}
+          month={day.slice(0, 7)}
+          around={day}
+          today={today}
+          items={items}
+          onOpen={open}
+          onMenu={openMenu}
+        />
       ) : view === "month" ? (
         <Month
           first={first}
@@ -398,21 +508,42 @@ export function CalendarView({
           today={today}
           items={items}
           onOpen={open}
+          onMenu={openMenu}
           onAsk={ask}
           onWrite={locked ? undefined : onWrite}
           onDay={(d) => onGo({ view: "days", day: d, count: 1 })}
         />
       ) : (
-        <Columns
-          days={daysFrom(first, last)}
-          today={today}
-          items={items}
-          onOpen={open}
-          onAsk={ask}
-          onWrite={locked ? undefined : onWrite}
-        />
+        /* The week — down its columns, or across the rows view — or the run of days, with a small
+           month beside it: the whole month is what a week does not say, and it stays while the grid
+           scrolls. */
+        <div className="dag-calendar__body">
+          {view === "rows" ? (
+            <Rows
+              days={daysFrom(first, last)}
+              today={today}
+              items={items}
+              onOpen={open}
+              onMenu={openMenu}
+              onAsk={ask}
+              onWrite={locked ? undefined : onWrite}
+            />
+          ) : (
+            <Columns
+              days={daysFrom(first, last)}
+              today={today}
+              items={items}
+              onOpen={open}
+              onMenu={openMenu}
+              onAsk={ask}
+              onWrite={locked ? undefined : onWrite}
+            />
+          )}
+          <MiniMonth day={day} first={first} last={last} today={today} weekStart={weekStart} onGo={(d) => onGo({ day: d })} />
+        </div>
       )}
       {making ? <NewEvent making={making} locked={locked} onMake={make} onClose={() => setMaking(null)} /> : null}
+      {menu ? <ItemMenu menu={menu} locked={locked} onPick={pick} onClose={() => closeMenu(true)} /> : null}
     </main>
   );
 }
@@ -441,6 +572,9 @@ function ShowMenu({
   scope,
   scopeValue,
   onScope,
+  list,
+  tagFilter,
+  onTagFilter,
 }: {
   hidden: ReadonlySet<CalKind>;
   onHidden(kind: CalKind, hide: boolean): void;
@@ -448,6 +582,9 @@ function ShowMenu({
   scope: ProjectFilter;
   scopeValue: string;
   onScope(next: ProjectFilter): void;
+  list: BoardTree;
+  tagFilter: TagFilter;
+  onTagFilter(next: TagFilter): void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -470,7 +607,9 @@ function ShowMenu({
       removeEventListener("keydown", esc, true);
     };
   }, [open]);
-  const held = hidden.size + (scope.kind === "all" ? 0 : 1);
+  const held = hidden.size + (scope.kind === "all" ? 0 : 1) + (tagFilter.kind === "all" ? 0 : 1);
+  /* The tags of what the calendar can draw: tasks, events and notes, whichever are on. */
+  const tagged = useMemo(() => list.notes.filter((n) => list.tags[n]?.length), [list.notes, list.tags]);
   return (
     <div className="dag-calendar__show" ref={box}>
       <button
@@ -541,6 +680,19 @@ function ShowMenu({
               </select>
             </>
           ) : null}
+          {tagged.length || tagFilter.kind !== "all" ? (
+            <>
+              <p className="dag-calendar__show-head">Tag</p>
+              <TagSelect
+                list={list}
+                names={tagged}
+                filter={tagFilter}
+                onFilter={onTagFilter}
+                label="Show the calendar tagged"
+                hook={{ "data-dag-calendar-tag": "" }}
+              />
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -561,6 +713,92 @@ function useToday(): string {
   return dayOf(now);
 }
 
+/**
+ * A small month beside a week or a run of days: the month the view is on, today marked, the days the
+ * view shows tinted, and a click on a day that takes the view to it. **Its arrows move the month on
+ * its own** — the view and the address stay where they are until a day is picked, so looking three
+ * weeks ahead costs the week being read nothing.
+ *
+ * It opens on the view's month and follows it when the view moves to another; a month its arrows
+ * chose is kept while the view stays on the day it was asked from. It draws no events — out of the
+ * issue's scope — and does no date arithmetic of its own: the weeks are `monthDays`, the month view's
+ * own range, so *Weeks start on* reaches this grid as it reaches the one above, and today is the
+ * page's `useToday`, which reads the viewer's zone. Under 720px it is not drawn: a week's seven
+ * columns already have the phone's whole width.
+ */
+function MiniMonth({
+  day,
+  first,
+  last,
+  today,
+  weekStart,
+  onGo,
+}: {
+  /** The day the view is around: the month shown is its own, until the arrows say otherwise. */
+  day: string;
+  /** The days the view shows, which are tinted. */
+  first: string;
+  last: string;
+  today: string;
+  /** The day a week starts on, `0` for Sunday — the account's (`WEEK_START`). */
+  weekStart: number;
+  onGo(day: string): void;
+}) {
+  const here = startOfMonth(day);
+  /* The month the arrows chose, and the day the view was on when they did: a view that moves to
+     another day follows itself again. */
+  const [moved, setMoved] = useState<{ month: string; from: string } | null>(null);
+  const month = moved?.from === day ? moved.month : here;
+  const days = monthDays(month, weekStart);
+  const move = (by: number) => setMoved({ month: addMonths(month, by), from: day });
+  return (
+    <aside className="dag-cal-mini" data-dag-cal-mini={month.slice(0, 7)} aria-label="Month overview">
+      <div className="dag-cal-mini__head">
+        <h2 className="dag-cal-mini__title" data-dag-cal-mini-title="">
+          {MONTH.format(calendarDate(month))}
+        </h2>
+        <span className="dag-cal-mini__step">
+          <IconButton
+            size="sm"
+            aria-label="Previous month"
+            title="Previous month"
+            data-dag-cal-mini-prev=""
+            onClick={() => move(-1)}
+          >
+            <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
+          <IconButton size="sm" aria-label="Next month" title="Next month" data-dag-cal-mini-next="" onClick={() => move(1)}>
+            <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
+        </span>
+      </div>
+      <div className="dag-cal-mini__grid">
+        {days.slice(0, 7).map((d) => (
+          <span key={`name-${d}`} className="dag-cal-mini__name" aria-hidden="true">
+            {WEEKDAY.format(calendarDate(d)).slice(0, 2)}
+          </span>
+        ))}
+        {days.map((d) => (
+          <button
+            key={d}
+            type="button"
+            className="dag-cal-mini__day"
+            data-dag-cal-mini-day={d}
+            data-out={d.slice(0, 7) === month.slice(0, 7) ? undefined : ""}
+            data-today={d === today ? "" : undefined}
+            data-in-view={d >= first && d <= last ? "" : undefined}
+            aria-current={d === today ? "date" : undefined}
+            aria-label={d === today ? `${dayWords(d)}, today` : dayWords(d)}
+            onClick={() => onGo(d)}
+          >
+            {Number(d.slice(8, 10))}
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 /** Each kind's mark: a clock for an event, a page for a note, and a task's own status. */
 function KindMark({ kind, item }: { kind: CalKind; item?: CalItem }) {
   if (kind === "task") return <TaskGlyph status={item?.task?.status ?? "todo"} size={12} />;
@@ -570,7 +808,8 @@ function KindMark({ kind, item }: { kind: CalKind; item?: CalItem }) {
 
 /**
  * One thing on the calendar, as a link to its note: its mark, a timed event's hour, and its title.
- * The press is stopped, so it is never the start of a range somebody meant to draw.
+ * The press is stopped, so it is never the start of a range somebody meant to draw. A right-click,
+ * and `shift+F10` or the context-menu key on its focus, ask the page for its menu.
  */
 function ItemLink({
   item,
@@ -581,6 +820,7 @@ function ItemLink({
   grab,
   axis,
   onOpen,
+  onMenu,
 }: {
   item: CalItem;
   style?: CSSProperties;
@@ -593,6 +833,8 @@ function ItemLink({
   /** Which way its ends run, so they can be pulled: across for a bar, down for a block in the grid. */
   axis?: "x" | "y";
   onOpen(name: string): void;
+  /** The item's menu, at the pointer or under it. Absent where there is none to offer. */
+  onMenu?: AskMenu;
 }) {
   /* Set when the press became a drag, and cleared when the next press starts — never in `onClick`,
      which a drop that ends somewhere else never sends (the sidebar's lesson). */
@@ -627,7 +869,7 @@ function ItemLink({
         const edge = (e.target as HTMLElement).closest<HTMLElement>("[data-dag-cal-edge]")?.dataset.dagCalEdge as
           | Edge
           | undefined;
-        grab!(item, e, () => (moved.current = true), edge);
+        grab!(item, e, () => (moved.current = true), edge, axis);
       }}
       onClick={(e: ReactMouseEvent) => {
         if (moved.current) {
@@ -635,9 +877,28 @@ function ItemLink({
           moved.current = false;
           return;
         }
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        /* Shift alone is the browser's new window; Ctrl/⌘ is a tab of this window, which `open`
+           hears from the press itself (`tabs/intent.ts`). */
+        if ((e.shiftKey && !(e.metaKey || e.ctrlKey)) || e.button !== 0) return;
         e.preventDefault();
         onOpen(item.name);
+      }}
+      onAuxClick={middle(() => onOpen(item.name))}
+      /* The browser's own menu off an item, and ours in its place. On empty time neither the
+         calendar nor this answers one, so a right-drag there is still nothing at all. */
+      onContextMenu={(e: ReactMouseEvent<HTMLAnchorElement>) => {
+        if (!onMenu) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMenu(item, { x: e.clientX, y: e.clientY }, e.currentTarget);
+      }}
+      onKeyDown={(e: ReactKeyboardEvent<HTMLAnchorElement>) => {
+        if (!onMenu || !menuKey(e.key, e.shiftKey)) return;
+        e.preventDefault();
+        const r = e.currentTarget.getBoundingClientRect();
+        /* Under the item rather than at an imaginary pointer: the keyboard has none, and the item
+           is where the person is looking. */
+        onMenu(item, { x: r.left, y: r.bottom }, e.currentTarget);
       }}
     >
       <KindMark kind={item.kind} item={item} />
@@ -655,6 +916,103 @@ function ItemLink({
   );
 }
 
+/** What right-clicking a calendar item offers: open it here or in a tab, copy it, or trash it. */
+const MENU_ROWS: { what: MenuAction; label: string; icon: LucideIcon; changes?: boolean; danger?: boolean }[] = [
+  { what: "open", label: "Open", icon: ArrowUpRight },
+  { what: "new-tab", label: "Open in new tab", icon: ExternalLink },
+  { what: "duplicate", label: "Duplicate", icon: Copy, changes: true },
+  { what: "trash", label: "Move to trash", icon: Trash2, changes: true, danger: true },
+];
+
+const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+/**
+ * An item's menu — its right-click, the context-menu key or `shift+F10` — at the point that asked
+ * for it, or under the item when the keyboard did. **The sidebar's menu control**: `role="menu"`,
+ * rows of `dag-more__item` walked by the arrow keys, a `card` surface on the popover layer, a press
+ * elsewhere or Escape shutting it. Read only, the two rows that change a file give way to the
+ * lock's sentence, as a row's menu in the column does.
+ */
+function ItemMenu({
+  menu,
+  locked = false,
+  onPick,
+  onClose,
+}: {
+  menu: OpenMenu;
+  /** Read only: what only reads a file is left, and the menu says why the rest is not. */
+  locked?: boolean;
+  onPick(what: MenuAction): void;
+  onClose(): void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState(menu.at);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos(menuWithin(menu.at, r, { width: innerWidth, height: innerHeight }));
+    el.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [menu]);
+
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("pointerdown", down, true);
+    return () => document.removeEventListener("pointerdown", down, true);
+  }, [onClose]);
+
+  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      return onClose();
+    }
+    /* Tab leaves the menu, as it does the column's row menu: a menu is entered and left by Escape,
+       and Tab would otherwise land nowhere once its row is gone. */
+    if (e.key === "Tab") {
+      e.preventDefault();
+      return onClose();
+    }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const rows = Array.from(ref.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? []);
+    const at = rows.indexOf(document.activeElement as HTMLElement);
+    e.preventDefault();
+    rows[(at + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length]?.focus();
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="dag-cal-menu"
+      data-dag-cal-menu=""
+      role="menu"
+      aria-label={`${menu.item.title}: actions`}
+      style={{ left: pos.x, top: pos.y }}
+      onKeyDown={onKey}
+    >
+      {MENU_ROWS.map(({ what, label, icon: Icon, changes, danger }) =>
+        locked && changes ? null : (
+          <button
+            key={what}
+            type="button"
+            role="menuitem"
+            className={danger ? "dag-more__item dag-cal-menu__danger" : "dag-more__item"}
+            data-dag-cal-menu-item={what}
+            onClick={() => onPick(what)}
+          >
+            <Icon {...ICON} aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        ),
+      )}
+      {locked ? <p className="dag-cal-menu__locked">Read only: unlock to change it.</p> : null}
+    </div>
+  );
+}
+
 /* -- the month ------------------------------------------------------------------------------- */
 
 function Month({
@@ -664,6 +1022,7 @@ function Month({
   today,
   items,
   onOpen,
+  onMenu,
   onAsk,
   onWrite,
   onDay,
@@ -674,6 +1033,7 @@ function Month({
   today: string;
   items: CalItem[];
   onOpen(name: string): void;
+  onMenu: AskMenu;
   /** Absent while the app is locked, and with them the drags that make and move. */
   onAsk?(start: string, end: string | null, x: number, y: number): void;
   onWrite?(item: CalItem, next: Write): void;
@@ -710,6 +1070,7 @@ function Month({
           bars={lanes(items, week)}
           grab={onWrite ? grab : undefined}
           onOpen={onOpen}
+          onMenu={onMenu}
           onDay={onDay}
         />
       ))}
@@ -731,6 +1092,7 @@ function DotMonth({
   today,
   items,
   onOpen,
+  onMenu,
 }: {
   first: string;
   last: string;
@@ -739,6 +1101,7 @@ function DotMonth({
   today: string;
   items: CalItem[];
   onOpen(name: string): void;
+  onMenu: AskMenu;
 }) {
   const days = daysFrom(first, last);
   const [picked, setPicked] = useState<string | null>(null);
@@ -781,7 +1144,7 @@ function DotMonth({
       <section className="dag-cal-dots__list" aria-label={on} data-dag-cal-dots-list={on}>
         <h2>{DAY_TITLE.format(calendarDate(on))}</h2>
         {list.length ? (
-          list.map((it) => <ItemLink key={it.name} item={it} onOpen={onOpen} />)
+          list.map((it) => <ItemLink key={it.name} item={it} onOpen={onOpen} onMenu={onMenu} />)
         ) : (
           <p className="dag-cal-dots__none">Nothing on this day.</p>
         )}
@@ -797,6 +1160,7 @@ function MonthWeek({
   bars,
   grab,
   onOpen,
+  onMenu,
   onDay,
 }: {
   days: string[];
@@ -805,6 +1169,7 @@ function MonthWeek({
   bars: Bar[];
   grab?: Grab;
   onOpen(name: string): void;
+  onMenu: AskMenu;
   onDay(day: string): void;
 }) {
   const kept = bars.filter((b) => b.lane < MONTH_LANES);
@@ -844,6 +1209,7 @@ function MonthWeek({
           grab={grab}
           axis="x"
           onOpen={onOpen}
+          onMenu={onMenu}
         />
       ))}
       {more.map((n, i) =>
@@ -916,34 +1282,33 @@ function useDayRange(host: RefObject<HTMLElement | null>, ask: (from: string, to
   );
 }
 
-/** Where the pointer is on a calendar: a day's cell — a month's, or the all-day row's — or a minute of a day in the hour grid. */
+/** Where the pointer is on a calendar: a day's cell — a month's, or a row's all-day start — or a minute of a day in an hour track. */
 interface Spot {
   day: string;
   minute?: number;
+  /** Which way the hour track the minute was read from runs; absent on a day cell, whose ends run across. */
+  axis?: "x" | "y";
 }
 
 /**
  * The spot under a point on the page, in `host` — read through whatever is drawn on top, a bar or a
- * block included, because the cells and the columns are under them.
+ * block included, because the cells and the tracks are under them. A day's column in the week runs
+ * its hours down, and a row's track runs them across; `minutesAt` is the one reading of either.
  */
 function spotAt(host: HTMLElement | null, x: number, y: number): Spot | undefined {
   for (const el of document.elementsFromPoint(x, y)) {
     if (!(el instanceof HTMLElement) || !host?.contains(el)) continue;
     if (el.dataset.dagCalDay) return { day: el.dataset.dagCalDay };
-    const day = el.dataset.dagCalColumn;
-    if (day) {
-      const r = el.getBoundingClientRect();
-      return { day, minute: Math.max(0, Math.min(DAY_MINUTES, ((y - r.top) / r.height) * DAY_MINUTES)) };
-    }
+    const column = el.dataset.dagCalColumn;
+    if (column) return { day: column, minute: minutesAt(el.getBoundingClientRect(), { x, y }, "y"), axis: "y" };
+    const row = el.dataset.dagCalRow;
+    if (row) return { day: row, minute: minutesAt(el.getBoundingClientRect(), { x, y }, "x"), axis: "x" };
   }
   return undefined;
 }
 
 /** A grid minute as the clock says it, snapped to the quarter hour below. */
-const quarter = (minute: number): string => {
-  const m = Math.min(DAY_MINUTES - SNAP, Math.floor(minute / SNAP) * SNAP);
-  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-};
+const quarter = (minute: number): string => clockOf(snapMinute(minute, SNAP));
 
 /** Minutes since midnight of a `HH:MM`. */
 const minutesOf = (hhmm: string): number => {
@@ -973,7 +1338,7 @@ function useGrab(
   onGhost?: (g: Ghost | null) => void,
 ): Grab {
   return useCallback(
-    (item, e, dragged, edge) => {
+    (item, e, dragged, edge, axis) => {
       const from = spotAt(host.current, e.clientX, e.clientY);
       if (!from) return;
       const el = e.currentTarget;
@@ -1055,8 +1420,9 @@ function useGrab(
           if (first) {
             dragged();
             el.dataset.dagCalMoving = edge ?? "";
-            /* The resize cursor for as long as an end is held, wherever the pointer goes. */
-            if (edge) document.documentElement.dataset.dagCalPulling = inGrid ? "y" : "x";
+            /* The resize cursor for as long as an end is held, wherever the pointer goes: the
+               item's own axis, which is the days of a bar and the clock of a block on either grid. */
+            if (edge) document.documentElement.dataset.dagCalPulling = (axis ?? from.axis) === "y" ? "y" : "x";
             addEventListener("keydown", esc, true);
           }
           if (off) return;
@@ -1085,6 +1451,7 @@ function Columns({
   today,
   items,
   onOpen,
+  onMenu,
   onAsk,
   onWrite,
 }: {
@@ -1092,6 +1459,7 @@ function Columns({
   today: string;
   items: CalItem[];
   onOpen(name: string): void;
+  onMenu: AskMenu;
   /** Absent while the app is locked, and with them the drags that make and move. */
   onAsk?(start: string, end: string | null, x: number, y: number): void;
   onWrite?(item: CalItem, next: Write): void;
@@ -1188,6 +1556,7 @@ function Columns({
             grab={onWrite ? grab : undefined}
             axis="x"
             onOpen={onOpen}
+            onMenu={onMenu}
           />
         ))}
       </div>
@@ -1209,6 +1578,7 @@ function Columns({
               moving={moving?.day === d ? moving : null}
               grab={onWrite ? grab : undefined}
               onOpen={onOpen}
+              onMenu={onMenu}
               onAsk={onAsk}
             />
           ))}
@@ -1229,6 +1599,84 @@ interface Ghost {
   title: string;
 }
 
+/** A range a drag on empty time is drawing, in minutes from the day's midnight. */
+interface Range {
+  from: number;
+  to: number;
+}
+
+/** What a drag on empty time paints on a day's hour track. */
+function RangeGhost({ range }: { range: Range | null }) {
+  return range ? (
+    <div className="dag-cal-ghost" style={{ "--at": range.from, "--len": range.to - range.from } as CSSProperties} />
+  ) : null;
+}
+
+/** The ghost of an item being moved or pulled, saying the time it would start and end. */
+function MovingGhost({ moving }: { moving: Ghost | null }) {
+  return moving ? (
+    <div
+      className="dag-cal-ghost dag-cal-ghost--move"
+      data-dag-cal-moving-to={moving.label}
+      data-dag-cal-moving-end={moving.end}
+      style={{ "--at": moving.top, "--len": moving.len } as CSSProperties}
+    >
+      <span className="dag-calendar__time">
+        {moving.label} – {moving.end}
+      </span>{" "}
+      <span className="dag-calendar__name">{moving.title}</span>
+    </div>
+  ) : null;
+}
+
+/**
+ * The press that draws a new event on one day's hour track — down its column in the week, across
+ * its row in the rows view. **The arithmetic is the model's** (`minutesAt`, `snapMinute`,
+ * `clockOf`), so a drag lands on the same quarter hour whichever way the hours run, and a click
+ * makes the same hour on the half hour in both.
+ */
+function useTimeDraw(day: string, axis: "x" | "y", onAsk?: (start: string, end: string | null, x: number, y: number) => void) {
+  const [range, setRange] = useState<Range | null>(null);
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0 || !onAsk) return;
+      const box = e.currentTarget.getBoundingClientRect();
+      const minute = (x: number, y: number) => minutesAt(box, { x, y }, axis);
+      const from = snapMinute(minute(e.clientX, e.clientY), SNAP);
+      let span: Range = { from, to: from + SNAP };
+      let x = e.clientX;
+      let y = e.clientY;
+      /* A grid minute is a wall-clock reading here, so the drag writes the time its label says. */
+      const at = (m: number) => timeOf(momentAt(day, clockOf(m)));
+      e.preventDefault();
+      startDrag(e, {
+        onMove(ev) {
+          x = ev.clientX;
+          y = ev.clientY;
+          const m = snapMinute(minute(ev.clientX, ev.clientY), SNAP);
+          span = { from: Math.min(from, m), to: Math.max(from, m) + SNAP };
+          setRange(span);
+        },
+        onDrop() {
+          onAsk(at(span.from), at(Math.min(DAY_MINUTES, span.to)), x, y);
+        },
+        onClick() {
+          const start = snapMinute(minute(x, y), CLICK);
+          const to = Math.min(DAY_MINUTES, start + 60);
+          setRange({ from: start, to });
+          onAsk(at(start), at(to), x, y);
+        },
+        onEnd() {
+          /* Held for a moment after a click so the hour it made is seen, then let go. */
+          setTimeout(() => setRange(null), 150);
+        },
+      });
+    },
+    [day, axis, onAsk],
+  );
+  return { range, onPointerDown: onAsk ? onPointerDown : undefined };
+}
+
 /**
  * One day's hour grid: its timed events side by side where they overlap, the line that marks now,
  * and the drag that draws a new one — snapped to a quarter of an hour, and an hour on the half hour
@@ -1242,6 +1690,7 @@ function DayColumn({
   moving,
   grab,
   onOpen,
+  onMenu,
   onAsk,
 }: {
   day: string;
@@ -1250,10 +1699,11 @@ function DayColumn({
   moving: Ghost | null;
   grab?: Grab;
   onOpen(name: string): void;
+  onMenu: AskMenu;
   onAsk?(start: string, end: string | null, x: number, y: number): void;
 }) {
   const placed = useMemo(() => blocks(items, day), [items, day]);
-  const [ghost, setGhost] = useState<{ from: number; to: number } | null>(null);
+  const { range, onPointerDown } = useTimeDraw(day, "y", onAsk);
   const now = today
     ? (() => {
         const at = wallOf(Date.now());
@@ -1261,47 +1711,9 @@ function DayColumn({
       })()
     : null;
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || !onAsk) return;
-    const col = e.currentTarget;
-    const rect = col.getBoundingClientRect();
-    const minute = (y: number) => Math.max(0, Math.min(DAY_MINUTES, ((y - rect.top) / rect.height) * DAY_MINUTES));
-    const snap = (m: number, by: number) => Math.floor(m / by) * by;
-    const from = snap(minute(e.clientY), SNAP);
-    let span = { from, to: from + SNAP };
-    let x = e.clientX;
-    let y = e.clientY;
-    /* A grid minute is a wall-clock reading here, so the drag writes the time its label says. */
-    const at = (m: number) => timeOf(momentAt(day, `${Math.floor(m / 60)}:${m % 60}`));
-    e.preventDefault();
-    startDrag(e, {
-      onMove(ev) {
-        x = ev.clientX;
-        y = ev.clientY;
-        const m = snap(minute(ev.clientY), SNAP);
-        span = { from: Math.min(from, m), to: Math.max(from, m) + SNAP };
-        setGhost(span);
-      },
-      onDrop() {
-        onAsk(at(span.from), at(Math.min(DAY_MINUTES, span.to)), x, y);
-      },
-      onClick() {
-        const start = snap(minute(e.clientY), CLICK);
-        setGhost({ from: start, to: start + 60 });
-        onAsk(at(start), at(Math.min(DAY_MINUTES, start + 60)), x, y);
-      },
-      onEnd() {
-        /* Held for a moment after a click so the hour it made is seen, then let go. */
-        setTimeout(() => setGhost(null), 150);
-      },
-    });
-  };
-
   return (
     <div className="dag-cal-column" data-dag-cal-column={day} data-today={today ? "" : undefined} onPointerDown={onPointerDown}>
-      {ghost ? (
-        <div className="dag-cal-ghost" style={{ "--at": ghost.from, "--len": ghost.to - ghost.from } as CSSProperties} />
-      ) : null}
+      <RangeGhost range={range} />
       {placed.map((b) => (
         <ItemLink
           key={`${b.item.kind}:${b.item.name}`}
@@ -1313,30 +1725,176 @@ function DayColumn({
           grab={grab}
           axis="y"
           onOpen={onOpen}
+          onMenu={onMenu}
         />
       ))}
-      {moving ? (
-        <div
-          className="dag-cal-ghost dag-cal-ghost--move"
-          data-dag-cal-moving-to={moving.label}
-          data-dag-cal-moving-end={moving.end}
-          style={{ "--at": moving.top, "--len": moving.len } as CSSProperties}
-        >
-          <span className="dag-calendar__time">
-            {moving.label} – {moving.end}
-          </span>{" "}
-          <span className="dag-calendar__name">{moving.title}</span>
-        </div>
-      ) : null}
+      <MovingGhost moving={moving} />
       {now !== null ? <div className="dag-cal-now" style={{ "--at": now } as CSSProperties} aria-hidden="true" /> : null}
     </div>
   );
 }
 
-/* -- the card that names what was drawn ------------------------------------------------------- */
+/* -- a week as rows --------------------------------------------------------------------------- */
 
 /**
- * What a drawn range becomes: a title typed here, Enter to make the event, Escape to leave nothing.
+ * The week turned on its side: **one row to a day**, the day and its all-day things at the start of
+ * the row, and the hours of the day across it. It is the same seven days and the same items as
+ * `Columns`; only the drawing turns. A timed event is `blocks`' `top` and `length` — minutes into the
+ * day — read as a left edge and a width, and *side by side where they overlap* becomes lanes down the
+ * row, so an event is never shorter than the 24px floor.
+ *
+ * The gestures are the page's, not this file's second copy: `useTimeDraw` draws a new event, `useGrab`
+ * moves one and pulls its ends (the same `spotAt`, the same `minutesAt`), and `useDayRange` makes an
+ * all-day event across the days at the start of the rows.
+ */
+function Rows({
+  days,
+  today,
+  items,
+  onOpen,
+  onMenu,
+  onAsk,
+  onWrite,
+}: {
+  days: string[];
+  today: string;
+  items: CalItem[];
+  onOpen(name: string): void;
+  onMenu: AskMenu;
+  /** Absent while the app is locked, and with them the drags that make and move. */
+  onAsk?(start: string, end: string | null, x: number, y: number): void;
+  onWrite?(item: CalItem, next: Write): void;
+}) {
+  const cols = useRef<HTMLDivElement>(null);
+  const [moving, setMoving] = useState<Ghost | null>(null);
+  const grab = useGrab(cols, (item, next) => onWrite?.(item, next), setMoving);
+  return (
+    <div className="dag-cal-rows" ref={cols} data-dag-cal-rows="">
+      <div className="dag-cal-rows__head">
+        <span className="dag-cal-rows__corner" aria-hidden="true" />
+        <span className="dag-cal-rows__allday" aria-hidden="true">
+          All day
+        </span>
+        <div className="dag-cal-rows__hours" aria-hidden="true">
+          {Array.from({ length: 24 }, (_, h) => (
+            <span key={h} className="dag-cal-rows__hour" style={{ "--at": h * 60 } as CSSProperties}>
+              {h % 2 === 0 && h > 0 ? `${String(h).padStart(2, "0")}:00` : ""}
+            </span>
+          ))}
+        </div>
+      </div>
+      {days.map((d) => (
+        <DayRow
+          key={d}
+          day={d}
+          today={d === today}
+          items={items}
+          host={cols}
+          moving={moving?.day === d ? moving : null}
+          grab={onWrite ? grab : undefined}
+          onOpen={onOpen}
+          onMenu={onMenu}
+          onAsk={onAsk}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One day of the rows: its date and every all-day thing it holds at the start, then the day's track
+ * with the hours across. Overlapping timed events take a lane each, 26px apart, so each one is 24px
+ * tall; the row grows to hold them — and any all-day things — and the track fills it.
+ */
+function DayRow({
+  day,
+  today,
+  items,
+  host,
+  moving,
+  grab,
+  onOpen,
+  onMenu,
+  onAsk,
+}: {
+  day: string;
+  today: boolean;
+  items: CalItem[];
+  /** The rows view, which holds every day's start cell: a drag across days paints them all. */
+  host: RefObject<HTMLElement | null>;
+  moving: Ghost | null;
+  grab?: Grab;
+  onOpen(name: string): void;
+  onMenu: AskMenu;
+  onAsk?(start: string, end: string | null, x: number, y: number): void;
+}) {
+  const placed = useMemo(() => blocks(items, day), [items, day]);
+  /* Everything all day on this day — a trip shows on each day of it, as a day reads it. */
+  const allDay = useMemo(() => items.filter((i) => i.allDay && i.first <= day && day <= i.last), [items, day]);
+  const lanes = Math.max(1, ...placed.map((b) => b.col + 1));
+  const drawDays = useDayRange(host, (from, to, x, y) => onAsk?.(from, to === from ? null : to, x, y));
+  const { range, onPointerDown } = useTimeDraw(day, "x", onAsk);
+  const now = today
+    ? (() => {
+        const at = wallOf(Date.now());
+        return at.hour * 60 + at.minute;
+      })()
+    : null;
+  return (
+    <div className="dag-cal-row" data-today={today ? "" : undefined}>
+      <div className="dag-cal-row__day">
+        <span className="dag-cal-row__weekday">{WEEKDAY.format(calendarDate(day))}</span>
+        <span className="dag-cal-row__n">{Number(day.slice(8, 10))}</span>
+      </div>
+      <div
+        className="dag-cal-row__start"
+        data-dag-cal-day={day}
+        data-dag-cal-start={day}
+        onPointerDown={onAsk ? drawDays : undefined}
+      >
+        {allDay.map((item) => (
+          <ItemLink key={`${item.kind}:${item.name}`} item={item} grab={grab} axis="y" onOpen={onOpen} onMenu={onMenu} />
+        ))}
+      </div>
+      <div
+        className="dag-cal-row__track"
+        data-dag-cal-row={day}
+        style={{ "--lanes": lanes } as CSSProperties}
+        onPointerDown={onPointerDown}
+      >
+        <RangeGhost range={range} />
+        {placed.map((b) => (
+          <ItemLink
+            key={`${b.item.kind}:${b.item.name}`}
+            item={b.item}
+            before={b.before}
+            after={b.after}
+            style={{ "--at": b.top, "--len": b.length, "--lane": b.col } as CSSProperties}
+            grab={grab}
+            axis="x"
+            onOpen={onOpen}
+            onMenu={onMenu}
+          />
+        ))}
+        <MovingGhost moving={moving} />
+        {now !== null ? <div className="dag-cal-now" style={{ "--at": now } as CSSProperties} aria-hidden="true" /> : null}
+      </div>
+    </div>
+  );
+}
+
+/* -- the card that sets up what was drawn ----------------------------------------------------- */
+
+/**
+ * What a drawn range becomes: a title, its start and end, whether it is all day, and an optional
+ * description. Enter still makes the event at once, so the quick path is the one it was; Escape
+ * leaves nothing.
+ *
+ * The fields are the event bar's (`EventBar`): the same writers, so a time is shown and written in
+ * the viewer's zone, a start changed keeps how long it is (`withStart`), an end that would come
+ * before the start is moved an hour on (`withEnd`), and the switch takes the event to the all-day
+ * row and back (`withAllDay`). The title alone keeps its own field, focused, above them.
+ *
  * Placed where the drag ended and nudged back inside the window. It owns its own Escape and stops
  * it, the settings card's rule, so the window's handlers never see a key meant for it.
  */
@@ -1349,13 +1907,29 @@ function NewEvent({
   making: Making;
   /** The app is read-only: the card opens to say why, and nothing it offers can write. */
   locked?: boolean;
-  onMake(title: string, start: string, end: string | null): Promise<void>;
+  onMake(title: string, when: NoteEvent, description: string): Promise<void>;
   onClose(): void;
 }) {
   const ref = useRef<HTMLFormElement>(null);
+  const titleField = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
+  const [draft, setDraft] = useState<NoteEvent>(() =>
+    making.end ? { start: making.start, end: making.end } : { start: making.start },
+  );
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [pos, setPos] = useState({ x: making.x, y: making.y });
+  /* The zone is read below (`zoneName`), so a change of it draws the card again. */
+  useZone();
+  const f = fieldsOf(draft);
+  const zone = f.allDay ? "" : zoneName(momentOf(draft.start));
+  const id = useId();
+  const allDayId = `${id}all-day`;
+  const startDayId = `${id}start-day`;
+  const startTimeId = `${id}start-time`;
+  const endDayId = `${id}end-day`;
+  const endTimeId = `${id}end-time`;
+  const off = locked || busy;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -1365,7 +1939,7 @@ function NewEvent({
       x: Math.max(8, Math.min(making.x + 8, innerWidth - r.width - 8)),
       y: Math.max(8, Math.min(making.y + 8, innerHeight - r.height - 8)),
     });
-    el.querySelector<HTMLInputElement>("input")?.focus();
+    titleField.current?.focus();
   }, [making]);
 
   useEffect(() => {
@@ -1376,12 +1950,16 @@ function NewEvent({
     return () => document.removeEventListener("pointerdown", down, true);
   }, [onClose]);
 
-  const when = whenWords(making.end ? { start: making.start, end: making.end } : { start: making.start });
+  /* The event bar's writers: an end nobody has stays no line, not an empty one (`asEvent`). */
+  const setAllDay = (on: boolean) => setDraft((d) => asEvent(withAllDay(d, on)));
+  const setStart = (day: string, time?: string) => setDraft((d) => asEvent(withStart(d, day, time)));
+  const setEnd = (day: string, time?: string) => setDraft((d) => asEvent(withEnd(d, day, time)));
+
   const submit = async () => {
     if (locked) return void refuseLocked();
     if (busy) return;
     setBusy(true);
-    await onMake(title, making.start, making.end);
+    await onMake(title, draft, description);
     onClose();
   };
   return (
@@ -1401,9 +1979,32 @@ function NewEvent({
         }
       }}
     >
+      <input
+        ref={titleField}
+        type="text"
+        className="dag-calendar__new-field dag-calendar__new-title"
+        placeholder="New event"
+        aria-label="The event's title"
+        value={title}
+        disabled={busy}
+        readOnly={locked}
+        aria-disabled={locked || undefined}
+        title={locked ? LOCK_HINT : undefined}
+        data-dag-calendar-new-title=""
+        data-dag-readonly-blocked={locked ? "" : undefined}
+        onChange={(e) => setTitle(e.target.value)}
+      />
       <p className="dag-calendar__new-when" data-dag-calendar-new-when="">
         <CalendarClock size={14} strokeWidth={2} aria-hidden="true" />
-        <span>{when}</span>
+        <span>{whenWords(draft)}</span>
+        {zone ? (
+          <span
+            className="dag-calendar__new-zone"
+            title={`Shown in ${currentZone().replace(/_/g, " ")}, and written with its offset. Settings → Calendar changes the time zone.`}
+          >
+            {zone}
+          </span>
+        ) : null}
       </p>
       {locked ? (
         <p className="dag-calendar__new-locked" data-dag-calendar-new-locked="" title={LOCK_HINT}>
@@ -1419,18 +2020,81 @@ function NewEvent({
           </button>
         </p>
       ) : null}
-      <input
-        type="text"
-        placeholder="New event"
-        aria-label="The event's title"
-        value={title}
-        disabled={busy}
-        readOnly={locked}
-        aria-disabled={locked || undefined}
-        title={locked ? LOCK_HINT : undefined}
-        data-dag-calendar-new-title=""
-        data-dag-readonly-blocked={locked ? "" : undefined}
-        onChange={(e) => setTitle(e.target.value)}
+      <div className="dag-calendar__new-allday">
+        <label htmlFor={allDayId} className="dag-calendar__new-label">
+          <Sun size={14} strokeWidth={2} aria-hidden="true" />
+          All day
+        </label>
+        <Switch
+          id={allDayId}
+          checked={f.allDay}
+          disabled={off}
+          data-dag-calendar-new-allday=""
+          onChange={(e) => setAllDay(e.target.checked)}
+        />
+      </div>
+      <div className="dag-calendar__new-times">
+        <label htmlFor={startDayId}>Starts</label>
+        <input
+          id={startDayId}
+          type="date"
+          className="dag-calendar__new-field"
+          value={f.startDay}
+          disabled={off}
+          data-dag-calendar-new-start-day=""
+          onChange={(e) => e.target.value && setStart(e.target.value)}
+        />
+        {f.allDay ? (
+          <span aria-hidden="true" />
+        ) : (
+          <input
+            id={startTimeId}
+            type="time"
+            step={900}
+            className="dag-calendar__new-field"
+            value={f.startTime}
+            disabled={off}
+            aria-label="Start time"
+            data-dag-calendar-new-start-time=""
+            onChange={(e) => e.target.value && setStart(f.startDay, e.target.value)}
+          />
+        )}
+        <label htmlFor={endDayId}>Ends</label>
+        <input
+          id={endDayId}
+          type="date"
+          className="dag-calendar__new-field"
+          value={f.endDay}
+          min={f.startDay}
+          disabled={off}
+          data-dag-calendar-new-end-day=""
+          onChange={(e) => e.target.value && setEnd(e.target.value)}
+        />
+        {f.allDay ? (
+          <span aria-hidden="true" />
+        ) : (
+          <input
+            id={endTimeId}
+            type="time"
+            step={900}
+            className="dag-calendar__new-field"
+            value={f.endTime}
+            disabled={off}
+            aria-label="End time"
+            data-dag-calendar-new-end-time=""
+            onChange={(e) => e.target.value && setEnd(f.endDay, e.target.value)}
+          />
+        )}
+      </div>
+      <textarea
+        className="dag-calendar__new-field dag-calendar__new-description"
+        placeholder="Description (optional)"
+        aria-label="The event's description"
+        rows={2}
+        value={description}
+        disabled={off}
+        data-dag-calendar-new-description=""
+        onChange={(e) => setDescription(e.target.value)}
       />
       <div className="dag-calendar__new-acts">
         <button type="button" className="dag-calendar__new-cancel" onClick={onClose}>

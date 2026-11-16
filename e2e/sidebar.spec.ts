@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { vaultKey, vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
+import { vaultKey } from "./vault";
 
 /**
  * The sidebar: the files as a tree, the account, and the way to the settings.
@@ -249,6 +249,88 @@ test("a folder opens and shuts, and the tree walks on the keyboard", async ({ pa
   await expect(folderRow(page, `${folder}/inner`)).toHaveAttribute("aria-expanded", "true");
 });
 
+test("a kind hidden from the tree says so, keeps the folder and the open file, and is remembered", async ({ page }) => {
+  /* Not `@smoke`: the tier is the few checks that must never be red, and this is a feature's own
+     check. Everything the issue asks of the filter is here — the menu, several kinds at once, the
+     folder that stays, the open file that stays, the heading and the accent, and a reload. */
+  await fresh(page);
+  const heading = page.locator("#dag-sidebar-files");
+  const filter = page.locator("[data-dag-sidebar-filter]");
+  await expect(heading).toHaveText("Files");
+  await expect(fileRow(page, note())).toBeVisible();
+
+  await filter.click();
+  const menu = page.locator("[data-dag-sidebar-filter-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText("Show in Files");
+  /* One row per kind the tree tells apart, events included. */
+  await expect(menu.locator("[data-dag-sidebar-filter-kind]")).toHaveCount(8);
+  const notes = menu.locator('[data-dag-sidebar-filter-kind="note"]');
+  await expect(notes).toHaveAttribute("aria-checked", "true");
+  await expect(notes).toContainText("Notes");
+  /* The count is the vault's, and the suite shares one, so it is a number rather than a figure. */
+  await expect(notes).toHaveAttribute("aria-label", /^Notes, \d+ notes?$/);
+
+  await notes.click();
+  await expect(notes).toHaveAttribute("aria-checked", "false");
+  await expect(menu).toBeVisible();
+  await expect(fileRow(page, note())).toHaveCount(0);
+  /* The folder stays, so the tree keeps its shape; the heading and the button say what is hidden. */
+  await expect(folderRow(page, folder)).toBeVisible();
+  await expect(heading).toHaveText("Files · notes hidden");
+  await expect(filter).toHaveAttribute("data-dag-sidebar-filtered", "");
+  const colour = await filter.evaluate((el) => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--dag-color-accent)";
+    document.body.append(probe);
+    const accent = getComputedStyle(probe).color;
+    probe.remove();
+    return { accent, got: getComputedStyle(el).color };
+  });
+  expect(colour.got).toBe(colour.accent);
+
+  /* A second kind, and the open board stays while the other one goes. */
+  await menu.locator('[data-dag-sidebar-filter-kind="board"]').click();
+  await expect(menu).toBeVisible();
+  await expect(fileRow(page, board())).toBeVisible();
+  await expect(fileRow(page, other())).toHaveCount(0);
+  await expect(heading).toHaveText("Files · notes and boards hidden");
+
+  /* The keyboard walks the filtered rows — the hidden ones are not steps — and F2 still asks for a
+     name on one of them. Escape closes the menu first and puts the focus back on the button. */
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(filter).toBeFocused();
+  await folderRow(page, folder).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(folderRow(page, `${folder}/inner`)).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(fileRow(page, board())).toBeFocused();
+  await page.keyboard.press("F2");
+  await expect(page.locator("[data-dag-sidebar-name]")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-sidebar-name]")).toHaveCount(0);
+
+  /* The choice is this browser's and this vault's, and survives a reload. */
+  const kept = await vaultKey(page, "dag:sidebar-hidden");
+  expect(JSON.parse((await page.evaluate((k) => localStorage.getItem(k), kept)) ?? "[]")).toEqual(["note", "board"]);
+  await page.reload();
+  await ready(page);
+  await expect(heading).toHaveText("Files · notes and boards hidden");
+  await expect(fileRow(page, note())).toHaveCount(0);
+  await expect(fileRow(page, board())).toBeVisible();
+
+  /* Show everything ticks them all, and the key goes with nothing left to say. */
+  await filter.click();
+  await expect(menu).toBeVisible();
+  await menu.locator("[data-dag-sidebar-filter-all]").click();
+  await expect(fileRow(page, note())).toBeVisible();
+  await expect(fileRow(page, other())).toBeVisible();
+  await expect(heading).toHaveText("Files");
+  await expect(filter).not.toHaveAttribute("data-dag-sidebar-filtered");
+  expect(await page.evaluate((k) => localStorage.getItem(k), kept)).toBeNull();
+});
+
 test("opening a board or a note keeps the sidebar exactly where it was", async ({ page }) => {
   await fresh(page);
   /* A mark on the element itself. If opening a file rebuilt the column, this would be gone. */
@@ -387,7 +469,7 @@ test.describe("on a phone", () => {
   test("the sheet's Home row goes home from a board", async ({ page }) => {
     /* The toolbar hides the mark at this width, and the sheet's head has no logo: the row is the
        only way back to the welcome card once a file is open. */
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await ready(page);
     await expect(page.locator('[data-dag-item="a"]')).toBeVisible();
 
@@ -411,7 +493,7 @@ test.describe("on a phone", () => {
   test("a folder's ⋯ makes a note in that folder", async ({ page }) => {
     /* The folder's `+` is hidden here and a finger has no hover, so this menu item is the way a
        phone fills a folder. */
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await ready(page);
     await page.locator("[data-dag-sidebar-toggle]").tap();
     await expect(page.locator("[data-dag-sidebar][data-sheet]")).toBeVisible();
@@ -552,6 +634,62 @@ test("a favourite is kept above the files, opens, follows a rename, and comes ou
 
   await more(`${folder}/other-renamed`, "unfavourite");
   await expect(page.locator("[data-dag-sidebar-favourite]")).toHaveCount(0);
+});
+
+test("a favourite's row is a row, and one, two or five of them leave the section unscrolled", async ({ page }) => {
+  /* Five files to favourite: the three this file makes, and two more in the same folder. */
+  const extra = [`${folder}/four`, `${folder}/five`];
+  for (const name of extra) fs.writeFileSync(path.join(BOARDS, `${name}.board.md`), BOARD(name));
+  await fresh(page);
+
+  const favourite = (name: string) => page.locator(`[data-dag-sidebar-favourite="${name}"]`);
+  const all = page.locator("[data-dag-sidebar-favourite]");
+  const section = page.locator(".dag-sidebar__favs");
+
+  const mark = async (name: string) => {
+    await clickOnHover(page, `[data-dag-sidebar-file="${name}"]`, `[data-dag-sidebar-more="${name}"]`);
+    await page.locator('[data-dag-sidebar-menu-item="favourite"]').click();
+    await expect(favourite(name)).toHaveCount(1);
+  };
+  const unmark = async (name: string) => {
+    await clickOnHover(page, `[data-dag-sidebar-favourite="${name}"]`, `[data-dag-sidebar-unfavourite="${name}"]`);
+    await expect(favourite(name)).toHaveCount(0);
+  };
+
+  for (const name of [board(), other(), note(), ...extra]) await mark(name);
+  await expect(all).toHaveCount(5);
+
+  /*
+   * A row is 30px wherever the column draws one — the tree's row, and a favourite's. It is measured
+   * with the pointer on it, because the 24px remove button that lives in it is what used to hang
+   * below a 16px line and turn `.dag-sidebar__favs` into a scroll container (#319). One, two and
+   * five favourites all leave that section with no overflow.
+   */
+  const check = async (count: number) => {
+    await expect(all).toHaveCount(count);
+    await fileRow(page, board()).scrollIntoViewIfNeeded({ timeout: 1_000 });
+    const tree = (await fileRow(page, board()).boundingBox())!.height;
+
+    /* Away from the column, then on the row with a real move, so its own controls are up as a
+       person would see them — and the row is the same height in both states. */
+    await page.mouse.move(900, 600);
+    expect((await favourite(board()).boundingBox())!.height).toBe(tree);
+    const at = (await favourite(board()).boundingBox())!;
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await expect(page.locator(`[data-dag-sidebar-unfavourite="${board()}"]`)).toBeVisible();
+    expect((await favourite(board()).boundingBox())!.height).toBe(tree);
+    const { clientHeight, scrollHeight } = await section.evaluate((el) => ({
+      clientHeight: el.clientHeight,
+      scrollHeight: el.scrollHeight,
+    }));
+    expect(scrollHeight).toBe(clientHeight);
+  };
+
+  await check(5);
+  for (const name of [note(), ...extra]) await unmark(name);
+  await check(2);
+  await unmark(other());
+  await check(1);
 });
 
 test("the open file's row keeps its actions, and a favourite its star, without a hover", async ({ page }) => {

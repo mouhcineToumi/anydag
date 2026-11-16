@@ -32,6 +32,14 @@ import { markSaved } from "./saved";
  */
 export const THEME = "dag:theme";
 /**
+ * How big the words a person reads are: `"small"`, `"large"`, or absent for the default step (#325).
+ * **The person's, in every vault**, {@link THEME}'s reason: how somebody reads their notes and the
+ * app around them is theirs, and opening another vault should not change it. `src/ui/textSize.ts`
+ * owns the three steps and the root attribute; a board's diagram is not affected — its sizes are the
+ * theme's `type` and `metric`, and the canvas has its own zoom.
+ */
+export const TEXT_SIZE = "dag:text-size";
+/**
  * Which model each AI feature uses: the `llm` and `assistant` sections of the settings object, as one
  * JSON string. **The person's, in every vault** (#191), beside the keys and sign-ins, which were
  * always this computer's: a second vault no longer starts the Assistant on another provider.
@@ -71,6 +79,14 @@ export const FAVOURITES = "dag:favourites";
  */
 export const SIDEBAR_FOLDERS = "dag:sidebar-open";
 /**
+ * Which kinds of file the Files tree hides — a JSON list of the hidden kinds (#360). The choice is
+ * view state, **this browser's and this vault's, and deliberately not in `PREF_KEYS`**, for
+ * {@link SIDEBAR_FOLDERS}'s reason: a laptop and a phone have no reason to agree on which rows
+ * somebody wants to see, and it is written with {@link writeLocal}, which wakes no sync. It is a
+ * list of what is hidden rather than what is shown, so a kind added later is shown by default.
+ */
+export const SIDEBAR_HIDDEN = "dag:sidebar-hidden";
+/**
  * The list of files as this browser last fetched it, per vault — a cache, never a
  * preference, and never in `PREF_KEYS`: the sidebar draws it the moment the page loads and the
  * fetch replaces it, so a refresh does not show an empty tree for as long as the listing takes. It
@@ -89,6 +105,20 @@ export const RECENT_FILES = "dag:recent-files";
  * settings that travel every time they switch.
  */
 export const TASKS_VIEW = "dag:tasks-view";
+/**
+ * Which tab of the Tasks page is pressed — *Open*, *Done* or *All* (#311). `TASKS_VIEW`'s reason:
+ * which of their tasks somebody is looking at is view state, this browser's, not in `PREF_KEYS`.
+ */
+export const TASKS_TAB = "dag:tasks-tab";
+/**
+ * How the Tasks page's list is ordered, grouped and drawn — the Order and Display menus (#311), one
+ * JSON object read by `displayOf` in `src/ui/taskView.ts`. **The person's, in every vault**, for
+ * `CALENDAR_HIDE`'s reason: how somebody likes their tasks laid out is theirs, not one folder's, and
+ * it is never written to a vault file. Absent is the default: grouped by status, by due date.
+ */
+export const TASKS_DISPLAY = "dag:tasks-display";
+/** Whether a task's properties are beside its text or folded into a line above it (#311): this browser's view. */
+export const TASK_PANEL = "dag:task-panel";
 
 /**
  * Whether a run's *About this quiz* panel is folded away, `"0"` when it is. The Tasks
@@ -158,6 +188,12 @@ export const UPDATE_LINKS = "dag:update-links";
  * browser or a home is read by nothing.
  */
 export const INSPECTOR_WIDTH = "dag:inspector-w";
+/**
+ * How wide somebody dragged the Assistant's panel. The person's, in every vault, for
+ * {@link INSPECTOR_WIDTH}'s reason: it says how this person reads beside a page, not what the vault
+ * holds. `src/assistant/width.ts` owns the bounds and the accessor.
+ */
+export const ASSISTANT_WIDTH = "dag:assistant-w";
 
 /**
  * Every preference that is not the settings object.
@@ -168,13 +204,16 @@ export const INSPECTOR_WIDTH = "dag:inspector-w";
  */
 export const PREF_KEYS = [
   THEME,
+  TEXT_SIZE,
   AI,
   LIBRARY,
   INSPECTOR_WIDTH,
+  ASSISTANT_WIDTH,
   SIDEBAR,
   SIDEBAR_WIDTH,
   FAVOURITES,
   CALENDAR_HIDE,
+  TASKS_DISPLAY,
   WEEK_START,
   TIME_ZONE,
   TIME_ZONE_SEEN,
@@ -200,11 +239,20 @@ export const VAULT_STAMP = "dag:vault-prefs-at";
 
 /**
  * Every key this browser keeps a copy of **per vault**: the vault's preferences, the settings
- * object (`store.ts`'s `dag:settings`), which folders are open — they are the vault's folders —
- * the cached file list, Home's recent files, and the clock that dates them. They are stored as
- * `key@slug`, so two tabs in two vaults never read each other's favourites (`vault/current.ts`).
+ * object (`store.ts`'s `dag:settings`), which folders are open and which kinds its tree hides — they
+ * are the vault's folders and files — the cached file list, Home's recent files, and the clock that
+ * dates them. They are stored as `key@slug`, so two tabs in two vaults never read each other's
+ * favourites (`vault/current.ts`).
  */
-const PER_VAULT = new Set<string>([...VAULT_PREF_KEYS, "dag:settings", SIDEBAR_FOLDERS, VAULT_STAMP, FILE_LIST, RECENT_FILES]);
+const PER_VAULT = new Set<string>([
+  ...VAULT_PREF_KEYS,
+  "dag:settings",
+  SIDEBAR_FOLDERS,
+  SIDEBAR_HIDDEN,
+  VAULT_STAMP,
+  FILE_LIST,
+  RECENT_FILES,
+]);
 
 /** Where `key` is kept in `localStorage` for this tab: scoped to the vault when it is a vault's. */
 export function storageKey(key: string): string {
@@ -241,6 +289,17 @@ export const STAMP = "dag:prefs-at";
  * carry a flag. `settings.spec.ts` turns it back on for the one check that is about the sync.
  */
 export const SYNC = "dag:sync";
+
+/**
+ * The anonymous-logs answer given in a build whose `cloud` switch is off (#326).
+ *
+ * **Not a preference, and deliberately not in `PREF_KEYS`.** It is the install's answer waiting for
+ * the first build that can send it (`src/telemetry/client.ts`), held here because a build with the
+ * switch off makes no telemetry request at all — so the app's home is not reachable — and Settings →
+ * Privacy still has to record the person's choice. The first build whose switch is on PUTs it to
+ * `/api/telemetry` and clears it, which is what makes the choice carry over.
+ */
+export const TELEMETRY_PENDING = "dag:telemetry-pending";
 
 function snapshot(): boolean {
   try {

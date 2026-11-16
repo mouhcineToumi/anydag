@@ -13,6 +13,7 @@
  */
 
 import { desktop } from "./desktop";
+import { pathSecret, underSecret } from "./secret";
 
 /** The query key a request and a page name their vault with. */
 const PARAM = "vault";
@@ -63,13 +64,18 @@ export function scopes(path: string): boolean {
   return !UNSCOPED.some((u) => (u.endsWith("/") ? path.startsWith(u) : path === u || path.startsWith(`${u}/`)));
 }
 
+/** Whether a path is the API's — what the server serves under the secret path too (`server/app.ts`). */
+const api = (path: string): boolean => path.startsWith("/__board/") || path.startsWith("/api/");
+
 /**
  * `url` with `vault=<id>` added, when it is one of this app's scoped routes and names no vault of
- * its own. Everything else comes back **byte for byte** — a string, never a re-serialised `URL`, so
- * an encoded path stays encoded as it was.
+ * its own, and — on `anydag serve` in a browser — under the launch's secret path, where the browser
+ * sends the cookie (`secret.ts`). Everything else comes back **byte for byte** — a string, never a
+ * re-serialised `URL`, so an encoded path stays encoded as it was. A URL already under the secret is
+ * not an API path any more, so it is never prefixed twice.
  */
-export function scopeUrl(url: string, id: string = currentVault(), origin?: string): string {
-  if (!id) return url;
+export function scopeUrl(url: string, id: string = currentVault(), origin?: string, secret: string = pathSecret()): string {
+  if (!id && !secret) return url;
   let rest = url;
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) {
     /* The page's own origin: an absolute URL on it is one of ours. */
@@ -82,9 +88,11 @@ export function scopeUrl(url: string, id: string = currentVault(), origin?: stri
   const tail = hash === -1 ? "" : rest.slice(hash);
   const q = body.indexOf("?");
   const path = q === -1 ? body : body.slice(0, q);
-  if (!scopes(path)) return url;
-  if (q !== -1 && new URLSearchParams(body.slice(q + 1)).has(PARAM)) return url;
-  const joined = `${body}${q === -1 ? "?" : "&"}${PARAM}=${encodeURIComponent(id)}${tail}`;
+  if (!api(path)) return url;
+  const named = !id || !scopes(path) || (q !== -1 && new URLSearchParams(body.slice(q + 1)).has(PARAM));
+  const scoped = named ? body : `${body}${q === -1 ? "?" : "&"}${PARAM}=${encodeURIComponent(id)}`;
+  const joined = `${underSecret(scoped, secret)}${tail}`;
+  if (joined === rest) return url;
   return url === rest ? joined : `${url.slice(0, url.length - rest.length)}${joined}`;
 }
 
@@ -206,8 +214,9 @@ function marked(input: RequestInfo | URL, init: RequestInit | undefined): [Reque
 }
 
 /**
- * Add `vault=` to every scoped request this page makes, and hear the one refusal that means the vault
- * itself has gone. Installed before the first request; idempotent.
+ * Add `vault=` to every scoped request this page makes, put every request to the API under the
+ * secret path when there is one, and hear the one refusal that means the vault itself has gone.
+ * Installed before the first request; idempotent.
  */
 let installed = false;
 export function watchVault(): void {
@@ -217,7 +226,7 @@ export function watchVault(): void {
   globalThis.fetch = async (...args: Parameters<typeof fetch>) => {
     const id = currentVault();
     let [input, init] = args;
-    if (id) {
+    if (id || pathSecret()) {
       if (typeof input === "string") input = scopeUrl(input, id);
       else if (input instanceof URL) input = new URL(scopeUrl(input.href, id));
       else if (typeof Request !== "undefined" && input instanceof Request) {

@@ -219,6 +219,8 @@ describe("opencodeComplete", () => {
       expect(opts.env.XDG_CONFIG_HOME.startsWith(opts.cwd)).toBe(true);
       expect(opts.env.ANYDAG_TOKEN).toBeUndefined();
       expect(opts.env.OPENCODE_CONFIG).toBeUndefined();
+      /* No config from the folders above the run's, which are a shared /tmp (#10). */
+      expect(opts.env.OPENCODE_DISABLE_PROJECT_CONFIG).toBe("1");
       const config = JSON.parse(opts.env.OPENCODE_CONFIG_CONTENT) as {
         agent: { "dag-diagram": { prompt: string; permission: Record<string, string> } };
       };
@@ -770,7 +772,15 @@ describe.skipIf(process.platform === "win32")("finding OpenCode", () => {
   it("does not let the server's own config or token reach the run", () => {
     expect(opencodeEnv({ OPENCODE_CONFIG: "/c.json", OPENCODE_CONFIG_DIR: "/d", ANYDAG_TOKEN: "t", HOME: "/h" })).toEqual({
       HOME: "/h",
+      OPENCODE_DISABLE_PROJECT_CONFIG: "1",
+      OPENCODE_DISABLE_CLAUDE_CODE: "1",
     });
+  });
+
+  it("does not let a run read config from the folders above its own, a shared /tmp among them (#10)", () => {
+    const env = opencodeEnv({ OPENCODE_DISABLE_PROJECT_CONFIG: "0", OPENCODE_DISABLE_CLAUDE_CODE: "false" });
+    expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBe("1");
+    expect(env.OPENCODE_DISABLE_CLAUDE_CODE).toBe("1");
   });
 });
 

@@ -664,8 +664,9 @@ describe("tasks, projects and events", () => {
     await env.vault.create("plain", "note", NOTE);
     await env.vault.create("plan", "board", "---\ntitle: t\nstatus: todo\n---\n\n```md {#a}\nx\n```\n");
     expect((await env.vault.tree()).tasks).toEqual({
-      todo: { status: "todo", due: "2026-10-03" },
-      "work/done": { status: "done" },
+      /* And what the listing counts beside it: a body, and when the file last changed (#311). */
+      todo: { status: "todo", due: "2026-10-03", body: true, changed: expect.any(Number) },
+      "work/done": { status: "done", changed: expect.any(Number) },
     });
   });
 
@@ -673,15 +674,30 @@ describe("tasks, projects and events", () => {
     const name = await env.vault.create("n", "note", NOTE);
     expect((await env.vault.tree()).tasks).toEqual({});
     await env.vault.write(name, "note", "---\nstatus: in-progress\n---\n" + NOTE, null);
-    expect((await env.vault.tree()).tasks).toEqual({ n: { status: "in-progress" } });
+    expect((await env.vault.tree()).tasks).toEqual({ n: { status: "in-progress", body: true, changed: expect.any(Number) } });
     await env.vault.write(name, "note", NOTE, null);
     expect((await env.vault.tree()).tasks).toEqual({});
+  });
+
+  it("the tree counts a task's check items and says when its file changed, and writes neither", async () => {
+    const text = "---\nstatus: todo\n---\n- [x] one\n- [ ] two\n- [X] three\n";
+    await env.vault.create("steps", "note", text);
+    const file = path.join(env.root, "steps.md");
+    const before = fs.readFileSync(file, "utf8");
+    const at = fs.statSync(file).mtimeMs;
+    expect((await env.vault.tree()).tasks.steps).toEqual({
+      status: "todo",
+      body: true,
+      items: { done: 2, total: 3 },
+      changed: Math.round(at),
+    });
+    expect(fs.readFileSync(file, "utf8")).toBe(before);
   });
 
   it("a task follows its note to a new name", async () => {
     await env.vault.create("n", "note", "---\nstatus: todo\n---\n");
     const moved = await env.vault.rename("n", "note", "work/n");
-    expect((await env.vault.tree()).tasks).toEqual({ [moved]: { status: "todo" } });
+    expect((await env.vault.tree()).tasks).toEqual({ [moved]: { status: "todo", changed: expect.any(Number) } });
   });
 
   it("the tree carries each project and only a note is one", async () => {
@@ -715,7 +731,7 @@ describe("tasks, projects and events", () => {
       offsite: { start: "2026-10-03T09:00+02:00" },
       "work/conf": { start: "2026-10-12", end: "2026-10-14" },
     });
-    expect(tree.tasks).toEqual({ chore: { status: "todo", start: "2026-10-12" } });
+    expect(tree.tasks).toEqual({ chore: { status: "todo", start: "2026-10-12", changed: expect.any(Number) } });
   });
 
   it("a start written is listed and one taken out is not", async () => {

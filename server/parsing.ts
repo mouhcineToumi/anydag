@@ -19,7 +19,7 @@ import path from "node:path";
 import { indexTexts } from "../src/refs/extract";
 import { corpusTexts } from "../src/search/corpus";
 import { COMPONENT_PREFIX, refusal, type TextKind, textFile } from "./names";
-import { Shelf, type Stamp } from "./parse-store";
+import { type Indexed, Shelf, type Stamp } from "./parse-store";
 
 /** Which of the grammar's whole-vault questions a cache answers: `/index`'s, or `/corpus`'s. */
 export type Question = "index" | "corpus";
@@ -67,11 +67,6 @@ const sha1 = (text: string): string => createHash("sha1").update(text).digest("h
 const CHUNK_TEXTS = 500;
 const CHUNK_BYTES = 2 * 1024 * 1024;
 
-let parsedHere = 0;
-
-/** How many texts this process has parsed since it started, every question's: what its heap has grown by. */
-export const parsedSinceStart = (): number => parsedHere;
-
 /** A name for an answer: random, so one kept on disk is never taken for another process's of the same number. */
 const newTurn = (): number => Math.floor(Math.random() * 2 ** 48);
 
@@ -102,8 +97,20 @@ export class Reader {
     private shelf: Shelf | null = null,
   ) {}
 
+  /** A reader keeping what it parsed in `home`'s `parse.sqlite` — or, with no home, on a shelf in memory. */
   static of(root: string, question: Question, home?: string | null): Reader {
-    return new Reader(root, PARSE[question], question, Shelf.at(home));
+    return new Reader(root, PARSE[question], question, Shelf.at(home) ?? Shelf.memory());
+  }
+
+  /** The words index of what this reader read, for a search (`server/words.ts`); `null` with no shelf. */
+  words(): Indexed | null {
+    this.load();
+    return this.shelf && this.question === "corpus" ? this.shelf.words(this.root) : null;
+  }
+
+  /** The attachments a search finds by name, into the index: see `Shelf.files`. */
+  files(seal: string, units: readonly (readonly string[])[]): void {
+    if (this.shelf && this.question === "corpus") this.shelf.files(this.root, seal, units);
   }
 
   /** The name of the answer this reader last gave. */
@@ -129,7 +136,7 @@ export class Reader {
   /** The shelf failed: keep everything in memory from here, starting from nothing. */
   private unshelve(e: unknown): void {
     console.warn(`anydag: keeping what was parsed of ${this.root} in memory only: ${(e as Error)?.message ?? e}`);
-    this.shelf = null;
+    this.shelf = this.shelf?.inMemory || !this.question ? null : Shelf.memory();
     this.kept = new Map();
     this.turn = newTurn();
   }
@@ -154,7 +161,7 @@ export class Reader {
    * way leaves what it parsed for the next. With `answer` false the docs are not gathered: a corpus or
    * a search reads them from the shelf as it needs them.
    */
-  *steps(entries: readonly Entry[], since: number | null, answer = true): Generator<void, Read> {
+  *steps(entries: readonly Entry[], since: number | null, answer = true, chunk = CHUNK_TEXTS): Generator<void, Read> {
     this.load();
     const now = new Map<string, Kept>();
     const missing: string[] = [];
@@ -180,7 +187,6 @@ export class Reader {
         if (answer) fresh.push([key, doc]);
       }
       parsed += keys.length;
-      parsedHere += keys.length;
       batch = {};
       batchStamps = new Map();
       batchBytes = 0;
@@ -205,7 +211,7 @@ export class Reader {
         batch[key] = got.text;
         batchStamps.set(key, { stat: got.stat, listed: listed ?? null, sha: got.sha, bytes: got.text.length });
         batchBytes += got.text.length;
-        if (batchStamps.size >= CHUNK_TEXTS || batchBytes >= CHUNK_BYTES) {
+        if (batchStamps.size >= chunk || batchBytes >= CHUNK_BYTES) {
           flush();
           // Kept as it goes, under no answer's name until the last part is down.
           if (this.shelf && this.question && !this.save(put, [], [], null)) return this.read(entries, null);
@@ -287,6 +293,23 @@ export class Reader {
     } else again.doc = doc;
     this.kept.set(key, again);
     return doc;
+  }
+
+  /**
+   * What was parsed of an entry this reader holds, from memory or the shelf only — `undefined` when
+   * neither has it. Nothing is read or written: a search asks this while it walks the index.
+   */
+  shelved(entry: Entry): Doc | null | undefined {
+    const [key] = entry;
+    const k = this.kept.get(key);
+    if (!k) return undefined;
+    if ("doc" in k) return k.doc ?? null;
+    if (!this.shelf || !this.question) return undefined;
+    try {
+      return this.shelf.doc(this.root, this.question, key);
+    } catch {
+      return undefined;
+    }
   }
 
   /** The text's length as last read, `0` for one not kept — what sizes the parts an answer goes in. */
@@ -377,13 +400,17 @@ export type FileMeta = [id: string, name: string, title: string | null];
 
 /**
  * What a read is for when it is not the docs: the corpus, as the JSON `/__board/corpus` streams, or
- * a query's answer — both made where the docs are (`server/searching.ts`), so neither the units nor
- * the engine cross to the server's thread (#279).
+ * a query's answer — both made where the docs are (`server/searching.ts`), so the units never cross
+ * to the server's thread (#279).
  */
 export type Want =
   | { corpus: true }
-  /** `retire`: a worker that has parsed many texts may ask to be replaced before it builds the engine (`{ again }`). */
-  | { search: string; limit?: number; retire?: boolean };
+  | { search: string; limit?: number; only?: string[] }
+  /**
+   * The corpus and its words index brought up to date, nothing answered — in the background
+   * (`server/upkeep.ts`): in small chunks, each waiting while a question on another reader runs.
+   */
+  | { warm: true };
 
 /** What the server's thread sends the worker: the entries of a question in parts, the next part of an answer, a cache dropped. */
 export type ReadAsk =
@@ -404,4 +431,6 @@ export type ReadAsk =
       want?: Want;
     }
   | { next: number }
+  /** An answer in parts its asker let go of: the rest is not sent. */
+  | { abandon: number }
   | { forget: number };

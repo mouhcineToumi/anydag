@@ -67,13 +67,15 @@ import { nameInBar } from "./Toolbar";
 import { TemplatePicker } from "./TemplatePicker";
 import { closeTemplates, createFromTemplate, useTemplatePicker } from "./templates";
 import { IconButton } from "@/ui/controls";
-import { closeAssistant, usePanel } from "@/assistant/panelState";
+import { closeAssistant, setPanelDocument, usePanel } from "@/assistant/panelState";
 import { AssistantPanel } from "./chunks";
 import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
+import { TagPopover, type Tagging } from "./tags/TagPopover";
 import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
+import type { NewTab } from "./tabs/intent";
 import { ancestors, follow, keyOf, leaf, parentOf, rebase, type Change } from "./tree";
 
 /**
@@ -108,13 +110,31 @@ export interface SidebarControl {
   /** A listed file's permanent id, which a link to it carries. */
   idOf(name: string): string | undefined;
   /**
+   * A copy of a file beside it, opening nothing — a page's menu (the calendar's) asking for the
+   * copy the sidebar makes, without the sidebar's follow-up: there, the next thing anybody does to
+   * a copy is name it, and it opens; here the person asked for a copy, not to go there.
+   */
+  duplicate(kind: FileKind, name: string): void;
+  /**
+   * A file into the trash, with the notice whose Undo puts it back — the sidebar's Delete, asked
+   * for from a page that has a file but no row: the calendar's menu.
+   */
+  trash(kind: FileKind, name: string): void;
+  /**
    * Home: nothing open, the welcome card, as a new history entry so Back comes back here. What
    * the AnyDag logo does — the column's own while it is docked, the toolbar's while it is away.
    */
   home(): void;
+  /**
+   * *Tags…*: a document's tags in a card under `anchor` — the top bar's `⋯` on a board, a quiz or a
+   * table, and a sidebar row's menu on any text (#327). One card for the window, drawn here.
+   */
+  editTags(kind: TextKind, name: string, anchor: HTMLElement | null): void;
 }
 
 const SidebarContext = createContext<SidebarControl | null>(null);
+
+const NO_TAGS: readonly string[] = [];
 
 /** The sidebar's control, or `null` where there is none — a snapshot draws no sidebar. */
 export function useSidebar(): SidebarControl | null {
@@ -184,6 +204,25 @@ function readFolders(): Set<string> {
 }
 
 /**
+ * **A preference is written after the commit, never from a state updater.**
+ *
+ * React runs an updater again while it renders, as soon as a second update is waiting on the
+ * component — so a `writePref` inside one fires during `Shell`'s render. That wakes every listener
+ * of `dag:prefs`, and the sidebar's `useAttachmentsFolder` answers by setting its own state, which
+ * React reports as *Cannot update a component (`Sidebar`) while rendering a different component
+ * (`Shell`)* (#352). The value is remembered, so a render that changed nothing writes nothing —
+ * including the first one, which read what is already stored.
+ */
+function usePersisted<T>(value: T, write: (value: T) => void): void {
+  const written = useRef(value);
+  useEffect(() => {
+    if (Object.is(written.current, value)) return;
+    written.current = value;
+    write(value);
+  }, [value, write]);
+}
+
+/**
  * The window: the sidebar down the left, and the page — a board or a note — beside it.
  *
  * **Above both pages, which is the whole reason it exists.** `App` renders a `NoteApp` or a
@@ -221,6 +260,7 @@ export function Shell({
   tasks,
   projects,
   events,
+  tags,
   quizzes,
   questions,
   tables,
@@ -262,6 +302,8 @@ export function Shell({
   projects: Readonly<Record<string, Project>>;
   /** Which notes are events, and when — what a row's glyph and its menu say. */
   events: Readonly<Record<string, NoteEvent>>;
+  /** Each text's tags, by name — what *Tags…* draws. */
+  tags: Readonly<Record<string, readonly string[]>>;
   /** Every quiz, the third kind of file, and how many questions each asks. */
   quizzes: string[];
   questions: Readonly<Record<string, number>>;
@@ -300,7 +342,9 @@ export function Shell({
   openAssistant(chat?: string | null): void;
   /** Home: nothing open, the welcome card, as a new history entry — what the AnyDag logo does. */
   openHome(): void;
-  open(kind: FileKind, name: string | null): void;
+  /** A document from a row or the search: a new history entry. `replace` is what a rename, a move
+      or a delete of the file already open does — the same place under another name, or none. */
+  open(kind: FileKind, name: string | null, options?: { replace?: boolean; tab?: NewTab }): void;
   children: ReactNode;
 }) {
   /* The Assistant's panel, down the right of whatever page is open (`space A`). Turning the
@@ -333,11 +377,14 @@ export function Shell({
   const saveFavourites = useCallback((next: (had: string[]) => string[]) => {
     setFavourites((had) => {
       const out = next(had);
-      if (out.length === had.length && out.every((k, i) => k === had[i])) return had;
-      writePref(FAVOURITES, out.length ? JSON.stringify(out) : null);
-      return out;
+      return out.length === had.length && out.every((k, i) => k === had[i]) ? had : out;
     });
   }, []);
+  const rememberFavourites = useCallback(
+    (kept: string[]) => writePref(FAVOURITES, kept.length ? JSON.stringify(kept) : null),
+    [],
+  );
+  usePersisted(favourites, rememberFavourites);
   /** Keep the favourites in step with what just happened to a file or a folder here. */
   const moved = useCallback((change: Change) => saveFavourites((had) => follow(had, change)), [saveFavourites]);
   const nameNext = useCallback((key: string) => setNaming((was) => ({ key, n: (was?.n ?? 0) + 1 })), []);
@@ -362,20 +409,37 @@ export function Shell({
     if (narrow && nothing) setPinned(true);
   }, [narrow, nothing]);
 
-  const setFolders = useCallback((next: (had: Set<string>) => Set<string>) => {
-    setOpenFolders((had) => {
-      const out = next(had);
-      if (out === had) return had;
-      writeLocal(SIDEBAR_FOLDERS, JSON.stringify([...out].sort()));
-      return out;
-    });
-  }, []);
+  const setFolders = useCallback((next: (had: Set<string>) => Set<string>) => setOpenFolders(next), []);
+  const rememberFolders = useCallback((kept: Set<string>) => writeLocal(SIDEBAR_FOLDERS, JSON.stringify([...kept].sort())), []);
+  usePersisted(openFolders, rememberFolders);
+  const rememberDock = useCallback((on: boolean) => writeFlag(SIDEBAR, on), []);
+  usePersisted(docked, rememberDock);
 
   /* What is open, by kind — a `Record`, so every question below asks all five and a sixth kind is
      a type error rather than a table taken for a board. */
   const opened = useMemo<Readonly<Record<FileKind, string | null>>>(
     () => ({ board, note, quiz, table, file }),
     [board, note, quiz, table, file],
+  );
+
+  /* What the Assistant's panel calls the document it is beside (#321). A chat belongs to one:
+     closing the panel and opening it again on the same page keeps the chat it had, and any other
+     page — another file, a list, Home — starts a new one. The Assistant's own page is not a move:
+     the panel is not drawn there, and going back to the file it was opened from should keep it. */
+  const place =
+    FILE_KINDS.map((kind) => (opened[kind] ? `${kind}:${opened[kind]}` : null)).find((key) => key !== null) ??
+    (tasksOpen ? "tasks" : calendarOpen ? "calendar" : quizzesOpen ? "quizzes" : trashOpen ? "trash" : "home");
+  useEffect(() => {
+    if (assistantOpen) return;
+    setPanelDocument(place);
+  }, [assistantOpen, place]);
+  /* The same document as the panel's chip shows it: a chat started beside it works on it (#323). */
+  const panelKind = FILE_KINDS.find((kind) => opened[kind] !== null);
+  const panelName = panelKind ? opened[panelKind] : null;
+  const panelTitle = panelName ? (titles[panelName] ?? leaf(panelName)) : "";
+  const panelDocument = useMemo(
+    () => (panelKind && panelName ? { kind: panelKind, name: panelName, title: panelTitle } : null),
+    [panelKind, panelName, panelTitle],
   );
 
   /* How many questions are in Mistakes, for the count beside Quizzes. Asked here rather
@@ -407,10 +471,7 @@ export function Shell({
       return;
     }
     setPinned(false);
-    setDocked((v) => {
-      writeFlag(SIDEBAR, !v);
-      return !v;
-    });
+    setDocked((v) => !v);
   }, [narrow]);
 
   const peek = useCallback(() => {
@@ -494,8 +555,8 @@ export function Shell({
   }, [pinned]);
 
   const onOpen = useCallback(
-    (kind: FileKind, name: string) => {
-      open(kind, name);
+    (kind: FileKind, name: string, tab?: NewTab) => {
+      open(kind, name, tab ? { tab } : undefined);
       dismiss();
     },
     [open, dismiss],
@@ -632,7 +693,7 @@ export function Shell({
           done(made !== null);
           if (!made || made === name) return;
           moved({ kind: "file", file: kind, from: name, to: made });
-          if (isOpen(kind, name)) open(kind, made);
+          if (isOpen(kind, name)) open(kind, made, { replace: true });
         });
       },
       duplicate(kind, name) {
@@ -675,7 +736,7 @@ export function Shell({
               file: went.files ?? [],
             };
             const wasOpen = openKind && was !== null && byKind[openKind].includes(was) ? { kind: openKind, name: was } : null;
-            if (wasOpen) open(wasOpen.kind, null);
+            if (wasOpen) open(wasOpen.kind, null, { replace: true });
             gone.push({ entry: went.trash, favourites: favs, open: wasOpen });
           } else {
             const entry = await deleteBoard(t.name, t.kind);
@@ -687,7 +748,7 @@ export function Shell({
             const key = keyOf(t);
             moved({ kind: "file", file: t.kind, from: t.name, to: null });
             const wasOpen = isOpen(t.kind, t.name) ? { kind: t.kind, name: t.name } : null;
-            if (wasOpen) open(t.kind, null);
+            if (wasOpen) open(t.kind, null, { replace: true });
             gone.push({ entry, favourites: favourites.includes(key) ? [key] : [], open: wasOpen });
           }
         }
@@ -701,7 +762,7 @@ export function Shell({
           if (!made) return false;
           moved({ kind: "file", file: kind, from: name, to: made });
           if (folder) setFolders((had) => (had.has(folder) ? had : new Set([...had, ...ancestors(`${folder}/x`)])));
-          if (isOpen(kind, name)) open(kind, made);
+          if (isOpen(kind, name)) open(kind, made, { replace: true });
           return true;
         });
       },
@@ -731,7 +792,7 @@ export function Shell({
             return next;
           });
           const was = openKind ? opened[openKind] : null;
-          if (openKind && was && rebase(was, path, made) !== was) open(openKind, rebase(was, path, made));
+          if (openKind && was && rebase(was, path, made) !== was) open(openKind, rebase(was, path, made), { replace: true });
           return null;
         });
       },
@@ -760,11 +821,11 @@ export function Shell({
               file: gone.files ?? [],
             };
             const was = openKind ? opened[openKind] : null;
-            if (openKind && was !== null && went[openKind].includes(was)) open(openKind, null);
+            if (openKind && was !== null && went[openKind].includes(was)) open(openKind, null, { replace: true });
           } else {
             await transferFile(what.kind, what.name, to);
             moved({ kind: "file", file: what.kind, from: what.name, to: null });
-            if (isOpen(what.kind, what.name)) open(what.kind, null);
+            if (isOpen(what.kind, what.name)) open(what.kind, null, { replace: true });
           }
           done(true);
           dispatchEvent(new CustomEvent("dag:boards"));
@@ -863,9 +924,30 @@ export function Shell({
   );
 
   const idOf = useCallback((name: string) => ids[name], [ids]);
+  /* *Tags…*, asked from the top bar or a row. A narrow window's sheet goes, so the card is not under it. */
+  const [tagging, setTagging] = useState<Tagging | null>(null);
+  const editTags = useCallback(
+    (kind: TextKind, name: string, anchor: HTMLElement | null) => {
+      if (narrow) dismiss();
+      setTagging({ kind, name, anchor });
+    },
+    [narrow, dismiss],
+  );
+  const stopTagging = useCallback(() => setTagging(null), []);
   const ctl = useMemo<SidebarControl>(
-    () => ({ docked: mode === "docked", reveal, create, renamed, retitle, idOf, home: openHome }),
-    [mode, reveal, create, renamed, retitle, idOf, openHome],
+    () => ({
+      docked: mode === "docked",
+      reveal,
+      create,
+      renamed,
+      retitle,
+      idOf,
+      duplicate: (kind, name) => void duplicateBoard(name, undefined, kind),
+      trash: (kind, name) => void files.trash([{ kind, name }]),
+      home: openHome,
+      editTags,
+    }),
+    [mode, reveal, create, renamed, retitle, idOf, files, openHome, editTags],
   );
 
   /* What Undo did with what came back: a favourite is a favourite again, under the name it has now,
@@ -877,7 +959,7 @@ export function Shell({
         const keys = g.favourites.map((k) => `${k.slice(0, k.indexOf(":"))}:${at(k.slice(k.indexOf(":") + 1))}`);
         saveFavourites((had) => [...had, ...keys.filter((k) => !had.includes(k))]);
       }
-      if (g.open) open(g.open.kind, at(g.open.name));
+      if (g.open) open(g.open.kind, at(g.open.name), { replace: true });
     },
     [open, saveFavourites],
   );
@@ -1003,11 +1085,14 @@ export function Shell({
               onPointerEnter={mode === "overlay" && peeking ? cancelLeave : undefined}
               onPointerLeave={mode === "overlay" && peeking && !pinned ? unpeek : undefined}
               onDismiss={dismiss}
+              onTags={editTags}
               sheet={narrow}
             />
           ) : null}
           {children}
-          {panel.open && assistantOn && !assistantOpen ? <AssistantPanel onOpen={open} onPage={openAssistant} /> : null}
+          {panel.open && assistantOn && !assistantOpen ? (
+            <AssistantPanel onOpen={open} onPage={openAssistant} beside={panelDocument} />
+          ) : null}
           {picker.open ? (
             <TemplatePicker
               folder={picker.folder ?? parentOf(board ?? note ?? quiz ?? table ?? file ?? "")}
@@ -1026,6 +1111,7 @@ export function Shell({
               onClose={() => setTrashed(null)}
             />
           ) : null}
+          {tagging ? <TagPopover what={tagging} tags={tags[tagging.name] ?? NO_TAGS} onClose={stopTagging} /> : null}
           {cloud ? <TelemetryPrompt page={asking} /> : null}
         </ToastHost>
       </SidebarContext.Provider>

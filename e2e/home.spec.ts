@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
-import { suiteVault, vaulted } from "./vault";
+import { expect, test, type Page } from "./fixture";
+import { suiteVault } from "./vault";
 
 /**
  * Home: the AnyDag logo goes back to the welcome card.
@@ -73,7 +73,7 @@ test.beforeEach(async ({ page }, info) => {
      watcher reports them a moment later; a page opened in that window asks about a file the
      listing does not name yet and draws *Nothing open* instead of the page this check is about.
      Waiting on the list is the same one-round-trip rule the rest of the suite follows. */
-  const vault = await suiteVault(page);
+  const vault = await suiteVault(page.request);
   await expect
     .poll(
       async () => {
@@ -142,11 +142,12 @@ const PAGES: { what: string; url: () => string; here: (page: Page) => Promise<vo
 
 for (const { what, url, here } of PAGES) {
   test(`the logo goes home from ${what}, and Back returns to it`, async ({ page }) => {
-    const address = await vaulted(page, url());
-    const search = address.slice(address.indexOf("?"));
-    await page.goto(address);
+    await page.goto(url());
     await here(page);
     await expect(welcome(page)).toHaveCount(0);
+    /* The page's address once it has settled, which names the vault it pinned. Read after it
+       arrived rather than off the string handed to `goto`, so this compares what the tab did. */
+    const search = new URL(page.url()).search;
 
     await logo(page).click();
     await expect(welcome(page)).toBeVisible();
@@ -168,7 +169,7 @@ for (const { what, url, here } of PAGES) {
 }
 
 test("pressing Enter on the logo goes home from a note", async ({ page }) => {
-  await page.goto(await vaulted(page, `/?note=${note()}`));
+  await page.goto(`/?note=${note()}`);
   await expect(page.locator(".dag-note-view")).toBeVisible({ timeout: 10_000 });
 
   await logo(page).focus();
@@ -178,7 +179,7 @@ test("pressing Enter on the logo goes home from a note", async ({ page }) => {
 });
 
 test("the logo says it can be clicked", async ({ page }) => {
-  await page.goto(await vaulted(page, "/?tasks=1"));
+  await page.goto("/?tasks=1");
   await expect(page.locator("[data-dag-tasks]")).toBeVisible({ timeout: 10_000 });
 
   /* Named for what it does — and, since #203, holding the wordmark it shows, because a spoken
@@ -207,7 +208,7 @@ test.describe("docked", () => {
   });
 
   test("the column's own logo goes home from a board", async ({ page }) => {
-    await page.goto(await vaulted(page, `/?board=${board()}`));
+    await page.goto(`/?board=${board()}`);
     await expect(page.locator('[data-dag-item="a"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator(".dag-toolbar .dag-toolbar__logo")).toHaveCount(0);
 
@@ -219,11 +220,11 @@ test.describe("docked", () => {
 });
 
 test("opening three files and going home lists them newest first", async ({ page }) => {
-  await page.goto(await vaulted(page, `/?board=${board()}`));
+  await page.goto(`/?board=${board()}`);
   await expect(page.locator('[data-dag-item="a"]')).toBeVisible({ timeout: 10_000 });
-  await page.goto(await vaulted(page, `/?note=${note()}`));
+  await page.goto(`/?note=${note()}`);
   await expect(page.locator(".dag-note-view")).toBeVisible({ timeout: 10_000 });
-  await page.goto(await vaulted(page, `/?quiz=${quiz()}`));
+  await page.goto(`/?quiz=${quiz()}`);
   await expect(page.locator("[data-dag-quiz-question]")).toBeVisible({ timeout: 10_000 });
 
   await logo(page).click();
@@ -253,7 +254,7 @@ test("a task due this week is on Home, and a done one is not", async ({ page }) 
   task("rent", "Pay rent", "todo");
   task("settled", "Already settled", "done");
 
-  await page.goto(await vaulted(page, "/"));
+  await page.goto("/");
   /* The watcher may report the two files a moment after the page's first listing; the row arrives
      when the list does, which is what `useBoardList` redraws on. Other workers share the vault, so
      this looks for its own two rows rather than counting the list. */

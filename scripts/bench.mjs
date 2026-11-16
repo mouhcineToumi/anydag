@@ -7,15 +7,21 @@
  * Electron shell, and prints one line per measurement. Nothing outside that temp folder is read or
  * written but the built bundles, and the folder is removed by its exact path when the run ends.
  *
- *   node scripts/bench.mjs [--quick] [--guard] [--sizes 100,1000,10000,50000] [--only <groups>]
- *                          [--json <file>] [--keep]
+ *   node scripts/bench.mjs [--quick] [--guard] [--release] [--save] [--sizes 100,1000,10000,50000]
+ *                          [--only <groups>] [--json <file>] [--keep]
  *
  *   --quick   small steps only (vaults of 100 and 1k files, boards of 10 and 100 items, diagrams of
  *             50 and 200 nodes, attachments of 1 and 10 MB): a few minutes; the whole run is ~25
  *   --guard   only the nightly guards, each against its ceiling in `scripts/bench-guard.json`;
  *             exit 1 when one is over (see *The guards* below)
+ *   --release one Markdown table of the fixed release rows, with the release before it beside them
+ *             (see *The release table* below); it needs a 1k-file vault and a 500-item board, so
+ *             `--quick` is the short run and the whole bench is the long one
+ *   --save    with --release, also write this run to `docs/bench/<VERSION>.json`, the file the next
+ *             release is compared with; refuses a row the run could not measure
  *   --sizes   the vault sizes, in files (default 100,1000,10000,50000)
- *   --only    a comma list of groups: vault, page, board, attach, leak, desktop (default all)
+ *   --only    a comma list of groups: vault, page, board, attach, leak, desktop (default all; with
+ *             --release, the four groups its rows come from)
  *   --json    also write every measurement, with the machine, to this file
  *   --keep    leave the temp folder in place and say where it is
  *
@@ -33,6 +39,15 @@
  * not finish inside its limit (that is a measurement: it is where something breaks). Units: `ms`,
  * `s`, `MB`, `%` (of one core, averaged over the window the note names), `count`. `--json` writes
  * `{ machine, started, args, results: [{ metric, value, unit, note }] }`.
+ *
+ * **The release table** (`--release`) is what a release carries (#328): the run ends with one
+ * Markdown table, ready to paste into the release notes, whose ten rows never change — startup to a
+ * drawn board, the page's first search, the server's memory at rest, the 1k-file vault's `/list`,
+ * `/index` and `/search` cold and warm, and a 500-item board to `data-dag-ready`. The previous
+ * release's numbers sit beside them, read from `docs/bench/<version>.json` (`--save` writes that
+ * file), so the comparison works offline and a change to a number is a diff in a pull request. The
+ * rows are in `scripts/bench-release.mjs`; the release step is in `docs/RELEASING.md`, and it is not
+ * run in CI: the numbers are the release machine's, and a runner's are not comparable.
  *
  * **What is measured, and how.**
  * - *vault.<n>*: the server started on a vault of n files (90% notes, 4% tasks among them, boards,
@@ -81,7 +96,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { storageState } from "./session.mjs";
+import { missingReleaseRows, previousRelease, RELEASE_DIR, releaseTable, releaseValues, writeRelease } from "./bench-release.mjs";
+import { enter } from "./session.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium, _electron } = require("@playwright/test");
@@ -104,16 +120,32 @@ const opt = (name, dflt) => {
 };
 const QUICK = argv.includes("--quick");
 const GUARD = argv.includes("--guard");
+const RELEASE = argv.includes("--release");
+const SAVE = argv.includes("--save");
 const KEEP = argv.includes("--keep");
 const JSON_OUT = opt("--json", null);
+if (SAVE && !RELEASE) {
+  console.error("bench: --save writes the release table's numbers — use it with --release");
+  process.exit(2);
+}
+if (RELEASE && GUARD) {
+  console.error("bench: --release prints the release table and --guard the nightly guards — run one at a time");
+  process.exit(2);
+}
 /** How long the vault group's server lets its grammar worker idle before ending it, in ms. */
 const REST_MS = 10_000;
+/** How long the vault is left quiet after a burst before `search.after-burst.quiet` is asked. */
+const QUIET_SEARCH_MS = 5_000;
 const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
   .split(",")
   .map(Number)
   .filter((n) => Number.isInteger(n) && n > 0);
-const ONLY = new Set(opt("--only", "vault,page,board,attach,leak,desktop").split(","));
+/* The release rows are made on a 1k-file vault and a 500-item board; a --sizes or --quick that
+   leaves either out gets it back, so the table always has the same ten rows to show. */
+if (RELEASE && !SIZES.includes(1000)) SIZES.push(1000);
+const ONLY = new Set((RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop")).split(","));
 const BOARD_ITEMS = QUICK ? [10, 100] : [10, 100, 500, 2000];
+if (RELEASE && !BOARD_ITEMS.includes(500)) BOARD_ITEMS.push(500);
 const DIAGRAM_NODES = QUICK ? [50, 200] : [50, 200, 500, 1000];
 const ATTACH_MB = QUICK ? [1, 10] : [1, 10, 100, 500];
 /** Any one step: past this it is `timeout`, which is where that thing breaks. */
@@ -655,7 +687,10 @@ async function launchBrowser() {
 }
 
 async function pageOn(b, s, size = { width: 1440, height: 900 }) {
-  const context = await b.browser.newContext({ viewport: size, storageState: storageState(s.token) });
+  const context = await b.browser.newContext({ viewport: size });
+  /* In once per context, through the address the server prints: its cookie is bound to a secret
+     path the page learns there, not seeded (`scripts/session.mjs`). */
+  await enter(context, s.origin, s.token);
   const page = await context.newPage();
   const problems = [];
   page.on("pageerror", (e) => problems.push(String(e)));
@@ -706,8 +741,8 @@ async function vaultGroup(n, b) {
   const v = makeVault(dir, n);
   record(`vault.${n}.generate`, now() - t, "ms", `${(duBytes(dir) / 1024 / 1024).toFixed(1)} MB on disk`);
   const before = fingerprint(dir);
-  /* The grammar's worker ends when idle — 30 s after its last answer, 5 min after its last search
-     (`server/grammar.ts`). Here both are 10 s, so `server.rss.rest` is measured inside the group. */
+  /* The grammar's worker ends when idle — 30 s after its last answer (`server/grammar.ts`; before #267,
+     5 min after its last search). Here both are 10 s, so `server.rss.rest` is measured inside the group. */
   const s = await startServer(dir, home, {
     env: { ANYDAG_GRAMMAR_IDLE_MS: String(REST_MS), ANYDAG_SEARCH_IDLE_MS: String(REST_MS) },
   });
@@ -726,7 +761,7 @@ async function vaultGroup(n, b) {
   record(`${p}.index.warm`, idx2.ms, "ms");
   record(`${p}.index.warm.health`, idx2.health, "ms", `the slowest /api/health of ${idx2.asked} asked while it ran`);
   const s1 = await timedReq(s, "/__board/search?q=ledger");
-  record(`${p}.search.cold`, s1.ms, "ms", "corpus parsed, engine built");
+  record(`${p}.search.cold`, s1.ms, "ms", "the corpus parsed and its words indexed");
   const corpus = await beside(s, "/__board/corpus");
   record(`${p}.corpus.warm`, corpus.ms, "ms", `${mb(corpus.bytes)?.toFixed(1)} MB answer`);
   record(`${p}.corpus.warm.health`, corpus.health, "ms", `the slowest /api/health of ${corpus.asked} asked while it ran`);
@@ -741,6 +776,9 @@ async function vaultGroup(n, b) {
     "ms",
     "median of 4 queries",
   );
+  /* One letter: the widest prefix a person types, every unit with a word starting with it ranked. */
+  const short = await timedReq(s, "/__board/search?q=h");
+  record(`${p}.search.warm.short`, short.ms, "ms", "the one-letter query `h`");
   const m = serverMem(s.pid);
   record(
     `${p}.server.rss.used`,
@@ -774,7 +812,7 @@ async function vaultGroup(n, b) {
   record(`${p}.index.after-idle`, idx4.ms, "ms", "a warm /index asked of a worker started again");
   record(`${p}.index.after-idle.health`, idx4.health, "ms", `the slowest /api/health of ${idx4.asked} asked while it ran`);
   const s4 = await beside(s, "/__board/search?q=harbour");
-  record(`${p}.search.after-idle`, s4.ms, "ms", "a search asked of a worker started again: its engine built again");
+  record(`${p}.search.after-idle`, s4.ms, "ms", "a search asked of a worker started again");
   record(`${p}.search.after-idle.health`, s4.health, "ms", `the slowest /api/health of ${s4.asked} asked while it ran`);
 
   const after = fingerprint(dir);
@@ -802,11 +840,43 @@ async function vaultGroup(n, b) {
   record(`${p}.burst.cpu`, cpu0 === null ? null : cpu1 - cpu0, "s", "server CPU for the burst");
   const idx3 = await timedReq(s, "/__board/index");
   record(`${p}.index.after-burst`, idx3.ms, "ms", "only what changed is parsed again, by a worker started again");
+  /* The words the burst wrote are found by the next search: only the texts that moved are read again. */
+  const s5 = await timedReq(s, "/__board/search?q=edited%20bench");
+  const found5 = typeof s5.ms === "number" ? (s5.json().hits?.length ?? 0) : 0;
+  record(`${p}.search.after-burst`, s5.ms, "ms", `${found5} hits for the words the burst wrote`);
+  /* The same burst again, then the vault left quiet for a few seconds before anybody searches — an
+     agent writes, a person looks a moment later. A watched vault's index follows the writes as they
+     land (`server/upkeep.ts`, #267), so the search finds them with nothing left to read. */
+  t = now();
+  for (const rel of targets) fs.appendFileSync(path.join(dir, rel), `\nRevised by the bench at ${Date.now()}.\n`);
+  while (now() - Math.max(feed.last, t) < 1_500 && now() - t < 60_000) await sleep(100);
+  await sleep(QUIET_SEARCH_MS);
+  const s7 = await timedReq(s, "/__board/search?q=revised%20bench");
+  const found7 = typeof s7.ms === "number" ? (s7.json().hits?.length ?? 0) : 0;
+  record(
+    `${p}.search.after-burst.quiet`,
+    s7.ms,
+    "ms",
+    `${found7} hits, asked ${QUIET_SEARCH_MS / 1000} s after a second burst went quiet`,
+  );
   record(`${p}.home.size.after-burst`, mb(duBytes(home)), "MB");
   feed.close();
 
   if (b && ONLY.has("page")) await pageGroup(n, s, v, b);
   await s.stop();
+
+  /* The app started again on the same home: its first search, after the listing it needs. Nothing in
+     the vault moved, so nothing should be read or parsed again. */
+  const again = await startServer(dir, home, { page: false });
+  try {
+    const listed = await timedReq(again, "/__board/list");
+    record(`${p}.restart.list`, listed.ms, "ms", "the first listing of a server started again on the same home");
+    const s6 = await beside(again, "/__board/search?q=harbour");
+    record(`${p}.search.after-restart`, s6.ms, "ms", "the first search of a server started again on the same home");
+    record(`${p}.search.after-restart.health`, s6.health, "ms", `the slowest /api/health of ${s6.asked} asked while it ran`);
+  } finally {
+    await again.stop();
+  }
 }
 
 async function pageGroup(n, s, v, b) {
@@ -897,6 +967,45 @@ async function pageGroup(n, s, v, b) {
       record(`${p}.heap.search`, mb((await metrics()).JSHeapUsedSize), "MB", "the page's JS heap with the search index");
       record(`${p}.rss.renderer.search`, mb(sumRss(chromiumProcs(b.pid).renderers)), "MB");
     }
+
+    /* The search card opened with nothing typed: it lists every name in the vault, as a tree. */
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    t = now();
+    let opened = "timeout";
+    try {
+      await page.locator("[data-dag-open-boards]").first().click({ timeout: 10_000 });
+      await page.locator("[data-dag-boards] [data-dag-note]").first().waitFor({ timeout: STEP_MS });
+      opened = now() - t;
+    } catch {
+      /* opened stays timeout */
+    }
+    record(`${p}.search.open`, opened, "ms", "the card opened, nothing typed, to its first row");
+    record(
+      `${p}.search.open.dom`,
+      await page.evaluate(() => document.querySelector("[data-dag-boards]")?.getElementsByTagName("*").length ?? null),
+      "count",
+      "elements in the card",
+    );
+    await page.keyboard.press("Escape");
+
+    /* The Tasks page: every note with a status (4% of the vault here), as a list. */
+    t = now();
+    let tasksAt = "timeout";
+    try {
+      await page.goto(`${s.origin}/?tasks=1`);
+      await page.locator("[data-dag-task-row]").first().waitFor({ timeout: STEP_MS });
+      tasksAt = now() - t;
+    } catch {
+      /* tasksAt stays timeout */
+    }
+    record(`${p}.tasks.ready`, tasksAt, "ms", "navigation to ?tasks=1 to its first row");
+    const tasksDom = await page.evaluate(() => ({
+      rows: document.querySelectorAll("[data-dag-task-row]").length,
+      nodes: document.getElementsByTagName("*").length,
+    }));
+    record(`${p}.tasks.rows`, tasksDom.rows, "count", "task rows in the DOM");
+    record(`${p}.tasks.dom`, tasksDom.nodes, "count", "elements in the page");
 
     /* A request's cost from a page on `anydag serve`, to set beside the desktop's `anydag://`. */
     if (n === 1000) {
@@ -1384,9 +1493,11 @@ async function main() {
   console.log(`# AnyDag bench · ${started}`);
   console.log(`# ${m.cpu} · ${m.cores} cores · ${m.memoryGB} GB · ${m.os} · ${m.arch} · Node ${m.node}`);
   console.log(`# temp: ${work}  (${m.disk})`);
+  if (RELEASE) console.log("# release: the table's ten rows, a 1k-file vault and a 500-item board");
   const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board");
   const b = wantBrowser ? await launchBrowser() : null;
-  if (b) console.log(`# Chromium ${b.browser.version()}`);
+  const chromiumVersion = b ? b.browser.version() : null;
+  if (b) console.log(`# Chromium ${chromiumVersion}`);
   let code = 0;
   try {
     if (GUARD) {
@@ -1410,6 +1521,44 @@ async function main() {
   if (JSON_OUT) {
     fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine: m, started, args: argv, results }, null, 2)}\n`);
     console.log(`# wrote ${JSON_OUT}`);
+  }
+  if (RELEASE) {
+    const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
+    const dir = path.join(root, RELEASE_DIR);
+    const previous = previousRelease(dir, version);
+    const machineLine = [
+      m.cpu,
+      `${m.cores} cores`,
+      `${m.memoryGB} GB`,
+      m.os,
+      m.arch,
+      `Node ${m.node}`,
+      chromiumVersion ? `Chromium ${chromiumVersion}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (SAVE) {
+      /* A baseline with a hole in it is worse than none: the next release would compare a number
+         with an em dash and nobody would know whether the app or the run was missing. */
+      const missing = missingReleaseRows(results);
+      if (missing.length) {
+        console.error(`bench: --save needs every release row measured; no value for ${missing.map((r) => r.metric).join(", ")}`);
+        code = 1;
+      } else {
+        const file = writeRelease(dir, { version, date: started, machine: machineLine, results });
+        console.log(`# wrote ${path.relative(root, file)} — commit it with the release`);
+      }
+    }
+    console.log("");
+    console.log(
+      releaseTable({
+        version,
+        machine: machineLine,
+        current: releaseValues(results),
+        previous: previous ? releaseValues(previous.results) : null,
+        previousVersion: previous?.version ?? null,
+      }),
+    );
   }
   return code;
 }

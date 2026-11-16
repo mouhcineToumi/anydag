@@ -60,7 +60,7 @@ export function runMcp(args: readonly string[]): Promise<number> {
 /**
  * `anydag serve [<folder>] [--port <n>]` — the server with the built page, for a browser on this
  * machine: what the desktop app runs inside itself, without the app. It prints the address once,
- * `/?token=…`, which the page swaps for a cookie. The page is found next to the CLI's bundle
+ * `/?token=…`, which the server swaps for a cookie bound to a secret path. The page is found next to the CLI's bundle
  * (`dist/`), or at `$ANYDAG_PAGE`.
  */
 export function runServe(args: readonly string[]): Promise<number> {

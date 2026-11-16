@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Page } from "./fixture";
 import { openSidebar } from "./sidebar";
-import { vaulted } from "./vault";
 
 /**
  * The sidebar draws the rows in view and a margin, not every row of an open folder (#281), so a
@@ -54,7 +53,7 @@ const tree = (page: Page) => page.locator(".dag-sidebar__tree");
 const rowsInDom = (page: Page) => page.locator("[data-dag-sidebar-row]").count();
 
 async function open(page: Page, n: number): Promise<void> {
-  await page.goto(await vaulted(page, `/?note=${encodeURIComponent(file(n))}`));
+  await page.goto(`/?note=${encodeURIComponent(file(n))}`);
   await openSidebar(page);
   /* The list is five thousand rows longer than the page was ready for: wait for the open row. */
   await expect(page.locator(`${fileRow(file(n))}[aria-current="page"]`)).toHaveCount(1, { timeout: 30_000 });

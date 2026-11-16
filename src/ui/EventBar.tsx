@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 
 import { CalendarClock, Clock, Sun } from "lucide-react";
 
@@ -35,10 +35,13 @@ export function EventBar({
   event,
   onChange,
   editable,
+  children,
 }: {
   event: NoteEvent;
   onChange(change: EventChange): void;
   editable: boolean;
+  /** Rows after the event's own: the Tags row. */
+  children?: ReactNode;
 }) {
   useZone();
   const f = fieldsOf(event);
@@ -131,6 +134,7 @@ export function EventBar({
           </span>
         ) : null}
       </span>
+      {children}
     </div>
   );
 }

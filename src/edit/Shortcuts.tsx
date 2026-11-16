@@ -91,6 +91,20 @@ const SECTIONS: { title: string; rows: [string, string[]][] }[] = [
     ],
   },
   {
+    /* The window's documents (`src/ui/tabs/keys.ts`). The chords are the desktop app's: a browser
+       keeps them for its own tabs. */
+    title: "Document tabs",
+    rows: [
+      ["Open in a new tab · in front", ["middle-click", "⌃⇧ click"]],
+      ["New tab · close it", ["⌃T", "⌃W"]],
+      ["Open the last closed again", ["⌃⇧T"]],
+      ["Next tab · the one before", ["⌃Tab", "⌃⇧Tab"]],
+      ["Tab 1 to 8 · the last", ["⌃1…8", "⌃9"]],
+      ["Reorder the tabs", ["drag a tab", "⇧← ⇧→"]],
+      ["Close the focused tab", ["Delete"]],
+    ],
+  },
+  {
     title: "Move around",
     rows: [
       ["Move the paper", ["wheel"]],

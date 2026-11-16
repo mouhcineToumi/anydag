@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { BOARDS } from "./boards";
+import { expect, test, type Locator, type Page } from "./fixture";
 import { clickOnHover } from "./hover";
 import { openSettings, openSidebar } from "./sidebar";
 

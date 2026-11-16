@@ -90,6 +90,32 @@ describe("a vault's search and corpus", () => {
     expect(await search(app, "nothing-like-this")).toEqual([]);
   });
 
+  it("narrows to one tag's documents before the limit, and with no words lists them by title (#327)", async () => {
+    await env.vault.create("Plan", "note", "---\ntags: [Pricing]\n---\n# Plan\n\nSeat prices settle.\n");
+    await env.vault.create("Other", "note", "# Other\n\nSeat counts by plan.\n");
+    await env.vault.create("Board", "board", "---\ntitle: Ops board\ntags: [pricing, q4]\n---\n\n```md {#a}\nA seat.\n```\n");
+    await env.vault.create("Templates/T", "note", "---\ntags: [pricing]\n---\n# {{title}}\n\nseat\n");
+    const app = appOf();
+    expect((await search(app, "seat")).map((h) => h.name).sort()).toEqual(["Board", "Other", "Plan", "Templates/T"]);
+    const tagged = await get(app, "/__board/search?q=seat&tag=PRICING");
+    expect(tagged.tag).toBe("PRICING");
+    expect((tagged.hits as Hit[]).map((h) => h.name).sort()).toEqual(["Board", "Plan"]);
+    /* The limit counts what the tag keeps, not what it drops. */
+    expect(((await get(app, "/__board/search?q=seat&tag=q4&limit=1")).hits as Hit[]).map((h) => h.name)).toEqual(["Board"]);
+    /* No words: every document carrying it, by title, with its kind — a template left out. */
+    const all = await get(app, "/__board/search?tag=pricing");
+    expect(all.hits).toEqual([]);
+    expect(all.count).toBe(2);
+    expect((all.docs as { name: string; kind: string; title: string | null }[]).map((d) => [d.name, d.kind, d.title])).toEqual([
+      ["Board", "board", "Ops board"],
+      ["Plan", "note", "Plan"],
+    ]);
+    const res = await app.request("http://127.0.0.1/__board/search?q=x&tag=2026", {
+      headers: { "x-anydag-token": "t", host: "127.0.0.1" },
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("keeps what it parsed in the app's home, a row per text, and writes nothing into the vault", async () => {
     await env.vault.create("Plan", "note", "# Plan\n\nPayments settle overnight.\n");
     await env.vault.create("Other", "note", "# Other\n\nNothing here.\n");
@@ -273,7 +299,7 @@ process.on("disconnect", () => process.exit(0));\n`,
   it("is a process that ends when it has been idle, and is started again by the next question", async () => {
     const w = fake();
     try {
-      const t = new WorkerProcess(w.file, 60_000, 100, 100);
+      const t = new WorkerProcess(w.file, 60_000, 100);
       const a = await ask(t);
       expect(a.pid).not.toBe(process.pid);
       expect(t.pid).toBe(a.pid);
@@ -286,14 +312,12 @@ process.on("disconnect", () => process.exit(0));\n`,
     }
   });
 
-  it("stays up longer after a search, for the engine it holds", async () => {
+  it("ends after a search as after any question: a search holds nothing it would build again (#267)", async () => {
     const w = fake();
     try {
-      const t = new WorkerProcess(w.file, 60_000, 50, 600);
+      const t = new WorkerProcess(w.file, 60_000, 50);
       const a = (await t.search(1, null, env.root, [], [], [], "q")).body as { pid: number };
-      await new Promise((r) => setTimeout(r, 250));
-      expect(t.pid).toBe(a.pid);
-      expect(await until(() => t.pid === null && !alive(a.pid))).toBe(true);
+      expect(await until(() => t.pid === null && !alive(a.pid), 2_000)).toBe(true);
     } finally {
       w.done();
     }
@@ -302,7 +326,7 @@ process.on("disconnect", () => process.exit(0));\n`,
   it("retired, answers the next question from a new process", async () => {
     const w = fake();
     try {
-      const t = new WorkerProcess(w.file, 60_000, 60_000, 60_000);
+      const t = new WorkerProcess(w.file, 60_000, 60_000);
       const a = await ask(t);
       t.retire();
       expect(await until(() => !alive(a.pid))).toBe(true);
@@ -319,7 +343,7 @@ process.on("disconnect", () => process.exit(0));\n`,
     process.env.ANYDAG_TEST_SECRET = "s";
     process.env.ANYDAG_TEST_TOKEN = "t";
     try {
-      const t = new WorkerProcess(w.file, 60_000, 50, 50);
+      const t = new WorkerProcess(w.file, 60_000, 50);
       const { env: names } = (await t.ask("POST", "/index", new URLSearchParams(), {})).body as { env: string[] };
       expect(names).not.toContain("ANYDAG_TEST_SECRET");
       expect(names).not.toContain("ANYDAG_TEST_TOKEN");
