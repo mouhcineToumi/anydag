@@ -204,6 +204,25 @@ function readFolders(): Set<string> {
 }
 
 /**
+ * **A preference is written after the commit, never from a state updater.**
+ *
+ * React runs an updater again while it renders, as soon as a second update is waiting on the
+ * component — so a `writePref` inside one fires during `Shell`'s render. That wakes every listener
+ * of `dag:prefs`, and the sidebar's `useAttachmentsFolder` answers by setting its own state, which
+ * React reports as *Cannot update a component (`Sidebar`) while rendering a different component
+ * (`Shell`)* (#352). The value is remembered, so a render that changed nothing writes nothing —
+ * including the first one, which read what is already stored.
+ */
+function usePersisted<T>(value: T, write: (value: T) => void): void {
+  const written = useRef(value);
+  useEffect(() => {
+    if (Object.is(written.current, value)) return;
+    written.current = value;
+    write(value);
+  }, [value, write]);
+}
+
+/**
  * The window: the sidebar down the left, and the page — a board or a note — beside it.
  *
  * **Above both pages, which is the whole reason it exists.** `App` renders a `NoteApp` or a
@@ -358,11 +377,14 @@ export function Shell({
   const saveFavourites = useCallback((next: (had: string[]) => string[]) => {
     setFavourites((had) => {
       const out = next(had);
-      if (out.length === had.length && out.every((k, i) => k === had[i])) return had;
-      writePref(FAVOURITES, out.length ? JSON.stringify(out) : null);
-      return out;
+      return out.length === had.length && out.every((k, i) => k === had[i]) ? had : out;
     });
   }, []);
+  const rememberFavourites = useCallback(
+    (kept: string[]) => writePref(FAVOURITES, kept.length ? JSON.stringify(kept) : null),
+    [],
+  );
+  usePersisted(favourites, rememberFavourites);
   /** Keep the favourites in step with what just happened to a file or a folder here. */
   const moved = useCallback((change: Change) => saveFavourites((had) => follow(had, change)), [saveFavourites]);
   const nameNext = useCallback((key: string) => setNaming((was) => ({ key, n: (was?.n ?? 0) + 1 })), []);
@@ -387,14 +409,11 @@ export function Shell({
     if (narrow && nothing) setPinned(true);
   }, [narrow, nothing]);
 
-  const setFolders = useCallback((next: (had: Set<string>) => Set<string>) => {
-    setOpenFolders((had) => {
-      const out = next(had);
-      if (out === had) return had;
-      writeLocal(SIDEBAR_FOLDERS, JSON.stringify([...out].sort()));
-      return out;
-    });
-  }, []);
+  const setFolders = useCallback((next: (had: Set<string>) => Set<string>) => setOpenFolders(next), []);
+  const rememberFolders = useCallback((kept: Set<string>) => writeLocal(SIDEBAR_FOLDERS, JSON.stringify([...kept].sort())), []);
+  usePersisted(openFolders, rememberFolders);
+  const rememberDock = useCallback((on: boolean) => writeFlag(SIDEBAR, on), []);
+  usePersisted(docked, rememberDock);
 
   /* What is open, by kind — a `Record`, so every question below asks all five and a sixth kind is
      a type error rather than a table taken for a board. */
@@ -452,10 +471,7 @@ export function Shell({
       return;
     }
     setPinned(false);
-    setDocked((v) => {
-      writeFlag(SIDEBAR, !v);
-      return !v;
-    });
+    setDocked((v) => !v);
   }, [narrow]);
 
   const peek = useCallback(() => {

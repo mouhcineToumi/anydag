@@ -369,6 +369,16 @@
   is written on a debounce; toggle the library and reload inside it and the older copy is what
   gets adopted, which reads as a click that did not register rather than as a sync. The bundle
   carries `at` and the browser keeps its own, and the newer one wins — `settings/sync.ts`.
+- **A preference written inside a state updater is written while React renders.** React runs an
+  updater again in the render that applies it as soon as a second update is waiting on the
+  component — the eager computation at dispatch is skipped then — so `Shell`'s
+  `writeFlag(SIDEBAR, …)` in `setDocked`'s updater fired `dag:prefs` during `Shell`'s render. The
+  sidebar's own listener (`useAttachmentsFolder`) answered with `setAt`, and React logged *Cannot
+  update a component (`Sidebar`) while rendering a different component (`Shell`)*; the e2e specs
+  count console output, so a run failed now and then (#352). **An updater is pure**: what follows a
+  change goes in an effect keyed on it (`usePersisted` in `Shell.tsx`) or after the call returns.
+  `test/shell-updaters.test.ts` refuses a `writePref`, `writeFlag` or `writeLocal` inside a `set…`
+  updater.
 - **Every span writer moves the key it rewrites to the end of the statement.** `writeModifier` cuts
   the old span and splices the new one at `insertAt`, so `x=0 y=0 w=120 h=48` rewritten on the x
   axis comes back `y=0 h=48 x=0 w=240`. It is uniform, it is stable after the first write, and it is
