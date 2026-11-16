@@ -51,6 +51,7 @@ import { loadVaults } from "./vault/api";
 import { desktop } from "./vault/desktop";
 import { setLocale } from "./locale";
 import { settleVault, watchVault } from "./vault/current";
+import { takeSecret } from "./vault/secret";
 import { installHistory } from "./ui/history";
 import { openSavedTabs } from "./ui/tabs/saved";
 import { watchTextSize } from "./ui/textSize";
@@ -148,6 +149,9 @@ async function start(): Promise<void> {
   /* Before anything is drawn, so every date and every sorted list follows the system rather than
      the desktop app's locale pack (`src/locale.ts`). A browser has no bridge and needs none. */
   setLocale(desktop()?.locale);
+  /* Before the first request: the secret path `anydag serve` handed this page in the address's
+     fragment, kept for this origin and taken off the address (`src/vault/secret.ts`, #339). */
+  takeSecret();
   /* Before the first request, so that every one of them says which vault it is about. */
   watchVault();
   /* Before the first paint, so the top row never draws under the macOS traffic lights. */

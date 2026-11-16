@@ -27,6 +27,7 @@ import { LOCKED } from "@/settings/lock";
 import { STORE } from "@/settings/store";
 import { RECENT_KEY } from "@/ui/modelList";
 import { SAVED_TABS, WINDOW_SEEN } from "@/ui/tabs/saved";
+import { SECRET } from "@/vault/secret";
 import { LAST } from "@/vault/current";
 
 /**
@@ -163,6 +164,9 @@ describe("the preference list", () => {
       SAVED_TABS,
       /* Whether this window has had the app in it: a session's, so a bare address is Home in it. */
       WINDOW_SEEN,
+      /* `anydag serve`'s secret path, this origin's alone and never a preference: syncing it would
+         carry it to another machine, where it opens nothing, and out of the origin it guards (#339). */
+      SECRET,
     ]);
     const loose = stored.filter((k) => !accounted.has(k));
     expect(loose, "a `dag:` key nothing accounts for — add it to PREF_KEYS, or to the note above").toEqual([]);

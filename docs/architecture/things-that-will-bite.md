@@ -348,8 +348,9 @@
   channel is one `EventSource` per page, and an `<img src>` pointing at an attachment is another
   request no script dresses. In the desktop app the main process adds the header to every request
   on its scheme, so neither notices; in a browser it is the `anydag_token` cookie, which rides on
-  both with no client change. A token in the query string would be a credential in every log there
-  is, which is why `/?token=` is accepted once and then taken out of the address.
+  both — bound to the secret path `/s/<secret>/` that `scopeUrl` puts every API URL under (#339,
+  see *The token is a header from a shell…* below). A token in the query string would be a credential
+  in every log there is, which is why `/?token=` is accepted once and then taken out of the address.
 - **A `server.json` names a port, it does not prove who holds it.** The app home is shared with
   `anydag serve`, and a file an earlier one left behind — a closed terminal, before `SIGHUP` was
   handled, or a crash — names a port that another local user may be listening on now. The desktop
@@ -359,8 +360,10 @@
 - **`?snapshot=1` strips the chrome, never the token.** Every Playwright check and both scripts
   open a board that way, and an exemption would be a query string any page on the machine could
   load. `scripts/session.mjs`, `e2e/global-setup.ts` and the CLI's `snapshot` find the token
-  (`ANYDAG_TOKEN`, else `server.json` in `ANYDAG_HOME`, `.dev-home/` or `~/.anydag`) and hand the
-  browser the `anydag_token` cookie.
+  (`ANYDAG_TOKEN`, else `server.json` in `ANYDAG_HOME`, `.dev-home/` or `~/.anydag`). Against
+  `anydag serve` a browser context is let in by opening `/?token=…` once, as a person is
+  (`enter()` in `scripts/session.mjs`, the CLI's `openPage`): a cookie seeded on `/` is no
+  credential there any more. Behind Vite the proxy adds the header and nothing is opened.
 - **A context made through Playwright's `browser` fixture inherits everything in `use`.** Not just
   `baseURL` — `storageState` too. So `browser.newContext()` in a test that wanted a browser which
   had never been here before arrived with the suite's stored state, the very mechanism it was
@@ -751,18 +754,54 @@
   by port. The CLI's launcher checks its own bundle's inputs on every run (`cli/dist/meta.json`);
   the server's does not.
 - **The token is a header from a shell and a cookie for a browser, and never a value in page
-  script.** Every request carries the per-launch token (`x-anydag-token`, or the `anydag_token`
-  cookie), and the `Host` must be `127.0.0.1`, `localhost` or `[::1]` — anything else is a `421`,
-  because a page on `evil.example` resolved to `127.0.0.1` still says its own name. Both checks are
-  needed: a "simple" `POST` from any website the person has open needs no preflight, so without the
-  token any site could write into a vault. The desktop shell adds the header in the main process;
-  `anydag serve` prints `/?token=…` once and swaps it for an `httpOnly`, `SameSite=Strict` cookie and
-  a redirect — and since a cookie is not bound to a port, and a page on any other `127.0.0.1` port
-  is the same site, a write the cookie alone vouches for must also say it came from this page's own
-  origin (`Sec-Fetch-Site`, else `Origin`), or it is a `403` (#10); Vite's proxy adds the header in development, after refusing anything that is not this
-  page. `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script
-  that `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401`
-  as an empty list.
+  script.** Every request to the API carries the per-launch token (`x-anydag-token`, or the
+  `anydag_token` cookie), and the `Host` must be `127.0.0.1`, `localhost` or `[::1]` — anything else
+  is a `421`, because a page on `evil.example` resolved to `127.0.0.1` still says its own name. Both
+  checks are needed: a "simple" `POST` from any website the person has open needs no preflight, so
+  without the token any site could write into a vault. The desktop shell adds the header in the main
+  process, and Vite's proxy adds it in development, after refusing anything that is not this page.
+  `scripts/dev.sh` mints that token per run, so there is no well-known one. A test or a script that
+  `fetch`es the server directly needs `authed()` from `scripts/session.mjs`, or it reads a `401` as
+  an empty list.
+
+  **A cookie is not bound to a port** (#339). Every `http://127.0.0.1:<port>` is the same site, so a
+  cookie on `/` is sent to whoever listens on any other port — another OS user — who reads it and
+  replays it as the header; a page on another site that sends the tab to that port, which then loads
+  an image from itself, is enough. `Path`, the cookie's name, another loopback address and `__Host-`
+  are none of them port-bound, and a separate session value is replayed as easily as the token. So
+  `anydag serve` binds the cookie to a **secret path** instead (`server/app.ts`): it mints a secret
+  per launch, serves the API both at the root — **the header only** — and under `/s/<secret>/`,
+  where the cookie counts too, and answers `/?token=…` with the cookie set with `Path=/s/<secret>/`
+  and a `302` to the same address with `#s=<secret>`. The fragment is never sent to a server; the
+  page takes it at boot, before its first request, keeps it in `localStorage` (per origin, port
+  included) and cleans the address (`src/vault/secret.ts`), and `scopeUrl` puts every `/__board` and
+  `/api` URL — `fetch`, both `EventSource`s, every `<img src>` and download — under it. The page
+  holds a path, not the token: the token is still only in the `HttpOnly` cookie. The prefix is taken
+  off before routing, by an outer app calling the routes on the rewritten URL — Hono's
+  `app.route('/s/:secret', …)` would leave it in `c.req.path` and the log's route template — so the
+  secret is in no route, log, error body or `server.json`, and `Referrer-Policy: no-referrer` keeps
+  an address under it out of every `Referer`. A wrong secret is a `401` like any other. The shell
+  and its assets at `/` answer with no credential: they hold no data. With no secret and a `401`,
+  the page says to open the address `anydag serve` printed, not that the server is not answering.
+
+  **What is left.** The cookie still reaches every port of `127.0.0.1` the browser is asked for a
+  path under the secret: only the secret keeps it from being sent there. A secret that leaks — out
+  of this origin's `localStorage`, the browser's history, a screen share of an attachment opened at
+  its address — reopens the attack until the server restarts and mints another. Because a page on
+  another port that learned it could also write, a write the cookie alone vouches for must still say
+  it came from this page's own origin (`Sec-Fetch-Site`, else `Origin`), or it is a `403` (#10).
+  `e2e/credential.spec.ts` replays the issue's table against a real `anydag serve`.
+- **A gate that reads the path must read it the way the router does, and deny what it does not
+  recognise.** The router decodes a path before it matches, so the first cut of the secret-path gate
+  (#339), which told the API from the page by a string test on the raw path and handed everything
+  else to the app that held the routes, let `/%61pi/vaults` and `/_%5Fboard/list` through to
+  `/api/vaults` and `/__board/list` — and their writes — with no credential at all, in every mode.
+  Now `kindOf` (`server/app.ts`) reads the path percent-decoded, slashes collapsed and in any case;
+  the API spelled any way but its own is a `400`; the routes refuse a request the gate did not hand
+  them; and the fall-through is an app with no route but the built page's files, served only from
+  inside its folder by real path (a neighbouring folder whose name begins the same was reachable
+  through `startsWith(root)`). `test/server/gate.test.ts` tries every spelling, at the root and under
+  the secret path, with a page and without.
 - **Opening a vault never writes a byte of it.** An existing `.md` with no `id:` is given one only
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text

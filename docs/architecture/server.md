@@ -40,10 +40,21 @@ Nine things are load-bearing:
 - **Frontmatter wins.** Two files with one id — a copy made in a file manager — keep it for the
   older by created date, and the copy is given a new id, written into it. A file moved outside the
   app keeps its id and the index learns the new path from the watcher.
-- **The token and the `Host` are the whole security model**, and both are checked on every request —
-  see *Things that will bite*. `server.json` is written mode `0600`. A write that carries the token
-  only as `anydag serve`'s cookie must also come from the page's own origin, because the cookie
-  rides along from a page on any other `127.0.0.1` port (`test/server/gate.test.ts`).
+- **The token and the `Host` are the whole security model**, and both are checked on every request
+  to the API — see *Things that will bite*. `server.json` is written mode `0600`. The API answers
+  twice: at the root it takes **only the header**, which the shell, the CLI, MCP and the Vite proxy
+  send; under `/s/<secret>/` — a path `createApp` mints per launch and tells only the page that
+  opened `/?token=…`, in the redirect's fragment — it takes `anydag serve`'s cookie too, whose `Path`
+  is that prefix, because a cookie on `/` reaches every port of `127.0.0.1` and whoever listens there
+  (#339). The prefix is taken off before routing, and is in no route, log, error or `server.json`.
+  **The gate denies by default**: the routes answer only a request one of those two branches handed
+  them after checking its credential, and refuse any other; the API spelled any way but the one the
+  routes are written in (`/%61pi/…`, `//api/…`, `/API/…`, `/api%2F…`) is a `400` whatever it carries;
+  and every other path goes to an app of its own that serves the built page's files and nothing
+  else — a `404` with no page.
+  A write that carries the token only as the cookie must also come from the page's own origin
+  (#336). The page and its assets at `/` need no credential: they hold no data
+  (`test/server/gate.test.ts`, `e2e/credential.spec.ts`).
 - **One server, several vaults.** Each vault has its own change feed, and `/__board/transfer` moves
   a document or a folder between two open vaults with its id and created date.
 - **Nothing the store may do may block sync**: no single shared index file in

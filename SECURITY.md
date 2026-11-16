@@ -74,10 +74,15 @@ or the latest stable release, say so and it will be fixed there first.
 In scope — anything that lets someone who is not the person at the keyboard read, change or run
 something they should not:
 
-- **The local server's gate.** Every request must carry the per-launch token *and* a `Host` of
-  `127.0.0.1`, `localhost` or `[::1]`. A bypass (a request that reaches a route without both, DNS
-  rebinding, a cross-site request that writes into a vault, a token written to a log or into page
-  script, `/?token=` handling) is in scope.
+- **The local server's gate.** Every request to the API must carry the per-launch token *and* a
+  `Host` of `127.0.0.1`, `localhost` or `[::1]`. A bypass (a request that reaches a route without
+  both, DNS rebinding, a cross-site request that writes into a vault, a token written to a log or
+  into page script, `/?token=` handling) is in scope. So is anything that lets the `anydag serve`
+  cookie reach another port of this machine, or reveals the secret path it is bound to
+  (`/s/<secret>/`, minted per launch and kept by the page in its own origin's storage): a cookie is
+  not bound to a port, so that path is the only thing keeping another local user who listens on a
+  loopback port from receiving it. The known limit: a secret that leaks reopens that attack until the
+  server restarts.
 - **The desktop shell.** The `anydag://` scheme and its page key for writes, window isolation and
   sandboxing, what is allowed to open in the OS (`shell.openExternal`), deep links, the `anydag` shim,
   key storage through `safeStorage`, and the updater.

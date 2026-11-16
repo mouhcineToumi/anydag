@@ -2,7 +2,7 @@ import { useEffect, type ComponentType } from "react";
 
 import { watch } from "@/settings/sync";
 
-import type { Account } from "./api";
+import { needsLink, type Account } from "./api";
 import { AccountProvider } from "./useAuth";
 
 /**
@@ -20,7 +20,14 @@ export function Gate({ initial, page: Page }: { initial: Account | null; page: C
     return watch();
   }, [initial]);
 
-  if (!initial || !Page) return <p role="alert">The AnyDag server is not answering.</p>;
+  if (!initial || !Page)
+    return (
+      <p role="alert">
+        {needsLink()
+          ? "This page needs the address `anydag serve` printed when it started — open that link, the one ending in ?token=…, to let this browser in."
+          : "The AnyDag server is not answering."}
+      </p>
+    );
   return (
     <AccountProvider value={initial}>
       <Page />
