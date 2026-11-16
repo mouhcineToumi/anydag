@@ -59,7 +59,7 @@ import { LayoutDashboard, MessageSquareQuote, Sigma, Trash2, Upload } from "luci
 import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 
 import { applySteps, type NoteBlock, type Step } from "@/note/markdown";
-import { noteSchema } from "@/note/schema";
+import { noteBlockSpecs, noteSchema } from "@/note/schema";
 import { readIndex } from "@/refs/useIndex";
 
 import { calloutBlock, insertCallout } from "./callout";
@@ -76,11 +76,12 @@ import { EMBED_TRIGGER, embedBlock, embedFor, refFor, refInline, refItems } from
  * with a field for their TeX. The
  * shapes are `noteSchema`'s, so what the editor holds is exactly what the round-trip tests hold;
  * only the drawing differs. A new schema rather than `noteSchema.extend()`, which changes the schema
- * it is called on.
+ * it is called on — and built from `noteBlockSpecs()`, not from `noteSchema.blockSpecs`, which are
+ * already built and come out of a second `create` without their keyboard (#385).
  */
 const editorSchema = BlockNoteSchema.create({
   blockSpecs: {
-    ...noteSchema.blockSpecs,
+    ...noteBlockSpecs(),
     codeBlock: codeBlock(),
     embed: embedBlock(),
     equation: equationBlock(),

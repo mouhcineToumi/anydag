@@ -338,6 +338,39 @@ test("a Markdown shortcut makes a block, and the file says it in Markdown", asyn
   expect(read().startsWith(NOTE.trimEnd())).toBe(true);
 });
 
+/* #385: Enter in a list made a paragraph, because the editor's schema was built from specs that had
+   already been built once and so had lost the keyboard of a list. */
+test("Enter at the end of a bullet makes the next bullet, and Enter on an empty one leaves the list", async ({ page }) => {
+  await open(page);
+  await endOf(page, "The last paragraph.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- first");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await page.keyboard.press("Enter");
+  /* The DOM first: the file is one round trip behind it. The note's own two bullets, then ours and the empty one. */
+  await expect(page.locator('.bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(5);
+  await page.keyboard.press("Enter");
+  await expect(page.locator('.bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(4);
+  await page.keyboard.type("after the list");
+  await expect.poll(read, { timeout: 5_000 }).toContain("- first\n- second\n\nafter the list");
+  expect(read().startsWith(NOTE.trimEnd())).toBe(true);
+});
+
+test("Enter at the end of a numbered item makes the next number", async ({ page }) => {
+  await open(page);
+  await endOf(page, "The last paragraph.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("1. one");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("three");
+  await expect(page.locator('.bn-block-content[data-content-type="numberedListItem"]')).toHaveCount(3);
+  await expect.poll(read, { timeout: 5_000 }).toContain("1. one\n2. two\n3. three");
+  expect(read().startsWith(NOTE.trimEnd())).toBe(true);
+});
+
 test("an outside write lands in the open note and the caret stays where it was", async ({ page }) => {
   await open(page);
   await endOf(page, "The second paragraph.");
