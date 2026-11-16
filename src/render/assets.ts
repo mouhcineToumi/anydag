@@ -31,6 +31,9 @@ const attachmentOf = (src: string): string | null => /^dag:([0-9a-z]{10})$/.exec
 
 /** The session's: the document's own folder, through the route behind it. An empty `src` is an upload still in flight and asks for nothing. */
 export const ownAssets: AssetUrl = (doc, src) => {
+  /* A path from the root that is one of the API's still goes through `scopeUrl`, which leaves any
+     other alone: it needs this tab's vault, and `anydag serve`'s secret path (`vault/secret.ts`). */
+  if (src.startsWith("/")) return scopeUrl(src);
   if (!src || external(src)) return src;
   /* In the workspace this tab is in: an `<img src>` cannot carry a header either. */
   const id = attachmentOf(src);

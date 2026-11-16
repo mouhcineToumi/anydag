@@ -120,7 +120,9 @@ Nineteen things are load-bearing:
   whose `pid` and `token` are this launch's (`desktop/launch.ts`) — because the home is shared with
   `anydag serve`, and a file an earlier one left behind names a port anybody may hold now. The page,
   its `localStorage` and its `EventSource` live on one stable origin, `anydag://app`, and no script
-  in it ever sees the token.
+  in it ever sees the token. The forwarder sends the root paths with the header, which the server
+  takes there; the secret path and the cookie `anydag serve` hands a browser (#339) are not the
+  desktop's — it sets no cookie, the page stores no secret, and `scopeUrl` adds no prefix.
 - **The page's requests go to the server over `node:http`, never `net.fetch`** (`desktop/forward.ts`,
   #123). `net.fetch` is Chromium's network stack, which holds six HTTP/1.1 connections to a host and
   queues the rest — and a page holds three streams that never end (the change feed, the

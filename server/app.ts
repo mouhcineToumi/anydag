@@ -2,16 +2,26 @@
  * The local server: the page's own protocol, answered from a vault.
  *
  * The gate comes first and is the whole of the security model a local server has: the `Host` must
- * be this machine's (DNS rebinding), and every request carries the per-launch token — a header from
- * the shell and the CLI, a cookie a browser was handed once. Then the routes, one module per family,
- * all reading one `Session`; then the built page, for a browser that is not behind Vite.
+ * be this machine's (DNS rebinding), and every request to the API carries the per-launch token — a
+ * header from the shell, the CLI, MCP and the Vite proxy, or the cookie a browser was handed once.
+ * Then the routes, one module per family, all reading one `Session`; then the built page, for a
+ * browser that is not behind Vite.
+ *
+ * **The cookie is bound to a secret path, not to the port** (#339). A cookie reaches every port of
+ * `127.0.0.1`, so another local user listening on one could read it and replay it. The API is
+ * therefore served twice: at the root, where only the header is taken, and under `/s/<secret>/`, a
+ * path minted per launch that only the page `/?token=` sent there knows, where the cookie — set with
+ * that `Path` — is taken too. The prefix is taken off before routing, so no route, log or error ever
+ * sees it.
  */
 
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import type { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { routePath } from "hono/route";
 
 import { Assistant } from "./chat/live";
@@ -35,8 +45,8 @@ import { trashRoutes } from "./routes/trash";
 
 export interface ServerOptions {
   session: Session;
-  /** The per-launch secret every request carries (`X-AnyDag-Token`, or the cookie a browser was
-   *  handed once). */
+  /** The per-launch secret every request to the API carries (`X-AnyDag-Token`, or the cookie a
+   *  browser was handed once). */
   token: string;
   /** Where the built page is, or `null` to serve the API alone (behind Vite's dev server). */
   page: string | null;
@@ -66,44 +76,120 @@ function ownOrigin(site: string | undefined, origin: string | undefined, host: s
 /** The routes about the app rather than one vault: they answer with no vault open. */
 const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me", "/api/telemetry"];
 
+/** Where the API is — as the routes and the page's own handler draw the line, so nothing on it is
+ *  ever answered without the gate. Everything else this server answers is the page, which holds no data. */
+const isApi = (p: string): boolean => p.startsWith("/__board") || p.startsWith("/api");
+
+/** The API under the launch's secret path: `/s/<secret>/__board/…`, `/s/<secret>/api/…`. */
+const UNDER = /^\/s\/([^/]*)(\/.*)?$/;
+
+/** Two secrets compared in a time that does not say how much of one was right. */
+function same(said: string | undefined, secret: string): boolean {
+  if (said === undefined) return false;
+  const a = Buffer.from(said);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * The same request at another address. Spelled out rather than `new Request(url, raw)`: a request
+ * `@hono/node-server` made is not the runtime's own, and the runtime's `Request` refuses to read one
+ * as its init (`duplex`, Node 26).
+ */
+function moved(raw: Request, url: URL): Request {
+  const init: RequestInit & { duplex?: "half" } = { method: raw.method, headers: raw.headers, signal: raw.signal };
+  if (raw.method !== "GET" && raw.method !== "HEAD") {
+    init.body = raw.body;
+    init.duplex = "half";
+  }
+  return new Request(url, init);
+}
+
+const refused = (c: Context) => c.json({ error: "this server needs its token", code: "token" }, 401);
+
+/**
+ * The server: the gate, in front of the routes and the page.
+ *
+ * - **`/s/<secret>/<api path>`** — the API for a browser on `anydag serve`. The secret must be this
+ *   launch's, then the token comes as the header or as the cookie, whose `Path` is this prefix and
+ *   which therefore no other port is sent; a write the cookie alone vouches for must still come from
+ *   the page's own origin (#336). The prefix is taken off and the routes see the path they know.
+ * - **`/<api path>`** — the API for the shell, the CLI, MCP and the Vite proxy: the header only. A
+ *   cookie here is no credential, so one that reached another port is worth nothing as a cookie.
+ * - **`/?token=<token>`** — the address `anydag serve` prints. It answers with the cookie and a
+ *   redirect to the same address without the token and with `#s=<secret>`, which the page keeps.
+ * - **anything else** — the page and its assets, which hold nothing and answer without a credential.
+ *
+ * The secret is minted here, per app, and lives nowhere else: not in `server.json`, a log, the
+ * console, a route's template or an error, and `Referrer-Policy: no-referrer` keeps an address under
+ * it out of every `Referer`. A wrong one is a 401 that says nothing about the right one.
+ */
 export function createApp(opts: ServerOptions): Hono {
+  const inner = routes(opts);
+  const secret = randomBytes(24).toString("base64url");
+  const scope = `/s/${secret}/`;
+  const app = new Hono();
+
+  app.use("*", async (c, next) => {
+    await next();
+    c.header("Referrer-Policy", "no-referrer");
+  });
+
+  app.all("*", async (c) => {
+    // DNS rebinding: a page on evil.example resolved to 127.0.0.1 still says `Host: evil.example`.
+    const host = (c.req.header("host") ?? "").replace(/:\d+$/, "");
+    if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") return c.text("wrong host", 421);
+    const url = new URL(c.req.url);
+    const header = c.req.header("x-anydag-token");
+
+    const under = UNDER.exec(url.pathname);
+    if (under) {
+      const rest = under[2] ?? "/";
+      if (!same(under[1], secret) || !isApi(rest)) return refused(c);
+      if (!same(header ?? getCookie(c, COOKIE), opts.token)) return refused(c);
+      // The page's own origin, still: the cookie is sent with a request a page on another port of
+      // this host makes to the secret path, should that page ever learn it (#336).
+      if (
+        header === undefined &&
+        !SAFE.has(c.req.method) &&
+        !ownOrigin(c.req.header("sec-fetch-site"), c.req.header("origin"), c.req.header("host"))
+      )
+        return c.json({ error: "a write with the cookie must come from this page", code: "origin" }, 403);
+      url.pathname = rest;
+      return inner.fetch(moved(c.req.raw, url), c.env);
+    }
+
+    if (isApi(url.pathname)) {
+      if (!same(header, opts.token)) return refused(c);
+      return inner.fetch(c.req.raw, c.env);
+    }
+
+    // A browser cannot send a header, so `anydag serve` prints an address with the token once. It is
+    // swapped for the cookie on the secret path, the secret is handed to the page in the fragment —
+    // never sent to a server, and kept by the page in its own origin's storage — and the token is
+    // taken off the address.
+    const once = c.req.query("token");
+    if (once !== undefined && c.req.method === "GET") {
+      if (!same(once, opts.token)) return c.text("wrong token", 401);
+      setCookie(c, COOKIE, opts.token, { httpOnly: true, sameSite: "Strict", path: scope });
+      // The cookie an older server set on `/`, which every port is sent: gone.
+      deleteCookie(c, COOKIE, { path: "/" });
+      url.searchParams.delete("token");
+      return c.redirect(`${url.pathname}${url.search}#s=${secret}`);
+    }
+    return inner.fetch(c.req.raw, c.env);
+  });
+
+  return app;
+}
+
+/** The routes and the page, behind no gate of their own: {@link createApp} is the only way in. */
+function routes(opts: ServerOptions): Hono {
   const s = opts.session;
   /* Read once per app: every route this app serves answers for the same process, whose environment
      does not change beneath it. A second app (a CLI's in-process serve) decides for itself. */
   const cloud = cloudOn(s.env);
   const app = new Hono();
-
-  /* -- the gate: the Host, then the token --------------------------------------------------- */
-
-  app.use("*", async (c, next) => {
-    // DNS rebinding: a page on evil.example resolved to 127.0.0.1 still says `Host: evil.example`.
-    const host = (c.req.header("host") ?? "").replace(/:\d+$/, "");
-    if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") return c.text("wrong host", 421);
-    // A browser cannot send a header, so `anydag serve` prints a URL with the token once; it is
-    // swapped for a cookie and the address cleaned.
-    const once = c.req.query("token");
-    if (once !== undefined && c.req.method === "GET" && !c.req.path.startsWith("/__board") && !c.req.path.startsWith("/api")) {
-      if (once !== opts.token) return c.text("wrong token", 401);
-      setCookie(c, COOKIE, opts.token, { httpOnly: true, sameSite: "Strict", path: "/" });
-      const url = new URL(c.req.url);
-      url.searchParams.delete("token");
-      return c.redirect(url.pathname + url.search);
-    }
-    const header = c.req.header("x-anydag-token");
-    const said = header ?? getCookie(c, COOKIE);
-    if (said !== opts.token) return c.json({ error: "this server needs its token", code: "token" }, 401);
-    // The cookie rides on every request to this host, whatever port the page that sent it came
-    // from: a page on another 127.0.0.1 port is the same *site*, so `SameSite=Strict` lets it
-    // through, and a `text/plain` POST needs no preflight. A write the cookie alone vouches for
-    // must therefore come from this page's own origin (#10).
-    if (
-      header === undefined &&
-      !SAFE.has(c.req.method) &&
-      !ownOrigin(c.req.header("sec-fetch-site"), c.req.header("origin"), c.req.header("host"))
-    )
-      return c.json({ error: "a write with the cookie must come from this page", code: "origin" }, 403);
-    await next();
-  });
 
   /* -- logs: how each route answered, by its template, and only once somebody said yes --
      behind the `cloud` switch (`server/features.ts`), whose being off is "no server": not even the

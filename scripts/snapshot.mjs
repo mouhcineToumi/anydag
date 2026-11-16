@@ -24,7 +24,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-import { authed, signIn, storageState } from "./session.mjs";
+import { authed, signIn, enter } from "./session.mjs";
 import { launch, tidyInPage } from "./tidy.mjs";
 
 const require = createRequire(import.meta.url);
@@ -91,9 +91,10 @@ const browser = await launch(chromium);
 const context = await browser.newContext({
   viewport: { width: 1600, height: 1200 },
   deviceScaleFactor: scale,
-  /* The session is httpOnly, so it cannot be set from a page script — this is the only way in. */
-  storageState: storageState(session.cookie),
 });
+/* Against `anydag serve`, in once through the address it prints: its cookie is httpOnly and bound
+   to a secret path, so it cannot be seeded or set from a page script (`scripts/session.mjs`). */
+await enter(context, origin, session.cookie);
 const page = await context.newPage();
 
 const consoleProblems = [];

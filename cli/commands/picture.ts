@@ -121,8 +121,8 @@ async function openPage(
   /* In the vault the command was asked in, as the page's own links are. */
   if (ctx.vault) params.set("vault", ctx.vault);
   /* A server that draws the page: the app's, or — with none running — one this process listens
-     with on an ephemeral port. `?token=` is swapped for a cookie by the server and cleaned off the
-     address, which is how a browser is let in (`server/app.ts`). */
+     with on an ephemeral port. `?token=` is swapped by the server for a cookie on a secret path and
+     a redirect that hands the page that path, which is how a browser is let in (`server/app.ts`). */
   /* `ANYDAG_WEB` names a page served somewhere else that reaches the same server — the Vite dev
      server, which proxies the routes and adds the token itself. */
   const elsewhere = ctx.env.ANYDAG_WEB?.replace(/\/+$/, "");

@@ -97,7 +97,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { missingReleaseRows, previousRelease, RELEASE_DIR, releaseTable, releaseValues, writeRelease } from "./bench-release.mjs";
-import { storageState } from "./session.mjs";
+import { enter } from "./session.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium, _electron } = require("@playwright/test");
@@ -687,7 +687,10 @@ async function launchBrowser() {
 }
 
 async function pageOn(b, s, size = { width: 1440, height: 900 }) {
-  const context = await b.browser.newContext({ viewport: size, storageState: storageState(s.token) });
+  const context = await b.browser.newContext({ viewport: size });
+  /* In once per context, through the address the server prints: its cookie is bound to a secret
+     path the page learns there, not seeded (`scripts/session.mjs`). */
+  await enter(context, s.origin, s.token);
   const page = await context.newPage();
   const problems = [];
   page.on("pageerror", (e) => problems.push(String(e)));

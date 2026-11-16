@@ -46,8 +46,9 @@ Six things are load-bearing:
   the skill's `anydag …` lines to `anydag help --json` and every command group to being named, so the
   skill cannot keep teaching a command that was removed.
 - **The picture is the page's.** `snapshot`, `tidy`, `board export --format svg|png` and `note export
-  --format pdf` open the page in Playwright with the token as its cookie under `?snapshot=1`, the way
-  `scripts/snapshot.mjs` does. Export goes through `dag:export`, a document event whose
+  --format pdf` open the page in Playwright under `?snapshot=1`, let in through `/?token=…` — the
+  server answers with its cookie on a secret path and a redirect that hands the page that path
+  (`server/app.ts`) — the way `scripts/snapshot.mjs` does through `enter()`. Export goes through `dag:export`, a document event whose
   `detail.reply` gets the SVG's text or the PNG as a data URL. A note's PDF replies with a title and
   Chromium's `page.pdf()` prints it. Playwright is `external` in the bundle and imported only there.
 - **Stdin is read when it is named, never because it is not a terminal.** The usual shortcut hangs for
