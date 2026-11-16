@@ -1,37 +1,25 @@
 /**
- * Matching a query against the corpus, on the server.
+ * What a search folds, splits, limits and marks — the rules every asker is answered by.
  *
- * **MiniSearch**, taken for what this stack already is: there is no database with a text index
- * behind it — the vault is a folder of plain files. The server cuts the texts into units
- * (`/__board/corpus`, where the grammar is), builds this over them once per corpus version, and
- * answers every query with `GET /__board/search`; the search card asks per query (`useSearch`) and
- * never holds the units. MiniSearch rather than FlexSearch because it ranks (BM25), does prefixes and
- * typos, is one small MIT file with no dependencies, and states its behaviour in options this file
- * can read. The page does not import this file, so none of it is in the page's bundle.
+ * The matching itself is the local server's: an SQLite FTS5 index kept on disk beside what the grammar
+ * parsed (`server/words.ts`, #267), asked by `GET /__board/search` per query. The search card asks
+ * per query (`useSearch`) and never holds the units. This file is what the index, the query and the
+ * snippet must agree on — how a text is cut into words and folded — and the snippet itself. The page
+ * does not import it, so none of it is in the page's bundle.
  *
- * No DOM and no React, so the ranking and the snippet are unit tests rather than a browser.
+ * No DOM and no React, so the folding and the snippet are unit tests rather than a browser.
  */
-import MiniSearch from "minisearch";
-
 import type { FileKind } from "@/board/useBoard";
 
 import type { Unit } from "./corpus";
 
-/** One document as `/__board/corpus` answers it, and as the engine holds it. */
+/** One document as `/__board/corpus` answers it. */
 export interface SearchDoc {
   id: string;
   name: string;
   kind: FileKind;
   title?: string;
   units: Unit[];
-}
-
-export interface Hit {
-  doc: SearchDoc;
-  unit: Unit;
-  score: number;
-  /** The words of the unit that matched, folded — what the snippet marks. */
-  terms: string[];
 }
 
 /** A run of the snippet: marked when it is a word the query matched. */
@@ -41,95 +29,23 @@ export interface Run {
 }
 
 /**
- * Where a word ends: space, punctuation and symbols — so `api-gateway` is two words, `·` between a
- * diagram's labels is nothing, and a title's `→` does not glue two words into one. The snippet
- * splits on the same class, which is what lets it mark exactly the words that matched.
+ * Where a word ends: space, punctuation, symbols and control characters — so `api-gateway` is two
+ * words, `·` between a diagram's labels is nothing, and a title's `→` does not glue two words into
+ * one. The index, the query and the snippet split on this one class, which is what lets the snippet
+ * mark exactly the words that matched.
  */
-const SPLIT = /[\p{Z}\p{P}\p{S}\s]+/u;
+const SPLIT = /[\p{Z}\p{P}\p{S}\p{Cc}\s]+/u;
 
 /** Accents off and lower case, so `café` finds `cafe` and `Cafe` alike. */
 export const fold = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
-export interface Row {
-  k: number;
-  text: string;
-}
-
-export interface Engine {
-  mini: MiniSearch<Row>;
-  units: { doc: SearchDoc; unit: Unit }[];
-}
-
-/**
- * An empty index, configured the one way every engine is: a unit is added as `{ k, text }`, `k` its
- * place in whatever list the caller keeps beside it.
- */
-export function newIndex(): MiniSearch<Row> {
-  return new MiniSearch<Row>({
-    idField: "k",
-    fields: ["text"],
-    tokenize: (s) => s.split(SPLIT).filter(Boolean),
-    processTerm: (t) => fold(t) || null,
-  });
-}
-
-export function buildEngine(docs: SearchDoc[]): Engine {
-  const units = docs.flatMap((doc) => doc.units.map((unit) => ({ doc, unit })));
-  const mini = newIndex();
-  mini.addAll(units.map((u, k) => ({ k, text: u.unit.text })));
-  return { mini, units };
-}
+/** A text's words, folded, in order: what the index holds of it and what a query asks for. */
+export const wordsOf = (s: string): string[] => fold(s).split(SPLIT).filter(Boolean);
 
 /** At most this many hits in one document, so a long note that says a word forty times leaves room for the rest. */
-const PER_DOC = 3;
+export const PER_DOC = 3;
 /** And this many in all: a result list is read, not scrolled. */
 export const LIMIT = 40;
-
-/**
- * The units that hold every word of the query, best first.
- *
- * Every word must match (`AND`) — a search narrows as it is typed, which is what the name filter
- * above it already does. The last word is a prefix of something, because it is the one still being
- * typed; the others are prefixes too, which is what lets `pay sett` find "payments settle". A word
- * of five letters or more forgives one typo in five, and a shorter one none: a two-letter word
- * with a typo in it matches half the corpus.
- */
-export function search(engine: Engine, query: string, limit = LIMIT): Hit[] {
-  return rank(engine.mini, query, limit, (k) => engine.units[k]);
-}
-
-/**
- * `search` over an index whose units the caller keeps: `at(k)` is the unit added as `k`, holding
- * at least the document it is in. The server keeps a unit's place and not its words, and reads the
- * words of the few it answers with (`server/search-store.ts`); the ranking is this one either way.
- */
-export function rank<T extends { doc: { id: string } }>(
-  mini: MiniSearch<Row>,
-  query: string,
-  limit: number,
-  at: (k: number) => T | undefined,
-  /** Which matches may be answered — a search filtered to a tag's documents — before `limit` counts them. */
-  keep?: (got: T) => boolean,
-): (T & { score: number; terms: string[] })[] {
-  if (!query.trim()) return [];
-  const found = mini.search(query, {
-    combineWith: "AND",
-    prefix: true,
-    fuzzy: (term) => (term.length >= 5 ? 0.2 : false),
-  });
-  const perDoc = new Map<string, number>();
-  const out: (T & { score: number; terms: string[] })[] = [];
-  for (const r of found) {
-    const got = at(r.id as number);
-    if (!got || (keep && !keep(got))) continue;
-    const n = perDoc.get(got.doc.id) ?? 0;
-    if (n >= PER_DOC) continue;
-    perDoc.set(got.doc.id, n + 1);
-    out.push({ ...got, score: r.score, terms: r.terms });
-    if (out.length >= limit) break;
-  }
-  return out;
-}
 
 /** How much of a long unit the snippet shows around the first match, in characters. */
 const BEFORE = 48;
@@ -145,7 +61,7 @@ const WIDTH = 180;
  */
 export function snippet(text: string, terms: readonly string[]): Run[] {
   const want = new Set(terms);
-  const words = [...text.matchAll(/[^\p{Z}\p{P}\p{S}\s]+/gu)];
+  const words = [...text.matchAll(/[^\p{Z}\p{P}\p{S}\p{Cc}\s]+/gu)];
   const first = words.find((w) => want.has(fold(w[0])));
   let start = 0;
   if (first && first.index! > BEFORE) {

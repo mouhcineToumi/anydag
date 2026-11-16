@@ -24,6 +24,8 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 
+import { createTables, dropTables, SPAN, WordIndex } from "./words";
+
 /** What one text was when it was last read: its stat, the kept listing's stamp for it then, its sha1 and its length. */
 export interface Stamp {
   stat: string;
@@ -69,29 +71,59 @@ const OPEN = 4;
 const open: Shelf[] = [];
 
 /** The shape of the file this code writes; a file of any other is emptied and made again — it is a cache. */
-const SCHEMA = 1;
+const SCHEMA = 2;
+
+/** The question whose docs are a search's units, and are indexed by their words. */
+const SEARCHED = "corpus";
+
+/** A corpus doc's units' words: what the index is given of it. */
+const unitTexts = (doc: Doc | null): string[] => ((doc?.units as { text: string }[] | undefined) ?? []).map((u) => u.text);
+
+/** What a folder's words index is asked through: the index, and which text a unit's rowid is in. */
+export interface Indexed {
+  index: WordIndex;
+  /** The key of the text a rowid at or above zero is a unit of, or `undefined` for none the set holds. */
+  keyOf(rowid: number): string | undefined;
+}
 
 export class Shelf {
   private handle: DatabaseSync | null = null;
   private readonly statements = new Map<string, StatementSync>();
+  private readonly indexes = new Map<number, WordIndex>();
 
-  private constructor(private readonly dir: string) {
+  /** `dir` null is a shelf in memory: for a cache with no home, or one whose home failed. */
+  private constructor(private readonly dir: string | null) {
     void this.db; // opened now, so a home that cannot hold it is known at once
   }
 
+  /** A shelf of its own in this process's memory, never closed: what a reader with no home keeps its docs on. */
+  static memory(): Shelf {
+    return new Shelf(null);
+  }
+
+  get inMemory(): boolean {
+    return this.dir === null;
+  }
+
   private get db(): DatabaseSync {
-    const at = open.indexOf(this);
-    if (at >= 0) open.splice(at, 1);
-    open.push(this);
-    if (open.length > OPEN) open.shift()!.close();
+    if (this.dir !== null) {
+      const at = open.indexOf(this);
+      if (at >= 0) open.splice(at, 1);
+      open.push(this);
+      if (open.length > OPEN) open.shift()!.close();
+    }
     if (this.handle) return this.handle;
-    const db = new DatabaseSync(path.join(this.dir, "parse.sqlite"));
+    const db = new DatabaseSync(this.dir === null ? ":memory:" : path.join(this.dir, "parse.sqlite"));
     db.exec(
       "pragma journal_mode = wal; pragma busy_timeout = 5000; pragma synchronous = normal; pragma journal_size_limit = 8388608;",
     );
     db.exec("begin immediate");
     try {
       if (Number((db.prepare("pragma user_version").get() as { user_version: number }).user_version) !== SCHEMA) {
+        const ids = db.prepare("select name from sqlite_master where type = 'table' and name = 'sets'").get()
+          ? (db.prepare("select id from sets").all() as { id: number }[])
+          : [];
+        for (const { id } of ids) dropTables(db, Number(id));
         db.exec("drop table if exists texts; drop table if exists sets;");
         /* One set of rows per question over one folder, cut by one build (`code`), and the answer the
            rows are (`turn`): the server's thread holds the docs of one answer and asks for what changed
@@ -103,6 +135,7 @@ export class Shelf {
           question text not null,
           code text not null,
           turn integer,
+          files text,
           unique (root, question)
         )`);
         /* A row per text: its stat and listed stamp when read, its sha1, and the doc, deflated. A
@@ -114,7 +147,8 @@ export class Shelf {
           listed text,
           sha1 text not null,
           bytes integer not null,
-          doc blob
+          doc blob,
+          units integer not null default 0
         )`);
         db.exec("create unique index texts_key on texts (set_id, key)");
         db.exec(`pragma user_version = ${SCHEMA}`);
@@ -130,6 +164,8 @@ export class Shelf {
 
   private close(): void {
     this.statements.clear();
+    for (const ix of this.indexes.values()) ix.forget();
+    this.indexes.clear();
     try {
       this.handle?.close();
     } catch {
@@ -156,7 +192,13 @@ export class Shelf {
   private sql(text: string): StatementSync {
     const db = this.db;
     let s = this.statements.get(text);
-    if (!s) this.statements.set(text, (s = db.prepare(text)));
+    if (!s) {
+      s = db.prepare(text);
+      /* FTS5 numbers its own rows past 2^53, and `run()` reports the connection's last rowid: as a
+         number that throws, so every statement here reads integers as bigints (`server/words.ts`). */
+      s.setReadBigInts(true);
+      this.statements.set(text, s);
+    }
     return s;
   }
 
@@ -173,7 +215,9 @@ export class Shelf {
 
   /**
    * The set of rows for one question over one folder, made if there is none — and emptied, and taken
-   * for this build, when another build cut it: its rows are not trusted.
+   * for this build, when another build cut it: its rows are not trusted. The corpus's set has its
+   * words index beside it; a set whose index is missing is emptied too, so it is made again from the
+   * vault rather than answered from rows it does not cover.
    */
   private setOf(root: string, question: string): { id: number; turn: number | null } {
     const code = codeHash();
@@ -192,14 +236,58 @@ export class Shelf {
         turn: number | null;
       };
     }
-    if (row.code !== code) {
+    const id = Number(row.id);
+    const searched = question === SEARCHED;
+    const indexed = !searched || !!this.sql("select 1 from sqlite_master where name = ?").get(`words_${id}`);
+    if (row.code !== code || !indexed) {
       this.tx(() => {
-        this.sql("delete from texts where set_id = ?").run(row.id);
-        this.sql("update sets set code = ?, turn = null where id = ?").run(code, row.id);
+        this.sql("delete from texts where set_id = ?").run(id);
+        this.sql("update sets set code = ?, turn = null, files = null where id = ?").run(code, id);
+        if (searched) {
+          this.indexes.get(id)?.forget();
+          this.indexes.delete(id);
+          dropTables(this.db, id);
+          createTables(this.db, id);
+        }
       });
-      return { id: Number(row.id), turn: null };
+      return { id, turn: null };
     }
-    return { id: Number(row.id), turn: row.turn === null ? null : Number(row.turn) };
+    return { id, turn: row.turn === null ? null : Number(row.turn) };
+  }
+
+  private indexOf(set: number): WordIndex {
+    let ix = this.indexes.get(set);
+    if (!ix) this.indexes.set(set, (ix = new WordIndex(this.db, set)));
+    return ix;
+  }
+
+  /** The corpus's words index over one folder, as the shelf's rows have it now. */
+  words(root: string): Indexed {
+    const { id } = this.setOf(root, SEARCHED);
+    const index = this.indexOf(id);
+    const key = this.sql("select key from texts where rowid = ? and set_id = ?");
+    return {
+      index,
+      keyOf: (rowid) => (key.get(Math.floor(rowid / SPAN), id) as { key: string } | undefined)?.key,
+    };
+  }
+
+  /**
+   * The attachments a folder's search finds by their names, indexed below rowid zero: the units of the
+   * `j`th are at `-(2j + 2)` and `-(2j + 1)`. Written again only when `seal` — what names the list —
+   * moved since the last time.
+   */
+  files(root: string, seal: string, units: readonly (readonly string[])[]): void {
+    const { id } = this.setOf(root, SEARCHED);
+    const had = this.sql("select files from sets where id = ?").get(id) as { files: string | null };
+    if (had.files === seal) return;
+    const index = this.indexOf(id);
+    const count = had.files === null ? 0 : Number(had.files.slice(0, had.files.indexOf(":")) || 0);
+    this.tx(() => {
+      for (let j = 0; j < count; j++) index.remove(-(2 * j + 2), 2);
+      units.forEach((u, j) => index.add(-(2 * j + 2), u.slice(0, 2)));
+      this.sql("update sets set files = ? where id = ?").run(seal, id);
+    });
   }
 
   /** Every row's stamp for one question over one folder, and the answer they are — rows another build cut are dropped. */
@@ -240,16 +328,38 @@ export class Shelf {
     turn: number | null,
   ): void {
     const { id } = this.setOf(root, question);
-    const upsert = this.sql(`insert into texts (set_id, key, stat, listed, sha1, bytes, doc) values (?, ?, ?, ?, ?, ?, ?)
+    const upsert =
+      this.sql(`insert into texts (set_id, key, stat, listed, sha1, bytes, doc, units) values (?, ?, ?, ?, ?, ?, ?, ?)
       on conflict (set_id, key) do update set stat = excluded.stat, listed = excluded.listed, sha1 = excluded.sha1,
-        bytes = excluded.bytes, doc = excluded.doc`);
+        bytes = excluded.bytes, doc = excluded.doc, units = excluded.units returning rowid`);
     const restamp = this.sql("update texts set stat = ?, listed = ?, bytes = ? where set_id = ? and key = ?");
     const remove = this.sql("delete from texts where set_id = ? and key = ?");
     const name = this.sql("update sets set turn = ? where id = ?");
+    /* The corpus's words go and come with its rows, in the same transaction. */
+    const index = question === SEARCHED ? this.indexOf(id) : null;
+    const was = this.sql("select rowid, units from texts where set_id = ? and key = ?");
+    const unindex = (key: string) => {
+      const r = was.get(id, key) as { rowid: number | bigint; units: number } | undefined;
+      if (r && r.units) index!.remove(Number(r.rowid) * SPAN, Number(r.units));
+    };
     const work: (() => void)[] = [];
-    for (const [key, s, doc] of put) work.push(() => upsert.run(id, key, s.stat, s.listed, s.sha, s.bytes, pack(doc)));
+    for (const [key, s, doc] of put)
+      work.push(() => {
+        if (!index) {
+          upsert.run(id, key, s.stat, s.listed, s.sha, s.bytes, pack(doc), 0);
+          return;
+        }
+        unindex(key);
+        const texts = unitTexts(doc).slice(0, SPAN);
+        const r = upsert.get(id, key, s.stat, s.listed, s.sha, s.bytes, pack(doc), texts.length) as { rowid: number | bigint };
+        index.add(Number(r.rowid) * SPAN, texts);
+      });
     for (const [key, s] of touch) work.push(() => restamp.run(s.stat, s.listed, s.bytes, id, key));
-    for (const key of drop) work.push(() => remove.run(id, key));
+    for (const key of drop)
+      work.push(() => {
+        if (index) unindex(key);
+        remove.run(id, key);
+      });
     if (work.length <= BATCH) {
       this.tx(() => {
         for (const w of work) w();

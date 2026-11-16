@@ -11,7 +11,8 @@ import { stampItems } from "../src/board/stamp";
 import { indexTexts } from "../src/refs/extract";
 import { corpusTexts } from "../src/search/corpus";
 import { diagnoseBoard } from "../src/dsl/diagnose";
-import { buildEngine, search, snippet } from "../src/search/engine";
+import { snippet } from "../src/search/engine";
+import { searchDocs } from "../server/words";
 import { parseQuiz } from "../src/quiz/parse";
 import { tableData } from "../src/table/data";
 import { applyTableOps } from "../src/table/ops";
@@ -410,11 +411,11 @@ describe("search", () => {
     }));
   };
 
-  it("is the page's engine over the corpus: the same hits, in the same order, with the same marks", async () => {
+  it("is a vault's index over the corpus: the same hits, in the same order, with the same marks", async () => {
     const docs = await docsOf();
     const r = await post("/search", { docs, q: "pay sett" });
     expect(r.status).toBe(200);
-    const direct = search(buildEngine(docs as never), "pay sett");
+    const direct = searchDocs(docs as never, "pay sett");
     const hits = (r.body as { hits: { name: string; part: string | null; snippet: string; runs: unknown }[] }).hits;
     expect(hits.map((h) => [h.name, h.part])).toEqual(direct.map((h) => [h.doc.name, h.unit.part ?? null]));
     expect(hits[0]!.name).toBe("plan");
@@ -433,10 +434,10 @@ describe("search", () => {
     expect((await post("/search", { docs })).status).toBe(400);
   });
 
-  it("keeps no engine: a question without its docs is refused, never answered from an old one", async () => {
+  it("keeps no index: a question without its docs is refused, never answered from an old one", async () => {
     const docs = await docsOf();
     expect((await post("/search", { docs, q: "pay sett" })).status).toBe(200);
-    // A vault's search keeps its engine where its docs are (`server/searching.ts`), not here.
+    // A vault's search keeps its index where its docs are (`server/words.ts`), not here.
     const alone = await post("/search", { q: "pay sett", version: "any" });
     expect(alone.status).toBe(400);
   });

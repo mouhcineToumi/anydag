@@ -10,8 +10,9 @@ import { applyPatch, type PatchOp } from "../src/board/patch";
 import { stampItems } from "../src/board/stamp";
 import { indexTexts } from "../src/refs/extract";
 import { corpusTexts, type Unit } from "../src/search/corpus";
-import { buildEngine, search, snippet, type SearchDoc } from "../src/search/engine";
+import { snippet, type SearchDoc } from "../src/search/engine";
 import type { Found } from "../src/search/wire";
+import { searchDocs } from "./words";
 import { parseQuiz, pinned } from "../src/quiz/parse";
 import { applyQuizOps } from "../src/quiz/ops";
 import { stampIds } from "../src/quiz/write";
@@ -363,7 +364,7 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
    * A query matched against a corpus.
    *
    * Every asker is answered here: the search card (`useSearch`, one request per paused query), the
-   * CLI, an agent over MCP, a script. One engine (`src/search/engine.ts`) over the corpus's units, so
+   * CLI, an agent over MCP, a script. One index (`server/words.ts`) over the corpus's units, so
    * they all rank a query the same way and mark the same words, and the page holds no text to match.
    * The answer is `Found[]` (`src/search/wire.ts`), snippets included.
    */
@@ -374,9 +375,9 @@ export async function handle(req: DslRequest): Promise<DslResponse> {
     if (!Array.isArray(docs)) return bad(400, "expected `docs: [{id, name, kind, title?, units}]`");
     const limit = body.limit === undefined ? undefined : Number(body.limit);
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) return bad(400, "`limit` is a whole number above zero");
-    /* Built per question and let go after it: a vault's search keeps its engine where its docs are,
-       on the grammar's worker (`server/searching.ts`), for as long as somebody is searching (#279). */
-    const hits = search(buildEngine(docs as SearchDoc[]), q, limit).map((h) => foundOf(h.doc, h.unit, h.score, h.terms));
+    /* An index made in memory for the question and closed after it; a vault's is kept on disk
+       beside its corpus (`server/words.ts`, #267). */
+    const hits = searchDocs(docs as SearchDoc[], q, limit).map((h) => foundOf(h.doc, h.unit, h.score, h.terms));
     return ok({ query: q, hits });
   }
 

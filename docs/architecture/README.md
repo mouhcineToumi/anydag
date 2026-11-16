@@ -23,7 +23,7 @@ the file for that area, not to a new place.
 | [`attachments.md`](attachments.md) | Any file kept in the vault: ids, previews, what the server serves inline, the zip export. |
 | [`trash.md`](trash.md) | Nothing is deleted at once: the vault's trash, restore, expiry, and its routes. |
 | [`references.md`](references.md) | Document ids, `dag:` references, embeds, backlinks, the references index, `?view=1`, and wikilinks following a rename. |
-| [`search.md`](search.md) | The corpus on the server, the index in the page, ranking and snippets. |
+| [`search.md`](search.md) | The corpus on the server, its FTS5 words index in the app's home, ranking and snippets. |
 | [`cli.md`](cli.md) | `anydag`, the MCP server, and the manifest that holds routes, commands and tools in step. |
 | [`lock.md`](lock.md) | Read-only mode, in two layers, and what it keeps. |
 | [`links.md`](links.md) | Links between items, the rule for when a diagram has a header, and drawing a link with the pointer. |

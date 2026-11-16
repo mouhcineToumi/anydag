@@ -954,6 +954,17 @@
   started again parses nothing that did not move. Measure a change to it with the worker's RSS
   counted (`serverMem` in `scripts/bench.mjs`), at rest as well as just after the work. To see the
   first half, allocate three million small objects, drop them, call `gc()`, and read `VmRSS`.
+- **FTS5 numbers its own rows past 2^53, and `node:sqlite` throws on any statement that reports one.**
+  Every `run()` answers the connection's `lastInsertRowid`, and once the search index (#267) has
+  written to its shadow tables that is a segment id FTS5 builds from bit fields — 9,007,474,132,647,936
+  in the first test that wrote one. As a JavaScript number it throws *Value is too large to be
+  represented*, from the next `run()` of *any* statement on that connection, an `update` of another
+  table included; the `Reader` took it for a shelf that failed and fell back to memory, so the rows on
+  disk stopped following the vault. Every statement on `parse.sqlite` reads integers as bigints
+  (`setReadBigInts(true)` in `Shelf.sql` and `WordIndex.sql`) and makes numbers where it reads them.
+- **SQLite's `bm25` is zero for an FTS5 table that keeps no positions.** `detail=none` and
+  `detail=column` store no term counts, so every hit ranks the same and the list comes back in rowid
+  order; the words index keeps `detail=full`.
 - **A deadline over work that grows with the vault is a deadline per step, not per question.** The
   grammar's worker is ended after 60 s without an answer (#9), and a cold `/index` of 50,000 notes is
   minutes of parsing: before #279 it was ended every time, the caller fell back to parsing

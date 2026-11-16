@@ -134,6 +134,8 @@ if (RELEASE && GUARD) {
 }
 /** How long the vault group's server lets its grammar worker idle before ending it, in ms. */
 const REST_MS = 10_000;
+/** How long the vault is left quiet after a burst before `search.after-burst.quiet` is asked. */
+const QUIET_SEARCH_MS = 5_000;
 const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
   .split(",")
   .map(Number)
@@ -736,8 +738,8 @@ async function vaultGroup(n, b) {
   const v = makeVault(dir, n);
   record(`vault.${n}.generate`, now() - t, "ms", `${(duBytes(dir) / 1024 / 1024).toFixed(1)} MB on disk`);
   const before = fingerprint(dir);
-  /* The grammar's worker ends when idle — 30 s after its last answer, 5 min after its last search
-     (`server/grammar.ts`). Here both are 10 s, so `server.rss.rest` is measured inside the group. */
+  /* The grammar's worker ends when idle — 30 s after its last answer (`server/grammar.ts`; before #267,
+     5 min after its last search). Here both are 10 s, so `server.rss.rest` is measured inside the group. */
   const s = await startServer(dir, home, {
     env: { ANYDAG_GRAMMAR_IDLE_MS: String(REST_MS), ANYDAG_SEARCH_IDLE_MS: String(REST_MS) },
   });
@@ -756,7 +758,7 @@ async function vaultGroup(n, b) {
   record(`${p}.index.warm`, idx2.ms, "ms");
   record(`${p}.index.warm.health`, idx2.health, "ms", `the slowest /api/health of ${idx2.asked} asked while it ran`);
   const s1 = await timedReq(s, "/__board/search?q=ledger");
-  record(`${p}.search.cold`, s1.ms, "ms", "corpus parsed, engine built");
+  record(`${p}.search.cold`, s1.ms, "ms", "the corpus parsed and its words indexed");
   const corpus = await beside(s, "/__board/corpus");
   record(`${p}.corpus.warm`, corpus.ms, "ms", `${mb(corpus.bytes)?.toFixed(1)} MB answer`);
   record(`${p}.corpus.warm.health`, corpus.health, "ms", `the slowest /api/health of ${corpus.asked} asked while it ran`);
@@ -771,6 +773,9 @@ async function vaultGroup(n, b) {
     "ms",
     "median of 4 queries",
   );
+  /* One letter: the widest prefix a person types, every unit with a word starting with it ranked. */
+  const short = await timedReq(s, "/__board/search?q=h");
+  record(`${p}.search.warm.short`, short.ms, "ms", "the one-letter query `h`");
   const m = serverMem(s.pid);
   record(
     `${p}.server.rss.used`,
@@ -804,7 +809,7 @@ async function vaultGroup(n, b) {
   record(`${p}.index.after-idle`, idx4.ms, "ms", "a warm /index asked of a worker started again");
   record(`${p}.index.after-idle.health`, idx4.health, "ms", `the slowest /api/health of ${idx4.asked} asked while it ran`);
   const s4 = await beside(s, "/__board/search?q=harbour");
-  record(`${p}.search.after-idle`, s4.ms, "ms", "a search asked of a worker started again: its engine built again");
+  record(`${p}.search.after-idle`, s4.ms, "ms", "a search asked of a worker started again");
   record(`${p}.search.after-idle.health`, s4.health, "ms", `the slowest /api/health of ${s4.asked} asked while it ran`);
 
   const after = fingerprint(dir);
@@ -832,11 +837,43 @@ async function vaultGroup(n, b) {
   record(`${p}.burst.cpu`, cpu0 === null ? null : cpu1 - cpu0, "s", "server CPU for the burst");
   const idx3 = await timedReq(s, "/__board/index");
   record(`${p}.index.after-burst`, idx3.ms, "ms", "only what changed is parsed again, by a worker started again");
+  /* The words the burst wrote are found by the next search: only the texts that moved are read again. */
+  const s5 = await timedReq(s, "/__board/search?q=edited%20bench");
+  const found5 = typeof s5.ms === "number" ? (s5.json().hits?.length ?? 0) : 0;
+  record(`${p}.search.after-burst`, s5.ms, "ms", `${found5} hits for the words the burst wrote`);
+  /* The same burst again, then the vault left quiet for a few seconds before anybody searches — an
+     agent writes, a person looks a moment later. A watched vault's index follows the writes as they
+     land (`server/upkeep.ts`, #267), so the search finds them with nothing left to read. */
+  t = now();
+  for (const rel of targets) fs.appendFileSync(path.join(dir, rel), `\nRevised by the bench at ${Date.now()}.\n`);
+  while (now() - Math.max(feed.last, t) < 1_500 && now() - t < 60_000) await sleep(100);
+  await sleep(QUIET_SEARCH_MS);
+  const s7 = await timedReq(s, "/__board/search?q=revised%20bench");
+  const found7 = typeof s7.ms === "number" ? (s7.json().hits?.length ?? 0) : 0;
+  record(
+    `${p}.search.after-burst.quiet`,
+    s7.ms,
+    "ms",
+    `${found7} hits, asked ${QUIET_SEARCH_MS / 1000} s after a second burst went quiet`,
+  );
   record(`${p}.home.size.after-burst`, mb(duBytes(home)), "MB");
   feed.close();
 
   if (b && ONLY.has("page")) await pageGroup(n, s, v, b);
   await s.stop();
+
+  /* The app started again on the same home: its first search, after the listing it needs. Nothing in
+     the vault moved, so nothing should be read or parsed again. */
+  const again = await startServer(dir, home, { page: false });
+  try {
+    const listed = await timedReq(again, "/__board/list");
+    record(`${p}.restart.list`, listed.ms, "ms", "the first listing of a server started again on the same home");
+    const s6 = await beside(again, "/__board/search?q=harbour");
+    record(`${p}.search.after-restart`, s6.ms, "ms", "the first search of a server started again on the same home");
+    record(`${p}.search.after-restart.health`, s6.health, "ms", `the slowest /api/health of ${s6.asked} asked while it ran`);
+  } finally {
+    await again.stop();
+  }
 }
 
 async function pageGroup(n, s, v, b) {

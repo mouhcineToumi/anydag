@@ -23,6 +23,7 @@ import { err } from "./http";
 import { Practice } from "./practice";
 import { SyncLinks } from "./sync/link";
 import { Telemetry } from "./telemetry";
+import { keepIndexed } from "./upkeep";
 import { DEFAULT_MAX_MB } from "./uploads";
 import { mint, validId } from "./ids";
 import { readVaultId, Refused, Vault, type VaultOptions, writeVaultId } from "./vault";
@@ -38,6 +39,8 @@ export interface Open {
   index: Parsed;
   corpus: Parsed;
   practice: Practice;
+  /** Stops keeping the search index up to date as the vault changes, while it is watched (`server/upkeep.ts`). */
+  upkeep?: () => void;
 }
 
 /** A vault on the recent list, as the switcher shows it. */
@@ -97,11 +100,14 @@ export class Session {
    */
   watchVaults(): void {
     this.watches = true;
-    for (const o of this.open.values()) this.watchOne(o.vault);
+    for (const o of this.open.values()) this.watchOne(o);
   }
 
-  private watchOne(vault: Vault): void {
+  /** Watch a vault, and keep its search index up to date as it changes (#267). */
+  private watchOne(o: Open): void {
+    const { vault } = o;
     vault.watch().catch((e) => console.warn(`anydag: not watching ${vault.root}: ${(e as Error)?.message ?? e}`));
+    o.upkeep ??= keepIndexed(vault, o.corpus, o.index);
   }
 
   /** Which open vaults sync, and their loops (`server/sync/link.ts`). Nothing for a vault not linked. */
@@ -180,7 +186,7 @@ export class Session {
     this.defaultId = vault.id;
     this.remember(vault);
     this.sync.opened(vault);
-    if (this.watches) this.watchOne(vault);
+    if (this.watches) this.watchOne(at);
     return at;
   }
 
@@ -263,6 +269,7 @@ export class Session {
       this.defaultId = last?.id ?? null;
     }
     await this.sync.closed(id);
+    at.upkeep?.();
     at.index.forget();
     at.corpus.forget();
     await at.vault.close();
@@ -288,6 +295,7 @@ export class Session {
     const wasDefault = this.defaultId === oldId;
     this.open.delete(oldId);
     await this.sync.closed(oldId);
+    at.upkeep?.();
     at.index.forget();
     at.corpus.forget();
     await at.vault.close();
