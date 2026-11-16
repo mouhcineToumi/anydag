@@ -197,8 +197,18 @@ const embed = createBlockSpec(EMBED_CONFIG, {
  */
 export const codeBlockSpec = () => createCodeBlockSpec({ defaultLanguage: "text" });
 
-export const noteSchema = BlockNoteSchema.create({
-  blockSpecs: {
+/**
+ * The blocks a note holds, **as a spec nothing has built yet**, made fresh on every call.
+ *
+ * `BlockNoteSchema.create` turns each spec into the one the editor runs, and that turn is not
+ * repeatable: it reads the spec's `experimental_keyboard` and writes `keyboard` in its place, so a
+ * spec handed to `create` a second time — `{ ...noteSchema.blockSpecs }`, as the editors did — comes
+ * out with BlockNote's *defaults*. A bullet then split into a paragraph on Enter, a numbered item
+ * stopped counting, and an empty item did not end its list (#385). An editor that draws a block its
+ * own way replaces that entry of this object; every other entry goes to `create` once, from here.
+ */
+export function noteBlockSpecs() {
+  return {
     paragraph: defaultBlockSpecs.paragraph,
     /* Six levels held, because a file may have them; the menus offer three (see `blocks/menus.ts`). */
     heading: createHeadingBlockSpec({ levels: [1, 2, 3, 4, 5, 6], allowToggleHeadings: false }),
@@ -213,7 +223,11 @@ export const noteSchema = BlockNoteSchema.create({
     embed: embed(),
     equation: equation(),
     callout: callout(),
-  },
+  };
+}
+
+export const noteSchema = BlockNoteSchema.create({
+  blockSpecs: noteBlockSpecs(),
   inlineContentSpecs: { ...defaultInlineContentSpecs, ref, math: mathInline },
   styleSpecs: {
     bold: defaultStyleSpecs.bold,

@@ -828,6 +828,14 @@
   beside a `contentDOM` names it in `ignoreMutation`, or ProseMirror reads the block back off the DOM
   every time that DOM changes — a tick replacing a copy icon redrew the block, button and all.
 
+- **A spec handed to `BlockNoteSchema.create` twice comes out with BlockNote's default keyboard.**
+  `create` reads a spec's `experimental_keyboard` and writes `keyboard` in its place, and the second
+  time there is nothing to read. The editors built `BlockNoteSchema.create({ blockSpecs:
+  { ...noteSchema.blockSpecs, … } })`, so Enter in a bullet made a paragraph, a numbered list never
+  went on to 2., and an empty item did not end its list — in a note, on a board's `md` card and in a
+  quiz's field alike, with nothing failing (#385). Every schema is made from `noteBlockSpecs()`,
+  which returns specs nothing has built, each call fresh; `test/note-keyboard.test.ts` holds it.
+
 - **BlockNote registers the extensions a *block* spec carries, and drops an inline spec's without a
   word.** `createReactInlineContentSpec` takes an extensions argument and documents it as "mirroring
   block specs"; 0.55's `ExtensionManager` walks `blockSpecs` alone, so the `$x$` input rule and
