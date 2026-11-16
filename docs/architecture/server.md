@@ -47,6 +47,11 @@ Nine things are load-bearing:
   opened `/?token=…`, in the redirect's fragment — it takes `anydag serve`'s cookie too, whose `Path`
   is that prefix, because a cookie on `/` reaches every port of `127.0.0.1` and whoever listens there
   (#339). The prefix is taken off before routing, and is in no route, log, error or `server.json`.
+  **The gate denies by default**: the routes answer only a request one of those two branches handed
+  them after checking its credential, and refuse any other; the API spelled any way but the one the
+  routes are written in (`/%61pi/…`, `//api/…`, `/API/…`, `/api%2F…`) is a `400` whatever it carries;
+  and every other path goes to an app of its own that serves the built page's files and nothing
+  else — a `404` with no page.
   A write that carries the token only as the cookie must also come from the page's own origin
   (#336). The page and its assets at `/` need no credential: they hold no data
   (`test/server/gate.test.ts`, `e2e/credential.spec.ts`).

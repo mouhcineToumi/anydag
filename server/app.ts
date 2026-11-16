@@ -76,12 +76,34 @@ function ownOrigin(site: string | undefined, origin: string | undefined, host: s
 /** The routes about the app rather than one vault: they answer with no vault open. */
 const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me", "/api/telemetry"];
 
-/** Where the API is — as the routes and the page's own handler draw the line, so nothing on it is
- *  ever answered without the gate. Everything else this server answers is the page, which holds no data. */
-const isApi = (p: string): boolean => p.startsWith("/__board") || p.startsWith("/api");
-
 /** The API under the launch's secret path: `/s/<secret>/__board/…`, `/s/<secret>/api/…`. */
 const UNDER = /^\/s\/([^/]*)(\/.*)?$/;
+
+/**
+ * What a path is, read the way the router will read it and stricter: percent-decoded, every run of
+ * slashes one slash, any case. A string test on the raw path is not enough — the router decodes, so
+ * `/%61pi/vaults` was `/api/vaults` to the routes and a page path to the gate.
+ *
+ * - `api` — the routes', and spelled the one way they are (`/api/…`, `/__board/…`): the gate asks
+ *   for a credential, then hands it to the routes.
+ * - `odd` — the API any other way (`/%61pi`, `//api`, `/API`, `/api%2F…`), the secret path any way
+ *   but its own, or a path that does not decode: refused whatever it carries. No client sends one.
+ * - `page` — everything else, which only the page's own app answers.
+ */
+type Kind = "api" | "odd" | "page";
+function kindOf(raw: string): Kind {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return "odd";
+  }
+  const seen = decoded.replace(/[\\/]+/g, "/").toLowerCase();
+  /* The secret path spelled any way but its own (`/%73/…`, `//s/…`) is never the page either. */
+  if (seen.startsWith("/s/")) return "odd";
+  if (!(seen.startsWith("/api") || seen.startsWith("/__board"))) return "page";
+  return raw.startsWith("/api/") || raw.startsWith("/__board/") ? "api" : "odd";
+}
 
 /** Two secrets compared in a time that does not say how much of one was right. */
 function same(said: string | undefined, secret: string): boolean {
@@ -106,9 +128,13 @@ function moved(raw: Request, url: URL): Request {
 }
 
 const refused = (c: Context) => c.json({ error: "this server needs its token", code: "token" }, 401);
+const odd = (c: Context) => c.json({ error: "not a path this server answers", code: "path" }, 400);
 
 /**
- * The server: the gate, in front of the routes and the page.
+ * The server: the gate, in front of the routes and the page. **It denies by default**: the routes are
+ * reached only through the two branches below that have checked a credential, and they refuse any
+ * request the gate did not hand them; everything else goes to the page's own app, which has no route
+ * but the built page's files.
  *
  * - **`/s/<secret>/<api path>`** — the API for a browser on `anydag serve`. The secret must be this
  *   launch's, then the token comes as the header or as the cookie, whose `Path` is this prefix and
@@ -116,19 +142,28 @@ const refused = (c: Context) => c.json({ error: "this server needs its token", c
  *   the page's own origin (#336). The prefix is taken off and the routes see the path they know.
  * - **`/<api path>`** — the API for the shell, the CLI, MCP and the Vite proxy: the header only. A
  *   cookie here is no credential, so one that reached another port is worth nothing as a cookie.
+ * - **the API spelled any other way** (`kindOf`) — a 400, token or not.
  * - **`/?token=<token>`** — the address `anydag serve` prints. It answers with the cookie and a
  *   redirect to the same address without the token and with `#s=<secret>`, which the page keeps.
- * - **anything else** — the page and its assets, which hold nothing and answer without a credential.
+ * - **anything else** — the page and its assets, which hold nothing and answer without a credential;
+ *   a 404 with no page.
  *
  * The secret is minted here, per app, and lives nowhere else: not in `server.json`, a log, the
  * console, a route's template or an error, and `Referrer-Policy: no-referrer` keeps an address under
  * it out of every `Referer`. A wrong one is a 401 that says nothing about the right one.
  */
 export function createApp(opts: ServerOptions): Hono {
-  const inner = routes(opts);
+  /* The requests the gate let through, and only those: the routes refuse any other. */
+  const passed = new WeakSet<Request>();
+  const inner = routes(opts, passed);
+  const page = pageApp(opts.page);
   const secret = randomBytes(24).toString("base64url");
   const scope = `/s/${secret}/`;
   const app = new Hono();
+  const through = (c: Context, request: Request) => {
+    passed.add(request);
+    return inner.fetch(request, c.env);
+  };
 
   app.use("*", async (c, next) => {
     await next();
@@ -145,7 +180,10 @@ export function createApp(opts: ServerOptions): Hono {
     const under = UNDER.exec(url.pathname);
     if (under) {
       const rest = under[2] ?? "/";
-      if (!same(under[1], secret) || !isApi(rest)) return refused(c);
+      if (!same(under[1], secret)) return refused(c);
+      const kind = kindOf(rest);
+      if (kind === "odd") return odd(c);
+      if (kind !== "api") return refused(c);
       if (!same(header ?? getCookie(c, COOKIE), opts.token)) return refused(c);
       // The page's own origin, still: the cookie is sent with a request a page on another port of
       // this host makes to the secret path, should that page ever learn it (#336).
@@ -156,12 +194,14 @@ export function createApp(opts: ServerOptions): Hono {
       )
         return c.json({ error: "a write with the cookie must come from this page", code: "origin" }, 403);
       url.pathname = rest;
-      return inner.fetch(moved(c.req.raw, url), c.env);
+      return through(c, moved(c.req.raw, url));
     }
 
-    if (isApi(url.pathname)) {
+    const kind = kindOf(url.pathname);
+    if (kind === "odd") return odd(c);
+    if (kind === "api") {
       if (!same(header, opts.token)) return refused(c);
-      return inner.fetch(c.req.raw, c.env);
+      return through(c, c.req.raw);
     }
 
     // A browser cannot send a header, so `anydag serve` prints an address with the token once. It is
@@ -177,19 +217,81 @@ export function createApp(opts: ServerOptions): Hono {
       url.searchParams.delete("token");
       return c.redirect(`${url.pathname}${url.search}#s=${secret}`);
     }
-    return inner.fetch(c.req.raw, c.env);
+    return page.fetch(c.req.raw, c.env);
   });
 
   return app;
 }
 
-/** The routes and the page, behind no gate of their own: {@link createApp} is the only way in. */
-function routes(opts: ServerOptions): Hono {
+/**
+ * The built page and nothing else: its files, and `index.html` for any other address, so a reload of
+ * `/?board=…` draws the app. A file is served only from inside the folder, by its real path — no
+ * `..`, link or neighbouring folder whose name begins the same reaches past it. No routes, no vault:
+ * it holds nothing, which is why it answers without a credential. With no page, a 404.
+ */
+function pageApp(root: string | null): Hono {
+  const app = new Hono();
+  if (!root) {
+    app.all("*", (c) => c.json({ error: "no page here" }, 404));
+    return app;
+  }
+  const TYPES: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+    ".json": "application/json",
+    ".wasm": "application/wasm",
+    ".ico": "image/x-icon",
+    ".mjs": "text/javascript; charset=utf-8",
+  };
+  const base = fs.realpathSync(root);
+  const shell = path.join(base, "index.html");
+  const inside = (rel: string): string | null => {
+    try {
+      const file = fs.realpathSync(path.resolve(base, rel));
+      return file.startsWith(base + path.sep) && fs.statSync(file).isFile() ? file : null;
+    } catch {
+      return null;
+    }
+  };
+  app.get("*", (c) => {
+    let rel: string;
+    try {
+      rel = decodeURIComponent(new URL(c.req.url).pathname).replace(/^\/+/, "");
+    } catch {
+      rel = "";
+    }
+    const file = (rel && inside(rel)) || shell;
+    const ext = path.extname(file);
+    return c.body(fs.readFileSync(file), 200, {
+      "content-type": TYPES[ext] ?? "application/octet-stream",
+      "cache-control": ext === ".html" ? "no-store" : "public, max-age=31536000, immutable",
+    });
+  });
+  app.all("*", (c) => c.json({ error: "not found" }, 404));
+  return app;
+}
+
+/**
+ * The routes. {@link createApp}'s gate is the only way in, and they hold it to that: a request it did
+ * not hand them (`passed`) is a 401 before any route, whatever its path says.
+ */
+function routes(opts: ServerOptions, passed: WeakSet<Request>): Hono {
   const s = opts.session;
   /* Read once per app: every route this app serves answers for the same process, whose environment
      does not change beneath it. A second app (a CLI's in-process serve) decides for itself. */
   const cloud = cloudOn(s.env);
   const app = new Hono();
+
+  app.use("*", async (c, next) => {
+    if (!passed.has(c.req.raw)) return refused(c);
+    passed.delete(c.req.raw);
+    await next();
+  });
 
   /* -- logs: how each route answered, by its template, and only once somebody said yes --
      behind the `cloud` switch (`server/features.ts`), whose being off is "no server": not even the
@@ -242,36 +344,6 @@ function routes(opts: ServerOptions): Hono {
     feedbackRoutes(app, s, opts.fetch);
   }
   chatRoutes(app, assistant);
-
-  /* -- the page ---------------------------------------------------------------------------- */
-
-  if (opts.page) {
-    const root = opts.page;
-    const TYPES: Record<string, string> = {
-      ".html": "text/html; charset=utf-8",
-      ".js": "text/javascript; charset=utf-8",
-      ".css": "text/css; charset=utf-8",
-      ".svg": "image/svg+xml",
-      ".png": "image/png",
-      ".woff2": "font/woff2",
-      ".woff": "font/woff",
-      ".json": "application/json",
-      ".wasm": "application/wasm",
-      ".ico": "image/x-icon",
-      ".mjs": "text/javascript; charset=utf-8",
-    };
-    app.get("*", (c, next) => {
-      if (c.req.path.startsWith("/__board") || c.req.path.startsWith("/api")) return next();
-      const rel = decodeURIComponent(c.req.path).replace(/^\/+/, "");
-      let file = path.resolve(root, rel);
-      if (!file.startsWith(root) || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) file = path.join(root, "index.html");
-      const ext = path.extname(file);
-      return c.body(fs.readFileSync(file), 200, {
-        "content-type": TYPES[ext] ?? "application/octet-stream",
-        "cache-control": ext === ".html" ? "no-store" : "public, max-age=31536000, immutable",
-      });
-    });
-  }
 
   app.onError((e, c) => {
     try {

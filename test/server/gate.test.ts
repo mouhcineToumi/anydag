@@ -209,15 +209,29 @@ describe("the page", () => {
   });
 
   it("is never the API: every route still needs a credential", async () => {
-    for (const route of [
-      "/__board/list",
-      "/__board/get?name=plan&kind=note",
-      "/api/auth/me",
-      "/api/vaults",
-      "/__boardx",
-      "/apix",
-    ]) {
+    for (const route of ["/__board/list", "/__board/get?name=plan&kind=note", "/api/auth/me", "/api/vaults"]) {
       expect((await get(route)).status).toBe(401);
+    }
+    /* The API's own prefix with more on it is not a path the routes know: refused, never the page. */
+    for (const route of ["/__boardx", "/apix"]) expect((await get(route)).status).toBe(400);
+  });
+
+  it("serves only the built page's own files, never one beside its folder", async () => {
+    /* A folder next to the page whose name begins with the page's: `startsWith(root)` let it through. */
+    const beside = `${page}-beside`;
+    fs.mkdirSync(beside, { recursive: true });
+    fs.writeFileSync(path.join(beside, "leak.txt"), "not the page's");
+    try {
+      for (const route of [
+        `/..%2F${path.basename(beside)}%2Fleak.txt`,
+        `/%2E%2E%2F${path.basename(beside)}%2Fleak.txt`,
+        `/..%5C${path.basename(beside)}%5Cleak.txt`,
+      ]) {
+        const res = await get(route);
+        expect(await res.text(), route).not.toContain("not the page's");
+      }
+    } finally {
+      fs.rmSync(beside, { recursive: true, force: true });
     }
   });
 
@@ -260,8 +274,7 @@ describe("the secret", () => {
   });
 
   it("is in no route the logs record", async () => {
-    /* With no page, as behind Vite: the page's own `GET *` would be the last route matched. */
-    app = createApp({ session, token: TOKEN, page: null });
+    /* With the page served: it is an app of its own, so its `GET *` is never the route a log names. */
     const { secret } = await enter();
     const cookie = `anydag_token=${TOKEN}`;
     const put = await app.request(`http://${HOST}/s/${secret}/api/telemetry`, {
@@ -285,3 +298,107 @@ describe("the secret", () => {
     expect(JSON.stringify(batch)).not.toContain("/s/");
   });
 });
+
+/**
+ * The router decodes a path before it matches it, so a gate that tested the raw string let
+ * `/%61pi/vaults` through to `/api/vaults` with no credential at all. Every way of spelling the API
+ * other than the one the routes are written in is refused, with or without a token, at the root and
+ * under the secret path, with a page and without one — and nothing that is not the API reaches a route.
+ */
+const ODD = [
+  "/%61pi/vaults",
+  "/%61pi/health",
+  "/%61pi/auth/me",
+  "/_%5Fboard/list",
+  "/%5F_board/list",
+  "/%5F%5Fboard/get?name=secret&kind=note",
+  "//api/vaults",
+  "///api/health",
+  "//__board/list",
+  "/API/vaults",
+  "/Api/health",
+  "/__BOARD/list",
+  "/__Board/list",
+  "/api%2Fvaults",
+  "/api%2fhealth",
+  "/__board%2Flist",
+  "/%2Fapi/vaults",
+  "/%2F__board/list",
+  "/api%5Cvaults",
+  "/api",
+  "/__board",
+  "/%E0%A4%A",
+  "/api/%E0%A4%A",
+];
+
+/** What any of the routes would have answered: none of it may come back. */
+const DATA = ['"vaults"', '"boards"', '"account"', '"features"', '"notes"', "Nobody else reads this"];
+
+for (const withPage of [true, false]) {
+  describe(`an API path spelled another way${withPage ? "" : ", with no page"}`, () => {
+    beforeEach(() => {
+      fs.writeFileSync(path.join(env.root, "secret.md"), "# Secret\n\nNobody else reads this.\n");
+      if (!withPage) app = createApp({ session, token: TOKEN, page: null });
+    });
+
+    const none = async (res: Response, route: string) => {
+      const body = await res.text();
+      expect(res.status, `${route} answered ${res.status}: ${body.slice(0, 120)}`).not.toBe(200);
+      for (const d of DATA) expect(body, route).not.toContain(d);
+    };
+
+    it("is refused at the root with no credential", async () => {
+      for (const route of ODD) await none(await get(route), route);
+    });
+
+    it("is refused at the root with the cookie", async () => {
+      for (const route of ODD) await none(await get(route, { cookie: `anydag_token=${TOKEN}` }), route);
+    });
+
+    it("is refused at the root even with the header: no client spells it that way", async () => {
+      for (const route of ODD) {
+        const res = await get(route, { "x-anydag-token": TOKEN });
+        expect(res.status, route).toBe(400);
+        await none(res, route);
+      }
+      /* While the one spelling the routes know answers. */
+      expect((await get("/api/vaults", { "x-anydag-token": TOKEN })).status).toBe(200);
+    });
+
+    it("is refused under the secret path, with the cookie and without it", async () => {
+      const { secret } = await enter();
+      for (const route of ODD) {
+        const at = `/s/${secret}${route}`;
+        await none(await get(at), at);
+        const res = await get(at, { cookie: `anydag_token=${TOKEN}` });
+        expect([400, 401], at).toContain(res.status);
+        await none(res, at);
+      }
+      expect((await get(`/s/${secret}/api/vaults`, { cookie: `anydag_token=${TOKEN}` })).status).toBe(200);
+    });
+
+    it("is refused under a secret path spelled another way", async () => {
+      const { secret } = await enter();
+      for (const at of [
+        `/%73/${secret}/api/vaults`,
+        `//s/${secret}/api/vaults`,
+        `/S/${secret}/api/vaults`,
+        `/s/${secret}//api/vaults`,
+      ]) {
+        await none(await get(at, { cookie: `anydag_token=${TOKEN}` }), at);
+      }
+    });
+
+    it("never writes, whatever it is spelled as", async () => {
+      for (const route of ["/%61pi/vaults/create", "//__board/create", "/__BOARD/create", "/_%5Fboard/create"]) {
+        const res = await create(route, {
+          cookie: `anydag_token=${TOKEN}`,
+          origin: `http://${HOST}`,
+          "sec-fetch-site": "same-origin",
+        });
+        expect(res.status, route).not.toBe(200);
+      }
+      expect(written()).toBe(false);
+    });
+  });
+}

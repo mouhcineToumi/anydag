@@ -791,6 +791,17 @@
   another port that learned it could also write, a write the cookie alone vouches for must still say
   it came from this page's own origin (`Sec-Fetch-Site`, else `Origin`), or it is a `403` (#10).
   `e2e/credential.spec.ts` replays the issue's table against a real `anydag serve`.
+- **A gate that reads the path must read it the way the router does, and deny what it does not
+  recognise.** The router decodes a path before it matches, so the first cut of the secret-path gate
+  (#339), which told the API from the page by a string test on the raw path and handed everything
+  else to the app that held the routes, let `/%61pi/vaults` and `/_%5Fboard/list` through to
+  `/api/vaults` and `/__board/list` — and their writes — with no credential at all, in every mode.
+  Now `kindOf` (`server/app.ts`) reads the path percent-decoded, slashes collapsed and in any case;
+  the API spelled any way but its own is a `400`; the routes refuse a request the gate did not hand
+  them; and the fall-through is an app with no route but the built page's files, served only from
+  inside its folder by real path (a neighbouring folder whose name begins the same was reachable
+  through `startsWith(root)`). `test/server/gate.test.ts` tries every spelling, at the root and under
+  the secret path, with a page and without.
 - **Opening a vault never writes a byte of it.** An existing `.md` with no `id:` is given one only
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
