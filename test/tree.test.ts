@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ancestors,
   between,
+  cardLines,
   contents,
   counted,
   emptyFolders,
@@ -248,6 +249,26 @@ describe("rows", () => {
 
   it("keeps a folder open under a shut parent from showing", () => {
     expect(rows(t, new Set(["clients/acme"])).map(line)).toEqual(["clients/ (shut)", "scratch"]);
+  });
+});
+
+describe("cardLines", () => {
+  /** A line as the card draws it: indented by its depth, a gap as a leading `+`. */
+  const said = (t: Tree) =>
+    cardLines(t).map((l) => {
+      const at = `${l.gap ? "+" : ""}${"  ".repeat(l.depth)}`;
+      return l.type === "folder" ? `${at}${l.name}/` : l.type === "file" ? `${at}${l.entry.name}` : `${at}(empty)`;
+    });
+
+  it("lists every folder open, its files a level in, and an empty folder's line under its heading", () => {
+    const t = tree(B("top", "work/plan", "work/deep/spec"), ["work", "work/deep", "attic"]);
+    expect(said(t)).toEqual(["attic/", "  (empty)", "+work/", "  deep/", "    work/deep/spec", "+  work/plan", "+top"]);
+  });
+
+  it("is the same files in the same order as the list Enter and the count read", () => {
+    const t = tree([...B("b", "x/a"), ...N("x/n", "c")], []);
+    const files = cardLines(t).flatMap((l) => (l.type === "file" ? [l.entry] : []));
+    expect(files).toEqual(flatten(t));
   });
 });
 

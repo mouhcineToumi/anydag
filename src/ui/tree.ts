@@ -294,6 +294,32 @@ export function rows(node: Tree, open: ReadonlySet<string>, depth = 0, out: Row[
   return out;
 }
 
+/**
+ * One line of the search card's tree, in the order it is drawn (`cardLines`). `gap` is the 2px a
+ * folder after another, or the first file after the folders, keeps above it.
+ */
+export type CardLine =
+  | { type: "folder"; path: string; name: string; depth: number; gap: boolean }
+  | { type: "file"; entry: Entry; depth: number; gap: boolean }
+  | { type: "empty"; path: string; depth: number; gap: false };
+
+/**
+ * The search card's tree as lines, every folder open: a heading, what is in it a level in, and an
+ * empty folder's *empty* line. Flat for the reason `rows` is — the card draws only the lines in
+ * view (`virtual.ts`), and a line's place has to be known without the lines before it being drawn.
+ */
+export function cardLines(node: Tree, depth = 0, out: CardLine[] = []): CardLine[] {
+  node.folders.forEach((f, i) => {
+    out.push({ type: "folder", path: f.path, name: f.name, depth, gap: i > 0 });
+    if (f.folders.length === 0 && f.files.length === 0) out.push({ type: "empty", path: f.path, depth: depth + 1, gap: false });
+    else cardLines(f, depth + 1, out);
+  });
+  node.files.forEach((entry, i) => {
+    out.push({ type: "file", entry, depth, gap: i === 0 && node.folders.length > 0 });
+  });
+  return out;
+}
+
 /** What happened to a file or a folder, as far as a remembered name cares. */
 export type Change =
   | { kind: "file"; file: FileKind; from: string; to: string | null }

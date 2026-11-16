@@ -137,6 +137,21 @@ because the bench asks `/index` and the search right after the burst. The backgr
 for `/index` to go quiet, so the search reads the 200 texts itself; `.quiet` is the same burst
 with the background read let finish.
 
+**Two lists that drew every row** (#267), measured with `node scripts/bench.mjs --only vault,page`,
+develop (`301f71b`) and the change on the same machine, one after the other:
+
+| `page.*` | 1k | 10k | 50k |
+|---|---|---|---|
+| `search.open`: the search card opened, nothing typed, to its first row | 108 → 85 ms | 917 → 70 ms | 3.4 s → 144 ms |
+| `search.open.dom`: elements in the card | 7,976 → 374 | 79,772 → 358 | 399,238 → 358 |
+| `tasks.ready`: `?tasks=1` to its first row (4% of the vault is tasks) | 146 → 140 ms | 435 → 206 ms | 932 → 342 ms |
+| `tasks.dom`: elements in the page | 2,285 → 2,285 | 15,511 → 2,119 | 72,615 → 2,127 |
+| `rss.renderer.search` | 235 → 217 MB | 486 → 244 MB | 306 → 267 MB |
+
+With nothing typed the search card lists every name in the vault, and the Tasks page every open
+task; both draw the rows in view and a margin now (`sidebar.md`, `tasks-projects-calendar.md`). The
+Tasks page draws every row of a list of up to 100, so at 1k it is unchanged.
+
 ### Startup
 
 The desktop app (Electron on `desktop/dist/main.cjs`), from launch to its first window and to a
@@ -291,7 +306,7 @@ unchanged, because it comes before any of the page's script runs.
 - **Other diagram layouts** — only `arch` (ELK). `flow` and `activity` lay out with `lanes.ts`, and the
   sequence, timeline and gitgraph layouts are linear passes.
 - **The Assistant, prompt cards and sync**, which spend their time in other processes or on the
-  network; the Tasks page and the calendar at 10k tasks.
+  network; the calendar at 10k tasks. (The Tasks page is `page.*.tasks.*`, 2,000 tasks at 50k.)
 
 ## The bench
 

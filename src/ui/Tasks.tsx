@@ -16,13 +16,18 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type HTMLAttributes,
   type KeyboardEvent,
+  type MutableRefObject,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { createNote, deleteBoard, moveBoard, setTask, type BoardTree, type TrashEntry } from "@/board/useBoard";
@@ -88,6 +93,7 @@ import { TasksMenu, under, type MenuRow } from "./TasksMenu";
 import { blankDraft, NewTaskDialog, NewTaskRow, type NewTaskDraft } from "./NewTask";
 import { Toast, ToastName, ToastWords } from "./Toast";
 import { middle } from "./tabs/intent";
+import { drawn, offsetsOf, windowFor, type Window } from "./virtual";
 
 /**
  * The Tasks page: every note that is a task, as a list or as a board.
@@ -308,6 +314,13 @@ export function TasksView({
   const [draft, setDraft] = useState<NewTaskDraft>(() => blankDraft(scope.kind === "project" ? scope.name : null));
   const [fresh, setFresh] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
+  /* The page's scroller, which a long list draws the rows in view of (`TaskRows`); the row the focus
+     is on, kept drawn wherever the list is scrolled; one asked for before it was drawn; and a row's
+     height, measured off one that is. */
+  const page = useRef<HTMLElement>(null);
+  const [focusedRow, setFocusedRow] = useState<string | null>(null);
+  const wantRow = useRef<string | null>(null);
+  const [rowHeight, setRowHeight] = useState(39);
   /* *Pick a date…* for several tasks: the browser's own picker, and the tasks it is for. */
   const picker = useRef<HTMLInputElement>(null);
   const [picking, setPicking] = useState<Row[]>([]);
@@ -580,8 +593,21 @@ export function TasksView({
     onAsk?.(true);
   }, [locked, onAsk]);
 
+  /** Focus a row, drawn or not: one a long list has not drawn is scrolled to, and focused once it is. */
   const focusRow = (name: string | undefined) => {
-    if (name) document.querySelector<HTMLElement>(`[data-dag-task-open="${CSS.escape(name)}"]`)?.focus();
+    if (!name) return;
+    const el = document.querySelector<HTMLElement>(`[data-dag-task-open="${CSS.escape(name)}"]`);
+    if (el) return el.focus();
+    const scroller = page.current;
+    const group = groups.find((g) => g.rows.some((p) => p.row.name === name));
+    if (!scroller || !group) return;
+    const box = scroller.querySelector(`[data-dag-tasks-rows="${CSS.escape(flat ? "all" : group.key || "none")}"]`);
+    if (!box) return;
+    const all = flat ? groups.flatMap((g) => g.rows) : group.rows;
+    const i = all.findIndex((p) => p.row.name === name);
+    wantRow.current = name;
+    scroller.scrollTop +=
+      box.getBoundingClientRect().top - scroller.getBoundingClientRect().top + i * rowHeight - scroller.clientHeight / 2;
   };
   /* Escape: the selection first, then the filter and the words. */
   const letGo = useCallback((): boolean => {
@@ -811,9 +837,10 @@ export function TasksView({
         return null;
     }
   };
-  const drawRow = (r: Row) => (
+  const drawRow = (r: Row, style?: CSSProperties) => (
     <TaskRow
       key={r.name}
+      style={style}
       row={r}
       chip={chip(r)}
       onOpen={onOpen}
@@ -825,9 +852,29 @@ export function TasksView({
     />
   );
   const hidden = Object.fromEntries(display.hidden.map((c) => [`data-hide-${c}`, ""]));
+  /* The rows a long list draws wherever it is scrolled: the focused one, and one just made, which is scrolled to. */
+  const keep = useMemo(() => new Set([focusedRow, fresh].filter((n): n is string => !!n)), [focusedRow, fresh]);
+  const rowsOf = (
+    key: string,
+    rows: readonly Row[],
+    attrs: HTMLAttributes<HTMLDivElement> & Record<`data-${string}`, string>,
+  ) => (
+    <TaskRows
+      rows={rows}
+      draw={drawRow}
+      scroller={page}
+      height={rowHeight}
+      onHeight={setRowHeight}
+      keep={keep}
+      want={wantRow}
+      data-dag-tasks-rows={key}
+      {...attrs}
+    />
+  );
 
   return (
     <main
+      ref={page}
       className="dag-tasks"
       data-dag-tasks={layout}
       data-dag-tasks-showing={layout === "list" ? tab : undefined}
@@ -916,43 +963,49 @@ export function TasksView({
           onAll={tab === "open" ? () => chooseTab?.("all") : undefined}
         />
       ) : (
-        <div className="dag-tasks__groups" onKeyDown={onListKey}>
-          {flat ? (
-            <div
-              className="dag-tasks__rows"
-              role="list"
-              aria-label={groups[0]?.label ?? "Tasks"}
-              data-dag-tasks-group={groups[0]?.key || "none"}
-            >
-              {groups.flatMap((g) => g.rows.map((p) => drawRow(p.row)))}
-            </div>
-          ) : (
-            groups.map((g) => {
-              const p = locked ? null : preset(g);
-              const { mark } = g.by === "none" ? { mark: null } : filterValue(g.by, g.key, projects);
-              return (
-                <Group
-                  key={g.key || "none"}
-                  id={g.key || "none"}
-                  label={g.label}
-                  mark={mark}
-                  count={g.rows.length}
-                  open={isOpen(g.key)}
-                  onToggle={() =>
-                    setFlipped((had) => {
-                      const out = new Set(had);
-                      if (out.has(groupId(g.key))) out.delete(groupId(g.key));
-                      else out.add(groupId(g.key));
-                      return out;
-                    })
-                  }
-                  onAdd={p ? () => addTo(p) : undefined}
-                >
-                  {g.rows.map((x) => drawRow(x.row))}
-                </Group>
-              );
-            })
-          )}
+        <div
+          className="dag-tasks__groups"
+          onKeyDown={onListKey}
+          onFocus={(e) =>
+            setFocusedRow((e.target as Element).closest("[data-dag-task-row]")?.getAttribute("data-dag-task-row") ?? null)
+          }
+          onBlur={() => setFocusedRow(null)}
+        >
+          {flat
+            ? rowsOf(
+                "all",
+                groups.flatMap((g) => g.rows.map((p) => p.row)),
+                { "aria-label": groups[0]?.label ?? "Tasks", "data-dag-tasks-group": groups[0]?.key || "none" },
+              )
+            : groups.map((g) => {
+                const p = locked ? null : preset(g);
+                const { mark } = g.by === "none" ? { mark: null } : filterValue(g.by, g.key, projects);
+                return (
+                  <Group
+                    key={g.key || "none"}
+                    id={g.key || "none"}
+                    label={g.label}
+                    mark={mark}
+                    count={g.rows.length}
+                    open={isOpen(g.key)}
+                    onToggle={() =>
+                      setFlipped((had) => {
+                        const out = new Set(had);
+                        if (out.has(groupId(g.key))) out.delete(groupId(g.key));
+                        else out.add(groupId(g.key));
+                        return out;
+                      })
+                    }
+                    onAdd={p ? () => addTo(p) : undefined}
+                  >
+                    {rowsOf(
+                      g.key || "none",
+                      g.rows.map((x) => x.row),
+                      {},
+                    )}
+                  </Group>
+                );
+              })}
         </div>
       )}
       {selected.size && layout === "list" && !locked ? (
@@ -1073,6 +1126,7 @@ function NoMatch({ words, tab, onClear, onAll }: { words: string; tab: TaskTab; 
  * menu can switch any of them but the date off.
  */
 function TaskRow({
+  style,
   row: r,
   chip,
   onOpen,
@@ -1082,6 +1136,8 @@ function TaskRow({
   selected = false,
   fresh = false,
 }: {
+  /** Where a long list places it (`TaskRows`). */
+  style?: CSSProperties;
   row: Row;
   chip: Row["project"];
   onOpen(name: string): void;
@@ -1103,6 +1159,7 @@ function TaskRow({
   return (
     <div
       ref={ref}
+      style={style}
       className="dag-tasks__row"
       role="listitem"
       data-dag-task-row={r.name}
@@ -1205,6 +1262,95 @@ function TaskRow({
   );
 }
 
+/** Above this many rows a list draws only those in view and a margin (#267); up to it, every one. */
+const DRAW_ALL = 100;
+
+/**
+ * A list of task rows — a group's, or the whole list's when it is not grouped. **A long one draws
+ * only the rows in view of the page's scroller, and a margin** (`virtual.ts`, as the sidebar and the
+ * search do): two thousand tasks were 73,000 elements and nearly a second before the first row
+ * showed. Every row is one height, measured off a drawn one, and placed by its offset, so a row
+ * kept drawn out of view — the one the focus is on, one just made — stays where it is. The keys
+ * walk the rows by name and scroll to one that is not drawn (`focusRow`), which is focused here once
+ * it is.
+ */
+function TaskRows({
+  rows,
+  draw,
+  scroller,
+  height,
+  onHeight,
+  keep,
+  want,
+  ...attrs
+}: {
+  rows: readonly Row[];
+  draw(r: Row, style?: CSSProperties): ReactNode;
+  scroller: RefObject<HTMLElement | null>;
+  height: number;
+  onHeight(h: number): void;
+  keep: ReadonlySet<string>;
+  want: MutableRefObject<string | null>;
+} & HTMLAttributes<HTMLDivElement>) {
+  const box = useRef<HTMLDivElement>(null);
+  const many = rows.length > DRAW_ALL;
+  const offsets = useMemo(
+    () => (many ? offsetsOf(new Array<number>(rows.length).fill(height)) : null),
+    [many, rows.length, height],
+  );
+  const [view, setView] = useState<Window | null>(null);
+  const sync = useCallback(() => {
+    const page = scroller.current;
+    const list = box.current;
+    if (!page || !list || !offsets) return;
+    const top = page.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    setView((prev) => windowFor(offsets, top, page.clientHeight, prev));
+  }, [scroller, offsets]);
+  useLayoutEffect(sync, [sync]);
+  useEffect(() => {
+    const page = scroller.current;
+    if (!page || !many) return;
+    page.addEventListener("scroll", sync, { passive: true });
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(sync);
+    watch?.observe(page);
+    return () => {
+      page.removeEventListener("scroll", sync);
+      watch?.disconnect();
+    };
+  }, [scroller, sync, many]);
+  useLayoutEffect(() => {
+    const list = box.current;
+    if (!list) return;
+    const h = list.querySelector("[data-dag-task-row]")?.getBoundingClientRect().height;
+    if (h && h !== height) onHeight(h);
+    const name = want.current;
+    const el = name ? list.querySelector<HTMLElement>(`[data-dag-task-open="${CSS.escape(name)}"]`) : null;
+    if (el) {
+      want.current = null;
+      el.focus({ preventScroll: true });
+    }
+  });
+  if (!offsets)
+    return (
+      <div ref={box} className="dag-tasks__rows" role="list" {...attrs}>
+        {rows.map((r) => draw(r))}
+      </div>
+    );
+  const pins = rows.flatMap((r, i) => (keep.has(r.name) ? [i] : []));
+  const shown = drawn(view ?? windowFor(offsets, 0, window.innerHeight), rows.length, pins);
+  return (
+    <div
+      ref={box}
+      className="dag-tasks__rows"
+      role="list"
+      style={{ position: "relative", height: offsets[rows.length] }}
+      {...attrs}
+    >
+      {shown.map((i) => draw(rows[i]!, { position: "absolute", top: offsets[i], left: 0, right: 0 }))}
+    </div>
+  );
+}
+
 /**
  * One group of the list, under a heading of what it is grouped by: a status, a priority, a due
  * date, a project. Done starts shut — it only grows, and it is what nobody is looking for — and a
@@ -1251,11 +1397,7 @@ function Group({
           </IconButton>
         ) : null}
       </h2>
-      {open ? (
-        <div className="dag-tasks__rows" role="list">
-          {children}
-        </div>
-      ) : null}
+      {open ? children : null}
     </section>
   );
 }
