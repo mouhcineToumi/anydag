@@ -11,8 +11,9 @@ import type { Dialect } from "../common";
  *     extsystem auth "Firebase Auth" "Signs learners in and issues the id tokens."
  *     web --> api "Reads content and progress" "JSON/HTTPS"
  *
- * C4's shape is three tiers of text per box — name, `[Type: technology]`, a sentence — and that
- * sentence is the only text in the whole system that wraps. It is what makes a C4 diagram readable
+ * C4's shape is three tiers of text per box — name, `[Type: technology]`, a sentence — and the
+ * sentence is what the card is shaped around: it wraps, and the name wraps too when it is longer
+ * than the box, which the sizer grows the card to hold. That is what makes a C4 diagram readable
  * by someone who was not in the room, and it is why C4 boards are tall rather than wide.
  */
 export const c4: Dialect = {

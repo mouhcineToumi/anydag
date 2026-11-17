@@ -93,6 +93,7 @@
     "entityName": 13,
     "rowMore": 11,
     "c4Name": 16,
+    "c4NameLeading": 1.25,
     "c4Type": 10,
     "c4Desc": 12.5,
     "c4DescLeading": 1.45,
