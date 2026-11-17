@@ -12,6 +12,7 @@
  * an app. No React here, so `test/vault.test.ts` can hold it in Node.
  */
 
+import { loseServer } from "../auth/lost";
 import { desktop } from "./desktop";
 import { pathSecret, underSecret } from "./secret";
 
@@ -66,6 +67,20 @@ export function scopes(path: string): boolean {
 
 /** Whether a path is the API's — what the server serves under the secret path too (`server/app.ts`). */
 const api = (path: string): boolean => path.startsWith("/__board/") || path.startsWith("/api/");
+
+/**
+ * Whether `url` — as this page sent it, already scoped — is a request to this server's API, at the
+ * root or under a secret path. An absolute URL on another origin is not, whatever its path says.
+ */
+export function toApi(url: string, origin?: string): boolean {
+  let rest = url;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) {
+    const ours = origin ?? (typeof location === "undefined" ? undefined : location.origin);
+    if (!ours || !url.startsWith(`${ours}/`)) return false;
+    rest = url.slice(ours.length);
+  }
+  return api(rest.replace(/^\/s\/[^/?#]+(?=\/)/, ""));
+}
 
 /**
  * `url` with `vault=<id>` added, when it is one of this app's scoped routes and names no vault of
@@ -215,7 +230,8 @@ function marked(input: RequestInfo | URL, init: RequestInit | undefined): [Reque
 
 /**
  * Add `vault=` to every scoped request this page makes, put every request to the API under the
- * secret path when there is one, and hear the one refusal that means the vault itself has gone.
+ * secret path when there is one, and hear the two refusals that mean the page cannot go on: the
+ * vault itself has gone (a `404` that says so), or the server no longer lets the page in (a `401`).
  * Installed before the first request; idempotent.
  */
 let installed = false;
@@ -236,6 +252,13 @@ export function watchVault(): void {
     }
     [input, init] = marked(input, init);
     const response = await original(input, init);
+    /* The gate's refusal: this page's credential is not this launch's — `anydag serve` restarted
+       under it (#402). Heard before the caller is handed the response, so whoever asked can already
+       read `serverLost()`. Every `401` the API answers is the gate's (`src/auth/lost.ts`). */
+    if (response.status === 401) {
+      const sent = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (toApi(sent)) loseServer();
+    }
     if (id && response.status === 404) {
       /* Read off a clone, so whoever asked still gets the body. Only a 404 is ever read. */
       void response

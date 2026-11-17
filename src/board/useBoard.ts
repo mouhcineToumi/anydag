@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { REFUSED } from "../auth/lost";
 import { CODES } from "../dsl/codes";
 import { concerns, onBoard, onBoards, onFile, onNote, onQuiz, onTable, type BoardChange } from "./events";
 import { GUESSED, guessed, shown, tick } from "./guess";
@@ -218,13 +219,20 @@ export function useBoard(name: string | null): BoardHandle {
    * it, the write resolves `null` like any that did not land, and the person is told through the
    * notice a refused drop already uses. Only the `fetch` is guarded: a bug in `adopt` is not an
    * unreachable server and must not be worded as one.
+   *
+   * **So is a server that no longer lets this page in** (#402): `anydag serve` restarted on the same
+   * port, with a secret path this page does not have. It answers — a `401`, not a rejection — so it
+   * read as a write that merely did not land, and the edit was taken back with nothing said. The
+   * page's `fetch` has already marked it lost (`src/auth/lost.ts`), which puts up the toast that says
+   * how to get back; this says what happened to the change.
    */
   const write = useCallback(
     async (route: string, payload: object, retry: boolean): Promise<Write | null> => {
       if (!name) return null;
       const post = async (against: Version | null): Promise<Response | null> => {
+        let response: Response;
         try {
-          return await fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
+          response = await fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ base: against?.base, ...payload }),
@@ -233,6 +241,11 @@ export function useBoard(name: string | null): BoardHandle {
           document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: UNREACHABLE }));
           return null;
         }
+        if (response.status === 401) {
+          document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: REFUSED }));
+          return null;
+        }
+        return response;
       };
 
       let before = held.current;

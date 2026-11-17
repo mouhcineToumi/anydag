@@ -784,6 +784,17 @@
   and its assets at `/` answer with no credential: they hold no data. With no secret and a `401`,
   the page says to open the address `anydag serve` printed, not that the server is not answering.
 
+  **A page left open over a restart is refused by a server that is alive** (#402). The new launch
+  mints another secret, so every request the page makes under the old one is a `401` — no network
+  error, nothing rejected — and every caller that read `!response.ok` as "did not land" took the edit
+  back in silence, while the change feed, whose stream the browser closes for good on a status, went
+  quietly stale. The gate's `401` is the only one the API answers (the sync link turns a sync
+  server's into a `403` for this reason), so the page's `fetch` (`watchVault`) marks the page lost on
+  the first one (`src/auth/lost.ts`); a toast that stays (`src/ui/ServerLost.tsx`) says nothing is
+  saved and how to get back, a refused board write says that it was not saved, and a feed closed by a
+  status asks `/api/auth/me` again where the `401` can be heard — and opens again after a pause when
+  it was some other refusal. The gate is not loosened: the way back is still the printed address.
+
   **What is left.** The cookie still reaches every port of `127.0.0.1` the browser is asked for a
   path under the secret: only the secret keeps it from being sent there. A secret that leaks — out
   of this origin's `localStorage`, the browser's history, a screen share of an attachment opened at

@@ -29,6 +29,7 @@
 import type { NoteEvent } from "../note/event";
 import type { Project } from "../note/project";
 import type { Task } from "../note/task";
+import { serverLost } from "../auth/lost";
 import { GONE, scopeUrl } from "../vault/current";
 import type { SyncStatus as SyncStatusPayload } from "../sync/types";
 
@@ -115,7 +116,7 @@ let dozeTimer: ReturnType<typeof setTimeout> | null = null;
    which is what the snapshot script and every `?snapshot=1` check are — never connects at all. */
 function open(): void {
   /* A listener added while dozing waits for the tab to be shown, and is told then like the rest. */
-  if (source || dozing || typeof EventSource === "undefined") return;
+  if (source || dozing || serverLost() || typeof EventSource === "undefined") return;
   watchVisibility();
   /* The workspace's feed: an `EventSource` cannot be handed a header, which is why a
      workspace is named in the query string everywhere — see `workspace/current.ts`. */
@@ -190,12 +191,45 @@ function open(): void {
     source = null;
     dispatchEvent(new Event(GONE));
   });
-  /* No handler for `error`. `EventSource` retries on its own, and logging each retry would fail
-     `npm run e2e`, which treats any console output as a failure. */
+  /* `EventSource` retries a dropped stream on its own — a server gone, coming back — and an `error`
+     then is nothing to do (nor to log: `npm run e2e` treats any console output as a failure). But a
+     stream **refused** with a status is not retried: the browser closes it for good, and the page
+     went quietly stale (#402). The refusal that matters is the gate's — `anydag serve` restarted with
+     another secret path — and a stream cannot read its status, so one cheap request asks the question
+     again where it can be heard: the page's `fetch` marks the page lost on its `401`. Anything else
+     — a server answering the stream with an error it will not answer forever — is tried again. */
+  const opened = source;
+  source.addEventListener("error", () => refused(opened));
   /* A tab opened hidden — a reference modifier-clicked into a new tab, a session restored, a phone
      bringing its tabs back — has had no `visibilitychange` to arm the doze, so it is asked here,
      once the stream exists for it to close. */
   onVisibility();
+}
+
+/** `EventSource.CLOSED`, spelled out: a stub of `EventSource` need not carry the constant. */
+const CLOSED = 2;
+
+/** How long after a refused stream the feed is opened again, when the refusal was not the gate's. */
+export const RETRY = 5_000;
+
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function refused(stream: EventSource): void {
+  if (stream !== source || stream.readyState !== CLOSED) return;
+  source = null;
+  void fetch("/api/auth/me")
+    .then((r) => r.status)
+    .catch(() => 0)
+    .then((status) => {
+      /* The gate: the page is lost, the toast says so, and a stream under a dead secret is not
+         asked for again. */
+      if (status === 401 || retryTimer !== null) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (source || dozing || serverLost()) return;
+        wake();
+      }, RETRY);
+    });
 }
 
 function idle(): boolean {
