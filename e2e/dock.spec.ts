@@ -4,13 +4,15 @@ import path from "node:path";
 import { BINDINGS } from "../src/edit/bindings";
 import { BOARDS } from "./boards";
 import { expect, test, type Page } from "./fixture";
+import { lead } from "./keys";
 import { openMore } from "./more";
 
 /**
  * The dock.
  *
- * Four things are held: **nothing on the dock wears a text label**, the rare half is
- * **behind one button**, the zoom figure is **live**, and a picture of a board is still a picture
+ * Five things are held: **nothing on the dock wears a text label**, the rare half is
+ * **behind one button**, the zoom figure is **live**, the two bars **never sit on each other when
+ * the canvas is narrow** (#395), and a picture of a board is still a picture
  * of a board. The last one is what let the rest of this change be made without fuss —
  * `?snapshot=1` strips the chrome, so none of this can move one of
  * the 45 reference baselines — and it is worth a check precisely because it is what everything
@@ -163,4 +165,87 @@ test("a snapshot has no dock, no zoom and no bar — which is what keeps the bas
   for (const sel of ["[data-dag-dock]", "[data-dag-zoombar]", "[data-dag-more]", ".dag-toolbar"]) {
     await expect(page.locator(sel)).toHaveCount(0);
   }
+});
+
+/*
+ * The two bars at the foot of the drawing.
+ *
+ * The dock is centred on the canvas and the zoom cluster is pinned to its right edge, and neither
+ * rule can see the other's width — so with the library open on an 800×700 window their boxes
+ * intersect, and the cluster, later in the DOM on the same layer, took every press aimed at the
+ * dock's last controls: `elementFromPoint` answered with the cluster at the centre of all nine of
+ * them (#395). The check is the defect's own: every control has to answer its own centre, and the
+ * two boxes must not touch.
+ */
+test("the zoom cluster never covers the dock, and every control answers its own centre", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 700 });
+  await open(page);
+
+  /* The library takes 272px off the drawing, which is the canvas width at which QA found the
+     overlap: the dock at its middle reached the cluster at its right edge by 68px. */
+  await lead(page, "l");
+  await expect(page.locator("[data-dag-library]")).toBeVisible();
+
+  const boxes = () =>
+    page.evaluate(() => {
+      const read = (sel: string) => {
+        const r = document.querySelector(sel)!.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height };
+      };
+      return { dock: read("[data-dag-dock]"), zoom: read("[data-dag-zoombar]"), canvas: read(".dag-viewport") };
+    });
+  type Box = { x: number; y: number; w: number; h: number };
+  const apart = (a: Box, b: Box) => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+
+  /* Every control, not a sample: the defect covered the last two, and the QA pass measured all
+     nine because a wrong stacking answer is not a bug about two buttons. */
+  const covered = () =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>("[data-dag-dock] button"))
+        .filter((b) => {
+          const r = b.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return !hit || !b.contains(hit);
+        })
+        .map((b) => b.getAttribute("aria-label") ?? "a control with no name"),
+    );
+  await expect.poll(covered, { timeout: 5_000 }).toEqual([]);
+
+  const narrow = await boxes();
+  expect(apart(narrow.dock, narrow.zoom)).toBe(true);
+  /* Above it rather than beside it, because there is no room beside it. */
+  expect(narrow.zoom.y + narrow.zoom.h).toBeLessThanOrEqual(narrow.dock.y);
+
+  /* The worst case QA measured: the board list docked as well, which leaves the drawing narrower
+     than the dock itself — the bar overflows the canvas on both sides and the cluster sits over its
+     right end, not past it. This is where all nine controls were unclickable. */
+  await page.locator("[data-dag-sidebar-toggle]").click();
+  await expect.poll(async () => (await boxes()).canvas.w, { timeout: 5_000 }).toBeLessThan(400);
+  await expect.poll(covered, { timeout: 5_000 }).toEqual([]);
+  const narrowest = await boxes();
+  expect(apart(narrowest.dock, narrowest.zoom)).toBe(true);
+
+  /* And a real press lands on it: ⋯ was the control the cluster sat on. */
+  await page.locator("[data-dag-more]").click();
+  await expect(page.locator("[data-dag-more-menu]")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dag-more-menu]")).toHaveCount(0);
+
+  /* A window with room keeps the arrangement the design asks for: the dock at the drawing's middle,
+     the cluster 12px inside its right edge, both on one row. */
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect
+    .poll(
+      async () => {
+        const wide = await boxes();
+        return (
+          apart(wide.dock, wide.zoom) &&
+          Math.abs(wide.zoom.y - wide.dock.y) < 1 &&
+          Math.round(wide.canvas.x + wide.canvas.w - (wide.zoom.x + wide.zoom.w)) === 12 &&
+          Math.abs(wide.dock.x + wide.dock.w / 2 - (wide.canvas.x + wide.canvas.w / 2)) <= 1
+        );
+      },
+      { timeout: 5_000 },
+    )
+    .toBe(true);
 });

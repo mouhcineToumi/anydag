@@ -267,6 +267,21 @@
   the five rules read `--canvas-mid` and `--canvas-right`; the bar is capped at the canvas and its
   row wraps. Painted rather than rendered, the way `data-zoom` and `data-pan` are, and for the same
   reason: state here would re-render every child of `App` on every drag of the inspector's edge.
+- **Two bars each positioned against the canvas know nothing about each other.** The dock is centred
+  on `--canvas-mid` and the zoom cluster pinned to `--canvas-right`, and each rule is right on its
+  own — but nothing keeps their boxes apart, and below about 690px of canvas they meet: the dock is
+  up to 327px wide and the cluster 156, and a centred bar reaches 180px past the middle. An 800×700
+  window with the library open leaves 528px, where the cluster covered the dock's `⋯`; with the
+  board list docked too it leaves 295 against a 327px dock, and `elementFromPoint` answered with the
+  cluster at the centre of **all nine** dock controls, while a Playwright click on `⋯` timed out
+  saying it intercepted pointer events (#395). A media query cannot see this one either: the canvas
+  is the window minus whatever panels are open, not the window. So `useBottomBars`
+  (`src/ui/bottomBars.ts`) measures the two boxes and lifts the cluster above the dock by the dock's
+  own height — measured, not named, because either bar's width follows what a board can do — and
+  `placeBottomBars` is the arithmetic `test/bottom-bars.test.ts` holds. `dock.spec.ts` asks
+  `elementFromPoint` at every control's centre with the library open and again with the board list
+  docked too, and checks that a wide window still has the dock at the drawing's middle and the
+  cluster 12px inside its right edge.
 - **A hue is bound, never defaulted in a component.** `hueVars()` sets `--dag-h`/`--dag-t` only when
   an element has a hue, and CSS falls back to `--dag-h-default`. Setting the property to an empty
   string would *not* trigger the `var()` fallback, which is why "bind nothing" is the mechanism.
