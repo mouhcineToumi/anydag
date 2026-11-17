@@ -14,7 +14,7 @@ anchor, and a reference is a Markdown link to `dag:<id>`.
 | canvas item | its `#id` | whoever makes it, else the stamp | move, edit, retitle, cut and paste, export and import; `renameItemId` is the one deliberate change |
 | note block | ` ^name` at the end of its last line | whatever first points at it | edits to the block, moving it |
 
-Thirteen things are load-bearing:
+Fifteen things are load-bearing:
 
 - **A document's id is in its frontmatter, and opening never writes.** `id:` is the truth and
   travels with the file through a copy, a sync and a `git mv`; the SQLite index in the app's home
@@ -50,8 +50,17 @@ Thirteen things are load-bearing:
   a click with a modifier still load.
 - **`react-markdown` empties any URL protocol it does not know**, which is what makes it safe with
   `javascript:` and what turned every reference into a link to nowhere and every embed into a broken
-  image. `urlTransform` in `src/refs/Ref.tsx` lets `dag:` through and nothing else, and every
-  `ReactMarkdown` that can hold a reference has to be handed it.
+  image. `urlTransform` in `src/refs/Ref.tsx` lets `dag:` and a wikilink's `wiki:` through and
+  nothing else, and every `ReactMarkdown` that can hold a reference has to be handed it.
+- **A reference URL is the caller's, not the document's asset path.** `NoteMarkdown` gives every
+  image it draws a folder — a note read-only, a snapshot, the editor's first-paint stand-in, an
+  embedded note — and `QuizMarkdown` does the same for a quiz. Both hand a `src` to the caller's
+  `img`, which draws `dag:` and a wikilink's `wiki:` alike, when `isRefUrl` (`src/refs/extract.ts`)
+  says it names a document. The test used to be `startsWith("dag:")`, so an `![[Target]]` fell
+  through as `wiki:Target` and asked `/__board/assets/wiki:Target`: a 403 and a broken image on
+  the read-only note, the snapshot and the editor's stand-in — and `![[…]]` is the one embed form
+  that arrives without going through the picker, because an agent writes notes (#396).
+  `test/note-embed.test.ts` holds both URLs to the caller, and a plain picture to the folder.
 - **An embed is a block, and a paragraph cannot hold one.** A `dag:` image alone on its line draws
   the target; anywhere else it is a one-line card, because a `<div>` in a `<p>` is a console error
   and the e2e suite fails on those. **An embed that throws is that embed's failure alone**:
@@ -84,6 +93,10 @@ Thirteen things are load-bearing:
   for one name, so a client asking about one document is not sent every document's (4.6 KB where
   `/index` is 10.9 MB on 5,000 notes). The MCP `refs` tool with a `name`, `anydag <kind> refs`, and
   `file rm` and `file_delete` read it.
+- **The vault as a graph is `GET /__board/graph`** (#457): every document, each link between two of
+  them once, and the fields the graph view colours, filters and groups by, columnar and built from
+  this same index — 0.40 MB where `/index` is 1.21 MB on the bench's 5,000 files. Its wire format,
+  fields and view model are in [`graph.md`](graph.md).
 - **The vault reads a disk somebody else is deleting from.** A folder listed a moment ago can
   be gone when it is opened, and a board read a moment ago gone when it is written. Both always
   could; the index route lists the vault far more often than anything did, and turned a rare race

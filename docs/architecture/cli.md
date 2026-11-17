@@ -38,9 +38,11 @@ Six things are load-bearing:
   `meta.json`'s inputs on every run. `src/board/`, `src/note/`, `src/quiz/` and `src/table/` come in
   through the server's own modules.
 - **A whole-text write carries its base and is never re-sent.** `<kind> write` wants `--base` (what
-  `cat --json` printed) or `--force`; a 409 is exit 3 naming the base it lost to. There is no
-  read-modify-write any more, so nothing recomputes an edit. A draft with no `id:` line keeps the
-  document's id: the store puts it back (#401), so the file differs from the draft by that line.
+  `cat --json` printed) or `--force`, which leaves the base out; an empty `--base` is refused, and the
+  server answers an empty `base` from an MCP tool with a 409, not a write (#400). A 409 is exit 3 naming
+  the base it lost to. There is no read-modify-write any more, so nothing recomputes an edit. A draft
+  with no `id:` line keeps the document's id: the store puts it back (#401), so the file differs from
+  the draft by that line.
 - **The accounting is a closed set.** Every route `server/routes/` declares is reached by some
   command's `routes`, refused (`REFUSED`), or held only by features marked `{"admin": false}`
   (`OUTSIDE`), all read out of `docs/parity.json` (see *Parity*). `check-skill.mjs`'s eighth set holds
@@ -68,6 +70,18 @@ rm` went on saying *never recursive* about a thing the app did. It is `folder rm
 **`anydag mcp --vault <folder>`** is the MCP server (`server/mcp/`) over stdio, on the same door: the
 running app's server through `server.json`, or one in this process. It speaks on stdout, so it takes no
 `--json`. See *Parity*.
+
+**A request is one frame, and it has a ceiling** (#399). `server/mcp/frame.ts` hands the stdio
+transport one assembled line at a time, and answers a frame over 64 MB instead of dying on it. That
+is not a detail of the SDK's: `StdioServerTransport` discards a frame past its `maxBufferSize` — 10 MB
+when nothing says — *and closes the transport*, which `main.ts` turns into an exit, so a `file_upload`
+of 8 MB (10.7 MB as base64) was an `EPIPE` on the client and a server that had answered its last
+call. The answer is a JSON-RPC error for the request's own `id`: nothing was done, and the connection
+is still up. A file's bytes travel as base64 `data`, four thirds their size, so `file_upload` and
+`image_add` carry about 48 MB that way and a bigger one goes as `url`, which the server fetches
+itself; a vault's 512 MB is the store's limit, not the wire's. The framer is also linear where the
+SDK's buffer concatenated with every chunk — one frame of n bytes cost about n²/(2·chunk) bytes of
+copy — which is what makes a 40 MB upload seconds rather than minutes.
 
 **The sheets `dsl_reference` serves ship beside the server bundle.** `server/build.mjs` copies
 `docs/dsl/` and `docs/generate/` into `server/dist/docs/`, the first place `server/handle.ts` looks;

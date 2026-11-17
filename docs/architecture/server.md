@@ -119,6 +119,20 @@ Nine things are load-bearing:
   in-place write the watcher reports anyway. `ANYDAG_TEST_WATCH=1 npx vitest run test/server` runs the
   store's contracts with every vault watched, which CI does beside the fast tier;
   `test/server/kept.test.ts` compares the kept tree with a walk's after each kind of change.
+- **On Linux a folder made with a folder already in it gets a watcher of its own** (#405). inotify
+  watches one folder at a time, and `@parcel/watcher` starts watching a new folder when it hears it
+  made, without looking inside: `mkdir -p a/b` left `a/b` unwatched for good, and a file written into
+  a new folder before its watch began was never reported. So when the watcher reports a folder made,
+  `Vault.inside` looks in it: a folder already in it means a second subscription rooted there
+  (`Vault.cover`), whose own walk watches everything under it — inotify shares a folder's one watch
+  between the two, and lets it go with the last — and every file found once it holds is said as made;
+  files only (the folder itself is watched) are said as made at once. A cover lasts until its folder
+  goes or the vault closes. **A subscription is begun again when a folder inside it went between the
+  watcher's walk and its watch** (`subscribeAt`, #389): `@parcel/watcher` fails the whole of it with
+  ENOENT (ENOTDIR when a file took its name), which left the vault unwatched and the rejection
+  unhandled; the folder's going is its own event, so a second walk without it is all it takes —
+  once the backend has let the failed walk go, which it does at once when nothing else is watched,
+  and keeps by the folder's path while another vault's watcher or a cover holds it.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
   there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
   see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a

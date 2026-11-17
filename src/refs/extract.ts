@@ -58,6 +58,15 @@ export function parseDagUrl(url: string): { id: string; part?: string } | null {
 
 export const dagUrl = (id: string, part?: string): string => (part ? `dag:${id}#${part}` : `dag:${id}`);
 
+/**
+ * Whether a URL names a document rather than a file — `dag:<id>`, or the `wiki:` a wikilink makes.
+ *
+ * `react-markdown`'s `urlTransform` keeps these, and the wrapper that gives a note or a quiz its
+ * own pictures relative to its folder (`NoteMarkdown`, `QuizMarkdown`) hands them to the caller's
+ * `img` instead. Asking the asset route for one was a 403 and a broken image (#396).
+ */
+export const isRefUrl = (url: string): boolean => parseDagUrl(url) !== null || parseWikiUrl(url) !== null;
+
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
 const textOf = (n: Nodes): string =>
@@ -120,7 +129,7 @@ export function refsInBoard(text: string): Ref[] {
   });
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** A board's or a note's `title:` from its frontmatter, when it has one — what a reference shows. */
 export function titleOf(text: string): string | undefined {

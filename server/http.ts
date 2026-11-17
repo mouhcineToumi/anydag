@@ -49,6 +49,20 @@ export async function bodyOf(c: Context): Promise<Record<string, unknown>> {
   return parsed as Record<string, unknown>;
 }
 
+/**
+ * The `base` a write carries: the sha1 of the text it was edited from, or `null` when the body has
+ * none (absent or `null`), which is the documented "I have not seen it" write. Any other string is
+ * compared with the file's sha1 as it is — `""` too, which is a stale base and a 409, never a missing
+ * one (#400: an agent passing an unset variable overwrote a person's edit). Anything that is not a
+ * string is a 400, not a write with no base.
+ */
+export function baseOf(body: Record<string, unknown>): string | null {
+  const base = body.base;
+  if (base === undefined || base === null) return null;
+  if (typeof base !== "string") throw err(400, "`base` is the sha1 the text was read with: a string, or left out");
+  return base;
+}
+
 export function textKind(raw: unknown): TextKind {
   const kind = kindOf(raw);
   if (!kind) throw err(400, `\`${String(raw)}\` is not a kind of file: board, note, quiz, table`);

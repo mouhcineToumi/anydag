@@ -38,6 +38,13 @@ a fourth until #281: it draws the rows in view and a margin now, so a folder of 
 one of 100 does. Startup no longer is one: since #283 the listing runs off the server's thread and a
 board is drawn in about the same time at every vault size (*Startup*).
 
+**Over MCP the wire has a limit of its own** (#399): a request is one JSON-RPC frame, at most 64 MB,
+so `file_upload` and `image_add` carry a file of about 48 MB as base64 `data` — 4/3 the bytes — and a
+bigger one goes as `url`, which the server fetches, or through the app. The vault's 512 MB is the
+store's limit. A frame over the ceiling is answered with a JSON-RPC error naming the request's `id`,
+not dropped with the connection: the SDK's own buffer, at 10 MB, did that, so every file over 7.5 MB
+was `EPIPE` on the client (`cli.md`).
+
 ### Memory, per process
 
 The desktop app with a 1k-file vault and a board of 20 items open, at rest (`desktop.rss.*`;

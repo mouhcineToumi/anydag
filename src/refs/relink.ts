@@ -37,10 +37,11 @@ import { unified } from "unified";
 
 import { isItemType } from "../board/types";
 import { locateItems } from "../board/locate";
+import { markOf } from "../note/bom";
 import { remarkMath } from "../note/math";
 import { WIKILINK, resolveWiki, type WikiCandidate } from "./wikilinks";
 
-const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
@@ -75,7 +76,8 @@ export type LinkKind = "board" | "note" | "quiz" | "table";
 /** Every span of `text` in which a wikilink counts — `extract.ts`'s places, as offsets into the file. */
 function spansOf(text: string, kind: LinkKind): [number, number][] {
   if (kind !== "board") {
-    const front = FRONT.exec(text)?.[0].length ?? 0;
+    /* After the frontmatter, or a byte-order mark: remark counts its offsets from past the mark (#394). */
+    const front = FRONT.exec(text)?.[0].length ?? markOf(text).length;
     return markdownSpans(text.slice(front), front);
   }
   const out: [number, number][] = [];

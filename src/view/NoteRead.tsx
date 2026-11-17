@@ -7,6 +7,7 @@ import { remarkWikilinks } from "@/refs/wikilinks";
 import { remarkAnchors } from "@/note/anchors";
 import { remarkCallouts } from "@/note/callout";
 import { remarkMath } from "@/note/math";
+import { isRefUrl } from "@/refs/extract";
 import { urlTransform } from "@/refs/Ref";
 import { AssetUrlContext, ownAssets } from "@/render/assets";
 
@@ -61,13 +62,14 @@ export function withComponents(base: Components | undefined, over: Components): 
  */
 export function NoteMarkdown({ name, body, components }: { name: string; body: string; components?: Components }): ReactNode {
   const assets = useContext(AssetUrlContext);
-  /* A caller's `img` draws what it knows — a reference's embed — and every other image is this
-     note's, relative to its folder. Memoised, because to React it is a component type: a new one on
-     every render unmounted every embed under it, an embedded board included (see `refComponents`). */
+  /* A caller's `img` draws what it knows — a reference's embed, `dag:` or a wikilink's `wiki:` —
+     and every other image is this note's, relative to its folder. Memoised, because to React it is
+     a component type: a new one on every render unmounted every embed under it, an embedded board
+     included (see `refComponents`). */
   const all = useMemo(() => {
     const Theirs = components?.img as MarkdownImg | undefined;
     const img: MarkdownImg = (props) => {
-      if (Theirs && typeof props.src === "string" && props.src.startsWith("dag:")) return <Theirs {...props} />;
+      if (Theirs && typeof props.src === "string" && isRefUrl(props.src)) return <Theirs {...props} />;
       const { node: _node, src, ...rest } = props;
       return <img {...rest} src={src ? assets(name, String(src)) : src} />;
     };
