@@ -128,6 +128,153 @@ export function denseVault(n, m, seed = 1) {
   return { ...v, src: Int32Array.from(src), dst: Int32Array.from(dst) };
 }
 
+/* Words for the files' titles and folders, the prototype's. */
+const WORDS_A = [
+  "Retrieval",
+  "Agents",
+  "Indexing",
+  "Embeddings",
+  "Planning",
+  "Sync",
+  "Layout",
+  "Parsers",
+  "Caching",
+  "Queues",
+  "Evals",
+  "Prompts",
+  "Routing",
+  "Tokens",
+  "Sharding",
+  "Rerankers",
+  "Memory",
+  "Schemas",
+  "Tracing",
+  "Latency",
+  "Consensus",
+  "Backoff",
+  "Streams",
+  "Vectors",
+  "Chunking",
+];
+const WORDS_B = [
+  "overview",
+  "trade-offs",
+  "in practice",
+  "notes",
+  "checklist",
+  "failure modes",
+  "patterns",
+  "interview",
+  "design",
+  "review",
+  "questions",
+  "glossary",
+  "worked example",
+  "limits",
+  "history",
+  "benchmarks",
+];
+const TAG_NAMES = [
+  "idea",
+  "reading",
+  "draft",
+  "evergreen",
+  "meeting",
+  "question",
+  "reference",
+  "paper",
+  "howto",
+  "decision",
+  "archive",
+  "person",
+  "course",
+  "review",
+];
+
+/**
+ * `v` (a `graphVault` or `denseVault`) written as a vault of files under `dir`, for the Graph page's
+ * bench and for looking at the page: a folder per folder, a map note heading each, the links as
+ * `[[wikilinks]]` in the note that makes them, tags in the frontmatter, and about a quarter of the
+ * files a task, an event, a project, a board, a quiz or a table by the prototype's shares. A link
+ * between two files that are not notes is written in neither, so a vault has a few fewer links than
+ * `v`. Seeded: the same `v` writes the same bytes. Returns the files written.
+ */
+export function writeGraphVault(fs, path, dir, v, seed = 1) {
+  const rnd = mulberry32(seed + 7);
+  const n = v.n;
+  const kind = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    let r = rnd();
+    let k = 0;
+    while (k < KIND_SHARES.length - 1 && r > KIND_SHARES[k]) r -= KIND_SHARES[k++];
+    kind[i] = k;
+  }
+  const folderName = (c) =>
+    c < 0 ? "" : `${WORDS_A[c % WORDS_A.length]}${c >= WORDS_A.length ? ` ${1 + Math.floor(c / WORDS_A.length)}` : ""}`;
+  const first = new Map();
+  for (let i = 0; i < n; i++) if (v.folder[i] >= 0 && !first.has(v.folder[i])) first.set(v.folder[i], i);
+  const title = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const c = v.folder[i];
+    title[i] =
+      first.get(c) === i
+        ? `${folderName(c)} map`
+        : `${WORDS_A[(Math.max(c, 0) + ((rnd() * 5) | 0)) % WORDS_A.length]} ${WORDS_B[(rnd() * WORDS_B.length) | 0]}`;
+    /* A hub is a note, whatever the shares said: a map is what a folder hangs off. */
+    if (first.get(c) === i) kind[i] = c % 3 === 1 ? 3 : 0;
+  }
+  const ext = ["md", "board.md", "md", "md", "md", "quiz.md", "table.md"];
+  const isNote = (i) => kind[i] === 0 || kind[i] === 2 || kind[i] === 3 || kind[i] === 4;
+  const stem = (i) => {
+    const f = folderName(v.folder[i]);
+    return `${f ? `${f}/` : ""}f${String(i).padStart(5, "0")}`;
+  };
+  const out = Array.from({ length: n }, () => []);
+  for (let k = 0; k < v.src.length; k++) {
+    const a = v.src[k];
+    const b = v.dst[k];
+    if (isNote(a)) out[a].push(b);
+    else if (isNote(b)) out[b].push(a);
+  }
+  let made = 0;
+  for (let i = 0; i < n; i++) {
+    const rel = `${stem(i)}.${ext[kind[i]]}`;
+    const abs = path.join(dir, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    const tags = [];
+    if (v.folder[i] >= 0 && rnd() < 0.5) tags.push(TAG_NAMES[(v.folder[i] * 3 + (rnd() < 0.7 ? 0 : 1)) % TAG_NAMES.length]);
+    if (rnd() < 0.16) {
+      const t = TAG_NAMES[(rnd() * TAG_NAMES.length) | 0];
+      if (!tags.includes(t)) tags.push(t);
+    }
+    const front = [`title: ${title[i]}`];
+    if (tags.length) front.push(`tags: [${tags.join(", ")}]`);
+    let body;
+    switch (kind[i]) {
+      case 1:
+        body = `\`\`\`md {#c x=0 y=0 w=360}\n### ${title[i]}\n\`\`\`\n`;
+        break;
+      case 5:
+        body = `## What is ${title[i]}?\n\n- [x] One thing\n- [ ] Another\n`;
+        break;
+      case 6:
+        body = "| Name | Done |\n|---|---|\n| one | yes |\n";
+        break;
+      default:
+        if (kind[i] === 2) front.push(["status: todo", "status: in-progress", "status: done"][(rnd() * 3) | 0]);
+        if (kind[i] === 3) front.push("project: active");
+        if (kind[i] === 4)
+          front.push(
+            `start: 2026-${String(1 + ((rnd() * 12) | 0)).padStart(2, "0")}-${String(1 + ((rnd() * 28) | 0)).padStart(2, "0")}`,
+          );
+        body = `${title[i]}, as written down.\n\n${out[i].map((j) => `- [[${stem(j)}]]`).join("\n")}\n`;
+    }
+    fs.writeFileSync(abs, `---\n${front.join("\n")}\n---\n\n${body}`);
+    made++;
+  }
+  return made;
+}
+
 /** From hot to rest, one tick at a time, timed: `{ tick, ticks, total }`, the median of `runs`. */
 function timeToRest(v, runs, extra = {}) {
   const out = [];

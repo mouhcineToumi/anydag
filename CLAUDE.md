@@ -73,7 +73,8 @@ the app's home).
 | `src/blocks/` | BlockNote configured once, loaded lazily | which file it writes |
 | `src/view/` | drawing read-only: `?view=1`, snapshots, embeds | `src/edit/`, BlockNote (`test/view-graph.test.ts` holds it) |
 | `src/refs/` · `src/calendar/` · `src/vault/` | what a reference is · what the calendar shows · which vault this tab is in | names (a reference is an id) · the DOM · the disk |
-| `src/graph/` | the graph view's wire (shared with the server), the view as data, the model as typed arrays | a field by name, the DOM, React |
+| `src/graph/` | the graph view's wire (shared with the server), the view as data, the model as typed arrays, the legend and the camera | a field by name, the DOM, React |
+| `src/ui/graph/` | the Graph page: WebGL drawing, the scene and its frame loop, the simulation's worker, the panel | a field by name (the panel lists what the route sends) |
 | `src/search/` · `src/telemetry/` · `src/assistant/` · `src/sync/` | the page's half of search, logs, the Assistant, sync status | what a log may hold (`api/protocol/logs.ts` decides) · the harness · the server's storage |
 | `icons/` | the brand vocabulary and its provenance | anything about diagrams |
 | `cli/` | `anydag`: arguments, finding the server, commands as op lists | the disk: every read and write is a route |

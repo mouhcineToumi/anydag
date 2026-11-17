@@ -119,7 +119,7 @@ export interface Allow {
 }
 
 /** Whether a rule's key names value `v`: itself, or on a `tree` field anything under it. */
-const covers = (field: Field, key: string, v: string): boolean =>
+export const covers = (field: Pick<Field, "tree">, key: string, v: string): boolean =>
   key !== NONE && (v === key || (field.tree && v.startsWith(`${key}/`)));
 
 function allowOf(field: Field, rule: GraphRule): Allow {

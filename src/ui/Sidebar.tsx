@@ -61,6 +61,7 @@ import {
   Trash2,
   TriangleAlert,
   Upload,
+  Waypoints,
   Workflow,
   X,
   type LucideIcon,
@@ -435,6 +436,8 @@ export function Sidebar({
   onTasks,
   calendarOpen = false,
   onCalendar,
+  graphOpen = false,
+  onGraph,
   quizzesOpen = false,
   mistakes = 0,
   onQuizzes,
@@ -509,6 +512,9 @@ export function Sidebar({
   /** Whether the Calendar page is what is open, and the way there. */
   calendarOpen?: boolean;
   onCalendar?(): void;
+  /** And the Graph page. */
+  graphOpen?: boolean;
+  onGraph?(): void;
   /** The same three for the Quizzes page: whether it is open, how many questions are in Mistakes, and the way there. */
   quizzesOpen?: boolean;
   mistakes?: number;
@@ -1461,6 +1467,20 @@ export function Sidebar({
           >
             <CalendarDays {...ICON} aria-hidden="true" />
             <span>Calendar</span>
+          </button>
+        ) : null}
+        {/* The vault as dots and lines: every file, and what links to what. */}
+        {onGraph ? (
+          <button
+            type="button"
+            className="dag-sidebar__act"
+            data-dag-sidebar-graph=""
+            aria-current={graphOpen ? "page" : undefined}
+            title="Every file, and what links to what"
+            onClick={onGraph}
+          >
+            <Waypoints {...ICON} aria-hidden="true" />
+            <span>Graph</span>
           </button>
         ) : null}
         {/* Every quiz, and the one set the app makes: the questions still in Mistakes,

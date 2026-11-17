@@ -29,7 +29,21 @@ export const LAST = "dag:vault";
 export const GONE = "dag:vault-gone";
 
 /** The query keys that open something, so an address carrying one is not a bare `/`. */
-const OPENS = ["board", "note", "quiz", "table", "file", "calendar", "ref", "tasks", "quizzes", "chat", "view", "snapshot"];
+const OPENS = [
+  "board",
+  "note",
+  "quiz",
+  "table",
+  "file",
+  "calendar",
+  "graph",
+  "ref",
+  "tasks",
+  "quizzes",
+  "chat",
+  "view",
+  "snapshot",
+];
 
 let pinned: string | null = null;
 

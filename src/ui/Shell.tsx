@@ -279,6 +279,8 @@ export function Shell({
   openTasks,
   calendarOpen,
   openCalendar,
+  graphOpen,
+  openGraph,
   quizzesOpen,
   openQuizzes,
   trashOpen,
@@ -331,6 +333,9 @@ export function Shell({
   /** The same for the Calendar page. */
   calendarOpen: boolean;
   openCalendar(): void;
+  /** The same for the Graph page. */
+  graphOpen: boolean;
+  openGraph(): void;
   /** The same for the Quizzes page; with `"mistakes"`, the Mistakes run it starts, and with
       `folder:<path>` every quiz in a folder as one run. */
   quizzesOpen: boolean;
@@ -405,7 +410,17 @@ export function Shell({
      and the files are what somebody opens the app to reach. Brought up each time the page becomes
      empty — a delete, a workspace switch, a cold load — and put away as anything is opened. */
   const nothing =
-    !board && !note && !quiz && !table && !file && !tasksOpen && !calendarOpen && !quizzesOpen && !trashOpen && !assistantOpen;
+    !board &&
+    !note &&
+    !quiz &&
+    !table &&
+    !file &&
+    !tasksOpen &&
+    !calendarOpen &&
+    !graphOpen &&
+    !quizzesOpen &&
+    !trashOpen &&
+    !assistantOpen;
   useEffect(() => {
     if (narrow && nothing) setPinned(true);
   }, [narrow, nothing]);
@@ -429,7 +444,17 @@ export function Shell({
      the panel is not drawn there, and going back to the file it was opened from should keep it. */
   const place =
     FILE_KINDS.map((kind) => (opened[kind] ? `${kind}:${opened[kind]}` : null)).find((key) => key !== null) ??
-    (tasksOpen ? "tasks" : calendarOpen ? "calendar" : quizzesOpen ? "quizzes" : trashOpen ? "trash" : "home");
+    (tasksOpen
+      ? "tasks"
+      : calendarOpen
+        ? "calendar"
+        : graphOpen
+          ? "graph"
+          : quizzesOpen
+            ? "quizzes"
+            : trashOpen
+              ? "trash"
+              : "home");
   useEffect(() => {
     if (assistantOpen) return;
     setPanelDocument(place);
@@ -1040,6 +1065,11 @@ export function Shell({
               calendarOpen={calendarOpen}
               onCalendar={() => {
                 openCalendar();
+                dismiss();
+              }}
+              graphOpen={graphOpen}
+              onGraph={() => {
+                openGraph();
                 dismiss();
               }}
               quizzesOpen={quizzesOpen}

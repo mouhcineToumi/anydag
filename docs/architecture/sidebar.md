@@ -6,7 +6,8 @@
 
 `src/ui/Shell.tsx` and `src/ui/Sidebar.tsx`. A column the full height
 of the window: the lockup beside the toggle — which goes home, one press from any page back to the
-welcome card, as it does in the toolbar while the column is away — the vault switcher, then Search, Tasks, Calendar, Quizzes and
+welcome card, as it does in the toolbar while the column is away — the vault switcher, then Search, Tasks, Calendar,
+Graph (the vault drawn as dots and links, [`graph.md`](graph.md)), Quizzes and
 one **New** row whose menu makes every kind, then Favourites, then the files as a tree,
 then Settings at the foot. The sidebar is "in Notion
 style", the place people "find their way to most of what the app has to offer"; Notion is the
@@ -597,7 +598,7 @@ Four things about it:
 
 `src/ui/tabs/`, across the top of the page: the window's documents, as a browser's tabs are (#264).
 Every kind of document has one — board, note, quiz, table, attachment — and so do Tasks, the
-Calendar, Quizzes, the Trash, the Assistant and Home, which is what a new tab shows. **The search is
+Calendar, the Graph, Quizzes, the Trash, the Assistant and Home, which is what a new tab shows. **The search is
 not a tab**: it stays the dialog it was, over whichever tab is in front. Which page a tab is, its
 label and its mark are each a `switch` ending in `assertNever` (`kindOf`, `tabLabel`, `identity` in
 `model.ts`).

@@ -72,6 +72,7 @@ describe("a place", () => {
     expect(kindOf("file=a.pdf")).toBe("file");
     expect(kindOf("tasks=1&project=p")).toBe("tasks");
     expect(kindOf("calendar=week")).toBe("calendar");
+    expect(kindOf("graph=1")).toBe("graph");
     expect(kindOf("quizzes=1&run=mistakes")).toBe("quizzes");
     expect(kindOf("trash=1")).toBe("trash");
     expect(kindOf("chat=new")).toBe("assistant");
@@ -88,6 +89,8 @@ describe("a place", () => {
   it("is one tab per document or page, and Home is never shared", () => {
     expect(identity("board=plan&page=p2")).toBe(identity("board=plan"));
     expect(identity("calendar=week&date=2026-01-01")).toBe(identity("calendar=1"));
+    expect(identity("graph=1")).not.toBeNull();
+    expect(identity("graph=1")).not.toBe(identity("calendar=1"));
     expect(identity("")).toBeNull();
     expect(identity("note=plan")).not.toBe(identity("board=plan"));
   });
@@ -96,6 +99,7 @@ describe("a place", () => {
     expect(tabLabel("note=work%2Fideas", {})).toBe("ideas");
     expect(tabLabel("note=work%2Fideas", { "work/ideas": "Ideas for Q3" })).toBe("Ideas for Q3");
     expect(tabLabel("calendar=1", {})).toBe("Calendar");
+    expect(tabLabel("graph=1", {})).toBe("Graph");
     expect(tabLabel("", {})).toBe("Home");
   });
 });
