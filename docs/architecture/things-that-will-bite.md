@@ -806,7 +806,9 @@
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
   the disk does not have, so its next save is a `409` against itself. `test/server/` holds both
-  halves. A synced vault depends on it as well: a write on open is a conflict on every machine.
+  halves. The one byte a write adds is the id the file already had, put back into a text that
+  omitted it (#401): dropping it would unlink the document at the next index rebuild, and every
+  writer takes its base from the answer, not from what it sent. A synced vault depends on it as well: a write on open is a conflict on every machine.
 - **A name is any portable file name, and portable means three file systems.** `Meeting notes.md`
   and `Écoles.md` are names, so the store refuses what Windows or macOS would:
   `: * ? " < > | \`, a trailing dot or space, `CON` and its kin, and a name or a folder differing
