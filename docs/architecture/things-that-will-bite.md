@@ -880,7 +880,12 @@
   living as long as the vault: stopping one while another started on the same folder made the
   native unsubscribe reject unhandled, which took the whole server down under the e2e suite. A
   save arrives as a rename onto the file, and the feed says `tree` only for a path it had not seen
-  — or every keystroke in a note was a listing refetch.
+  — or every keystroke in a note was a listing refetch. **On Linux it watches folder by folder, and
+  starts on a new one too late to see inside it**: `mkdir -p a/b` left `a/b` unwatched until a
+  restart, and nothing written there reached an open page (#405). A folder reported made is looked
+  into (`Vault.inside`), and one holding a folder gets a subscription of its own (`Vault.cover`).
+  And a folder that goes between the watcher's walk and its watch, or is replaced by a file, fails
+  the whole subscription, so `subscribeAt` begins it again (#389).
 
 - **BlockNote builds a block's ProseMirror node when the schema is made, and calls its `render` for
   more than the editor.** `noteSchema.blockSpecs` are the processed specs, each carrying the node
