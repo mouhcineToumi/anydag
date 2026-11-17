@@ -128,8 +128,9 @@ describe("the change feed", () => {
     expect(await doc(f, "work/deep/notes", (d) => d.sha1 === null)).toMatchObject({ kind: "note", sha1: null });
     await tree(f);
     await sleep(200);
-    // A sibling whose name only starts the same is not inside it.
-    expect(f.docs("work-other/keep")).toEqual([]);
+    // A sibling whose name only starts the same is not inside it. (Watched from the start, its
+    // making is a change too, so only its going is asked about.)
+    expect(f.docs("work-other/keep").filter((d) => d.sha1 === null)).toEqual([]);
   });
 
   it("a folder removed by another program says each document in it went", async () => {
