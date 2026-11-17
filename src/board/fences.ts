@@ -7,21 +7,35 @@
  * A fence is CommonMark-ish: three or more backticks, an info string, and a closing run of at least
  * as many backticks. Fences inside a fence are not scanned, which is what lets a `md` item contain
  * a fenced code sample.
+ *
+ * **A line ends at `\n`, and a `\r` before it is part of the break**; a BOM at offset 0 is part of
+ * no line (`eol.ts`). So a CRLF file scans to the fences its LF twin does: every offset stops short
+ * of the `\r`, and `body` is LF. Matching each line with the `\r` still on it found no fence at all
+ * in a CRLF board, which then read as one prose card (#391).
  */
+
+import { bomLength } from "./eol";
 
 export interface RawFence {
   /** `arch`, `md`, `image`… — the first word of the info string. */
   type: string;
   /** The `{…}` part of the info string, without the braces. Empty when absent. */
   attrText: string;
-  /** Everything between the fence lines, newlines preserved, no trailing newline. */
+  /** Everything between the fence lines, no trailing newline, every line break LF whatever the file's. */
   body: string;
   /** 1-based line of the opening fence, for diagnostics. */
   line: number;
-  /** Character offsets of the opening fence line, so a rewrite can splice it. */
+  /** Character offsets of the opening fence line, so a rewrite can splice it. Its line break is outside. */
   openStart: number;
   openEnd: number;
-  /** Character offset just past the closing fence line (or EOF for an unclosed fence). */
+  /**
+   * The body's span in the file, its own line breaks as written: from the line after the opening
+   * fence to the end of the last body line, its break outside (to EOF for an unclosed fence).
+   * `body` is this span made LF. Zero body lines and one empty one are both an empty span.
+   */
+  bodyStart: number;
+  bodyEnd: number;
+  /** Character offset just past the closing fence line, its line break outside (or EOF for an unclosed fence). */
   blockEnd: number;
   /** False when the file ended before a closing run of backticks. */
   closed: boolean;
@@ -47,17 +61,26 @@ export function scanFences(text: string): RawFence[] {
   const lines = text.split("\n");
 
   /* Offsets are tracked as we go: `text.indexOf` would find the wrong line when two fences share
-     an info string, which is common (three `md` blocks in a row). */
+     an info string, which is common (three `md` blocks in a row). `from` and `content` are a line
+     without what is not part of it — the BOM before the first, the `\r` of a CRLF break after any. */
   const offsets: number[] = [];
   let at = 0;
   for (const l of lines) {
     offsets.push(at);
     at += l.length + 1;
   }
+  const bom = bomLength(text);
+  const from = (i: number): number => offsets[i]! + (i === 0 ? bom : 0);
+  const content = (i: number): string => {
+    const l = lines[i]!;
+    const end = l.endsWith("\r") ? l.length - 1 : l.length;
+    return i === 0 && bom ? l.slice(bom, end) : end === l.length ? l : l.slice(0, end);
+  };
 
   let i = 0;
   while (i < lines.length) {
-    const m = lines[i]!.length > LONGEST_OPEN ? null : OPEN.exec(lines[i]!);
+    const line = content(i);
+    const m = line.length > LONGEST_OPEN ? null : OPEN.exec(line);
     if (!m) {
       i++;
       continue;
@@ -65,17 +88,22 @@ export function scanFences(text: string): RawFence[] {
     const ticks = m[2]!;
     const type = m[3] ?? "";
     const attrText = m[4] ? m[4].slice(1, -1) : "";
-    const openStart = offsets[i]!;
-    const openEnd = openStart + lines[i]!.length;
+    const openStart = from(i);
+    const openEnd = openStart + line.length;
 
     let j = i + 1;
     const close = new RegExp(`^[ \\t]*\`{${ticks.length},}[ \\t]*$`);
-    while (j < lines.length && !close.test(lines[j]!)) j++;
+    while (j < lines.length && !close.test(content(j))) j++;
 
-    const body = lines.slice(i + 1, j).join("\n");
-    const blockEnd = j < lines.length ? offsets[j]! + lines[j]!.length : text.length;
+    const inner: string[] = [];
+    for (let k = i + 1; k < j; k++) inner.push(content(k));
+    const body = inner.join("\n");
+    const bodyStart = i + 1 < lines.length ? offsets[i + 1]! : text.length;
+    /* An unclosed fence's body runs to EOF, the trailing break included, as its `body` does. */
+    const bodyEnd = j >= lines.length ? text.length : j > i + 1 ? from(j - 1) + content(j - 1).length : bodyStart;
+    const blockEnd = j < lines.length ? from(j) + content(j).length : text.length;
 
-    out.push({ type, attrText, body, line: i + 1, openStart, openEnd, blockEnd, closed: j < lines.length });
+    out.push({ type, attrText, body, line: i + 1, openStart, openEnd, bodyStart, bodyEnd, blockEnd, closed: j < lines.length });
     i = j + 1;
   }
 

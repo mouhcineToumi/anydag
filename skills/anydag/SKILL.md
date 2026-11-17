@@ -524,7 +524,8 @@ hue?}` or `project_set` changes the two lines without touching the text.
 
 **A note and a board reference each other by id.** Every board and note has a permanent id — `id:`
 in its frontmatter, written when the app makes the file or the first time something links to it,
-and unchanged by a rename or a move — which `GET /__board/index` lists
+and unchanged by a rename, a move or a whole-text write (a text written with no `id:` line keeps the
+file's, put back in) — which `GET /__board/index` lists
 beside each one's title and the references it makes (MCP's `board_list` carries the ids too). A
 reference is a Markdown link to `dag:<id>`:
 

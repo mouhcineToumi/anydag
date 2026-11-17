@@ -1,7 +1,7 @@
 import type { Graph } from "@/dsl/ir";
 import type { ThemeMetric } from "@/theme/contract";
 
-import { routeEdges, type RouteNode } from "./route";
+import { labelReach, type Reach, routeEdges, routeReach, type RouteNode } from "./route";
 import type { Placed, SizedNode } from "./types";
 
 /**
@@ -101,7 +101,7 @@ export function layoutLanes(
     colX.push(x);
     x += colW[c]! + m.lane.colGap;
   }
-  const contentRight = x - m.lane.colGap + m.lane.padY;
+  let contentRight = x - m.lane.colGap + m.lane.padY;
 
   /* A cell is one (lane, column) pair. Several nodes in one cell stack. */
   const cell = new Map<string, string[]>();
@@ -129,7 +129,7 @@ export function layoutLanes(
     bandY.push(y);
     y += bandH[i]! + m.lane.bandGap;
   }
-  const totalH = Math.max(0, y - m.lane.bandGap);
+  let totalH = Math.max(0, y - m.lane.bandGap);
 
   const placedNodes: Placed["nodes"] = {};
   const rows: Placed["rows"] = {};
@@ -183,13 +183,56 @@ export function layoutLanes(
     }
   }
 
-  const edges = routeEdges({
-    nodes: routeNodes,
-    edges: graph.edges.filter((e) => routeNodes[e.from.node] && routeNodes[e.to.node]),
-    bends: {},
-    labels,
-    metric,
-  });
+  const route = () =>
+    routeEdges({
+      nodes: routeNodes,
+      edges: graph.edges.filter((e) => routeNodes[e.from.node] && routeNodes[e.to.node]),
+      bends: {},
+      labels,
+      metric,
+    });
+
+  /*
+   * The bands hold the lines as well as the cards.
+   *
+   * The bands are sized from the cards, and the lines are routed after: a back edge from the last
+   * column to the first bows over the top band, and a self-loop stands above its card, so a box
+   * taken from the bands alone ended through the loop and its label. Past the item's box a drawing
+   * is where `content-visibility` cuts it — "around" came out half a word, and `Q_EDGE_OUTSIDE`
+   * fired on a layout it says can never earn it (#407). So: once to route, and — only when a line
+   * or a label reaches past the bands — once more with the bands grown to hold it. Room above or
+   * to the left moves every card by that much, and routing is translation-invariant, so the second
+   * pass is the first one moved; room below or to the right moves nothing. The overhang goes to
+   * the outer bands, which is where it is drawn, rather than out of the item's frame beside them.
+   */
+  let edges = route();
+  const box: Reach = { left: m.lane.bandLeft, top: 0, right: contentRight, bottom: totalH };
+  const lines = routeReach(edges, box);
+  const words = labelReach(edges, labels ?? {}, box);
+  /* A grid step clear of the band's edge as well, so a label pushed in is not left sitting on the
+     border it was cut by. Nothing that already fits moves. */
+  const room = (past: number) => (past > 0 ? Math.ceil((past + m.grid) / m.grid) * m.grid : 0);
+  const left = room(box.left - Math.min(lines.left, words.left));
+  const top = room(box.top - Math.min(lines.top, words.top));
+  const right = room(Math.max(lines.right, words.right) - box.right);
+  const bottom = room(Math.max(lines.bottom, words.bottom) - box.bottom);
+  if (laneIds.length > 0 && (left || top || right || bottom)) {
+    for (const id of Object.keys(placedNodes)) {
+      const b = placedNodes[id]!;
+      b.x += left;
+      b.y += top;
+      const rn = routeNodes[id]!;
+      rn.x = b.x;
+      rn.y = b.y;
+      for (const r of Object.keys(rows[id] ?? {})) rows[id]![r]! += top;
+    }
+    bandH[0]! += top;
+    for (let i = 1; i < bandY.length; i++) bandY[i]! += top;
+    bandH[bandH.length - 1]! += bottom;
+    contentRight += left + right;
+    totalH += top + bottom;
+    if (left || top) edges = route();
+  }
 
   return {
     kind: "graph",

@@ -111,6 +111,8 @@ One line each; the full account with the defect that found it is in
 - **A snapshot reads no preference** (`?snapshot=1`), and `main.tsx` loads every font face by name first.
 - **Opening a vault never writes a byte of it**; an id is minted only when something links the file.
 - **Every write carries a sha1 `base`**; a stale one is a 409 with the text that replaced it.
+- **A board file may be CRLF, mixed, or start with a BOM** (`src/board/eol.ts`): offsets stop short
+  of the `\r`, bodies are LF, and a writer puts back the mark and the line endings it found (#391, #392).
 - **Undo is a version of the file**, not an inverse op. Gestures paint, then commit once.
 - **The board is one round trip stale after a write** — e2e specs wait on the DOM, not only the file.
 - **BlockNote never parses or writes a byte of a note** — `src/note/markdown.ts` (remark) does. See

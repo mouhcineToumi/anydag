@@ -255,6 +255,9 @@ export function keyEnd(lines: readonly string[], at: number): number {
  * caller, and both fixtures hold it.
  */
 export function withKeys(text: string, change: object, keys: readonly string[]): string {
+  /* A byte-order mark is not `---`: matched with it in front, the block was not found and a second
+     one was written before the mark, burying the first as text (#392). The mark stays where it is. */
+  if (text.charCodeAt(0) === 0xfeff) return text[0]! + withKeys(text.slice(1), change, keys);
   const m = FRONT.exec(text);
   const block = m ? m[1]! : "";
   /* Read off the whole block, fences included: a one-line block has no line end of its own to say. */
