@@ -946,6 +946,34 @@ describe("layoutChart · pie and donut", () => {
     expect(shares).not.toContain("tiny");
   });
 
+  it("keeps a usable radius when an outside label cannot fit (#412)", () => {
+    const placed = run(
+      `pie
+slice organic "Organic" 42
+slice referral "Referral" 23
+slice paid "Paid" 18
+slice social "Social" 11
+slice tail "The long tail of search traffic from everywhere" 6`,
+      { w: 560, h: 420 },
+    );
+    /* The wedge path spells the radius: `A 8 8` is the dot the old reservation collapsed to. */
+    const radius = Number(/A ([\d.]+) [\d.]+ 0/.exec(placed.slices[0]!.d)?.[1] ?? 0);
+    const maxR = Math.min(placed.plot.w, placed.plot.h) / 2;
+    expect(radius).toBeGreaterThanOrEqual(maxR / 2 - 0.5);
+
+    /* It is wider than the room left on a usable pie, so it is dropped rather than clipped, and
+       the legend still names the slice. */
+    expect(placed.labels.some((l) => l.of === "tail" && l.token === "value")).toBe(false);
+    expect(placed.legend!.rows.map((r) => r.id)).toContain("tail");
+
+    /* Dropped or not, no wedge label leaves the item: the item clips anything outside its own box.
+       (A legend row is capped by #434, which is a different fix.) */
+    const box = { x: 0, y: 0, w: placed.size.w, h: placed.size.h };
+    for (const l of placed.labels.filter((l) => l.token === "value")) {
+      expect(inside(labelBox(l), box), `${l.text} in the item`).toBe(true);
+    }
+  });
+
   it("sizes the hero to the hole, and only a donut has one", () => {
     const placed = run(DONUT);
     expect(placed.hero).toBeDefined();
