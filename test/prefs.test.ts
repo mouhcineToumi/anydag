@@ -134,6 +134,9 @@ const EVENTS = new Set([
   /* The vault's tag list changed: the change feed's event, and this tab's own after it creates,
      recolours or deletes a tag — `onTags`, `onTrash`'s shape. */
   "dag:tags",
+  /* The server no longer lets this page in — `anydag serve` restarted under it (#402): the toast
+     that says so, and how to get back. */
+  "dag:server-lost",
 ]);
 
 describe("the preference list", () => {

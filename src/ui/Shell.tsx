@@ -73,6 +73,7 @@ import { useFeatures } from "@/features";
 import { SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_W, Sidebar, folderKey, type SidebarFiles, type Thing } from "./Sidebar";
 import { TrashNotice, type Gone } from "./TrashNotice";
 import { TagPopover, type Tagging } from "./tags/TagPopover";
+import { ServerLost } from "./ServerLost";
 import { ToastHost } from "./Toast";
 import { TelemetryPrompt } from "@/telemetry/Prompt";
 import type { NewTab } from "./tabs/intent";
@@ -1113,6 +1114,7 @@ export function Shell({
           ) : null}
           {tagging ? <TagPopover what={tagging} tags={tags[tagging.name] ?? NO_TAGS} onClose={stopTagging} /> : null}
           {cloud ? <TelemetryPrompt page={asking} /> : null}
+          <ServerLost />
         </ToastHost>
       </SidebarContext.Provider>
     </div>
