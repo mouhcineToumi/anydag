@@ -253,6 +253,36 @@ describe("a folder that goes while the watcher starts (#389)", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it("a folder a file takes the place of does not stop the vault being watched", async () => {
+    /* The same gap, answered ENOTDIR: the watcher walked `work` as a folder and found a file there. */
+    await env.vault.close();
+    const root = fs.mkdtempSync(path.join(path.dirname(env.root), "anydag-vault-"));
+    try {
+      for (let i = 0; i < 2000; i++) fs.mkdirSync(path.join(root, `d${i}`));
+      for (let round = 0; round < 8; round++) {
+        fs.mkdirSync(path.join(root, "work"));
+        const v = new Vault(root, env.home);
+        try {
+          const watching = v.watch();
+          await sleep(round % 4);
+          fs.rmdirSync(path.join(root, "work"));
+          fs.writeFileSync(path.join(root, "work"), "a file now");
+          await watching;
+          const f = await listen(v);
+          await sleep(100);
+          write(root, `r${round}.board.md`, BOARD);
+          await until(() => f.docs(`r${round}`).length, 5000, `a change in round ${round}`);
+          f.stop();
+        } finally {
+          await v.close();
+        }
+        fs.rmSync(path.join(root, "work"), { force: true });
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 describe("note changes", () => {

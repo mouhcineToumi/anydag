@@ -121,10 +121,10 @@ Nine things are load-bearing:
   files only (the folder itself is watched) are said as made at once. A cover lasts until its folder
   goes or the vault closes. **A subscription is begun again when a folder inside it went between the
   watcher's walk and its watch** (`subscribeAt`, #389): `@parcel/watcher` fails the whole of it with
-  ENOENT, which left the vault unwatched and the rejection unhandled; the folder's going is its own
-  event, so a second walk without it is all it takes — once the backend has let the failed walk go,
-  which it does at once when nothing else is watched, and keeps by the folder's path while another
-  vault's watcher or a cover holds it.
+  ENOENT (ENOTDIR when a file took its name), which left the vault unwatched and the rejection
+  unhandled; the folder's going is its own event, so a second walk without it is all it takes —
+  once the backend has let the failed walk go, which it does at once when nothing else is watched,
+  and keeps by the folder's path while another vault's watcher or a cover holds it.
 - **`/api/auth/me` answers the one local user, always.** The page's account context is a constant;
   there is no sign-in, no session and no share link. Logs are sent only once the person says yes —
   see *Logs*. Feedback leaves only when the person presses Send, through a relay that alone holds a

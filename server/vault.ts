@@ -2771,8 +2771,9 @@ const SUBSCRIBE_TRIES = 6;
 
 /**
  * Subscribe `on` to everything under the folder `abs`. `@parcel/watcher` walks the folder and then
- * watches each folder it found; one that went in between fails the whole subscription with ENOENT
- * (#389: `work/empty` made and moved at once), and the vault went unwatched. Its going is an event to
+ * watches each folder it found; one that went in between fails the whole subscription with ENOENT,
+ * or ENOTDIR when a file took its name (#389: `work/empty` made and moved at once), and the vault
+ * went unwatched. Its going is an event to
  * whoever watches the folder it was in, so the subscription is begun again a moment later, walking
  * without it — while `abs` itself is still there. **The failed walk is kept by the folder's path for
  * as long as anything else holds `@parcel/watcher`'s backend** (another vault watched by the same
@@ -2784,7 +2785,8 @@ async function subscribeAt(abs: string, on: watcher.SubscribeCallback): Promise<
     try {
       return await watcher.subscribe(abs, on, { ignore: UNWATCHED });
     } catch (e) {
-      const gone = /No such file or directory/.test(String((e as Error)?.message ?? e));
+      /* ENOENT: the folder went. ENOTDIR: a file took its name. Either way it is no folder to watch. */
+      const gone = /No such file or directory|Not a directory/.test(String((e as Error)?.message ?? e));
       if (!gone || tries >= SUBSCRIBE_TRIES || !isDir(abs)) throw e;
       /* The walk it failed on is kept by the folder's path until the backend has taken in the going. */
       await new Promise((ok) => setTimeout(ok, 25 * tries));
