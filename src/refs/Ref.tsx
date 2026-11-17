@@ -52,7 +52,7 @@ import { DueLabel, StatusButton, TaskGlyph } from "@/ui/TaskGlyph";
 import { usePractice } from "@/ui/quiz/practice";
 import { withVault } from "@/vault/current";
 
-import { parseDagUrl } from "./extract";
+import { parseDagUrl, isRefUrl } from "./extract";
 import { RefLink, WikiLink } from "./RefLink";
 import { follow } from "./follow";
 import { parseWikiUrl, resolveWiki, wikiLabel, wikilinksIn } from "./wikilinks";
@@ -661,9 +661,10 @@ function RefEmbedBody({ id, part, fallback, depth, boards, placed }: EmbedProps)
 /**
  * `react-markdown`'s URL filter, letting `dag:` through. Its default empties any protocol it does not
  * know — safely, since `javascript:` is one — and so turned every reference into a link to nowhere
- * and every embed into a broken image. `dag:` is ours and names an id, never code.
+ * and every embed into a broken image. `dag:` and a wikilink's `wiki:` are ours and name a
+ * document, never code.
  */
-export const urlTransform = (url: string): string => (parseDagUrl(url) || parseWikiUrl(url) ? url : defaultUrlTransform(url));
+export const urlTransform = (url: string): string => (isRefUrl(url) ? url : defaultUrlTransform(url));
 
 /** `![[…]]`: what it names, resolved by name now, and drawn as `![…](dag:…)` would be. */
 function WikiEmbed({ target, part, fallback, depth, boards, placed }: Omit<EmbedProps, "id"> & { target: string }) {
