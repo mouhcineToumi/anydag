@@ -657,6 +657,17 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
     }));
     const total = parts.reduce((a, p) => a + p.value, 0);
 
+    /* The angles belong to the data, not to the radius, so they are read once. Whether a label
+       goes outside depends on the radius; where its box would land depends on both. */
+    let cursor = 0;
+    const wedges = parts.map((p) => {
+      const pct = total ? p.value / total : 0;
+      const a0 = TOP + cursor * TAU;
+      const a1 = TOP + (cursor + pct) * TAU;
+      cursor += pct;
+      return { ...p, pct, a0, a1 };
+    });
+
     const point = (a: number, r: number): { x: number; y: number } => ({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
     const textOf = (p: { title: string; value: number }, pct: number, outside: boolean): string => {
       const head = model.values ? fmt(p.value) : `${Math.round(pct * 100)}%`;
@@ -669,46 +680,64 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
       return c.lineH <= (r - innerR) * 0.9 && span >= Math.PI / 6;
     };
 
+    const maxR = Math.max(grid, Math.min(plot.w, plot.h) / 2);
+    /* A label may cost the pie half its radius, never all of it. A label too wide to fit at that
+       floor is refused: shrinking to the grid to make room for it leaves a pie nobody can read,
+       and drawing it anyway spills it out of the item. */
+    const minR = Math.max(grid, maxR / 2);
+
     /*
-     * How much room the labels that go *outside* need, at this radius.
+     * One slice's label on a leader, or `null` when it must not be drawn.
      *
-     * Measured over those slices alone, and re-measured each pass. Taking the widest label on the
-     * chart would let one 6% sliver — whose own label is `Other 6%` — shrink the pie by the width
-     * of the longest *name* on it, and a pie small enough to leave room for a label nobody is
-     * drawing is the same defect as a clipped one, arrived at from the other side.
+     * The box is measured here rather than at the offer, because the item clips its content: a
+     * label that leaves the box is lost mid-word, and `flush()` only refuses collisions between
+     * labels. The legend still names a slice whose share was dropped.
      */
-    const outsideW = (r: number): number => {
+    const outsideAt = (
+      p: (typeof wedges)[number],
+      r: number,
+    ): { text: string; x: number; y: number; anchor: "start" | "end"; tipX: number; b: { x: number; y: number } } | null => {
+      if (p.pct < c.minLabelPct || fits(r, p.a1 - p.a0)) return null;
+      const mid = (p.a0 + p.a1) / 2;
+      const b = point(mid, r + c.leader);
+      const dir = Math.cos(mid) >= 0 ? 1 : -1;
+      const tipX = b.x + dir * c.leader;
+      const text = textOf(p, p.pct, true);
+      const w = width(text, valueFont);
+      const x = tipX + dir * c.tickGap;
+      const box = { x: dir > 0 ? x : x - w, y: b.y - c.lineH / 2, w, h: c.lineH };
+      if (box.x < -0.5 || box.y < -0.5 || box.x + box.w > W + 0.5 || box.y + box.h > H + 0.5) return null;
+      return { text, x, y: b.y, anchor: dir > 0 ? "start" : "end", tipX, b };
+    };
+
+    /*
+     * How much room the labels that go *outside* need.
+     *
+     * Measured over those slices alone. Taking the widest label on the chart would let one 6%
+     * sliver — whose own label is `Other 6%` — shrink the pie by the width of the longest *name*
+     * on it, and a pie small enough to leave room for a label nobody is drawing is the same defect
+     * as a clipped one, arrived at from the other side. A label that cannot be drawn at the floor
+     * does not get to shrink the pie at all, so the set is fixed: shrinking a radius only moves a
+     * label inward, and one that is outside at the floor is outside at every radius used here.
+     */
+    const outsideW = (): number => {
       let widest = 0;
-      for (const p of parts) {
-        const pct = total ? p.value / total : 0;
-        if (pct < c.minLabelPct || fits(r, pct * TAU)) continue;
-        widest = Math.max(widest, width(textOf(p, pct, true), valueFont));
+      for (const p of wedges) {
+        if (!outsideAt(p, minR)) continue;
+        widest = Math.max(widest, width(textOf(p, p.pct, true), valueFont));
       }
       return widest;
     };
 
-    /* Passes, because whether a label goes outside depends on the radius and the radius has to
-       leave room for the ones that do — and shrinking it can push one more out. Three is enough and
-       terminates; iterating to a fixed point would wobble a pixel either way for nothing a reader
-       can see. */
-    let R = Math.max(grid, Math.min(plot.w, plot.h) / 2);
-    for (let pass = 0; pass < 3 && total > 0; pass++) {
-      const need = outsideW(R);
-      const reserveX = need ? c.leader * 2 + c.tickGap + need : 0;
-      const reserveY = need ? c.leader + c.lineH : 0;
-      const next = Math.max(grid, Math.min(plot.w / 2 - reserveX, plot.h / 2 - reserveY));
-      if (Math.abs(next - R) < 0.5) break;
-      R = next;
-    }
+    const need = outsideW();
+    const reserveX = need ? c.leader * 2 + c.tickGap + need : 0;
+    const reserveY = need ? c.leader + c.lineH : 0;
+    const R = Math.max(minR, Math.min(plot.w / 2 - reserveX, plot.h / 2 - reserveY));
     const innerR = model.form === "donut" ? R * c.donutInner : 0;
 
-    let cursor = 0;
-    for (const p of parts) {
+    for (const p of wedges) {
       if (total <= 0) break;
-      const pct = p.value / total;
-      const a0 = TOP + cursor * TAU;
-      const a1 = TOP + (cursor + pct) * TAU;
-      cursor += pct;
+      const { pct, a0, a1 } = p;
       if (pct <= 0) continue;
 
       /* The gap between wedges is a paper stroke, so it is a *distance* at the rim turned into an
@@ -737,22 +766,12 @@ export function layoutChart(model: ChartModel, box: { w: number; h: number }, th
           const at = point(mid, (innerR + R) / 2);
           offer({ x: at.x, y: at.y, text: textOf(p, pct, false), anchor: "middle", token: "value", of: p.id }, valueFont);
         } else {
-          const a = point(mid, R);
-          const b = point(mid, R + c.leader);
-          const dir = Math.cos(mid) >= 0 ? 1 : -1;
-          const tipX = b.x + dir * c.leader;
-          wedge.leader = `M ${n2(a.x)} ${n2(a.y)} L ${n2(b.x)} ${n2(b.y)} L ${n2(tipX)} ${n2(b.y)}`;
-          offer(
-            {
-              x: tipX + dir * c.tickGap,
-              y: b.y,
-              text: textOf(p, pct, true),
-              anchor: dir > 0 ? "start" : "end",
-              token: "value",
-              of: p.id,
-            },
-            valueFont,
-          );
+          const out = outsideAt(p, R);
+          if (out) {
+            const a = point(mid, R);
+            wedge.leader = `M ${n2(a.x)} ${n2(a.y)} L ${n2(out.b.x)} ${n2(out.b.y)} L ${n2(out.tipX)} ${n2(out.b.y)}`;
+            offer({ x: out.x, y: out.y, text: out.text, anchor: out.anchor, token: "value", of: p.id }, valueFont);
+          }
         }
       }
 
