@@ -20,7 +20,7 @@ import type { Theme } from "./contract";
  * and one weight, because a font weight is a point on the face's own axis: 700 scaled to 770 is a
  * number no face carries, and the browser would synthesize the difference.
  */
-const RATIOS = new Set(["base", "c4DescLeading", "mdLeading", "mdCodeLeading", "weightBold"]);
+const RATIOS = new Set(["base", "c4NameLeading", "c4DescLeading", "mdLeading", "mdCodeLeading", "weightBold"]);
 
 /**
  * Half a pixel.

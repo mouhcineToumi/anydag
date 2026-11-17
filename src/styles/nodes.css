@@ -514,7 +514,12 @@
 .dag-c4__head { display: flex; align-items: center; gap: var(--dag-metric-node-c4HeadGap); }
 .dag-tile--c4 { width: var(--dag-metric-tile-sizeC4); height: var(--dag-metric-tile-sizeC4); border-radius: var(--dag-metric-radius-tileC4); }
 .dag-tile--round { border-radius: var(--dag-metric-radius-pill); }
-.dag-c4__name { font-size: var(--dag-type-c4Name); font-weight: 600; letter-spacing: -0.008em; }
+.dag-c4__name {
+  font-size: var(--dag-type-c4Name);
+  font-weight: 600;
+  line-height: var(--dag-type-c4NameLeading);
+  letter-spacing: -0.008em;
+}
 .dag-c4__type { font-family: var(--dag-font-mono); font-size: var(--dag-type-c4Type); font-weight: 500; color: var(--dag-color-slate); }
 .dag-c4__desc { font-size: var(--dag-type-c4Desc); line-height: var(--dag-type-c4DescLeading); color: var(--dag-color-slate); }
 

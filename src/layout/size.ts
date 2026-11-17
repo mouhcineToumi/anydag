@@ -86,6 +86,29 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
   const c4 = node.kind === "extsystem" || (type === "c4" && (node.kind === "container" || node.kind === "db"));
   const kind = c4 ? "extsystem" : node.kind === "container" || node.kind === "db" ? "service" : node.kind;
 
+  /**
+   * A C4 card: a fixed width, so a row of containers lines up, and a height that follows the text.
+   *
+   * The name wraps too — it shares the head's row with the icon tile, and the tile is only so tall.
+   * The old arithmetic counted one name line, so a three-line name was drawn taller than the box
+   * and pushed the description out through `overflow: hidden` (#409). The head is whichever of the
+   * two is taller, and both leadings come from the theme, so the drawing and the sizer cannot
+   * disagree about how tall a line is.
+   */
+  const c4Box = (width: number): { w: number; h: number } => {
+    const inner = width - m.node.c4PadX * 2;
+    /* The name's wrap width: the card's content box, less the tile and the gap beside it. The
+       border is taken off as well, or a line that lands between the two widths wraps only in the
+       browser and is a line the sizer never counted. */
+    const nameWidth = inner - m.line.hair * 2 - m.tile.sizeC4 - m.node.c4HeadGap;
+    const nameLines = measure.lines(node.title, titleFontFor(t.c4Name), nameWidth);
+    const head = Math.max(m.tile.sizeC4, nameLines * t.c4Name * t.c4NameLeading);
+    const descLines = measure.lines(node.desc ?? "", fontOf(theme, t.c4Desc), inner);
+    const h =
+      m.node.c4Pad * 2 + head + m.node.c4Gap + t.c4Type + m.node.c4Gap + descLines * Math.round(t.c4Desc * t.c4DescLeading);
+    return { w: width, h: Math.round(h) };
+  };
+
   switch (kind) {
     case "start":
       return { w: m.node.start, h: m.node.start, rowY };
@@ -240,24 +263,14 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
     }
 
     case "extsystem": {
-      /* C4 is the one kind whose description wraps. Width is fixed so a row of containers lines up;
-         height follows the text, which is why C4 boards are tall. */
-      const width = node.w ?? m.node.c4W;
-      const inner = width - m.node.c4PadX * 2;
-      const descLines = measure.lines(node.desc ?? "", fontOf(theme, t.c4Desc), inner);
-      const h = m.node.c4Pad * 2 + m.tile.sizeC4 + 7 + t.c4Type + 7 + descLines * Math.round(t.c4Desc * t.c4DescLeading);
-      return { w: width, h: Math.round(h), rowY };
+      /* C4 is the one kind whose name and description wrap. Width is fixed so a row of containers
+         lines up; height follows the text, which is why C4 boards are tall. */
+      return { ...c4Box(node.w ?? m.node.c4W), rowY };
     }
 
     case "person":
     case "actor": {
-      if (node.desc) {
-        const width = node.w ?? m.node.c4W;
-        const inner = width - m.node.c4PadX * 2;
-        const descLines = measure.lines(node.desc, fontOf(theme, t.c4Desc), inner);
-        const h = m.node.c4Pad * 2 + m.tile.sizeC4 + 7 + t.c4Type + 7 + descLines * Math.round(t.c4Desc * t.c4DescLeading);
-        return { w: width, h: Math.round(h), rowY };
-      }
+      if (node.desc) return { ...c4Box(node.w ?? m.node.c4W), rowY };
       break;
     }
 
