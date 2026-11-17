@@ -26,10 +26,14 @@ Still here.
 `;
 
 let file = "";
+/* Folders a check made, each named in full — never a prefix, which once emptied the vault. */
+let folders: string[] = [];
 
 test.afterEach(() => {
   if (file) fs.rmSync(file, { force: true });
   file = "";
+  for (const dir of folders) if (path.basename(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  folders = [];
 });
 
 const card = (page: Page, reason: "missing" | "unreachable" | "unreadable") =>
@@ -137,4 +141,50 @@ test("home from the card is the welcome page", async ({ page }, info) => {
   await expect(card(page, "missing")).toBeVisible({ timeout: 20_000 });
   await page.locator('[data-dag-file-problem-act="home"]').click();
   await expect(page.locator("[data-dag-welcome]")).toBeVisible();
+});
+
+/*
+ * #403. A folder moved by another program — a file manager, a shell — is one watcher event at the
+ * folder's own path, and the page holding a board inside it heard nothing: it went on drawing the
+ * board as if live, and every edit was a 404 the card snapped back from without a word.
+ */
+test("a board whose folder is renamed on disk says it is gone", async ({ page }, info) => {
+  const folder = `e2e-file-problem-folder-${info.testId}`;
+  const from = path.join(BOARDS, folder);
+  const to = path.join(BOARDS, `${folder}-moved`);
+  folders.push(from, to);
+  fs.mkdirSync(from, { recursive: true });
+  fs.writeFileSync(path.join(from, "one.board.md"), BOARD);
+
+  await page.goto(`/?board=${folder}/one`);
+  await expect(page.locator('[data-dag-item="one"]')).toBeVisible({ timeout: 20_000 });
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+
+  fs.renameSync(from, to);
+  await expect(card(page, "missing")).toBeVisible({ timeout: 10_000 });
+  await expect(card(page, "missing")).toContainText(`There's no board called \u201c${folder}/one\u201d`);
+});
+
+test("an edit the server answers with a 404 says the board is gone rather than snapping back", async ({ page }, info) => {
+  const name = `e2e-file-problem-write-${info.testId}`;
+  file = path.join(BOARDS, `${name}.board.md`);
+  fs.writeFileSync(file, BOARD);
+
+  await page.goto(`/?board=${name}`);
+  const one = page.locator('[data-dag-item="one"]');
+  await expect(one).toBeVisible({ timeout: 20_000 });
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+
+  /* The file going is the feed's to say; this is the write finding out on its own, as it must when
+     the feed said nothing. */
+  await page.route("**/__board/patch?*", (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "no such board" }) }),
+  );
+  const at = (await one.boundingBox())!;
+  await page.mouse.click(at.x + 40, at.y + 12);
+  await expect(page.locator("[data-dag-selected]")).toHaveAttribute("data-dag-item", "one");
+  await page.keyboard.press("ArrowRight");
+
+  await expect(card(page, "missing")).toBeVisible({ timeout: 10_000 });
+  await expect(card(page, "missing")).toContainText(`There's no board called \u201c${name}\u201d`);
 });

@@ -585,6 +585,13 @@
   had gone — a 404 on the console, which fails the suite. `Store.rename` takes an `edit` now, and
   the renamed file *arrives* holding the edited text. Anything that both moves and changes
   a file wants the same shape.
+- **A folder moved on disk is one event, at the folder.** The watcher reports nothing at the
+  documents inside it, and `classify()` does not take a folder for a document, so for a long time
+  the only thing said was `dag:boards`: the sidebar moved, and the page holding a board inside drew
+  it as live while every edit was a 404 it snapped back from in silence (#403). A folder's delete is
+  read as every document `present` had under it going (`Vault.folderWent`), and a write answered 404
+  says the file is gone. Anything else that holds a path open has to hear a folder too, not only a
+  file.
 - **A title in the text makes every write a change to the list.** A note being typed in is four
   writes a second, in every tab, and the page used to refetch `/__board/list` for each — requests
   that queue behind a note's own fetches in the browser's six connections, which is how those

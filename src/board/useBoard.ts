@@ -96,6 +96,9 @@ export function useBoard(name: string | null): BoardHandle {
   /* A ref, not state: a write must read the version as of the moment it is called, and a value
      captured in a render closure is one HMR push out of date exactly when it matters. */
   const held = useRef<Version | null>(null);
+  /* The name this hook is on now, for a write's answer that arrives after it moved to another. */
+  const named = useRef(name);
+  named.current = name;
 
   const adopt = useCallback((boardName: string, v: Version) => {
     try {
@@ -247,6 +250,18 @@ export function useBoard(name: string | null): BoardHandle {
         before = held.current;
         r = await post(before);
         if (!r) return null;
+      }
+      /* **A 404 is the file gone from under the page**, and the page must say so rather than snap the
+         edit back without a word: a folder moved by another program reached the page as nothing at
+         all, and every edit after it was a silent 404 (#403). The feed says it too, now; this is for
+         whatever it does not — and only while the page is still on the name the write went to, since
+         a write in flight across one of the app's own renames answers 404 for the old name. */
+      if (r.status === 404) {
+        if (named.current === name) {
+          held.current = null;
+          setProblem({ reason: "missing", message: `\`${name}\` is not there any more` });
+        }
+        return null;
       }
       if (!r.ok || !before) return null;
       const done = (await r.json()) as { base?: string; text?: string };

@@ -40,6 +40,14 @@ Nine things are load-bearing:
 - **Frontmatter wins.** Two files with one id — a copy made in a file manager — keep it for the
   older by created date, and the copy is given a new id, written into it. A file moved outside the
   app keeps its id and the index learns the new path from the watcher.
+- **A folder that went says each document in it went.** A folder moved or removed by another program
+  is one watcher event at the folder's own path and none at the files inside it, so the feed only
+  said `dag:boards` and a page holding a document in it drew it as live while every edit answered
+  404 (#403). `Vault.folderWent` names each document the watcher last knew under that path — the
+  `present` map keeps each path's spelling on disk for this — and emits it gone, as a file rename
+  does; the page draws its `missing` card, and a tab whose file carries an id follows it on the next
+  listing. A board write answered 404 draws the same card on its own (`useBoard.ts`), for whatever
+  the feed does not say.
 - **The token and the `Host` are the whole security model**, and both are checked on every request
   to the API — see *Things that will bite*. `server.json` is written mode `0600`. The API answers
   twice: at the root it takes **only the header**, which the shell, the CLI, MCP and the Vite proxy
