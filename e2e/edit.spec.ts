@@ -86,3 +86,53 @@ test("a click is not a drag", async ({ page }) => {
   await page.waitForTimeout(500);
   expect(fs.readFileSync(file, "utf8")).toBe(BOARD);
 });
+
+/*
+ * A board written on Windows. A CRLF file once read as one prose card, and Delete on it erased the
+ * board (#391); a BOM made the frontmatter a card, and the first drag wrote a corrupted file (#392).
+ * Both must draw and write as their LF twin does, the file's own line endings and mark kept.
+ */
+const CRLF = BOARD.replace(/\n/g, "\r\n");
+const lone = (text: string) => /(?<!\r)\n/.test(text);
+
+test("Delete on a CRLF board takes one card and keeps the file CRLF (#391)", async ({ page }) => {
+  fs.writeFileSync(file, CRLF);
+  await open(page);
+  await expect(page.locator("[data-dag-item]")).toHaveCount(2);
+
+  await page.locator('[data-dag-item="one"]').click();
+  await expect(page.locator('[data-dag-item="one"][data-dag-selected]')).toHaveCount(1);
+  await page.keyboard.press("Delete");
+  await expect.poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 }).not.toContain("The first item.");
+
+  const after = fs.readFileSync(file, "utf8");
+  expect(after).toContain("```md {#two}\r\nThe second item.\r\n```");
+  expect(after.startsWith("---\r\ntitle: Drag me\r\n---\r\n")).toBe(true);
+  expect(lone(after)).toBe(false);
+  await expect(page.locator("[data-dag-item]")).toHaveCount(1);
+});
+
+test("a drag on a BOM board pins the cards and keeps the mark (#392)", async ({ page }) => {
+  fs.writeFileSync(file, `﻿${CRLF}`);
+  await open(page);
+  await expect(page.locator("[data-dag-item]")).toHaveCount(2);
+
+  const one = page.locator('[data-dag-item="one"]');
+  const from = (await one.boundingBox())!;
+  await page.mouse.move(from.x + 40, from.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 140, from.y + 120, { steps: 8 });
+  await page.mouse.move(from.x + 240, from.y + 220, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => fs.readFileSync(file, "utf8"), { timeout: 5_000 }).toMatch(/```md \{#one x=\d+ y=\d+\}/);
+
+  const after = fs.readFileSync(file, "utf8");
+  expect(after.startsWith("﻿---\r\ntitle: Drag me\r\n---\r\n")).toBe(true);
+  expect(after.indexOf("﻿", 1)).toBe(-1);
+  expect(after).toMatch(/```md \{#two x=\d+ y=\d+\}\r\nThe second item\.\r\n```/);
+  expect(after.split("\n").length).toBe(CRLF.split("\n").length);
+  expect(lone(after)).toBe(false);
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(page.locator("[data-dag-item]")).toHaveCount(2);
+});

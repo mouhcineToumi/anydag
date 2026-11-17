@@ -2,6 +2,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { removeRefs } from "../dsl/restate";
 import { serializeAttrs, str, type Attrs, type AttrValue } from "./attrs";
+import { BOM, eolAt, eolOf, lf, withEol } from "./eol";
 import { rewriteFenceAttrs } from "./fences";
 import { locateItems, renderFence, type Located } from "./locate";
 import { isItemType, isLinkType } from "./types";
@@ -19,6 +20,11 @@ import { isItemType, isLinkType } from "./types";
  *
  * Four kinds of op, all addressed by the id `parseBoard` shows — which for an anonymous item is the
  * auto id, and `locateItems` is what makes those two agree.
+ *
+ * **The file's line endings and BOM are the file's** (`eol.ts`). A body in an op is read as LF
+ * whatever it was sent as; what is written takes the line endings of the block it replaces, or the
+ * file's for a new one, and a BOM stays at offset 0. A CRLF board edited here comes back as its LF
+ * twin's edit in CRLF, and a mixed one keeps every line it was not asked to touch (#391, #392).
  */
 
 /** Set attributes on an item's fence line (`null` removes one), replace its body, or both. */
@@ -106,13 +112,16 @@ const isRemove = (op: PatchOp): op is RemoveOp => "remove" in op && op.remove ==
 const isMeta = (op: PatchOp): op is MetaOp => "meta" in op;
 const isMove = (op: PatchOp): op is MoveOp => "move" in op;
 
-/** Between two blocks: exactly one blank line, which is how every board here is written. */
-function join(left: string, right: string): string {
-  const a = left.replace(/\n+$/, "");
-  const b = right.replace(/^\n+/, "");
-  if (!a) return b;
-  if (!b) return `${a}\n`;
-  return `${a}\n\n${b}`;
+/**
+ * Between two blocks: exactly one blank line, which is how every board here is written, in the
+ * line ending `eol`. A BOM alone on the left is the start of the file, not a block.
+ */
+function join(left: string, right: string, eol = "\n"): string {
+  const a = left.replace(/(?:\r?\n)+$/, "");
+  const b = right.replace(/^(?:\r?\n)+/, "");
+  if (!a || a === BOM) return a + b;
+  if (!b) return `${a}${eol}`;
+  return `${a}${eol}${eol}${b}`;
 }
 
 /* Exported for `rename.ts`, which pins an id onto a fence exactly as a `SetOp` does when a drag
@@ -153,9 +162,14 @@ export function withId(attrs: Record<string, AttrValue>, id: string): Attrs {
  * `bodyStart` is the length of the block `locateItems` matched, so the slice before it is exactly
  * the frontmatter — including the one newline the regex takes after the closing `---`. A file with
  * no frontmatter grows one, separated from the body by a blank line the way every board here is
- * written.
+ * written. Either way it goes behind a BOM (`docStart`), in the line endings of the block it
+ * replaces or, for a new one, of the file.
  */
-function withMeta(text: string, bodyStart: number, yaml: string | null, patch: Record<string, unknown>): string {
+function withMeta(
+  text: string,
+  { docStart, bodyStart, frontmatter: yaml }: { docStart: number; bodyStart: number; frontmatter: string | null },
+  patch: Record<string, unknown>,
+): string {
   let meta: Record<string, unknown> = {};
   if (yaml !== null) {
     try {
@@ -170,10 +184,12 @@ function withMeta(text: string, bodyStart: number, yaml: string | null, patch: R
     if (v === null) delete meta[k];
     else meta[k] = v;
   }
+  const head = text.slice(0, docStart);
   const body = text.slice(bodyStart);
-  if (Object.keys(meta).length === 0) return yaml === null ? text : body.replace(/^\n+/, "");
-  const block = `---\n${stringifyYaml(meta)}---\n`;
-  return yaml === null ? `${block}\n${body}` : block + body;
+  if (Object.keys(meta).length === 0) return yaml === null ? text : head + body.replace(/^(?:\r?\n)+/, "");
+  const eol = yaml === null ? eolOf(text) : eolAt(text, docStart);
+  const block = withEol(`---\n${stringifyYaml(meta)}---\n`, eol);
+  return yaml === null ? `${head}${block}${eol}${body}` : head + block + body;
 }
 
 export function applyPatch(text: string, ops: PatchOp[]): PatchResult {
@@ -228,16 +244,21 @@ export function applyPatch(text: string, ops: PatchOp[]): PatchResult {
     ...ops.filter(isAppend),
   ];
 
+  /* Line endings are read off the text as it came in: every offset below is into it, and an op
+     only ever writes over its own block. */
+  const fileEol = eolOf(text);
   let out = text;
   for (const op of ordered) {
     if (isInsert(op)) {
       const { type, attrs, body } = op.insert;
-      const block = renderFence(type, serializeAttrs(withId(attrs, attrs.id as string)), body);
       if (op.after === undefined) {
-        out = `${join(out, block)}\n`;
+        const block = renderFence(type, serializeAttrs(withId(attrs, attrs.id as string)), body, fileEol);
+        out = `${join(out, block, fileEol)}${fileEol}`;
       } else {
-        const end = byId.get(op.after)!.end;
-        out = join(join(out.slice(0, end), block), out.slice(end));
+        const after = byId.get(op.after)!;
+        const eol = eolAt(text, after.start);
+        const block = renderFence(type, serializeAttrs(withId(attrs, attrs.id as string)), body, eol);
+        out = join(join(out.slice(0, after.end), block, eol), out.slice(after.end), eol);
       }
       continue;
     }
@@ -248,9 +269,11 @@ export function applyPatch(text: string, ops: PatchOp[]): PatchResult {
     if (isMeta(op) || isMove(op)) continue;
 
     const item = byId.get(op.id)!;
+    /* The item's own line ending, read off its first line: a CRLF card in a mixed file stays CRLF. */
+    const eol = eolAt(text, item.start);
 
     if (isRemove(op)) {
-      out = join(out.slice(0, item.start), out.slice(item.end));
+      out = join(out.slice(0, item.start), out.slice(item.end), eol);
       continue;
     }
 
@@ -263,15 +286,17 @@ export function applyPatch(text: string, ops: PatchOp[]): PatchResult {
       attrs.map.id = item.id;
       attrs.order.unshift("id");
     }
-    const body = op.body ?? item.body;
+    /* LF, as `item.body` is: an agent's CRLF body is the same body, not a change to every line. */
+    const sent = op.body === undefined ? undefined : lf(op.body);
+    const body = sent ?? item.body;
 
     if (item.prose) {
       /* Loose prose has no fence line to carry an attribute, so setting one wraps it. */
       if (!op.attrs) {
-        out = out.slice(0, item.start) + body.trim() + out.slice(item.end);
+        out = out.slice(0, item.start) + withEol(body.trim(), eol) + out.slice(item.end);
         continue;
       }
-      out = out.slice(0, item.start) + renderFence("md", serializeAttrs(attrs), body) + out.slice(item.end);
+      out = out.slice(0, item.start) + renderFence("md", serializeAttrs(attrs), body, eol) + out.slice(item.end);
       continue;
     }
 
@@ -281,32 +306,34 @@ export function applyPatch(text: string, ops: PatchOp[]): PatchResult {
     /* A retype is a rewrite of the whole block: the info word is on the opening fence line, which
        `rewriteFenceAttrs` deliberately does not touch — it rewrites only what is inside the braces. */
     if (op.type !== undefined && op.type !== item.type) {
-      out = out.slice(0, fence.openStart) + renderFence(op.type, attrText, op.body ?? item.body) + out.slice(fence.blockEnd);
+      out = out.slice(0, fence.openStart) + renderFence(op.type, attrText, body, eol) + out.slice(fence.blockEnd);
       continue;
     }
 
-    if (op.body !== undefined && op.body !== item.body) {
+    if (sent !== undefined && sent !== item.body) {
       /* A body that closes its own fence — a markdown item quoting a code sample — needs longer
          backticks than the fence has, and that is a rewrite of the block rather than of the body. */
       const ticks = /^[ \t]*(`+)/.exec(out.slice(fence.openStart, fence.openEnd))?.[1]?.length ?? 3;
-      const needs = Math.max(3, ...[...op.body.matchAll(/^[ \t]*(`{3,})[ \t]*$/gm)].map((m) => m[1]!.length + 1));
+      const needs = Math.max(3, ...[...sent.matchAll(/^[ \t]*(`{3,})[ \t]*$/gm)].map((m) => m[1]!.length + 1));
       if (needs > ticks) {
-        out = out.slice(0, fence.openStart) + renderFence(item.type, attrText, op.body) + out.slice(fence.blockEnd);
+        out = out.slice(0, fence.openStart) + renderFence(item.type, attrText, sent, eol) + out.slice(fence.blockEnd);
         continue;
       }
-      const bodyStart = fence.openEnd + 1;
+      const written = withEol(sent, eol);
+      const bodyStart = fence.bodyStart;
       if (!fence.closed) {
         /* An unclosed fence runs to the end of the file, so the body is everything after the open
            line — and when the open line is the last line, there is not even a newline yet. */
-        out = bodyStart > out.length ? `${out}\n${op.body}` : out.slice(0, bodyStart) + op.body;
+        out = bodyStart > fence.openEnd ? out.slice(0, bodyStart) + written : `${out}${eol}${written}`;
       } else {
         const closeStart = out.lastIndexOf("\n", fence.blockEnd - 1) + 1;
         /* Zero body lines and one empty body line both read back as `""`; only the offsets tell
-           them apart, and the rewrite has to put back whichever shape it found. */
+           them apart, and the rewrite has to put back whichever shape it found. The last body
+           line's break is outside `bodyEnd`, so it stays as it was written. */
         const lines = closeStart > bodyStart;
-        if (op.body === "") out = out.slice(0, bodyStart) + out.slice(closeStart);
-        else if (lines) out = out.slice(0, bodyStart) + op.body + out.slice(closeStart - 1);
-        else out = `${out.slice(0, bodyStart)}${op.body}\n${out.slice(bodyStart)}`;
+        if (sent === "") out = out.slice(0, bodyStart) + out.slice(closeStart);
+        else if (lines) out = out.slice(0, bodyStart) + written + out.slice(fence.bodyEnd);
+        else out = `${out.slice(0, bodyStart)}${written}${eol}${out.slice(bodyStart)}`;
       }
     }
 
@@ -321,7 +348,7 @@ export function applyPatch(text: string, ops: PatchOp[]): PatchResult {
      last of all: it sits before every item, so writing it earlier would move every offset the
      moves above still had to read. */
   for (const op of ops) if (isMove(op)) out = applyMove(out, op);
-  for (const op of ops) if (isMeta(op)) out = withMeta(out, located.bodyStart, located.frontmatter, op.meta);
+  for (const op of ops) if (isMeta(op)) out = withMeta(out, located, op.meta);
 
   const gone = new Set(ops.filter(isRemove).map((op) => op.id));
   return { ok: true, text: gone.size ? dropLinks(out, gone) : out };
@@ -405,7 +432,8 @@ function applyMove(text: string, op: MoveOp): string {
   const mover = before.items.find((it) => it.id === op.id);
   if (!mover) return text;
 
-  const cut = join(text.slice(0, mover.start), text.slice(mover.end));
+  const eol = eolAt(text, mover.start);
+  const cut = join(text.slice(0, mover.start), text.slice(mover.end), eol);
   const after = locateItems(cut, isItemType);
   const target = moveTarget(op.move, str(mover.attrs, "page") ?? "page-1", after.items);
   if (!target) return text;
@@ -415,14 +443,14 @@ function applyMove(text: string, op: MoveOp): string {
      encountered first; without this the mover and whoever now stands where it used to could
      silently trade identities the next time the board is parsed. */
   let block = text.slice(mover.start, mover.end);
-  if (mover.prose) block = renderFence("md", serializeAttrs(withId({}, mover.id)), mover.body);
+  if (mover.prose) block = renderFence("md", serializeAttrs(withId({}, mover.id)), mover.body, eol);
   else if (!("id" in mover.attrs.map)) {
     const attrs = attrsOf(mover);
     attrs.map.id = mover.id;
     attrs.order.unshift("id");
-    block = renderFence(mover.type, serializeAttrs(attrs), mover.body);
+    block = renderFence(mover.type, serializeAttrs(attrs), mover.body, eol);
   }
 
   const at = target.side === "after" ? target.item.end : target.item.start;
-  return join(join(cut.slice(0, at), block), cut.slice(at));
+  return join(join(cut.slice(0, at), block, eol), cut.slice(at), eol);
 }

@@ -498,6 +498,12 @@
   write resolves `null` and `dag:upload-problem` tells the person. Unlike a note's save, a board
   write is not retried: the file is the document and the person can see what it says.
   `e2e/offline-write.spec.ts` fails `/__board/patch` with `page.route` and reads `pageerror`.
+- **A write retried after a 409 is the edit rebased, not the edit again.** `write` adopted the 409's
+  text and re-posted the same ops, which is right for an `attrs` op and wrong for a body: the body
+  was rendered from the old text, so the retry overwrote the item whole and an agent's line added
+  to the same fence was gone, with nobody told (#393). A drag merged and a retitle did not, because
+  one sends `x=`/`y=` and the other the whole fence. `src/board/rebase.ts` merges each body against
+  the 409's text and refuses, with a notice, what it cannot merge. See *Editing* in `editing.md`.
 
 - **A peek that slides over the control that summoned it swallows the click meant for it.** The
   sidebar's hover peek first ran the full height of the window, so it arrived on top of the toolbar
@@ -717,6 +723,19 @@
   which carries its polyfills, and `optimizeDeps` names that entry. The lesson is the snapshot
   rule's: a browser the gate does not run is not the one the page has to work in.
 
+- **A board file's line endings and BOM are the file's, and a pattern anchored at `$` or `^---`
+  sees neither.** A fence line written on Windows ends in `\r`, and `OPEN` (`…$`) matched no line of a
+  CRLF board: it read as one prose card, and Delete on it erased the board (#391). A UTF-8 BOM is
+  not `---`, so a BOM board's frontmatter became a card, and since `String.trim` takes U+FEFF for a
+  space, that card's span started after the mark and the first drag wrote two blocks through
+  overlapping spans (#392). `src/board/eol.ts` holds the rule: a `\r` before `\n` is part of the
+  break, a BOM at offset 0 is part of no line. `scanFences` and `locateItems` keep both outside every
+  offset and hand out LF bodies; every writer (`applyPatch`, `renameItemId`, the repairs, the server's
+  `withKeys`/`withTitle`) puts the mark back and writes the line endings of the block it replaced, or
+  the file's for a new one (`eolAt`, `eolOf`). An offset counted in an LF `body` is not an offset
+  into a CRLF file — use the fence's `bodyStart`/`bodyEnd`. `test/board-eol.test.ts` runs every op
+  against CRLF, mixed and BOM twins of one board and holds each to the LF twin's result.
+
 - **A board fence's unquoted attribute ends at the `}` that closes the braces.** `src=plan.assets/x.png}`
   is how a regex over the text reads the last attribute of an image fence if `}` is allowed in a
   path, and the zip export went looking for a file called `x.png}`. `namedAssets` in
@@ -806,7 +825,9 @@
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
   the disk does not have, so its next save is a `409` against itself. `test/server/` holds both
-  halves. A synced vault depends on it as well: a write on open is a conflict on every machine.
+  halves. The one byte a write adds is the id the file already had, put back into a text that
+  omitted it (#401): dropping it would unlink the document at the next index rebuild, and every
+  writer takes its base from the answer, not from what it sent. A synced vault depends on it as well: a write on open is a conflict on every machine.
 - **An empty `base` is a stale base, not a missing one.** `Vault.write` read `if (base && …)`, so
   `""` — an agent passing an unset variable to `board_write`, or `{"base": ""}` to `/__board/put` —
   skipped the sha1 check and overwrote the other writer's edit, and the routes turned a `base` of any
