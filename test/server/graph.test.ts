@@ -108,6 +108,14 @@ describe("GET /__board/graph", () => {
       "Launch/assets/spec.pdf": "attachment",
       Lonely: "note",
     });
+    // A note is the plain ground; every other kind wears a hue of its own.
+    expect(g.fields[0]!.values.map((v) => [v.key, v.hue ?? (v.plain ? "plain" : null)])).toEqual([
+      ["note", "plain"],
+      ["task", "spruce"],
+      ["project", "coral"],
+      ["event", "ochre"],
+      ["attachment", "bronze"],
+    ]);
     expect(valuesBy(g, "folder")).toEqual({
       Inbox: null,
       Kickoff: null,

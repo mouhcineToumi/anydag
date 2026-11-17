@@ -70,16 +70,20 @@ const byLabel = (values: GraphValue[]): GraphValue[] => {
 /** What the graph calls a document's kind: the sidebar's mark (`shownKind` in `src/ui/filter.ts`). */
 type GraphKind = "note" | "task" | "project" | "event" | "board" | "quiz" | "table" | "attachment";
 
-/** In the order the sidebar's *Show in Files* lists them. */
-const KINDS: readonly { key: GraphKind; label: string }[] = [
-  { key: "note", label: "Notes" },
-  { key: "task", label: "Tasks" },
-  { key: "project", label: "Projects" },
-  { key: "event", label: "Events" },
-  { key: "board", label: "Boards" },
-  { key: "quiz", label: "Quizzes" },
-  { key: "table", label: "Tables" },
-  { key: "attachment", label: "Attachments" },
+/**
+ * In the order the sidebar's *Show in Files* lists them, each with the hue the graph draws it in: a
+ * note is `plain` — slate, the ground most of a vault is — so the kinds that are not a plain note
+ * stand out on it (the design session's picture, #262).
+ */
+const KINDS: readonly (GraphValue & { key: GraphKind })[] = [
+  { key: "note", label: "Notes", plain: true },
+  { key: "task", label: "Tasks", hue: "spruce" },
+  { key: "project", label: "Projects", hue: "coral" },
+  { key: "event", label: "Events", hue: "ochre" },
+  { key: "board", label: "Boards", hue: "indigo" },
+  { key: "quiz", label: "Quizzes", hue: "violet" },
+  { key: "table", label: "Tables", hue: "teal" },
+  { key: "attachment", label: "Attachments", hue: "bronze" },
 ];
 
 /** A note wears the mark of the first of project, task and event it is, as in the sidebar. */
@@ -115,7 +119,7 @@ const kindField: FieldBuilder = {
     const per: string[] = [];
     await paced(docs, (d) => per.push(kindOf(d)));
     const seen = new Set(per);
-    return { values: KINDS.filter((k) => seen.has(k.key)).map((k) => ({ key: k.key, label: k.label })), per };
+    return { values: KINDS.filter((k) => seen.has(k.key)).map((k) => ({ ...k })), per };
   },
 };
 

@@ -240,6 +240,15 @@ describe("palette", () => {
     expect(new Set(handed).size).toBe(3);
   });
 
+  it("draws a plain value in slate and hands it no hue", () => {
+    const wire = structuredClone(WIRE);
+    wire.fields[0]!.values[0]!.plain = true;
+    const kind = paletteOf(read(wire), "kind")!;
+    expect(kind.slots[0]).toBe(SLOT_SLATE);
+    // The hue the commonest value would have taken goes to the next one.
+    expect(kind.slots[kind.order[1]!]).toBe(slotOfHue(HUE_ORDER[0]!));
+  });
+
   it("colours a many field by the first value the rules let through", () => {
     const g = read(WIRE);
     const v = view({ colourBy: "tag", rules: [{ field: "tag", hide: ["draft"] }] });

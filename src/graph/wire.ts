@@ -36,6 +36,11 @@ export interface GraphValue {
   label: string;
   /** The value's own colour (a tag's, a project's), or absent for none: the palette hands one out. */
   hue?: Hue | null;
+  /**
+   * Drawn in slate and handed no hue: the ground the other values stand on — a note among the kinds,
+   * which is most of a vault and would otherwise take the first hue going.
+   */
+  plain?: true;
 }
 
 export interface GraphField {

@@ -52,7 +52,7 @@ interface GraphField {
   none: string;                     // "No tag": what a document with no value has
   type: "one" | "many";
   tree?: true;                      // values are "/" paths
-  values: { key: string; label: string; hue?: Hue | null }[];
+  values: { key: string; label: string; hue?: Hue | null; plain?: true }[];
   of?: number[];                    // "one": an index into values per document, -1 for none
   start?: number[]; items?: number[]; // "many": CSR, start has n + 1 entries
 }
@@ -72,7 +72,7 @@ The fields today:
 
 | Field | Type | Value key | Label | Hue |
 |---|---|---|---|---|
-| `kind` | one | `note` `task` `project` `event` `board` `quiz` `table` `attachment`, a note's as the sidebar marks it (`shownKind`: project, then task, then event) | *Notes*, *Tasks*, … | none: the page maps kinds |
+| `kind` | one | `note` `task` `project` `event` `board` `quiz` `table` `attachment`, a note's as the sidebar marks it (`shownKind`: project, then task, then event) | *Notes*, *Tasks*, … | one per kind, set in the builder; a note is `plain` (slate), the ground the rest stand on |
 | `folder` | one, tree | the parent folder's path; none at the top | the path | none |
 | `tag` | many | `tagKey` | the tag list's spelling, else the one most documents use | the tag list's hue, else `defaultHue` |
 | `project` | one | the project note's id; membership is a path (`projectFor`) | its title | its `hue:` |
@@ -124,9 +124,12 @@ check that neither file spells a field key.
   `#draft` hidden, is coloured and grouped as `#idea`.
 - `paletteOf(graph, key, own?)`: each value's **slot**, an index into `SLOT_TOKENS` (`slate`, `muted`,
   then `hues-<hue>` in `HUE_ORDER`) — a token name the renderer resolves as `--dag-color-<token>`,
-  never a colour. A value's own hue (or one the page hands in `own`, which is how kinds get theirs);
-  else the ten hues no value owns, handed out from the commonest value down; the rest slate; "none"
-  muted. Counted over the whole vault, so filtering does not re-colour what stays.
+  never a colour. A value's own hue (or one handed in `own`); slate for a `plain` value; else the ten
+  hues no value owns, handed out from the commonest value down; the rest slate; "none" muted. Counted
+  over the whole vault, so filtering does not re-colour what stays. **Kinds get their hues from the
+  server's builder** (#459), not from the page: a note is `plain`, so the three quarters of a vault
+  that are notes are the slate ground the other kinds stand out on, as in the design session's
+  picture, and the page names no field to get there.
 - `groupsOf(graph, shown, view)`: each shown document's group by a field's value, `-1` for none,
   numbered from the biggest group down, with the groups' keys, names and sizes. `null` for
   `"links"`, whose clusters come from the links (#458).

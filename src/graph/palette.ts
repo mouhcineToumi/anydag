@@ -3,10 +3,10 @@
  * list of theme token names. A slot is never a colour — the renderer resolves the tokens of the
  * theme it draws in (`--dag-color-<token>`), so a theme change re-colours nothing here.
  *
- * A value's own hue when it has one (a tag's, a project's), else the ten theme hues (`HUE_ORDER`)
- * handed out from the commonest value down, skipping the hues values already own; the rest slate,
- * and "none" muted. No field is known by name: the page may hand its own hues for a field's values
- * (`own`), which is how it colours kinds.
+ * A value's own hue when it has one (a tag's, a project's), slate for a `plain` one (a note among the
+ * kinds), else the ten theme hues (`HUE_ORDER`) handed out from the commonest value down, skipping
+ * the hues values already own; the rest slate, and "none" muted. No field is known by name: a caller
+ * may hand its own hues for a field's values (`own`); the kinds' come from the server, on the wire.
  *
  * Pure: no DOM, no React, no `@/` alias.
  */
@@ -72,7 +72,9 @@ export function paletteOf(graph: Graph, key: string, own?: ReadonlyMap<string, H
   let next = 0;
   for (const v of order) {
     const h = hueOf(v);
-    slots[v] = h ? slotOfHue(h) : next < free.length ? slotOfHue(free[next++]!) : SLOT_SLATE;
+    if (h) slots[v] = slotOfHue(h);
+    else if (f.values[v]!.plain) slots[v] = SLOT_SLATE;
+    else slots[v] = next < free.length ? slotOfHue(free[next++]!) : SLOT_SLATE;
   }
   return { field: f.key, slots, none: SLOT_MUTED, counts, noneCount, order };
 }
