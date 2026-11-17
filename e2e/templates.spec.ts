@@ -112,7 +112,10 @@ test("with no title the note starts Untitled, and its title is the first thing a
   await templatesFolder(page, tpl);
   await openAnchor(page);
   await newFile(page, "template");
-  /* One template, so Enter in the title field makes it. */
+  /* One template, so Enter in the title field makes it — once it is listed. The file was written a
+     moment ago, and under a full suite's load the picker can open before the server has listed it:
+     Enter on an empty list makes nothing, and the page stays on the anchor (#493). */
+  await expect(page.locator(`[data-dag-template="${tpl}/Blank"]`)).toBeVisible();
   await page.locator("[data-dag-templates-title]").press("Enter");
   await opened(page, `${folder}/Untitled`);
   await expect(page.locator("[data-dag-note-title]")).toBeFocused();
