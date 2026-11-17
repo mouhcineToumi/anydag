@@ -68,6 +68,13 @@ rm` went on saying *never recursive* about a thing the app did. It is `folder rm
 running app's server through `server.json`, or one in this process. It speaks on stdout, so it takes no
 `--json`. See *Parity*.
 
+**The sheets `dsl_reference` serves ship beside the server bundle.** `server/build.mjs` copies
+`docs/dsl/` and `docs/generate/` into `server/dist/docs/`, the first place `server/handle.ts` looks;
+a checkout's unit suite reads the repository's `docs/`, and `ANYDAG_DOCS_DIR` beats both. A packaged
+app has no repository above it, so a build that skipped the copy answered `{"types":[]}` to every
+`dsl_reference` and 404ed every `anydag://dsl/<type>` (#398); `test/server-build.test.ts` builds a
+bundle and asks it for a sheet.
+
 **Tags have no command** (#327). A tag is finer than a whole file, so adding, renaming, recolouring
 and deleting one are the page's and MCP's (`tag_list`, `tag_apply`, `tag_rename`, `tag_delete`,
 `tag_color`), and their features in `docs/parity.json` say `{"admin": false}`. The CLI reads them

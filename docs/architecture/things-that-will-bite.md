@@ -753,6 +753,17 @@
   last hour's grammar, and the e2e suite then fails on behaviour the source no longer has. Kill it
   by port. The CLI's launcher checks its own bundle's inputs on every run (`cli/dist/meta.json`);
   the server's does not.
+- **A bundle has no repository above it, and a file it reads off disk does not come along by being
+  in the checkout.** `server/handle.ts` resolves the cheat sheets as `../docs` from wherever it
+  runs: from `server/`, Vitest's import of the source, that is the repository's `docs/` — and from
+  `server/dist/anydag-server.mjs` it is `server/docs`, which no build wrote. So `GET /__board/dsl`
+  answered `{"types":[]}`, every `dsl_reference` was a 404, the Inspector's cheat sheet said *No
+  cheat sheet for this type*, and `/system` assembled the generation prompt with no guide and no
+  grammar in it — in `anydag serve`, in `npm run dev` and in the packaged app, while every test that
+  asked passed because the unit suite imports the handler from source (#398). `server/build.mjs`
+  copies `docs/dsl/` and `docs/generate/` beside the bundle now, and `test/server-build.test.ts`
+  builds one and asks it for a sheet. Anything else a route reads off disk wants the same two
+  halves: a build that puts it there, and a test of the built layout.
 - **The token is a header from a shell and a cookie for a browser, and never a value in page
   script.** Every request to the API carries the per-launch token (`x-anydag-token`, or the
   `anydag_token` cookie), and the `Host` must be `127.0.0.1`, `localhost` or `[::1]` — anything else
