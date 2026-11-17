@@ -138,7 +138,9 @@ Six things about that are load-bearing:
 - **`applyPatch` rewrites one span**, last block first so the offsets from a single scan stay
   valid, preserving unknown attributes in their original order. A board file is a document a person
   edits; a drag must not show up in a diff as a rewrite of the whole thing. Loose prose has no fence
-  line to carry an attribute, so pinning it wraps it in one.
+  line to carry an attribute, so pinning it wraps it in one. The file's line endings and BOM are
+  kept: what is rewritten takes the line endings of the block it replaces (or the file's, for a new
+  one), and a BOM stays at offset 0 — a CRLF board edited here is its LF twin's edit in CRLF (#391, #392).
 - **The clipboard flavour is the item's own source** — the fence line, the body, the closing
   fence — so a copy pastes into an editor, into another board, or back into this one, where a
   taken id is replaced and a free one (a cut, say) is kept. Text with no fence in it becomes a note.

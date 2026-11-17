@@ -26,6 +26,9 @@ function scalar(title: string): string {
  * after the block is the Markdown the editor holds.
  */
 export function withTitle(text: string, title: string, kind = "board"): string {
+  /* Past a byte-order mark, which stays where it is: matched with it in front, the frontmatter was
+     not found and a second one was written before the mark (#392). */
+  if (text.charCodeAt(0) === 0xfeff) return text[0]! + withTitle(text.slice(1), title, kind);
   const line = `title: ${scalar(title)}`;
   const m = FRONT.exec(text);
   /* Saying it already, however it is quoted, is no change: `quiz_create` given a text and
@@ -53,6 +56,7 @@ export function withTitle(text: string, title: string, kind = "board"): string {
 
 /** `text` with no `title:` line in its frontmatter — and no frontmatter left if that was all of it. */
 export function withoutTitle(text: string): string {
+  if (text.charCodeAt(0) === 0xfeff) return text[0]! + withoutTitle(text.slice(1));
   const m = FRONT.exec(text);
   if (!m) return text;
   const lines = m[1]!.split(/\r?\n/);
