@@ -370,6 +370,20 @@ export function parseTimeline(src: string): Graph {
       graph.diagnostics.push({ line: i + 1, code: CODES.E_BAD_DATE, message: `\`${m[2]}\` is not a date`, severity: "error" });
       return;
     }
+    /* A range is a span, and one that ends before it starts has no place on the axis: the layout's
+       domain takes `end ?? start`, so the start would fall outside it and the card off the frame. */
+    if (end !== null && end < start) {
+      graph.diagnostics.push({
+        line: i + 1,
+        /* The end date, which is the word that has to change — its column in the file, indentation
+           included. */
+        col: raw.length - raw.trimStart().length + line.indexOf(m[2]!, m[1]!.length) + 1,
+        code: CODES.E_BAD_DATE,
+        message: `the end \`${m[2]}\` is before the start \`${m[1]}\``,
+        severity: "error",
+      });
+      return;
+    }
 
     const id = `t${seq++}`;
     const flags = (m[4] ?? "").split(/\s+/).filter(Boolean);
