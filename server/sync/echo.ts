@@ -17,9 +17,13 @@
  *   is somebody else's write since, and is touched as before. Every write sync makes is a
  *   compare-and-set against what it read, so a write that came in between either made sync's fail
  *   (no note) or was what sync decided on.
- * - **Every event spends its path's note**, echo or not, so a note never outlives the first write
- *   after it. A note no event spends — a write that changed nothing reports nothing, and a folder
- *   that was already there was not made — lapses after `ECHO_MS`.
+ * - **An event that disagrees spends its path's note**, so a note never outlives the first write
+ *   after it. **An echo leaves it**: one write can be reported more than once — a file in a folder
+ *   made just now is said by the vault's watcher and again by the folder's own once it holds
+ *   (`cover`, #405) — and the second report, finding no note, woke the run #36 removed (#486). An
+ *   event whose disk still agrees is no change, however many come. A note no event contradicts — a
+ *   write that changed nothing reports nothing, and a folder that was already there was not made —
+ *   lapses after `ECHO_MS`.
  * - **A folder is never read**: `SyncFs` (frozen) cannot tell a folder from nothing. A folder sync
  *   made is implied by what it holds, so its event says nothing a file's event does not; the engine
  *   still touches one the state holds as an empty-folder marker.
@@ -59,12 +63,21 @@ export class Echoes {
     }
   }
 
-  /** What sync last left at `rel`, if it is still believed — `undefined` when nothing is. Spends it. */
-  take(rel: string): Left | undefined {
+  /**
+   * Whether an event at `rel` is the echo of sync's own last write there: `agrees` is asked whether
+   * the disk is still what the note says sync left. An echo keeps the note for another report of the
+   * same write; an event that disagrees spends it, unless sync has noted the path again meanwhile.
+   */
+  async heard(rel: string, agrees: (left: Left) => Promise<boolean>): Promise<boolean> {
     const n = this.notes.get(rel);
-    if (!n) return undefined;
-    this.notes.delete(rel);
-    return this.now() - n.at <= ECHO_MS ? n.left : undefined;
+    if (!n) return false;
+    if (this.now() - n.at > ECHO_MS) {
+      this.notes.delete(rel);
+      return false;
+    }
+    const echo = await agrees(n.left);
+    if (!echo && this.notes.get(rel) === n) this.notes.delete(rel);
+    return echo;
   }
 
   /** `fs`, noting every write, removal and folder that succeeds through it. Reads pass through. */
