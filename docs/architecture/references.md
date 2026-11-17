@@ -14,7 +14,7 @@ anchor, and a reference is a Markdown link to `dag:<id>`.
 | canvas item | its `#id` | whoever makes it, else the stamp | move, edit, retitle, cut and paste, export and import; `renameItemId` is the one deliberate change |
 | note block | ` ^name` at the end of its last line | whatever first points at it | edits to the block, moving it |
 
-Ten things are load-bearing:
+Fourteen things are load-bearing:
 
 - **A document's id is in its frontmatter, and opening never writes.** `id:` is the truth and
   travels with the file through a copy, a sync and a `git mv`; the SQLite index in the app's home
@@ -43,8 +43,17 @@ Ten things are load-bearing:
   a click with a modifier still load.
 - **`react-markdown` empties any URL protocol it does not know**, which is what makes it safe with
   `javascript:` and what turned every reference into a link to nowhere and every embed into a broken
-  image. `urlTransform` in `src/refs/Ref.tsx` lets `dag:` through and nothing else, and every
-  `ReactMarkdown` that can hold a reference has to be handed it.
+  image. `urlTransform` in `src/refs/Ref.tsx` lets `dag:` and a wikilink's `wiki:` through and
+  nothing else, and every `ReactMarkdown` that can hold a reference has to be handed it.
+- **A reference URL is the caller's, not the document's asset path.** `NoteMarkdown` gives every
+  image it draws a folder — a note read-only, a snapshot, the editor's first-paint stand-in, an
+  embedded note — and `QuizMarkdown` does the same for a quiz. Both hand a `src` to the caller's
+  `img`, which draws `dag:` and a wikilink's `wiki:` alike, when `isRefUrl` (`src/refs/extract.ts`)
+  says it names a document. The test used to be `startsWith("dag:")`, so an `![[Target]]` fell
+  through as `wiki:Target` and asked `/__board/assets/wiki:Target`: a 403 and a broken image on
+  the read-only note, the snapshot and the editor's stand-in — and `![[…]]` is the one embed form
+  that arrives without going through the picker, because an agent writes notes (#396).
+  `test/note-embed.test.ts` holds both URLs to the caller, and a plain picture to the folder.
 - **An embed is a block, and a paragraph cannot hold one.** A `dag:` image alone on its line draws
   the target; anywhere else it is a one-line card, because a `<div>` in a `<p>` is a console error
   and the e2e suite fails on those. **An embed that throws is that embed's failure alone**:

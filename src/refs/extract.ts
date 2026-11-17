@@ -58,6 +58,15 @@ export function parseDagUrl(url: string): { id: string; part?: string } | null {
 
 export const dagUrl = (id: string, part?: string): string => (part ? `dag:${id}#${part}` : `dag:${id}`);
 
+/**
+ * Whether a URL names a document rather than a file — `dag:<id>`, or the `wiki:` a wikilink makes.
+ *
+ * `react-markdown`'s `urlTransform` keeps these, and the wrapper that gives a note or a quiz its
+ * own pictures relative to its folder (`NoteMarkdown`, `QuizMarkdown`) hands them to the caller's
+ * `img` instead. Asking the asset route for one was a 403 and a broken image (#396).
+ */
+export const isRefUrl = (url: string): boolean => parseDagUrl(url) !== null || parseWikiUrl(url) !== null;
+
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
 const textOf = (n: Nodes): string =>

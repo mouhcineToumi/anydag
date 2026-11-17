@@ -50,6 +50,19 @@ test("the read view draws a wikilink with its own words and follows it by name",
   await expect(page.locator("[data-dag-backlinks]")).toHaveAttribute("data-dag-backlinks", "1");
 });
 
+test("the read view and a snapshot draw a ![[wikilink]] as the embed it is, and ask for no asset", async ({ page }) => {
+  fs.writeFileSync(fileOf(source()), `# Source\n\nEmbedded:\n\n![[${target()}]]\n`);
+  await open(page, source(), true);
+  const embed = page.locator('[data-dag-embed-kind="note"]');
+  await expect(embed).toHaveCount(1);
+  await expect(embed).toContainText("The target.");
+  /* The snapshot draws the same file the same way — and the console check in `afterEach` is what
+     finds the 403 a `wiki:` src used to ask the asset route for (#396). */
+  await page.goto(`/?note=${encodeURIComponent(source())}&snapshot=1`);
+  await page.waitForFunction(() => document.documentElement.dataset.dagReady === "1", null, { timeout: 20_000 });
+  await expect(page.locator('[data-dag-embed-kind="note"]')).toContainText("The target.");
+});
+
 test("the editor draws it as a reference and writes it back as it was written", async ({ page }) => {
   await open(page, source());
   await expect(page.locator(`[data-dag-note-editor] [data-dag-wiki-target="${target()}"]`)).toHaveText("the target");
