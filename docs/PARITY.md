@@ -44,7 +44,7 @@ above must say so. The one switch today is `cloud`, and no release build says it
 | Every board, note, quiz, table, attachment and folder, with titles, ids, tasks and projects | `GET /__board/list` | `ls` | `board_list` `note_list` `quiz_list` `table_list` |
 | Hear each change as it happens | `GET /__board/events` | · | ✗ [9] |
 | What a permanent id names | `GET /__board/resolve` | · | `resolve` |
-| What refers to what: references and backlinks | `GET /__board/index` `GET /__board/refs` | · | `refs` |
+| What refers to what: references, backlinks and the vault as a graph | `GET /__board/index` `GET /__board/refs` `GET /__board/graph` | · | `refs` |
 | Every place some words appear, ranked; or one tag's documents | `GET /__board/search` `GET /__board/corpus` | · | `search` |
 
 ## Boards
