@@ -732,6 +732,19 @@
   which carries its polyfills, and `optimizeDeps` names that entry. The lesson is the snapshot
   rule's: a browser the gate does not run is not the one the page has to work in.
 
+- **A board file's line endings and BOM are the file's, and a pattern anchored at `$` or `^---`
+  sees neither.** A fence line written on Windows ends in `\r`, and `OPEN` (`…$`) matched no line of a
+  CRLF board: it read as one prose card, and Delete on it erased the board (#391). A UTF-8 BOM is
+  not `---`, so a BOM board's frontmatter became a card, and since `String.trim` takes U+FEFF for a
+  space, that card's span started after the mark and the first drag wrote two blocks through
+  overlapping spans (#392). `src/board/eol.ts` holds the rule: a `\r` before `\n` is part of the
+  break, a BOM at offset 0 is part of no line. `scanFences` and `locateItems` keep both outside every
+  offset and hand out LF bodies; every writer (`applyPatch`, `renameItemId`, the repairs, the server's
+  `withKeys`/`withTitle`) puts the mark back and writes the line endings of the block it replaced, or
+  the file's for a new one (`eolAt`, `eolOf`). An offset counted in an LF `body` is not an offset
+  into a CRLF file — use the fence's `bodyStart`/`bodyEnd`. `test/board-eol.test.ts` runs every op
+  against CRLF, mixed and BOM twins of one board and holds each to the LF twin's result.
+
 - **A board fence's unquoted attribute ends at the `}` that closes the braces.** `src=plan.assets/x.png}`
   is how a regex over the text reads the last attribute of an image fence if `}` is allowed in a
   path, and the zip export went looking for a file called `x.png}`. `namedAssets` in
