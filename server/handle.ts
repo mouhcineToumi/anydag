@@ -73,18 +73,20 @@ const bad = (status: number, error: string): DslResponse => ({ status, body: { e
  * written beside the parsers they describe, and symlinked into the skill so they cannot drift from
  * them. Serving them from anywhere else would be a third copy.
  *
- * Two layouts, in order: `docs/` beside the bundle, which is what the Dockerfile builds, and
- * `docs/dsl/` up in the repository, which is where they are when this runs from a checkout. The
- * first that exists wins and `ANYDAG_DOCS_DIR` beats both. Resolved once at import, because a
- * directory does not appear halfway through a process's life — and picked by what is *there*
- * rather than by an env var the tests would have to remember to set, which is the kind of default
- * that silently serves an empty list.
+ * Two layouts, in order: `docs/` beside the bundle — `server/build.mjs` copies `docs/dsl/` and
+ * `docs/generate/` there, which is what `anydag serve` and the packaged app read — and `../docs/`,
+ * which is where they are when this runs from a checkout (the unit suite). The first that exists
+ * wins and `ANYDAG_DOCS_DIR` beats both. Resolved once at import, because a directory does not
+ * appear halfway through a process's life — and picked by what is *there* rather than by an env var
+ * the tests would have to remember to set, which is the kind of default that silently serves an
+ * empty list. #398 was the build not putting them there, so `test/server-build.test.ts` builds a
+ * bundle and asks it for a sheet.
  */
-const docsRoot = (): string => {
-  if (process.env.ANYDAG_DOCS_DIR) return process.env.ANYDAG_DOCS_DIR;
-  const beside = path.resolve(import.meta.dirname, "docs");
+export const docsRoot = (here = import.meta.dirname, env = process.env): string => {
+  if (env.ANYDAG_DOCS_DIR) return env.ANYDAG_DOCS_DIR;
+  const beside = path.resolve(here, "docs");
   if (fs.existsSync(beside)) return beside;
-  return path.resolve(import.meta.dirname, "../docs");
+  return path.resolve(here, "../docs");
 };
 /** `docs/` — holds `dsl/` and `generate/guide.md`, which is the shape `systemPrompt` expects. */
 const DOCS_ROOT = docsRoot();

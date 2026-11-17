@@ -6,7 +6,21 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ALPHABET, frontId, mint, validId, withId } from "../../server/ids";
-import { BOARD, NOTE, PDF, makeEnv, readText, sleep, sweepTemps, until, write, type Env, watchedFromTheStart } from "./helpers";
+import {
+  BOARD,
+  NOTE,
+  PDF,
+  QUIZ,
+  TABLE,
+  makeEnv,
+  readText,
+  sleep,
+  sweepTemps,
+  until,
+  write,
+  type Env,
+  watchedFromTheStart,
+} from "./helpers";
 
 let env: Env;
 beforeEach(() => {
@@ -152,6 +166,77 @@ describe("an existing `.md` with no id", () => {
     await env.vault.write("a", "note", cur.text + "edited\n", cur.base);
     expect(readText(env.root, "a.md")).toBe("# a\nedited\n");
     expect(frontId(readText(env.root, "a.md"))).toBeNull();
+  });
+});
+
+/** Each text kind: its file's suffix, and a fresh whole body with no frontmatter at all. */
+const KINDS = [
+  { kind: "board", suffix: ".board.md", made: BOARD, fresh: "```md {#two}\nfresh\n```\n" },
+  { kind: "note", suffix: ".md", made: NOTE, fresh: "# Fresh\n\nAnother paragraph.\n" },
+  { kind: "quiz", suffix: ".quiz.md", made: QUIZ, fresh: "## Three? {#q3}\n- [x] y\n- [ ] n\n" },
+  {
+    kind: "table",
+    suffix: ".table.md",
+    made: TABLE,
+    fresh: "## Deals {#deals}\n\n| Name {#name} |\n| --- |\n| Beta {#rbeta} |\n",
+  },
+] as const;
+
+// #401: the id is the document. A rebuilt index reads it from the file, so a write that dropped it
+// left every `dag:` reference naming nothing once the index was rebuilt, synced or copied.
+describe("a whole-text write that omits `id:`", () => {
+  for (const { kind, suffix, made, fresh } of KINDS) {
+    it(`keeps a ${kind}'s id, which a rebuilt index still resolves`, async () => {
+      const name = await env.vault.create("doc", kind, made);
+      const file = `${name}${suffix}`;
+      const id = frontId(readText(env.root, file));
+      expect(validId(id)).toBe(true);
+      await env.vault.create("source", "note", `[it](dag:${id})\n`);
+
+      const cur = (await env.vault.read(name, kind))!;
+      const after = await env.vault.write(name, kind, fresh, cur.base);
+      expect(readText(env.root, file)).toBe(withId(fresh, id as string));
+      expect(after).toEqual(await env.vault.read(name, kind));
+
+      env = env.reopen({ freshHome: true });
+      expect((await env.vault.tree()).ids[name]).toBe(id);
+      expect(await env.vault.resolve(id as string)).toEqual({ name, kind });
+    });
+  }
+
+  it("keeps it when the text has a frontmatter of its own, and keeps every other byte of that", async () => {
+    const name = await env.vault.create("plan", "note", NOTE);
+    const id = frontId(readText(env.root, "plan.md")) as string;
+    const text = "---\ntitle: Renamed\ntags: [a]\n---\n# Renamed\n";
+    await env.vault.write(name, "note", text, null);
+    expect(readText(env.root, "plan.md")).toBe(`---\ntitle: Renamed\ntags: [a]\nid: ${id}\n---\n# Renamed\n`);
+  });
+
+  it("keeps it on a write with no base, which overwrites", async () => {
+    const name = await env.vault.create("plan", "board", BOARD);
+    const id = frontId(readText(env.root, "plan.board.md"));
+    await env.vault.write(name, "board", "```md {#x}\nx\n```\n");
+    expect(frontId(readText(env.root, "plan.board.md"))).toBe(id);
+  });
+
+  it("writes a text that carries the id byte for byte, and the same text less its `id:` line changes nothing", async () => {
+    const name = await env.vault.create("plan", "note", NOTE);
+    const cur = (await env.vault.read(name, "note"))!;
+    const text = `${cur.text}more\n`;
+    const after = await env.vault.write(name, "note", text, cur.base);
+    expect(after.text).toBe(text);
+    const mtime = fs.statSync(path.join(env.root, "plan.md")).mtimeMs;
+    await sleep(15);
+    const again = await env.vault.write(name, "note", withId(text, null), after.base);
+    expect(again).toEqual(after);
+    expect(fs.statSync(path.join(env.root, "plan.md")).mtimeMs).toBe(mtime);
+  });
+
+  it("leaves a file with someone else's `id:` key as the writer gave it", async () => {
+    write(env.root, "z.md", "---\nid: 202301011200\n---\n# Z\n");
+    await env.vault.tree();
+    await env.vault.write("z", "note", "# Z changed\n", null);
+    expect(readText(env.root, "z.md")).toBe("# Z changed\n");
   });
 });
 

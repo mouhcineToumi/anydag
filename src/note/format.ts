@@ -11,10 +11,15 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { markOf } from "./bom";
 import { QUIET } from "./quiet";
 
 export interface NoteFile {
-  /** The frontmatter block including both `---` lines and the newline after them, or `""`. */
+  /**
+   * Everything before the Markdown: the frontmatter block including both `---` lines and the newline
+   * after them, or `""` — behind the file's byte-order mark when it opens with one, which is carried
+   * here even with no frontmatter, so the body the editor holds never starts with it (`bom.ts`).
+   */
   front: string;
   /** Everything after it: the Markdown the editor holds. */
   body: string;
@@ -28,15 +33,18 @@ export const UNTITLED = "Untitled";
 /** The family a file nobody has named wears: `Untitled`, and the numbers `unique()` gives it. */
 const UNNAMED = /^untitled(?: \d+)?$/i;
 
-const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 
 export function splitNote(text: string): NoteFile {
   const m = FRONT.exec(text);
-  if (!m) return { front: "", body: text };
+  if (!m) {
+    const mark = markOf(text);
+    return { front: mark, body: text.slice(mark.length) };
+  }
   const front = m[0];
   let title: string | undefined;
   try {
-    const data = parseYaml(front.replace(/^---\r?\n/, "").replace(/\r?\n---[ \t]*(?:\r?\n)?$/, ""), QUIET);
+    const data = parseYaml(front.replace(/^\uFEFF?---\r?\n/, "").replace(/\r?\n---[ \t]*(?:\r?\n)?$/, ""), QUIET);
     if (data && typeof data === "object" && typeof (data as { title?: unknown }).title === "string") {
       const t = (data as { title: string }).title.trim();
       if (t) title = t;

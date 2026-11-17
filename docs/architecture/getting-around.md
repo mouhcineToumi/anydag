@@ -45,7 +45,13 @@ small card means to look at it closely; `0` and the zoom figure remain 100% rath
 
 ### The dock's tooltip
 
-The dock and the zoom cluster are icon-only, so a control's name and chord live in a tooltip rather
+Both bars float at the foot of the drawing: the dock centred on it, the zoom cluster in its
+bottom-right corner. The dock is up to 327px wide and the cluster 156, so the pair needs about
+690px of canvas to sit side by side — and a canvas can be narrower than that without the window
+being narrow: the library takes 272px of it, the board list another 233. So the cluster is measured
+against the dock's own box and lifted above it when the two would meet
+(`src/ui/bottomBars.ts`, #395). The dock and the zoom cluster are icon-only, so a control's name and
+chord live in a tooltip rather
 than on its face. Both are `role="toolbar"` with a label, and both sit inside the board's `<main>`
 beside `.dag-viewport`; the page's top bar is a `<header>` inside that main, so a board has one main
 landmark and no second banner. The browser's `title` was that tooltip until macOS stopped showing it in the

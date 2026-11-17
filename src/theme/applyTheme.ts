@@ -30,6 +30,8 @@ const UNITLESS = new Set([
   "t1",
   "base",
   "c4DescLeading",
+  "stepTitleLeading",
+  "stepTitleLines",
   "mdLeading",
   "mdCodeLeading",
   "weightBold",

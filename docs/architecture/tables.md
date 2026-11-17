@@ -64,6 +64,12 @@ Ten things are load-bearing:
   says what a tab shows: its filter kept, in its sort's order, stable, each row with its stored
   index. Dragging a row is refused while a sort is showing, because under a sort a row's place is not
   its own; clearing the sort gives the file's order back.
+- **A filter rule is written only when the file reads it back as the same rule.** `col=` is *is
+  empty* and `col!=` *is not empty*, so a rule with an operator and no value yet has no spelling:
+  written, it came back as one of those tests and lost its value field, and **Add a filter** alone
+  rewrote the heading and hid rows (#404). `src/ui/table/filters.ts` holds the card's rules as
+  drafts, writes the complete ones and nothing else, and `test/table-filter.test.ts` holds each
+  choice: "is" on a fresh line keeps the value field, and an unfinished line writes no byte.
 - **The file is kept by `useDocFile`, the quiz's controller** (`src/ui/docFile.ts`, which both pages
   share): a `put` 250 ms after a change against the sha1 last seen, a 409 merged line by line, *Keep
   mine* or *Use theirs* when both touched one line, a retry on a backoff. **Undo is a version of the

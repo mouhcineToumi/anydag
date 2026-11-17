@@ -5,11 +5,12 @@
  * `event.ts`), which the hosted api held to fixtures and this one simply imports.
  */
 
+import { underMark } from "../src/note/bom";
 import { titleOf } from "../src/refs/extract";
 import { hasOffset, isDay, whenOf, type NoteEvent } from "../src/note/event";
 import { instantOf, utc, validZone } from "../src/note/zone";
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** A title that can go into YAML as it is; anything else is written double-quoted (JSON's syntax). */
 const PLAIN = /^[A-Za-z][A-Za-z0-9 _.,()'&+-]*$/;
@@ -26,6 +27,11 @@ function scalar(title: string): string {
  * after the block is the Markdown the editor holds.
  */
 export function withTitle(text: string, title: string, kind = "board"): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => titled(rest, title, kind));
+}
+
+function titled(text: string, title: string, kind: string): string {
   const line = `title: ${scalar(title)}`;
   const m = FRONT.exec(text);
   /* Saying it already, however it is quoted, is no change: `quiz_create` given a text and
@@ -53,6 +59,11 @@ export function withTitle(text: string, title: string, kind = "board"): string {
 
 /** `text` with no `title:` line in its frontmatter — and no frontmatter left if that was all of it. */
 export function withoutTitle(text: string): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, untitled);
+}
+
+function untitled(text: string): string {
   const m = FRONT.exec(text);
   if (!m) return text;
   const lines = m[1]!.split(/\r?\n/);

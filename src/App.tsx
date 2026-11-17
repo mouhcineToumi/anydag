@@ -162,6 +162,7 @@ import { dayOf, eventOf, nextHourEvent, type NoteEvent } from "@/note/event";
 import { Dock } from "@/ui/Dock";
 import { PageBar } from "@/ui/PageBar";
 import { ZoomBar } from "@/ui/ZoomBar";
+import { useBottomBars } from "@/ui/bottomBars";
 import { planRepair } from "@/edit/repair";
 import { listProblems, type Problem } from "@/ui/problemList";
 import { Problems } from "@/ui/Problems";
@@ -3134,6 +3135,12 @@ function BoardApp({
     ro.observe(el);
     return () => ro.disconnect();
   }, [snapshot]);
+
+  /* The two floating bars at the canvas's foot are positioned from those numbers, and neither rule
+     can see the other's box — so at a narrow canvas the zoom cluster was drawn over the dock's last
+     controls (#395). `useBottomBars` measures them and lifts the cluster clear; `src/ui/bottomBars.ts`
+     says why it is measured rather than asked of a media query. */
+  useBottomBars(body);
 
   /* Toolbar actions hand focus back to the board, so the shortcut typed next reaches it rather
      than the button that was just clicked. */

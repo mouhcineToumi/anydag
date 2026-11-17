@@ -22,6 +22,7 @@ import { useDocFile } from "@/ui/docFile";
 import { leaf } from "@/ui/tree";
 import { TableFrame, keysOf, rowCount, tablePart } from "@/view/TableRead";
 
+import { type FilterDraft, type FilterTest, draftOf, retest, rulesToWrite, sameRules } from "./filters";
 import { Grid, Pop, type At, type Edit } from "./Grid";
 import { ProblemList } from "./ProblemList";
 import { aboveGrid, countByTab, problemsOf, repair, tabOfProblem, type Fix, type Problem } from "./problems";
@@ -648,17 +649,8 @@ function SortButton({ tab, write }: { tab: Tab; write: Edit }) {
   );
 }
 
-/** What a filter line offers besides the eight operators: a test for emptiness, which is `=` or `!=` with nothing after it. */
-type Test = FilterOp | "empty" | "filled";
-
-const testOf = (r: FilterRule): Test =>
-  r.value === "" && r.op === "=" ? "empty" : r.value === "" && r.op === "!=" ? "filled" : r.op;
-
 /** The tab's filter: one line per rule, every rule kept — written as the tab's `filter=`. */
 function FilterButton({ tab, write }: { tab: Tab; write: Edit }) {
-  const save = (rules: FilterRule[]) => write((t, a) => setTab(t, a.tab, { filter: rules.length ? rules : null }));
-  const cols = tab.columns.filter((c) => c.id);
-  const set = (i: number, change: Partial<FilterRule>) => save(tab.filter.map((r, j) => (j === i ? { ...r, ...change } : r)));
   return (
     <BarPop
       icon={<Filter {...ICON} aria-hidden="true" />}
@@ -666,72 +658,94 @@ function FilterButton({ tab, write }: { tab: Tab; write: Edit }) {
       count={tab.filter.length}
       attr="data-dag-tablepage-filter"
     >
-      {() => (
-        <div className="dag-tablepage__rules" data-dag-tablepage-filters="">
-          {tab.filter.length === 0 ? <p className="dag-tablepage__hint">Every row shows.</p> : null}
-          {tab.filter.map((r, i) => {
-            const test = testOf(r);
-            return (
-              <div key={i} className="dag-tablepage__rule" data-dag-tablepage-rule={i}>
-                <select aria-label="Column" value={r.column} onChange={(e) => set(i, { column: e.target.value })}>
-                  {cols.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Test"
-                  data-dag-tablepage-test=""
-                  value={test}
-                  onChange={(e) => {
-                    const v = e.target.value as Test;
-                    if (v === "empty") set(i, { op: "=", value: "" });
-                    else if (v === "filled") set(i, { op: "!=", value: "" });
-                    else set(i, { op: v, value: test === "empty" || test === "filled" ? "" : r.value });
-                  }}
-                >
-                  {FILTER_OPS.map((op) => (
-                    <option key={op} value={op}>
-                      {OP_LABEL[op]}
-                    </option>
-                  ))}
-                  <option value="empty">is empty</option>
-                  <option value="filled">is not empty</option>
-                </select>
-                {test === "empty" || test === "filled" ? null : (
-                  <RuleValue value={r.value} onCommit={(value) => set(i, { value })} />
-                )}
-                <button
-                  type="button"
-                  className="dag-icon"
-                  aria-label="Remove this filter"
-                  onClick={() => save(tab.filter.filter((_, j) => j !== i))}
-                >
-                  <X {...ICON} aria-hidden="true" />
-                </button>
-              </div>
-            );
-          })}
-          <div className="dag-tablepage__rule-actions">
-            <button
-              type="button"
-              className="dag-grid__menu-item"
-              data-dag-tablepage-filter-add=""
-              disabled={cols.length === 0}
-              onClick={() => save([...tab.filter, { column: cols[0]!.id!, op: "!=", value: "" }])}
-            >
-              <Plus {...ICON} aria-hidden="true" /> Add a filter
-            </button>
-            {tab.filter.length ? (
-              <button type="button" className="dag-grid__menu-item" data-dag-tablepage-filter-clear="" onClick={() => save([])}>
-                <Trash2 {...ICON} aria-hidden="true" /> Clear
-              </button>
-            ) : null}
-          </div>
-        </div>
-      )}
+      {() => <FilterRules tab={tab} write={write} />}
     </BarPop>
+  );
+}
+
+/**
+ * The card's lines. A rule is a draft here until the file can read it back (#404): an operator with
+ * no value is "is empty" to the file, so "is" on a fresh line would come back "is empty" and lose
+ * its value field. Only the complete drafts are written — which is also why **Add a filter** writes
+ * no byte and hides no row until the rule says something.
+ */
+function FilterRules({ tab, write }: { tab: Tab; write: Edit }) {
+  const cols = tab.columns.filter((c) => c.id);
+  const [rules, setRules] = useState<FilterDraft[]>(() => tab.filter.map(draftOf));
+  /* The filter this card last wrote, so its own write does not replace its drafts and another
+     writer's filter does. */
+  const written = useRef<FilterRule[]>(tab.filter);
+
+  useEffect(() => {
+    if (sameRules(tab.filter, written.current)) return;
+    written.current = tab.filter;
+    setRules(tab.filter.map(draftOf));
+  }, [tab.filter]);
+
+  const save = (next: FilterDraft[]) => {
+    setRules(next);
+    const complete = rulesToWrite(next);
+    written.current = complete;
+    write((t, a) => setTab(t, a.tab, { filter: complete.length ? complete : null }));
+  };
+  const set = (i: number, change: Partial<FilterDraft>) => save(rules.map((r, j) => (j === i ? { ...r, ...change } : r)));
+
+  return (
+    <div className="dag-tablepage__rules" data-dag-tablepage-filters="">
+      {rules.length === 0 ? <p className="dag-tablepage__hint">Every row shows.</p> : null}
+      {rules.map((r, i) => (
+        <div key={i} className="dag-tablepage__rule" data-dag-tablepage-rule={i}>
+          <select aria-label="Column" value={r.column} onChange={(e) => set(i, { column: e.target.value })}>
+            {cols.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Test"
+            data-dag-tablepage-test=""
+            value={r.test}
+            onChange={(e) => save(rules.map((x, j) => (j === i ? retest(x, e.target.value as FilterTest) : x)))}
+          >
+            {FILTER_OPS.map((op) => (
+              <option key={op} value={op}>
+                {OP_LABEL[op]}
+              </option>
+            ))}
+            <option value="empty">is empty</option>
+            <option value="filled">is not empty</option>
+          </select>
+          {r.test === "empty" || r.test === "filled" ? null : (
+            <RuleValue value={r.value} onCommit={(value) => set(i, { value })} />
+          )}
+          <button
+            type="button"
+            className="dag-icon"
+            aria-label="Remove this filter"
+            onClick={() => save(rules.filter((_, j) => j !== i))}
+          >
+            <X {...ICON} aria-hidden="true" />
+          </button>
+        </div>
+      ))}
+      <div className="dag-tablepage__rule-actions">
+        <button
+          type="button"
+          className="dag-grid__menu-item"
+          data-dag-tablepage-filter-add=""
+          disabled={cols.length === 0}
+          onClick={() => save([...rules, { column: cols[0]!.id!, test: "=", value: "" }])}
+        >
+          <Plus {...ICON} aria-hidden="true" /> Add a filter
+        </button>
+        {rules.length ? (
+          <button type="button" className="dag-grid__menu-item" data-dag-tablepage-filter-clear="" onClick={() => save([])}>
+            <Trash2 {...ICON} aria-hidden="true" /> Clear
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

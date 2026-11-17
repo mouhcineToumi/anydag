@@ -29,7 +29,7 @@ import { OPS_SHAPE } from "../handle";
 import { type Doc, grammar, type Over, type Parsed } from "../grammar";
 import type { Entry } from "../parsing";
 import { type Listed, listed, overOfVault } from "../upkeep";
-import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
+import { anyKind, baseOf, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { paced } from "../pace";
 import { mimeOf } from "../uploads";
@@ -462,7 +462,8 @@ export function docRoutes(app: Hono, s: Session): void {
     const body = await bodyOf(c);
     const ops = body.ops ?? [];
     if (!Array.isArray(ops)) throw err(400, OPS_SHAPE);
-    if (body.base !== undefined && body.base !== null && body.base !== current.base) {
+    const base = baseOf(body);
+    if (base !== null && base !== current.base) {
       return c.json({ error: "the board changed underneath this edit", base: current.base, text: current.text }, 409);
     }
     const { text } = await grammar.patch(current.text, ops);
@@ -482,7 +483,7 @@ export function docRoutes(app: Hono, s: Session): void {
     await mustRead(s.vault, name, kind);
     const body = await bodyOf(c);
     if (typeof body.text !== "string") throw err(400, "expected `text`");
-    const after = await s.vault.write(name, kind, body.text, typeof body.base === "string" ? body.base : null);
+    const after = await s.vault.write(name, kind, body.text, baseOf(body));
     return c.json({ base: after.base, text: after.text });
   });
 
@@ -714,7 +715,7 @@ export function docRoutes(app: Hono, s: Session): void {
     const name = str(body.name);
     const ops = body.ops;
     if (!Array.isArray(ops)) throw err(400, "expected `ops: [{op, …}]`");
-    const base = typeof body.base === "string" ? body.base : null;
+    const base = baseOf(body);
     for (let i = 0; i < 4; i++) {
       const current = await mustRead(s.vault, name, "table");
       if (base !== null && base !== current.base) {
@@ -749,7 +750,7 @@ export function docRoutes(app: Hono, s: Session): void {
     const name = str(body.name);
     const ops = body.ops;
     if (!Array.isArray(ops) || ops.length === 0) throw err(400, "expected `ops: [{op, …}]`");
-    const base = typeof body.base === "string" ? body.base : null;
+    const base = baseOf(body);
     for (let i = 0; i < 4; i++) {
       const current = await mustRead(s.vault, name, "quiz");
       if (base !== null && base !== current.base) {

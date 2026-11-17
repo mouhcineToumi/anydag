@@ -14,7 +14,7 @@ anchor, and a reference is a Markdown link to `dag:<id>`.
 | canvas item | its `#id` | whoever makes it, else the stamp | move, edit, retitle, cut and paste, export and import; `renameItemId` is the one deliberate change |
 | note block | ` ^name` at the end of its last line | whatever first points at it | edits to the block, moving it |
 
-Ten things are load-bearing:
+Thirteen things are load-bearing:
 
 - **A document's id is in its frontmatter, and opening never writes.** `id:` is the truth and
   travels with the file through a copy, a sync and a `git mv`; the SQLite index in the app's home
@@ -22,6 +22,13 @@ Ten things are load-bearing:
   first time something links or embeds it by id (in the write that links it), or when the app
   creates it — not on its first edit, which would change bytes the page sent. `npm run stamp` is the
   one script, for items: an empty patch per board *is* a stamp.
+- **A whole-text write never drops an id** (#401). `Vault.write` puts the file's own `id:` back
+  into a replacement that has no `id:` line — an agent's fresh body, `<kind> write --file draft.md`,
+  a `/put` of a text from before the id was minted — and answers that text, so the writer takes its
+  base from the answer. Every write path (`/put`, `/patch`, the table and quiz routes, the CLI and
+  MCP) goes through it. Without it the file lost its id while the index went on resolving it, and
+  every `dag:` reference named nothing once the index was rebuilt, the file synced or copied. A file
+  with no id of its own is still written as given, and so is a text that says `id:` itself.
 - **A file moved outside the app keeps its id**, because the id is in it; the index learns the new
   path from the watcher or the next scan. Two files with one id — a copy made in a file manager —
   leave it with the older by created date, and the copy is given a new one.

@@ -64,6 +64,10 @@ export const CODES = {
   E_BAD_FK: "E_BAD_FK",
 
   /* ---- the DSL: per-dialect ---- */
+  /**
+   * `timeline`: a line whose date is not a date, or a range whose end comes before its start. The
+   * entry is skipped rather than drawn backwards.
+   */
   E_BAD_DATE: "E_BAD_DATE",
   E_NO_BRANCH: "E_NO_BRANCH",
   E_UNKNOWN_COMMAND: "E_UNKNOWN_COMMAND",
