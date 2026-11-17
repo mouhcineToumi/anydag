@@ -141,6 +141,9 @@ Three knobs in `theme.metric.elk`, and each exists because a board looked wrong 
   `EB_BAD_ASPECT`. The item view's *Wrapping* select writes all three states — off the line, `0`, a
   ratio — and the problems dock's repair for `EB_BAD_ASPECT` takes the bad value off (`editing.md`,
   *Settings that had no source-free way in*).
+  A wrapped chain's back edges are ELK's least trustworthy routes: the one that closes a cycle is
+  laid out for the sides of the wrap, and it is drawn only while it misses every card once our
+  anchors are on it — otherwise the curve is, and the item grows to hold it (#408).
 - **`hierarchy`** — `separate` lays each group out on its own and then arranges the boxes; `include`
   is one global pass. `separate` is what makes the ERD look hand-drawn: domains side by side,
   entities stacked, every group hugging its content. Under `include` one direction serves both axes
