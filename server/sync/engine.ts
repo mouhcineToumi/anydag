@@ -238,16 +238,16 @@ export class SyncEngine {
   }
 
   /** Whether the event for `rel` is this engine's own last write there, unchanged since (`echo.ts`). */
-  private async echo(rel: string): Promise<boolean> {
-    const left = this.wrote.take(rel);
-    if (left === undefined) return false;
-    if (left === FOLDER) {
-      // A folder cannot be read; one the state holds as an empty-folder marker is decided by a push.
-      const st = this.state.entry(this.keyOf(rel));
-      return !(st && st.kind === "dir" && st.blob !== null);
-    }
-    const disk = await this.fs.read(rel);
-    return (disk ? sha1Of(disk) : null) === left;
+  private echo(rel: string): Promise<boolean> {
+    return this.wrote.heard(rel, async (left) => {
+      if (left === FOLDER) {
+        // A folder cannot be read; one the state holds as an empty-folder marker is decided by a push.
+        const st = this.state.entry(this.keyOf(rel));
+        return !(st && st.kind === "dir" && st.blob !== null);
+      }
+      const disk = await this.fs.read(rel);
+      return (disk ? sha1Of(disk) : null) === left;
+    });
   }
 
   private async fetchBlob(id: string): Promise<Uint8Array> {

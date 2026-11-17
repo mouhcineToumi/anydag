@@ -56,8 +56,10 @@ Seventeen things are load-bearing:
   that, and the loop arms the debounce only for what is left. It is safe because every write sync
   makes is a compare-and-set: a write in between either failed sync's (no note) or was what sync
   decided on, and whatever that left to push — a merge, a conflict copy — the engine marked itself.
-  A write after it changes the bytes and is pushed as before. Each event spends its path's note, a
-  note nothing spent lapses after 30 s, and a folder (which `SyncFs` cannot read) the state holds as
+  A write after it changes the bytes and is pushed as before. An event that disagrees spends its
+  path's note; an echo keeps it, since one write can be reported twice — a file in a folder made just
+  now is said by the vault's watcher and again by the folder's own (`cover`, #405), and the second
+  report, with the note spent, woke the run again (#486). A note nothing contradicts lapses after 30 s, and a folder (which `SyncFs` cannot read) the state holds as
   an empty-folder marker is always touched. `touch` and `scan` are unchanged: the harness calls
   `touch` directly, and a scan decides against the base whatever a note says.
 - **A conflict is visible**: ours stays at the path and theirs is written beside it as
