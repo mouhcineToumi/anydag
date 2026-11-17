@@ -1,0 +1,57 @@
+{
+  "version": "0.8.0",
+  "date": "2026-11-17T20:50:43.108Z",
+  "machine": "Intel(R) Core(TM) i5-8300H CPU @ 2.30GHz · 8 cores · 12 GB · Linux 7.2.15-1-omarchy (Omarchy) · x64 · Node v26.12.0 · Chromium 158.0.8127.18",
+  "results": [
+    {
+      "metric": "desktop.startup.1000.cold.ready",
+      "value": 1121,
+      "unit": "ms"
+    },
+    {
+      "metric": "page.1000.search.first",
+      "value": 358,
+      "unit": "ms"
+    },
+    {
+      "metric": "vault.1000.server.rss.rest",
+      "value": 173,
+      "unit": "MB"
+    },
+    {
+      "metric": "vault.1000.list.cold",
+      "value": 275,
+      "unit": "ms"
+    },
+    {
+      "metric": "vault.1000.list.warm",
+      "value": 2.9,
+      "unit": "ms"
+    },
+    {
+      "metric": "vault.1000.index.cold",
+      "value": 2237,
+      "unit": "ms"
+    },
+    {
+      "metric": "vault.1000.index.warm",
+      "value": 4,
+      "unit": "ms"
+    },
+    {
+      "metric": "vault.1000.search.cold",
+      "value": 3182,
+      "unit": "ms"
+    },
+    {
+      "metric": "vault.1000.search.warm",
+      "value": 9.2,
+      "unit": "ms"
+    },
+    {
+      "metric": "board.500.ready",
+      "value": 1060,
+      "unit": "ms"
+    }
+  ]
+}
