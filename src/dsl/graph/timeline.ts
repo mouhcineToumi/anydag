@@ -17,11 +17,33 @@ import { emptyGraph, HUE_ORDER, type Graph, type Node } from "../ir";
  * Only the placement is special, and placement is what a timeline is.
  */
 
+const DATE = /^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$/;
+
 /** `2026`, `2026-09`, `2026-09-06` — resolved to a day so the scale is linear in real time. */
 function parseDate(text: string): number | null {
-  const m = /^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$/.exec(text);
-  if (!m) return null;
+  if (!DATE.test(text) || dateFault(text) !== null) return null;
+  const m = DATE.exec(text)!;
   return Date.UTC(Number(m[1]), Number(m[2] ?? 1) - 1, Number(m[3] ?? 1));
+}
+
+/**
+ * Why a date that looks like one is not a day on the calendar, or `null` when it is one.
+ *
+ * The regex alone accepts `2026-13-01`, `2026-02-30` and `2026-00-10`, and `Date.UTC` rolls each
+ * over into a real day instead of refusing it — a typo moved a milestone a year, or a month, with no
+ * diagnostic (#411). The year floor is `typed()`'s, and it also keeps `Date.UTC` from reading a
+ * two-digit year as 19xx.
+ */
+function dateFault(text: string): string | null {
+  const m = DATE.exec(text);
+  if (!m) return null;
+  if (Number(m[1]) < 1000) return "the year must be 1000–9999";
+  const month = Number(m[2] ?? 1);
+  if (month < 1 || month > 12) return `there is no month ${month} (01–12)`;
+  const day = Number(m[3] ?? 1);
+  const last = new Date(Date.UTC(Number(m[1]), month, 0)).getUTCDate();
+  if (day < 1 || day > last) return `${MONTH_NAMES[month - 1]} ${m[1]} has ${last} days, not ${day}`;
+  return null;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -357,17 +379,26 @@ export function parseTimeline(src: string): Graph {
 
     const start = parseDate(m[1]!);
     if (start === null) {
+      const fault = dateFault(m[1]!);
       graph.diagnostics.push({
         line: i + 1,
+        col: raw.length - raw.trimStart().length + 1,
         code: CODES.E_BAD_DATE,
-        message: `\`${m[1]}\` is not a date (YYYY, YYYY-MM or YYYY-MM-DD)`,
+        message: fault ? `\`${m[1]}\` is not a date: ${fault}` : `\`${m[1]}\` is not a date (YYYY, YYYY-MM or YYYY-MM-DD)`,
         severity: "error",
       });
       return;
     }
     const end = m[2] ? parseDate(m[2]) : null;
     if (m[2] && end === null) {
-      graph.diagnostics.push({ line: i + 1, code: CODES.E_BAD_DATE, message: `\`${m[2]}\` is not a date`, severity: "error" });
+      const fault = dateFault(m[2]);
+      graph.diagnostics.push({
+        line: i + 1,
+        col: raw.length - raw.trimStart().length + line.indexOf(m[2], m[1]!.length) + 1,
+        code: CODES.E_BAD_DATE,
+        message: fault ? `\`${m[2]}\` is not a date: ${fault}` : `\`${m[2]}\` is not a date`,
+        severity: "error",
+      });
       return;
     }
     /* A range is a span, and one that ends before it starts has no place on the axis: the layout's
