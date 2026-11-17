@@ -97,7 +97,7 @@ server is a bundle too (`server/dist/`): a change to any of them is not served u
 `var(--dag-color-…)` or `theme.color.…`; a size is `theme.metric.…`. That is what makes a theme a
 folder rather than a refactor. `scripts/check-theme.mjs` (every `--dag-*` read exists in every theme)
 and `scripts/check-literals.mjs` hold it in the gate. The app chrome is exempt and lives in
-`src/styles/chrome.css`. Do not edit the colours in `themes/*/theme.json` to make a check pass.
+`src/styles/chrome.css`, an index of one file per area under `src/styles/chrome/`. Do not edit the colours in `themes/*/theme.json` to make a check pass.
 **Which token, control and layer the chrome uses for what is in [`DESIGN.md`](DESIGN.md).**
 
 ## The bites to know before you start

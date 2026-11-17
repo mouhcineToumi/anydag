@@ -1,0 +1,555 @@
+/* ---- Quizzes ------------------------------------------------------------------------
+   The Quizzes page, a quiz's form, a run and the sheet a snapshot draws. Chrome, so lengths are
+   written here and every colour is the theme's: right is the `success` family and wrong the
+   `danger` one, which is what those two were put in the theme for. */
+
+.dag-toolbar__practice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-left: auto;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-accent);
+  background: var(--dag-color-accentSoft);
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-toolbar__practice:hover:not(:disabled) { border-color: var(--dag-color-accent); }
+.dag-toolbar__practice:disabled { color: var(--dag-color-muted); background: transparent; cursor: default; }
+.dag-toolbar__practice:focus-visible { box-shadow: var(--focus-ring); }
+.dag-backlinks + .dag-toolbar__practice,
+.dag-toolbar__practice + .dag-export { margin-left: 0; }
+
+/* The gallery. */
+.dag-quizzes {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 32px 96px;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-quizzes__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; max-width: 1040px; margin: 0 auto 16px; }
+.dag-select.dag-quizzes__folder { flex: 0 1 200px; min-width: 0; }
+.dag-quizzes__filter {
+  flex: 0 1 280px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-quizzes__filter:focus-visible { box-shadow: var(--focus-ring); }
+.dag-quizzes__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+.dag-quizzes__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+}
+.dag-quizzes__card--new { justify-content: center; border-style: dashed; background: transparent; }
+.dag-quizzes__open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.dag-quizzes__open:hover .dag-quizzes__title { text-decoration: underline; text-decoration-color: var(--dag-color-outline); }
+.dag-quizzes__open:focus-visible { box-shadow: var(--focus-ring-inset); border-radius: var(--dag-ui-radius-control); }
+.dag-quizzes__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--chrome-text-xl);
+  font-weight: var(--dag-ui-weight-strong);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.dag-quizzes__title > svg { flex: none; color: var(--dag-color-slate); }
+.dag-quizzes__where { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); overflow-wrap: anywhere; }
+.dag-quizzes__meta { margin: 0; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-quizzes__mistakes { color: var(--dag-color-dangerText); }
+.dag-quizzes__about { margin: 0; font-size: var(--chrome-text-sm); line-height: 1.45; color: var(--dag-color-slate); }
+.dag-quizzes__practice {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-top: auto;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-accent);
+  background: var(--dag-color-accentSoft);
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quizzes__practice:hover:not(:disabled) { border-color: var(--dag-color-accent); }
+.dag-quizzes__practice:disabled { color: var(--dag-color-muted); background: var(--dag-color-paper200); cursor: default; }
+.dag-quizzes__practice:focus-visible { box-shadow: var(--focus-ring); }
+/* The bar's: every quiz in the chosen folder as one run. */
+.dag-quizzes__practice-folder { margin-top: 0; align-self: center; }
+.dag-quizzes__count { font-weight: var(--dag-ui-weight-regular); color: var(--dag-color-slate); }
+.dag-quizzes__new { display: flex; align-items: center; gap: 8px; color: var(--dag-color-slate); }
+.dag-quizzes__new input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  font: inherit;
+  font-size: var(--chrome-text-lg);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+}
+.dag-quizzes__new input::placeholder { color: var(--dag-color-slate); }
+.dag-quizzes__new input:focus { outline: none; }
+.dag-quizzes__new:focus-within { color: var(--dag-color-slate); box-shadow: var(--focus-ring-inset); }
+.dag-quizzes__empty { max-width: 1040px; margin: 16px auto; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+
+/* A quiz's form. */
+.dag-quiz {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 32px 96px;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-quiz > * { max-width: 760px; margin-inline: auto; }
+/* A field's and a problem list's own `margin` shorthand would undo the centring above. */
+.dag-quiz > .dag-quiz__rich,
+.dag-quiz > .dag-quiz__shuffle,
+.dag-quiz > .dag-quiz__problems { margin-inline: auto; }
+.dag-quiz__bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.dag-quiz__bar:empty { display: none; }
+.dag-quiz__status { margin-left: auto; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+
+/*
+ * A rich field: drawn as what it says until it is opened, then the block editor in the same box. The
+ * box is the field's, so the two look like one control; BlockNote's own gutter and padding are taken
+ * off inside it (`.dag-blocks--field`).
+ */
+.dag-quiz__rich {
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  font-size: var(--chrome-text-lg);
+  line-height: 1.45;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: text;
+}
+.dag-quiz__rich[data-dag-quiz-open-field],
+.dag-quiz__rich:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-quiz__rich-view { min-height: 20px; padding: 7px 10px; outline: none; overflow-wrap: anywhere; }
+.dag-quiz__rich-view > :first-child { margin-top: 0; }
+.dag-quiz__rich-view > :last-child { margin-bottom: 0; }
+.dag-quiz__rich-view[aria-readonly="true"] { color: var(--dag-color-slate); background: var(--dag-color-paper100); cursor: default; }
+.dag-quiz__rich--line .dag-quiz__rich-view { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dag-quiz__placeholder { color: var(--dag-color-slate); }
+.dag-quiz__prompt { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz__description { margin-bottom: 12px; }
+/* The editor in the field's box, at the field's size: no gutter, no background of its own. */
+.dag-rich-field .dag-blocks--field .bn-editor { padding: 4px 10px; font-size: var(--chrome-text-lg); line-height: 1.45; background: transparent; }
+.dag-rich-field .dag-blocks--field.bn-root[data-color-scheme] { --bn-colors-editor-background: transparent; }
+.dag-quiz__prompt .dag-rich-field .dag-blocks--field .bn-editor { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+/* No empty block after the last to click into, so a field opens at its drawing's height: a field
+   that grew as it opened moved everything under it, and a press on the button below it — *Add an
+   answer*, a tick — was let go over something else and missed. A code block is left with Enter
+   three times or shift+Enter, BlockNote's own keys. */
+.dag-rich-field .dag-blocks--field .bn-trailing-block { display: none; }
+
+.dag-quiz__card {
+  margin-bottom: 16px;
+  padding: 14px 16px 6px;
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+}
+.dag-quiz__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dag-quiz__card-number { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-select.dag-quiz__kind { width: auto; min-width: 0; font-size: var(--chrome-text-sm); }
+/* A handle to drag by: the row moves, the handle says so. */
+.dag-quiz__grip { cursor: grab; touch-action: none; color: var(--dag-color-muted); }
+.dag-quiz__grip:hover:not(:disabled) { color: var(--dag-color-ink); }
+[data-dag-dragging] .dag-quiz__grip { cursor: grabbing; }
+[data-dag-quiz-dragging] { opacity: 0.5; }
+[data-dag-quiz-drop="before"] { box-shadow: 0 -2px 0 var(--dag-color-accent); }
+[data-dag-quiz-drop="after"] { box-shadow: 0 2px 0 var(--dag-color-accent); }
+.dag-quiz__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin: -4px 0 10px;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.dag-quiz__more:hover:not(:disabled) { color: var(--dag-color-ink); }
+.dag-quiz__more:focus-visible { box-shadow: var(--focus-ring); }
+/* A flashcard in a run: the tag says which kind, nothing more. */
+.dag-run__flashcard-tag {
+  margin-inline-start: 8px;
+  padding: 1px 7px;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-accent);
+  background: var(--dag-color-paper200);
+  border-radius: var(--dag-ui-radius-pill);
+  vertical-align: 1px;
+}
+.dag-quiz__card-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.dag-quiz__confirm { display: inline-flex; align-items: center; gap: 6px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-quiz__confirm > button {
+  min-height: 24px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__confirm > .dag-quiz__danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); background: var(--dag-color-dangerSoft); }
+.dag-quiz__confirm--line { display: flex; flex-wrap: wrap; margin: 0 0 10px; }
+.dag-quiz__options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+/* At the top of the row, which an option holding a code block makes tall. */
+.dag-quiz__option { display: flex; align-items: flex-start; gap: 6px; }
+.dag-quiz__option > .dag-quiz__rich { margin: 0; flex: 1; min-width: 0; }
+.dag-quiz__option > .dag-check { margin: 5px 4px 0 2px; }
+/* One right answer is a choice of one: a circle, as a radio is everywhere else. */
+.dag-check--round { border-radius: 50%; }
+/* A right answer is ticked in the success colour: it is the key, not a setting. */
+.dag-quiz__option > .dag-check:checked { background: var(--dag-color-success); border-color: var(--dag-color-success); }
+/* No answer is marked: the ticks are where to look. */
+.dag-quiz__card[data-dag-quiz-needs-answer] .dag-quiz__option > .dag-check { border-color: var(--dag-color-dangerBorder); box-shadow: 0 0 0 3px var(--dag-color-dangerSoft); }
+.dag-quiz__option > .dag-icon { margin-top: 2px; }
+/* Pressed, a pin wears the accent: the option keeps its place when a run shuffles. */
+.dag-quiz__pin[aria-pressed="true"] { color: var(--dag-color-accent); }
+.dag-quiz__pin[aria-pressed="true"]:disabled { opacity: 0.6; }
+.dag-quiz__option[data-dag-quiz-correct] > .dag-quiz__rich { border-color: var(--dag-color-successBorder); }
+.dag-quiz__add-option,
+.dag-quiz__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__add { display: flex; margin-top: 4px; }
+.dag-quiz__add-option:hover:not(:disabled),
+.dag-quiz__add:hover { color: var(--dag-color-ink); border-color: var(--dag-color-slate); }
+.dag-quiz__add-option:focus-visible,
+.dag-quiz__add:focus-visible { box-shadow: var(--focus-ring); }
+.dag-quiz__check { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-quiz__hint { color: var(--dag-color-slate); }
+.dag-quiz__note { margin: 0 0 10px; font-size: var(--chrome-text-md); color: var(--dag-color-warningText); }
+.dag-quiz__note[data-dag-quiz-open] { color: var(--dag-color-slate); }
+.dag-quiz__adds { display: flex; flex-wrap: wrap; gap: 8px; }
+.dag-quiz__empty { margin: 24px auto 12px; font-size: var(--chrome-text-lg); color: var(--dag-color-slate); }
+.dag-quiz__problems { margin: 0 0 10px; padding: 0; list-style: none; }
+.dag-quiz__problem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 0; font-size: var(--chrome-text-sm); color: var(--dag-color-warningText); }
+.dag-quiz__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
+.dag-quiz__fix {
+  min-height: 24px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__fix:hover { border-color: var(--dag-color-slate); }
+.dag-quiz__fix:focus-visible { box-shadow: var(--focus-ring); }
+/* The text the form has no field for, shown as it reads, and where it can go. */
+.dag-quiz__stray { flex-basis: 100%; }
+.dag-quiz__stray-text {
+  margin: 4px 0 6px;
+  padding: 6px 10px;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border-left: 3px solid var(--dag-color-warningText);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-quiz__stray-text > :first-child { margin-top: 0; }
+.dag-quiz__stray-text > :last-child { margin-bottom: 0; }
+.dag-quiz__stray-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
+.dag-quiz__conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+}
+.dag-quiz__conflict > button {
+  min-height: 24px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+
+/* A run: one question at a time. */
+.dag-run {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 24px 32px 96px;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+  outline: none;
+}
+.dag-run > * { max-width: 680px; margin-inline: auto; }
+/* The question and, where the quiz has a description, a panel beside it. `.dag-run` is
+   the container the panel asks about, because the width it needs is the run's and not the
+   window's: a docked sidebar takes a quarter of the window, and a 1240px window with it docked is
+   a run about 930px wide. */
+.dag-run { container-type: inline-size; }
+.dag-run__layout { display: flex; align-items: flex-start; gap: 32px; }
+.dag-run > .dag-run__layout[data-dag-run-about-open] { max-width: 972px; }
+.dag-run__main { flex: 1 1 0; min-width: 0; max-width: 680px; }
+.dag-run__about {
+  position: sticky;
+  top: 0;
+  flex: 0 0 260px;
+  box-sizing: border-box;
+  max-height: calc(100dvh - 160px);
+  overflow: auto;
+  padding: 10px 14px 14px;
+  font-size: var(--chrome-text-lg);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+}
+.dag-run__about-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -8px 4px 0; }
+.dag-run__about-title { min-width: 0; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); overflow-wrap: anywhere; }
+.dag-run__about-hide { flex: none; width: 26px; height: 26px; }
+.dag-run__about-body > :first-child { margin-top: 0; }
+/* A board in the description: the panel is a column, so the board is a shorter one. */
+.dag-run__about .dag-embed__canvas { height: 200px; }
+.dag-run__about-body > :last-child { margin-bottom: 0; }
+.dag-run__about-show { flex: none; height: 26px; color: var(--dag-color-slate); }
+.dag-run__about-inline { display: none; margin-block-end: 16px; font-size: var(--chrome-text-lg); color: var(--dag-color-slate); }
+.dag-run__about-inline > summary { width: max-content; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); cursor: pointer; }
+.dag-run__about-inline > .dag-run__about-body {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-ui-radius-surface);
+}
+@container (max-width: 819px) {
+  .dag-run__about,
+  .dag-run__about-show { display: none; }
+  .dag-run__about-inline { display: block; }
+}
+.dag-run__title { margin-top: 24px; font-size: var(--chrome-text-title); font-weight: var(--dag-ui-weight-strong); }
+.dag-run__head { display: flex; align-items: center; gap: 12px; margin-block-end: 20px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-run__where { flex: none; }
+.dag-run__progress { position: relative; flex: 1; height: 4px; overflow: hidden; background: var(--dag-color-paper200); /* a 4px bar */ border-radius: 2px; }
+.dag-run__progress-bar { position: absolute; inset: 0 auto 0 0; background: var(--dag-color-accent); transition: width var(--dag-ui-motion-base) var(--dag-ui-motion-ease); }
+.dag-run__question { margin-block: 0 12px; font-size: var(--chrome-text-title); font-weight: var(--dag-ui-weight-strong); line-height: 1.35; }
+.dag-run__prompt { margin-bottom: 8px; }
+.dag-run__hint { margin-block: 0 10px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-run__options { display: flex; flex-direction: column; gap: 8px; }
+.dag-run__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: var(--chrome-text-lg);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-run__option:hover { border-color: var(--dag-color-outline); }
+.dag-run__option[data-dag-run-picked] { border-color: var(--dag-color-accent); background: var(--dag-color-accentSoft); }
+.dag-run__option[data-dag-run-mark="right"] { border-color: var(--dag-color-successBorder); background: var(--dag-color-successSoft); }
+.dag-run__option[data-dag-run-mark="wrong"] { border-color: var(--dag-color-dangerBorder); background: var(--dag-color-dangerSoft); }
+.dag-run__option > input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--dag-color-accent); }
+.dag-run__option:has(input:disabled) { cursor: default; }
+.dag-run__key {
+  flex: none;
+  min-width: 18px;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  text-align: center;
+  color: var(--dag-color-slate);
+}
+.dag-run__option-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* An option of more than one line — a code block, most often: the radio, the key and the
+   mark at the top of the row beside it, and its first and last block flush with the row's padding. */
+.dag-run__option--block { align-items: flex-start; }
+.dag-run__option--block > input,
+.dag-run__option--block > .dag-run__key,
+.dag-run__option--block > .dag-run__mark { margin-top: 3px; }
+.dag-run__option-text--block > :first-child { margin-top: 0; }
+.dag-run__option-text--block > :last-child { margin-bottom: 0; }
+.dag-run__mark { flex: none; }
+[data-dag-run-mark="right"] > .dag-run__mark { color: var(--dag-color-successText); }
+[data-dag-run-mark="wrong"] > .dag-run__mark { color: var(--dag-color-dangerText); }
+/* An open question's box: words, or code when the model answer is code. */
+.dag-run__answer {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: var(--chrome-text-lg);
+  line-height: 1.5;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  resize: vertical;
+}
+.dag-run__answer--code { font-family: var(--dag-font-mono); font-size: var(--chrome-text-md); tab-size: 2; }
+.dag-run__answer::placeholder { color: var(--dag-color-slate); }
+.dag-run__answer:focus-visible { box-shadow: var(--focus-ring); border-color: transparent; }
+.dag-run__answer[readonly] { color: var(--dag-color-slate); background: var(--dag-color-paper100); }
+.dag-run__judge { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.dag-run__judge-ask { font-size: var(--chrome-text-lg); font-weight: var(--dag-ui-weight-strong); margin-inline-end: 4px; }
+.dag-run__verdict[data-dag-run-verdict="open"] .dag-run__verdict-line { color: var(--dag-color-slate); }
+.dag-run__verdict { margin-top: 16px; }
+.dag-run__verdict-line { margin: 0 0 8px; font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+.dag-run__verdict[data-dag-run-verdict="right"] .dag-run__verdict-line { color: var(--dag-color-successText); }
+.dag-run__verdict[data-dag-run-verdict="wrong"] .dag-run__verdict-line { color: var(--dag-color-dangerText); }
+.dag-run__why {
+  padding: 10px 14px;
+  font-size: var(--chrome-text-lg);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border-left: 3px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-run__why > :first-child { margin-top: 0; }
+.dag-run__why > :last-child { margin-bottom: 0; }
+.dag-run__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.dag-run__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: var(--chrome-text-lg);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-run__button--primary { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-run__button:disabled { color: var(--dag-color-muted); background: var(--dag-color-paper200); border-color: transparent; cursor: default; }
+.dag-run__button:focus-visible { box-shadow: var(--focus-ring); }
+.dag-run__score { margin-block: 8px; font-size: var(--chrome-text-display); font-weight: var(--dag-ui-weight-strong); }
+.dag-run__note { margin-block: 0; font-size: var(--chrome-text-lg); color: var(--dag-color-slate); }
+.dag-run__tally { margin-block: 0 8px; font-size: var(--chrome-text-lg); color: var(--dag-color-slate); }
+/* Exit at the far end of the row, apart from the three that move through the questions. */
+.dag-run__exit { margin-inline-start: auto; }
+
+/* The sheet: every question with its answers showing. */
+.dag-quiz-page { flex: 1; min-height: 0; overflow: auto; padding: 24px 32px 64px; background: var(--dag-color-paper); color: var(--dag-color-ink); }
+.dag-quiz-sheet { max-width: 720px; margin: 0 auto; }
+.dag-quiz-sheet__title { margin: 0 0 8px; font-size: var(--chrome-text-display); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz-sheet__description { margin-bottom: 16px; color: var(--dag-color-slate); }
+.dag-quiz-sheet__questions { display: flex; flex-direction: column; gap: 20px; margin: 0; padding-left: 20px; }
+.dag-quiz-sheet__prompt { margin: 0 0 8px; font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz-sheet__options { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; padding: 0; list-style: none; }
+.dag-quiz-sheet__option { display: flex; align-items: center; gap: 8px; font-size: var(--chrome-text-lg); }
+.dag-quiz-sheet__option[data-dag-run-mark="right"] { font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz-sheet__option--block { align-items: flex-start; }
+/* The right option is bold; its code is code, at the weight code is drawn in everywhere else. */
+.dag-quiz-sheet__option--block pre { font-weight: var(--dag-ui-weight-regular); }
+.dag-quiz-sheet__option--block > .dag-run__mark,
+.dag-quiz-sheet__option--block > .dag-quiz-sheet__blank { margin-top: 3px; }
+.dag-quiz-sheet__blank { display: inline-block; flex: none; width: 14px; }
+.dag-quiz-sheet__open { margin: 8px 0; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+
+@media (max-width: 719px) {
+  .dag-quizzes,
+  .dag-quiz,
+  .dag-run,
+  .dag-quiz-page { padding: 16px; }
+}
+
+/* A quiz, embedded — on a board or in a note: its title, how many questions and how many in
+   Mistakes, and Practice. The task card's shape. */
+.dag-embed.dag-embed--quiz { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; }
+.dag-embed__quiz-mark { flex: none; color: var(--dag-color-slate); }
+.dag-embed__quiz { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.dag-embed--quiz .dag-embed__title { padding: 0; font-size: var(--chrome-text-lg); border-bottom: none; overflow-wrap: anywhere; }
+.dag-embed--quiz .dag-embed__title:hover { background: transparent; text-decoration: underline; text-decoration-color: var(--dag-color-outline); }
+.dag-embed__quiz-meta { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-embed__quiz-mistakes { color: var(--dag-color-dangerText); }
+.dag-embed__quiz-practice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 4px 10px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-accent);
+  text-decoration: none;
+  background: var(--dag-color-accentSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-embed__quiz-practice:hover { text-decoration: underline; }
+

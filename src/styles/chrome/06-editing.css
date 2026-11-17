@@ -1,0 +1,548 @@
+/* ---- hand editing ---- */
+
+/* Only under the interactive app: a snapshot has no pointer and no reason to advertise one. */
+[data-dag-movable] { cursor: grab; }
+.dag-item--dragging,
+.dag-viewport[data-tool] .dag-item--dragging { cursor: grabbing; }
+.dag-item--dragging {
+  /* A drag must not leave a trail of selected prose behind it in a markdown item. */
+  user-select: none;
+}
+
+
+/* ---- editing: selection, handles, the marquee, the chip ---- */
+
+/*
+ * A selected item wears an accent outline. An outline, not a border: it lives outside the box, so
+ * the item's own size — the one the layout was computed at — does not change by a pixel, and the
+ * dev size assertion stays quiet. `outline-offset` keeps it clear of a card's own border.
+ */
+.dag-item[data-dag-selected] {
+  outline: 2px solid var(--dag-color-accent);
+  outline-offset: 3px;
+  border-radius: 4px; /* hugs the diagram item, not a control */
+  /* `content-visibility: auto` brings paint containment, which clips the chip above the item and
+     the handle at its corner. A selected item is on screen — that is how it got selected — so
+     there is nothing for the containment to save on it. */
+  content-visibility: visible;
+  /* And above its neighbours: every item is its own stacking context (it is transformed), so a
+     later sibling paints over an earlier one, handles included — a handle on an edge that
+     touches the next card was the next card's to press. */
+  z-index: 2;
+}
+.dag-item[data-dag-selected]::after {
+  /* A soft halo so a selection reads at a distance, on a dark theme as well as a light one. */
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 6px; /* hugs the diagram item, not a control */
+  box-shadow: 0 0 0 6px var(--dag-color-accentSoft);
+  pointer-events: none;
+}
+
+/*
+ * A standing rewrite proposal: the drawing on the paper is not the file's.
+ *
+ * Dashed, against the selection's solid, and in the accent — it is a proposal *about* this
+ * diagram, not a second kind of selection. An outline rather than a border for the reason the
+ * selection's is: outside the box, so the measured size never moves and the dev size assertion
+ * stays quiet. The attribute is painted by `App` after the render, not rendered by `Item`.
+ */
+.dag-item[data-dag-proposed] {
+  outline: 2px dashed var(--dag-color-accent);
+  outline-offset: 3px;
+  content-visibility: visible;
+}
+
+/* The select tool: an arrow on the paper, a move cursor on what can be moved. The hand tool and a
+   held pan modifier keep their grab, which `data-pan` above already spells out. The pen is a
+   crosshair: a stroke can start anywhere, and the cursor is the only thing that says so. */
+.dag-viewport[data-tool="select"] { cursor: default; }
+.dag-viewport[data-tool="select"] [data-dag-movable] { cursor: move; }
+.dag-viewport[data-tool="hand"] [data-dag-movable] { cursor: grab; }
+.dag-viewport[data-tool="pen"] { cursor: crosshair; }
+
+/* With the pen up, the paper is the paper even over an item: a stroke is drawn wherever the
+   pointer is, and a press must reach the viewport, not the thing it crossed. The handles and the
+   link hit-strokes go with it — they are chrome over the paper, and a stroke that started on a
+   resize handle or a link line is not a stroke. One rule here rather than a prop threaded through
+   the memoised `Item`, which is exactly the trade this file exists to make cheap. The tools'
+   children re-enable the pointer on themselves, so the rule reaches them the way
+   `data-dag-connecting` does. */
+.dag-viewport[data-tool="pen"] .dag-item,
+.dag-viewport[data-tool="pen"] .dag-nodetools,
+.dag-viewport[data-tool="pen"] .dag-nodetools > *,
+.dag-viewport[data-tool="pen"] .dag-gitlanes *,
+.dag-viewport[data-tool="pen"] .dag-edge-hit { pointer-events: none; }
+
+.dag-marquee {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px solid var(--dag-color-accent);
+  background: var(--dag-color-accentSoft);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Eight handles, one per side and corner, each with the cursor for the way it pulls. */
+.dag-handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--dag-color-accent);
+  border-radius: 3px; /* a handle a few pixels across */
+  background: var(--dag-color-card);
+  z-index: 2;
+}
+/* An item's own, and — `data-dag-group-handle` — the same eight on a group's dashed box,
+   which sit on its border the way an item's sit on its edge. A second attribute rather than a second
+   use of `data-dag-handle`: a spec or a `closest()` asking for an item's handle must not find the
+   group's, which is the namespace hazard `docs/architecture/things-that-will-bite.md` records. */
+.dag-handle:is([data-dag-handle="n"], [data-dag-group-handle="n"])   { top: -8px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.dag-handle:is([data-dag-handle="s"], [data-dag-group-handle="s"])   { bottom: -8px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.dag-handle:is([data-dag-handle="e"], [data-dag-group-handle="e"])   { right: -8px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.dag-handle:is([data-dag-handle="w"], [data-dag-group-handle="w"])   { left: -8px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.dag-handle:is([data-dag-handle="ne"], [data-dag-group-handle="ne"]) { top: -8px; right: -8px; cursor: nesw-resize; }
+.dag-handle:is([data-dag-handle="sw"], [data-dag-group-handle="sw"]) { bottom: -8px; left: -8px; cursor: nesw-resize; }
+.dag-handle:is([data-dag-handle="nw"], [data-dag-group-handle="nw"]) { top: -8px; left: -8px; cursor: nwse-resize; }
+.dag-handle:is([data-dag-handle="se"], [data-dag-group-handle="se"]) { bottom: -8px; right: -8px; cursor: nwse-resize; }
+
+/*
+ * Four connect handles, outside the resize ones: drag from a side to link this item to another.
+ *
+ * Further out than the resize squares on purpose. They sit on the same four midpoints, and two
+ * targets on one point is a coin toss; sixteen pixels of clear paper between them is the whole
+ * difference between resizing and connecting.
+ */
+.dag-connect-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--dag-color-accent);
+  border-radius: 50%;
+  background: var(--dag-color-card);
+  cursor: crosshair;
+  z-index: 2;
+}
+.dag-connect-handle[data-dag-connect="n"] { top: -30px; left: 50%; margin-left: -5px; }
+.dag-connect-handle[data-dag-connect="s"] { bottom: -30px; left: 50%; margin-left: -5px; }
+.dag-connect-handle[data-dag-connect="e"] { right: -30px; top: 50%; margin-top: -5px; }
+.dag-connect-handle[data-dag-connect="w"] { left: -30px; top: 50%; margin-top: -5px; }
+
+/* The line being pulled, painted into the guides overlay. */
+.dag-connect {
+  fill: none;
+  stroke: var(--dag-color-accent);
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 5;
+  vector-effect: non-scaling-stroke;
+}
+.dag-connect__end {
+  fill: none;
+  stroke: var(--dag-color-accent);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+.dag-connect__end--over { fill: var(--dag-color-accent); }
+
+/*
+ * An edge's hit stroke, and the ring on the one that is picked.
+ *
+ * The hairline an edge is drawn with is a pixel and a half wide and nobody can hit it, so an
+ * invisible stroke twenty times that carries the pointer. It used to be the board layer's alone —
+ * a diagram's own edges were lines of DSL inside a fence, and the fence was what you edited — and
+ * a diagram's edges are pickable too now, so the rule lost its scope. `.dag-edges` is
+ * `pointer-events: none` in both places and a child re-enabling it is how either one is reachable
+ * at all; nothing draws the stroke unless `Edges` was handed an `onPick`, which `?snapshot=1`
+ * never does.
+ */
+.dag-edge-hit {
+  stroke: transparent;
+  stroke-width: 18px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+/* While a link is being pulled, the strokes must not answer `elementFromPoint` before the card
+   under them does. */
+[data-dag-connecting] .dag-edge-hit { pointer-events: none; }
+
+/*
+ * A sequence: the lifeline a message is drawn from, the message being drawn, and the tab a
+ * fragment is picked by.
+ *
+ * The lifeline's stroke is `.dag-edge-hit`'s answer to a hairline nobody can hit, and only drawn
+ * with a pointer to use it (`SequenceView`'s `live`). It answers the pointer on a diagram that is
+ * not selected too, because a press there is how the diagram gets selected and moved; the crosshair
+ * only says "draw from here" once a press there would.
+ */
+.dag-lifeline-hit {
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+}
+[data-dag-selected] .dag-lifeline-hit { cursor: crosshair; }
+[data-dag-drawing] .dag-lifeline-hit,
+[data-dag-drawing] .dag-edge-hit { pointer-events: none; }
+.dag-msg-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.dag-msg-ghost path {
+  fill: none;
+  stroke: var(--dag-color-accent);
+  stroke-width: 2px;
+  stroke-dasharray: 6 4;
+}
+[data-dag-selected] .dag-frag-tab[data-dag-frag] { cursor: pointer; }
+
+/*
+ * The bend handle at a picked link's middle: pull it, and the line goes through the point.
+ *
+ * Drawn only for the one line that is picked, and only on the board layer — a fixed point between
+ * two cards ELK placed is a claim the next relayout would make false. Its radius is here rather
+ * than in a theme for `.dag-edge-hit`'s reason one line up: no theme has an opinion about how big
+ * a thing you drag is, and inventing a key nobody would set is how a design system stops meaning
+ * anything. `.dag-edges` takes no pointer, so this puts it back on itself.
+ */
+.dag-bend-handle {
+  r: 5px;
+  fill: var(--dag-color-card);
+  stroke: var(--dag-color-accent);
+  stroke-width: 2px;
+  pointer-events: auto;
+  cursor: grab;
+}
+.dag-bend-handle:hover { fill: var(--dag-color-accent); }
+/* The line under the handle would otherwise answer the pointer first, and a bend that started by
+   re-picking the link it is already on is a gesture that does nothing. */
+[data-dag-bending] .dag-edge-hit { pointer-events: none; }
+[data-dag-bending] .dag-bend-handle { cursor: grabbing; }
+
+/* A hanging board link's loose stub (#173): a handle, so it takes the pointer `.dag-edges` does
+   not, and gives it up while a drag is reading what is under the pointer — its own included. */
+.dag-loose--live {
+  pointer-events: auto;
+  cursor: grab;
+}
+[data-dag-connecting] .dag-loose--live { pointer-events: none; }
+
+.dag-edges [data-dag-picked] .dag-edge-line {
+  stroke: var(--dag-color-accent);
+  stroke-width: 3px;
+  opacity: 1;
+}
+.dag-edges [data-dag-picked] [data-dag-marker] { stroke: var(--dag-color-accent); opacity: 1; }
+
+/*
+ * The card, group or lane picked inside a diagram.
+ *
+ * An outline rather than a border or a shadow, for the reason a selected item's is: it lives
+ * outside the box, so the card's own size — the one the layout was computed at — does not change by
+ * a pixel and the dev size assertion in `DiagramItem` stays quiet. It reads as the same gesture as
+ * a selected item one level out, which is what it is: the accent, one step in.
+ */
+[data-dag-node][data-dag-picked],
+[data-dag-group][data-dag-picked],
+[data-dag-lane][data-dag-picked],
+[data-dag-frag][data-dag-picked] {
+  outline: 2px solid var(--dag-color-accent);
+  outline-offset: 2px;
+}
+/* A card comes forward; a container does not. A group or a lane raised over its own cards took
+   every click meant for them, so a picked group's cards could not be picked out of it (#145). */
+[data-dag-node][data-dag-picked],
+[data-dag-frag][data-dag-picked] {
+  z-index: 2;
+}
+/* A geometric shape is picked on its outline: a rectangle round a circle says "this box", and the
+   box is not the thing. A stroke changes no geometry, which is why the outline was chosen above. */
+.dag-sketch--shape[data-dag-picked] { outline: none; }
+.dag-sketch--shape[data-dag-picked] .dag-sketch__fill,
+.dag-sketch--shape[data-dag-picked] .dag-sketch__rim {
+  stroke: var(--dag-color-accent);
+  stroke-width: 2px;
+}
+
+/*
+ * The same ring, inside an `<svg>`.
+ *
+ * A chart's series is a `<g>`, and neither `outline` nor `z-index` means anything on one — the rule
+ * above resolves to a box the browser draws nothing for. So the *marks* carry the ring: a stroke on
+ * a bar, a wedge or a marker sits outside its own fill and changes no geometry, which is the same
+ * property the outline was picked for.
+ *
+ * A line is the one mark that already wears a stroke, and it is its hue. Ringing it is not possible
+ * without a second path, so a picked line takes the accent for as long as it is picked — the legend
+ * swatch beside it still says which series it is.
+ */
+.dag-chart__marks[data-dag-picked] .dag-chart__bar,
+.dag-chart__marks[data-dag-picked] .dag-chart__wedge,
+.dag-chart__marks[data-dag-picked] .dag-chart__marker,
+.dag-chart__marks[data-dag-picked] .dag-chart__line {
+  stroke: var(--dag-color-accent);
+  stroke-width: 2px;
+}
+
+
+/* ---- the toolbar's editing controls ---- */
+
+.dag-icon:disabled { opacity: 0.35; cursor: default; }
+.dag-icon:disabled:hover { background: transparent; color: var(--dag-color-slate); }
+.dag-icon--wide { width: auto; gap: 6px; padding: 0 10px; font: inherit; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); }
+
+/* A file input and a select, each worn by a row of the dock's overflow menu. The visible part
+   is `.dag-more__item`; this is only the transparent control laid over it, which is how both
+   keep being the real elements Playwright drives rather than look-alikes. */
+.dag-add__select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ---- the editor panel ---- */
+
+.dag-inspector {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  /* Set from the panel, which remembers what the reader pulled it to. Deliberately *not* a
+     `--dag-*` name: that prefix means "a theme said so", and no theme has an opinion about how wide
+     somebody dragged their editor — the same argument that keeps this whole file out of the theme
+     layer. `check-theme.mjs` reads the prefix literally and would demand a key in all three. */
+  width: var(--inspector-w, 400px);
+  min-height: 0;
+  border-left: 1px solid var(--dag-color-outline);
+  background: var(--dag-color-paper);
+}
+/* The grab strip, sitting over the border rather than beside it: a panel edge is where a person
+   already aims, and taking a column of the layout for it would move the whole panel. */
+.dag-inspector__grip {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.dag-inspector__grip:hover, .dag-inspector__grip:active { background: var(--dag-color-accentSoft); }
+.dag-inspector__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-inspector__type {
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+}
+.dag-inspector__id {
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dag-inspector__name {
+  min-width: 0;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dag-inspector__name::before { content: "·"; margin-right: 8px; color: var(--dag-color-muted); }
+.dag-inspector__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-field--row { flex-direction: row; align-items: center; gap: 8px; }
+.dag-field__hint { margin: -2px 0 0; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-input {
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  padding: 5px 8px;
+  width: 100%;
+  min-width: 0;
+}
+.dag-input:focus-visible { box-shadow: var(--focus-ring); }
+.dag-inspector__body:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-inspector__body {
+  flex: 1;
+  min-height: 160px;
+  margin: 0;
+  padding: 12px;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-md);
+  line-height: 1.55;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: none;
+  resize: none;
+  /* Wrapped, not clipped. A 400px column and `pre` meant a long `arch` line ran off the right edge
+     behind a horizontal scrollbar — the panel's whole job is to show a source, and half of one is
+     worse than none. `break-spaces` keeps the leading indent that a nested group is written with. */
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  tab-size: 2;
+}
+/* ---- an offer the panel makes: convert this Mermaid paste ---- */
+
+.dag-offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  background: var(--dag-color-accentSoft);
+}
+.dag-offer__text { margin: 0; flex: 1; font-size: var(--chrome-text-sm); color: var(--dag-color-ink); }
+.dag-offer__text code { font-family: var(--dag-font-mono); font-size: var(--chrome-text-sm); }
+.dag-offer__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.dag-offer__go:hover { border-color: var(--dag-color-accent); }
+
+/* ---- the properties strip: what the card under the caret is wearing ----
+   `dag-props`, not `dag-strip`: `nodes.css` already owns that name for a timeline's section bar, and
+   the diagram stylesheets load after this one, so the collision made the panel absolute. */
+
+.dag-props {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  background: var(--dag-color-paper100);
+}
+.dag-props__head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.dag-props__what {
+  display: inline-block;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+}
+.dag-props__what::first-letter { text-transform: uppercase; }
+.dag-props__id {
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dag-props__row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dag-swatch {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 4px; /* a box under 20px: the control corner would make it a circle */
+  cursor: pointer;
+}
+/* "No hue of its own" is the absence of a colour, so it is drawn as one: the paper, struck
+   through. A ninth tint would say there is a ninth hue. */
+.dag-swatch--none {
+  background:
+    linear-gradient(to top right, transparent 46%, var(--dag-color-mutedBorder) 46%, var(--dag-color-mutedBorder) 54%, transparent 54%),
+    var(--dag-color-card);
+}
+.dag-swatch--on { outline: 2px solid var(--dag-color-accent); outline-offset: 1px; }
+.dag-swatch:focus-visible { box-shadow: var(--focus-ring); }
+.dag-props__status { flex: none; }
+.dag-props__label { flex: 1; min-width: 80px; }
+.dag-props__arrow { flex: none; font-family: var(--dag-font-mono); }
+
+/* A picked edge's ends: a list per side, an id in it per select, and one more select to add to it. */
+.dag-props__edgeends { display: flex; flex-direction: column; gap: 6px; }
+.dag-props__ends { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dag-props__tag { flex: none; min-width: 34px; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-props__end { display: inline-flex; align-items: center; gap: 2px; }
+.dag-props__id { max-width: 140px; font-family: var(--dag-font-mono); }
+.dag-props__id--add { color: var(--dag-color-slate); }
+
+/* The properties view proper: the kind, the strings, the flags and the rows. */
+.dag-props__fields { display: flex; flex-direction: column; gap: 8px; }
+.dag-props__out {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  padding: 2px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-props__out:hover { color: var(--dag-color-ink); background: var(--dag-color-card); }
+.dag-props__rows { display: flex; flex-direction: column; gap: 4px; }
+.dag-props__rowline { display: flex; align-items: center; gap: 4px; }
+.dag-props__rowline .dag-input { flex: 1; min-width: 0; }
+.dag-props__add,
+.dag-props__convert button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  height: 26px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-props__add:hover,
+.dag-props__convert button:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+/* A topic move the grammar refuses (the root has no siblings) stays on the panel, dimmed, so the
+   row does not change shape from one topic to the next. */
+.dag-props__add:disabled { opacity: 0.45; cursor: default; }
+.dag-props__add:disabled:hover { color: var(--dag-color-slate); border-color: var(--dag-color-outline); }
+.dag-props__convert { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dag-icon--tiny { width: 24px; height: 24px; flex: none; }
+.dag-input--mono { font-family: var(--dag-font-mono); font-size: var(--chrome-text-sm); }
+.dag-field__hint--bad { color: var(--dag-color-dangerText); }
+

@@ -1,0 +1,128 @@
+/* ---- The toast and the dialog frame (#208) ----------------------------------------------
+   One toast (`src/ui/Toast.tsx`) and one stack for every notice the app raises, and one frame
+   (`src/ui/Dialog.tsx`) for every modal: Settings, Feedback, Search and the logs question. Every
+   size, corner, shadow, layer and duration here is a `--dag-ui-*` token, and every colour the
+   theme's. Names grepped first: `dag-toast*`, `dag-dialog*`, `data-dag-toast*`, `data-dag-dialog`
+   and `--toasts-left` were nobody's. */
+
+/* The stack: bottom centre of the page — right of a docked sidebar, so `--toasts-left` is the
+   sidebar's width while it is docked, the trash notice's old rule — and above a board's dock.
+   Newest at the bottom, nearest the dock; three at most are drawn, and an older one waits under
+   them until one goes. It takes no pointer itself, so the page between toasts stays usable. */
+.dag-toasts {
+  position: fixed;
+  left: var(--toasts-left, 0px);
+  right: 0;
+  bottom: var(--dag-ui-space-5);
+  z-index: var(--dag-ui-layer-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  padding: 0 var(--dag-ui-space-4);
+  pointer-events: none;
+}
+.dag-toasts:empty { display: none; }
+.dag-toasts > :nth-last-child(n + 4) { display: none; }
+.dag-shell:has(.dag-dock) .dag-toasts { bottom: 104px; }
+.dag-shell:has(.dag-sidebar[data-mode="docked"]) .dag-toasts { --toasts-left: min(var(--sidebar-w, 272px), max(232px, 25vw)); }
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]):has(.dag-sidebar[data-mode="docked"]) .dag-toasts { --toasts-left: min(var(--sidebar-w, 272px), max(232px, 50vw)); }
+
+/* A toast: the mark, one line, the actions, the ×. */
+.dag-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  max-width: min(680px, 100%);
+  min-height: calc(var(--dag-ui-control-md) + 2 * var(--dag-ui-space-1) + 2px);
+  padding: var(--dag-ui-space-1) var(--dag-ui-space-1) var(--dag-ui-space-1) var(--dag-ui-space-3);
+  font-size: var(--chrome-text-md);
+  line-height: var(--dag-ui-leading-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  pointer-events: auto;
+  animation: dag-toast-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+@keyframes dag-toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dag-toast { animation: none; } }
+.dag-toast__mark { flex: none; color: var(--dag-color-slate); }
+.dag-toast--accent .dag-toast__mark { color: var(--dag-color-accent); }
+.dag-toast--danger .dag-toast__mark { color: var(--dag-color-dangerText); }
+/* One line, always: a sentence too long for it ends in an ellipsis, with the whole of it the title. */
+.dag-toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A line with a name in it gives way in the name's middle: the words around it keep their size,
+   the name's head shrinks to an ellipsis, and its tail — the extension — stays. */
+.dag-toast__text:has(.dag-toast__name) { display: flex; }
+.dag-toast__words { flex: none; white-space: pre; }
+.dag-toast__name { display: flex; flex: 0 1 auto; min-width: 0; }
+.dag-toast__head { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.dag-toast__tail { flex: none; white-space: pre; }
+/* Where a problem is, before what it is: quieter, and the first thing to give way. */
+.dag-toast__aside { color: var(--dag-color-slate); }
+.dag-toast__acts { flex: none; display: flex; align-items: center; gap: var(--dag-ui-space-1); }
+.dag-toast__close { flex: none; }
+/* Settings' reset toast is drawn inside its modal, at the card's foot, where the trap can reach it. */
+.dag-settings-modal > .dag-toast {
+  position: absolute;
+  left: 50%;
+  bottom: var(--dag-ui-space-4);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--dag-ui-space-4));
+  transform: translateX(-50%);
+}
+
+/* On a phone the stack is the window's width less a margin, and the actions take their own row
+   under the line, so the line keeps the room a sentence needs. */
+@media (max-width: 719px) {
+  .dag-toasts { left: 0; bottom: 72px; padding: 0 var(--dag-ui-space-3); }
+  .dag-toasts > .dag-toast {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "mark text close" "acts acts acts";
+    column-gap: var(--dag-ui-space-2);
+    width: 100%;
+    max-width: none;
+  }
+  .dag-toasts .dag-toast__mark { grid-area: mark; }
+  .dag-toasts .dag-toast__text { grid-area: text; }
+  .dag-toasts .dag-toast__close { grid-area: close; }
+  .dag-toasts .dag-toast__acts { grid-area: acts; justify-content: flex-end; }
+}
+
+/* The dialog frame: over the whole window, sidebar included, and dimming it. The scrim is
+   `color.shadow` — the translucent elevation colour every card's shadow is drawn in, dark in every
+   theme (a mix of `ink` would have lightened the page in Paper Dark) — because no theme has a
+   colour of its own for a scrim. One rule, so a `color.scrim` is one line to change. */
+.dag-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dag-ui-layer-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dag-color-shadow);
+}
+.dag-dialog > [role="dialog"]:focus { outline: none; }
+/* Electron's drag region ignores what is drawn over it (`desktop.md`): over the window's top row a
+   press on the scrim or the card would drag the window. The whole frame is cut out of the region. */
+[data-dag-window] .dag-dialog { -webkit-app-region: no-drag; }
+
+/* The logs question's dialog, behind its toast's *What's sent*: the full list, then the answer. */
+.dag-telemetry-dialog { width: 480px; }
+.dag-telemetry-dialog__mark { flex: none; color: var(--dag-color-accent); }
+.dag-telemetry-dialog .dag-settings__foot { gap: var(--dag-ui-space-2); }
+.dag-telemetry-dialog__label { margin: var(--dag-ui-space-3) 0 2px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-telemetry-dialog__list { margin: 0; padding-left: 18px; font-size: var(--chrome-text-md); line-height: var(--dag-ui-leading-md); color: var(--dag-color-slate); }
+.dag-telemetry-dialog__hint { margin: var(--dag-ui-space-3) 0 0; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-telemetry-dialog__failed { margin: var(--dag-ui-space-2) 0 0; font-size: var(--chrome-text-sm); color: var(--dag-color-dangerText); }
+

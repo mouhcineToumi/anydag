@@ -1,0 +1,156 @@
+/* ---- The trash ------------------------------------------------------------------------
+   A page of what was deleted. The notice a delete raises is a toast (`src/ui/Toast.tsx`, above).
+   Chrome, so lengths are written here and every colour is the theme's. Names grepped first:
+   `dag-trash*` and `data-dag-trash*` were nobody's. */
+
+.dag-app--trash { background: var(--dag-color-paper); color: var(--dag-color-ink); }
+.dag-trash {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 32px 96px;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-trash > * { max-width: 880px; margin-inline: auto; }
+.dag-trash__bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.dag-trash__filter {
+  flex: 0 1 280px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-trash__filter:focus-visible { box-shadow: var(--focus-ring); }
+.dag-trash__intro { margin: 0 auto 16px; font-size: var(--chrome-text-md); line-height: 1.5; color: var(--dag-color-slate); }
+.dag-trash__none { margin: 24px auto; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+
+/* The buttons: a quiet one that restores, the danger one that cannot be undone. */
+.dag-trash__plain,
+.dag-trash__empty,
+.dag-trash__danger:not(.dag-icon) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-trash__plain:hover,
+.dag-trash__empty:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-trash__empty { margin-left: auto; }
+.dag-trash__empty:hover { color: var(--dag-color-dangerText); }
+.dag-trash__danger:not(.dag-icon) { color: var(--dag-color-card); background: var(--dag-color-danger); border-color: var(--dag-color-danger); }
+.dag-trash__danger:not(.dag-icon):hover { box-shadow: 0 0 0 2px var(--dag-color-dangerSoft); }
+.dag-trash .dag-icon.dag-trash__danger { color: var(--dag-color-dangerText); }
+.dag-trash__plain:disabled,
+.dag-trash__empty:disabled { opacity: 0.5; cursor: default; }
+.dag-trash button:focus-visible { box-shadow: var(--focus-ring); }
+.dag-trash__link {
+  margin-left: 6px;
+  padding: 0;
+  font: inherit;
+  color: var(--dag-color-accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.dag-trash__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  font-size: var(--chrome-text-md);
+  background: var(--dag-color-dangerSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-trash__ask--row { margin: 0; padding: 2px 4px 2px 10px; font-size: var(--chrome-text-sm); }
+.dag-trash__said { margin: 0 auto 12px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-trash__said--problem { color: var(--dag-color-dangerText); }
+
+/* One heading per day, saying the two dates every row of it used to repeat; the rows under it are
+   a list with no rules between them, the sidebar's, and Restore and Delete appear on the row the
+   pointer is on — always on a touch screen, which has no pointer to be on a row. */
+.dag-trash__day + .dag-trash__day { margin-top: 20px; }
+.dag-trash__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 0 6px 6px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+}
+.dag-trash__left { margin-left: auto; font-weight: var(--dag-ui-weight-regular); color: var(--dag-color-slate); }
+.dag-trash__rows { margin: 0 auto; padding: 0; list-style: none; }
+.dag-trash__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 6px;
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-trash__row:hover { background: var(--dag-color-paper100); }
+@media (hover: hover) {
+  .dag-trash__acts { opacity: 0; transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
+  .dag-trash__row:hover .dag-trash__acts,
+  .dag-trash__row:focus-within .dag-trash__acts { opacity: 1; }
+}
+.dag-trash__mark { flex: none; display: inline-flex; color: var(--dag-color-muted); }
+.dag-trash__what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dag-trash__title { overflow: hidden; font-size: var(--chrome-text-md); text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-ink); }
+.dag-trash__meta { overflow: hidden; font-size: var(--chrome-text-sm); text-overflow: ellipsis; white-space: nowrap; color: var(--dag-color-slate); }
+.dag-trash__acts { flex: none; display: flex; align-items: center; gap: 4px; }
+.dag-trash__forget:hover { color: var(--dag-color-dangerText); }
+@media (max-width: 719px) {
+  .dag-trash { padding: 16px 12px 96px; }
+  .dag-trash__bar { flex-wrap: wrap; }
+  .dag-trash__filter { flex: 1 1 140px; min-height: 40px; font-size: var(--chrome-text-lg); }
+  .dag-trash__row { align-items: flex-start; padding: 10px 4px; }
+  .dag-trash__meta { white-space: normal; }
+  .dag-trash__plain { min-height: 36px; }
+}
+
+
+/* Sync: the sidebar's status row and the Settings tab's own bits. Colour from the
+   theme's tokens only. */
+.dag-sync-row[data-tone="warn"] { color: var(--dag-color-warning); }
+.dag-sync-row[data-tone="warn"] > svg { color: var(--dag-color-warning); }
+.dag-sync-row[data-dag-sync-row="syncing"] > svg { animation: dag-sync-spin 1.2s linear infinite; }
+@keyframes dag-sync-spin { to { transform: rotate(360deg); } }
+.dag-sync__confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dag-sync__code { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dag-sync__code code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  background: var(--dag-color-paper100);
+  color: var(--dag-color-ink);
+  user-select: all;
+}
+.dag-sync__conflicts { list-style: none; margin: 0; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 4px; font-size: var(--chrome-text-md); }
+.dag-sync__conflicts a { color: var(--dag-color-accent); overflow-wrap: anywhere; }
+.dag-sync__me { font-style: normal; color: var(--dag-color-slate); }
+

@@ -1,0 +1,406 @@
+/* ---- the model chip ----
+   Who would answer, on the prompt card, in the Rewrite bar and in the Generate flashcards dialog.
+   Text only for now; the provider's mark arrives with #182. One rule, three surfaces, so the words
+   and the way to change them are the same wherever a person sees them. */
+.dag-modelchip {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  line-height: 1.5;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-modelchip:hover { color: var(--dag-color-ink); border-color: var(--dag-color-mutedBorder); }
+.dag-modelchip:focus-visible { box-shadow: var(--focus-ring); }
+.dag-prompt__bar .dag-modelchip { max-width: 42%; }
+
+/* ---- the prompt card ----
+   A form on the paper (`src/render/PromptItem.tsx`), so it is chrome rather than drawing: no theme
+   has an opinion about the height of a Generate button, and the card is gone the moment it runs.
+   Names are `dag-prompt*` and hooks `data-dag-prompt*` — both grepped across `src/`, `e2e/` and
+   `plugins/` first, as this file has learned to. The accent is the one on the canvas already: it
+   rings a card under the pointer, and a card that turns into a diagram is the same idea. */
+.dag-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  background: var(--dag-color-card);
+  border: 1px dashed var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-surface);
+  color: var(--dag-color-ink);
+  font-size: var(--chrome-text-md);
+}
+.dag-prompt--still { border-style: dashed; border-color: var(--dag-color-outline); }
+.dag-prompt__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dag-color-accent);
+  cursor: grab;
+  user-select: none;
+}
+.dag-prompt--still .dag-prompt__head { color: var(--dag-color-slate); cursor: default; }
+.dag-prompt__still { margin: 0; white-space: pre-wrap; line-height: 1.45; color: var(--dag-color-slate); }
+.dag-prompt__text {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font: inherit;
+  line-height: 1.45;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: text;
+}
+.dag-prompt__text:focus-visible { box-shadow: var(--focus-ring); border-color: var(--dag-color-accent); }
+.dag-prompt__text:disabled { color: var(--dag-color-muted); }
+.dag-prompt__bar { display: flex; align-items: center; gap: 8px; }
+.dag-prompt__as {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-prompt__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dag-prompt__btn:hover { border-color: var(--dag-color-outline); }
+.dag-prompt__btn--go { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-prompt__btn--go:hover { border-color: var(--dag-color-ink); }
+.dag-prompt__btn:disabled { opacity: 0.45; cursor: default; }
+.dag-prompt__status { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-prompt__fail .dag-prompt__status { align-items: flex-start; color: var(--dag-color-dangerText); }
+.dag-prompt__fail .dag-prompt__status > svg { flex: none; margin-top: 2px; }
+.dag-prompt__diags { margin: 4px 0 0; padding-left: 18px; font-size: var(--chrome-text-sm); line-height: 1.45; color: var(--dag-color-slate); }
+.dag-prompt__diags code { font-family: var(--dag-font-mono); font-size: var(--chrome-text-xs); }
+.dag-prompt__acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.dag-prompt__spin { animation: dag-prompt-spin 0.9s linear infinite; }
+@keyframes dag-prompt-spin { to { transform: rotate(360deg); } }
+/* ---- the problems dock ---- */
+
+/*
+ * What is wrong with the board, at the bottom of it rather than on it.
+ *
+ * Bottom centre, the mirror of the selection bar at top centre: clear of the board list on the
+ * left and the inspector and library on the right, and never over the page tabs, which are a
+ * sibling of `.dag-body` rather than inside it. A column, so the notification or the list sits
+ * directly above the count that stands for it.
+ */
+.dag-problems {
+  position: absolute;
+  bottom: 12px;
+  left: var(--canvas-mid, 50%);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: min(640px, calc(var(--canvas-w, 100%) - 32px));
+  z-index: calc(var(--dag-ui-layer-chrome) + 1) /* over the dock it shares the bottom centre with */;
+  user-select: none;
+}
+
+.dag-problems__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-pill);
+  box-shadow: var(--dag-ui-elevation-raised);
+  cursor: pointer;
+}
+.dag-problems__pill--error { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
+.dag-problems__pill:hover { background: var(--dag-color-paper100); }
+
+.dag-problems__show {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-problems__show:hover { background: var(--dag-color-paper200); }
+
+.dag-problems__tray {
+  display: flex;
+  flex-direction: column;
+  width: 560px;
+  max-width: 100%;
+  max-height: 320px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  overflow: hidden;
+}
+.dag-problems__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 6px 12px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-problems__head .dag-icon { width: 26px; height: 26px; }
+.dag-problems__list { margin: 0; padding: 4px; list-style: none; overflow-y: auto; }
+.dag-problems__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-left: 2px solid var(--dag-color-warning);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-problems__row--error { border-left-color: var(--dag-color-danger); }
+/* A repair, in words, under the row it answers — indented to sit under the message, not the code. */
+.dag-problems__fix { display: flex; flex-direction: column; gap: 6px; padding: 2px 8px 8px 12px; }
+.dag-problems__fix-words { margin: 0; font-size: var(--chrome-text-sm); line-height: 1.5; color: var(--dag-color-slate); }
+.dag-problems__fix-words--bad { color: var(--dag-color-dangerText); }
+.dag-problems__fix-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dag-problems__row:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-problems__row:disabled { cursor: default; }
+.dag-problems__row .dag-problems__msg { font-size: var(--chrome-text-md); color: var(--dag-color-ink); }
+.dag-problems__where {
+  grid-column: 2;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+}
+
+/* ---- the drawn tooltip ---- */
+
+/*
+ * The dock is icon-only, so its `title` was the only place a control's name and chord existed —
+ * and the desktop app's native tooltip is not dependable on macOS. `Tooltip` draws this instead,
+ * in a portal at the body, so no ancestor's overflow or stacking context can clip it.
+ *
+ * Names grepped before they were written: `dag-tip` and `data-dag-tip` were both free. The
+ * colours are the menu's own (`card`, `ink`, `outline`), which is what keeps it legible in paper,
+ * paper-dark and neutral without a second surface colour to drift.
+ */
+.dag-tip { display: inline-flex; flex: none; }
+
+.dag-tip__bubble {
+  position: fixed;
+  z-index: var(--dag-ui-layer-tooltip);
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 9px;
+  background: var(--dag-color-card);
+  color: var(--dag-color-ink);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-sm);
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.dag-tip__key {
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+
+/* ---- the dock, the overflow and the zoom cluster ---- */
+
+/*
+ * The toolbar was one full-width strip of seventeen controls, six wearing text labels that each
+ * duplicated a key, with a spacer holding the two clusters as far apart as the window allowed.
+ * What replaced it floats over the board: `position: absolute` inside `.dag-body`, which is what
+ * `.dag-selbar` has always been — so neither of these takes a place in the flex tree, and
+ * `.dag-viewport`'s `flex: 1; min-width: 0` contract is untouched. `.dag-body` is a *sibling* of
+ * `.dag-pagebar`, so `bottom` here already clears the page tabs; nothing needs to know they exist.
+ *
+ * Names grepped before they were written — `dag-dock`, `dag-more`, `dag-zoombar` and their
+ * `data-dag-*` twins were all free. `chrome.css` loads before `nodes.css` and the diagram wins any
+ * collision, and `docs/architecture/things-that-will-bite.md` records that biting three times.
+ */
+
+.dag-dock,
+.dag-zoombar {
+  position: absolute;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-raised);
+  z-index: var(--dag-ui-layer-chrome);
+  user-select: none;
+}
+.dag-dock { left: var(--canvas-mid, 50%); transform: translateX(-50%); }
+/* The transform makes the dock its own stacking context, so its menu can rise no higher than the dock:
+   while the menu is open the whole dock is a popover, over the problems list and the notices. */
+.dag-dock:has(.dag-more__menu) { z-index: var(--dag-ui-layer-popover); }
+/* `--canvas-right` is whatever the panels take, so this stays 12px off the *drawing's* edge
+   instead of being drawn on top of the library. */
+.dag-zoombar { right: calc(var(--canvas-right, 0px) + 12px); }
+/* And while the drawing is wide enough for both. Under about 690px of canvas — a 800×700 window
+   with the library open leaves 528 — the dock, centred on `--canvas-mid`, reaches the cluster
+   pinned to `--canvas-right`, and the cluster, later in the DOM on the same layer, took every press
+   meant for the dock's last controls (#395). No media query can see this: the canvas is the window
+   minus whatever panels are open. `useBottomBars` measures the two boxes (`src/ui/bottomBars.ts`)
+   and lifts the cluster above the dock by the dock's own height, which is the one number here only
+   the browser has. */
+.dag-zoombar[data-dag-zoombar-lifted] { bottom: calc(12px + var(--zoom-lift, 50px)); }
+
+.dag-dock__group { display: flex; align-items: center; gap: 2px; }
+.dag-dock__rule { width: 1px; height: 20px; margin: 0 4px; background: var(--dag-color-outlineSoft); }
+/* The dock's own way out of a locked board: the same switch as the top bar's Unlock, where a hand
+   already on the tools will look for it. */
+.dag-dock__locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-dock__locked:hover { background: var(--dag-color-paper200); }
+.dag-dock__locked:focus-visible { box-shadow: var(--focus-ring); }
+.dag-dock__locked > svg { flex: none; color: var(--dag-color-slate); }
+
+/* The one promoted thing, which is what both references do with exactly one control. */
+.dag-icon--accent { color: var(--dag-color-accent); }
+.dag-icon--accent:hover { color: var(--dag-color-accent); background: var(--dag-color-paper100); }
+
+/* The percentage is a quiet `Button` with room for four glyphs, in figures that do not move. */
+.dag-zoombar__pct { min-width: 52px; padding: 0 6px; font-size: var(--chrome-text-sm); font-variant-numeric: tabular-nums; }
+
+/*
+ * A board on a phone: fitted, pinched and panned with fingers, a tap to select and a drag
+ * to move what is selected. The fine editing stays the pointer's, so the dock
+ * keeps undo and redo, the zoom bar keeps the level and Fit, and the handles that resize and connect
+ * are not drawn for a finger, where they were targets smaller than it that caught the drag meant for
+ * the item.
+ */
+@media (max-width: 719px) {
+  .dag-dock .dag-dock__group--tools,
+  .dag-dock .dag-dock__group--make,
+  .dag-dock .dag-dock__rule,
+  .dag-dock > .dag-more,
+  .dag-zoombar .dag-zoombar__step { display: none; }
+  .dag-dock { left: calc(var(--canvas-x, 0px) + 12px); transform: none; }
+  .dag-dock__locked { height: 44px; }
+}
+@media (pointer: coarse) {
+  .dag-handle,
+  .dag-connect-handle,
+  [data-dag-group-handle],
+  .dag-nodetools { display: none; }
+}
+
+/* ---- the overflow ---- */
+
+/* Anchored to the `⋯` rather than to the dock, so the menu stays put as the dock's own width
+   changes with what a board can do. Opens upward for the obvious reason. */
+.dag-more { position: relative; display: flex; }
+.dag-more__menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
+}
+.dag-more__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-more__item:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-more__item:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-more__item span { flex: 1; }
+.dag-more__item kbd {
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+}
+.dag-more__rule { height: 1px; margin: 3px 0; background: var(--dag-color-outlineSoft); }
+

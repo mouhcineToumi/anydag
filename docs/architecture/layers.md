@@ -60,7 +60,8 @@ Two scripts hold it, and both are in the gate. `check-theme.mjs` proves every `-
 reads exists in every theme, and checks the shapes the `Theme` type cannot (`theme.json` arrives
 through an unchecked cast). `check-literals.mjs` is the other half, and it exists because this
 file once claimed `check-theme.mjs` did its job, and 99 px literals had accumulated behind the
-claim. The app chrome is exempt and lives in `src/styles/chrome.css`: no theme has an opinion about
+claim. The app chrome is exempt and lives in `src/styles/chrome.css` — an index of one file per area
+under `src/styles/chrome/`, imported in cascade order (#492): no theme has an opinion about
 the height of a zoom button, and inventing keys nobody would set is how a design system stops
 meaning anything. Its fifth section does hold the chrome's text tone: a `color: var(--dag-color-muted)`
 there is refused unless its selector is listed, with a reason, in

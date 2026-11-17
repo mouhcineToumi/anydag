@@ -23,6 +23,7 @@ describe("kindOf", () => {
     ["boards/local/demo.board.md", "pixels"],
     ["src/layout/size.ts", "pixels"],
     ["src/styles/chrome.css", "pixels"],
+    ["src/styles/chrome/03-sidebar.css", "pixels"],
     ["icons/data/icons.json", "pixels"],
     ["src/ui/Sidebar.tsx", "app"],
     ["src/note/markdown.ts", "app"],
