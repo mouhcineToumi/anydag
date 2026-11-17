@@ -315,6 +315,39 @@ to **5,000** files, degrades at **20,000** (2.7 s to rest, a core busy for it); 
 replaced took 8.2 ms and 41 ms a tick on the same machine. The account, and the prototype beside it
 at every size, is in [`graph-simulation.md`](graph-simulation.md).
 
+### The Graph page (#459)
+
+`node scripts/bench.mjs --only graph-page` (`graph.page.*`), on the machine of the section above (an
+Intel i5-8300H laptop, 4 cores and 8 threads, 12 GB, Node 26.12, Chromium 158), load average 3 to 8,
+2026-11-17. It needs the built page. The vaults are the simulation's, written as files
+(`writeGraphVault`); the dense one asks for 150,000 links and gets 147,665, because a link between
+two files that are not notes is written in neither. Each runs on two renderers: **SwiftShader**,
+headless Chromium's own, which draws on the CPU and reads every frame back for a compositor that is
+software too; and the laptop's **integrated Intel UHD 630** (`--enable-gpu --use-angle=gl`), which is
+what a person's window draws with. A frame's time waits for the GPU (`gl.finish`).
+
+| Vault | Renderer | Navigation to rest | The scene's settle | Frames | A frame, settling | A frame, zooming | At rest |
+|---|---|---|---|---|---|---|---|
+| 2,000 files, 2,602 links | UHD 630 | 1.27 s | 0.93 s | 54 | 0.45 ms | 0.29 ms | 0 frames, 2 % CPU |
+| 5,000 files, 6,618 links | UHD 630 | 1.33 s | 0.93 s | 60 | 0.38 ms | 0.31 ms | 0 frames, 2 % CPU |
+| 5,000 files, 147,665 links | UHD 630 | 2.05 s | 1.68 s | 76 | 0.55 ms | 0.59 ms | 0 frames, 2 % CPU |
+| 2,000 files | SwiftShader | 1.42 s | 1.04 s | 17 | 0.67 ms | 0.47 ms | 0 frames, 1 % CPU |
+| 5,000 files | SwiftShader | 2.44 s | 1.66 s | 15 | 0.76 ms | 0.47 ms | 0 frames, 0 % CPU |
+| 5,000 files, 147,665 links | SwiftShader | 29 s | 9.1 s | 10 | 1.4 ms | 0.74 ms | 0 frames, 0 % CPU |
+
+On the GPU a settle is the simulation's floor (0.92 s, 220 ticks at 240 a second) up to 5,000
+files, at about 60 frames a second, and a frame is under a millisecond even with 150,000 links.
+**SwiftShader draws a frame as fast but shows few of them**: the page's main thread waits on each
+frame's readback, so it draws 15 frames where the GPU draws 60, and the dense vault's 150,000 links
+take most of half a minute to come up. That is headless Chromium's software path, not a person's;
+the frame times in the e2e suite and CI are SwiftShader's. The page's JS heap is 10 to 16 MB at
+every size. **With the page closed**, at every size and on both renderers, no graph worker and no
+WebGL context is left, and the browser's CPU over 5 s is 0 %.
+
+`/__board/graph`'s first answer is the server's cold index of the vault (part 1): 2.1 s at 2,000
+files, 4.8 s at 5,000, and 14 s on the dense vault, whose 150,000 `[[wikilinks]]` are read from
+5,000 files. The page asks for it once and again only after a change.
+
 ### Not measured
 
 - **The packaged app on macOS and Windows**, and the packaged app at all for memory and time — the

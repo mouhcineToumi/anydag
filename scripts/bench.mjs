@@ -79,6 +79,15 @@
  *   host on the real clock, which paces it at 240 ticks a second, so 0.9 s is the floor; and the
  *   typed arrays it holds. Then a dense vault of 5,000 files and 150,000 links, the linked clusters
  *   of the 5,000-file vault, and a tick grouped by them.
+ * - *graph.page.<n>*: the Graph page (#459; `--only graph-page`), built, in Chromium, on those
+ *   vaults written as files (`writeGraphVault`: 2,000 and 5,000 files, and the dense one of 5,000
+ *   files with 150,000 links asked): the route's first answer; from navigation to the page at rest,
+ *   and the scene's own time from the graph handed to it to rest; frames drawn and the mean frame
+ *   time while it settles and while the camera zooms, each frame waited for on the GPU
+ *   (`gl.finish`); frames and CPU at rest; the heap and the renderers' memory; and, the page closed,
+ *   the graph's workers and WebGL contexts left (none) and the CPU after. Each runs on SwiftShader,
+ *   headless Chromium's own renderer, and again as `<n>.gpu` on this machine's GPU when Chromium can
+ *   be given one; which drew it and the machine's load are in each line's note.
  * - *desktop.*: the Electron shell (`desktop/dist/main.cjs`) on the 1k vault: time to the first
  *   window and to `data-dag-ready`, `app.getAppMetrics()` per process plus the server child,
  *   idle CPU per process, and a request's cost through `anydag://` (`desktop/forward.ts`) against
@@ -104,7 +113,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { graphGroup } from "./bench-graph.mjs";
+import { denseVault, graphGroup, graphVault, writeGraphVault } from "./bench-graph.mjs";
 import { missingReleaseRows, previousRelease, RELEASE_DIR, releaseTable, releaseValues, writeRelease } from "./bench-release.mjs";
 import { enter } from "./session.mjs";
 
@@ -153,7 +162,7 @@ const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
    leaves either out gets it back, so the table always has the same ten rows to show. */
 if (RELEASE && !SIZES.includes(1000)) SIZES.push(1000);
 const ONLY = new Set(
-  (RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop,graph")).split(","),
+  (RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop,graph,graph-page")).split(","),
 );
 const BOARD_ITEMS = QUICK ? [10, 100] : [10, 100, 500, 2000];
 if (RELEASE && !BOARD_ITEMS.includes(500)) BOARD_ITEMS.push(500);
@@ -676,14 +685,14 @@ async function openFeed(s) {
 
 /* -- Chromium ------------------------------------------------------------------------------------- */
 
-async function launchBrowser() {
+async function launchBrowser(args = []) {
   const candidates = [process.env.ANYDAG_CHROMIUM, undefined, "/opt/pw-browsers/chromium"].filter(
     (c, i, all) => all.indexOf(c) === i,
   );
   let last;
   for (const executablePath of candidates) {
     try {
-      const server = await chromium.launchServer(executablePath ? { executablePath } : {});
+      const server = await chromium.launchServer({ ...(executablePath ? { executablePath } : {}), args });
       const browser = await chromium.connect(server.wsEndpoint());
       const stop = async () => {
         live.delete(stop);
@@ -743,6 +752,237 @@ const sumRss = (pids) => {
   }
   return total;
 };
+
+/* -- the Graph page ------------------------------------------------------------------------------ */
+
+/**
+ * Counts the page's graph workers and WebGL contexts, before its own scripts run: what "nothing is
+ * left once the page is closed" is measured by. `e2e/graph.spec.ts` holds the same.
+ */
+function graphProbe() {
+  const seen = { made: 0, ended: 0, contexts: [] };
+  window.__probe = seen;
+  const Native = window.Worker;
+  window.Worker = class extends Native {
+    constructor(url, opts) {
+      super(url, opts);
+      this.sim = /sim\.worker/.test(String(url));
+      if (this.sim) seen.made++;
+    }
+    terminate() {
+      if (this.sim) seen.ended++;
+      super.terminate();
+    }
+  };
+  const get = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+    const c = get.call(this, type, ...rest);
+    if (type === "webgl2" && c && !seen.contexts.includes(c)) seen.contexts.push(c);
+    return c;
+  };
+}
+
+/** How many files each graph vault was written with: the second renderer reads the same folder. */
+const written = new Map();
+
+/** The Graph page on one vault written as files: open, settle, draw, rest, close. */
+async function graphPageOne(b, label, v) {
+  const p = `graph.page.${label}`;
+  /* The same vault for both renderers, written once. */
+  const dir = path.join(work, `graph-${label.replace(/\.gpu$/, "")}`);
+  if (!written.has(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    written.set(dir, writeGraphVault(fs, path, dir, v));
+  }
+  const files = written.get(dir);
+  const s = await startServer(dir, path.join(work, `home-graph-${label}`));
+  const { context, page, metrics, problems } = await pageOn(b, s);
+  try {
+    await context.addInitScript(graphProbe);
+    const route = await timedReq(s, "/__board/graph");
+    const wire = route.ms === null ? null : (await s.req("/__board/graph")).json();
+    const links = wire ? wire.links.length / 2 : null;
+    record(
+      `${p}.route`,
+      route.ms,
+      "ms",
+      `/__board/graph, first answer: ${files} files, ${links} links, ${mb(route.bytes)?.toFixed(1)} MB`,
+    );
+    const load = () => `load ${os.loadavg()[0].toFixed(1)} on ${os.cpus().length} cores`;
+    const renderer = await page.evaluate(() => {
+      const gl = document.createElement("canvas").getContext("webgl2");
+      if (!gl) return "no WebGL 2";
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      const name = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      return /SwiftShader/i.test(name)
+        ? "SwiftShader"
+        : name.replace(/^ANGLE \([^,]+, (.+?)(?: \(0x[0-9A-Fa-f]+\))?, [^,]+\)$/, "$1");
+    });
+
+    const t = now();
+    await page.goto(`${s.origin}/?graph=1`, { timeout: STEP_MS });
+    let rest = "timeout";
+    try {
+      await page.waitForFunction(
+        () => document.querySelector('[data-dag-graph="rest"]') && window.__dagGraph && window.__dagGraph.settleMs > 0,
+        null,
+        { timeout: STEP_MS, polling: 50 },
+      );
+      rest = now() - t;
+    } catch {
+      /* rest stays timeout */
+    }
+    const g = () =>
+      page.evaluate(() => ({
+        frames: window.__dagGraph.frames,
+        frameMs: window.__dagGraph.frameMs,
+        settleMs: window.__dagGraph.settleMs,
+        tickMs: window.__dagGraph.tickMs,
+        where: window.__dagGraph.where,
+      }));
+    record(`${p}.open`, rest, "ms", `navigation to data-dag-graph="rest", cold; ${renderer}, ${load()}`);
+    if (rest === "timeout") return;
+    const first = await g();
+    record(
+      `${p}.settle`,
+      first.settleMs,
+      "ms",
+      `the scene's own: the graph handed to it to rest; simulation in the ${first.where}`,
+    );
+    record(`${p}.settle.frames`, first.frames, "count", "frames drawn from the first to rest");
+    record(`${p}.tick`, first.tickMs, "ms", "the worker's last tick");
+
+    /* Frame time, each frame waited for on the GPU: while it settles again (Reset the layout), and
+       while the camera zooms with nothing moving. */
+    await page.evaluate(() => {
+      window.__dagGraph.finish = true;
+    });
+    const f0 = (await g()).frames;
+    await page.locator("[data-dag-graph-reset]").click();
+    await page
+      .waitForFunction(() => document.querySelector('[data-dag-graph="settling"]'), null, { timeout: 10_000 })
+      .catch(() => {});
+    await page.waitForFunction(() => document.querySelector('[data-dag-graph="rest"]'), null, { timeout: STEP_MS, polling: 50 });
+    const settled = await g();
+    record(
+      `${p}.frame.settling`,
+      settled.frameMs,
+      "ms",
+      `mean of the last frames (EMA) while it settles, GPU waited for; ${settled.frames - f0} frames; ${renderer}, ${load()}`,
+    );
+    const z0 = (await g()).frames;
+    const box = await page.locator("[data-dag-graph]").boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    for (let i = 0; i < 10; i++) {
+      await page.mouse.wheel(0, i % 2 ? 120 : -120);
+      await sleep(60);
+    }
+    await page.waitForFunction(() => document.querySelector('[data-dag-graph="rest"]'), null, { timeout: STEP_MS, polling: 50 });
+    const zoomed = await g();
+    record(
+      `${p}.frame.zoom`,
+      zoomed.frameMs,
+      "ms",
+      `mean of the last frames (EMA) while the camera eases, nothing moving; ${zoomed.frames - z0} frames; ${renderer}`,
+    );
+    await page.evaluate(() => {
+      window.__dagGraph.finish = false;
+    });
+
+    /* At rest: no frame, and what the browser spends. */
+    await sleep(1_000);
+    const r0 = (await g()).frames;
+    const procs = chromiumProcs(b.pid);
+    const idle = await cpuOver(procs.all, 5_000);
+    record(`${p}.rest.frames`, (await g()).frames - r0, "count", "frames drawn over 5 s at rest");
+    record(`${p}.rest.cpu`, idle, "%", `all Chromium processes over 5 s at rest; ${load()}`);
+    const m = await metrics();
+    record(`${p}.heap`, mb(m.JSHeapUsedSize), "MB", "the page's JS heap at rest");
+    record(`${p}.rss.renderer`, mb(sumRss(chromiumProcs(b.pid).renderers)), "MB", "every renderer of the browser");
+    record(`${p}.rss.browser`, mb(sumRss(chromiumProcs(b.pid).all)), "MB", "every Chromium process, the GPU's included");
+
+    /* Closed: a press on a dot opens its file in the same tab, and nothing of the graph is left. */
+    const spot = await page.evaluate(
+      ({ w, h }) => {
+        const at = window.__dagGraph.at;
+        for (let i = 0; ; i++) {
+          const q = at(i);
+          if (!q) return null;
+          if (q.x > w * 0.1 && q.x < w * 0.6 && q.y > h * 0.1 && q.y < h * 0.9 && window.__dagGraph.pick(q.x, q.y) === i)
+            return q;
+        }
+      },
+      { w: box.width, h: box.height },
+    );
+    if (spot) await page.mouse.click(box.x + spot.x, box.y + spot.y);
+    await page.waitForFunction(() => !document.querySelector("[data-dag-graph]"), null, { timeout: 30_000 });
+    let left = null;
+    try {
+      await page.waitForFunction(
+        () => window.__probe.made === window.__probe.ended && window.__probe.contexts.every((c) => c.isContextLost()),
+        null,
+        { timeout: 10_000, polling: 100 },
+      );
+    } catch {
+      /* `left` says what stayed */
+    }
+    left = await page.evaluate(() => ({
+      workers: window.__probe.made - window.__probe.ended,
+      contexts: window.__probe.contexts.filter((c) => !c.isContextLost()).length,
+    }));
+    record(`${p}.closed.workers`, left.workers, "count", "graph workers still running once the page is closed");
+    record(`${p}.closed.contexts`, left.contexts, "count", "WebGL contexts still held once the page is closed");
+    await sleep(2_000);
+    record(
+      `${p}.closed.cpu`,
+      await cpuOver(chromiumProcs(b.pid).all, 5_000),
+      "%",
+      `all Chromium processes over 5 s, a note open; ${load()}`,
+    );
+    if (problems.length) record(`${p}.errors`, problems.length, "count", problems[0].slice(0, 120));
+  } finally {
+    await context.close().catch(() => undefined);
+    await s.stop();
+  }
+}
+
+/**
+ * The Graph page at 2,000 and 5,000 files, and on the dense vault: on the headless browser's own
+ * renderer, SwiftShader, which draws on the CPU and reads every frame back for a compositor that
+ * is software too — and again on this machine's GPU when Chromium can be given one, which is what a
+ * person's window draws with. Each line says which.
+ */
+async function graphPageGroup(b) {
+  const vaults = [
+    ["2000", graphVault(2000)],
+    ...(QUICK
+      ? []
+      : [
+          ["5000", graphVault(5000)],
+          ["dense", denseVault(5000, 150_000)],
+        ]),
+  ];
+  for (const [label, v] of vaults) await graphPageOne(b, label, v);
+  let gpu = null;
+  try {
+    gpu = await launchBrowser(["--enable-gpu", "--ignore-gpu-blocklist", "--use-angle=gl"]);
+    const page = await gpu.browser.newPage();
+    const name = await page.evaluate(() => {
+      const gl = document.createElement("canvas").getContext("webgl2");
+      const info = gl?.getExtension("WEBGL_debug_renderer_info");
+      return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : "";
+    });
+    await page.close();
+    if (!name || /SwiftShader/i.test(name)) {
+      console.log("# graph.page: no GPU for Chromium here; SwiftShader only");
+      return;
+    }
+    for (const [label, v] of vaults) await graphPageOne(gpu, `${label}.gpu`, v);
+  } finally {
+    await gpu?.stop();
+  }
+}
 
 /* -- the groups ----------------------------------------------------------------------------------- */
 
@@ -1507,7 +1747,7 @@ async function main() {
   console.log(`# ${m.cpu} · ${m.cores} cores · ${m.memoryGB} GB · ${m.os} · ${m.arch} · Node ${m.node}`);
   console.log(`# temp: ${work}  (${m.disk})`);
   if (RELEASE) console.log("# release: the table's ten rows, a 1k-file vault and a 500-item board");
-  const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board");
+  const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board") || ONLY.has("graph-page");
   const b = wantBrowser ? await launchBrowser() : null;
   const chromiumVersion = b ? b.browser.version() : null;
   if (b) console.log(`# Chromium ${chromiumVersion}`);
@@ -1524,6 +1764,7 @@ async function main() {
          leaves the shared browser holding gigabytes, and a board timed after it is timed on a
          machine still giving them back. */
       if (ONLY.has("graph")) await graphGroup(record, { quick: QUICK });
+      if (ONLY.has("graph-page")) await graphPageGroup(b);
       if (ONLY.has("board")) await boardGroup(b);
       if (ONLY.has("attach")) await attachGroup();
       if (ONLY.has("vault") || ONLY.has("page")) for (const n of SIZES) await vaultGroup(n, b);

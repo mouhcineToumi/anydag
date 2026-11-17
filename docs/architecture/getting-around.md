@@ -18,6 +18,11 @@ on a canvas holding one graph sized to fit, wrong on a plane you travel across.
 | middle-drag | move, over an item, without a modifier |
 | arrows · `F` · `+` `-` · `0` | move · fit · zoom · 100% — arrows nudge the selection instead when there is one |
 
+**The Graph page is the exception: its wheel zooms**, about the pointer, and a drag on the paper
+moves it (*The Graph page* in [`graph.md`](graph.md)). A graph is one picture sized to fit, the
+case the earlier code was right about: there is no up and down to travel through, and a person
+looking at one reaches for the wheel to look closer. Its `F`, `+` `-` and `0` are the board's.
+
 The pan modifier is load-bearing rather than a convenience: a press on an item *moves the item*, so
 on a full board there is no paper left to grab and the view could only be reached with the wheel.
 `Viewport` paints `data-pan` on `.dag-viewport` while one is held and `Item` reads it back off the
