@@ -71,6 +71,18 @@ rm` went on saying *never recursive* about a thing the app did. It is `folder rm
 running app's server through `server.json`, or one in this process. It speaks on stdout, so it takes no
 `--json`. See *Parity*.
 
+**A request is one frame, and it has a ceiling** (#399). `server/mcp/frame.ts` hands the stdio
+transport one assembled line at a time, and answers a frame over 64 MB instead of dying on it. That
+is not a detail of the SDK's: `StdioServerTransport` discards a frame past its `maxBufferSize` — 10 MB
+when nothing says — *and closes the transport*, which `main.ts` turns into an exit, so a `file_upload`
+of 8 MB (10.7 MB as base64) was an `EPIPE` on the client and a server that had answered its last
+call. The answer is a JSON-RPC error for the request's own `id`: nothing was done, and the connection
+is still up. A file's bytes travel as base64 `data`, four thirds their size, so `file_upload` and
+`image_add` carry about 48 MB that way and a bigger one goes as `url`, which the server fetches
+itself; a vault's 512 MB is the store's limit, not the wire's. The framer is also linear where the
+SDK's buffer concatenated with every chunk — one frame of n bytes cost about n²/(2·chunk) bytes of
+copy — which is what makes a 40 MB upload seconds rather than minutes.
+
 **The sheets `dsl_reference` serves ship beside the server bundle.** `server/build.mjs` copies
 `docs/dsl/` and `docs/generate/` into `server/dist/docs/`, the first place `server/handle.ts` looks;
 a checkout's unit suite reads the repository's `docs/`, and `ANYDAG_DOCS_DIR` beats both. A packaged

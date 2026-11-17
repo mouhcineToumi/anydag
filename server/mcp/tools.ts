@@ -26,8 +26,9 @@ import { FetchRefused, fetchFile, type Fetched } from "../fetch";
 import { endsBeforeItStarts, placed, withTitle } from "../frontmatter";
 import { grammar } from "../grammar";
 import { extOf } from "../names";
-import { MIME } from "../uploads";
+import { MIME, megabytes } from "../uploads";
 import type { Answer, Backend, CallOptions } from "./backend";
+import { MAX_DATA_BYTES } from "./frame";
 
 /* -- the shapes a tool and its server share ------------------------------------------------- */
 
@@ -1382,7 +1383,7 @@ const imageTools: Tool[] = [
   tool({
     name: "image_add",
     description: withNote(
-      `Keep a picture in the vault. \`data\` is a \`data:image/…;base64,…\` URL, or plain base64 with \`mime\` saying what it is (\`image/png\`)${IMAGE_BY_URL}.\n\n` +
+      `Keep a picture in the vault. \`data\` is a \`data:image/…;base64,…\` URL, or plain base64 with \`mime\` saying what it is (\`image/png\`), for a picture of up to about ${megabytes(MAX_DATA_BYTES)}${IMAGE_BY_URL}.\n\n` +
         "It is stored as an attachment in the vault's attachments folder and referred to as `dag:<id>`. On a **board** it is placed too — an `image` item appended at `x`/`y` and `w` wide, on `page` — and the answer names the item. On a **note** or a **quiz** nothing is written: put `![what it shows](<src>)` where it belongs with `note_write`, using the `src` that comes back.",
     ),
     write: true,
@@ -1475,7 +1476,7 @@ const fileTools: Tool[] = [
   tool({
     name: "file_upload",
     description: withNote(
-      "Keep a file — a PDF, a picture, a document, a sheet, slides, audio, video, an archive — as an attachment, listed with the boards and notes. `data` is its bytes as base64 (a `data:…;base64,…` URL is taken too) — or, instead, `url`: an `https://` address the server fetches it from, so its bytes never pass through you (an address on this machine or a private network is refused). `filename` is what it is called, extension and all (`Q3 Report.pdf`), which is what decides its type — with a `url` it defaults to the address's last segment; `folder` is where it goes, `\"\"` the top. What this vault accepts is `file_list`'s `limits`; anything else is refused, with why.\n\n" +
+      `Keep a file — a PDF, a picture, a document, a sheet, slides, audio, video, an archive — as an attachment, listed with the boards and notes. \`data\` is its bytes as base64 (a \`data:…;base64,…\` URL is taken too), for a file of up to about ${megabytes(MAX_DATA_BYTES)}; past that, give \`url\` instead — an \`https://\` address the server fetches it from, so its bytes never pass through you (an address on this machine or a private network is refused). \`filename\` is what it is called, extension and all (\`Q3 Report.pdf\`), which is what decides its type — with a \`url\` it defaults to the address's last segment; \`folder\` is where it goes, \`""\` the top. What this vault accepts is \`file_list\`'s \`limits\`; anything else is refused, with why.\n\n` +
         'Refer to it from a note with `![Q3 Report.pdf](dag:<id>)` — drawn: a picture inline, anything else as a card — or `[Q3 Report.pdf](dag:<id>)`, a link; on a board a picture is an `image` fence with `src="dag:<id>"`. The `id` comes back, and `sha256`, the checksum of the bytes that arrived.',
     ),
     write: true,

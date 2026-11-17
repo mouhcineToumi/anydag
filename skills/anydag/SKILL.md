@@ -61,7 +61,7 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `tag_list` · `tag_apply` · `tag_rename` · `tag_delete` · `tag_color` | tags — a frontmatter `tags:` on any document — with each one's colour and how many documents carry it (with `tag`, which ones); adding and taking them off one document (a tag the vault has never seen is created); renaming or merging one everywhere (**ask first before a merge**); deleting one everywhere, **only when asked**, with `confirm`; and a tag's colour, one of the ten hues. `note_create`, `task_create` and `event_create` take `tags` too |
 | `search` · `refs` · `resolve` | the page's search over every board, note, quiz and table — with a `tag`, only what carries it; references and backlinks; what a `dag:<id>` names |
 | `image_add` · `image_get` · `image_unused` · `image_sweep` | a picture beside a board (placed) or a note (kept) — **by `url` when it is on the web**, which the server fetches, rather than its bytes through the conversation; looking at one; the ones nothing names any more |
-| `file_upload` · `file_list` · `file_get` · `file_rename` · `file_duplicate` · `file_title` · `file_delete` | attachments: any file — a PDF, a picture, a sheet — kept beside the boards and notes and referred to by `dag:<id>` (see *Attachments*), given as base64 `data` or as an `https://` `url` the server fetches (a private address is refused) — and its `sha256` comes back, to prove the bytes arrived; `file_list` says what this vault accepts, `file_get` shows a picture or a text file, and `file_delete` moves it to the trash and says what used it |
+| `file_upload` · `file_list` · `file_get` · `file_rename` · `file_duplicate` · `file_title` · `file_delete` | attachments: any file — a PDF, a picture, a sheet — kept beside the boards and notes and referred to by `dag:<id>` (see *Attachments*), given as base64 `data` — for a file of up to about 48 MB — or as an `https://` `url` the server fetches, which is how a bigger one goes (a private address is refused) — and its `sha256` comes back, to prove the bytes arrived; `file_list` says what this vault accepts, `file_get` shows a picture or a text file, and `file_delete` moves it to the trash and says what used it |
 | `trash_list` · `trash_restore` · `trash_delete` · `trash_empty` | what was deleted: **every `*_delete` and `board_rmdir` moves a thing to the trash**, where it stays for `days` (thirty) and `trash_restore` puts it back with its id; `trash_delete` and `trash_empty` delete for good, each with a `confirm` — **ask the person first** |
 | `sync_status` · `sync_now` | whether the vault syncs to a sync server and how it is going (`state`, `pending`, `conflicts`, `last`), and a pull-and-push now — **only in builds with the `cloud` switch on: if they are not in the tool list, this build has none**. Pairing and linking are the person's — they take a one-time code and a passphrase, typed in Settings → Sync or `anydag sync` — so there is no tool for either; a vault that is not linked says `unlinked` |
 | `component_delete` | removing a saved component, for good — keeping one is `board_create` under `components/` |
@@ -566,7 +566,10 @@ spreadsheet, slides, audio, video, an archive — listed and foldered with them,
 `?file=<name>`, and, like every document, given a permanent id. Its name keeps its extension
 (`specs/q3-report.pdf`); what it is *called* (`Q3 Report.pdf`) is its title, and the extension is
 what decides its type. Keep one with `file_upload` or `anydag file upload`; `file_list` says the
-largest file and the types this vault takes, and anything else is refused with why.
+largest file and the types this vault takes, and anything else is refused with why. Over MCP a
+request is one JSON-RPC frame, so the base64 `data` a tool call carries is a file of up to about
+48 MB; past that give `url`. `anydag file upload`, a drop in the app and the tool's own `url` reach
+the vault's whole limit, 512 MB by default.
 
 Refer to one by its id, exactly as to a board or a note. In a note, `![Q3 Report.pdf](dag:1eaj124s6h)`
 on a line of its own draws a picture inline and anything else as a card to open or download, and
