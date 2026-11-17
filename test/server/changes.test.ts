@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { Change } from "../../server/vault";
+import { type Change, Vault } from "../../server/vault";
 import {
   BOARD,
   NOTE,
@@ -183,6 +183,76 @@ describe("the change feed", () => {
     write(env.root, "x.board.md", BOARD);
     await until(() => heard.some((c) => c.type === "doc"));
   });
+});
+
+describe("a folder made with its parent in one go (#405)", () => {
+  /* inotify watches a new folder only once it hears it made, and never looks inside, so what
+     `mkdir -p` made beneath it in the same breath was never watched. */
+  it("a document written later in a folder made with its parent reaches the feed", async () => {
+    const f = await feed();
+    fs.mkdirSync(path.join(env.root, "a", "b", "c"), { recursive: true });
+    await tree(f);
+    await sleep(300);
+    write(env.root, "a/b/later.board.md", BOARD);
+    write(env.root, "a/b/c/deeper.board.md", BOARD);
+    expect((await doc(f, "a/b/later")).sha1).not.toBeNull();
+    expect((await doc(f, "a/b/c/deeper")).sha1).not.toBeNull();
+  });
+
+  it("a document written with the folders it is in, in one go, reaches the feed", async () => {
+    const f = await feed();
+    write(env.root, "a/b/c/now.board.md", BOARD);
+    write(env.root, "a/b/beside.md", NOTE);
+    write(env.root, "a/top.board.md", BOARD);
+    for (const name of ["a/b/c/now", "a/b/beside", "a/top"]) expect((await doc(f, name)).sha1).not.toBeNull();
+  });
+
+  it("a folder made with its parent, removed and made again, is watched again", async () => {
+    const f = await feed();
+    fs.mkdirSync(path.join(env.root, "a", "b"), { recursive: true });
+    await tree(f);
+    await sleep(200);
+    fs.rmSync(path.join(env.root, "a"), { recursive: true });
+    await sleep(200);
+    fs.mkdirSync(path.join(env.root, "a", "b"), { recursive: true });
+    await sleep(300);
+    write(env.root, "a/b/again.board.md", BOARD);
+    expect((await doc(f, "a/b/again")).sha1).not.toBeNull();
+  });
+});
+
+describe("a folder that goes while the watcher starts (#389)", () => {
+  /* The watcher walks the vault and then watches each folder it found; one moved in between failed
+     the whole subscription, unhandled, and left the vault unwatched. */
+  it("does not stop the vault being watched", async () => {
+    /* With nothing else watched, as on CI, the watcher lets its failed walk go and a second walks
+       afresh; another vault's watcher would keep the failed walk (`subscribeAt`). */
+    await env.vault.close();
+    const root = fs.mkdtempSync(path.join(path.dirname(env.root), "anydag-vault-"));
+    try {
+      for (let i = 0; i < 2000; i++) fs.mkdirSync(path.join(root, `d${i}`));
+      for (let round = 0; round < 8; round++) {
+        fs.mkdirSync(path.join(root, "work", "empty"), { recursive: true });
+        const v = new Vault(root, env.home);
+        try {
+          const watching = v.watch();
+          await sleep(round % 4);
+          fs.renameSync(path.join(root, "work"), path.join(root, "moved"));
+          await watching;
+          const f = await listen(v);
+          await sleep(100);
+          write(root, `moved/r${round}.board.md`, BOARD);
+          await until(() => f.docs(`moved/r${round}`).length, 5000, `a change in round ${round}`);
+          f.stop();
+        } finally {
+          await v.close();
+        }
+        fs.rmSync(path.join(root, "moved"), { recursive: true, force: true });
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 describe("note changes", () => {
