@@ -30,8 +30,12 @@ changes only through a pull request from `release/X.Y.Z` or `hotfix/X.Y.Z` (a me
 version and kept after it ships; betas are tagged on it. Every merge into `main` is tagged `vX.Y.Z`,
 and main is merged back into develop with the version bumped. Branches are never deleted after a
 merge. Rulesets on GitHub hold all of it: a pull request for `main`, `develop`, `release/**` and
-`hotfix/**`, the code owner's approval for anybody but the owner, no force-push or deletion, and
-`v*` tags and `nightly/**` branches that cannot be moved once made.
+`hotfix/**`, no force-push or deletion, and `v*` tags and `nightly/**` branches that cannot be moved
+once made. On `develop` a pull request needs no approval (since 2026-11-17): only the owner can merge,
+so an outside one is merged after the owner has read it, and the owner's own are armed with
+auto-merge (`gh pr merge --auto --squash`) and land when the required checks pass. A required
+approval there could only be met by bypassing it, which meant every merge was an `--admin` merge
+somebody had to sit and wait for.
 
 **A release is a tag, and the workflow checks where it stands.** `release.yml` runs on `v*` tags that
 are not nightlies: a stable tag must be on `main` and a beta on `release/<core>` or `hotfix/<core>`.

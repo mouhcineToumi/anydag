@@ -257,9 +257,10 @@ release note, so write it for someone reading a changelog.
 
 **Review**
 
-- **Every PR from someone other than the maintainer needs the maintainer's approval** (it is the
-  code owner of everything, see [`.github/CODEOWNERS`](.github/CODEOWNERS)); the maintainer can also
-  merge their own PRs without one.
+- **Only the maintainer can merge**, so every PR from someone else is merged after the
+  maintainer has reviewed it (the code owner of everything, see [`.github/CODEOWNERS`](.github/CODEOWNERS)).
+  The maintainer's own PRs merge by **auto-merge**: armed when the PR opens, they land when the
+  required checks pass, with no approval to wait for.
 - The maintainer reviews in their own time. If you have heard nothing for a while, a polite nudge on the
   PR is welcome.
 - Review is about the code, never the person. Feedback is concrete and may ask for a smaller PR, a
