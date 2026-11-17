@@ -20,6 +20,7 @@
 import { parse as parseYaml } from "yaml";
 
 import { HUE_ORDER, type Hue } from "../dsl/ir";
+import { underMark } from "./bom";
 import { QUIET } from "./quiet";
 import { keyEnd } from "./task";
 
@@ -31,7 +32,7 @@ export interface TagChange {
   rename?: { from: string; to: string };
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** Letters, digits, `_`, `-` and `/` — Obsidian's characters. */
 const CHARS = /^[\p{L}\p{M}\p{N}_/-]+$/u;
@@ -189,6 +190,11 @@ function found(lines: readonly string[]): Found {
  * line when `board` is set (`withTitle`'s rule: a board's frontmatter is apart from its body).
  */
 export function withTags(text: string, change: TagChange, opts: { board?: boolean } = {}): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => tagsIn(rest, change, opts));
+}
+
+function tagsIn(text: string, change: TagChange, opts: { board?: boolean }): string {
   const remove = new Set((change.remove ?? []).map(tagKey));
   const m = FRONT.exec(text);
   const block = m ? m[1]! : "";

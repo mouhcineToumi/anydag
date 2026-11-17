@@ -497,6 +497,21 @@
   when the note was opened, so a paragraph a person had edited *and saved* still counted as edited;
   the next outside write replaced it rather than keeping it, and the caret in it went with it — to
   the start of the next block. `saved()` returns the map for the body it wrote.
+- **remark skips a byte-order mark, and counts its offsets from past it.** A file that opens with
+  U+FEFF — Windows editors write one — was parsed with the mark in it and sliced at remark's offsets
+  with the mark still there, so every unit of the span map was one code unit early: each lost its
+  last character to the next unit's gap, and the first edit wrote that gap back as a blank line. The
+  period before the edited block went, and under frontmatter the closing `---` lost a hyphen (#394).
+  Anything that slices a text at remark's offsets parses the text after the mark (`markOf` in
+  `src/note/bom.ts`): `load`, `mdToBlocks`, `relink.ts`. `splitNote` carries the mark in `front`, so
+  the editor's body never has one, and every frontmatter pattern on the note side is
+  `^\uFEFF?---`, its writers working behind the mark through `underMark`.
+- **A rewritten block still stands where it stood, and keeps the gaps on either side.** `saved()`
+  used to write `\n\n` before and after any block that was typed into, so the block before it —
+  untouched — lost its own line ending: CRLF in a CRLF note (#416), and the stolen byte in the BOM
+  case above. The gap is the loaded one wherever both blocks are where they were; only when it holds
+  no blank line, and one side was rewritten, does it gain one, since a heading needs none under it
+  and the paragraph somebody turned it into does.
 - **A marker cleared by `.finally()` has to compare against the promise it was set to.**
   `writing.current = next.finally(() => { if (writing.current === next) … })` never clears — the
   stored promise is the `finally` one — so every outside write after the first save looked like a

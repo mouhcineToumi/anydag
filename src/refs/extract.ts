@@ -120,7 +120,7 @@ export function refsInBoard(text: string): Ref[] {
   });
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** A board's or a note's `title:` from its frontmatter, when it has one — what a reference shows. */
 export function titleOf(text: string): string | undefined {
