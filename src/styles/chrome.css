@@ -4766,6 +4766,14 @@ html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !importa
 /* `--canvas-right` is whatever the panels take, so this stays 12px off the *drawing's* edge
    instead of being drawn on top of the library. */
 .dag-zoombar { right: calc(var(--canvas-right, 0px) + 12px); }
+/* And while the drawing is wide enough for both. Under about 690px of canvas — a 800×700 window
+   with the library open leaves 528 — the dock, centred on `--canvas-mid`, reaches the cluster
+   pinned to `--canvas-right`, and the cluster, later in the DOM on the same layer, took every press
+   meant for the dock's last controls (#395). No media query can see this: the canvas is the window
+   minus whatever panels are open. `useBottomBars` measures the two boxes (`src/ui/bottomBars.ts`)
+   and lifts the cluster above the dock by the dock's own height, which is the one number here only
+   the browser has. */
+.dag-zoombar[data-dag-zoombar-lifted] { bottom: calc(12px + var(--zoom-lift, 50px)); }
 
 .dag-dock__group { display: flex; align-items: center; gap: 2px; }
 .dag-dock__rule { width: 1px; height: 20px; margin: 0 4px; background: var(--dag-color-outlineSoft); }
