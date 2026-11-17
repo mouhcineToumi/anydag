@@ -136,6 +136,28 @@ describe("documents", () => {
     expect((await call(c, "note_list")).data.notes).toEqual([]);
   });
 
+  // #401: a fresh body with no frontmatter, as an agent writes one, keeps the document's id.
+  it("a `*_write` of a text with no `id:` keeps the document's id, and answers the base of what landed", async () => {
+    const c = await connect();
+    const fresh: Record<string, string> = {
+      board: '```sketch {#s}\nbox a "A"\n```\n',
+      note: "# Fresh\n",
+      quiz: "## Three? {#q3}\n- [x] y\n- [ ] n\n",
+      table: "## Deals {#deals}\n\n| Name {#name} |\n| --- |\n| Beta {#rbeta} |\n",
+    };
+    for (const kind of ["board", "note", "quiz", "table"]) {
+      const made = (await call(c, `${kind}_create`, { name: `doc-${kind}` })).data;
+      expect(made.id).toMatch(/^[0-9a-z]{10}$/);
+      const read = (await call(c, `${kind}_read`, { name: made.name })).data;
+      const wrote = await call(c, `${kind}_write`, { name: made.name, text: fresh[kind], base: read.base });
+      expect(wrote.error).toBeUndefined();
+      const after = (await call(c, `${kind}_read`, { name: made.name })).data;
+      expect(after.text).toMatch(new RegExp(`^---\\nid: ${made.id}\\n---\\n`));
+      expect(after.id).toBe(made.id);
+      expect(wrote.data.base).toBe(after.base);
+    }
+  });
+
   it("percent-encodes a name with spaces and slashes in its deep link", async () => {
     const c = await connect();
     const made = (await call(c, "note_create", { name: "a folder/with space", text: "x\n" })).data;

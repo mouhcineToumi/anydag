@@ -1468,6 +1468,12 @@ export class Vault {
   /**
    * Replace a document's text. `base` of `null`/`undefined` is "I have not seen it", which overwrites
    * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1.
+   *
+   * **A text with no `id:` keeps the one the file has** (#401): the id is the document, every `dag:`
+   * link names it, and the index that would otherwise remember it is rebuildable. So a replacement
+   * that carries no `id:` line — an agent's fresh body, a draft written whole — is written with the
+   * file's id put back, and the answer is that text, whose sha1 is the new base. A file with no id
+   * of its own is written as given (an edit never mints one), and so is a text that says `id:`.
    */
   async write(name: string, kind: TextKind, text: string, base?: string | null): Promise<Version> {
     const file = this.writeAt(this.fileOf(name, kind));
@@ -1478,13 +1484,15 @@ export class Vault {
       throw new NotFound(`no ${kind} \`${name}\``);
     }
     if (base && base !== now.base) throw new Conflict(now.base, now.text);
-    if (now.text !== text) {
-      writeAtomic(file, text);
-      this.mintTargets(text, now.text);
+    const own = frontId(now.text);
+    const body = typeof own === "string" && frontId(text) === null ? withId(text, own) : text;
+    if (now.text !== body) {
+      writeAtomic(file, body);
+      this.mintTargets(body, now.text);
       if (this.component(name) !== null)
-        this.emit({ type: "doc", kind: "board", name, sha1: sha1(text), title: titleOf(text) ?? null });
+        this.emit({ type: "doc", kind: "board", name, sha1: sha1(body), title: titleOf(body) ?? null });
     }
-    return version(text);
+    return version(body);
   }
 
   /**
