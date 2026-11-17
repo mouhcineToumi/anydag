@@ -11,3 +11,7 @@
 things in one week and one a year later do not look evenly spaced. Entries pack into rows to avoid
 overlapping. A section is drawn as a labelled rule over the stretch it covers.
 Flags: `done` `wait`.
+
+A date must exist on the calendar: `2026-02-30`, `2026-04-31` and month `00` or `13` are
+`E_BAD_DATE` at the date's line:col, and the entry is not drawn. February has 29 days in a leap
+year — `2024-02-29` is a day, `2023-02-29` is not.
