@@ -1,0 +1,1003 @@
+/* ---- the sidebar ---- */
+
+/*
+ * The column down the left: the files as a tree, the ways to make more, the account and the
+ * settings. `Shell` places it; `data-mode` says whether it is docked beside the page or over it.
+ *
+ * Docked it is a flex child of `.dag-shell` and takes `--sidebar-w`, which the grip paints for the
+ * length of a drag and React settles after — named with no `--dag-` prefix for the reason
+ * `--inspector-w` has none: `check-theme.mjs` reads that prefix as a theme token. Over the page it is
+ * the same column, positioned, which is what makes a peek cost the canvas nothing.
+ *
+ * `paper100` is DESIGN.md's surface-container, "a recessed strip", and the rows sit on it the way
+ * Notion's do on its own. Names claimed, grepped first: `dag-sidebar*` and `dag-shell` are free —
+ * the retired `dag-sidebar__*` survives only in the comment above the board list.
+ */
+.dag-sidebar {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  /* Docked from 720px, so on a laptop window the *default* gives way: never more than
+     a quarter of the window, and never under 232px — which at 929px is exactly 232, the width a
+     laptop window has room for. A width somebody dragged is theirs up to half the window:
+     under the quarter rule the grip on that same window moved nothing at all. */
+  width: min(var(--sidebar-w, 272px), var(--sidebar-cap));
+  --sidebar-cap: max(232px, 25vw);
+  /* A row's height, wherever the column draws one: the tree and the favourites above it are the
+     same row (#319). `--sidebar-row` used to live on the tree alone, so a favourite's row fell back
+     to `height: auto` — shorter than the 24px tool it holds, which is what made `.dag-sidebar__favs`
+     scroll. `Sidebar.tsx` reads it from the tree's computed style to place the rows it has not
+     drawn. The phone's taller row is the sheet's rule below. */
+  --sidebar-row: 30px;
+  height: 100%;
+  min-height: 0;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border-right: 1px solid var(--dag-color-outline);
+}
+/* `data-sidebar-sized` is React's (a width that is not the default); `data-sidebar-dragging` is the
+   grip's, painted for the length of a drag so the column follows the pointer from the first pixel. */
+.dag-shell:is([data-sidebar-sized], [data-sidebar-dragging]) .dag-sidebar { --sidebar-cap: max(232px, 50vw); }
+/* Over the page it floats **below the toolbar**, never over it — Notion's peek. Full height, it
+   slid in over the very toggle that summoned it, so the click meant to dock it landed on the
+   sidebar's own logo instead: the suite found that, and so would anybody with a mouse. */
+.dag-sidebar[data-mode="overlay"] {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  bottom: 8px;
+  /* Its size comes from its two edges; the docked `height: 100%` would push the foot off the glass. */
+  height: auto;
+  z-index: var(--dag-ui-layer-popover);
+  border: 1px solid var(--dag-color-outline);
+  border-left: none;
+  border-radius: 0 var(--dag-ui-radius-surface) var(--dag-ui-radius-surface) 0;
+  box-shadow: var(--dag-ui-elevation-overlay);
+  animation: dag-sidebar-in var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
+}
+@keyframes dag-sidebar-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Floating, it hangs under a toolbar that already carries the mark and the toggle, so it has no
+   header of its own; the first row gets the room the header's edge would have given it. */
+.dag-sidebar[data-mode="overlay"] { padding-top: 4px; }
+
+/* The header, docked: the toggle's slot, then the mark — the toolbar's own arrangement, on the
+   toolbar's own numbers (16px in, a 30px slot, a 12px gap, a 48px band), so neither moves when the
+   column goes and the toolbar takes over drawing them. */
+.dag-sidebar__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  height: 48px;
+  padding: 0 8px 0 calc(16px + var(--window-inset));
+}
+/* The logo is a button that goes home: nothing open, the welcome card, as a new history entry.
+   `font: inherit` — a button's own font would otherwise redraw the wordmark. The 4px of air is the
+   same on the toolbar's, so the mark sits exactly where the toolbar draws it when the column goes
+   (`e2e/sidebar.spec.ts` holds the two level), and the hover is the column's own. */
+.dag-sidebar__logo {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 4px;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__logo:hover { background: var(--dag-color-paper200); }
+.dag-sidebar__logo:focus-visible { box-shadow: var(--focus-ring); }
+
+/*
+ * The sidebar's one toggle. `Shell` draws it once, over the top-left corner of the
+ * window, and the sidebar's header or the toolbar — whichever is at that corner — keeps an empty
+ * slot for it. So it sits at exactly the same place docked, away and peeking, which is Claude.ai's
+ * arrangement: it used to jump from the column's right edge to
+ * the window's left one and back.
+ *
+ * `top` centres 30px in the 48px both bars share, and `left` is both bars' 16px of padding; the two
+ * rules this is placed against are `.dag-toolbar` and `.dag-sidebar__head`, and moving either one's
+ * padding or height moves the slot out from under the button. `z-index: 1` is for the docked
+ * column, which is `position: relative` and drawn first; every scrim is 20 and stays over it.
+ * Names grepped first: `dag-sidebar-toggle*` and `data-dag-sidebar-toggle` were nobody's.
+ */
+.dag-sidebar-toggle { position: absolute; top: 9px; left: calc(16px + var(--window-inset)); z-index: 1; }
+.dag-sidebar-toggle:focus-visible { box-shadow: var(--focus-ring); }
+/* Over the docked column's `paper100`, the usual hover fill is the colour already behind it. */
+.dag-sidebar-toggle[data-dag-sidebar-toggle="docked"]:hover { background: var(--dag-color-paper200); }
+.dag-sidebar-toggle-slot { flex: none; width: 30px; height: 30px; }
+
+.dag-sidebar__acts,
+.dag-sidebar__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: none;
+  padding: 4px 8px;
+}
+.dag-sidebar__foot { padding: 8px; border-top: 1px solid var(--dag-color-outlineSoft); }
+
+.dag-sidebar__act {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__act > svg { flex: none; }
+.dag-sidebar__act span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The search chord as two keycaps, Space then O: one string in 10px mono read as "space 0". */
+.dag-sidebar__act .dag-sidebar__keys { flex: none; display: inline-flex; gap: 3px; }
+/* And every keycap on the Tasks page: a menu row's key, the New task row's hints. */
+.dag-sidebar__keys kbd,
+.dag-tasks-kbd {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-xs);
+  line-height: var(--dag-ui-leading-xs);
+  text-align: center;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: 4px; /* a key, not a pill: the control corner rounds an 18px box into one */
+}
+.dag-sidebar__act:hover .dag-sidebar__keys kbd { color: var(--dag-color-slate); }
+.dag-sidebar__act:hover,
+.dag-sidebar__row:hover,
+.dag-sidebar__account:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-sidebar__act:focus-visible,
+.dag-sidebar__row:focus-visible,
+.dag-sidebar__account:focus-visible { box-shadow: var(--focus-ring-inset); }
+
+/* No capitals: DESIGN.md sets nothing in all-caps but a badge. */
+.dag-sidebar__section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  margin: 12px 8px 4px 16px;
+}
+.dag-sidebar__section h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); text-overflow: ellipsis; white-space: nowrap; }
+/* What the filter holds back, after the heading's word: *Files · tasks hidden*. Regular weight, so
+   the section still reads as one heading at a glance. */
+.dag-sidebar__filtered { min-width: 0; overflow: hidden; font-weight: var(--dag-ui-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
+
+.dag-sidebar__tree {
+  /* An open empty folder's *Empty* line, said once: the tree draws only the rows in view
+     (`virtual.ts`) and places each by its offset, so `Sidebar.tsx` reads this to know where a line
+     it has not drawn would be. The row's height is the column's `--sidebar-row` above. */
+  --sidebar-empty: 26px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  scrollbar-width: thin;
+}
+.dag-sidebar__line { position: relative; display: block; }
+/* Favourites sit above the tree and do not scroll with it; a long list scrolls on its own. */
+.dag-sidebar__favs { flex: none; max-height: 30%; overflow-y: auto; padding: 0 8px; scrollbar-width: thin; }
+
+/*
+ * A row's own tools — the folder's `+`, a favourite's star and everybody's `⋯` — on the hovered,
+ * focused or open row, over the end of the name on the row's own ground so the ellipsis reads as
+ * the name running under them. The open row is the one that keeps them up without a pointer, so
+ * the first thing somebody sees is a file with actions. `tabIndex=-1` on each: the keyboard
+ * reaches the same menu with `shift+F10`, and a Tab stop per row per tool would make the tree a
+ * hundred stops long.
+ */
+.dag-sidebar__tools {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  display: none;
+  gap: 2px;
+  border-radius: var(--dag-ui-radius-control);
+  background: var(--dag-color-paper200);
+}
+.dag-sidebar__line:hover > .dag-sidebar__tools,
+.dag-sidebar__line:focus-within > .dag-sidebar__tools { display: flex; }
+.dag-sidebar__line--on > .dag-sidebar__tools { display: flex; background: var(--dag-color-accentSoft); }
+/* `IconButton size="sm"`: the size, corner and colour are the component's. The hover is not the
+   usual `paper100`, which is the row's own ground under a hovered row, so the tool would vanish. */
+.dag-sidebar__tool:hover { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
+.dag-sidebar__tool--danger { color: var(--dag-color-dangerText); }
+/* The hover keeps `dangerText`: `danger` on `dangerSoft` is under 4.5:1, and this one carries a word. */
+.dag-sidebar__tool--danger:hover { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
+.dag-sidebar__tool:focus-visible { box-shadow: var(--focus-ring-inset); }
+
+/* A question asked in the row — a name, a folder to move to, whether to delete — never through a
+   browser dialog, which blocks the page, cannot be themed and cannot be driven by the suite. */
+.dag-sidebar__line--ask {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 2px 4px 2px calc(8px + var(--depth, 0) * 16px);
+}
+.dag-sidebar__ask {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dag-sidebar__namebox { position: relative; display: flex; flex: 1; min-width: 0; }
+.dag-sidebar__name-input,
+.dag-sidebar__move {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+/* DESIGN.md's input focus: an accent hairline and a soft ring, never a change of size. */
+.dag-sidebar__name-input:focus-visible,
+.dag-sidebar__move:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__name-input[aria-invalid="true"] { border-color: var(--dag-color-danger); }
+.dag-sidebar__name-why {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 4px 6px;
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-dangerText);
+  background: var(--dag-color-dangerSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+
+/*
+ * A selection: a row picked with ctrl, ⌘ or shift wears the accent's tint and a hairline of
+ * the accent — the open file's tint without its cap, so the two read apart when they are one row — and
+ * the bar under the tree says how many and what can be done to them.
+ */
+.dag-sidebar__line[aria-selected="true"] > .dag-sidebar__row,
+.dag-sidebar__line[aria-selected="true"] > .dag-sidebar__row:hover { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); box-shadow: inset 0 0 0 1px var(--dag-color-accent); }
+/* The ring outranks the selection's hairline: both are the accent, and the ring is what the
+   keyboard asked for. */
+.dag-sidebar__line[aria-selected="true"] > .dag-sidebar__row:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__bulk {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin: 4px 8px;
+  padding: 2px 4px 2px 10px;
+  box-sizing: border-box;
+  background: var(--dag-color-accentSoft);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-sidebar__bulk > .dag-sidebar__move { margin-left: -6px; }
+.dag-sidebar__bulk-count { flex: 1; min-width: 0; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dag-sidebar__bulk-acts { display: flex; flex-wrap: wrap; gap: 2px; }
+.dag-sidebar__bulk-head { margin: 2px 8px 4px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+/* An action says its name beside its mark, so what it does is read rather than hovered for; the
+   bar wraps in a narrow column, which puts them on a line of their own under the count. */
+.dag-sidebar__bulk-act {
+  width: auto;
+  gap: 4px;
+  padding: 0 6px;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-sm);
+  white-space: nowrap;
+}
+.dag-sidebar__bulk-act > span { line-height: 1; }
+
+/*
+ * A row lets the list scroll under a finger: a swipe is a scroll, and only a row held
+ * still for a moment is picked — the selection begun — and can then be dragged:
+ * `startDrag`'s `hold`, with `holdStill` stopping the scroll under it. `none` here made every swipe
+ * that started on a row a drag. No callout or text selection on a long press, which is the
+ * gesture's and not the browser's.
+ */
+.dag-sidebar__row {
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Where a dragged row would land: the folder row, or the whole tree for the top level. */
+.dag-sidebar__row[data-dag-sidebar-over],
+.dag-sidebar__empty[data-dag-sidebar-over] {
+  background: var(--dag-color-accentSoft);
+  outline: 2px solid var(--dag-color-accent);
+  outline-offset: -2px;
+}
+.dag-sidebar__tree[data-dag-sidebar-over] { box-shadow: inset 0 0 0 2px var(--dag-color-accent); }
+html[data-dag-sidebar-drag],
+html[data-dag-sidebar-drag] * { cursor: grabbing !important; }
+/* What is being dragged: a chip that rides beside the pointer, as a file manager's does,
+   and the rows it came from left in place, faded. Fixed on `<body>` and moved by a painted
+   transform, so the list under it is never re-rendered by a move; it takes no pointer, so what
+   `elementFromPoint` finds under the cursor is the row, never the chip. */
+.dag-sidebar-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--dag-ui-layer-tooltip);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  height: 28px;
+  padding: 0 10px;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  pointer-events: none;
+  will-change: transform;
+}
+.dag-sidebar-ghost > svg { flex: none; }
+.dag-sidebar-ghost > span { overflow: hidden; text-overflow: ellipsis; }
+.dag-sidebar__row[data-dag-sidebar-lifted] { opacity: 0.45; }
+
+/*
+ * A row: its indent, a chevron or the room for one, the kind's mark, the title. 30px, the chrome's
+ * smallest hittable thing, and `--depth` levels of 16px in.
+ */
+.dag-sidebar__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: var(--sidebar-row);
+  padding: 0 8px 0 calc(8px + var(--depth, 0) * 16px);
+  /* Inter: a row says a file's *title*, and a title is words somebody
+     wrote, not a string they would type — DESIGN.md keeps mono for the second. */
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__row > svg { flex: none; }
+/* The active item on the accent tint, and nothing else: a bar as well as a tint was saying it twice.
+   Ink rather than accent text, because accent on its own tint is the pair DESIGN.md forbids. */
+.dag-sidebar__row--on { color: var(--dag-color-ink); background: var(--dag-color-accentSoft); font-weight: var(--dag-ui-weight-strong); }
+.dag-sidebar__row--on:hover { background: var(--dag-color-accentSoft); }
+/* The open file's ⋯ is always shown, so its title ends in an ellipsis before it rather than under it.
+   A favourite's star sits beside it, and the open row keeps room for both. */
+.dag-sidebar__line--on > .dag-sidebar__row { padding-right: 32px; }
+.dag-sidebar__line--on:has(> .dag-sidebar__tools > [data-dag-sidebar-star]) > .dag-sidebar__row { padding-right: 60px; }
+/* The vault's attachments folder: last, and a step quieter, since nobody files work there. */
+.dag-sidebar__row[data-dag-sidebar-store] { color: var(--dag-color-slate); }
+/* One guide rule per level, under the middle of the chevron above it, the way the search draws its
+   tree: a reader can walk four levels back up by eye. */
+.dag-sidebar__indent {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: calc(var(--depth, 0) * 16px);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 7px,
+    var(--dag-color-outline) 7px 8px,
+    transparent 8px 16px
+  );
+  pointer-events: none;
+}
+.dag-sidebar__chev { flex: none; width: 14px; height: 14px; color: var(--dag-color-muted); transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
+.dag-sidebar__row[aria-expanded="true"] .dag-sidebar__chev { transform: rotate(90deg); }
+.dag-sidebar__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-sidebar__empty {
+  margin: 0;
+  height: var(--sidebar-empty);
+  line-height: var(--sidebar-empty);
+  padding-left: calc(8px + var(--depth, 0) * 16px + 20px);
+  font-size: var(--chrome-text-sm);
+  font-style: italic;
+  color: var(--dag-color-slate);
+}
+.dag-sidebar__none { margin: 4px 8px; font-size: var(--chrome-text-sm); line-height: 1.5; color: var(--dag-color-slate); }
+/* A refusal under the tree — an upload, a move to another workspace — set off from the rows above it,
+   which otherwise read straight on into it. */
+.dag-sidebar__none[role="alert"] {
+  margin: 6px 12px 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--dag-color-outline);
+  color: var(--dag-color-ink);
+}
+/*
+ * The list could not be asked for. A card rather than a line because it is the tree's whole state,
+ * and the rows this browser already had stay below it dimmed — a server that went quiet is not a
+ * reason to take the files away too. Names grepped first: `dag-sidebar__failed*`,
+ * `dag-sidebar__retry`, `data-dag-sidebar-failed` and `data-dag-sidebar-stale` were nobody's.
+ */
+.dag-sidebar__failed {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
+  margin: 4px 0 10px;
+  padding: 10px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-warningSoft);
+  border: 1px solid var(--dag-color-warning);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-sidebar__failed-mark {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  margin-top: 1px;
+  color: var(--dag-color-warningText);
+}
+.dag-sidebar__failed-title { grid-column: 2; margin: 0; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); line-height: 1.3; }
+.dag-sidebar__failed-line { grid-column: 2; margin: 0; font-size: var(--chrome-text-sm); line-height: 1.4; color: var(--dag-color-slate); }
+.dag-sidebar__retry {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__retry:hover { background: var(--dag-color-paper200); }
+.dag-sidebar__retry:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__tree[data-dag-sidebar-stale] > [role="tree"] > .dag-sidebar__line { opacity: 0.55; }
+
+.dag-sidebar__account-wrap { position: relative; margin-top: 4px; }
+/* Settings and, when a new version waits, the Update button beside it (#268): the row takes what the
+   button leaves, and Settings' label is what gives way. */
+.dag-sidebar__setrow { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.dag-sidebar__setrow > .dag-sidebar__account-wrap { flex: 1; min-width: 0; margin-top: 0; }
+.dag-sidebar__update { flex: none; }
+.dag-sidebar__account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-accentSoft);
+}
+.dag-sidebar__who-name { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-sidebar__menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
+}
+/* A row's menu, placed where it was asked for rather than hung off the account. */
+.dag-sidebar__menu--row { position: fixed; right: auto; bottom: auto; min-width: 184px; }
+.dag-sidebar__menu-danger:hover { color: var(--dag-color-danger); }
+
+/* Deleting a folder with everything in it: the Settings card's shape, over the whole
+   window rather than over the canvas, because it is asked from the sidebar and the sidebar is not
+   in the canvas. The one card here that dims what is behind it — the rest are things somebody
+   opened to look at, and this is a question the page waits on. Names grepped first: `dag-purge*`
+   and `data-dag-purge*` were nobody's, and `data-dag-sidebar-dialog` is what `Shell` counts as
+   inside the column. */
+/* Two classes deep, because it is worn beside `.dag-settings__scrim`, which is declared further down
+   with one class and so won every tie: this card was `absolute` at 20 for as long as it existed,
+   whatever the rule said, and nothing noticed until the Settings modal (50) opened it. */
+.dag-settings__scrim.dag-purge__scrim {
+  position: fixed;
+  z-index: var(--dag-ui-layer-modal);
+  background: color-mix(in srgb, var(--dag-color-ink) 14%, transparent);
+}
+.dag-purge { width: 420px; }
+.dag-purge__mark { flex: none; color: var(--dag-color-danger); }
+.dag-purge .dag-settings__head h2 { overflow-wrap: anywhere; }
+.dag-purge__what { margin: 8px 0 0; font-size: var(--chrome-text-md); line-height: 1.5; color: var(--dag-color-slate); }
+.dag-purge__failed { margin: 10px 0 0; font-size: var(--chrome-text-sm); color: var(--dag-color-dangerText); }
+.dag-purge__foot { gap: 8px; }
+.dag-purge .dag-purge__go { color: var(--dag-color-card); background: var(--dag-color-danger); }
+.dag-purge .dag-purge__go:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: 0 0 0 2px var(--dag-color-dangerSoft); }
+.dag-purge .dag-purge__go:disabled:hover { color: var(--dag-color-card); background: var(--dag-color-danger); box-shadow: none; }
+.dag-purge button:focus-visible { box-shadow: var(--focus-ring); }
+/* The Privacy tab's two lists, which the logs toast (`src/telemetry/Prompt.tsx`) says again when
+   *What's sent* is opened. Names grepped first: `dag-telemetry*` and `data-dag-telemetry*` were
+   nobody's. */
+.dag-telemetry__list { margin: 0; padding: 10px 14px 10px 30px; font-size: var(--chrome-text-md); line-height: 1.55; color: var(--dag-color-slate); text-wrap: pretty; }
+.dag-sidebar__menu-who {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The workspace switcher: the first row of the column, a mark and a name in the account
+ * block's type, and a menu that drops *down* from it — the account's opens up from the foot, and
+ * this is at the top. Names grepped first: `dag-vault*` and `data-dag-vault*` were nobody's.
+ */
+.dag-vault { position: relative; flex: none; padding: 4px 8px 0; }
+.dag-vault__button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-vault__button:hover,
+.dag-vault__button[aria-expanded="true"] { background: var(--dag-color-paper200); }
+.dag-vault__button:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-vault__name { flex: 1; min-width: 0; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-vault__chev { flex: none; color: var(--dag-color-slate); }
+/* A square where the account's avatar is round: a workspace is a place, the account a person.
+   The tile's two colours are the mark's own custom properties, bound by `Vaults.tsx` from the hue
+   its id hashes to; ink on a tint keeps the letters legible in every theme. */
+.dag-vault__mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--dag-ui-radius-control);
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--vault-t);
+  box-shadow: inset 0 0 0 1px var(--vault-h);
+}
+.dag-vault__menu { top: calc(100% + 4px); bottom: auto; left: 8px; right: 8px; z-index: var(--dag-ui-layer-popover); max-height: 70vh; overflow-y: auto; }
+/* Two classes deep: a menu item's every `span` is `flex: 1`, and the mark is a span. */
+.dag-vault__item > .dag-vault__mark { flex: none; }
+.dag-vault__item { height: auto; min-height: 38px; padding: 4px 8px; }
+.dag-vault__item[aria-checked="true"] { color: var(--dag-color-ink); font-weight: var(--dag-ui-weight-strong); }
+.dag-vault__item[aria-checked="true"] .dag-vault__title { font-weight: var(--dag-ui-weight-strong); }
+.dag-vault__item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-vault__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dag-vault__item .dag-vault__text > span { flex: none; }
+.dag-vault__title { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-vault__tick { flex: none; color: var(--dag-color-accent); }
+.dag-vault__rule { margin: 4px 0; border: none; border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-vault__namebox { padding: 2px 0; }
+.dag-vault__namebox .dag-sidebar__name-input { height: 30px; font-family: var(--dag-font-sans); font-size: var(--chrome-text-md); }
+.dag-vault__problem { margin: 4px 8px; font-size: var(--chrome-text-sm); line-height: 1.4; color: var(--dag-color-dangerText); overflow-wrap: anywhere; }
+.dag-vault__problem code { font-family: var(--dag-font-mono); font-size: var(--chrome-text-xs); color: var(--dag-color-ink); }
+.dag-vault__line { display: flex; align-items: center; gap: 2px; }
+.dag-vault__line > .dag-vault__item { flex: 1; min-width: 0; }
+.dag-vault__item:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-vault__item:disabled .dag-vault__title,
+.dag-vault__item:disabled .dag-vault__path { color: var(--dag-color-muted); }
+.dag-vault__note { flex: none; margin-left: auto; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-vault__forget { flex: none; opacity: 0; }
+.dag-vault__line:hover .dag-vault__forget,
+.dag-vault__line:focus-within .dag-vault__forget { opacity: 1; }
+.dag-vault__path { font-family: var(--dag-font-mono); font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+/*
+ * The two first-run forms. The card centres its prose, but a label is not prose: it starts at its
+ * field's left edge and sits directly above the control it names, so the two fields read as a form
+ * rather than as two captions. The error is always in the flow with its line reserved, so a refusal
+ * from the server never moves the actions under the person's pointer.
+ */
+.dag-vault__form { display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; padding: 4px 8px 6px; text-align: left; }
+.dag-vault__form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+/* `flex: none`: a label is a column, and the field's own `flex: 1` there is a basis of 0 high, which
+   beat `height` and left the name field at its text's height (#384). A row (below) turns it back on. */
+.dag-vault__form .dag-sidebar__name-input { flex: none; height: 30px; font-family: var(--dag-font-sans); font-size: var(--chrome-text-md); }
+.dag-vault__field-row { display: flex; align-items: center; gap: 6px; }
+.dag-vault__field-row > .dag-sidebar__name-input { flex: 1; min-width: 0; }
+.dag-vault__form-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.dag-vault__form-error { min-height: 17px; margin: 0; font-size: var(--chrome-text-sm); line-height: 1.4; color: var(--dag-color-dangerText); }
+/* The page when no vault is open: the picker alone, on the paper. */
+.dag-novault {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+  font-family: var(--dag-font-sans);
+}
+/* It has no header, so with no title bar (macOS desktop) its top 48px is what drags the window. */
+[data-dag-window] .dag-novault::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  -webkit-app-region: drag;
+}
+.dag-novault .dag-welcome { position: static; max-width: 460px; width: 100%; }
+.dag-novault__recent { display: flex; flex-direction: column; gap: 2px; align-self: stretch; margin-top: 12px; text-align: left; }
+.dag-novault__recent .dag-more__item { width: 100%; }
+
+.dag-sidebar__grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 7px;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+/* The edge it moves, drawn on the line the column's border already occupies. */
+.dag-sidebar__grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: transparent;
+}
+.dag-sidebar__grip:hover::after,
+.dag-sidebar__grip:active::after { background: var(--dag-color-accent); }
+
+/* New, the + beside Files since the UI review. */
+.dag-sidebar__tool[aria-expanded="true"] { color: var(--dag-color-ink); background: var(--dag-color-outlineSoft); }
+/* Show in Files (#360): the filter button beside the + and the popover it opens. While a kind is
+   hidden the glyph is the accent — expanded, hovered or at rest — so a filtered tree is never
+   mistaken for a tree with nothing in it. The popover is fixed and placed by `FilterMenu`, the
+   `NewMenu` rule, so the column's width and its scroller never clip it. */
+.dag-sidebar__filter { display: inline-flex; flex: none; }
+.dag-sidebar__tool.dag-sidebar__filterbtn--on,
+.dag-sidebar__tool.dag-sidebar__filterbtn--on:hover,
+.dag-sidebar__tool.dag-sidebar__filterbtn--on[aria-expanded="true"] { color: var(--dag-color-accent); }
+.dag-sidebar__filter-menu {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 224px;
+  max-height: min(520px, calc(100vh - 16px));
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  scrollbar-width: thin;
+}
+.dag-sidebar__filter-head { margin: 2px 6px 4px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-sidebar__filter-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__filter-row:hover { background: var(--dag-color-paper100); }
+.dag-sidebar__filter-row:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__filter-row[aria-checked="false"] { color: var(--dag-color-slate); }
+.dag-sidebar__filter-row > svg { flex: none; color: var(--dag-color-slate); }
+/* A 14px box, so a square rather than the 9px control corner made into a circle. */
+.dag-sidebar__filter-tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 0;
+}
+.dag-sidebar__filter-row[aria-checked="true"] .dag-sidebar__filter-tick { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-sidebar__filter-word { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-sidebar__filter-count { flex: none; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+.dag-sidebar__filter-all {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__filter-all:hover { background: var(--dag-color-paper100); }
+.dag-sidebar__filter-all:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-sidebar__menu--new { min-width: 232px; }
+/* Where the file will go, above what it will be — the header the creation flow was missing. */
+.dag-sidebar__menu-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px 8px;
+  margin-bottom: 4px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-sidebar__menu-where > svg { flex: none; color: var(--dag-color-muted); }
+.dag-sidebar__menu-where > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-sidebar__menu-where strong { color: var(--dag-color-ink); font-weight: var(--dag-ui-weight-strong); }
+.dag-sidebar__menu-switch {
+  flex: none;
+  min-height: 24px;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-sidebar__menu-switch:hover { color: var(--dag-color-ink); }
+.dag-sidebar__menu-switch:focus-visible { box-shadow: var(--focus-ring-inset); }
+
+
+/*
+ * On a phone the column is the whole window: a sheet over the page, rows a
+ * finger can hit, and its own way out. The toggle that brings it is the top bar's; the sheet covers
+ * it, which is why it has a close button of its own.
+ */
+.dag-sidebar__sheethead { display: flex; align-items: center; gap: 4px; flex: none; padding: 8px 8px 4px 0; }
+.dag-sidebar__sheethead .dag-vault { flex: 1; min-width: 0; padding-top: 0; }
+.dag-sidebar__close { flex: none; }
+.dag-sidebar[data-sheet] {
+  position: fixed;
+  inset: 0;
+  /* The modal layer, under the toasts: a file deleted from the sheet says so over it. */
+  z-index: var(--dag-ui-layer-modal);
+  width: auto;
+  height: auto;
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: var(--chrome-text-lg);
+  /* The tree and the favourites are one row height here too. */
+  --sidebar-row: 44px;
+  animation: dag-sheet-in var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+@keyframes dag-sheet-in { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
+.dag-sidebar[data-sheet] .dag-vault__button { height: 44px; }
+.dag-sidebar[data-sheet] .dag-vault__name { font-size: var(--chrome-text-xl); }
+.dag-sidebar[data-sheet] .dag-sidebar__act,
+.dag-sidebar[data-sheet] .dag-sidebar__row,
+.dag-sidebar[data-sheet] .dag-more__item { height: 44px; font-size: var(--chrome-text-lg); gap: 12px; }
+.dag-sidebar[data-sheet] .dag-sidebar__row { padding-left: calc(10px + var(--depth, 0) * 18px); }
+.dag-sidebar[data-sheet] .dag-sidebar__indent { width: calc(var(--depth, 0) * 18px); left: 10px; }
+.dag-sidebar[data-sheet] .dag-sidebar__section h2,
+/* A finger has no hover: a row's tools are always there on a phone, not only under a pointer. */
+.dag-sidebar[data-sheet] .dag-sidebar__tools { display: flex; top: 0; background: transparent; }
+/* 44×44 each, even though the ⋯ and the + keep their 14px glyph (#209). */
+.dag-sidebar[data-sheet] .dag-sidebar__tool { width: 44px; height: 44px; }
+.dag-sidebar[data-sheet] .dag-sidebar__filter-row,
+.dag-sidebar[data-sheet] .dag-sidebar__filter-all { min-height: 44px; font-size: var(--chrome-text-lg); }
+.dag-sidebar[data-sheet] .dag-sidebar__row:has(+ .dag-sidebar__tools) { padding-right: 52px; }
+.dag-sidebar[data-sheet] .dag-sidebar__tool[data-dag-sidebar-add] { display: none; }
+.dag-sidebar[data-sheet] .dag-sidebar__name-input,
+.dag-sidebar[data-sheet] .dag-sidebar__move { height: 44px; font-size: var(--chrome-text-lg); }
+/* A row with its box open is as tall as a row — the tree places the rows after it as if it were. */
+.dag-sidebar[data-sheet] .dag-sidebar__line--ask { padding-block: 0; }
+.dag-sidebar[data-sheet] .dag-sidebar__menu-switch { min-height: 44px; }
+/* Settings shares the foot with Trash and the two cloud rows; it was the one 28px row left. */
+.dag-sidebar[data-sheet] .dag-sidebar__account { min-height: 44px; }
+.dag-sidebar[data-sheet] .dag-sidebar__foot { padding: 8px 12px 16px; }
+.dag-sidebar[data-sheet] .dag-sidebar__tree { padding-bottom: 12px; }
+/* The selection's bar on a phone, begun by a long press: a finger's size, like the rows. */
+.dag-sidebar[data-sheet] .dag-sidebar__bulk { min-height: 48px; font-size: var(--chrome-text-lg); }
+/* Labelled now (#215), so as wide as the word, and still a finger's 44 each way (#209). */
+.dag-sidebar[data-sheet] .dag-sidebar__bulk .dag-sidebar__tool { width: auto; min-width: 44px; height: 44px; padding: 0 8px; }
+.dag-sidebar[data-sheet] .dag-sidebar__bulk-act { font-size: var(--chrome-text-lg); }
+.dag-sidebar[data-sheet] .dag-sidebar__bulk-count { font-size: var(--chrome-text-lg); }
+
+/* The folders above the open file, in the toolbar. Each shows its folder in the sidebar. */
+.dag-toolbar__crumbs { display: inline-flex; align-items: center; min-width: 0; flex: none; }
+.dag-toolbar__crumbs + .dag-toolbar__board,
+.dag-toolbar__crumbs + .dag-toolbar__name { margin-left: 2px; }
+.dag-toolbar__crumb-wrap { display: inline-flex; align-items: center; }
+.dag-toolbar__crumb {
+  max-width: 160px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dag-toolbar__crumb:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-toolbar__crumb:focus-visible { box-shadow: var(--focus-ring); }
+.dag-toolbar__sep { padding: 0 2px; color: var(--dag-color-slate); }
+
+/*
+ * The bar's two halves: where the file is and what it is called on the left, taking what
+ * room there is and giving it up to an ellipsis, and the page's controls on the right, which never
+ * shrink. The controls used to push each other right with `margin-left: auto` one by one; inside the
+ * end they are a row with a gap, and the older rules' margins are put back to nothing.
+ */
+.dag-toolbar__where { display: flex; align-items: center; flex: 1 1 auto; min-width: 0; }
+.dag-toolbar__where .dag-toolbar__board { max-width: 100%; }
+.dag-toolbar__end { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
+.dag-toolbar .dag-toolbar__end > * { margin-left: 0; }
+/* *Link copied*, for a moment after the `⋯`'s Copy link: the menu has shut by then. */
+.dag-toolbar__copied { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
+
+/* The title being named where it is drawn: the field's font, so nothing moves when it opens. */
+.dag-toolbar__name {
+  min-width: 0;
+  max-width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  letter-spacing: -0.006em;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-toolbar__name:focus { outline: none; }
+.dag-toolbar__name:focus-visible { box-shadow: var(--focus-ring); }
+
+/* The top bar's `⋯`. Names grepped first: `dag-pagemore*` and `data-dag-page-more*` were nobody's. */
+.dag-pagemore { position: relative; display: flex; flex: none; }
+.dag-pagemore__toggle[aria-expanded="true"] { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-pagemore__toggle:focus-visible { box-shadow: var(--focus-ring); }
+.dag-pagemore__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
+}
+.dag-pagemore__group { display: flex; flex-direction: column; }
+.dag-pagemore__menu .dag-more__item { width: 100%; color: var(--dag-color-ink); }
+.dag-pagemore__menu .dag-more__item > svg { flex: none; color: var(--dag-color-slate); }
+.dag-pagemore__menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-pagemore__menu .dag-more__item:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-pagemore__rule { height: 0; margin: 3px 4px; border: none; border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-pagemore__group:first-child > .dag-pagemore__rule { display: none; }
+/* Rows only a phone needs — the exports, whose button a wide window keeps. */
+.dag-pagemore--narrow,
+.dag-pagemore__group--narrow { display: none; }
+
+/*
+ * The bar on a phone: the sidebar's toggle, the title, and the file's controls as marks a
+ * finger can hit — 44px each — with Export folded into the `⋯`. The folders go; the sidebar says
+ * where a file is, one press away.
+ */
+@media (max-width: 719px) {
+  .dag-toolbar { height: 52px; gap: 2px; padding: 0 4px; }
+  .dag-toolbar[data-dag-toolbar-edge] { padding-left: calc(4px + var(--window-inset)); }
+  .dag-toolbar .dag-sidebar-toggle-slot { width: 44px; height: 44px; }
+  .dag-sidebar-toggle { top: 4px; left: calc(4px + var(--window-inset)); }
+  .dag-toolbar .dag-toolbar__logo,
+  .dag-toolbar .dag-toolbar__crumbs,
+  .dag-toolbar .dag-export { display: none; }
+  .dag-toolbar__end { gap: 0; }
+  .dag-toolbar__board { height: 44px; padding: 0 6px; font-size: var(--chrome-text-lg); }
+  .dag-toolbar__name { height: 44px; font-size: var(--chrome-text-lg); }
+  /* The editor's sparkle is the one mark left at 30px; the practice button and the Tasks
+     List/Board switch are the bar's other controls that did not grow with the rest (#209). */
+  .dag-toolbar .dag-toolbar__assistant { width: 44px; height: 44px; }
+  .dag-toolbar__practice { height: 44px; padding: 0 12px; }
+  .dag-toolbar .dag-tasks__layout { height: 44px; }
+  .dag-toolbar .dag-tasks__layout-choice { height: 38px; }
+  .dag-backlinks__word,
+  .dag-export__word { display: none; }
+  /* The pill drops its word to keep the bar's width for the title, but a reader still needs the
+     word: the `Unlock` beside it would otherwise be the whole of what the lock says. */
+  .dag-readonly__word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  /* As tall as Unlock beside it, which is a `Button` and so a finger's here by itself. */
+  .dag-readonly__pill { justify-content: center; min-width: 40px; height: var(--dag-ui-control-touch); padding: 0 8px; }
+  .dag-toolbar .dag-backlinks__toggle { justify-content: center; min-width: 44px; height: 44px; padding: 0 8px; border-color: transparent; }
+  .dag-pagemore--narrow { display: flex; }
+  .dag-pagemore__group--narrow { display: flex; }
+  .dag-pagemore__menu .dag-more__item { height: 44px; font-size: var(--chrome-text-lg); }
+  .dag-pagemore__menu { min-width: 240px; max-width: calc(100vw - 16px); }
+  .dag-export__menu,
+  .dag-backlinks__list { max-width: calc(100vw - 16px); }
+}
+

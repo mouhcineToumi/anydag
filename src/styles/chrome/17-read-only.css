@@ -1,0 +1,89 @@
+/* The read-only page: `?view=1`, a share link, a snapshot. */
+.dag-tablepage--read { flex: 1; min-height: 0; overflow: auto; padding: 24px 32px 64px; }
+.dag-tablepage--read .dag-tablepage__scroll { flex: none; overflow: visible; padding: 0; }
+.dag-tablepage__title { margin: 0 0 8px; font-size: var(--chrome-text-display); font-weight: var(--dag-ui-weight-strong); line-height: 1.25; }
+.dag-tablepage--read .dag-tablepage__description { margin: 0 0 16px; }
+.dag-tablepage__tab + .dag-tablepage__tab { margin-top: 32px; }
+.dag-tablepage__tabname { margin: 0 0 8px; font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
+
+@media (max-width: 719px) {
+  .dag-tablepage__bar { padding: 4px 8px; flex-wrap: wrap; }
+  .dag-tablepage__scroll { padding: 8px 8px 48px; }
+  .dag-tablepage--read { padding: 16px; }
+}
+
+/*
+ * A code block's copy button — on a board's text card, a note in the editor or drawn
+ * read-only, a quiz, the cheat sheet. Over the block's top right, in the row its language label
+ * makes, so it changes no box: a snapshot draws the label and not this, and the two must measure the
+ * same. Shown while the block is hovered or the button has the keyboard, and always where nothing
+ * hovers. Names claimed, grepped first: `dag-code*`, `data-dag-code*`, `dag-offscreen`.
+ */
+.dag-code__copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
+}
+.dag-code__copy svg { width: 14px; height: 14px; }
+.dag-code__copy:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-code__copy[data-dag-code-copy="copied"] { color: var(--dag-color-accent); }
+.dag-code:hover > .dag-code__copy,
+.bn-block-content[data-content-type="codeBlock"]:hover .dag-code__copy,
+.dag-code__copy:focus-visible,
+.dag-code__copy[data-dag-code-copy="copied"],
+.dag-code__copy[data-dag-code-copy="failed"] { opacity: 1; }
+@media (hover: none) {
+  .dag-code__copy { opacity: 1; }
+}
+
+/* An equation's field in the note editor: its TeX under it, what KaTeX made of it under that.
+   A portal on <body>, fixed, so the editor's own DOM never holds it. */
+.dag-math-field {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-math-field__tex {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-md);
+  line-height: 1.5;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  padding: 6px 8px;
+}
+.dag-math-field__tex:focus-visible { box-shadow: var(--focus-ring); }
+.dag-math-field__foot {
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  overflow-wrap: anywhere;
+}
+.dag-math-field__error { color: var(--dag-color-dangerText); }
+
+/* The sidebar's menu says why a locked row offers less. */
+.dag-sidebar__menu-locked { margin: 4px 8px 2px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+

@@ -1,0 +1,20 @@
+/*
+ * Motion, from one place (#206). Every transition and entrance in the chrome reads
+ * `--dag-ui-motion-fast` or `--dag-ui-motion-base` with `--dag-ui-motion-ease`, so asking the
+ * system for less motion is answered here once rather than in a block beside each rule (there were
+ * eight). The two durations go to 0: `!important` because the theme writes them on `<html>`'s own
+ * style, which an ordinary rule cannot outrank. What turns rather than moves — the three spinners —
+ * and the *Saved* tick's timed fade have a period, not a duration, so they stop instead; the tick
+ * then stays, which is the version of "it saved" that does not move. **It is the last rule in the
+ * file on purpose**: a spinner's own `animation` is the same specificity, and the later rule wins.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dag-ui-motion-fast: 0ms !important;
+    --dag-ui-motion-base: 0ms !important;
+  }
+  .dag-rewrite__spin,
+  .dag-prompt__spin,
+  .dag-sync-row[data-dag-sync-row="syncing"] > svg,
+  .dag-settings__saved { animation: none; }
+}

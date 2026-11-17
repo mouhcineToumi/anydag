@@ -1,0 +1,242 @@
+/* ---- The Graph page (#459) -------------------------------------------------------------
+   The vault as dots and lines: a WebGL canvas and a canvas of names, under three cards — *Find a
+   file* at the top left, the panel at the top right, the zoom bar at the bottom right. The drawing's
+   own colours are uniforms the page reads from the theme (`src/ui/graph/look.ts`); this is only the
+   chrome round it. Names grepped first: `dag-graph*` and `data-dag-graph*` were nobody's. */
+
+.dag-app--graph { background: var(--dag-color-paper); color: var(--dag-color-ink); }
+.dag-graph { position: relative; display: flex; flex: 1; min-height: 0; }
+.dag-graph__stage { position: relative; flex: 1; min-width: 0; overflow: hidden; background: var(--dag-color-paper); }
+.dag-graph__surface,
+.dag-graph__gl,
+.dag-graph__labels { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.dag-graph__gl { touch-action: none; cursor: grab; }
+.dag-graph__gl.is-node { cursor: pointer; }
+.dag-graph__gl.is-pan { cursor: grabbing; }
+.dag-graph__labels { pointer-events: none; }
+
+.dag-graph__find,
+.dag-graph__panel {
+  position: absolute;
+  top: var(--dag-ui-space-4);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-raised);
+  z-index: var(--dag-ui-layer-chrome);
+}
+.dag-graph__find { left: var(--dag-ui-space-4); width: 264px; overflow: hidden; }
+.dag-graph__find:focus-within { border-color: var(--dag-color-accent); }
+.dag-graph__findbox { display: flex; align-items: center; gap: var(--dag-ui-space-2); height: 38px; padding: 0 var(--dag-ui-space-2) 0 var(--dag-ui-space-3); }
+.dag-graph__findbox > svg { flex: none; color: var(--dag-color-slate); }
+.dag-graph__findfield {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.dag-graph__findfield::placeholder { color: var(--dag-color-slate); }
+.dag-graph__matches { padding: var(--dag-ui-space-1); border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-graph__match {
+  height: 28px;
+  padding: 0 var(--dag-ui-space-2);
+  overflow: hidden;
+  font-size: var(--chrome-text-md);
+  line-height: 28px;
+  color: var(--dag-color-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-graph__match:hover { background: var(--dag-color-paper100); }
+.dag-graph__match[aria-selected="true"] { background: var(--dag-color-accentSoft); }
+.dag-graph__findhint { margin: var(--dag-ui-space-1) var(--dag-ui-space-2); font-size: var(--chrome-text-xs); line-height: var(--dag-ui-leading-xs); color: var(--dag-color-slate); }
+.dag-graph__findhint--none { margin: 0; padding: var(--dag-ui-space-2) var(--dag-ui-space-3); border-top: 1px solid var(--dag-color-outlineSoft); }
+
+.dag-graph__panel {
+  right: var(--dag-ui-space-4);
+  width: 256px;
+  max-height: calc(100% - 88px);
+  padding: var(--dag-ui-space-3) var(--dag-ui-space-3) var(--dag-ui-space-1);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.dag-graph__title { margin: 0; font-size: var(--chrome-text-md); line-height: var(--dag-ui-leading-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-graph__counts {
+  margin: 0 0 var(--dag-ui-space-2);
+  font-size: var(--chrome-text-sm);
+  line-height: var(--dag-ui-leading-sm);
+  color: var(--dag-color-slate);
+  font-variant-numeric: tabular-nums;
+}
+.dag-graph__chips { display: flex; flex-wrap: wrap; gap: var(--dag-ui-space-1); margin: 0 0 var(--dag-ui-space-2); }
+.dag-graph__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 6px 0 var(--dag-ui-space-2);
+  font: inherit;
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-pill);
+  cursor: pointer;
+}
+.dag-graph__chip:hover { background: var(--dag-color-paper200); }
+.dag-graph__chip > svg { color: var(--dag-color-slate); }
+.dag-graph__chipcount { color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+
+.dag-graph__section { margin: 0 calc(-1 * var(--dag-ui-space-3)); padding: 0 var(--dag-ui-space-3); border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-graph__section > :last-child { margin-bottom: var(--dag-ui-space-2); }
+.dag-graph__summary {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-graph__summary::-webkit-details-marker { display: none; }
+.dag-graph__summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0 var(--dag-ui-space-1) 0 auto;
+  border-right: 1.5px solid var(--dag-color-slate);
+  border-bottom: 1.5px solid var(--dag-color-slate);
+  transform: rotate(-45deg);
+  transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease);
+}
+.dag-graph__section[open] > .dag-graph__summary::after { transform: rotate(45deg); }
+.dag-graph__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dag-ui-space-2);
+  min-height: 36px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+}
+.dag-graph__field > .dag-select { width: 140px; }
+
+.dag-graph__legend { max-height: 216px; margin: 0 -6px; padding: 0 6px; overflow: auto; list-style: none; scrollbar-width: thin; }
+.dag-graph__value { position: relative; }
+.dag-graph__row {
+  display: flex;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  width: calc(100% + 12px);
+  height: 28px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-graph__value > .dag-graph__row { width: calc(100% + 12px); }
+.dag-graph__row:hover,
+.dag-graph__value:hover > .dag-graph__row { background: var(--dag-color-paper100); }
+.dag-graph__row[aria-pressed="false"] { color: var(--dag-color-slate); }
+.dag-graph__dot { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.dag-graph__row[aria-pressed="false"] > .dag-graph__dot,
+.dag-graph__dot--hollow {
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1.5px var(--dag-color-slate);
+}
+.dag-graph__row--orphans[aria-pressed="true"] > .dag-graph__dot { background: var(--dag-color-muted) !important; box-shadow: none; }
+.dag-graph__name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dag-graph__count { margin-left: auto; padding-left: var(--dag-ui-space-1); font-size: var(--chrome-text-sm); color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+/* *Only*, over the count, while the line is under the pointer or holds the focus: there, and
+   reachable by Tab, but quiet until wanted. */
+.dag-graph__only {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  height: 24px;
+  padding: 0 var(--dag-ui-space-2);
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-accent);
+  background: var(--dag-color-paper100);
+  border: 0;
+  border-radius: var(--dag-ui-radius-control);
+  opacity: 0;
+  cursor: pointer;
+}
+.dag-graph__value:hover > .dag-graph__only,
+.dag-graph__value:focus-within > .dag-graph__only { opacity: 1; }
+.dag-graph__only:hover { text-decoration: underline; }
+
+.dag-graph__slider {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  align-items: center;
+  gap: var(--dag-ui-space-2);
+  min-height: 30px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+}
+.dag-graph__slider[data-off] { opacity: 0.45; }
+.dag-graph__range { width: 100%; height: 16px; margin: 0; accent-color: var(--dag-color-accent); cursor: pointer; }
+.dag-graph__range:disabled { cursor: default; }
+.dag-graph__reset { margin: var(--dag-ui-space-1) 0 var(--dag-ui-space-2) -6px; }
+
+.dag-graph__find :focus-visible,
+.dag-graph__panel :focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-graph__panel .dag-graph__row:focus-visible,
+.dag-graph__panel .dag-graph__summary:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-graph__findfield:focus-visible { box-shadow: none; }
+.dag-graph__gl:focus-visible { outline: none; }
+
+.dag-graph__hint {
+  position: absolute;
+  left: var(--dag-ui-space-4);
+  bottom: var(--dag-ui-space-4);
+  margin: 0;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  pointer-events: none;
+  z-index: var(--dag-ui-layer-chrome);
+}
+.dag-graph__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dag-ui-space-3);
+  padding: var(--dag-ui-space-5);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+  text-align: center;
+  pointer-events: none;
+}
+.dag-graph__empty > p { max-width: 360px; margin: 0; }
+.dag-graph__empty > button { pointer-events: auto; }
+
+@media (max-width: 719px) {
+  .dag-graph__find { right: var(--dag-ui-space-4); width: auto; }
+  .dag-graph__panel { top: 72px; width: 232px; max-height: calc(100% - 144px); }
+  .dag-graph__hint { display: none; }
+}
+

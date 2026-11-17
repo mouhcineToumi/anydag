@@ -1,0 +1,576 @@
+/* ---- the icon picker ----
+   `dag-iconpick`, not `dag-icon`: the toolbar's buttons own that name, and `data-dag-icon` is on every
+   card on the surface — a hook meant to find this field found forty of them first. Both grepped
+   clean across `src/`, `e2e/`, `plugins/` and `test/` before being written. */
+
+.dag-iconpick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dag-iconpick__field { display: flex; align-items: center; gap: 6px; }
+
+/* The current value's glyph, drawn the way the card draws it: the tint for a mono or concept glyph
+   (`--dag-t` is bound on this very span by `hueVars()`, or falls back to the theme's default hue
+   exactly as an unhued card's tile does) and the neutral brand tile for a colour logo. */
+.dag-iconpick__current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  color: var(--dag-color-ink);
+  background: var(--dag-t, var(--dag-t-default));
+  border-radius: var(--dag-ui-radius-control);
+  overflow: hidden;
+}
+.dag-iconpick__current--brand { background: var(--dag-color-brandTile); }
+.dag-iconpick__current .dag-glyph { display: flex; align-items: center; justify-content: center; }
+.dag-iconpick__input { flex: 1; min-width: 0; }
+
+/* Mode as three chips, the inspector's own tab rule — a pressed one is underlined, because a
+   background change alone did not read as *the* mode for the page tabs either. */
+.dag-iconpick__modes { display: flex; gap: 2px; }
+.dag-iconpick__mode {
+  font: inherit;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 2px 8px 3px;
+  cursor: pointer;
+}
+.dag-iconpick__mode:hover { color: var(--dag-color-ink); }
+.dag-iconpick__mode--on { color: var(--dag-color-ink); border-bottom-color: var(--dag-color-accent); }
+.dag-iconpick__mode:focus-visible { box-shadow: var(--focus-ring-inset); }
+
+/* The candidates. A grid of small cards: the glyph on top, the name under it — recognising a logo
+   at a glance is the point, and the name is there to confirm what the eye already said. */
+.dag-iconpick__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 4px;
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+.dag-iconpick__opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px 3px 4px;
+  font: inherit;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-iconpick__opt:hover { border-color: var(--dag-color-accent); }
+.dag-iconpick__opt:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-iconpick__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper100);
+  border-radius: 4px; /* a small glyph tile */
+  overflow: hidden;
+}
+/* A colour logo is drawn for light backgrounds — the same tile the card gives it, in every theme. */
+.dag-iconpick__glyph[data-dag-iconpick-glyph="brand"] { background: var(--dag-color-brandTile); }
+.dag-iconpick__name {
+  max-width: 100%;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-xs);
+  line-height: 1.1;
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dag-iconpick__opt:hover .dag-iconpick__name,
+.dag-iconpick__opt:focus-visible .dag-iconpick__name { color: var(--dag-color-ink); }
+.dag-iconpick__note {
+  margin: 0;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+}
+
+/*
+ * The Advanced disclosure: the structural half of the item's own fields — page, title,
+ * id, the two conversions — behind one collapsed heading, so what the panel opens on is the
+ * styling a person actually reached for. All chrome, and deliberately no `--dag-*` token anywhere
+ * in it: a theme has no opinion about how a disclosure triangle looks, and naming one would
+ * demand a key in all three themes for a value nobody would set.
+ */
+.dag-props__adv { display: flex; flex-direction: column; gap: 8px; }
+.dag-props__adv-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 0;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: none;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-props__adv-head:hover { color: var(--dag-color-ink); }
+/* The chevron points at what opening it would reveal: right while it is shut, down once it is
+   open. Drawn as a `ChevronDown` and turned a quarter anticlockwise for the shut state, rather
+   than swapping two Lucide components — one glyph that moves reads as the same triangle, and two
+   that replace each other read as a flicker. */
+.dag-props__adv-head svg { transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); transform: rotate(-90deg); }
+.dag-props__adv-head[aria-expanded="true"] svg { transform: rotate(0deg); }
+
+/* The text-style toggles (`dag-props__em`, not a swatch row: emphasis is a binary, not a pick of
+   one of ten). The letter draws itself in the style it writes — B in bold, I in slanted — which
+   is the whole of the control's documentation. */
+.dag-props__em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-props__em--bold { font-weight: var(--dag-ui-weight-strong); }
+.dag-props__em--italic { font-style: italic; }
+.dag-props__em:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+.dag-props__em--on { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+
+/* The status picker on a timeline entry: three options, each an icon and a word, one on. */
+.dag-props__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-props__choice:hover { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+.dag-props__choice--on { color: var(--dag-color-ink); border-color: var(--dag-color-accent); }
+
+/*
+ * The handles on a picked card: four to link from, four to grow from.
+ *
+ * The container takes no pointer, so everywhere the handles are not, the card underneath is still
+ * clickable — a pick has to be able to move to the next card without letting go first. It sits
+ * above a selected item's own `z-index: 2`, since it is drawn over the diagram it belongs to.
+ */
+.dag-nodetools {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.dag-nodetools > * { pointer-events: auto; }
+
+/* The `+` sits ten pixels out, inside the connect handles' thirty: nearer the card because it acts
+   on the card, and clear of them because two targets on one point is a coin toss. */
+.dag-plus {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  line-height: 1;
+  color: var(--dag-color-card);
+  background: var(--dag-color-accent);
+  border-radius: 50%;
+  cursor: cell;
+  user-select: none;
+}
+.dag-plus[data-dag-plus="n"] { top: -10px; left: 50%; margin-left: -8px; }
+.dag-plus[data-dag-plus="s"] { bottom: -10px; left: 50%; margin-left: -8px; }
+.dag-plus[data-dag-plus="e"] { right: -10px; top: 50%; margin-top: -8px; }
+.dag-plus[data-dag-plus="w"] { left: -10px; top: 50%; margin-top: -8px; }
+
+/*
+ * A selected git graph's lanes as controls: a chip over each branch name, a `+` past each tip and
+ * **+ New branch** under the last lane. Like `.dag-nodetools`, the container takes no pointer and
+ * sits over the diagram it belongs to.
+ */
+.dag-gitlanes { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 4; }
+.dag-gitlanes button { position: absolute; top: 0; left: 0; pointer-events: auto; }
+/* The chip is the drawn label, made pressable: no fill of its own, so the name and its hue still
+   read through, and an outline that says it can be renamed. */
+.dag-git-chip {
+  padding: 0;
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: text;
+}
+.dag-git-chip:not(:disabled):hover { border-color: var(--dag-color-accent); }
+.dag-git-chip:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-git-chip:disabled { cursor: default; }
+.dag-git-plus { border: 0; padding: 0; }
+.dag-git-newbranch {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  white-space: nowrap;
+  color: var(--dag-color-accent);
+  background: var(--dag-color-card);
+  border: 1px dashed var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-git-newbranch:hover { background: var(--dag-color-paper); }
+
+/*
+ * The inline rename box.
+ *
+ * In the layer, so the board's own transform carries it — no zoom arithmetic, and it stays over
+ * the thing it is renaming through a pan. Its font is copied off the element it covers, which is
+ * why nothing here sets one.
+ */
+/* An md card's text, open where it is drawn (`CardText`): over the card, on its rectangle, and
+   growing down from it while somebody types. The card's own type size, so nothing jumps. */
+.dag-card-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--dag-ui-elevation-raised);
+}
+.dag-card-text .dag-rich-field .dag-blocks--field .bn-editor {
+  padding: 2px 6px;
+  /* A card's text is markdown on the board: the diagram's `--dag-type-*`, not a chrome step. */
+  font-size: var(--dag-type-mdBody);
+  line-height: var(--dag-type-mdLeading);
+}
+
+.dag-rename {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  padding: 0 4px;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--dag-ui-elevation-raised);
+  outline: none;
+}
+
+.dag-inspector__sheet {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  border-top: 1px solid var(--dag-color-outlineSoft);
+  font-size: var(--chrome-text-md);
+}
+.dag-inspector__sheet pre { font-size: var(--chrome-text-sm); }
+.dag-inspector__foot {
+  flex: none;
+  /* At the panel's foot, whatever is above it: three lines of properties used to end in a rule
+     halfway down a column with nothing under it. */
+  margin-top: auto;
+  padding: 6px 12px;
+  border-top: 1px solid var(--dag-color-outlineSoft);
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+}
+
+/* The open item's problems, under its source: where somebody editing it is already looking. */
+/* The panel's Problems block (#145): at the top, words and the act that answers them. */
+/* An `edges` fence with no link picked: what to do instead of reading its statements (#145). */
+.dag-inspector__hint { margin: 10px 14px; font-size: var(--chrome-text-md); line-height: 1.5; color: var(--dag-color-slate); }
+
+.dag-inspector__problems {
+  flex: none;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-inspector__problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dag-inspector__problem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: var(--chrome-text-sm);
+  border-left: 2px solid var(--dag-color-warning);
+}
+.dag-inspector__problem--error { border-left-color: var(--dag-color-danger); }
+.dag-inspector__problem-acts { display: flex; gap: 6px; }
+.dag-inspector__problem-acts:empty { display: none; }
+.dag-inspector__problem-act {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: none;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-inspector__problem-act:hover { background: var(--dag-color-paper100); }
+
+[data-snapshot="1"] .dag-inspector { display: none; }
+
+/* ---- the component library ---- */
+
+.dag-library {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 272px;
+  min-height: 0;
+  border-left: 1px solid var(--dag-color-outline);
+  background: var(--dag-color-paper);
+}
+.dag-library__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+.dag-component {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.dag-component:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
+.dag-component:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-component__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-component__text { display: flex; flex-direction: column; min-width: 0; }
+.dag-component__name { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); }
+.dag-component__desc {
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* What a component is made of: a chevron beside the row, and the parts indented under it. */
+.dag-component__row { display: flex; align-items: center; }
+.dag-component__row .dag-component { min-width: 0; }
+.dag-component__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 0;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-component__toggle:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-component__toggle:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-component__toggle svg { transition: transform var(--dag-ui-motion-fast) var(--dag-ui-motion-ease); }
+.dag-component__toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.dag-component__parts {
+  margin: 2px 0 6px 19px;
+  padding-left: 8px;
+  border-left: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-component__parts .dag-component__icon { width: 22px; height: 22px; }
+.dag-component__parts .dag-component__desc { display: none; }
+.dag-component--inner { cursor: default; opacity: 0.65; }
+.dag-component--inner:hover { background: transparent; border-color: transparent; }
+
+/*
+ * The Objects section: shelves of pictures rather than rows of words. A tile is the
+ * picture over its name; four to a row in the panel's 272px. The picture draws in the ink — a
+ * Lucide glyph and a mono emoji take `currentColor` — and colour art brings its own, the rule a
+ * brand tile follows on a card.
+ */
+.dag-shelf + .dag-shelf { margin-top: 10px; }
+.dag-shelf__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 4px;
+  padding: 0 8px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+}
+.dag-shelf__count { font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-regular); color: var(--dag-color-slate); }
+.dag-shelf__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+}
+/* A shape's name is one word that cannot break — Parallelogram — so its shelf is three wide. */
+.dag-shapes__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 6px; }
+.dag-shapes__grid .dag-object__name { font-size: var(--chrome-text-xs); white-space: normal; }
+.dag-object {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px 2px 4px;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.dag-object:hover { background: var(--dag-color-paper100); border-color: var(--dag-color-outlineSoft); }
+.dag-object:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-object__pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--dag-color-ink);
+}
+.dag-object__name {
+  width: 100%;
+  font-size: var(--chrome-text-xs);
+  line-height: 1.25;
+  text-align: center;
+  color: var(--dag-color-slate);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dag-shelf__more {
+  display: block;
+  margin: 2px 0 0;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-accent);
+  background: transparent;
+  border: 0;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-shelf__more:hover { background: var(--dag-color-paper100); }
+.dag-shelf__more:focus-visible { box-shadow: var(--focus-ring-inset); }
+
+/* The chip that follows the pointer while a component is dragged, and the diagram it may land on. */
+.dag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 4px 10px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--dag-ui-elevation-raised);
+  pointer-events: none;
+  z-index: var(--dag-ui-layer-popover);
+}
+/* While anything is being dragged — an item, a component — the cursor says so everywhere and no
+   text on the board lights up under the pointer's path. A grip's own drag is the exception: it says
+   `ew-resize`, and it sets the second attribute for exactly as long as it runs. */
+html[data-dag-dragging], html[data-dag-dragging] * { cursor: grabbing !important; user-select: none; }
+html[data-dag-dragging][data-dag-assistant-sizing], html[data-dag-dragging][data-dag-assistant-sizing] * { cursor: ew-resize !important; }
+.dag-item[data-dag-drop] { outline: 2px dashed var(--dag-color-accent); outline-offset: 6px; content-visibility: visible; }
+
+/*
+ * A drop target *inside* a diagram — a card to land beside, a boundary or a band to land in.
+ *
+ * Two attributes deep, so it outranks anything `nodes.css` says about a card with one class: the
+ * diagram surface owns those names and loads second, which is the hazard this file's header names.
+ * An outline rather than a border, for the reason a selected item's is one — it sits outside the
+ * box, so the card stays exactly the size the layout computed and the DEV size assertion stays
+ * quiet through the whole gesture.
+ *
+ * This also gives the connect gesture the mark it writes and had no rule for:
+ * `connect()` writes `data-dag-drop` onto the card under the pointer, and until now only an *item*
+ * lit up.
+ */
+[data-dag-node][data-dag-drop],
+[data-dag-group][data-dag-drop],
+[data-dag-lane][data-dag-drop] {
+  outline: 2px dashed var(--dag-color-accent);
+  outline-offset: 3px;
+}
+
+/* A card being dragged inside its diagram: the cursor says so everywhere, and the hit strokes on
+   the board's own links stop answering `elementFromPoint` before the card under them does — the
+   same two things a connect needs, for the same two reasons. */
+html[data-dag-node-drag], html[data-dag-node-drag] * { cursor: grabbing !important; user-select: none; }
+[data-dag-node-drag] .dag-edge-hit { pointer-events: none; }
+
+[data-snapshot="1"] .dag-library { display: none; }
+

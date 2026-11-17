@@ -98,9 +98,9 @@ for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))
   }
 }
 
-/* 4. The chrome's scale (#205). In `chrome.css`, a font size, a corner, a shadow, a layer or a
+/* 4. The chrome's scale (#205). In the chrome's CSS (`chrome.css` and its parts), a font size, a corner, a shadow, a layer or a
       duration reads `--dag-ui-*`. A font size reads `--chrome-text-*` instead: the theme's
-      `ui.text.*` steps at the person's text size (#325), composed in `chrome.css`'s head. The chrome
+      `ui.text.*` steps at the person's text size (#325), composed in `chrome/01-base.css`'s head. The chrome
       had none of these and typed its own (26 font sizes, 28 shadows, 19 z-indexes) or borrowed the
       diagram's (`--dag-metric-radius-chip` as every button's corner, which counts as a literal
       here: it is the diagram's number, not the chrome's). The rules that still type one are counted
@@ -108,6 +108,32 @@ for (const file of RENDER_DIRS.flatMap((d) => walk(d, (n) => /\.tsx?$/.test(n)))
       literal fails, and a migration that removes some lowers the file in the same commit. */
 const CHROME = "src/styles/chrome.css";
 const CHROME_ALLOW = "scripts/chrome-literals.json";
+/* `chrome.css` is an index of `@import`s, one part per area of the app under `chrome/` (#492), and
+   its order is the cascade. Every part is imported and every import is a part, or a rule would be
+   written that nothing loads (or loaded from nowhere); then the parts are read in that order. */
+const CHROME_PARTS = (() => {
+  const index = fs.readFileSync(path.join(root, CHROME), "utf8");
+  const imported = [...strip(index, ".css").matchAll(/@import\s+"\.\/(chrome\/[^"]+\.css)"\s*;/g)].map(
+    (m) => `src/styles/${m[1]}`,
+  );
+  const onDisk = fs
+    .readdirSync(path.join(root, "src/styles/chrome"))
+    .filter((f) => f.endsWith(".css"))
+    .map((f) => `src/styles/chrome/${f}`)
+    .sort();
+  for (const f of onDisk.filter((f) => !imported.includes(f)))
+    findings.push({
+      file: CHROME,
+      line: 0,
+      what: "not imported",
+      text: `${f} is under chrome/ but chrome.css does not import it`,
+    });
+  for (const f of imported.filter((f) => !onDisk.includes(f)))
+    findings.push({ file: CHROME, line: 0, what: "no such part", text: `chrome.css imports ${f}, which is not there` });
+  if (imported.join() !== [...imported].sort().join())
+    findings.push({ file: CHROME, line: 0, what: "out of order", text: "the parts are imported in their numbered order" });
+  return imported.filter((f) => onDisk.includes(f));
+})();
 const STRUCTURAL = {
   "font-size": /^(?:inherit|initial|unset|1em|100%)$/,
   "border-radius": /^(?:0|inherit|initial|unset|50%)$/,
@@ -138,7 +164,7 @@ const isRing = (v) => {
   );
 };
 const chromeCounts = Object.fromEntries(Object.keys(STRUCTURAL).map((k) => [k, 0]));
-const chromeText = strip(fs.readFileSync(path.join(root, CHROME), "utf8"), ".css");
+const chromeText = CHROME_PARTS.map((f) => strip(fs.readFileSync(path.join(root, f), "utf8"), ".css")).join("\n");
 for (const m of chromeText.matchAll(
   /(?<![\w-])(font-size|border-radius|box-shadow|z-index|transition|animation)\s*:\s*([^;{}]+)/g,
 )) {
@@ -184,7 +210,6 @@ if (lowered.length) {
       second text tone the themes already carry. What may keep `muted` is listed, selector by
       selector and with its reason, in `chrome-muted-allowlist.json`: disabled controls,
       separators and decorative glyphs, none of which is text. */
-const MUTED_CSS = "src/styles/chrome.css";
 const MUTED_ALLOWLIST = "scripts/chrome-muted-allowlist.json";
 
 /** The selector and declarations of every rule in a stylesheet, at-rules included. */
@@ -222,10 +247,12 @@ const muted = /color\s*:\s*var\(--dag-color-muted\)/;
 const mutedSeen = new Set();
 const mutedFindings = [];
 
-for (const rule of cssRules(fs.readFileSync(path.join(root, MUTED_CSS), "utf8"))) {
-  if (rule.selector.startsWith("@") || !muted.test(rule.decls)) continue;
-  if (mutedAllow.has(rule.selector)) mutedSeen.add(rule.selector);
-  else mutedFindings.push({ file: MUTED_CSS, line: rule.line, what: "muted text", text: rule.selector });
+for (const part of CHROME_PARTS) {
+  for (const rule of cssRules(fs.readFileSync(path.join(root, part), "utf8"))) {
+    if (rule.selector.startsWith("@") || !muted.test(rule.decls)) continue;
+    if (mutedAllow.has(rule.selector)) mutedSeen.add(rule.selector);
+    else mutedFindings.push({ file: part, line: rule.line, what: "muted text", text: rule.selector });
+  }
 }
 
 for (const [selector, reason] of mutedAllow) {

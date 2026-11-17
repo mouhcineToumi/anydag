@@ -97,7 +97,7 @@ It is also the pre-commit hook; do not skip it with `--no-verify`, and do not pu
   change is a design decision made by the maintainer.
 - Never add a colour literal, or a length or SVG style value on the diagram surface, in `src/`. A colour
   is `var(--dag-color-…)` or `theme.color.…`; a size is `theme.metric.…`. `check:literals` and
-  `check:theme` enforce it; the app chrome in `src/styles/chrome.css` is the one exemption.
+  `check:theme` enforce it; the app chrome in `src/styles/chrome.css` (one file per area under `src/styles/chrome/`) is the one exemption.
 - Never import browser APIs or `@/` aliases into `src/board/`, `src/dsl/`, `src/note/`, `src/quiz/` or
   `src/table/`; the server and the CLI bundle them as plain Node.
 - Never write a vault's files with `fs` from the CLI or the MCP server; every read and write goes

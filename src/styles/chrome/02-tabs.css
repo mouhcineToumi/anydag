@@ -1,0 +1,294 @@
+/* ---- the page tabs, along the bottom ---- */
+
+/*
+ * A sheet-tab strip: a bordered box per page, the active one lifted out of the bar, and the whole
+ * row scrolling sideways rather than squeezing when there are more pages than fit. Nothing here is
+ * a theme's business — no design system has an opinion about how wide a tab is before it
+ * truncates — so the sizes are literals and only the colours come from tokens.
+ */
+.dag-pagebar {
+  flex: none;
+  height: 34px;
+  border-top: 1px solid var(--dag-color-outline);
+  background: var(--dag-color-paper);
+}
+.dag-pagebar__scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 100%;
+  padding: 4px 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.dag-tab {
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  /* A minimum so a one-word page is still a target, a maximum so a sentence does not own the bar,
+     and one line either way: the name is truncated with an ellipsis and the whole of it is the
+     tooltip. Wrapping is what made a tab three lines tall inside a box with no edges. */
+  min-width: 88px;
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border: 1px solid var(--dag-color-outline);
+  border-bottom: none;
+  border-radius: var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0 0;
+  padding: 0 10px;
+  cursor: pointer;
+}
+/* Lifted to the surface the board is drawn on, with the accent as a cap: the active tab has to be
+   readable as *the* page at a glance, which a background change alone was not. */
+.dag-tab--on {
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  box-shadow: inset 0 2px 0 var(--dag-color-accent);
+}
+.dag-tab:hover { color: var(--dag-color-ink); }
+.dag-tab:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-tab--on:focus-visible { box-shadow: var(--focus-ring-inset), inset 0 2px 0 var(--dag-color-accent); }
+.dag-tab-wrap { position: relative; display: inline-flex; align-items: stretch; flex: none; }
+/* Only on the page you are on, so the strip does not read as a row of dismissals. 30px holds the
+   24px close button and the 4px it keeps from the tab's edge (#209). */
+.dag-tab-wrap .dag-tab--on { padding-right: 30px; }
+/* The tab being carried must not answer `elementFromPoint` — otherwise the drop target is always
+   the thing in your hand. On the *wrap*, not on the `.dag-tab` inside it: the wrap is what the
+   drag translates, so it is the wrap that ends up over the tab being aimed at, and disabling only
+   the button left the span around it answering every hit test. Painted by the gesture; nothing
+   reaches React until the drop. */
+.dag-tab-wrap--dragging { opacity: 0.55; z-index: 1; pointer-events: none; }
+/* Where it would land: a bar down the side of the tab it was let go over. */
+.dag-tab-wrap[data-dag-tab-drop]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 0;
+  width: 2px;
+  background: var(--dag-color-accent);
+}
+.dag-tab-wrap[data-dag-tab-drop="before"]::after { left: -2px; }
+.dag-tab-wrap[data-dag-tab-drop="after"]::after { right: -2px; }
+.dag-tab__close {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tab__close:hover { color: var(--dag-color-danger); }
+.dag-tab__close:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+/* A page with problems: its name truncates, its count does not. */
+.dag-tab--flagged { display: inline-flex; align-items: center; gap: 6px; }
+.dag-tab__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dag-tab__flag {
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  line-height: var(--dag-ui-leading-xs);
+  text-align: center;
+  border-radius: var(--dag-ui-radius-pill);
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border: 1px solid var(--dag-color-warning);
+}
+.dag-tab__add {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-width: 0;
+  padding: 0 8px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border-color: transparent;
+}
+.dag-tab__add:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-tab__name {
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  width: 12ch;
+  flex: none;
+  min-width: 0;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0 0;
+  padding: 4px 8px;
+  outline: none;
+}
+/* A finger's strip: the tab and its close are 44px, so the bar is taller on a phone (#209). */
+@media (max-width: 719px) {
+  .dag-pagebar { height: 48px; }
+  /* 48 − the bar's top rule − 3 = the tab's 44. */
+  .dag-pagebar__scroll { padding-top: 3px; }
+  .dag-tab-wrap .dag-tab--on { padding-right: 50px; }
+  .dag-tab__close { right: 2px; width: 44px; height: 44px; }
+  .dag-tab__add { min-width: 44px; }
+}
+
+/*
+ * The document tabs (#264): the window's open documents, across the top of the page, as a browser's
+ * tabs are. Not the page tabs above, which are a board's pages along the bottom and own `dag-tab*`;
+ * every name here is `dag-doctabs*`, grepped first. The strip is drawn once there are two tabs, so
+ * a window with one document looks exactly as it did.
+ */
+.dag-doctabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: var(--dag-ui-space-1);
+  height: 40px;
+  padding: 0 var(--dag-ui-space-2) 0 var(--dag-ui-space-3);
+  background: var(--dag-color-paper100);
+  border-bottom: 1px solid var(--dag-color-outline);
+  font-size: var(--chrome-text-sm);
+}
+/* At the window's left edge — the column away — it keeps clear of the toggle and the traffic lights,
+   and the page's own bar under it no longer has to. */
+.dag-doctabs[data-dag-doctabs-edge] { padding-left: calc(var(--dag-ui-space-3) + var(--window-inset)); }
+.dag-doctabs > .dag-sidebar-toggle-slot { align-self: center; margin-right: var(--dag-ui-space-1); }
+.dag-docs:has(> .dag-doctabs) .dag-toolbar > .dag-sidebar-toggle-slot { display: none; }
+.dag-docs:has(> .dag-doctabs) .dag-toolbar[data-dag-toolbar-edge] { padding-left: 16px; }
+.dag-doctabs__scroll {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  padding-top: var(--dag-ui-space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.dag-doctabs__wrap { position: relative; display: inline-flex; align-items: stretch; flex: none; height: 32px; }
+.dag-doctabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* A minimum so a one-word title is still a target, a maximum so a sentence does not own the strip,
+     and one line: the title runs out in an ellipsis and the whole of it is the tooltip. */
+  min-width: 96px;
+  max-width: 220px;
+  padding: 0 30px 0 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--dag-ui-radius-control) var(--dag-ui-radius-control) 0 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dag-doctabs__tab:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-doctabs__tab > svg { flex: none; }
+.dag-doctabs__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The tab in front is lifted onto the page it opens, joined to it, with the accent as its cap — a
+   change of fill alone did not read as *the* document on the page strip either. */
+.dag-doctabs__wrap--on .dag-doctabs__tab {
+  color: var(--dag-color-ink);
+  font-weight: var(--dag-ui-weight-strong);
+  background: var(--dag-color-paper);
+  border-color: var(--dag-color-outline);
+  box-shadow: inset 0 2px 0 var(--dag-color-accent);
+  margin-bottom: -1px;
+}
+.dag-doctabs__tab:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-doctabs__wrap--on .dag-doctabs__tab:focus-visible { box-shadow: var(--focus-ring-inset), inset 0 2px 0 var(--dag-color-accent); }
+.dag-doctabs__close {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-doctabs__close:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-doctabs__close:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-doctabs__new { align-self: center; flex: none; }
+/* A tab being dragged along the strip, and where it would land: the page strip's marks
+   (`.dag-tab-wrap--dragging`), painted by the gesture and gone at the drop. */
+.dag-doctabs__wrap--dragging { opacity: 0.55; z-index: 1; pointer-events: none; }
+.dag-doctabs__wrap[data-dag-doctab-drop]::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 0;
+  width: 2px;
+  background: var(--dag-color-accent);
+}
+.dag-doctabs__wrap[data-dag-doctab-drop="before"]::after { left: -2px; }
+.dag-doctabs__wrap[data-dag-doctab-drop="after"]::after { right: -2px; }
+[data-dag-window] .dag-doctabs { -webkit-app-region: drag; }
+[data-dag-window] .dag-doctabs :is(button, [role]) { -webkit-app-region: no-drag; }
+/* A finger's strip: a tab, its close and the new-tab button are 44px on a phone. */
+@media (max-width: 719px) {
+  .dag-doctabs { height: 52px; padding-left: var(--dag-ui-space-1); }
+  .dag-doctabs[data-dag-doctabs-edge] { padding-left: calc(var(--dag-ui-space-1) + var(--window-inset)); }
+  .dag-doctabs > .dag-sidebar-toggle-slot { width: 44px; height: 44px; }
+  .dag-doctabs__wrap { height: 44px; }
+  .dag-doctabs__tab { padding-right: 48px; }
+  .dag-doctabs__close { right: 2px; width: 44px; height: 44px; }
+  .dag-docs:has(> .dag-doctabs) .dag-toolbar[data-dag-toolbar-edge] { padding-left: 4px; }
+}
+
+.dag-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dag-ui-control-md);
+  height: var(--dag-ui-control-md);
+  color: var(--dag-color-slate);
+  background: transparent;
+  /* No box around a glyph. A row of bordered squares reads as a row of boxes rather than a row of
+     tools — the hover fill is the affordance.
+     The border is kept at 1px and made transparent rather than dropped: every one of these is
+     30x30 under `box-sizing: border-box`, so removing it outright would change the content area
+     and shift the icon inside by a pixel. The problems dock had already unset this twice, locally;
+     that it had to is what says the default was wrong. */
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-icon:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-icon--sm { width: var(--dag-ui-control-sm); height: var(--dag-ui-control-sm); }
+.dag-icon--touch { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+.dag-icon--danger:hover:not(:disabled) { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
+.dag-icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A finger's under 720px, for `Button` and `IconButton` both: `md` is the size nobody chose, so it is
+   the one that grows; `sm` was chosen, and stays. */
+@media (max-width: 719px) {
+  .dag-button--md { gap: 8px; height: var(--dag-ui-control-touch); padding: 0 16px; }
+  .dag-icon--md { width: var(--dag-ui-control-touch); height: var(--dag-ui-control-touch); }
+}
+.dag-icon--on { background: var(--dag-color-paper200); color: var(--dag-color-ink); }
+

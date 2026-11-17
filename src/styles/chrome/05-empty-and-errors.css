@@ -1,0 +1,369 @@
+/* ---- nothing open ---- */
+
+/*
+ * The card a person meets before they have opened a board (`src/ui/Welcome.tsx`).
+ *
+ * The layer is `pointer-events: none` and the card turns it back on, so the paper underneath is
+ * still a live canvas — it can be panned and zoomed behind the invitation. That is the difference
+ * between an empty board with a suggestion on it and a modal blocking one.
+ */
+.dag-welcome__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: calc(var(--dag-ui-layer-chrome) + 1) /* over the dock, under the floating sidebar */;
+}
+.dag-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  max-width: calc(100% - 48px);
+  padding: 28px 36px 24px;
+  text-align: center;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-modal);
+}
+.dag-welcome__title { margin: 8px 0 0; font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-welcome__hint { margin: 0; font-size: var(--chrome-text-md); line-height: 1.45; color: var(--dag-color-slate); }
+.dag-welcome__acts { display: flex; gap: 8px; margin-top: 14px; }
+.dag-welcome__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.dag-welcome__act:hover { background: var(--dag-color-paper100); }
+.dag-welcome__act:focus-visible { box-shadow: var(--focus-ring); }
+/* One of the two is the one to press, and it is the one that makes something: an empty board with
+   two identical buttons asks a question it already knows the usual answer to. */
+.dag-welcome__act--go { border-color: var(--dag-color-accent); color: var(--dag-color-ink); }
+/* An empty board's three ways in: tiles rather than a row of buttons, each with the key
+   that does the same thing under it, so the card teaches the keys it stands in for. */
+.dag-welcome--empty { padding: 20px 20px 18px; box-shadow: none; }
+.dag-welcome--empty .dag-welcome__hint { font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-welcome--empty .dag-welcome__acts { margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+.dag-welcome__act--tile {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 160px;
+  min-height: 72px;
+  padding: 10px 12px;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+}
+.dag-welcome__act--tile > svg { margin-bottom: 2px; }
+.dag-welcome__act--tile kbd { font-family: var(--dag-font-mono); font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-welcome__act--tile.dag-welcome__act--go kbd { color: var(--dag-color-slate); }
+
+/*
+ * Home proper: the ways to start, then the files this browser opened last, then what is due.
+ *
+ * The card is wider than the other two because the two lists need a line for a title and a line
+ * for what it is; the title and hint stay centred, while a row reads from the left like a list.
+ * The tiles are a grid rather than the row `EmptyBoard` draws, so *More…* can open its kinds under
+ * them without moving the ones already there.
+ */
+.dag-welcome--home {
+  width: 520px;
+  gap: 0;
+  padding: 24px;
+  align-items: stretch;
+  text-align: left;
+}
+.dag-welcome--home > svg { align-self: center; }
+.dag-welcome--home > .dag-welcome__title,
+.dag-welcome--home > .dag-welcome__hint { text-align: center; }
+.dag-welcome--vault-empty { width: 460px; }
+.dag-welcome__unlock { align-self: center; margin-top: 14px; }
+.dag-welcome__acts--home {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+.dag-welcome--vault-empty .dag-welcome__acts--home { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dag-welcome__acts--home .dag-welcome__act--tile { width: auto; min-height: 66px; padding: 10px 8px; }
+.dag-welcome__section { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; }
+.dag-welcome__sectiontitle {
+  margin: 0 0 2px;
+  padding: 0 8px;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dag-color-slate);
+}
+.dag-welcome__rows { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; }
+.dag-welcome__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-welcome__row:hover { background: var(--dag-color-paper100); }
+.dag-welcome__row:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-welcome__row > svg { flex: none; color: var(--dag-color-slate); }
+.dag-welcome__rowtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-welcome__rowmeta { flex: none; margin-left: auto; padding-left: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+@media (max-width: 719px) {
+  .dag-welcome--home,
+  .dag-welcome--vault-empty { width: 100%; max-width: calc(100% - 32px); padding: 18px; }
+  .dag-welcome--home .dag-welcome__acts--home { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 719px) {
+  .dag-welcome__act--tile { width: 100%; min-height: 52px; flex-direction: row; gap: 10px; justify-content: flex-start; }
+  .dag-welcome__act--tile kbd { display: none; }
+  .dag-welcome__acts { flex-direction: column; align-self: stretch; }
+}
+
+/* ---- the file that is not there ---- */
+
+/*
+ * The one card a board, note, quiz or table draws when the file could not be loaded
+ * (`src/ui/FileProblem.tsx`). It takes the place of the DSL error card a board used to be drawn
+ * with and the one-line notice a note used to say: both named the failure and neither named a next
+ * step. Names grepped first: `dag-file-problem*` and `data-dag-file-problem*` were unclaimed.
+ *
+ * Over a canvas it sits in a layer of its own — the paper underneath is empty, but the dock and the
+ * zoom cluster still exist, and the card is the page until the file is back. On a page without a
+ * canvas it is the body, and `flex: 1` is what fills it.
+ */
+.dag-file-problem__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  z-index: calc(var(--dag-ui-layer-chrome) + 1) /* covers the dock, as it always did; under the floating sidebar */;
+  background: var(--dag-color-paper);
+}
+.dag-file-problem {
+  flex: 1;
+  min-width: 0;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  overflow: auto;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-note-view--problem { display: flex; }
+.dag-file-problem__card {
+  width: min(480px, 100%);
+  padding: 24px 28px 22px;
+  text-align: center;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-modal);
+}
+.dag-file-problem__title {
+  margin: 0;
+  font-size: var(--chrome-text-xl);
+  font-weight: var(--dag-ui-weight-strong);
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  color: var(--dag-color-ink);
+}
+.dag-file-problem__body {
+  margin: 8px 0 0;
+  font-size: var(--chrome-text-md);
+  line-height: 1.5;
+  color: var(--dag-color-slate);
+}
+.dag-file-problem__acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dag-file-problem__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-file-problem__act:hover { background: var(--dag-color-paper100); }
+.dag-file-problem__act:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-file-problem__act > svg { flex: none; color: var(--dag-color-slate); }
+.dag-file-problem__text {
+  max-height: 320px;
+  margin: 16px 0 0;
+  padding: 12px;
+  overflow: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-sm);
+  line-height: 1.5;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-file-problem__details {
+  margin-top: 16px;
+  font-size: var(--chrome-text-sm);
+  text-align: left;
+  color: var(--dag-color-slate);
+}
+.dag-file-problem__details summary { cursor: pointer; }
+.dag-file-problem__details summary:focus-visible { box-shadow: var(--focus-ring); }
+.dag-file-problem__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 10px 0 0;
+}
+.dag-file-problem__facts dt { font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-file-problem__facts dd { margin: 0; overflow-wrap: anywhere; }
+
+[data-snapshot="1"] .dag-toolbar,
+[data-snapshot="1"] .dag-pagebar { display: none; }
+
+/* The canvas says it has the keys only when nothing on it does: with an item selected, its own
+   outline is where an arrow or a Delete lands, and a ring round the whole board on the first nudge
+   says nothing a person did not already know. */
+.dag-viewport:focus-visible:not(:has([data-dag-selected])) { box-shadow: var(--focus-ring-inset); }
+
+/* ---- the two cards that report trouble ---- */
+
+.dag-pending {
+  background: var(--dag-color-card);
+  border: 1px dashed var(--dag-color-externalBorder);
+  border-radius: var(--dag-ui-radius-surface);
+  padding: 16px;
+}
+.dag-pending__head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+/* The pending, error and broken cards stand where a diagram would, so their type is the diagram's `--dag-type-*`, not a chrome step. */
+.dag-pending__type {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-ui-radius-pill);
+  padding: 3px 9px;
+}
+.dag-pending__title { font-size: var(--dag-type-nodeTitle); font-weight: var(--dag-ui-weight-strong); }
+.dag-pending__src {
+  margin: 0;
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-rowDetail);
+  line-height: 1.6;
+  color: var(--dag-color-slate);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dag-error {
+  background: var(--dag-color-dangerSoft);
+  border: 1px solid var(--dag-color-dangerBorder);
+  border-radius: var(--dag-ui-radius-surface);
+  padding: 14px 16px;
+}
+.dag-error__title { font-size: var(--dag-type-nodeTitle); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-dangerText); }
+.dag-error__list { margin: 8px 0 0; padding: 0; list-style: none; font-size: var(--dag-type-legend); color: var(--dag-color-ink); }
+.dag-error__list li { display: flex; gap: 10px; padding: 2px 0; }
+.dag-error__code {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  color: var(--dag-color-dangerText);
+  flex: none;
+}
+.dag-error__line {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  color: var(--dag-color-dangerText);
+  min-width: 24px;
+  text-align: right;
+}
+
+/*
+ * An item that cannot be drawn, with no earlier drawing to keep: a stand-in, not an alarm.
+ *
+ * Grey and dashed rather than red, because the canvas is where the picture goes and the dock is
+ * where problems are read. It only has to say "something is here" well enough to be selected,
+ * opened and deleted like the item it stands for.
+ */
+.dag-broken {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  padding: 12px 14px;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  background: var(--dag-color-paper100);
+}
+.dag-broken__what {
+  font-family: var(--dag-font-mono);
+  font-size: var(--dag-type-pill);
+  color: var(--dag-color-slate);
+}
+.dag-broken__why { font-size: var(--dag-type-legend); color: var(--dag-color-slate); }
+
+/* The dot on a diagram showing its last good drawing. Inside the item's box, top right: `.dag-item`
+   clips anything painted outside it. */
+/* A diagram with a problem a person can act on (#145): its frame in the problem colour and a count
+   by its title. Painted by App onto the item, never in a snapshot; an outline and a pseudo-element,
+   so the box `size.ts` measured is the box drawn. `::before`, because `::after` is the selection's. */
+.dag-item[data-dag-problem-count] {
+  outline: 1.5px solid var(--dag-color-dangerBorder);
+  outline-offset: 2px;
+  content-visibility: visible;
+}
+.dag-item[data-dag-problem-count]::before {
+  content: attr(data-dag-problem-count);
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: var(--dag-ui-radius-pill);
+  background: var(--dag-color-danger);
+  color: var(--dag-color-paper);
+  font: 600 11px/18px var(--dag-font-sans);
+  text-align: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
