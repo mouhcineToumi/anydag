@@ -294,6 +294,27 @@ The Calendar gained more than one throttle; where the rest went was not isolated
 and the board's own window 682 → 410 ms from navigation to `data-dag-ready`. The first window is
 unchanged, because it comes before any of the page's script runs.
 
+### The graph view's simulation (#458)
+
+`node scripts/bench.mjs --only graph` (`graph.*`), on another machine than the rest of this file: an
+Intel i5-8300H laptop, 4 cores and 8 threads, 12 GB, Node 26.12, load average 1, 2026-11-17. It runs
+the simulation's source in the bench's own process and needs no build. The vault is the design
+session's made-up one (`scripts/bench-graph.mjs`), about 1.3 links per file.
+
+| Files | Links | One tick | Hot to rest, through the host | Typed arrays held |
+|---|---|---|---|---|
+| 500 | 640 | 0.26 ms | 0.92 s | 0.1 MB |
+| 2,000 | 2,632 | 1.0 ms | 0.92 s | 0.4 MB |
+| 5,000 | 6,695 | 3.1 ms | 0.92 s | 1 MB |
+| 20,000 | 27,049 | 14.3 ms | 2.7 s | 4 MB |
+| 5,000, dense | 150,000 | 5.4 ms | 1.2 s | |
+
+A settle is 220 ticks and the host paces them at 240 a second, so 0.92 s is the floor: up to about
+5,000 files a settle waits on the clock, not the tick; at 20,000 the tick is the limit. Works well up
+to **5,000** files, degrades at **20,000** (2.7 s to rest, a core busy for it); the prototype it
+replaced took 8.2 ms and 41 ms a tick on the same machine. The account, and the prototype beside it
+at every size, is in [`graph-simulation.md`](graph-simulation.md).
+
 ### Not measured
 
 - **The packaged app on macOS and Windows**, and the packaged app at all for memory and time — the
