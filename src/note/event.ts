@@ -46,7 +46,7 @@ export interface EventChange {
   end?: string | null;
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /**
  * A time as a person or an agent writes one. The separator may be a `T`, a `t` or one space; the

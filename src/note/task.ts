@@ -13,6 +13,7 @@
 import { parse as parseYaml } from "yaml";
 import { collation } from "../locale";
 
+import { underMark } from "./bom";
 import { QUIET } from "./quiet";
 
 /** The three a task can be, in the order work moves through them — the Tasks page's columns. */
@@ -69,7 +70,7 @@ export interface TaskChange {
 }
 
 /** The frontmatter pattern `splitNote` and `titleOf` use: a block at the very start of the text. */
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /**
  * A `status:` value, or `undefined` when it is not one of the three.
@@ -255,6 +256,11 @@ export function keyEnd(lines: readonly string[], at: number): number {
  * caller, and both fixtures hold it.
  */
 export function withKeys(text: string, change: object, keys: readonly string[]): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => keysIn(rest, change, keys));
+}
+
+function keysIn(text: string, change: object, keys: readonly string[]): string {
   const m = FRONT.exec(text);
   const block = m ? m[1]! : "";
   /* Read off the whole block, fences included: a one-line block has no line end of its own to say. */

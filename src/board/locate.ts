@@ -1,4 +1,5 @@
 import { parseAttrs, str, type Attrs, type AttrError } from "./attrs";
+import { bomLength, lf, withEol } from "./eol";
 import { scanFences, type RawFence } from "./fences";
 
 /**
@@ -26,13 +27,17 @@ export interface Located {
   type: string;
   /** A run of loose prose, or an unlabelled code block, promoted to an item. */
   prose: boolean;
-  /** Span of the whole block in the full text: the fence lines included, or the trimmed prose. */
+  /**
+   * Span of the whole block in the full text: the fence lines included, or the trimmed prose. The
+   * closing line's break is outside it, a CRLF's `\r` included.
+   */
   start: number;
   end: number;
   /** The fence, with offsets rebased onto the full text. `null` for prose. */
   fence: RawFence | null;
   attrs: Attrs;
   attrErrors: AttrError[];
+  /** LF whatever the file's line endings: the fence's body, or the trimmed prose. */
   body: string;
   /** 1-based line in the full file. */
   line: number;
@@ -42,6 +47,11 @@ export interface Located {
 
 export interface Location {
   items: Located[];
+  /**
+   * Where the document starts: 1 past a byte-order mark, else 0. The mark is part of no item and
+   * of no frontmatter, and every writer puts it back where it was (#392).
+   */
+  docStart: number;
   /** Fences whose type is not one the board knows. */
   unknown: { line: number; type: string }[];
   /** Where the frontmatter ends: the body of the document starts here. */
@@ -53,8 +63,12 @@ export interface Location {
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/;
 
 export function locateItems(text: string, isType: (t: string) => boolean): Location {
-  const m = FRONTMATTER.exec(text);
-  const bodyStart = m ? m[0].length : 0;
+  /* A BOM is not `---`, so the frontmatter is matched past it — and `String.trim` takes U+FEFF for
+     a space, which is how a BOM board once grew a card that started after the mark and was written
+     back over it (#392). */
+  const docStart = bomLength(text);
+  const m = FRONTMATTER.exec(docStart ? text.slice(docStart) : text);
+  const bodyStart = docStart + (m ? m[0].length : 0);
   const body = text.slice(bodyStart);
   const fences = scanFences(body);
 
@@ -113,7 +127,7 @@ export function locateItems(text: string, isType: (t: string) => boolean): Locat
       fence: null,
       attrs: { map: {}, order: [] },
       attrErrors: [],
-      body: trimmed,
+      body: lf(trimmed),
       line: lineAt(start),
     });
   };
@@ -151,7 +165,14 @@ export function locateItems(text: string, isType: (t: string) => boolean): Locat
       prose: false,
       start: bodyStart + f.openStart,
       end: bodyStart + f.blockEnd,
-      fence: { ...f, openStart: bodyStart + f.openStart, openEnd: bodyStart + f.openEnd, blockEnd: bodyStart + f.blockEnd },
+      fence: {
+        ...f,
+        openStart: bodyStart + f.openStart,
+        openEnd: bodyStart + f.openEnd,
+        bodyStart: bodyStart + f.bodyStart,
+        bodyEnd: bodyStart + f.bodyEnd,
+        blockEnd: bodyStart + f.blockEnd,
+      },
       attrs,
       attrErrors,
       body: f.body,
@@ -161,19 +182,21 @@ export function locateItems(text: string, isType: (t: string) => boolean): Locat
   }
   pushProse(cursor, body.length);
 
-  return { items, unknown, bodyStart, frontmatter: m ? m[1]! : null };
+  return { items, unknown, docStart, bodyStart, frontmatter: m ? m[1]! : null };
 }
 
 /**
  * A fence around a body, with a run of backticks long enough that nothing inside closes it.
  *
  * Three is the norm; a markdown item quoting a code sample needs four. The attribute list is the
- * inner text, no braces — `serializeAttrs` produces exactly that.
+ * inner text, no braces — `serializeAttrs` produces exactly that. `eol` is the line break to write
+ * it with: the file's, when the block is going into one (`eol.ts`).
  */
-export function renderFence(type: string, attrText: string, body: string): string {
+export function renderFence(type: string, attrText: string, body: string, eol = "\n"): string {
+  const plain = lf(body);
   let longest = 2;
-  for (const m of body.matchAll(/^[ \t]*(`{3,})[ \t]*$/gm)) longest = Math.max(longest, m[1]!.length);
+  for (const m of plain.matchAll(/^[ \t]*(`{3,})[ \t]*$/gm)) longest = Math.max(longest, m[1]!.length);
   const ticks = "`".repeat(longest + 1);
   const info = attrText ? `${type} {${attrText}}` : type;
-  return body ? `${ticks}${info}\n${body}\n${ticks}` : `${ticks}${info}\n${ticks}`;
+  return withEol(plain ? `${ticks}${info}\n${plain}\n${ticks}` : `${ticks}${info}\n${ticks}`, eol);
 }
