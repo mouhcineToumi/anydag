@@ -14,19 +14,8 @@ import type { List, Nodes, Root } from "mdast";
 import { parseBoard } from "@/board/parseBoard";
 import { CALLOUT_KINDS } from "@/note/callout";
 import { joinNote, splitNote } from "@/note/format";
-import {
-  applySteps,
-  blocksToMd,
-  lcs,
-  load,
-  mdToBlocks,
-  plan,
-  save,
-  saved,
-  settle,
-  type NoteBlock,
-  type Step,
-} from "@/note/markdown";
+import { applySteps, blocksToMd, load, mdToBlocks, plan, save, saved, settle, type NoteBlock, type Step } from "@/note/markdown";
+import { lcs } from "@/note/lcs";
 import { merge3 } from "@/note/merge";
 import { noteSchema } from "@/note/schema";
 
@@ -584,9 +573,9 @@ describe("empty lines", () => {
     expect(words(doc)).toEqual(["Plan", "First.", "Second.", "Third."]);
     const settled = settle(loaded, doc);
     expect(save(settled, doc)).toBe(md);
-    /* An edit to the last paragraph keeps every blank line it did not reach; its own gap is the house form's. */
+    /* An edit to the last paragraph keeps every blank line it did not reach, the ones after it too (#394, #416). */
     const edited = doc.map((b, i) => (i === 3 ? { ...b, content: [{ type: "text" as const, text: "Third!", styles: {} }] } : b));
-    expect(save(settled, edited)).toBe("# Plan\n\n\n\nFirst.\n\n\n\n\nSecond.\n\nThird!\n");
+    expect(save(settled, edited)).toBe("# Plan\n\n\n\nFirst.\n\n\n\n\nSecond.\n\nThird!\n\n\n");
   });
 
   it("keeps a file's own &nbsp; lines, at the end too, when nothing reached them", async () => {

@@ -6,9 +6,12 @@
  */
 
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Readable, Writable } from "node:stream";
 
 import type { Backend } from "./backend";
 import { chatTools } from "./chat";
+import { Frames, MAX_FRAME_BYTES, frameTooLarge } from "./frame";
 import { Picture, listTools, ToolError, makeKit, type Kit, type Tool } from "./tools";
 
 const INSTRUCTIONS =
@@ -111,10 +114,25 @@ export async function buildMcp(backend: Backend, opts: McpOptions): Promise<McpS
   return server;
 }
 
+/**
+ * The transport `anydag mcp` speaks over: stdin a line at a time, with a ceiling on one request
+ * that is answered rather than fatal (`frame.ts`, #399). `limit` is for a test that wants a frame
+ * it can write; a caller never passes one.
+ */
+export async function stdioTransport(stdin: Readable, stdout: Writable, limit = MAX_FRAME_BYTES): Promise<Transport> {
+  const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
+  return new StdioServerTransport(
+    new Frames(stdin, limit, (head, tail, bytes) => {
+      stdout.write(frameTooLarge(head, tail, bytes, limit));
+    }),
+    stdout,
+    { maxBufferSize: limit },
+  );
+}
+
 /** Serve over stdio until the client goes away. */
 export async function startMcp(backend: Backend, opts: McpOptions): Promise<McpServer> {
-  const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
   const server = await buildMcp(backend, opts);
-  await server.connect(new StdioServerTransport());
+  await server.connect(await stdioTransport(process.stdin, process.stdout));
   return server;
 }

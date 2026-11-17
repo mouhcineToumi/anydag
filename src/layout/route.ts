@@ -264,6 +264,38 @@ function runHits(a: Point, b: Point, obstacles: RouteNode[], margin: number): bo
 }
 
 /**
+ * Does a straight leg from `a` to `b` pass through the inside of any obstacle?
+ *
+ * Any angle, unlike `runHits`: the first and last legs of an ELK polyline run from our anchor to
+ * ELK's bend, and need not be square. Liang–Barsky against each box, open at the border, so a leg
+ * that runs along a card's edge is not a hit.
+ */
+function legHits(a: Point, b: Point, obstacles: RouteNode[]): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return obstacles.some((o) => {
+    let t0 = 0;
+    let t1 = 1;
+    for (const [p, q] of [
+      [-dx, a.x - o.x],
+      [dx, o.x + o.w - a.x],
+      [-dy, a.y - o.y],
+      [dy, o.y + o.h - a.y],
+    ] as const) {
+      if (p === 0) {
+        if (q <= 0) return false;
+        continue;
+      }
+      const r = q / p;
+      if (p < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 >= t1) return false;
+    }
+    return true;
+  });
+}
+
+/**
  * A dogleg around the card a bow cannot clear.
  *
  * Only for a horizontal exit, which is where the problem lives: a row anchor is fixed on the side
@@ -546,6 +578,16 @@ function bundleOutward(
   return out;
 }
 
+/** An extent, by its four sides. */
+export type Reach = { left: number; top: number; right: number; bottom: number };
+
+/**
+ * What `routeReach` and `labelReach` grow from when asked nothing else: the origin, so a reach past
+ * the top or the left comes back negative. A layout whose drawing does not start at the origin — the
+ * lane bands start at `bandLeft` — passes its own box instead, and reads the overhang on each side.
+ */
+const ORIGIN: Reach = { left: 0, top: 0, right: 0, bottom: 0 };
+
 /**
  * How far the routed labels reach on every side — the part of a drawing no box accounts for.
  *
@@ -556,14 +598,8 @@ function bundleOutward(
  * (`bundleOutward`), so the left and top are reported too: past the origin it is drawn outside the
  * item, and `content-visibility` clips it there — "report the status back" came out ":he status back".
  */
-export function labelReach(
-  edges: RoutedEdge[],
-  labels: Record<string, { w: number; h: number }>,
-): { left: number; top: number; right: number; bottom: number } {
-  let left = 0;
-  let top = 0;
-  let right = 0;
-  let bottom = 0;
+export function labelReach(edges: RoutedEdge[], labels: Record<string, { w: number; h: number }>, within: Reach = ORIGIN): Reach {
+  let { left, top, right, bottom } = within;
   for (const e of edges) {
     if (!e.label) continue;
     const size = labels[e.id];
@@ -589,11 +625,8 @@ export function labelReach(
  * and `Q`, from `pathOf` and `roundedPolyline` — and samples each curve, since a cubic's control
  * points reach further than the curve does and a frame grown to them would be grown for nothing.
  */
-export function routeReach(edges: RoutedEdge[]): { left: number; top: number; right: number; bottom: number } {
-  let left = 0;
-  let top = 0;
-  let right = 0;
-  let bottom = 0;
+export function routeReach(edges: RoutedEdge[], within: Reach = ORIGIN): Reach {
+  let { left, top, right, bottom } = within;
   const take = (x: number, y: number) => {
     left = Math.min(left, x);
     top = Math.min(top, y);
@@ -754,6 +787,10 @@ export function routeEdges(input: RouteInput): RoutedEdge[] {
     const dy = end.y - start.y;
 
     const bends = usableBends(input.bends[e.id], start, slot.from.side, end, slot.to.side);
+    const polylineHits = (points: Point[]) => {
+      const others = obstacles.filter((o) => o.id !== e.from.node && o.id !== e.to.node);
+      return points.some((p, i) => i > 0 && legHits(points[i - 1]!, p, others));
+    };
     const via = input.via?.[e.id];
     let spine: Spine;
 
@@ -781,10 +818,18 @@ export function routeEdges(input: RouteInput): RoutedEdge[] {
         p2: { x: end.x, y: end.y - reach },
         p3: end,
       };
-    } else if (bends && bends.length > 2) {
+    } else if (bends && bends.length > 2 && !polylineHits([start, ...bends, end])) {
       /* ELK went around something. Its polyline is the only route that misses the obstacle, so keep
          it — but round the corners, because a right angle in a board of S-curves reads as a
-         different diagram. */
+         different diagram.
+
+         Only while it still misses everything once our anchors are on its ends. What ELK routed
+         was an exit it chose, and `usableBends` trims only the bends behind ours: when ELK wraps
+         a chain into rows (`aspect`), the edge that closes a cycle comes back as a zigzag laid out
+         for the sides of the wrap, and spliced onto a top and a bottom anchor its first leg ran
+         through the card between them and its runs stopped in mid-air past the frame — the
+         closing relationship of a three-table cycle, unreadable (#408). A polyline that crosses a
+         card is no longer a route round anything, and the curve, which bows clear, is drawn. */
       spine = { kind: "polyline", points: [start, ...bends, end] };
     } else {
       /*

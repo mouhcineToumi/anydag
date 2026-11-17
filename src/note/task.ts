@@ -13,6 +13,7 @@
 import { parse as parseYaml } from "yaml";
 import { collation } from "../locale";
 
+import { underMark } from "./bom";
 import { frontBlock } from "./front";
 import { QUIET } from "./quiet";
 
@@ -253,6 +254,11 @@ export function keyEnd(lines: readonly string[], at: number): number {
  * caller, and both fixtures hold it.
  */
 export function withKeys(text: string, change: object, keys: readonly string[]): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => keysIn(rest, change, keys));
+}
+
+function keysIn(text: string, change: object, keys: readonly string[]): string {
   const m = frontBlock(text);
   const block = m ? m[1]! : "";
   /* Read off the whole block, fences included: a one-line block has no line end of its own to say. */

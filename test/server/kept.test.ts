@@ -114,6 +114,17 @@ describe("the kept listing", () => {
     await same();
   });
 
+  it("a text written in place in a folder made with its parent is in the answer once the watcher has said so", async () => {
+    /* #405: `mkdir -p` made `fresh/inner` before anything watched `fresh`, so nothing watched it. */
+    fs.mkdirSync(at("fresh/inner"), { recursive: true });
+    write(env.root, "fresh/inner/plan.md", "---\ntitle: First\n---\n");
+    await until(async () => (await env.vault.tree()).titles["fresh/inner/plan"] === "First", 5000, "the new note");
+    await sleep(300);
+    fs.writeFileSync(at("fresh/inner/plan.md"), "---\ntitle: Second\n---\n");
+    await until(async () => (await env.vault.tree()).titles["fresh/inner/plan"] === "Second", 5000, "the title written in place");
+    await same();
+  });
+
   it("the twin a deleted `plan.md` was hiding is listed in its place", async () => {
     fs.rmSync(at("work/twice.md"));
     const t = await same();

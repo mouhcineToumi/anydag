@@ -5,6 +5,7 @@
  * `event.ts`), which the hosted api held to fixtures and this one simply imports.
  */
 
+import { underMark } from "../src/note/bom";
 import { titleOf } from "../src/refs/extract";
 import { hasOffset, isDay, whenOf, type NoteEvent } from "../src/note/event";
 import { frontBlock } from "../src/note/front";
@@ -25,6 +26,11 @@ function scalar(title: string): string {
  * after the block is the Markdown the editor holds.
  */
 export function withTitle(text: string, title: string, kind = "board"): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => titled(rest, title, kind));
+}
+
+function titled(text: string, title: string, kind: string): string {
   const line = `title: ${scalar(title)}`;
   const m = frontBlock(text);
   /* Saying it already, however it is quoted, is no change: `quiz_create` given a text and
@@ -52,6 +58,11 @@ export function withTitle(text: string, title: string, kind = "board"): string {
 
 /** `text` with no `title:` line in its frontmatter — and no frontmatter left if that was all of it. */
 export function withoutTitle(text: string): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, untitled);
+}
+
+function untitled(text: string): string {
   const m = frontBlock(text);
   if (!m) return text;
   const lines = m[1]!.split(/\r?\n/);

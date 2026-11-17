@@ -25,6 +25,7 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { underMark } from "./bom";
 import { frontBlock } from "./front";
 import { within } from "./project";
 import { wallOf, type Wall } from "./zone";
@@ -164,6 +165,11 @@ function fillLine(line: string, vars: TemplateVars, wall: Wall): string {
  * A pure function of its arguments: the same template, title and moment make the same text.
  */
 export function fillTemplate(text: string, vars: TemplateVars): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => filled(rest, vars));
+}
+
+function filled(text: string, vars: TemplateVars): string {
   const wall = wallOf(vars.at, vars.zone);
   const m = frontBlock(text);
   if (!m) return fillText(text, vars, wall);

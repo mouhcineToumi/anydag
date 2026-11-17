@@ -37,6 +37,7 @@ import { unified } from "unified";
 
 import { isItemType } from "../board/types";
 import { locateItems } from "../board/locate";
+import { markOf } from "../note/bom";
 import { frontBlock } from "../note/front";
 import { remarkMath } from "../note/math";
 import { WIKILINK, resolveWiki, type WikiCandidate } from "./wikilinks";
@@ -74,15 +75,17 @@ export type LinkKind = "board" | "note" | "quiz" | "table";
 /** Every span of `text` in which a wikilink counts — `extract.ts`'s places, as offsets into the file. */
 function spansOf(text: string, kind: LinkKind): [number, number][] {
   if (kind !== "board") {
-    const front = frontBlock(text)?.[0].length ?? 0;
+    /* After the frontmatter, or a byte-order mark: remark counts its offsets from past the mark (#394). */
+    const front = frontBlock(text)?.[0].length ?? markOf(text).length;
     return markdownSpans(text.slice(front), front);
   }
   const out: [number, number][] = [];
   for (const it of locateItems(text, isItemType).items) {
     if (it.type !== "md" && it.type !== "note") continue;
-    const at = it.fence ? text.indexOf(it.body, it.fence.openEnd) : it.start;
-    if (at < 0 || !text.startsWith(it.body, at)) continue;
-    out.push(...markdownSpans(it.body, at));
+    /* The body as the file holds it, not `it.body`: that is LF, and in a CRLF board it is not a
+       substring of the file, so its wikilinks were never followed (#391). */
+    const [from, to] = it.fence ? [it.fence.bodyStart, it.fence.bodyEnd] : [it.start, it.end];
+    out.push(...markdownSpans(text.slice(from, to), from));
   }
   return out;
 }

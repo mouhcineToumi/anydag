@@ -20,8 +20,11 @@ import { parse as parseYaml } from "yaml";
 
 import { QUIET } from "./quiet";
 
-/** A pair of `---` lines at the start of a text: the whole block in `[0]`, what is between in `[1]`. */
-const BLOCK = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+/**
+ * A pair of `---` lines at the start of a text, behind a byte-order mark when it opens with one
+ * (`bom.ts`, #394): the whole block, the mark included, in `[0]`, and what is between in `[1]`.
+ */
+const BLOCK = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** A line that opens a mapping's entry: a plain key, then a colon that ends it. */
 const KEY_LINE = /^[\p{L}\p{N}_][\p{L}\p{N}_.-]*[ \t]*:(?:[ \t]|$)/u;
@@ -51,8 +54,10 @@ function judged(inner: string): boolean {
 }
 
 /**
- * The frontmatter `text` opens with — the whole block, both `---` lines and the line end after the
- * second, in `[0]`, and the lines between in `[1]` — or `null` when it opens with none.
+ * The frontmatter `text` opens with — the whole block, any byte-order mark in front of it, both
+ * `---` lines and the line end after the second, in `[0]`, and the lines between in `[1]` — or
+ * `null` when it opens with none. A writer works behind the mark (`underMark`), so the block it
+ * edits starts with the `---`.
  */
 export function frontBlock(text: string): RegExpExecArray | null {
   const m = BLOCK.exec(text);

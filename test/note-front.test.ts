@@ -120,3 +120,51 @@ describe("a note whose body opens with a rule (#397)", () => {
     expect(out).toBe("---\n\nWritten for Q3: the plan.\n\n---\n");
   });
 });
+
+describe("behind a byte-order mark (#394 with #397)", () => {
+  const BOM = "﻿";
+
+  it("finds a frontmatter behind the mark, and carries the mark in front", () => {
+    const text = `${BOM}---\ntitle: Plan\nstatus: todo\n---\nbody\n`;
+    expect(frontBlock(text)?.[0]).toBe(`${BOM}---\ntitle: Plan\nstatus: todo\n---\n`);
+    const f = splitNote(text);
+    expect(f).toEqual({ front: `${BOM}---\ntitle: Plan\nstatus: todo\n---\n`, body: "body\n", title: "Plan" });
+    expect(taskOf(text)).toEqual({ status: "todo" });
+    expect(titleOf(text)).toBe("Plan");
+  });
+
+  it("reads two rules behind the mark as body, the mark alone in front", () => {
+    const text = BOM + RULED;
+    expect(frontBlock(text)).toBeNull();
+    expect(splitNote(text)).toEqual({ front: BOM, body: RULED });
+    expect(taskOf(text)).toBeUndefined();
+    expect(titleOf(text)).toBeUndefined();
+    expect(frontId(text)).toBeNull();
+  });
+
+  it("grows a frontmatter behind the mark and above the rules, every byte of the body kept", () => {
+    const text = BOM + RULED;
+    for (const out of [
+      withTask(text, { status: "todo" }),
+      withTags(text, { add: ["pricing"] }),
+      withTitle(text, "Plan", "note"),
+      withId(text, "0123456789"),
+    ]) {
+      expect(out.startsWith(`${BOM}---\n`)).toBe(true);
+      expect(out.indexOf(BOM, 1)).toBe(-1);
+      const f = splitNote(out);
+      expect(f.front.startsWith(BOM)).toBe(true);
+      expect(f.body).toBe(RULED);
+    }
+    expect(withoutTitle(text)).toBe(text);
+  });
+
+  it("relinks a wikilink between the rules behind the mark", () => {
+    const text = `${BOM}---\n\nSee [[Plan]].\n\n---\n`;
+    const change = changeOf(
+      [{ id: "plan000001", name: "Plan", kind: "note", title: "Plan" }],
+      [{ id: "plan000001", name: "Budget", kind: "note", title: "Budget" }],
+    );
+    expect(relinkText(text, "note", change!).text).toBe(text.replace("[[Plan]]", "[[Budget]]"));
+  });
+});

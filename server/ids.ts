@@ -50,6 +50,7 @@ const ID_LINE = /^id[ \t]*:[ \t]*(["']?)([^\r\n"']*)\1[ \t]*$/m;
  * key is there and holds something else — a key this app must not write over.
  */
 export function frontId(text: string): string | null | false {
+  /* Past a byte-order mark: `frontBlock` reads behind one, which hid the id and minted a fresh one (#392). */
   const m = frontBlock(text);
   if (!m) return null;
   const line = ID_LINE.exec(m[1]!);

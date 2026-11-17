@@ -11,11 +11,16 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { markOf } from "./bom";
 import { frontBlock } from "./front";
 import { QUIET } from "./quiet";
 
 export interface NoteFile {
-  /** The frontmatter block including both `---` lines and the newline after them, or `""`. */
+  /**
+   * Everything before the Markdown: the frontmatter block including both `---` lines and the newline
+   * after them, or `""` — behind the file's byte-order mark when it opens with one, which is carried
+   * here even with no frontmatter, so the body the editor holds never starts with it (`bom.ts`).
+   */
   front: string;
   /** Everything after it: the Markdown the editor holds. */
   body: string;
@@ -32,11 +37,15 @@ const UNNAMED = /^untitled(?: \d+)?$/i;
 /**
  * A note's text as its frontmatter and its body. Only a block that is a frontmatter is one
  * (`front.ts`): a body that opens with a rule and has another further down is all body, rules
- * included, and is drawn so (#397).
+ * included, and is drawn so (#397). A byte-order mark goes in `front`, with the frontmatter behind
+ * it or alone, so the body the editor holds never starts with one (#394).
  */
 export function splitNote(text: string): NoteFile {
   const m = frontBlock(text);
-  if (!m) return { front: "", body: text };
+  if (!m) {
+    const mark = markOf(text);
+    return { front: mark, body: text.slice(mark.length) };
+  }
   const front = m[0];
   let title: string | undefined;
   try {

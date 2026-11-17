@@ -61,7 +61,7 @@ reach for first at the top. **Every one that touches a file takes a `vault`** �
 | `tag_list` · `tag_apply` · `tag_rename` · `tag_delete` · `tag_color` | tags — a frontmatter `tags:` on any document — with each one's colour and how many documents carry it (with `tag`, which ones); adding and taking them off one document (a tag the vault has never seen is created); renaming or merging one everywhere (**ask first before a merge**); deleting one everywhere, **only when asked**, with `confirm`; and a tag's colour, one of the ten hues. `note_create`, `task_create` and `event_create` take `tags` too |
 | `search` · `refs` · `resolve` | the page's search over every board, note, quiz and table — with a `tag`, only what carries it; references and backlinks; what a `dag:<id>` names |
 | `image_add` · `image_get` · `image_unused` · `image_sweep` | a picture beside a board (placed) or a note (kept) — **by `url` when it is on the web**, which the server fetches, rather than its bytes through the conversation; looking at one; the ones nothing names any more |
-| `file_upload` · `file_list` · `file_get` · `file_rename` · `file_duplicate` · `file_title` · `file_delete` | attachments: any file — a PDF, a picture, a sheet — kept beside the boards and notes and referred to by `dag:<id>` (see *Attachments*), given as base64 `data` or as an `https://` `url` the server fetches (a private address is refused) — and its `sha256` comes back, to prove the bytes arrived; `file_list` says what this vault accepts, `file_get` shows a picture or a text file, and `file_delete` moves it to the trash and says what used it |
+| `file_upload` · `file_list` · `file_get` · `file_rename` · `file_duplicate` · `file_title` · `file_delete` | attachments: any file — a PDF, a picture, a sheet — kept beside the boards and notes and referred to by `dag:<id>` (see *Attachments*), given as base64 `data` — for a file of up to about 48 MB — or as an `https://` `url` the server fetches, which is how a bigger one goes (a private address is refused) — and its `sha256` comes back, to prove the bytes arrived; `file_list` says what this vault accepts, `file_get` shows a picture or a text file, and `file_delete` moves it to the trash and says what used it |
 | `trash_list` · `trash_restore` · `trash_delete` · `trash_empty` | what was deleted: **every `*_delete` and `board_rmdir` moves a thing to the trash**, where it stays for `days` (thirty) and `trash_restore` puts it back with its id; `trash_delete` and `trash_empty` delete for good, each with a `confirm` — **ask the person first** |
 | `sync_status` · `sync_now` | whether the vault syncs to a sync server and how it is going (`state`, `pending`, `conflicts`, `last`), and a pull-and-push now — **only in builds with the `cloud` switch on: if they are not in the tool list, this build has none**. Pairing and linking are the person's — they take a one-time code and a passphrase, typed in Settings → Sync or `anydag sync` — so there is no tool for either; a vault that is not linked says `unlinked` |
 | `component_delete` | removing a saved component, for good — keeping one is `board_create` under `components/` |
@@ -75,7 +75,9 @@ the page in a browser — and nothing here streams: `base` is how you learn a do
 **`base` is the whole concurrency story.** It is a sha1 of the file, it comes back from
 `board_read`, and passing it to `board_write` or `board_patch` is what stops a write from throwing
 away an edit the person made while you were thinking. A board that moved underneath answers by
-naming its new `base`: read it again and redo the change against what is there.
+naming its new `base`: read it again and redo the change against what is there. An empty `base` is
+not a missing one: it is a stale base, and answers the same conflict — leave `base` out only when
+you mean to write over whatever is there.
 
 **The loop is the same one, minus the eyes.** `board_diagnose` is the parser's half — the `E_`,
 `W_` and `EB_` codes, exactly as below. The `Q_` quality half and the picture need a laid-out page
@@ -524,7 +526,8 @@ hue?}` or `project_set` changes the two lines without touching the text.
 
 **A note and a board reference each other by id.** Every board and note has a permanent id — `id:`
 in its frontmatter, written when the app makes the file or the first time something links to it,
-and unchanged by a rename or a move — which `GET /__board/index` lists
+and unchanged by a rename, a move or a whole-text write (a text written with no `id:` line keeps the
+file's, put back in) — which `GET /__board/index` lists
 beside each one's title and the references it makes (MCP's `board_list` carries the ids too). A
 reference is a Markdown link to `dag:<id>`:
 
@@ -563,7 +566,10 @@ spreadsheet, slides, audio, video, an archive — listed and foldered with them,
 `?file=<name>`, and, like every document, given a permanent id. Its name keeps its extension
 (`specs/q3-report.pdf`); what it is *called* (`Q3 Report.pdf`) is its title, and the extension is
 what decides its type. Keep one with `file_upload` or `anydag file upload`; `file_list` says the
-largest file and the types this vault takes, and anything else is refused with why.
+largest file and the types this vault takes, and anything else is refused with why. Over MCP a
+request is one JSON-RPC frame, so the base64 `data` a tool call carries is a file of up to about
+48 MB; past that give `url`. `anydag file upload`, a drop in the app and the tool's own `url` reach
+the vault's whole limit, 512 MB by default.
 
 Refer to one by its id, exactly as to a board or a note. In a note, `![Q3 Report.pdf](dag:1eaj124s6h)`
 on a line of its own draws a picture inline and anything else as a card to open or download, and

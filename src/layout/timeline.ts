@@ -28,8 +28,14 @@ export function layoutTimeline(graph: Graph, sizes: Record<string, SizedNode>, m
 
   const sizeOf = (id: string) => sizes[id] ?? { w: metric.node.stepW, h: metric.node.stepH, rowY: [] };
 
-  const min = Math.min(...entries.map((e) => e.start));
-  const max = Math.max(...entries.map((e) => e.end ?? e.start));
+  /* Both ends of every entry are in the domain. A range is a span, and taking the domain from
+     `end ?? start` would leave an entry's start outside it — the card would land past the right
+     edge of the frame. `parseTimeline` refuses a range that ends before it starts (#410); this is
+     the layout's own guarantee that no entry can be placed where nobody can see it. */
+  const starts = entries.map((e) => e.start);
+  const ends = entries.map((e) => e.end ?? e.start);
+  const min = Math.min(...starts, ...ends);
+  const max = Math.max(...starts, ...ends);
   const span = Math.max(DAY * 30, max - min);
 
   /* Wide enough that the narrowest gap between two entries still separates their cards. */

@@ -123,6 +123,7 @@ export function refsInBoard(text: string): Ref[] {
 
 /** A board's or a note's `title:` from its frontmatter, when it has one — what a reference shows. */
 export function titleOf(text: string): string | undefined {
+  /* Past a byte-order mark, which a board written by Notepad starts with (#392): `frontBlock` reads behind one. */
   const m = frontBlock(text);
   if (!m) return undefined;
   try {
