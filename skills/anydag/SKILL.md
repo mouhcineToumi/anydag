@@ -75,7 +75,9 @@ the page in a browser — and nothing here streams: `base` is how you learn a do
 **`base` is the whole concurrency story.** It is a sha1 of the file, it comes back from
 `board_read`, and passing it to `board_write` or `board_patch` is what stops a write from throwing
 away an edit the person made while you were thinking. A board that moved underneath answers by
-naming its new `base`: read it again and redo the change against what is there.
+naming its new `base`: read it again and redo the change against what is there. An empty `base` is
+not a missing one: it is a stale base, and answers the same conflict — leave `base` out only when
+you mean to write over whatever is there.
 
 **The loop is the same one, minus the eyes.** `board_diagnose` is the parser's half — the `E_`,
 `W_` and `EB_` codes, exactly as below. The `Q_` quality half and the picture need a laid-out page
