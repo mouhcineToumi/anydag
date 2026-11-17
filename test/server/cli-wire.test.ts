@@ -108,6 +108,32 @@ describe("anydag board", () => {
   });
 });
 
+// #401: `<kind> write --file draft.md` with a draft that has no frontmatter kept no `id:`, and every
+// `dag:` reference to the document named nothing once the index was rebuilt.
+describe("anydag <kind> write", () => {
+  const KINDS = [
+    { kind: "board", suffix: ".board.md", fresh: STACK },
+    { kind: "note", suffix: ".md", fresh: "# Fresh\n" },
+    { kind: "quiz", suffix: ".quiz.md", fresh: "## Three? {#q3}\n- [x] y\n- [ ] n\n" },
+    { kind: "table", suffix: ".table.md", fresh: "## Deals {#deals}\n\n| Name {#name} |\n| --- |\n| Beta {#rbeta} |\n" },
+  ];
+  for (const { kind, suffix, fresh } of KINDS) {
+    it(`keeps a ${kind}'s id when the text written has none`, async () => {
+      const made = await anydag(kind, "new", `wire-id-${kind}`);
+      expect(made.code, made.err).toBe(0);
+      const name = made.out.trim();
+      const file = path.join(root, `${name}${suffix}`);
+      const id = /^id: ([0-9a-z]{10})$/m.exec(fs.readFileSync(file, "utf8"))?.[1];
+      expect(id).toBeTruthy();
+      const read = JSON.parse((await anydag(kind, "cat", name, "--json")).out) as { base: string };
+      fs.writeFileSync(path.join(work, "draft.md"), fresh);
+      const written = await anydag(kind, "write", name, "--base", read.base, "--file", path.join(work, "draft.md"));
+      expect(written.code, written.err).toBe(0);
+      expect(fs.readFileSync(file, "utf8")).toMatch(new RegExp(`^---\\nid: ${id}\\n---\\n`));
+    });
+  }
+});
+
 describe("anydag quiz check", () => {
   it("is the route's answer, through the server's grammar", async () => {
     /* It was answered inside the CLI until it became a route, and `cli-main.test.ts` stubs the

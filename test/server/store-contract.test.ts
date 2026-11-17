@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { frontId, validId, validInstant } from "../../server/ids";
+import { frontId, validId, validInstant, withId } from "../../server/ids";
 import { byKind, Conflict, NotFound, Refused, sha1, version } from "../../server/vault";
 import { BOARD, NOTE, PDF, QUIZ, TABLE, has, makeEnv, readText, sweepTemps, write, type Env } from "./helpers";
 
@@ -46,20 +46,23 @@ describe("read and write", () => {
   it("a write against a version that moved is refused with the current one", async () => {
     const name = await env.vault.create("plan", "board", BOARD);
     const first = (await env.vault.read(name))!;
+    // The id is kept through a text that omits it (#401), so what somebody else wrote is that and the id.
+    const theirs = withId("changed by somebody else\n", frontId(first.text) as string);
     await env.vault.write(name, "board", "changed by somebody else\n", null);
     const err = await env.vault.write(name, "board", "mine\n", first.base).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Conflict);
-    expect((err as Conflict).text).toBe("changed by somebody else\n");
-    expect((err as Conflict).base).toBe(sha1("changed by somebody else\n"));
-    expect(readText(env.root, "plan.board.md")).toBe("changed by somebody else\n");
+    expect((err as Conflict).text).toBe(theirs);
+    expect((err as Conflict).base).toBe(sha1(theirs));
+    expect(readText(env.root, "plan.board.md")).toBe(theirs);
   });
 
   it("a base of null or undefined overwrites, which is what an asset append needs", async () => {
     const name = await env.vault.create("plan", "board", BOARD);
+    const id = frontId(readText(env.root, "plan.board.md")) as string;
     await env.vault.write(name, "board", "whatever\n", null);
-    expect((await env.vault.read(name))!.text).toBe("whatever\n");
+    expect((await env.vault.read(name))!.text).toBe(withId("whatever\n", id));
     await env.vault.write(name, "board", "again\n");
-    expect((await env.vault.read(name))!.text).toBe("again\n");
+    expect((await env.vault.read(name))!.text).toBe(withId("again\n", id));
   });
 
   it("writing a document that is not there is not found", async () => {

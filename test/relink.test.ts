@@ -172,6 +172,27 @@ describe("relinkText", () => {
     );
   });
 
+  it("reads a CRLF board's multi-line cards behind a BOM, and keeps both (#391, #392)", () => {
+    const lf = [
+      "---",
+      "title: Board",
+      "---",
+      "",
+      "```md {#a}",
+      "First line.",
+      "See [[Plan]].",
+      "```",
+      "",
+      "Loose,",
+      "then [[Plan]].",
+      "",
+    ].join("\n");
+    const want = lf.replace(/\[\[Plan\]\]/g, "[[Budget plan]]");
+    const text = `\uFEFF${lf.replace(/\n/g, "\r\n")}`;
+    const got = relink(text, before, renamed, "board");
+    expect(got).toEqual({ text: `\uFEFF${want.replace(/\n/g, "\r\n")}`, links: 2 });
+  });
+
   it("reads a quiz the way the index does", () => {
     const text = "---\ntitle: Drill\n---\n\n## Which is [[Plan]]? {#q1}\n\n- [x] [[Plan]]\n- [ ] no\n\n> See [[Plan]].\n";
     expect(relink(text, before, renamed, "quiz").text).toBe(text.split("[[Plan]]").join("[[Budget plan]]"));

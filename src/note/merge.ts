@@ -13,7 +13,7 @@
  *
  * No browser, no React, no `@/` aliases.
  */
-import { lcs } from "./markdown";
+import { lcs } from "./lcs";
 
 /** Past this, the quadratic LCS is not worth running; the note asks instead of merging. */
 const MAX_LINES = 3000;

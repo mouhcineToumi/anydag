@@ -160,11 +160,15 @@ lessons about the codebase rather than about charts.
   draws neither a border nor a paper stroke: either would draw the gap a second time and double it.
   The doctrine's "gap and ring, never a border" is split across two layers, and the view's half is to
   leave it alone.
-- **A pie shrinks to fit the label it is not drawing.** The radius has to leave room for the shares
-  that go outside on a leader, and the first version reserved the widest label on the *chart*: one 6%
-  sliver whose own label reads `Other 6%` cost the pie the width of the longest name on it, and a
-  440px card drew an 88px pie. `outsideW()` measures only the slices actually going outside, at the
-  radius being tried, which is why it is re-measured each pass.
+- **A pie shrinks to fit the label it is not drawing, but only down to half its radius.** The radius
+  has to leave room for the shares that go outside on a leader, and the first version reserved the
+  widest label on the *chart*: one 6% sliver whose own label reads `Other 6%` cost the pie the width
+  of the longest name on it, and a 440px card drew an 88px pie. `outsideW()` measures only the slices
+  actually going outside. A label wider than the room left on a pie at half its maximum radius is
+  refused outright: it does not get to shrink the pie to the 8px grid, and a leader whose label
+  would leave the item is dropped rather than clipped (the legend still names the slice). That was
+  #412 — one 49-character slice name turned a 560×420 pie into a 16px dot and spilled its label 26px
+  outside the item. #434 is the separate case of a legend row longer than its column.
 
 Three more about the pointer — the pick and its controls meeting a model that is not a graph.
 

@@ -39,7 +39,8 @@ Six things are load-bearing:
   through the server's own modules.
 - **A whole-text write carries its base and is never re-sent.** `<kind> write` wants `--base` (what
   `cat --json` printed) or `--force`; a 409 is exit 3 naming the base it lost to. There is no
-  read-modify-write any more, so nothing recomputes an edit.
+  read-modify-write any more, so nothing recomputes an edit. A draft with no `id:` line keeps the
+  document's id: the store puts it back (#401), so the file differs from the draft by that line.
 - **The accounting is a closed set.** Every route `server/routes/` declares is reached by some
   command's `routes`, refused (`REFUSED`), or held only by features marked `{"admin": false}`
   (`OUTSIDE`), all read out of `docs/parity.json` (see *Parity*). `check-skill.mjs`'s eighth set holds
@@ -79,6 +80,13 @@ is still up. A file's bytes travel as base64 `data`, four thirds their size, so 
 itself; a vault's 512 MB is the store's limit, not the wire's. The framer is also linear where the
 SDK's buffer concatenated with every chunk — one frame of n bytes cost about n²/(2·chunk) bytes of
 copy — which is what makes a 40 MB upload seconds rather than minutes.
+
+**The sheets `dsl_reference` serves ship beside the server bundle.** `server/build.mjs` copies
+`docs/dsl/` and `docs/generate/` into `server/dist/docs/`, the first place `server/handle.ts` looks;
+a checkout's unit suite reads the repository's `docs/`, and `ANYDAG_DOCS_DIR` beats both. A packaged
+app has no repository above it, so a build that skipped the copy answered `{"types":[]}` to every
+`dsl_reference` and 404ed every `anydag://dsl/<type>` (#398); `test/server-build.test.ts` builds a
+bundle and asks it for a sheet.
 
 **Tags have no command** (#327). A tag is finer than a whole file, so adding, renaming, recolouring
 and deleting one are the page's and MCP's (`tag_list`, `tag_apply`, `tag_rename`, `tag_delete`,

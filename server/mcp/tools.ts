@@ -329,6 +329,10 @@ const tagsInput = z
     "Tags for the new document — its frontmatter `tags:`; a tag the vault has never seen is created in its default colour",
   );
 
+/** What every whole-text write tool says about the document's id (#401). */
+const KEEPS_ID =
+  "A text with no `id:` line in its frontmatter keeps the document's id: the server writes it back in, so every `dag:` reference still names it, and the text stored differs from yours by that line — take `base` from the answer rather than hashing what you sent.";
+
 async function docWrite(kit: Kit, kind: string, name: string, text: string, base: string | undefined, v?: string) {
   kit.needWrite(`write a ${kind}`);
   const got = await kit.api("POST", "/__board/put", {
@@ -502,7 +506,8 @@ const boardTools: Tool[] = [
     description: withNote(
       "Replace a board's whole text. What to use when you are writing or rewriting a diagram.\n\n" +
         "Pass the `base` from `board_read`. Without one the write wins unconditionally, which will throw away an edit somebody made while you were thinking; with one, a board that moved underneath answers a conflict carrying the text that replaced it, and the right response is to read that, redo the change against it and write again.\n\n" +
-        "Give every fence a `#id`. One you leave off is written for you — the id the item would have been numbered with — so the text that comes back may differ from the text you sent by exactly those ids; read `base` from the answer rather than hashing what you sent.",
+        "Give every fence a `#id`. One you leave off is written for you — the id the item would have been numbered with — so the text that comes back may differ from the text you sent by exactly those ids; read `base` from the answer rather than hashing what you sent.\n\n" +
+        KEEPS_ID,
     ),
     write: true,
     input: { name: z.string(), text: z.string(), base: z.string().optional(), vault },
@@ -633,7 +638,8 @@ const noteTools = kindTools("note", {
   create:
     "Make a note. The name is settled by the server — numbered if taken. With a `title` the file is named after it, in the folder `name` gives (`work/` puts it in `work`); with neither text nor title it starts *Untitled*, as New note does. Plain Markdown: headings, lists, checklists, tables, quotes, code, images.",
   write:
-    "Replace a note's whole text.\n\nPass the `base` from `note_read`: a person may be typing in it, and a note that moved underneath answers a conflict naming its new base — read it again, redo the change, write again. Without one the write wins unconditionally.",
+    "Replace a note's whole text.\n\nPass the `base` from `note_read`: a person may be typing in it, and a note that moved underneath answers a conflict naming its new base — read it again, redo the change, write again. Without one the write wins unconditionally.\n\n" +
+    KEEPS_ID,
   rename: "Rename or move a note, its images with it. A `/` in `to` is the folder it moves into.",
   duplicate: "Copy a note. The copy is a new document with its own id.",
   del:
@@ -649,7 +655,8 @@ const quizTools = kindTools("quiz", {
   create:
     "Make a quiz. The name is settled by the server and may be numbered; with a `title` the file is named after it. Write the questions as `## Question?` then `- [x] right` / `- [ ] wrong` then `> why`, and check it with `quiz_check`. An option may hold a code block, indented two spaces under its `- [ ]` line. A question with no checklist and a `>` quote at its end is answered in words: the quote is its model answer, and the person says whether they had it.",
   write:
-    "Replace a quiz's whole text, under the `base` from `quiz_read`. Keep every question's `{#id}`: what somebody answered is recorded against it. To change one question, add one, remove one or reorder them, `quiz_question_set`, `quiz_question_remove` and `quiz_question_move` send that question alone and leave every other byte as it is.",
+    "Replace a quiz's whole text, under the `base` from `quiz_read`. Keep every question's `{#id}`: what somebody answered is recorded against it. To change one question, add one, remove one or reorder them, `quiz_question_set`, `quiz_question_remove` and `quiz_question_move` send that question alone and leave every other byte as it is.\n\n" +
+    KEEPS_ID,
   rename: "Rename or move a quiz. Its id, and so what was answered in it, go with it.",
   duplicate: "Copy a quiz. The copy is a new document: nothing answered in the original is in it.",
   del:
@@ -833,7 +840,8 @@ const tableTools: Tool[] = [
     create:
       "Make a table. The name is settled by the server and may be numbered; with a `title` the file is named after it. Every tab, column and row it holds is given an id if it has none, so it can be addressed by `table_edit` at once. With no text it has no tabs yet: add one with `table_edit`'s `addTab`, or write `## Tab` and a GFM table, or `importCsv`.",
     write:
-      "Replace a table's whole text, under the `base` from `table_read`. Keep every `{#id}`: a reference, a sort, a filter and a card on a board name them. To change a few cells, rows or columns, `table_edit` is the smaller write and never loses a person's edit to another row.",
+      "Replace a table's whole text, under the `base` from `table_read`. Keep every `{#id}`: a reference, a sort, a filter and a card on a board name them. To change a few cells, rows or columns, `table_edit` is the smaller write and never loses a person's edit to another row.\n\n" +
+      KEEPS_ID,
     rename: "Rename or move a table. Its id goes with it, so every card and reference to it still works.",
     duplicate: "Copy a table. The copy is a new document with its own id.",
     del:
