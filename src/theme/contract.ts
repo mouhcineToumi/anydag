@@ -176,6 +176,8 @@ interface ThemeType {
   entityName: number;
   rowMore: number;
   c4Name: number;
+  /** The C4 name's line-height, a ratio: a wrapped name grows the card by one of these per line. */
+  c4NameLeading: number;
   c4Type: number;
   c4Desc: number;
   c4DescLeading: number;

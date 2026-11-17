@@ -32,6 +32,7 @@ const UNITLESS = new Set([
   "t0",
   "t1",
   "base",
+  "c4NameLeading",
   "c4DescLeading",
   "stepTitleLeading",
   "stepTitleLines",
