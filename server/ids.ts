@@ -42,7 +42,7 @@ export function derivedId(id: string, rel: string, taken: (x: string) => boolean
   }
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const ID_LINE = /^id[ \t]*:[ \t]*(["']?)([^\r\n"']*)\1[ \t]*$/m;
 
 /**

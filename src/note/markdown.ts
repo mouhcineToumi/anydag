@@ -47,6 +47,7 @@ import type {
   TableRow,
 } from "mdast";
 
+import { markOf } from "./bom";
 import { calloutLine, splitCallout } from "./callout";
 import { blockTex, inlineMathNode, inlineTex, isDisplay, MATH_WRITE, remarkEscapeDollars, remarkMath } from "./math";
 
@@ -384,8 +385,10 @@ function definitions(root: Root): Ctx["defs"] {
 }
 
 export function mdToBlocks(md: string): NoteBlock[] {
-  const root = parser.parse(md) as Root;
-  return toBlocks(root.children, { md, defs: definitions(root) });
+  /* remark's offsets start past a byte-order mark, so the text they are sliced from must too (#394). */
+  const text = md.slice(markOf(md).length);
+  const root = parser.parse(text) as Root;
+  return toBlocks(root.children, { md: text, defs: definitions(root) });
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -837,7 +840,10 @@ function equationsIn(root: Nodes): string[] {
 interface Unit {
   ids: string[];
   source: string;
-  /** What sat between the previous unit and this one — `\n\n` as often as not, and exactly that. */
+  /**
+   * What sat between the previous unit and this one — `\n\n` as often as not, and exactly that. The
+   * first unit's is the lead, and a byte-order mark the body opens with is in it.
+   */
   gap: string;
   /** What these blocks serialise to *as the editor holds them*, filled by `settle`. */
   canon?: string;
@@ -866,8 +872,14 @@ let loads = 0;
  * nested blocks and for anything a person types.
  */
 export function load(body: string): { blocks: NoteBlock[]; loaded: Loaded } {
-  const root = parser.parse(body) as Root;
-  const ctx: Ctx = { md: body, defs: definitions(root) };
+  /* remark skips a byte-order mark and counts its offsets from the character after it, so the map is
+     sliced from the text after the mark, and the mark goes in front of the first gap. Sliced from
+     the text with the mark in it, every unit was one code unit early: each lost its last character
+     to the next one's gap, and the first edit wrote that gap back as a blank line (#394). */
+  const mark = markOf(body);
+  const md = body.slice(mark.length);
+  const root = parser.parse(md) as Root;
+  const ctx: Ctx = { md, defs: definitions(root) };
   const tag = `n${(++loads).toString(36)}`;
   const blocks: NoteBlock[] = [];
   const units: Unit[] = [];
@@ -881,12 +893,12 @@ export function load(body: string): { blocks: NoteBlock[]; loaded: Loaded } {
     made.forEach((b, i) => (b.id = ids[i]));
     blocks.push(...made);
     if (made.length) {
-      units.push({ ids, source: body.slice(start, end), gap: body.slice(prevEnd, start) });
+      units.push({ ids, source: md.slice(start, end), gap: (units.length ? "" : mark) + md.slice(prevEnd, start) });
       prevEnd = end;
     }
   }
   if (!units.length) return { blocks, loaded: { units, lead: body, tail: "" } };
-  return { blocks, loaded: { units, lead: units[0].gap, tail: body.slice(prevEnd) } };
+  return { blocks, loaded: { units, lead: units[0].gap, tail: md.slice(prevEnd) } };
 }
 
 /**
@@ -1020,25 +1032,30 @@ export function save(loaded: Loaded, doc: NoteBlock[]): string {
  * source is exactly the bytes just written for it.
  */
 export function saved(loaded: Loaded, doc: NoteBlock[]): { body: string; loaded: Loaded } {
-  const parts: { text: string; canon: string; json: string; ids: string[]; unit?: number }[] = [];
+  /* `at` is the unit a group stands where, its text rewritten or not; `unit` is set only when the
+     text is that unit's own bytes. */
+  const parts: { text: string; canon: string; json: string; ids: string[]; unit?: number; at?: number }[] = [];
   for (const g of edges(groups(doc, loaded))) {
     const json = JSON.stringify(g.blocks);
     const ids = g.blocks.map((b) => b.id ?? "");
-    const unit = g.unit === undefined ? undefined : loaded.units[g.unit];
+    const at = g.unit;
+    const unit = at === undefined ? undefined : loaded.units[at];
     /* Unchanged data is unchanged Markdown: the loaded bytes, with no serialising at all. */
     if (unit && unit.canon !== undefined && unit.json === json) {
-      parts.push({ text: unit.source, canon: unit.canon, json, ids, unit: g.unit });
+      parts.push({ text: unit.source, canon: unit.canon, json, ids, unit: at, at });
       continue;
     }
     const canon = groupMd(g.blocks);
     if (unit && unit.canon !== undefined && unit.canon === canon) {
-      parts.push({ text: unit.source, canon, json, ids, unit: g.unit });
+      parts.push({ text: unit.source, canon, json, ids, unit: at, at });
     } else if (canon) {
-      parts.push({ text: canon, canon, json, ids });
+      parts.push({ text: canon, canon, json, ids, at });
     }
   }
+  /* The byte-order mark the body opened with, which no edit takes away. */
+  const mark = markOf(loaded.lead);
   if (!parts.length) {
-    const body = loaded.units.length ? "" : loaded.lead;
+    const body = loaded.units.length ? mark : loaded.lead;
     return { body, loaded: { units: [], lead: body, tail: "" } };
   }
   const units: Unit[] = [];
@@ -1046,16 +1063,33 @@ export function saved(loaded: Loaded, doc: NoteBlock[]): { body: string; loaded:
   parts.forEach((p, i) => {
     const prev = parts[i - 1];
     let gap: string;
-    if (i === 0) gap = p.unit === 0 ? loaded.lead : "";
-    else if (p.unit !== undefined && prev.unit !== undefined && p.unit === prev.unit + 1) gap = loaded.units[p.unit].gap;
-    else gap = "\n\n";
+    if (i === 0) gap = p.at === 0 ? (p.unit === undefined ? loaded.lead.replace(/[ \t]+$/, "") : loaded.lead) : mark;
+    else if (p.at !== undefined && prev.at !== undefined && p.at === prev.at + 1) {
+      /* Two blocks that still stand where they were keep the bytes between them — the previous one's
+         line ending included, CRLF or not (#416) — whether or not either was typed into. A rewritten
+         block starts at the start of its line, in the house form. */
+      gap = loaded.units[p.at].gap;
+      if (p.unit === undefined) gap = gap.replace(/[ \t]+$/, "");
+      if (p.unit === undefined || prev.unit === undefined) gap = parted(gap);
+    } else gap = "\n\n";
     body += gap + p.text;
     units.push({ ids: p.ids, source: p.text, gap, canon: p.canon, json: p.json });
   });
   const last = parts[parts.length - 1];
-  const tail = last.unit !== undefined && last.unit === loaded.units.length - 1 ? loaded.tail : "\n";
+  const tail = last.at !== undefined && last.at === loaded.units.length - 1 ? loaded.tail : "\n";
   body += tail;
   return { body, loaded: { units, lead: units[0].gap, tail } };
+}
+
+/**
+ * A gap with a blank line in it, as the one beside a rewritten block needs: a heading needs none
+ * under it, but the paragraph somebody turned it into does, or the line after it joins the paragraph.
+ * A gap that has one is kept as it is; one that has none gains it in its own line ending.
+ */
+function parted(gap: string): string {
+  if (/\n[ \t]*\r?\n/.test(gap)) return gap;
+  const nl = gap.includes("\r\n") ? "\r\n" : "\n";
+  return gap.endsWith("\n") ? gap + nl : gap + nl + nl;
 }
 
 /* ------------------------------------------------------------------------------------------------ */

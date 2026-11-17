@@ -37,7 +37,7 @@ export interface ProjectChange {
   hue?: Hue | null;
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /**
  * A `project:` value, or `undefined` when it is not one of the three. Lenient in case and blanks
