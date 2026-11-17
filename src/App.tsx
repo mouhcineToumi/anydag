@@ -111,7 +111,7 @@ import { changeTabs, tabsNow, useTabs } from "@/ui/tabs/store";
 import { useSettings } from "@/settings/useSettings";
 import { typing, useEditor, type EditorKeep } from "@/edit/useEditor";
 import { Item } from "@/render/Item";
-import { THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
+import { DEFAULT_THEME, THEMES, THEME_NAMES, paperTheme, useTheme } from "@/theme/useTheme";
 import { ExportButton, NOTE_EXPORTS, QUIZ_EXPORTS, boardExports, exportRows } from "@/ui/Export";
 import { FileProblem } from "@/ui/FileProblem";
 import { Button, IconButton } from "@/ui/controls";
@@ -122,6 +122,7 @@ import {
   BoardBrowser,
   CalendarView,
   FeedbackCard,
+  GraphPage,
   LayoutToggle,
   TaskTabs,
   QuizEditor,
@@ -187,9 +188,9 @@ import { Runner, Sheet, type RunQuestion } from "@/ui/quiz/Runner";
 import { useQuizFile } from "@/ui/quiz/useQuizFile";
 import { NotePrint } from "@/view/NotePrint";
 import { leaf } from "@/ui/tree";
-import { useIndex } from "@/refs/useIndex";
+import { hrefFor, useIndex } from "@/refs/useIndex";
 import { clearTarget, setTarget, useTarget } from "@/refs/target";
-import { FOLLOW } from "@/refs/follow";
+import { FOLLOW, follow as followRef } from "@/refs/follow";
 import { useAccount } from "@/auth/useAuth";
 import { FileView } from "@/files/FileView";
 import { fileUrl } from "@/files/upload";
@@ -505,14 +506,16 @@ function pagesOf(query: URLSearchParams, assistantOn: boolean) {
   /* `?calendar=` is the Calendar page — `month`, `week`, `days`, or `1` for the view this
      browser used last — exclusive with the rest as they are with each other. */
   const calendar = !tasks && !!query.get("calendar");
-  const quizzes = !tasks && !calendar && query.get("quizzes") === "1";
+  /* `?graph=1` is the Graph page: the vault drawn as dots and lines (#459), exclusive with the rest. */
+  const graph = !tasks && !calendar && query.get("graph") === "1";
+  const quizzes = !tasks && !calendar && !graph && query.get("quizzes") === "1";
   /* `?trash=1` is the Trash page, exclusive with the rest. */
-  const trash = !tasks && !calendar && !quizzes && query.get("trash") === "1";
+  const trash = !tasks && !calendar && !graph && !quizzes && query.get("trash") === "1";
   /* `?chat=` is the Assistant page: a chat's id, `new`, or `1` for the newest — a page with no
      canvas, exclusive with the rest as they are with each other. With the Assistant turned off
      (#296) the address names no page, and home is drawn. */
-  const assistant = assistantOn && !tasks && !calendar && !quizzes && !trash && !!query.get("chat");
-  const listing = tasks || calendar || quizzes || trash || assistant;
+  const assistant = assistantOn && !tasks && !calendar && !graph && !quizzes && !trash && !!query.get("chat");
+  const listing = tasks || calendar || graph || quizzes || trash || assistant;
   const quiz = listing ? null : query.get("quiz");
   /* `?table=` is a table's page, `&tab=` the tab it shows. */
   const table = listing || quiz ? null : query.get("table");
@@ -520,7 +523,7 @@ function pagesOf(query: URLSearchParams, assistantOn: boolean) {
   const file = listing || quiz || table ? null : query.get("file");
   const note = listing || quiz || table || file ? null : query.get("note");
   const board = listing || quiz || table || file || note ? null : query.get("board");
-  return { tasks, calendar, quizzes, trash, assistant, quiz, table, file, note, board };
+  return { tasks, calendar, graph, quizzes, trash, assistant, quiz, table, file, note, board };
 }
 
 /**
@@ -543,7 +546,7 @@ export function App() {
   const snapshot = query.get("snapshot") === "1";
   const ai = useAi();
   const shown = pagesOf(query, ai.assistant);
-  const { tasks, calendar, quizzes, trash, assistant, quiz, table, file, note, board } = shown;
+  const { tasks, calendar, graph, quizzes, trash, assistant, quiz, table, file, note, board } = shown;
 
   /* The document tabs. The first set is the address this page loaded on; the tab in front is the
      one the history entry names while the window still has it. */
@@ -641,6 +644,7 @@ export function App() {
   );
   const openTasks = useCallback(() => visit({ ...pageQuery("board", null), tasks: "1" }), [visit]);
   const openCalendar = useCallback(() => visit({ ...pageQuery("board", null), calendar: "1" }), [visit]);
+  const openGraph = useCallback(() => visit({ ...pageQuery("board", null), graph: "1" }), [visit]);
   const openTrash = useCallback(() => visit({ ...pageQuery("board", null), trash: "1" }), [visit]);
   /* The Assistant page, on a chat; `1` is the newest one the vault has. */
   const openAssistantPage = useCallback(
@@ -841,6 +845,8 @@ export function App() {
       openTasks={openTasks}
       calendarOpen={calendar}
       openCalendar={openCalendar}
+      graphOpen={graph}
+      openGraph={openGraph}
       quizzesOpen={quizzes}
       openQuizzes={openQuizzes}
       trashOpen={trash}
@@ -1107,11 +1113,13 @@ function TabPage({
   openTrash(): void;
   goHome(): void;
 }) {
-  const { tasks, calendar, quizzes, trash, assistant, quiz, table, file, note } = shown;
+  const { tasks, calendar, graph, quizzes, trash, assistant, quiz, table, file, note } = shown;
   return tasks ? (
     <TasksApp query={query} setQuery={setQuery} list={list} open={open} />
   ) : calendar ? (
     <CalendarApp query={query} setQuery={setQuery} list={list} open={open} />
+  ) : graph ? (
+    <GraphApp query={query} setQuery={setQuery} list={list} open={open} />
   ) : quizzes ? (
     <QuizzesApp query={query} setQuery={setQuery} list={list} open={open} openQuizzes={openQuizzes} />
   ) : trash ? (
@@ -1421,6 +1429,37 @@ function TasksApp({
         asking={asking}
         onAsk={setAsking}
       />
+      {cards}
+    </div>
+  );
+}
+
+/**
+ * The Graph page: the vault as dots and lines, coloured, filtered and grouped by any field —
+ * `?graph=1` (#459). A page without a canvas of the board's kind, for the Tasks page's reason:
+ * `useEditor` is not mounted, so the wheel, `F`, `+` and `-` are the graph's. Its code is a chunk of
+ * its own (`ui/chunks.tsx`), and so is its worker, made only while it is open. A file is opened by
+ * following its id (`follow`), as a reference is, so Back comes back here with the graph as it was.
+ */
+function GraphApp({
+  query,
+  setQuery,
+  list,
+  open,
+}: {
+  query: URLSearchParams;
+  setQuery: SetQuery;
+  list: BoardTree;
+  open: OpenFile;
+}) {
+  const snapshot = query.get("snapshot") === "1";
+  const { themeName, openBrowser, cards } = usePageChrome({ query, setQuery, list, open });
+  const theme = THEMES[themeName] ?? THEMES[DEFAULT_THEME]!;
+  const onOpen = useCallback((id: string) => followRef(hrefFor(id)), []);
+  return (
+    <div className="dag-app dag-app--graph" data-snapshot={snapshot ? "1" : undefined}>
+      {!snapshot && <Toolbar boardName={null} title="Graph" onBoards={openBrowser} />}
+      <GraphPage theme={theme} onOpen={onOpen} />
       {cards}
     </div>
   );

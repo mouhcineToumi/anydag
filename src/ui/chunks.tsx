@@ -28,6 +28,7 @@ const feedback = chunk(() => import("@/feedback/FeedbackCard"));
 const search = chunk(() => import("./BoardBrowser"));
 const calendar = chunk(() => import("./Calendar"));
 const tasks = chunk(() => import("./Tasks"));
+const graph = chunk(() => import("./graph/GraphPage"));
 const trash = chunk(() => import("./Trash"));
 const assistant = chunk(() => import("@/assistant/Page"));
 const assistantPanel = chunk(() => import("@/assistant/Panel"));
@@ -40,6 +41,7 @@ export const FeedbackCard = part(feedback, (m) => m.FeedbackCard, "FeedbackCard"
 export const BoardBrowser = part(search, (m) => m.BoardBrowser, "BoardBrowser");
 export const CalendarView = part(calendar, (m) => m.CalendarView, "CalendarView");
 export const TasksView = part(tasks, (m) => m.TasksView, "TasksView");
+export const GraphPage = part(graph, (m) => m.GraphPage, "GraphPage");
 export const LayoutToggle = part(tasks, (m) => m.LayoutToggle, "LayoutToggle");
 export const TaskTabs = part(tasks, (m) => m.TaskTabs, "TaskTabs");
 export const TrashView = part(trash, (m) => m.TrashView, "TrashView");
