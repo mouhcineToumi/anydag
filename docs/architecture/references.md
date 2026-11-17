@@ -77,6 +77,10 @@ Ten things are load-bearing:
   for one name, so a client asking about one document is not sent every document's (4.6 KB where
   `/index` is 10.9 MB on 5,000 notes). The MCP `refs` tool with a `name`, `anydag <kind> refs`, and
   `file rm` and `file_delete` read it.
+- **The vault as a graph is `GET /__board/graph`** (#457): every document, each link between two of
+  them once, and the fields the graph view colours, filters and groups by, columnar and built from
+  this same index — 0.40 MB where `/index` is 1.21 MB on the bench's 5,000 files. Its wire format,
+  fields and view model are in [`graph.md`](graph.md).
 - **The vault reads a disk somebody else is deleting from.** A folder listed a moment ago can
   be gone when it is opened, and a board read a moment ago gone when it is written. Both always
   could; the index route lists the vault far more often than anything did, and turned a rare race
