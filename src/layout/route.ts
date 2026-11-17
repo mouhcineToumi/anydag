@@ -546,6 +546,16 @@ function bundleOutward(
   return out;
 }
 
+/** An extent, by its four sides. */
+export type Reach = { left: number; top: number; right: number; bottom: number };
+
+/**
+ * What `routeReach` and `labelReach` grow from when asked nothing else: the origin, so a reach past
+ * the top or the left comes back negative. A layout whose drawing does not start at the origin — the
+ * lane bands start at `bandLeft` — passes its own box instead, and reads the overhang on each side.
+ */
+const ORIGIN: Reach = { left: 0, top: 0, right: 0, bottom: 0 };
+
 /**
  * How far the routed labels reach on every side — the part of a drawing no box accounts for.
  *
@@ -556,14 +566,8 @@ function bundleOutward(
  * (`bundleOutward`), so the left and top are reported too: past the origin it is drawn outside the
  * item, and `content-visibility` clips it there — "report the status back" came out ":he status back".
  */
-export function labelReach(
-  edges: RoutedEdge[],
-  labels: Record<string, { w: number; h: number }>,
-): { left: number; top: number; right: number; bottom: number } {
-  let left = 0;
-  let top = 0;
-  let right = 0;
-  let bottom = 0;
+export function labelReach(edges: RoutedEdge[], labels: Record<string, { w: number; h: number }>, within: Reach = ORIGIN): Reach {
+  let { left, top, right, bottom } = within;
   for (const e of edges) {
     if (!e.label) continue;
     const size = labels[e.id];
@@ -589,11 +593,8 @@ export function labelReach(
  * and `Q`, from `pathOf` and `roundedPolyline` — and samples each curve, since a cubic's control
  * points reach further than the curve does and a frame grown to them would be grown for nothing.
  */
-export function routeReach(edges: RoutedEdge[]): { left: number; top: number; right: number; bottom: number } {
-  let left = 0;
-  let top = 0;
-  let right = 0;
-  let bottom = 0;
+export function routeReach(edges: RoutedEdge[], within: Reach = ORIGIN): Reach {
+  let { left, top, right, bottom } = within;
   const take = (x: number, y: number) => {
     left = Math.min(left, x);
     top = Math.min(top, y);

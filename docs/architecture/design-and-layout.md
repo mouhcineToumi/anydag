@@ -171,7 +171,12 @@ or, in the last two's case, because it has no axis at all and because its axes a
 
 - `layout/lanes.ts` — `flow` and `activity`. A swimlane has two axes: the column is how far along
   the flow you are, the band is who does it. ELK's `partitioning` orders layers *along* the flow,
-  not bands across it.
+  not bands across it. The bands are sized from the cards and the lines are routed after, so the
+  bands are then grown to hold what was routed: a loop back to the first column bows over the top
+  band and a self-loop stands above its card, and a box taken from the bands alone cut both off with
+  their labels (#407). `routeReach` and `labelReach`, grown from the bands' box, say how far past it
+  anything reaches; room above or to the left moves every card and routes again, room below or to
+  the right only grows the outer band. A diagram whose lines already fit moves by nothing.
 - `layout/sequence.ts` — columns across, a clock down. One pass over the event list; the order in
   the file is the order on the page, which is the only property a reader relies on.
 - `layout/timeline.ts` — x is real time (linear in days, not one column per entry), y is a packing

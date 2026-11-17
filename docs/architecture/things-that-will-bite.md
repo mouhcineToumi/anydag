@@ -95,7 +95,9 @@
   sides, because `bundleOutward` hangs a loop's other label *left* of its stroke, and past the
   origin it is drawn outside the item where `content-visibility` clips it: "report the status back"
   came out ":he status back". `layoutGraph` moves every box and bend clear by a whole grid step and
-  routes again, which is exact because routing is translation-invariant.
+  routes again, which is exact because routing is translation-invariant. `layoutLanes` and
+  `layoutSketch` do the same with `routeReach` beside it, since a back edge or a self-loop bows past
+  every box: a lane diagram's loop back over the top band was cut off with its label (#407).
 - **ELK places on fractional pixels.** Everything is snapped to `metric.grid` (8).
 - **The frame's body offset is derived, never a key.** The theme carried `frame.bodyTop: 152` from
   the artboards while `nodes.css` drew the body at `pad + head + ruleGapTop + hair + ruleGapBottom`
