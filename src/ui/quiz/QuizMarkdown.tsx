@@ -6,6 +6,7 @@ import { remarkWikilinks } from "@/refs/wikilinks";
 
 import { remarkCallouts } from "@/note/callout";
 import { remarkMath } from "@/note/math";
+import { isRefUrl } from "@/refs/extract";
 import { refComponents, urlTransform } from "@/refs/Ref";
 import { AssetUrlContext } from "@/render/assets";
 import { withComponents, type MarkdownImg } from "@/view/NoteRead";
@@ -37,11 +38,11 @@ export function QuizMarkdown({ name, md, inline = false }: { name: string; md: s
   const assets = useContext(AssetUrlContext);
   const components = useMemo(() => {
     const refs = refComponents({ boards: !inline });
-    /* A `dag:` picture is a reference's embed, which the references draw; every other one is this
-       quiz's, relative to its folder — `NoteMarkdown`'s rule. */
+    /* A reference — a `dag:` picture, or a wikilink's `wiki:` embed — is drawn by the references;
+       every other picture is this quiz's, relative to its folder — `NoteMarkdown`'s rule. */
     const Theirs = refs.img as MarkdownImg | undefined;
     const img: MarkdownImg = (props) => {
-      if (Theirs && typeof props.src === "string" && props.src.startsWith("dag:")) return <Theirs {...props} />;
+      if (Theirs && typeof props.src === "string" && isRefUrl(props.src)) return <Theirs {...props} />;
       const { node: _node, src, ...rest } = props;
       return <img {...rest} src={src ? assets(name, String(src)) : src} />;
     };

@@ -22,6 +22,27 @@ const root = path.resolve(here, "..");
 export const BUNDLE = path.join(here, "dist", "anydag-server.mjs");
 
 /**
+ * What the running server reads off the disk: the cheat sheets `GET /__board/dsl` serves to the
+ * Inspector and to `dsl_reference`, and the guide and flashcards prompts the grammar's `/system`
+ * route assembles. Both live under `docs/` in the repository, which `server/handle.ts` finds from a
+ * checkout — but a bundle has no repository above it, and the packaged app has none at all, so
+ * `docsRoot` looks for `docs/` beside the bundle first and a build has to put it there (#398).
+ * Nothing else in `docs/` ships: the architecture pages are the repository's.
+ */
+export const SHIPPED_DOCS = ["dsl", "generate"];
+
+/**
+ * Put the documentation the server reads beside a built bundle, replacing what an older build left
+ * (a sheet removed from the repository must not survive a rebuild). `outdir` is the bundle's
+ * directory; `build()` calls it, and the test that holds the built layout does too.
+ */
+export function shipDocs(outdir) {
+  const into = path.join(outdir, "docs");
+  fs.rmSync(into, { recursive: true, force: true });
+  for (const part of SHIPPED_DOCS) fs.cpSync(path.join(root, "docs", part), path.join(into, part), { recursive: true });
+}
+
+/**
  * What a build bakes in: the version, and — from the two `_BUILD_URL` variables the release and
  * nightly workflows set (`https://api.anydag.com/v1/logs` and `/v1/feedback`) — where the running
  * server sends anonymous logs and the feedback relay. A checkout's build bakes in nothing at all,
@@ -43,7 +64,7 @@ function version() {
   return fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
 }
 
-export async function build() {
+export async function build({ outdir = path.dirname(BUNDLE) } = {}) {
   const { build: esbuild } = await import("esbuild");
   await esbuild({
     absWorkingDir: root,
@@ -59,7 +80,7 @@ export async function build() {
     platform: "node",
     format: "esm",
     target: "node22",
-    outdir: path.dirname(BUNDLE),
+    outdir,
     outExtension: { ".js": ".mjs" },
     banner: { js: "import{createRequire as __acr}from'node:module';const require=__acr(import.meta.url);" },
     external: ["@parcel/watcher", "@playwright/test", "playwright", "playwright-core", "esbuild"],
@@ -68,7 +89,10 @@ export async function build() {
     define: defines(),
     logLevel: "warning",
   });
-  return BUNDLE;
+  /* The docs go beside the bundle, where `handle.ts`'s `docsRoot` reads them first — the same
+     directory the packaged app unpacks and `anydag serve` runs from. */
+  shipDocs(outdir);
+  return path.join(outdir, "anydag-server.mjs");
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

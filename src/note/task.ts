@@ -13,6 +13,8 @@
 import { parse as parseYaml } from "yaml";
 import { collation } from "../locale";
 
+import { underMark } from "./bom";
+import { frontBlock } from "./front";
 import { QUIET } from "./quiet";
 
 /** The three a task can be, in the order work moves through them — the Tasks page's columns. */
@@ -68,9 +70,6 @@ export interface TaskChange {
   priority?: Priority | null;
 }
 
-/** The frontmatter pattern `splitNote` and `titleOf` use: a block at the very start of the text. */
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-
 /**
  * A `status:` value, or `undefined` when it is not one of the three.
  *
@@ -121,7 +120,7 @@ export function dueOf(raw: unknown): string | undefined {
 
 /** The task a note's text describes, or `undefined` for a note that is not one. */
 export function taskOf(text: string): Task | undefined {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return undefined;
   let data: unknown;
   try {
@@ -151,7 +150,7 @@ const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
  * page's *Check items*. A check item inside a code fence is an example, not a step, and is not counted.
  */
 export function taskFactsOf(text: string): Pick<TaskFacts, "items" | "body"> {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   const body = m ? text.slice(m[0].length) : text;
   if (body.trim() === "") return {};
   let done = 0;
@@ -255,7 +254,12 @@ export function keyEnd(lines: readonly string[], at: number): number {
  * caller, and both fixtures hold it.
  */
 export function withKeys(text: string, change: object, keys: readonly string[]): string {
-  const m = FRONT.exec(text);
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => keysIn(rest, change, keys));
+}
+
+function keysIn(text: string, change: object, keys: readonly string[]): string {
+  const m = frontBlock(text);
   const block = m ? m[1]! : "";
   /* Read off the whole block, fences included: a one-line block has no line end of its own to say. */
   const nl = m?.[0].includes("\r\n") ? "\r\n" : "\n";

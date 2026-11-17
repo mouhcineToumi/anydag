@@ -969,7 +969,12 @@ describe("the engine", () => {
     await b.engine.syncOnce();
     expect(server.commitCalls).toBe(calls + 1);
 
-    // A note is spent by the event it explains: the next event at that path is judged as any other.
+    // The same write reported again is still its echo (#486): a file in a folder made just now is said
+    // twice. A note is spent by the first event that disagrees, and the next is judged as any other.
+    expect(await b.engine.heard(["old.md"])).toBe(false);
+    b.fs.write("old.md", note("8q2m9xk4tb", ["back"]));
+    expect(await b.engine.heard(["old.md"])).toBe(true);
+    b.fs.remove("old.md");
     expect(await b.engine.heard(["old.md"])).toBe(true);
     // A path sync never wrote is always a change.
     b.fs.write("new.md", note("9q2m9xk4tb", ["new"]));

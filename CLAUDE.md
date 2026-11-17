@@ -73,6 +73,8 @@ the app's home).
 | `src/blocks/` | BlockNote configured once, loaded lazily | which file it writes |
 | `src/view/` | drawing read-only: `?view=1`, snapshots, embeds | `src/edit/`, BlockNote (`test/view-graph.test.ts` holds it) |
 | `src/refs/` · `src/calendar/` · `src/vault/` | what a reference is · what the calendar shows · which vault this tab is in | names (a reference is an id) · the DOM · the disk |
+| `src/graph/` | the graph view's wire (shared with the server), the view as data, the model as typed arrays, the legend and the camera | a field by name, the DOM, React |
+| `src/ui/graph/` | the Graph page: WebGL drawing, the scene and its frame loop, the simulation's worker, the panel | a field by name (the panel lists what the route sends) |
 | `src/search/` · `src/telemetry/` · `src/assistant/` · `src/sync/` | the page's half of search, logs, the Assistant, sync status | what a log may hold (`api/protocol/logs.ts` decides) · the harness · the server's storage |
 | `icons/` | the brand vocabulary and its provenance | anything about diagrams |
 | `cli/` | `anydag`: arguments, finding the server, commands as op lists | the disk: every read and write is a route |
@@ -111,6 +113,8 @@ One line each; the full account with the defect that found it is in
 - **A snapshot reads no preference** (`?snapshot=1`), and `main.tsx` loads every font face by name first.
 - **Opening a vault never writes a byte of it**; an id is minted only when something links the file.
 - **Every write carries a sha1 `base`**; a stale one is a 409 with the text that replaced it.
+- **A board file may be CRLF, mixed, or start with a BOM** (`src/board/eol.ts`): offsets stop short
+  of the `\r`, bodies are LF, and a writer puts back the mark and the line endings it found (#391, #392).
 - **Undo is a version of the file**, not an inverse op. Gestures paint, then commit once.
 - **The board is one round trip stale after a write** — e2e specs wait on the DOM, not only the file.
 - **BlockNote never parses or writes a byte of a note** — `src/note/markdown.ts` (remark) does. See
@@ -153,6 +157,7 @@ One line each; the full account with the defect that found it is in
 | quizzes · tables · attachments | [`quizzes.md`](docs/architecture/quizzes.md) · [`tables.md`](docs/architecture/tables.md) · [`attachments.md`](docs/architecture/attachments.md) |
 | ids, `dag:` references, embeds, backlinks, wikilinks, `?view=1` | [`references.md`](docs/architecture/references.md) |
 | search · the trash · the lock | [`search.md`](docs/architecture/search.md) · [`trash.md`](docs/architecture/trash.md) · [`lock.md`](docs/architecture/lock.md) |
+| the graph view: `/__board/graph`, its fields, the view model | [`graph.md`](docs/architecture/graph.md) |
 | settings and preferences | [`settings.md`](docs/architecture/settings.md) |
 | prompt cards, rewriting a diagram with a model | [`prompt-cards.md`](docs/architecture/prompt-cards.md) |
 | the `anydag` CLI, the MCP server, `docs/parity.json` | [`cli.md`](docs/architecture/cli.md) |

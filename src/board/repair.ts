@@ -1,5 +1,6 @@
 import { parse as parseYaml } from "yaml";
 
+import { eolAt } from "./eol";
 import { scanFences } from "./fences";
 import { locateItems } from "./locate";
 import { isItemType } from "./types";
@@ -66,17 +67,23 @@ export function repairFrontmatter(text: string): Repaired {
   if (stray) dropped.push("lines before the first setting");
 
   /* `yaml` is the text between the two `---` lines, so it starts after the first line and its end
-     is where `bodyStart` less the closing fence's own line begins. */
+     is where `bodyStart` less the closing fence's own line begins. The kept blocks go back in the
+     block's own line endings, and a BOM before the block stays where it is (#392). */
   const yamlStart = text.indexOf("\n") + 1;
   const yamlEnd = yamlStart + yaml.length;
+  const eol = eolAt(text, located.docStart);
 
   const joined = kept.map((b) => b.text).join("\n");
   if (kept.length === 0 || !readable(joined)) {
     if (kept.length > 0) dropped.splice(0, dropped.length, ...blocks.map((b) => b.key));
-    const rest = text.slice(located.bodyStart).replace(/^\n+/, "");
-    return { ok: true, text: rest, dropped: dropped.length ? dropped : ["the whole settings block"] };
+    const rest = text.slice(located.bodyStart).replace(/^(?:\r?\n)+/, "");
+    return {
+      ok: true,
+      text: text.slice(0, located.docStart) + rest,
+      dropped: dropped.length ? dropped : ["the whole settings block"],
+    };
   }
-  return { ok: true, text: text.slice(0, yamlStart) + joined + text.slice(yamlEnd), dropped };
+  return { ok: true, text: text.slice(0, yamlStart) + joined.replace(/\n/g, eol) + text.slice(yamlEnd), dropped };
 }
 
 /**

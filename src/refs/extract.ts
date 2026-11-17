@@ -24,6 +24,7 @@ import { unified } from "unified";
 import { isItemType } from "../board/types";
 import { locateItems } from "../board/locate";
 import { eventOf, type NoteEvent } from "../note/event";
+import { frontBlock } from "../note/front";
 import { projectOf, type Project } from "../note/project";
 import { tagsOf } from "../note/tags";
 import { taskOf, type Task } from "../note/task";
@@ -57,6 +58,15 @@ export function parseDagUrl(url: string): { id: string; part?: string } | null {
 }
 
 export const dagUrl = (id: string, part?: string): string => (part ? `dag:${id}#${part}` : `dag:${id}`);
+
+/**
+ * Whether a URL names a document rather than a file — `dag:<id>`, or the `wiki:` a wikilink makes.
+ *
+ * `react-markdown`'s `urlTransform` keeps these, and the wrapper that gives a note or a quiz its
+ * own pictures relative to its folder (`NoteMarkdown`, `QuizMarkdown`) hands them to the caller's
+ * `img` instead. Asking the asset route for one was a 403 and a broken image (#396).
+ */
+export const isRefUrl = (url: string): boolean => parseDagUrl(url) !== null || parseWikiUrl(url) !== null;
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
@@ -120,11 +130,10 @@ export function refsInBoard(text: string): Ref[] {
   });
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-
 /** A board's or a note's `title:` from its frontmatter, when it has one — what a reference shows. */
 export function titleOf(text: string): string | undefined {
-  const m = FRONT.exec(text);
+  /* Past a byte-order mark, which a board written by Notepad starts with (#392): `frontBlock` reads behind one. */
+  const m = frontBlock(text);
   if (!m) return undefined;
   try {
     const data = parseYaml(m[1]!, QUIET) as { title?: unknown } | null;
@@ -168,7 +177,7 @@ export function indexTexts(texts: Record<string, string>): Record<string, Indexe
     const project = note ? projectOf(text) : undefined;
     const event = note ? eventOf(text) : undefined;
     const tags = tagsOf(text);
-    const refs = note || quiz || table ? refsInMarkdown(text.replace(FRONT, "")) : refsInBoard(text);
+    const refs = note || quiz || table ? refsInMarkdown(text.slice(frontBlock(text)?.[0].length ?? 0)) : refsInBoard(text);
     out[key] = {
       title: titleOf(text),
       ...(task ? { task } : {}),

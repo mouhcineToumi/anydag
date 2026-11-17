@@ -20,6 +20,16 @@ follows from, and it is measured (*Things that will bite*).
 `src/note/markdown.ts` is remark both ways — the parser `MarkdownItem` already draws board text with
 — over a structural subset of BlockNote's block JSON, with no BlockNote import at all.
 
+**A frontmatter is a block that is one** (`src/note/front.ts`, #397). Two `---` lines are also two
+Markdown rules, so the pair at the start of a file is a frontmatter only when YAML reads what is
+between them as a mapping, or there is nothing but blank lines between them, or — a frontmatter
+somebody broke, still carried byte for byte — YAML cannot read it but its first line is a `key:`
+line. A body that opens with a rule, a sentence, and another rule is all body: drawn, searched and
+linked as such. Every reader and writer of a note's frontmatter asks `frontBlock` — `splitNote`, the
+task, project, event, tag, title and id readers and their writers, `fillTemplate`, the index and a
+rename's relink — so a writer never puts a `status:` line into text the page draws as the body; it
+grows a frontmatter above the rule instead.
+
 Nine things are load-bearing:
 
 - **An edit rewrites only the blocks it touched.** `load` records, for each top-level mdast node, its
@@ -35,6 +45,13 @@ Nine things are load-bearing:
   group whose JSON changed is turned back into Markdown — 4 ms a save on a 118 KB note, where
   serialising every group was 65 ms of main thread every quarter-second while somebody typed.
   Opening is dominated by remark's own parse, about 0.3 MB/s, the same parser `MarkdownItem` pays.
+  **A block that was typed into keeps the bytes on either side of it**: the gap before it and after
+  it are the loaded ones while both neighbours stand where they did, so a CRLF note keeps its CRLF
+  around an edit (#416), with a blank line added only where a rewritten block needs one. **A
+  byte-order mark is kept and never read**: `splitNote` carries it in `front` (with the frontmatter
+  behind it, or alone), `frontBlock` finds a frontmatter behind it, the writers work behind the
+  mark (`src/note/bom.ts`), and `load` parses past it, because remark counts from past it (#394;
+  *Things that will bite*).
 - **The schema is the Markdown's.** Thirteen blocks and four marks, `NOTE_BLOCKS`/`NOTE_STYLES`, and
   beside text two inline kinds of content, a reference and an equation; no
   underline, no toggle, no file, no colour (a colour the theme does not own — the *A custom colour*

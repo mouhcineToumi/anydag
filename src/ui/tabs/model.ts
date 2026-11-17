@@ -36,6 +36,7 @@ export const PAGE_KEYS = [
   "days",
   "trash",
   "chat",
+  "graph",
 ] as const;
 
 /**
@@ -90,7 +91,7 @@ export function addressOf(place: string, address: URLSearchParams | string): URL
 }
 
 /** What a tab shows: a file of one of the five kinds, one of the listing pages, or Home. */
-export type TabKind = FileKind | "tasks" | "calendar" | "quizzes" | "trash" | "assistant" | "home";
+export type TabKind = FileKind | "tasks" | "calendar" | "graph" | "quizzes" | "trash" | "assistant" | "home";
 
 /**
  * The page a place draws, by the rule `App` reads the address with: a listing page before a file,
@@ -101,6 +102,7 @@ export function kindOf(place: string): TabKind {
   const q = new URLSearchParams(place);
   if (q.get("tasks") === "1") return "tasks";
   if (q.get("calendar")) return "calendar";
+  if (q.get("graph") === "1") return "graph";
   if (q.get("quizzes") === "1") return "quizzes";
   if (q.get("trash") === "1") return "trash";
   if (q.get("chat")) return "assistant";
@@ -124,6 +126,8 @@ export function tabLabel(place: string, titles: Readonly<Record<string, string>>
       return "Tasks";
     case "calendar":
       return "Calendar";
+    case "graph":
+      return "Graph";
     case "quizzes":
       return "Quizzes";
     case "trash":
@@ -162,6 +166,7 @@ export function identity(place: string): string | null {
       return `${kind}:${new URLSearchParams(place).get(kind)}`;
     case "tasks":
     case "calendar":
+    case "graph":
     case "quizzes":
     case "trash":
     case "assistant":

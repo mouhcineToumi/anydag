@@ -20,6 +20,8 @@
 import { parse as parseYaml } from "yaml";
 
 import { HUE_ORDER, type Hue } from "../dsl/ir";
+import { underMark } from "./bom";
+import { frontBlock } from "./front";
 import { QUIET } from "./quiet";
 import { keyEnd } from "./task";
 
@@ -30,8 +32,6 @@ export interface TagChange {
   /** One tag respelled where it stands — a vault-wide rename — or, onto a tag the text carries, merged into it. */
   rename?: { from: string; to: string };
 }
-
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** Letters, digits, `_`, `-` and `/` — Obsidian's characters. */
 const CHARS = /^[\p{L}\p{M}\p{N}_/-]+$/u;
@@ -72,7 +72,7 @@ export function tagsOf(text: string): string[] {
 
 /** Every tag entry a text's frontmatter holds, in order, each spelling as written — repeats kept. */
 export function everyTagOf(text: string): string[] {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return [];
   const lines = m[1]!.split(/\r?\n/);
   const at = lines.findIndex((l) => /^tags\s*:/.test(l));
@@ -189,8 +189,13 @@ function found(lines: readonly string[]): Found {
  * line when `board` is set (`withTitle`'s rule: a board's frontmatter is apart from its body).
  */
 export function withTags(text: string, change: TagChange, opts: { board?: boolean } = {}): string {
+  /* Behind a byte-order mark, which stays first and is never mistaken for the text (#394). */
+  return underMark(text, (rest) => tagsIn(rest, change, opts));
+}
+
+function tagsIn(text: string, change: TagChange, opts: { board?: boolean }): string {
   const remove = new Set((change.remove ?? []).map(tagKey));
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   const block = m ? m[1]! : "";
   const nl = m?.[0].includes("\r\n") ? "\r\n" : "\n";
   const lines = block === "" ? [] : block.split(nl);

@@ -18,6 +18,11 @@ on a canvas holding one graph sized to fit, wrong on a plane you travel across.
 | middle-drag | move, over an item, without a modifier |
 | arrows · `F` · `+` `-` · `0` | move · fit · zoom · 100% — arrows nudge the selection instead when there is one |
 
+**The Graph page is the exception: its wheel zooms**, about the pointer, and a drag on the paper
+moves it (*The Graph page* in [`graph.md`](graph.md)). A graph is one picture sized to fit, the
+case the earlier code was right about: there is no up and down to travel through, and a person
+looking at one reaches for the wheel to look closer. Its `F`, `+` `-` and `0` are the board's.
+
 The pan modifier is load-bearing rather than a convenience: a press on an item *moves the item*, so
 on a full board there is no paper left to grab and the view could only be reached with the wheel.
 `Viewport` paints `data-pan` on `.dag-viewport` while one is held and `Item` reads it back off the
@@ -40,7 +45,13 @@ small card means to look at it closely; `0` and the zoom figure remain 100% rath
 
 ### The dock's tooltip
 
-The dock and the zoom cluster are icon-only, so a control's name and chord live in a tooltip rather
+Both bars float at the foot of the drawing: the dock centred on it, the zoom cluster in its
+bottom-right corner. The dock is up to 327px wide and the cluster 156, so the pair needs about
+690px of canvas to sit side by side — and a canvas can be narrower than that without the window
+being narrow: the library takes 272px of it, the board list another 233. So the cluster is measured
+against the dock's own box and lifted above it when the two would meet
+(`src/ui/bottomBars.ts`, #395). The dock and the zoom cluster are icon-only, so a control's name and
+chord live in a tooltip rather
 than on its face. Both are `role="toolbar"` with a label, and both sit inside the board's `<main>`
 beside `.dag-viewport`; the page's top bar is a `<header>` inside that main, so a board has one main
 landmark and no second banner. The browser's `title` was that tooltip until macOS stopped showing it in the

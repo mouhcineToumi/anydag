@@ -26,6 +26,8 @@ import { readPrefs, SETTINGS_MAX, writePrefs, type Scope } from "./prefs";
 
 /** A window's tabs, saved: a few hundred tabs' places is far less. */
 const TABS_MAX = 64 * 1024;
+/** The Graph page's view, saved: a few rules and six sliders, with room for a long list of hidden values. */
+const GRAPH_VIEW_MAX = 32 * 1024;
 
 const PROMPT_MAX = 4000;
 const SOURCE_MAX = 16000;
@@ -126,6 +128,36 @@ export function metaRoutes(app: Hono, s: Session): void {
     if (text.length > TABS_MAX) throw err(413, `tabs are at most ${TABS_MAX} bytes`);
     s.home.set(tabsKey(), text);
     return c.json({ tabs: value });
+  });
+
+  /* -- the Graph page's view (#459) -------------------------------------------------------- */
+
+  /* What the Graph page colours, filters and groups by, and its sliders: kept in the app's home by
+     the vault's id, for the tabs' reason — how one person looks at the graph is not a document of
+     the vault. Opaque here: `src/graph/view.ts`'s `viewOf` reads it back leniently. */
+  const graphViewKey = () => `graph-view:${s.vault.id}`;
+  app.get("/api/graph-view", (c) => {
+    const raw = s.home.get(graphViewKey());
+    let view: unknown = null;
+    try {
+      view = raw ? (JSON.parse(raw) as unknown) : null;
+    } catch {
+      view = null;
+    }
+    return c.json({ view });
+  });
+  app.put("/api/graph-view", async (c) => {
+    const body = await bodyOf(c);
+    const value = body.view;
+    if (value === null) {
+      s.home.set(graphViewKey(), null);
+      return c.json({ view: null });
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw err(400, "expected `view` to be an object or null");
+    const text = JSON.stringify(value);
+    if (text.length > GRAPH_VIEW_MAX) throw err(413, `the graph's view is at most ${GRAPH_VIEW_MAX} bytes`);
+    s.home.set(graphViewKey(), text);
+    return c.json({ view: value });
   });
 
   /* -- saved components -------------------------------------------------------------------- */

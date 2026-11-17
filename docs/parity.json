@@ -117,6 +117,14 @@
       "mcp": {"refused": "Which documents a window has open is the person's window; an agent opens a document by the url every document tool returns."}
     },
     {
+      "id": "vault.graph-view",
+      "area": "Vaults",
+      "what": "The Graph page's view in a vault — colour by, the filters, group by, the layout's sliders — kept in the app's home, restored when the page opens",
+      "rest": ["GET /api/graph-view", "PUT /api/graph-view"],
+      "cli": {"admin": false},
+      "mcp": {"refused": "How one person looks at the graph is their window's; an agent reads the links themselves through refs."}
+    },
+    {
       "id": "vault.transfer",
       "area": "Vaults",
       "what": "Move a file, or a folder whole, to another open vault",
@@ -151,8 +159,8 @@
     {
       "id": "files.refs",
       "area": "Files",
-      "what": "What refers to what: references and backlinks",
-      "rest": ["GET /__board/index", "GET /__board/refs"],
+      "what": "What refers to what: references, backlinks and the vault as a graph",
+      "rest": ["GET /__board/index", "GET /__board/refs", "GET /__board/graph"],
       "cli": {"admin": false},
       "mcp": ["refs"]
     },

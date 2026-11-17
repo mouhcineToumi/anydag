@@ -14,19 +14,8 @@ import type { List, Nodes, Root } from "mdast";
 import { parseBoard } from "@/board/parseBoard";
 import { CALLOUT_KINDS } from "@/note/callout";
 import { joinNote, splitNote } from "@/note/format";
-import {
-  applySteps,
-  blocksToMd,
-  lcs,
-  load,
-  mdToBlocks,
-  plan,
-  save,
-  saved,
-  settle,
-  type NoteBlock,
-  type Step,
-} from "@/note/markdown";
+import { applySteps, blocksToMd, load, mdToBlocks, plan, save, saved, settle, type NoteBlock, type Step } from "@/note/markdown";
+import { lcs } from "@/note/lcs";
 import { merge3 } from "@/note/merge";
 import { noteSchema } from "@/note/schema";
 
@@ -497,6 +486,24 @@ describe("the span map", () => {
     const doc = await hold(blocks);
     expect(save(settle(loaded, doc), [...doc, { id: "below", type: "paragraph", content: [] }])).toBe(md);
   });
+
+  it("opens a body that starts with a rule as the rules and the text between them, and edits it in place (#397)", async () => {
+    const text = "---\n\nText after a rule.\n\n---\n\nMore.\n";
+    const f = splitNote(text);
+    expect(f.front).toBe("");
+    const { blocks, loaded } = load(f.body);
+    const doc = await hold(blocks);
+    expect(doc.map((b) => b.type)).toEqual(["divider", "paragraph", "divider", "paragraph"]);
+    expect(drawn(f.body)).toContain("Text after a rule.");
+    /* Typed into the last paragraph: every other byte — the blank line under the second rule too — is kept. */
+    const last = doc[doc.length - 1]!;
+    const edited = doc.map((b) =>
+      b.id === last.id ? { ...b, content: [{ type: "text" as const, text: "More, edited.", styles: {} }] } : b,
+    );
+    const out = joinNote(f.front, saved(settle(loaded, doc), edited).body);
+    expect(out).toBe("---\n\nText after a rule.\n\n---\n\nMore, edited.\n");
+    expect(splitNote(out).body).toBe(out);
+  });
 });
 
 /*
@@ -566,9 +573,9 @@ describe("empty lines", () => {
     expect(words(doc)).toEqual(["Plan", "First.", "Second.", "Third."]);
     const settled = settle(loaded, doc);
     expect(save(settled, doc)).toBe(md);
-    /* An edit to the last paragraph keeps every blank line it did not reach; its own gap is the house form's. */
+    /* An edit to the last paragraph keeps every blank line it did not reach, the ones after it too (#394, #416). */
     const edited = doc.map((b, i) => (i === 3 ? { ...b, content: [{ type: "text" as const, text: "Third!", styles: {} }] } : b));
-    expect(save(settled, edited)).toBe("# Plan\n\n\n\nFirst.\n\n\n\n\nSecond.\n\nThird!\n");
+    expect(save(settled, edited)).toBe("# Plan\n\n\n\nFirst.\n\n\n\n\nSecond.\n\nThird!\n\n\n");
   });
 
   it("keeps a file's own &nbsp; lines, at the end too, when nothing reached them", async () => {
@@ -700,7 +707,8 @@ describe("the file", () => {
 
   it("is all body without frontmatter, and survives frontmatter that is not YAML", () => {
     expect(splitNote("# Just a body\n")).toEqual({ front: "", body: "# Just a body\n" });
-    const odd = splitNote("---\n: : :\n---\nbody\n");
+    const odd = splitNote("---\ntitle: [unclosed\n---\nbody\n");
+    expect(odd.front).toBe("---\ntitle: [unclosed\n---\n");
     expect(odd.body).toBe("body\n");
     expect(odd.title).toBeUndefined();
   });

@@ -111,3 +111,44 @@ test("a delete while the server is unreachable says so and leaves the item drawn
   await expect(item(page)).toBeVisible();
   expect(fs.readFileSync(file, "utf8")).toBe(before);
 });
+
+/*
+ * #402: the server answers, but no longer lets this page in — `anydag serve` restarted on the same
+ * port with another secret path, under a page left open. The gate's refusal is a `401` with
+ * `code: "token"` (`server/app.ts`), fulfilled here by `page.route` for every write, as the restarted
+ * server answers the old secret. It used to be read as a write that merely did not land: the item
+ * went back and nothing was said, and the page looked fully alive.
+ */
+async function refusePatches(page: Page): Promise<() => number> {
+  let tried = 0;
+  await page.route("**/__board/patch**", (route) => {
+    tried += 1;
+    return route.fulfill({ status: 401, json: { error: "this server needs its token", code: "token" } });
+  });
+  return () => tried;
+}
+
+test("a nudge the server refuses this page its credential for goes back, says so, and the page says it lost the server", async ({
+  page,
+}) => {
+  await open(page);
+  const tried = await refusePatches(page);
+  const drawn = await item(page).getAttribute("style");
+  const before = fs.readFileSync(file, "utf8");
+  await expect(page.locator("[data-dag-server-lost]")).toHaveCount(0);
+
+  const at = (await item(page).boundingBox())!;
+  await page.mouse.click(at.x + 40, at.y + 12);
+  await page.keyboard.press("ArrowRight");
+
+  await expect.poll(tried, { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect(notice(page)).toContainText("no longer lets this page in");
+  await expect(notice(page)).toContainText("not saved");
+  /* The lasting notice: what happened and the way back, there for as long as the page is open. */
+  const lost = page.locator("[data-dag-server-lost]");
+  await expect(lost).toBeVisible();
+  await expect(lost).toContainText("nothing here is saved");
+  await expect(lost).toHaveAttribute("role", "alert");
+  await expect(item(page)).toHaveAttribute("style", drawn!);
+  expect(fs.readFileSync(file, "utf8")).toBe(before);
+});

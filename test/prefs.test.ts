@@ -26,6 +26,7 @@ import {
 import { LOCKED } from "@/settings/lock";
 import { STORE } from "@/settings/store";
 import { RECENT_KEY } from "@/ui/modelList";
+import { SAVED_VIEW } from "@/ui/graph/saved";
 import { SAVED_TABS, WINDOW_SEEN } from "@/ui/tabs/saved";
 import { SECRET } from "@/vault/secret";
 import { LAST } from "@/vault/current";
@@ -134,6 +135,9 @@ const EVENTS = new Set([
   /* The vault's tag list changed: the change feed's event, and this tab's own after it creates,
      recolours or deletes a tag — `onTags`, `onTrash`'s shape. */
   "dag:tags",
+  /* The server no longer lets this page in — `anydag serve` restarted under it (#402): the toast
+     that says so, and how to get back. */
+  "dag:server-lost",
 ]);
 
 describe("the preference list", () => {
@@ -162,6 +166,8 @@ describe("the preference list", () => {
       TELEMETRY_PENDING,
       /* A window's tabs, kept here only when the settings do not sync (#264). */
       SAVED_TABS,
+      /* How the Graph page was left, kept here only when the settings do not sync (#459). */
+      SAVED_VIEW,
       /* Whether this window has had the app in it: a session's, so a bare address is Home in it. */
       WINDOW_SEEN,
       /* `anydag serve`'s secret path, this origin's alone and never a preference: syncing it would

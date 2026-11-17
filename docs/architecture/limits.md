@@ -38,6 +38,13 @@ a fourth until #281: it draws the rows in view and a margin now, so a folder of 
 one of 100 does. Startup no longer is one: since #283 the listing runs off the server's thread and a
 board is drawn in about the same time at every vault size (*Startup*).
 
+**Over MCP the wire has a limit of its own** (#399): a request is one JSON-RPC frame, at most 64 MB,
+so `file_upload` and `image_add` carry a file of about 48 MB as base64 `data` — 4/3 the bytes — and a
+bigger one goes as `url`, which the server fetches, or through the app. The vault's 512 MB is the
+store's limit. A frame over the ceiling is answered with a JSON-RPC error naming the request's `id`,
+not dropped with the connection: the SDK's own buffer, at 10 MB, did that, so every file over 7.5 MB
+was `EPIPE` on the client (`cli.md`).
+
 ### Memory, per process
 
 The desktop app with a 1k-file vault and a board of 20 items open, at rest (`desktop.rss.*`;
@@ -293,6 +300,60 @@ The Calendar gained more than one throttle; where the rest went was not isolated
 185–226 ms. `--only desktop --quick`: launch to a drawn 20-item board 1.01–1.21 s → 0.75–0.95 s,
 and the board's own window 682 → 410 ms from navigation to `data-dag-ready`. The first window is
 unchanged, because it comes before any of the page's script runs.
+
+### The graph view's simulation (#458)
+
+`node scripts/bench.mjs --only graph` (`graph.*`), on another machine than the rest of this file: an
+Intel i5-8300H laptop, 4 cores and 8 threads, 12 GB, Node 26.12, load average 1, 2026-11-17. It runs
+the simulation's source in the bench's own process and needs no build. The vault is the design
+session's made-up one (`scripts/bench-graph.mjs`), about 1.3 links per file.
+
+| Files | Links | One tick | Hot to rest, through the host | Typed arrays held |
+|---|---|---|---|---|
+| 500 | 640 | 0.26 ms | 0.92 s | 0.1 MB |
+| 2,000 | 2,632 | 1.0 ms | 0.92 s | 0.4 MB |
+| 5,000 | 6,695 | 3.1 ms | 0.92 s | 1 MB |
+| 20,000 | 27,049 | 14.3 ms | 2.7 s | 4 MB |
+| 5,000, dense | 150,000 | 5.4 ms | 1.2 s | |
+
+A settle is 220 ticks and the host paces them at 240 a second, so 0.92 s is the floor: up to about
+5,000 files a settle waits on the clock, not the tick; at 20,000 the tick is the limit. Works well up
+to **5,000** files, degrades at **20,000** (2.7 s to rest, a core busy for it); the prototype it
+replaced took 8.2 ms and 41 ms a tick on the same machine. The account, and the prototype beside it
+at every size, is in [`graph-simulation.md`](graph-simulation.md).
+
+### The Graph page (#459)
+
+`node scripts/bench.mjs --only graph-page` (`graph.page.*`), on the machine of the section above (an
+Intel i5-8300H laptop, 4 cores and 8 threads, 12 GB, Node 26.12, Chromium 158), load average 3 to 8,
+2026-11-17. It needs the built page. The vaults are the simulation's, written as files
+(`writeGraphVault`); the dense one asks for 150,000 links and gets 147,665, because a link between
+two files that are not notes is written in neither. Each runs on two renderers: **SwiftShader**,
+headless Chromium's own, which draws on the CPU and reads every frame back for a compositor that is
+software too; and the laptop's **integrated Intel UHD 630** (`--enable-gpu --use-angle=gl`), which is
+what a person's window draws with. A frame's time waits for the GPU (`gl.finish`).
+
+| Vault | Renderer | Navigation to rest | The scene's settle | Frames | A frame, settling | A frame, zooming | At rest |
+|---|---|---|---|---|---|---|---|
+| 2,000 files, 2,602 links | UHD 630 | 1.27 s | 0.93 s | 54 | 0.45 ms | 0.29 ms | 0 frames, 2 % CPU |
+| 5,000 files, 6,618 links | UHD 630 | 1.33 s | 0.93 s | 60 | 0.38 ms | 0.31 ms | 0 frames, 2 % CPU |
+| 5,000 files, 147,665 links | UHD 630 | 2.05 s | 1.68 s | 76 | 0.55 ms | 0.59 ms | 0 frames, 2 % CPU |
+| 2,000 files | SwiftShader | 1.42 s | 1.04 s | 17 | 0.67 ms | 0.47 ms | 0 frames, 1 % CPU |
+| 5,000 files | SwiftShader | 2.44 s | 1.66 s | 15 | 0.76 ms | 0.47 ms | 0 frames, 0 % CPU |
+| 5,000 files, 147,665 links | SwiftShader | 29 s | 9.1 s | 10 | 1.4 ms | 0.74 ms | 0 frames, 0 % CPU |
+
+On the GPU a settle is the simulation's floor (0.92 s, 220 ticks at 240 a second) up to 5,000
+files, at about 60 frames a second, and a frame is under a millisecond even with 150,000 links.
+**SwiftShader draws a frame as fast but shows few of them**: the page's main thread waits on each
+frame's readback, so it draws 15 frames where the GPU draws 60, and the dense vault's 150,000 links
+take most of half a minute to come up. That is headless Chromium's software path, not a person's;
+the frame times in the e2e suite and CI are SwiftShader's. The page's JS heap is 10 to 16 MB at
+every size. **With the page closed**, at every size and on both renderers, no graph worker and no
+WebGL context is left, and the browser's CPU over 5 s is 0 %.
+
+`/__board/graph`'s first answer is the server's cold index of the vault (part 1): 2.1 s at 2,000
+files, 4.8 s at 5,000, and 14 s on the dense vault, whose 150,000 `[[wikilinks]]` are read from
+5,000 files. The page asks for it once and again only after a change.
 
 ### Not measured
 

@@ -284,11 +284,12 @@ export class Vault {
 
   private listeners = new Set<(c: Change) => void>();
   /**
-   * The documents on disk at the last walk, lowercased, kept up to date by the watcher. A save is a
-   * rename onto the file, which the watcher reports as a create; one at a path already here is an
-   * edit, and does not change the tree.
+   * The documents on disk at the last walk, kept up to date by the watcher: the path lowercased, to
+   * the path as it is spelled on disk. A save is a rename onto the file, which the watcher reports as
+   * a create; one at a path already here is an edit, and does not change the tree. The spelling is
+   * what a folder that went names its documents by (`folderWent`).
    */
-  private present: Set<string> | null = null;
+  private present: Map<string, string> | null = null;
   private stopping: Promise<() => Promise<void>> | null = null;
   /** Attachments whose sha1 the watcher is reading, and whether another event came in meanwhile. */
   private hashing = new Map<string, boolean>();
@@ -298,6 +299,15 @@ export class Vault {
   private adoptedIds = new Map<string, Map<string, string>>();
   /** The raw channel: every path the watcher reports, for the sync client. */
   private rawListeners = new Set<(rels: string[]) => void>();
+  /**
+   * Folders under the vault with a watcher of their own beside the vault's, by absolute path: each
+   * one made with a folder already in it, which inotify left unwatched (#405, `cover`).
+   */
+  private covers = new Map<string, Promise<watcher.AsyncSubscription | null>>();
+  /** A cover being let go of, by its path: a new one on the same folder waits for it (`cover`). */
+  private leaving = new Map<string, Promise<void>>();
+  /** What the vault's watcher does with a batch of events, which a cover's does too. */
+  private hear: watcher.SubscribeCallback | null = null;
   private held = false;
   /** Whether sync has ever read or written created here — kept in the index, so it outlives a restart. */
   private syncing: boolean | null = null;
@@ -401,12 +411,36 @@ export class Vault {
     return entries.some((e) => wanted.has(e.toLowerCase()));
   }
 
+  /**
+   * The documents a folder that went held, as `gone` changes, each taken out of `present`. Only a
+   * document that is really not there any more: on a disk that ignores case, `Plan` renamed to `plan`
+   * is reported as `Plan` going, and the file is still where its name says. `seen` is the watcher
+   * batch's own, so a backend that also reports each file is not told twice.
+   */
+  private folderWent(rel: string, seen: Set<string>): Change[] {
+    if (!this.present || !rel) return [];
+    const under = `${rel.toLowerCase()}/`;
+    const out: Change[] = [];
+    for (const [low, file] of this.present) {
+      if (!low.startsWith(under)) continue;
+      if (isFile(path.join(this.root, file))) continue;
+      this.present.delete(low);
+      const found = classify(file, this.types);
+      if (!found) continue;
+      const key = `${found.kind}:${found.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ type: "doc", kind: found.kind, name: found.name, sha1: null, title: null });
+    }
+    return out;
+  }
+
   // -- the walk --------------------------------------------------------------
 
   /** Every document of every kind, and every folder, sorted — on this thread, for the callers that need it now. */
   private walk(): { docs: Listed[]; folders: string[] } {
     const out = walk(this.root, this.types);
-    this.present = new Set(out.docs.map((d) => d.file.toLowerCase()));
+    this.present = presentOf(out.docs);
     return out;
   }
 
@@ -833,7 +867,7 @@ export class Vault {
   ): Promise<{ tree: Tree; rows: Map<string, DocRow>; templates: string | null } | null> {
     if (still && !still()) return null;
     // Only when there is none: a running watcher has kept it since this walk, which is older.
-    this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+    this.present ??= presentOf(docs);
     const t: Tree = {
       boards: [],
       notes: [],
@@ -1467,7 +1501,14 @@ export class Vault {
 
   /**
    * Replace a document's text. `base` of `null`/`undefined` is "I have not seen it", which overwrites
-   * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1.
+   * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1,
+   * and an empty string is not the current sha1: it is a stale base, never a missing one (#400).
+   *
+   * **A text with no `id:` keeps the one the file has** (#401): the id is the document, every `dag:`
+   * link names it, and the index that would otherwise remember it is rebuildable. So a replacement
+   * that carries no `id:` line — an agent's fresh body, a draft written whole — is written with the
+   * file's id put back, and the answer is that text, whose sha1 is the new base. A file with no id
+   * of its own is written as given (an edit never mints one), and so is a text that says `id:`.
    */
   async write(name: string, kind: TextKind, text: string, base?: string | null): Promise<Version> {
     const file = this.writeAt(this.fileOf(name, kind));
@@ -1477,14 +1518,16 @@ export class Vault {
     } catch {
       throw new NotFound(`no ${kind} \`${name}\``);
     }
-    if (base && base !== now.base) throw new Conflict(now.base, now.text);
-    if (now.text !== text) {
-      writeAtomic(file, text);
-      this.mintTargets(text, now.text);
+    if (base != null && base !== now.base) throw new Conflict(now.base, now.text);
+    const own = frontId(now.text);
+    const body = typeof own === "string" && frontId(text) === null ? withId(text, own) : text;
+    if (now.text !== body) {
+      writeAtomic(file, body);
+      this.mintTargets(body, now.text);
       if (this.component(name) !== null)
-        this.emit({ type: "doc", kind: "board", name, sha1: sha1(text), title: titleOf(text) ?? null });
+        this.emit({ type: "doc", kind: "board", name, sha1: sha1(body), title: titleOf(body) ?? null });
     }
-    return version(text);
+    return version(body);
   }
 
   /**
@@ -2416,6 +2459,8 @@ export class Vault {
     this.rawListeners.clear();
     const stop = this.stopping;
     this.stopping = null;
+    this.hear = null;
+    await this.uncover(null);
     if (stop) await (await stop.catch(() => async () => undefined))();
   }
 
@@ -2457,14 +2502,16 @@ export class Vault {
     this.hearing = new Promise((ok) => {
       heard = ok;
     });
-    const subscribing = watcher.subscribe(
+    const subscribing = subscribeAt(
       this.root,
-      (err, events) => {
+      (this.hear = (err, batch) => {
         // Events were dropped (a queue overflowed): what is kept may be missing some, so walk.
         if (err) {
           this.kept = null;
           return;
         }
+        /* What inotify missed inside a folder made just now (#405) is said with what it reported. */
+        const events = INOTIFY ? [...batch, ...this.inside(batch)] : batch;
         if (this.watching) for (const ev of events) this.heard(this.rel(ev.path));
         if (this.rawListeners.size) {
           const rels = [...new Set(events.map((ev) => this.rel(ev.path)).filter(Boolean))];
@@ -2499,6 +2546,9 @@ export class Vault {
           const found = classify(rel, this.types);
           if (!found) {
             if (ev.type !== "update") tree = true; // a folder came or went
+            /* A folder moved or removed by another program is one event at the folder's own path,
+               and nothing at the documents in it (#403): a page holding one must still hear it went. */
+            if (ev.type === "delete") for (const gone of this.folderWent(rel, seen)) this.emit(gone);
             continue;
           }
           const key = `${found.kind}:${found.name}`;
@@ -2510,7 +2560,7 @@ export class Vault {
             this.present?.delete(low);
             tree = true;
           } else if (ev.type === "create" && !this.present?.has(low)) {
-            this.present?.add(low);
+            this.present?.set(low, rel);
             tree = true;
           }
           if (gone) {
@@ -2552,8 +2602,7 @@ export class Vault {
         }
         if (tree) this.emit({ type: "tree" });
         if (tags) this.emit({ type: "tags" });
-      },
-      { ignore: [".git", ".obsidian", ".trash", ".stversions", "node_modules", ".anydag/vault.json"] },
+      }),
     );
     let sub: Awaited<typeof subscribing>;
     try {
@@ -2566,7 +2615,7 @@ export class Vault {
     // listing running or kept already says what is present.
     if (!this.present && !this.listing && !this.kept) {
       const { docs } = await listVault(this.lister, this.types, true);
-      this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+      this.present ??= presentOf(docs);
     }
     return async () => {
       try {
@@ -2575,6 +2624,99 @@ export class Vault {
         /* the folder went first, or the watcher with it: nothing left to stop */
       }
     };
+  }
+
+  /**
+   * What inotify missed inside the folders a batch says were made (#405). Linux watches each folder
+   * on its own, and `@parcel/watcher` starts watching a new one when it hears it made, without
+   * looking inside: a folder `mkdir -p` made beneath it in the same breath is never watched, so
+   * nothing written there is ever heard, and a file written into a new folder before its watch began
+   * is never reported. So a folder made with a folder already in it is given a watcher of its own
+   * (`cover`), and one made with files only — watched already — has those files said as made here.
+   * A file said twice is the same change said twice; a listener already takes that. A folder that
+   * went lets go of the covers in it.
+   */
+  private inside(batch: readonly watcher.Event[]): watcher.Event[] {
+    const out: watcher.Event[] = [];
+    let told: Set<string> | null = null;
+    for (const ev of batch) {
+      if (ev.type === "delete") {
+        if (this.covers.size) void this.uncover(ev.path);
+        continue;
+      }
+      if (ev.type !== "create") continue;
+      const rel = this.rel(ev.path);
+      if (!rel || rel.split("/").some(ignored)) continue;
+      let ents: fs.Dirent[];
+      try {
+        ents = fs.readdirSync(ev.path, { withFileTypes: true });
+      } catch {
+        continue; // a file, or gone already
+      }
+      if (ents.some((d) => d.isDirectory() && !ignored(d.name))) {
+        this.cover(ev.path);
+        continue;
+      }
+      told ??= new Set(batch.map((e) => e.path));
+      for (const d of ents) {
+        const abs = path.join(ev.path, d.name);
+        if (d.isFile() && !ignored(d.name) && !told.has(abs)) out.push({ type: "create", path: abs });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Watch the folder `abs` and everything under it with a watcher of its own, beside the vault's
+   * (#405): its walk watches every folder in it as it is now, which the vault's watcher never will.
+   * inotify gives a folder one watch however many watchers ask for it, and `@parcel/watcher` lets it
+   * go only with the last of them, so the vault's watcher loses nothing. Every file in it once the
+   * watch holds is said as made — what was written before is heard by no watcher. It lasts until the
+   * folder goes (`uncover`) or the vault is closed.
+   */
+  private cover(abs: string): void {
+    const hear = this.hear;
+    if (!hear || this.covers.has(abs)) return;
+    /* One watcher per folder in `@parcel/watcher`: a new one started while the last is being let go
+       of shares it, and is stopped with it. */
+    const after = this.leaving.get(abs) ?? Promise.resolve();
+    const p: Promise<watcher.AsyncSubscription | null> = after
+      .then(() => subscribeAt(abs, hear))
+      .then(
+        async (sub) => {
+          if (this.covers.get(abs) !== p || !this.stopping) {
+            await sub.unsubscribe().catch(() => undefined);
+            return null;
+          }
+          const made = filesUnder(abs).map((f): watcher.Event => ({ type: "create", path: f }));
+          if (made.length) hear(null, made);
+          return sub;
+        },
+        () => {
+          /* Gone before it could be watched: its going is its own event. */
+          if (this.covers.get(abs) === p) this.covers.delete(abs);
+          return null;
+        },
+      );
+    this.covers.set(abs, p);
+  }
+
+  /** Let go of the covers at or under `abs` — every one, with `null`. */
+  private async uncover(abs: string | null): Promise<void> {
+    const left: Promise<void>[] = [];
+    for (const [at, p] of this.covers) {
+      if (abs !== null && at !== abs && !at.startsWith(`${abs}${path.sep}`)) continue;
+      this.covers.delete(at);
+      const going = p
+        .then((sub) => sub?.unsubscribe())
+        .catch(() => undefined) // the folder went first, and its watch with it
+        .finally(() => {
+          if (this.leaving.get(at) === going) this.leaving.delete(at);
+        });
+      this.leaving.set(at, going);
+      left.push(going);
+    }
+    await Promise.all(left);
   }
 }
 
@@ -2653,7 +2795,65 @@ function pluralOf(kind: Kind): Exclude<keyof Removed, "folders"> {
 
 const exists = (abs: string): boolean => fs.existsSync(abs);
 const isFile = (abs: string): boolean => !!fs.statSync(abs, { throwIfNoEntry: false })?.isFile();
+
+/** What `present` holds for a listing: each document's path lowercased, to its spelling on disk. */
+const presentOf = (docs: readonly Listed[]): Map<string, string> => new Map(docs.map((d) => [d.file.toLowerCase(), d.file]));
 const isDir = (abs: string): boolean => !!fs.statSync(abs, { throwIfNoEntry: false })?.isDirectory();
+
+/** Linux, whose inotify watches each folder on its own rather than a whole tree (#405, `Vault.inside`). */
+const INOTIFY = process.platform === "linux";
+
+/** What a vault's watchers leave alone: folders no document lives in, and the app's own record of the vault. */
+const UNWATCHED = [".git", ".obsidian", ".trash", ".stversions", "node_modules", ".anydag/vault.json"];
+
+/** How many times a subscription is begun again while folders inside it go as it is made. */
+const SUBSCRIBE_TRIES = 6;
+
+/**
+ * Subscribe `on` to everything under the folder `abs`. `@parcel/watcher` walks the folder and then
+ * watches each folder it found; one that went in between fails the whole subscription with ENOENT,
+ * or ENOTDIR when a file took its name (#389: `work/empty` made and moved at once), and the vault
+ * went unwatched. Its going is an event to
+ * whoever watches the folder it was in, so the subscription is begun again a moment later, walking
+ * without it — while `abs` itself is still there. **The failed walk is kept by the folder's path for
+ * as long as anything else holds `@parcel/watcher`'s backend** (another vault watched by the same
+ * process, or a cover), and a try that finds it walks nothing again: it then succeeds only once the
+ * backend has heard the folder go, and after the last try the vault is unwatched as before.
+ */
+async function subscribeAt(abs: string, on: watcher.SubscribeCallback): Promise<watcher.AsyncSubscription> {
+  for (let tries = 1; ; tries++) {
+    try {
+      return await watcher.subscribe(abs, on, { ignore: UNWATCHED });
+    } catch (e) {
+      /* ENOENT: the folder went. ENOTDIR: a file took its name. Either way it is no folder to watch. */
+      const gone = /No such file or directory|Not a directory/.test(String((e as Error)?.message ?? e));
+      if (!gone || tries >= SUBSCRIBE_TRIES || !isDir(abs)) throw e;
+      /* The walk it failed on is kept by the folder's path until the backend has taken in the going. */
+      await new Promise((ok) => setTimeout(ok, 25 * tries));
+    }
+  }
+}
+
+/** Every file under the folder `abs`, absolute, outside what the vault ignores; links are not followed. */
+function filesUnder(abs: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    let ents: fs.Dirent[];
+    try {
+      ents = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // gone meanwhile: its going is its own event
+    }
+    for (const d of ents) {
+      if (ignored(d.name)) continue;
+      const at = path.join(dir, d.name);
+      if (d.isDirectory()) walk(at);
+      else if (d.isFile()) out.push(at);
+    }
+  };
+  walk(abs);
+  return out;
+}
 
 function sameFile(a: string, b: string): boolean {
   const x = fs.statSync(a, { throwIfNoEntry: false });

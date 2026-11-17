@@ -14,7 +14,7 @@ anchor, and a reference is a Markdown link to `dag:<id>`.
 | canvas item | its `#id` | whoever makes it, else the stamp | move, edit, retitle, cut and paste, export and import; `renameItemId` is the one deliberate change |
 | note block | ` ^name` at the end of its last line | whatever first points at it | edits to the block, moving it |
 
-Ten things are load-bearing:
+Fifteen things are load-bearing:
 
 - **A document's id is in its frontmatter, and opening never writes.** `id:` is the truth and
   travels with the file through a copy, a sync and a `git mv`; the SQLite index in the app's home
@@ -22,6 +22,13 @@ Ten things are load-bearing:
   first time something links or embeds it by id (in the write that links it), or when the app
   creates it — not on its first edit, which would change bytes the page sent. `npm run stamp` is the
   one script, for items: an empty patch per board *is* a stamp.
+- **A whole-text write never drops an id** (#401). `Vault.write` puts the file's own `id:` back
+  into a replacement that has no `id:` line — an agent's fresh body, `<kind> write --file draft.md`,
+  a `/put` of a text from before the id was minted — and answers that text, so the writer takes its
+  base from the answer. Every write path (`/put`, `/patch`, the table and quiz routes, the CLI and
+  MCP) goes through it. Without it the file lost its id while the index went on resolving it, and
+  every `dag:` reference named nothing once the index was rebuilt, the file synced or copied. A file
+  with no id of its own is still written as given, and so is a text that says `id:` itself.
 - **A file moved outside the app keeps its id**, because the id is in it; the index learns the new
   path from the watcher or the next scan. Two files with one id — a copy made in a file manager —
   leave it with the older by created date, and the copy is given a new one.
@@ -43,8 +50,17 @@ Ten things are load-bearing:
   a click with a modifier still load.
 - **`react-markdown` empties any URL protocol it does not know**, which is what makes it safe with
   `javascript:` and what turned every reference into a link to nowhere and every embed into a broken
-  image. `urlTransform` in `src/refs/Ref.tsx` lets `dag:` through and nothing else, and every
-  `ReactMarkdown` that can hold a reference has to be handed it.
+  image. `urlTransform` in `src/refs/Ref.tsx` lets `dag:` and a wikilink's `wiki:` through and
+  nothing else, and every `ReactMarkdown` that can hold a reference has to be handed it.
+- **A reference URL is the caller's, not the document's asset path.** `NoteMarkdown` gives every
+  image it draws a folder — a note read-only, a snapshot, the editor's first-paint stand-in, an
+  embedded note — and `QuizMarkdown` does the same for a quiz. Both hand a `src` to the caller's
+  `img`, which draws `dag:` and a wikilink's `wiki:` alike, when `isRefUrl` (`src/refs/extract.ts`)
+  says it names a document. The test used to be `startsWith("dag:")`, so an `![[Target]]` fell
+  through as `wiki:Target` and asked `/__board/assets/wiki:Target`: a 403 and a broken image on
+  the read-only note, the snapshot and the editor's stand-in — and `![[…]]` is the one embed form
+  that arrives without going through the picker, because an agent writes notes (#396).
+  `test/note-embed.test.ts` holds both URLs to the caller, and a plain picture to the folder.
 - **An embed is a block, and a paragraph cannot hold one.** A `dag:` image alone on its line draws
   the target; anywhere else it is a one-line card, because a `<div>` in a `<p>` is a console error
   and the e2e suite fails on those. **An embed that throws is that embed's failure alone**:
@@ -77,6 +93,10 @@ Ten things are load-bearing:
   for one name, so a client asking about one document is not sent every document's (4.6 KB where
   `/index` is 10.9 MB on 5,000 notes). The MCP `refs` tool with a `name`, `anydag <kind> refs`, and
   `file rm` and `file_delete` read it.
+- **The vault as a graph is `GET /__board/graph`** (#457): every document, each link between two of
+  them once, and the fields the graph view colours, filters and groups by, columnar and built from
+  this same index — 0.40 MB where `/index` is 1.21 MB on the bench's 5,000 files. Its wire format,
+  fields and view model are in [`graph.md`](graph.md).
 - **The vault reads a disk somebody else is deleting from.** A folder listed a moment ago can
   be gone when it is opened, and a board read a moment ago gone when it is written. Both always
   could; the index route lists the vault far more often than anything did, and turned a rare race

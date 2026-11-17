@@ -24,6 +24,7 @@ the file for that area, not to a new place.
 | [`trash.md`](trash.md) | Nothing is deleted at once: the vault's trash, restore, expiry, and its routes. |
 | [`references.md`](references.md) | Document ids, `dag:` references, embeds, backlinks, the references index, `?view=1`, and wikilinks following a rename. |
 | [`search.md`](search.md) | The corpus on the server, its FTS5 words index in the app's home, ranking and snippets. |
+| [`graph.md`](graph.md) | The graph view: `GET /__board/graph`, its generic fields, the view as data, the model that turns them into typed arrays, and the Graph page that draws it with WebGL. |
 | [`cli.md`](cli.md) | `anydag`, the MCP server, and the manifest that holds routes, commands and tools in step. |
 | [`lock.md`](lock.md) | Read-only mode, in two layers, and what it keeps. |
 | [`links.md`](links.md) | Links between items, the rule for when a diagram has a header, and drawing a link with the pointer. |
@@ -48,6 +49,7 @@ the file for that area, not to a new place.
 | [`api.md`](api.md) | The api server: its features, config, what it stores and never stores, and running and deploying it. |
 | [`feedback.md`](feedback.md) | Send feedback: the card, what leaves the machine, the stateless relay that makes a GitHub issue, and how to run it. |
 | [`gate-and-releases.md`](gate-and-releases.md) | Versions, how a release is cut, and what `npm run gate`, `checks` and CI run. |
+| [`graph-simulation.md`](graph-simulation.md) | The graph view's force-directed layout: the forces a person turns, groups and the rule about a group's disc, the tree, the host that paces it, the linked clusters. |
 | [`limits.md`](limits.md) | What the app costs to run and where it slows down and stops, measured; the bench and the nightly guards. |
 
 ## Find a section by name
@@ -123,6 +125,10 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The document tabs | [`sidebar.md`](sidebar.md) |
 | The tabs' keys, their order and their menu | [`sidebar.md`](sidebar.md) |
 | The free canvas | [`free-canvas.md`](free-canvas.md) |
+| The graph route | [`graph.md`](graph.md) |
+| The Graph page | [`graph.md`](graph.md) |
+| The graph view | [`graph.md`](graph.md) |
+| The graph view's simulation | [`graph-simulation.md`](graph-simulation.md) |
 | The layers, and what each may not know | [`layers.md`](layers.md) |
 | The leader key | [`editing.md`](editing.md) |
 | The library | [`library.md`](library.md) |

@@ -30,6 +30,7 @@
 import { parse as parseYaml } from "yaml";
 
 import { QUIET } from "./quiet";
+import { frontBlock } from "./front";
 
 import { dueOf, statusOf, withKeys } from "./task";
 import { instantOf, offsetOf, wallOf } from "./zone";
@@ -45,8 +46,6 @@ export interface EventChange {
   start?: string | null;
   end?: string | null;
 }
-
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /**
  * A time as a person or an agent writes one. The separator may be a `T`, a `t` or one space; the
@@ -91,7 +90,7 @@ export const allDay = (event: NoteEvent): boolean => isDay(event.start);
 
 /** The event a note's text describes, or `undefined` for a note that is not one. */
 export function eventOf(text: string): NoteEvent | undefined {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return undefined;
   let data: unknown;
   try {
