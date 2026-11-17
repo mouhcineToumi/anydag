@@ -154,6 +154,73 @@ jobs:
     with:
       scope: full
 
+  # The tests that passed only on retry (#494). The suite retries a failed test once, so a flake leaves
+  # the run green and is said once, in a report nobody reads; this keeps one issue per flaky test —
+  # opened the first night it shows, commented on every night after — so a flake is a thing on the
+  # board rather than a re-run somebody pressed and forgot. It reads the full suite's shards, whatever
+  # `e2e` concluded: a red night still says which of its other tests needed a second try. It holds
+  # nothing back, and a failure here (GitHub not answering) is its own red, not the build's.
+  flaky:
+    name: flaky tests
+    needs: [prepare, e2e]
+    if: ${{ !cancelled() && needs.prepare.outputs.build == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          sparse-checkout: scripts/flaky.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          path: blobs
+          pattern: blob-report-full-*
+          merge-multiple: true
+      - name: Keep an issue per test that passed only on retry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ ! -d blobs ]; then echo "::warning::no shard left a report, so there is nothing to read"; exit 0; fi
+          PLAYWRIGHT_JSON_OUTPUT_NAME=report.json npx --yes -p @playwright/test@1.65.0 playwright merge-reports --reporter=json ./blobs > /dev/null
+          node scripts/flaky.mjs report.json > flaky.jsonl
+          count=$(wc -l < flaky.jsonl | tr -d ' ')
+          {
+            echo "## Tests that passed only on retry: $count"
+            jq -r '"- `\(.file):\(.line)` \(.name | split(" › ")[1:] | join(" › "))"' flaky.jsonl
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$count" = 0 ] && { echo "no test needed a second try"; exit 0; }
+          # The labels say where it goes: triage, so a person decides; never `status: ready` from here.
+          while IFS= read -r line; do
+            title=$(jq -r .title <<<"$line")
+            body=$(jq -r --arg v "$VERSION" --arg run "$RUN_URL" '
+              "`\(.file):\(.line)` failed, then passed on its retry, in the full browser suite of nightly `\($v)` ([run](\($run))).\n\n" +
+              "```\n\(.error)\n```"' <<<"$line")
+            # The open issue with exactly this title, if there is one: a search matches words, so the title is compared whole.
+            number=$(gh issue list --state open --label "area: ci" --search "in:title \"$(jq -r .file <<<"$line")\"" --limit 100 \
+              --json number,title | jq -r --arg t "$title" 'map(select(.title == $t)) | .[0].number // empty')
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body "Again, in nightly \`$VERSION\` ([run]($RUN_URL))."
+              echo "flaky again: #$number $title"
+            else
+              gh issue create --title "$title" --label "status: triage" --label "type: bug" --label "area: ci" --body "$body
+
+          Opened by the nightly's *flaky tests* job (#494). It comments here each night the test needs a second try again; close this when it is fixed."
+              echo "flaky, new issue: $title"
+            fi
+          done < flaky.jsonl
+
   desktop:
     name: desktop
     needs: prepare
