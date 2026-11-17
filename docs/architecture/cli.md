@@ -38,8 +38,9 @@ Six things are load-bearing:
   `meta.json`'s inputs on every run. `src/board/`, `src/note/`, `src/quiz/` and `src/table/` come in
   through the server's own modules.
 - **A whole-text write carries its base and is never re-sent.** `<kind> write` wants `--base` (what
-  `cat --json` printed) or `--force`; a 409 is exit 3 naming the base it lost to. There is no
-  read-modify-write any more, so nothing recomputes an edit.
+  `cat --json` printed) or `--force`, which leaves the base out; an empty `--base` is refused, and the
+  server answers an empty `base` from an MCP tool with a 409, not a write (#400). A 409 is exit 3 naming
+  the base it lost to. There is no read-modify-write any more, so nothing recomputes an edit.
 - **The accounting is a closed set.** Every route `server/routes/` declares is reached by some
   command's `routes`, refused (`REFUSED`), or held only by features marked `{"admin": false}`
   (`OUTSIDE`), all read out of `docs/parity.json` (see *Parity*). `check-skill.mjs`'s eighth set holds

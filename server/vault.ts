@@ -1467,7 +1467,8 @@ export class Vault {
 
   /**
    * Replace a document's text. `base` of `null`/`undefined` is "I have not seen it", which overwrites
-   * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1.
+   * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1,
+   * and an empty string is not the current sha1: it is a stale base, never a missing one (#400).
    */
   async write(name: string, kind: TextKind, text: string, base?: string | null): Promise<Version> {
     const file = this.writeAt(this.fileOf(name, kind));
@@ -1477,7 +1478,7 @@ export class Vault {
     } catch {
       throw new NotFound(`no ${kind} \`${name}\``);
     }
-    if (base && base !== now.base) throw new Conflict(now.base, now.text);
+    if (base != null && base !== now.base) throw new Conflict(now.base, now.text);
     if (now.text !== text) {
       writeAtomic(file, text);
       this.mintTargets(text, now.text);

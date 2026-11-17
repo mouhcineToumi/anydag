@@ -807,6 +807,13 @@
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
   the disk does not have, so its next save is a `409` against itself. `test/server/` holds both
   halves. A synced vault depends on it as well: a write on open is a conflict on every machine.
+- **An empty `base` is a stale base, not a missing one.** `Vault.write` read `if (base && …)`, so
+  `""` — an agent passing an unset variable to `board_write`, or `{"base": ""}` to `/__board/put` —
+  skipped the sha1 check and overwrote the other writer's edit, and the routes turned a `base` of any
+  other type into "none" the same way (#400). Only an absent or `null` base is the "I have not seen
+  it" write (the CLI's `--force`); `baseOf` (`server/http.ts`) is the one reading of a request's
+  `base`, a string compared as it is or a 400, and `test/server/write-base.test.ts` sends `""` and
+  `{}` to every route that takes one.
 - **A name is any portable file name, and portable means three file systems.** `Meeting notes.md`
   and `Écoles.md` are names, so the store refuses what Windows or macOS would:
   `: * ? " < > | \`, a trailing dot or space, `CON` and its kin, and a name or a folder differing
