@@ -11,7 +11,8 @@
  *                          [--only <groups>] [--json <file>] [--keep]
  *
  *   --quick   small steps only (vaults of 100 and 1k files, boards of 10 and 100 items, diagrams of
- *             50 and 200 nodes, attachments of 1 and 10 MB): a few minutes; the whole run is ~25
+ *             50 and 200 nodes, attachments of 1 and 10 MB, graphs of 500 and 2k files): a few
+ *             minutes; the whole run is ~25
  *   --guard   only the nightly guards, each against its ceiling in `scripts/bench-guard.json`;
  *             exit 1 when one is over (see *The guards* below)
  *   --release one Markdown table of the fixed release rows, with the release before it beside them
@@ -20,12 +21,13 @@
  *   --save    with --release, also write this run to `docs/bench/<VERSION>.json`, the file the next
  *             release is compared with; refuses a row the run could not measure
  *   --sizes   the vault sizes, in files (default 100,1000,10000,50000)
- *   --only    a comma list of groups: vault, page, board, attach, leak, desktop (default all; with
- *             --release, the four groups its rows come from)
+ *   --only    a comma list of groups: vault, page, board, attach, leak, desktop, graph (default all;
+ *             with --release, the four groups its rows come from)
  *   --json    also write every measurement, with the machine, to this file
  *   --keep    leave the temp folder in place and say where it is
  *
- * Needs the built page and server (`npm run build && node server/build.mjs`); the `desktop` group
+ * Needs the built page and server (`npm run build && node server/build.mjs`), except `--only graph`,
+ * which runs the simulation's source in this process (Node strips its types); the `desktop` group
  * also needs `node desktop/build.mjs` and a display, and is skipped with a line saying so without
  * them. Per-process memory and CPU are read from `/proc` on Linux and from `ps` on macOS; on Windows
  * those lines say `n/a`.
@@ -71,6 +73,12 @@
  *   RSS after each, and one over the 512 MB limit.
  * - *leak.*: the server's RSS across 30 rounds of list, index and search, and across 100 change-feed
  *   connections opened and dropped.
+ * - *graph.<n>*: the graph view's simulation (`src/graph/sim.ts`, #458) on a made-up vault of n files
+ *   and about 1.3 links per file (`scripts/bench-graph.mjs`): one tick, hot to rest, timed tick by
+ *   tick (mean over the run, median of three runs); the ticks it took; the time to rest through the
+ *   host on the real clock, which paces it at 240 ticks a second, so 0.9 s is the floor; and the
+ *   typed arrays it holds. Then a dense vault of 5,000 files and 150,000 links, the linked clusters
+ *   of the 5,000-file vault, and a tick grouped by them.
  * - *desktop.*: the Electron shell (`desktop/dist/main.cjs`) on the 1k vault: time to the first
  *   window and to `data-dag-ready`, `app.getAppMetrics()` per process plus the server child,
  *   idle CPU per process, and a request's cost through `anydag://` (`desktop/forward.ts`) against
@@ -96,6 +104,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { graphGroup } from "./bench-graph.mjs";
 import { missingReleaseRows, previousRelease, RELEASE_DIR, releaseTable, releaseValues, writeRelease } from "./bench-release.mjs";
 import { enter } from "./session.mjs";
 
@@ -143,7 +152,9 @@ const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
 /* The release rows are made on a 1k-file vault and a 500-item board; a --sizes or --quick that
    leaves either out gets it back, so the table always has the same ten rows to show. */
 if (RELEASE && !SIZES.includes(1000)) SIZES.push(1000);
-const ONLY = new Set((RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop")).split(","));
+const ONLY = new Set(
+  (RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop,graph")).split(","),
+);
 const BOARD_ITEMS = QUICK ? [10, 100] : [10, 100, 500, 2000];
 if (RELEASE && !BOARD_ITEMS.includes(500)) BOARD_ITEMS.push(500);
 const DIAGRAM_NODES = QUICK ? [50, 200] : [50, 200, 500, 1000];
@@ -151,11 +162,13 @@ const ATTACH_MB = QUICK ? [1, 10] : [1, 10, 100, 500];
 /** Any one step: past this it is `timeout`, which is where that thing breaks. */
 const STEP_MS = 300_000;
 
+/* The graph group runs the simulation's source in this process, and needs neither bundle. */
+const NEEDS_BUILD = GUARD || [...ONLY].some((g) => g !== "graph");
 for (const [file, what] of [
   [SERVER, "node server/build.mjs"],
   [PAGE, "npm run build"],
 ]) {
-  if (!fs.existsSync(file)) {
+  if (NEEDS_BUILD && !fs.existsSync(file)) {
     console.error(`bench: ${path.relative(root, file)} is missing — run \`${what}\` first`);
     process.exit(2);
   }
@@ -1507,8 +1520,10 @@ async function main() {
         code = 1;
       }
     } else {
-      /* Boards first: the biggest vault leaves the shared browser holding gigabytes, and a board
-         timed after it is timed on a machine still giving them back. */
+      /* The graph first, on a machine nothing else here has warmed. Then boards: the biggest vault
+         leaves the shared browser holding gigabytes, and a board timed after it is timed on a
+         machine still giving them back. */
+      if (ONLY.has("graph")) await graphGroup(record, { quick: QUICK });
       if (ONLY.has("board")) await boardGroup(b);
       if (ONLY.has("attach")) await attachGroup();
       if (ONLY.has("vault") || ONLY.has("page")) for (const n of SIZES) await vaultGroup(n, b);
