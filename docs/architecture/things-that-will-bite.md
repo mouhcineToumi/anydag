@@ -344,6 +344,18 @@
   not stub": it is that a stub written from what the caller *expects* tests the caller against
   itself. `test/fixtures/dsl-answers.json` is the grammar's own recorded answers, held to the live
   handler by `test/dsl-service.test.ts`, and a stub is copied from a route, never invented.
+- **An SDK default is not this app's limit, and the SDK's way past it is the whole session.** The
+  MCP server took `StdioServerTransport`'s own read buffer, 10 MB: a frame past it is thrown away and
+  the transport **closed**, which `main.ts` turns into an exit, so a `file_upload` of 8 MB — 10.7 MB
+  as base64 — was `EPIPE` on the client and a server that answered nothing afterwards, in a vault that
+  takes 512 MB (#399). The buffer also concatenated what it held with every chunk, so one frame of n
+  bytes cost about n²/(2·chunk) bytes of copy. `server/mcp/frame.ts` frames stdin a line at a time —
+  linear in the bytes — states its own 64 MB ceiling, and answers an over-size frame with a JSON-RPC
+  error for its `id`: nothing done, connection up, and the message says how to send the file instead
+  (`url`). The `id` is written **before** the arguments by one client and **after** them by another
+  (the SDK's own order is `{...request, jsonrpc, id}`), so both ends of a dropped frame are kept and
+  the head's is read at depth 1 — a card's `id` in `board_patch`'s arguments is not the request's.
+  `test/server/mcp-stdio.test.ts` uploads 8 MB, then answers the next call, and fails without it.
 - **An `EventSource` cannot send a header, and that decided how the token travels.** The live
   channel is one `EventSource` per page, and an `<img src>` pointing at an attachment is another
   request no script dresses. In the desktop app the main process adds the header to every request
