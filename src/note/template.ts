@@ -26,6 +26,7 @@
 import { parse as parseYaml } from "yaml";
 
 import { underMark } from "./bom";
+import { frontBlock } from "./front";
 import { within } from "./project";
 import { wallOf, type Wall } from "./zone";
 
@@ -122,8 +123,6 @@ function fillText(text: string, vars: TemplateVars, wall: Wall, quote: (value: s
   });
 }
 
-const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-
 /** A line of a frontmatter block: what comes before its value (a key, or a list's dash) and the value. */
 const LINE = /^(\s*(?:-[ \t]+)?(?:[^\s#:'"-][^:]*:[ \t]+)?)(\S.*)$/;
 
@@ -172,7 +171,7 @@ export function fillTemplate(text: string, vars: TemplateVars): string {
 
 function filled(text: string, vars: TemplateVars): string {
   const wall = wallOf(vars.at, vars.zone);
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return fillText(text, vars, wall);
   const block = m[1]!;
   const start = m[0].startsWith("---\r\n") ? 5 : 4;

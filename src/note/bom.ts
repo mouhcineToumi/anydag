@@ -4,8 +4,8 @@
  *
  * It is part of the file, so it is kept: an edit anywhere writes it back where it was, and a
  * frontmatter grows behind it, never in front. It is not part of the text, so nothing reads it:
- * a frontmatter is still the block that opens the file when the mark comes first (every `FRONT`
- * pattern in `src/note/`, `src/refs/` and `server/` allows `\uFEFF?` before the `---`), and remark
+ * a frontmatter is still the block that opens the file when the mark comes first (`frontBlock` in
+ * `front.ts`, which every note-side reader asks, allows `\uFEFF?` before the `---`), and remark
  * — which skips the mark and counts its offsets from the character after it — is never handed a
  * text whose offsets would then be one code unit out of step with it.
  *

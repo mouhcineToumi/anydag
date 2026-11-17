@@ -516,8 +516,8 @@
   period before the edited block went, and under frontmatter the closing `---` lost a hyphen (#394).
   Anything that slices a text at remark's offsets parses the text after the mark (`markOf` in
   `src/note/bom.ts`): `load`, `mdToBlocks`, `relink.ts`. `splitNote` carries the mark in `front`, so
-  the editor's body never has one, and every frontmatter pattern on the note side is
-  `^\uFEFF?---`, its writers working behind the mark through `underMark`.
+  the editor's body never has one, and `frontBlock` (`src/note/front.ts`, which every note-side
+  reader asks) finds a frontmatter behind the mark, its writers working behind it through `underMark`.
 - **A rewritten block still stands where it stood, and keeps the gaps on either side.** `saved()`
   used to write `\n\n` before and after any block that was typed into, so the block before it —
   untouched — lost its own line ending: CRLF in a CRLF note (#416), and the stolen byte in the BOM
@@ -1080,6 +1080,14 @@
   file list and the reference index used to wait for the feed's next change, which after an agent's
   last write never comes (`src/board/refresher.ts`). To see the first half again, open six
   `EventSource`s through a `protocol.handle` that forwards with `net.fetch` and try a seventh request.
+- **Two `---` lines at the top of a note are not a frontmatter until what is between them is one.**
+  Every frontmatter pattern was `^---\n…\n---`, which a body opening with a rule and with another
+  rule further down matches too: the text between them was taken for frontmatter, so the editor, the
+  read-only page, search, the index and a print showed only what came after the second rule, and a
+  writer (`withTask`, `withTags`, `withTitle`) would have put its line into the person's text (#397).
+  `frontBlock` in `src/note/front.ts` is the one test — a YAML mapping, blank, or a broken block that
+  opens with a `key:` line — and every note-side reader and writer asks it; a new one must not grow
+  its own pattern.
 - **A template's `{{…}}` is not YAML, and `yaml` says so on every parse.** `due: {{date}}` is a flow map
   inside a flow map: it parses, and warns ("Keys with collection values will be stringified") through
   `process.emitWarning` — to the server's stderr each time a template's stat moved, and to the page's

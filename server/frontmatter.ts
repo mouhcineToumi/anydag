@@ -8,9 +8,8 @@
 import { underMark } from "../src/note/bom";
 import { titleOf } from "../src/refs/extract";
 import { hasOffset, isDay, whenOf, type NoteEvent } from "../src/note/event";
+import { frontBlock } from "../src/note/front";
 import { instantOf, utc, validZone } from "../src/note/zone";
-
-const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** A title that can go into YAML as it is; anything else is written double-quoted (JSON's syntax). */
 const PLAIN = /^[A-Za-z][A-Za-z0-9 _.,()'&+-]*$/;
@@ -33,7 +32,7 @@ export function withTitle(text: string, title: string, kind = "board"): string {
 
 function titled(text: string, title: string, kind: string): string {
   const line = `title: ${scalar(title)}`;
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   /* Saying it already, however it is quoted, is no change: `quiz_create` given a text and
      its own title re-quoted the line, and the base it answered was then not the text it was sent. */
   if (m && titleOf(text) === title) return text;
@@ -64,7 +63,7 @@ export function withoutTitle(text: string): string {
 }
 
 function untitled(text: string): string {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return text;
   const lines = m[1]!.split(/\r?\n/);
   const at = lines.findIndex((raw) => /^title\s*:/.test(raw));

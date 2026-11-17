@@ -11,6 +11,7 @@
 import { createHash, randomInt } from "node:crypto";
 
 import { withKeys } from "../src/note/task";
+import { frontBlock } from "../src/note/front";
 
 export const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 const ID = /^[0-9a-z]{10}$/;
@@ -42,7 +43,6 @@ export function derivedId(id: string, rel: string, taken: (x: string) => boolean
   }
 }
 
-const FRONT = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const ID_LINE = /^id[ \t]*:[ \t]*(["']?)([^\r\n"']*)\1[ \t]*$/m;
 
 /**
@@ -50,8 +50,8 @@ const ID_LINE = /^id[ \t]*:[ \t]*(["']?)([^\r\n"']*)\1[ \t]*$/m;
  * key is there and holds something else — a key this app must not write over.
  */
 export function frontId(text: string): string | null | false {
-  /* Past a byte-order mark: one in front of the `---` hid the id, and a fresh one was minted (#392). */
-  const m = FRONT.exec(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+  /* Past a byte-order mark: `frontBlock` reads behind one, which hid the id and minted a fresh one (#392). */
+  const m = frontBlock(text);
   if (!m) return null;
   const line = ID_LINE.exec(m[1]!);
   if (!line) return null;

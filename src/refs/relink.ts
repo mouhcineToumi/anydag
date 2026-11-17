@@ -38,10 +38,9 @@ import { unified } from "unified";
 import { isItemType } from "../board/types";
 import { locateItems } from "../board/locate";
 import { markOf } from "../note/bom";
+import { frontBlock } from "../note/front";
 import { remarkMath } from "../note/math";
 import { WIKILINK, resolveWiki, type WikiCandidate } from "./wikilinks";
-
-const FRONT = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
@@ -77,7 +76,7 @@ export type LinkKind = "board" | "note" | "quiz" | "table";
 function spansOf(text: string, kind: LinkKind): [number, number][] {
   if (kind !== "board") {
     /* After the frontmatter, or a byte-order mark: remark counts its offsets from past the mark (#394). */
-    const front = FRONT.exec(text)?.[0].length ?? markOf(text).length;
+    const front = frontBlock(text)?.[0].length ?? markOf(text).length;
     return markdownSpans(text.slice(front), front);
   }
   const out: [number, number][] = [];
