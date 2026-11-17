@@ -8,7 +8,7 @@ import type { ThemeMetric } from "@/theme/contract";
 import { layoutGitgraph } from "./gitgraph";
 import { layoutLanes } from "./lanes";
 import { layoutTimeline } from "./timeline";
-import { labelReach, routeEdges, type RouteNode } from "./route";
+import { labelReach, routeEdges, routeReach, type RouteNode } from "./route";
 import { isFixed, layoutSketch } from "./sketch";
 import type { Placed, PlacedGroup, SizedNode } from "./types";
 
@@ -417,11 +417,14 @@ export async function layoutGraph(
   const groupLevel = new Map(graph.groups.map((g) => [g.id, g.level]));
   for (const id of hoisted) delete bends[id];
 
-  /* Once to route, and — only when a label hangs past the top or the left — once more with every
-     box and bend moved clear of it. Routing is translation-invariant, so the second pass is the
-     first one moved, and no label is left drawn outside the item where `content-visibility` cuts it. */
+  /* Once to route, and — only when a line or a label reaches past the top or the left — once more
+     with every box and bend moved clear of it. Routing is translation-invariant, so the second pass
+     is the first one moved, and nothing is left drawn outside the item where `content-visibility`
+     cuts it. The lines count as well as their labels: a curve bowed round a card it has nothing to
+     do with goes past every box — the edge that closes a cycle of three tables bows round the one
+     between its ends — and a frame taken from the boxes cut it off (#408). */
   let placed = place();
-  let reach = labelReach(placed.edges, labels);
+  let reach = drawnReach(placed.edges);
   const dx = reach.left < 0 ? Math.ceil(-reach.left / grid) * grid : 0;
   const dy = reach.top < 0 ? Math.ceil(-reach.top / grid) * grid : 0;
   if (dx || dy) {
@@ -431,7 +434,7 @@ export async function layoutGraph(
     }
     for (const list of Object.values(bends)) for (const p of list) (p.x += dx), (p.y += dy);
     placed = place();
-    reach = labelReach(placed.edges, labels);
+    reach = drawnReach(placed.edges);
   }
   const { nodes, rows, groups, edges } = placed;
 
@@ -443,7 +446,7 @@ export async function layoutGraph(
     w = Math.max(w, b.x + b.w);
     h = Math.max(h, b.y + b.h);
   }
-  /* …and the labels, which hang off a line rather than sit in a box. */
+  /* …and the lines and their labels, which no box accounts for. */
   w = Math.max(w, reach.right);
   h = Math.max(h, reach.bottom);
 
@@ -456,6 +459,18 @@ export async function layoutGraph(
     lanes: [],
     edges,
   };
+
+  /** How far the routed lines and their labels reach, on every side, measured from the origin. */
+  function drawnReach(edges: Placed["edges"]) {
+    const a = routeReach(edges);
+    const b = labelReach(edges, labels);
+    return {
+      left: Math.min(a.left, b.left),
+      top: Math.min(a.top, b.top),
+      right: Math.max(a.right, b.right),
+      bottom: Math.max(a.bottom, b.bottom),
+    };
+  }
 
   function place() {
     const nodes: Placed["nodes"] = {};

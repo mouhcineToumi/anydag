@@ -64,6 +64,14 @@
   ELK's benefit; its bend points then describe a route between two group boxes. Splicing those onto
   anchors on two entities draws a tenancy line as a rectangle around the whole diagram, so
   `elk.ts` drops the bends for every edge it hoisted.
+- **ELK's polyline is kept only while it still misses every card.** It was routed for an exit ELK
+  chose, and `usableBends` trims only the bends behind our anchors. Under `aspect` ELK wraps a chain
+  into rows, and the edge that closes a cycle of three tables came back as a zigzag laid out for the
+  sides of the wrap: spliced onto a top and a bottom anchor, its first leg ran through the table
+  between them and its runs stopped in mid-air past the item (#408). `route.ts` draws the curve
+  instead when any leg of the spliced polyline (`legHits`) crosses a card, and `layoutGraph` sizes
+  the item from `routeReach` as well as `labelReach`, since that curve bows round the table past
+  every box.
 - **A dogleg is what gets past the card next door.** A row anchor is fixed on its card's side and
   the next card starts one `colGap` away, so the chord to anything not in that card runs through
   it and no bow leaving a fixed point can rise fast enough. `detour()` in `route.ts` leaves the
