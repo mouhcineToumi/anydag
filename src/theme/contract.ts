@@ -166,6 +166,8 @@ interface ThemeType {
   groupSub: number;
   stepTitle: number;
   stepId: number;
+  /** The step title's line-height, a ratio: the sizer grows a step by one of these per extra line. */
+  stepTitleLeading: number;
   decision: number;
   ucId: number;
   ucTitle: number;
@@ -294,6 +296,8 @@ export interface ThemeMetric {
     pillPadX: number;
     stepW: number;
     stepH: number;
+    /** How many title lines `stepH` is drawn for; each line past it grows the card by one leading. */
+    stepTitleLines: number;
     stepGap: number;
     stepPadY: number;
     stepPadX: number;

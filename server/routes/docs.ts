@@ -29,14 +29,16 @@ import { OPS_SHAPE } from "../handle";
 import { type Doc, grammar, type Over, type Parsed } from "../grammar";
 import type { Entry } from "../parsing";
 import { type Listed, listed, overOfVault } from "../upkeep";
-import { anyKind, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
+import { anyKind, baseOf, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { paced } from "../pace";
 import { mimeOf } from "../uploads";
-import { Conflict, NotFound, Refused, byKind, type Tree } from "../vault";
+import { Conflict, NotFound, Refused, TAGS_FILE, byKind, type Tree } from "../vault";
 import { trashAnswer, trashDays } from "../trash";
 import { readPrefs } from "./prefs";
 import { relinking } from "../relink";
+import { graphJson, graphOf } from "../graph";
+import { registryOf } from "../tags";
 
 const str = (v: unknown): string => (typeof v === "string" ? v : v === undefined || v === null ? "" : String(v));
 const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -129,6 +131,27 @@ async function indexOf(s: Session): Promise<{ docs: IndexDoc[]; json: Promise<st
 async function indexJson(s: Session): Promise<string> {
   const at = await indexOf(s);
   return (at.json ??= jsonListPaced(at.docs).then((list) => `{"docs":${list}}`));
+}
+
+/* The graph's JSON, per index answer and the tag list it was coloured with: the same text while
+   neither moved, as `indexJson` keeps the index's (#457). */
+const graphs = new WeakMap<readonly IndexDoc[], { tags: string | undefined; json: Promise<string> }>();
+
+/**
+ * `/__board/graph`: the index as a graph (`server/graph.ts`), a fraction of its size. Nothing is
+ * read but the tag list, a few hundred bytes, for the tags' colours.
+ */
+async function graphText(s: Session): Promise<string> {
+  const at = await indexOf(s);
+  const tags = s.vault.readRaw(TAGS_FILE)?.toString("utf8");
+  const had = graphs.get(at.docs);
+  if (had && had.tags === tags) return had.json;
+  const json = graphOf(at.docs, registryOf(tags)).then(graphJson);
+  graphs.set(at.docs, { tags, json });
+  json.catch(() => {
+    if (graphs.get(at.docs)?.json === json) graphs.delete(at.docs);
+  });
+  return json;
 }
 
 /* What each vault's index last answered for each text, with the parse and the names it resolved its
@@ -368,6 +391,9 @@ export function docRoutes(app: Hono, s: Session): void {
 
   app.get("/__board/index", async (c) => jsonText(c, await indexJson(s)));
 
+  /* The vault as a graph for the graph view: documents, links and fields, without the references' text. */
+  app.get("/__board/graph", async (c) => jsonText(c, await graphText(s)));
+
   /* One document's references out, each with what it names, and its backlinks — the index read for
      one name, so a client asking about one document is not sent every document's. */
   app.get("/__board/refs", async (c) => {
@@ -436,7 +462,8 @@ export function docRoutes(app: Hono, s: Session): void {
     const body = await bodyOf(c);
     const ops = body.ops ?? [];
     if (!Array.isArray(ops)) throw err(400, OPS_SHAPE);
-    if (body.base !== undefined && body.base !== null && body.base !== current.base) {
+    const base = baseOf(body);
+    if (base !== null && base !== current.base) {
       return c.json({ error: "the board changed underneath this edit", base: current.base, text: current.text }, 409);
     }
     const { text } = await grammar.patch(current.text, ops);
@@ -456,7 +483,7 @@ export function docRoutes(app: Hono, s: Session): void {
     await mustRead(s.vault, name, kind);
     const body = await bodyOf(c);
     if (typeof body.text !== "string") throw err(400, "expected `text`");
-    const after = await s.vault.write(name, kind, body.text, typeof body.base === "string" ? body.base : null);
+    const after = await s.vault.write(name, kind, body.text, baseOf(body));
     return c.json({ base: after.base, text: after.text });
   });
 
@@ -688,7 +715,7 @@ export function docRoutes(app: Hono, s: Session): void {
     const name = str(body.name);
     const ops = body.ops;
     if (!Array.isArray(ops)) throw err(400, "expected `ops: [{op, …}]`");
-    const base = typeof body.base === "string" ? body.base : null;
+    const base = baseOf(body);
     for (let i = 0; i < 4; i++) {
       const current = await mustRead(s.vault, name, "table");
       if (base !== null && base !== current.base) {
@@ -723,7 +750,7 @@ export function docRoutes(app: Hono, s: Session): void {
     const name = str(body.name);
     const ops = body.ops;
     if (!Array.isArray(ops) || ops.length === 0) throw err(400, "expected `ops: [{op, …}]`");
-    const base = typeof body.base === "string" ? body.base : null;
+    const base = baseOf(body);
     for (let i = 0; i < 4; i++) {
       const current = await mustRead(s.vault, name, "quiz");
       if (base !== null && base !== current.base) {

@@ -151,8 +151,8 @@
     {
       "id": "files.refs",
       "area": "Files",
-      "what": "What refers to what: references and backlinks",
-      "rest": ["GET /__board/index", "GET /__board/refs"],
+      "what": "What refers to what: references, backlinks and the vault as a graph",
+      "rest": ["GET /__board/index", "GET /__board/refs", "GET /__board/graph"],
       "cli": {"admin": false},
       "mcp": ["refs"]
     },

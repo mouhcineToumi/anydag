@@ -1,6 +1,8 @@
 import { edgeSpan } from "../dsl/restate";
 import type { Token } from "../dsl/tokenizer";
 import { serializeAttrs } from "./attrs";
+import { eolAt } from "./eol";
+import type { Located } from "./locate";
 import { locateItems, renderFence } from "./locate";
 import { attrsOf, withId, type PatchResult } from "./patch";
 import { isItemType, isLinkType } from "./types";
@@ -57,10 +59,20 @@ function renameRefs(line: string, from: string, to: string, ids: ReadonlySet<str
   return out;
 }
 
-/** Each line's 0-based char offset within a fence's body: `\n`-joined, no trailing newline. */
-function lineOffsets(body: string): number[] {
-  const out: number[] = [0];
-  for (const line of body.split("\n").slice(0, -1)) out.push(out[out.length - 1]! + line.length + 1);
+/**
+ * Each of a fence's body lines with where it starts in the file. Read off the file rather than off
+ * `body`, which is LF: in a CRLF board every line after the first starts one more character on per
+ * line before it, and an offset counted in the body would land the edit on the wrong bytes.
+ */
+function bodyLines(text: string, item: Located): { line: string; at: number }[] {
+  const out: { line: string; at: number }[] = [];
+  let at = item.fence!.bodyStart;
+  for (const line of item.body.split("\n")) {
+    out.push({ line, at });
+    const nl = text.indexOf("\n", at);
+    if (nl < 0) break;
+    at = nl + 1;
+  }
   return out;
 }
 
@@ -87,7 +99,8 @@ export function renameItemId(text: string, from: string, to: string): PatchResul
   /* The mover's own declaration. Prose has no fence to carry an id, so renaming it pins one — the
      same rule `SetOp` follows in `patch.ts` when a drag pins an unnamed item. */
   if (mover.prose) {
-    edits.push({ from: mover.start, to: mover.end, text: renderFence("md", serializeAttrs(withId({}, to)), mover.body) });
+    const fence = renderFence("md", serializeAttrs(withId({}, to)), mover.body, eolAt(text, mover.start));
+    edits.push({ from: mover.start, to: mover.end, text: fence });
   } else {
     const attrs = attrsOf(mover);
     attrs.map.id = to;
@@ -107,15 +120,10 @@ export function renameItemId(text: string, from: string, to: string): PatchResul
      dangling; `parseBoard` reports that on its own the next time the file is read. */
   for (const fence of located.items) {
     if (!isLinkType(fence.type)) continue;
-    const bodyStart = fence.fence!.openEnd + 1;
-    const lines = fence.body.split("\n");
-    const offsets = lineOffsets(fence.body);
-    lines.forEach((line, i) => {
+    for (const { line, at } of bodyLines(text, fence)) {
       const rewritten = renameRefs(line, from, to, ids);
-      if (rewritten === line) return;
-      const at = bodyStart + offsets[i]!;
-      edits.push({ from: at, to: at + line.length, text: rewritten });
-    });
+      if (rewritten !== line) edits.push({ from: at, to: at + line.length, text: rewritten });
+    }
   }
 
   let out = text;
@@ -170,15 +178,10 @@ export function renameNodeLinks(text: string, item: string, from: string, to: st
   const edits: { from: number; to: number; text: string }[] = [];
   for (const fence of located.items) {
     if (!isLinkType(fence.type)) continue;
-    const bodyStart = fence.fence!.openEnd + 1;
-    const lines = fence.body.split("\n");
-    const offsets = lineOffsets(fence.body);
-    lines.forEach((line, i) => {
+    for (const { line, at } of bodyLines(text, fence)) {
       const rewritten = renameNodeRefs(line, item, from, to, ids);
-      if (rewritten === line) return;
-      const at = bodyStart + offsets[i]!;
-      edits.push({ from: at, to: at + line.length, text: rewritten });
-    });
+      if (rewritten !== line) edits.push({ from: at, to: at + line.length, text: rewritten });
+    }
   }
   let out = text;
   for (const e of edits.sort((a, b) => b.from - a.from)) out = out.slice(0, e.from) + e.text + out.slice(e.to);

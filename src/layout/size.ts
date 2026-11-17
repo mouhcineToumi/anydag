@@ -143,7 +143,15 @@ function measureNode(node: Node, theme: Theme, type?: DiagramType): SizedNode {
          hit it went back to add \`w=\`. The card grows to its meta, up to the same cap as any card;
          a lane column is as wide as its widest step, so the rhythm survives. */
       const metaW = node.meta ? w(node.meta, metaFont) + m.group.dot + m.node.stepRowGap + m.node.stepPadX * 2 : 0;
-      return { w: node.w ?? Math.min(m.node.plainMaxW, Math.max(m.node.stepW, Math.ceil(metaW))), h: m.node.stepH, rowY };
+      const width = node.w ?? Math.min(m.node.plainMaxW, Math.max(m.node.stepW, Math.ceil(metaW)));
+      /* The title wraps, and the card is `overflow: hidden`: at a fixed `stepH` a third line was
+         cut off mid-sentence with nothing to say so (#406). `stepH` is drawn for `stepTitleLines`
+         lines — id row, title, meta row — so each line past those grows the card by one leading,
+         the same `stepTitleLeading` the CSS draws it at. The wrap width is the card's content box. */
+      const inner = width - (m.node.stepPadX + m.line.hair) * 2;
+      const lines = measure.lines(node.title, titleFontFor(t.stepTitle), inner);
+      const extra = Math.max(0, lines - m.node.stepTitleLines) * t.stepTitle * t.stepTitleLeading;
+      return { w: width, h: Math.ceil(m.node.stepH + extra), rowY };
     }
 
     case "state":

@@ -35,6 +35,13 @@ Nine things are load-bearing:
   group whose JSON changed is turned back into Markdown — 4 ms a save on a 118 KB note, where
   serialising every group was 65 ms of main thread every quarter-second while somebody typed.
   Opening is dominated by remark's own parse, about 0.3 MB/s, the same parser `MarkdownItem` pays.
+  **A block that was typed into keeps the bytes on either side of it**: the gap before it and after
+  it are the loaded ones while both neighbours stand where they did, so a CRLF note keeps its CRLF
+  around an edit (#416), with a blank line added only where a rewritten block needs one. **A
+  byte-order mark is kept and never read**: `splitNote` carries it in `front` (with the frontmatter
+  behind it, or alone), every frontmatter reader takes `^\uFEFF?---`, the writers work behind the
+  mark (`src/note/bom.ts`), and `load` parses past it, because remark counts from past it (#394;
+  *Things that will bite*).
 - **The schema is the Markdown's.** Thirteen blocks and four marks, `NOTE_BLOCKS`/`NOTE_STYLES`, and
   beside text two inline kinds of content, a reference and an equation; no
   underline, no toggle, no file, no colour (a colour the theme does not own — the *A custom colour*
