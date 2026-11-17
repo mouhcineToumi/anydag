@@ -16,6 +16,9 @@
     html & pdf --> j1
     j1 --> ready --> [*]
 
+An `action` is sized like a flow `step`: its meta widens it, and a title longer than two lines
+makes it taller rather than being cut off.
+
 `start <id>` and `end <id>` declare the filled dot and the ringed one with an id, the way `fork f1`
 declares a bar — `[*]` inside an edge still draws the same two, one per mention. They take no text.
 

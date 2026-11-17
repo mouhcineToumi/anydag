@@ -17,6 +17,11 @@
     04 --> 05 "yes"
 
 A `decision` is a pill, not a diamond. The step's id is shown, so make it short and meaningful.
+
+A step is a fixed width that its meta widens (the meta never wraps), and its title wraps inside it:
+the card is drawn for two title lines, and grows one line taller for each line past them. A long
+title is never cut off, but a short one keeps a column of steps in rhythm.
+
 Columns come from longest-path order, bands from lane order — neither is ELK's.
 
 A loop back — `retry --> check` after `check --> fix "no"` — is fine: the body of the loop lands in
