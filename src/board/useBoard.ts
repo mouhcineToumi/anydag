@@ -9,6 +9,7 @@ import { parseBoard } from "./parseBoard";
 import { openDoc } from "./prefetch";
 import { FILE_LIST, readPref, writeLocal } from "../settings/prefs";
 import type { PatchOp } from "./patch";
+import { rebaseOps } from "./rebase";
 import type { Board } from "./types";
 import type { EventChange, NoteEvent } from "../note/event";
 import { UNTITLED } from "../note/format";
@@ -33,6 +34,12 @@ import { blankTable } from "../table/write";
 
 /** What the page says when a write never reached the server — the sentence `UploadNotice` draws. */
 const UNREACHABLE = "The AnyDag server did not answer, so that change was not saved.";
+
+/**
+ * What the page says when an edit met another writer's change to the same lines and was not written:
+ * their text is the file, and the person's edit is gone from the screen with it.
+ */
+const COLLIDED = "The board changed in the same place while you were editing, so that change was not saved.";
 
 /** A version of the file: the text and the sha1 the server knows it by. */
 interface Version {
@@ -209,7 +216,14 @@ export function useBoard(name: string | null): BoardHandle {
    * than a guess. A second 409 means writes are landing faster than this loop can follow, and the
    * right thing is to drop the edit: the file is the document, the person can see what it says.
    *
-   * `retry` is false for a whole-text put: putting an old snapshot over a file that has moved is
+   * **The retry is the edit rebased, not the edit again.** `rebase` turns the payload written against
+   * the text this client held into one for the text the 409 carried — for a patch, every body merged
+   * three ways (`src/board/rebase.ts`), because a body re-sent as it was rendered overwrites whatever
+   * the other writer did inside that item (#393). `null` is a change both made to the same lines:
+   * nothing is sent, their text stays, and the person is told their edit was not saved — as they
+   * are after a second 409. Never an overwrite, never a silent drop.
+   *
+   * No `rebase` for a whole-text put: putting an old snapshot over a file that has moved is
    * precisely the thing a base check exists to refuse.
    *
    * **A server that cannot be reached is a refusal too.** `fetch` rejects rather than answering, and
@@ -219,15 +233,15 @@ export function useBoard(name: string | null): BoardHandle {
    * notice a refused drop already uses. Only the `fetch` is guarded: a bug in `adopt` is not an
    * unreachable server and must not be worded as one.
    */
-  const write = useCallback(
-    async (route: string, payload: object, retry: boolean): Promise<Write | null> => {
+  const send = useCallback(
+    async (route: string, payload: object, rebase?: (from: string, onto: string) => object | null): Promise<Write | null> => {
       if (!name) return null;
-      const post = async (against: Version | null): Promise<Response | null> => {
+      const post = async (against: Version | null, what: object): Promise<Response | null> => {
         try {
           return await fetch(`/__board/${route}?name=${encodeURIComponent(name)}`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ base: against?.base, ...payload }),
+            body: JSON.stringify({ base: against?.base, ...what }),
           });
         } catch {
           document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: UNREACHABLE }));
@@ -235,18 +249,33 @@ export function useBoard(name: string | null): BoardHandle {
         }
       };
 
-      let before = held.current;
-      let r = await post(before);
-      if (!r) return null;
-      if (r.status === 409) {
+      const refused = async (r: Response): Promise<void> => {
         const stale = (await r.json()) as { base?: string; text?: string };
         if (stale.text !== undefined) adopt(name, { text: stale.text, base: stale.base ?? "" });
-        if (!retry) return null;
+      };
+
+      const sent = held.current;
+      let before = sent;
+      let r = await post(before, payload);
+      if (!r) return null;
+      if (r.status === 409) {
+        await refused(r);
+        if (!rebase) return null;
         /* The retry is against what the server said, and that is what the edit is recorded
            against — an undo must put *that* back, not the version this client held before. */
         before = held.current;
-        r = await post(before);
+        const again = sent && before ? rebase(sent.text, before.text) : payload;
+        if (!again) {
+          document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: COLLIDED }));
+          return null;
+        }
+        r = await post(before, again);
         if (!r) return null;
+        if (r.status === 409) {
+          await refused(r);
+          document.dispatchEvent(new CustomEvent("dag:upload-problem", { detail: COLLIDED }));
+          return null;
+        }
       }
       if (!r.ok || !before) return null;
       const done = (await r.json()) as { base?: string; text?: string };
@@ -259,11 +288,36 @@ export function useBoard(name: string | null): BoardHandle {
     [name, adopt],
   );
 
+  /*
+   * **One write at a time.** A card's text and the panel write every quarter second while a person
+   * types, and a second write sent before the first one's answer carried the base the first one
+   * moved: a 409 against this page's own edit. Re-sending the body was harmless then; merging it is
+   * not, because the page's earlier keystrokes would be "theirs", on the same line as its later ones,
+   * and the later ones would be refused. Queued, each write leaves with the version the one before
+   * it produced, so a 409 is always another writer — and an overlapping pair was two round trips
+   * anyway, the second one a retry.
+   */
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const write = useCallback(
+    (route: string, payload: object, rebase?: (from: string, onto: string) => object | null): Promise<Write | null> => {
+      const run = queue.current.then(() => send(route, payload, rebase));
+      queue.current = run.catch(() => undefined);
+      return run;
+    },
+    [send],
+  );
+
   const patch = useCallback(
-    (ops: PatchOp[]): Promise<Write | null> => (ops.length === 0 ? Promise.resolve(null) : write("patch", { ops }, true)),
+    (ops: PatchOp[]): Promise<Write | null> => {
+      if (ops.length === 0) return Promise.resolve(null);
+      return write("patch", { ops }, (from, onto) => {
+        const rebased = rebaseOps(ops, from, onto);
+        return rebased.ok ? { ops: rebased.ops } : null;
+      });
+    },
     [write],
   );
-  const put = useCallback((text: string): Promise<Write | null> => write("put", { text }, false), [write]);
+  const put = useCallback((text: string): Promise<Write | null> => write("put", { text }), [write]);
   const current = useCallback(() => held.current, []);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
