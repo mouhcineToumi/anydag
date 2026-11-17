@@ -510,6 +510,36 @@ export interface ThemeMetric {
      */
     lineH: number;
   };
+  /**
+   * The Graph page (#459): what a file's dot, a link and a name measure, in CSS px on the screen.
+   * Read by `src/ui/graph/` only, drawn in WebGL and on a 2D canvas, so no stylesheet reads them.
+   * Identical in all three themes, for `metricsHash()`'s reason.
+   */
+  graph: {
+    /** A dot's radius with no link, and what each √link adds, up to `dotMax`, at zoom 1. */
+    dot: number;
+    dotGrow: number;
+    dotMax: number;
+    /** The smallest a dot is drawn however far out, so a file never vanishes. */
+    dotMin: number;
+    /** The sliver of paper round a dot, so a link stops short of it. */
+    ring: number;
+    /** The glow round the file under the pointer. */
+    halo: number;
+    /** A link's width. */
+    link: number;
+    /** How far outside a dot the pointer still finds it. */
+    hit: number;
+    /** A file's name: its size, its gap under the dot, the paper drawn round its letters. */
+    label: number;
+    labelGap: number;
+    labelHalo: number;
+    /** How big a dot is on screen before its name is drawn: names come as you zoom in. */
+    labelFrom: number;
+    /** A group's name over the group while zoomed out. */
+    groupLabel: number;
+    groupHalo: number;
+  };
   edge: {
     stroke: number;
     dash: string;
