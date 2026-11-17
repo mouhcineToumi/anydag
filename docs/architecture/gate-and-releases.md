@@ -47,7 +47,12 @@ pre-release. It keeps the GitHub *releases* of the newest seven nightlies and ne
 branch — electron-updater reads the ten newest releases, and ten nightlies in a row would hide a
 beta's next version from it. Beside the build it runs the two resource guards,
 `node scripts/bench.mjs --guard` (idle CPU on a 1k-file vault, a 200-node layout), which go red on a
-2x regression and hold nothing back — see *The bench* in [`limits.md`](limits.md).
+2x regression and hold nothing back — see *The bench* in [`limits.md`](limits.md). And it keeps
+**an issue per test that passed only on retry** (#494): the suite retries a failed test once, so a
+flake leaves the run green; the `flaky tests` job merges the full suite's shards into Playwright's
+JSON, lists the flaky tests with `scripts/flaky.mjs`, and opens an issue for each
+(`flaky: <spec> › <test>`, `status: triage`, `type: bug`, `area: ci`) or comments on the open one with
+that title. The night's list is also in the run's summary.
 
 **The update channel is the version's own word.** `0.2.0` is `latest`, `0.2.0-beta.1` is `beta`,
 `0.2.0-nightly.…` is `nightly`. The update files are named after it (`latest*.yml`, `beta*.yml`,
