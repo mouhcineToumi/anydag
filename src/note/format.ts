@@ -11,6 +11,7 @@
  */
 import { parse as parseYaml } from "yaml";
 
+import { frontBlock } from "./front";
 import { QUIET } from "./quiet";
 
 export interface NoteFile {
@@ -28,21 +29,24 @@ export const UNTITLED = "Untitled";
 /** The family a file nobody has named wears: `Untitled`, and the numbers `unique()` gives it. */
 const UNNAMED = /^untitled(?: \d+)?$/i;
 
-const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
-
+/**
+ * A note's text as its frontmatter and its body. Only a block that is a frontmatter is one
+ * (`front.ts`): a body that opens with a rule and has another further down is all body, rules
+ * included, and is drawn so (#397).
+ */
 export function splitNote(text: string): NoteFile {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return { front: "", body: text };
   const front = m[0];
   let title: string | undefined;
   try {
-    const data = parseYaml(front.replace(/^---\r?\n/, "").replace(/\r?\n---[ \t]*(?:\r?\n)?$/, ""), QUIET);
+    const data = parseYaml(m[1]!, QUIET);
     if (data && typeof data === "object" && typeof (data as { title?: unknown }).title === "string") {
       const t = (data as { title: string }).title.trim();
       if (t) title = t;
     }
   } catch {
-    /* A frontmatter that is not YAML is still carried; it just names no title. */
+    /* A frontmatter YAML cannot read, but that opens with a `key:` line, is still carried; it names no title. */
   }
   return { front, body: text.slice(front.length), title };
 }

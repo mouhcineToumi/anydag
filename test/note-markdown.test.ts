@@ -497,6 +497,24 @@ describe("the span map", () => {
     const doc = await hold(blocks);
     expect(save(settle(loaded, doc), [...doc, { id: "below", type: "paragraph", content: [] }])).toBe(md);
   });
+
+  it("opens a body that starts with a rule as the rules and the text between them, and edits it in place (#397)", async () => {
+    const text = "---\n\nText after a rule.\n\n---\n\nMore.\n";
+    const f = splitNote(text);
+    expect(f.front).toBe("");
+    const { blocks, loaded } = load(f.body);
+    const doc = await hold(blocks);
+    expect(doc.map((b) => b.type)).toEqual(["divider", "paragraph", "divider", "paragraph"]);
+    expect(drawn(f.body)).toContain("Text after a rule.");
+    /* Typed into the last paragraph: every other byte — the blank line under the second rule too — is kept. */
+    const last = doc[doc.length - 1]!;
+    const edited = doc.map((b) =>
+      b.id === last.id ? { ...b, content: [{ type: "text" as const, text: "More, edited.", styles: {} }] } : b,
+    );
+    const out = joinNote(f.front, saved(settle(loaded, doc), edited).body);
+    expect(out).toBe("---\n\nText after a rule.\n\n---\n\nMore, edited.\n");
+    expect(splitNote(out).body).toBe(out);
+  });
 });
 
 /*
@@ -700,7 +718,8 @@ describe("the file", () => {
 
   it("is all body without frontmatter, and survives frontmatter that is not YAML", () => {
     expect(splitNote("# Just a body\n")).toEqual({ front: "", body: "# Just a body\n" });
-    const odd = splitNote("---\n: : :\n---\nbody\n");
+    const odd = splitNote("---\ntitle: [unclosed\n---\nbody\n");
+    expect(odd.front).toBe("---\ntitle: [unclosed\n---\n");
     expect(odd.body).toBe("body\n");
     expect(odd.title).toBeUndefined();
   });

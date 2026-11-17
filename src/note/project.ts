@@ -15,6 +15,7 @@
 import { parse as parseYaml } from "yaml";
 
 import { QUIET } from "./quiet";
+import { frontBlock } from "./front";
 
 import { HUE_ORDER, type Hue } from "../dsl/ir";
 import { withKeys } from "./task";
@@ -37,8 +38,6 @@ export interface ProjectChange {
   hue?: Hue | null;
 }
 
-const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-
 /**
  * A `project:` value, or `undefined` when it is not one of the three. Lenient in case and blanks
  * only — `project: yes` or `project: true` is somebody meaning something the three cannot hold,
@@ -59,7 +58,7 @@ export function hueOf(raw: unknown): Hue | undefined {
 
 /** The project a note's text describes, or `undefined` for a note that is not one. */
 export function projectOf(text: string): Project | undefined {
-  const m = FRONT.exec(text);
+  const m = frontBlock(text);
   if (!m) return undefined;
   let data: unknown;
   try {

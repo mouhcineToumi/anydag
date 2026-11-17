@@ -37,10 +37,9 @@ import { unified } from "unified";
 
 import { isItemType } from "../board/types";
 import { locateItems } from "../board/locate";
+import { frontBlock } from "../note/front";
 import { remarkMath } from "../note/math";
 import { WIKILINK, resolveWiki, type WikiCandidate } from "./wikilinks";
-
-const FRONT = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
@@ -75,7 +74,7 @@ export type LinkKind = "board" | "note" | "quiz" | "table";
 /** Every span of `text` in which a wikilink counts — `extract.ts`'s places, as offsets into the file. */
 function spansOf(text: string, kind: LinkKind): [number, number][] {
   if (kind !== "board") {
-    const front = FRONT.exec(text)?.[0].length ?? 0;
+    const front = frontBlock(text)?.[0].length ?? 0;
     return markdownSpans(text.slice(front), front);
   }
   const out: [number, number][] = [];
