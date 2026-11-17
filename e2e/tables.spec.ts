@@ -155,6 +155,58 @@ test("the Filter card writes the tab's filter, and the bar says how many rows sh
   expect(await names(page)).toEqual(["Acme", "Initech"]);
 });
 
+test('a fresh filter rule takes "is" and "is not", and one with no value yet writes nothing', async ({ page }) => {
+  const name = write("pipeline");
+  await open(page, name);
+  await page.locator("[data-dag-tablepage-filter]").click();
+  await page.locator("[data-dag-tablepage-filter-add]").click();
+  const rule = page.locator('[data-dag-tablepage-rule="0"]');
+
+  /* A rule with no value yet is not "is empty": it is a draft, so adding one writes no byte and
+     hides no row. A save is on a 250 ms debounce, so 600 ms is past it. */
+  await expect(rule.locator("[data-dag-tablepage-value]")).toBeVisible();
+  await page.waitForTimeout(600);
+  expect(read("pipeline")).toBe(TABLE);
+
+  await rule.locator("select").first().selectOption("stage");
+  await rule.locator("[data-dag-tablepage-test]").selectOption("=");
+  /* "is" keeps the value field; it must not snap back to "is empty". */
+  await expect(rule.locator("[data-dag-tablepage-test]")).toHaveValue("=");
+  await expect(rule.locator("[data-dag-tablepage-value]")).toBeVisible();
+  await rule.locator("[data-dag-tablepage-value]").fill("Won");
+  await rule.locator("[data-dag-tablepage-value]").press("Enter");
+  await expect.poll(() => read("pipeline")).toContain('filter="stage=Won"');
+  expect(await names(page)).toEqual(["Acme"]);
+
+  /* And "is not", from a second fresh line. */
+  await page.locator("[data-dag-tablepage-filter-add]").click();
+  const second = page.locator('[data-dag-tablepage-rule="1"]');
+  await second.locator("select").first().selectOption("stage");
+  await second.locator("[data-dag-tablepage-test]").selectOption("!=");
+  await expect(second.locator("[data-dag-tablepage-test]")).toHaveValue("!=");
+  await expect(second.locator("[data-dag-tablepage-value]")).toBeVisible();
+  await second.locator("[data-dag-tablepage-value]").fill("Lost");
+  await second.locator("[data-dag-tablepage-value]").press("Enter");
+  await expect.poll(() => read("pipeline")).toContain('filter="stage=Won; stage!=Lost"');
+  expect(await names(page)).toEqual(["Acme"]);
+
+  /* The emptiness tests are still their own choice, and a rule set to one is written at once. */
+  await page.locator("[data-dag-tablepage-filter-clear]").click();
+  await page.locator("[data-dag-tablepage-filter-add]").click();
+  const third = page.locator('[data-dag-tablepage-rule="0"]');
+  await third.locator("select").first().selectOption("signed");
+  await third.locator("[data-dag-tablepage-test]").selectOption("filled");
+  await expect.poll(() => read("pipeline")).toContain('filter="signed!="');
+  await expect(third.locator("[data-dag-tablepage-value]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-tablepage-count]")).toHaveText("1 of 3 rows");
+
+  /* Changing that one to "is" is a draft again: the heading loses it until a value is typed. */
+  await third.locator("[data-dag-tablepage-test]").selectOption("=");
+  await expect(third.locator("[data-dag-tablepage-test]")).toHaveValue("=");
+  await expect(third.locator("[data-dag-tablepage-value]")).toBeVisible();
+  await expect.poll(() => read("pipeline")).not.toContain("filter=");
+});
+
 test("a new row is written with an id, its menu deletes it, and ctrl+Z brings it back", async ({ page }) => {
   const name = write("pipeline");
   await open(page, name);

@@ -64,6 +64,14 @@
   ELK's benefit; its bend points then describe a route between two group boxes. Splicing those onto
   anchors on two entities draws a tenancy line as a rectangle around the whole diagram, so
   `elk.ts` drops the bends for every edge it hoisted.
+- **ELK's polyline is kept only while it still misses every card.** It was routed for an exit ELK
+  chose, and `usableBends` trims only the bends behind our anchors. Under `aspect` ELK wraps a chain
+  into rows, and the edge that closes a cycle of three tables came back as a zigzag laid out for the
+  sides of the wrap: spliced onto a top and a bottom anchor, its first leg ran through the table
+  between them and its runs stopped in mid-air past the item (#408). `route.ts` draws the curve
+  instead when any leg of the spliced polyline (`legHits`) crosses a card, and `layoutGraph` sizes
+  the item from `routeReach` as well as `labelReach`, since that curve bows round the table past
+  every box.
 - **A dogleg is what gets past the card next door.** A row anchor is fixed on its card's side and
   the next card starts one `colGap` away, so the chord to anything not in that card runs through
   it and no bow leaving a fixed point can rise fast enough. `detour()` in `route.ts` leaves the
@@ -95,7 +103,9 @@
   sides, because `bundleOutward` hangs a loop's other label *left* of its stroke, and past the
   origin it is drawn outside the item where `content-visibility` clips it: "report the status back"
   came out ":he status back". `layoutGraph` moves every box and bend clear by a whole grid step and
-  routes again, which is exact because routing is translation-invariant.
+  routes again, which is exact because routing is translation-invariant. `layoutLanes` and
+  `layoutSketch` do the same with `routeReach` beside it, since a back edge or a self-loop bows past
+  every box: a lane diagram's loop back over the top band was cut off with its label (#407).
 - **ELK places on fractional pixels.** Everything is snapped to `metric.grid` (8).
 - **The frame's body offset is derived, never a key.** The theme carried `frame.bodyTop: 152` from
   the artboards while `nodes.css` drew the body at `pad + head + ruleGapTop + hair + ruleGapBottom`
@@ -267,6 +277,21 @@
   the five rules read `--canvas-mid` and `--canvas-right`; the bar is capped at the canvas and its
   row wraps. Painted rather than rendered, the way `data-zoom` and `data-pan` are, and for the same
   reason: state here would re-render every child of `App` on every drag of the inspector's edge.
+- **Two bars each positioned against the canvas know nothing about each other.** The dock is centred
+  on `--canvas-mid` and the zoom cluster pinned to `--canvas-right`, and each rule is right on its
+  own — but nothing keeps their boxes apart, and below about 690px of canvas they meet: the dock is
+  up to 327px wide and the cluster 156, and a centred bar reaches 180px past the middle. An 800×700
+  window with the library open leaves 528px, where the cluster covered the dock's `⋯`; with the
+  board list docked too it leaves 295 against a 327px dock, and `elementFromPoint` answered with the
+  cluster at the centre of **all nine** dock controls, while a Playwright click on `⋯` timed out
+  saying it intercepted pointer events (#395). A media query cannot see this one either: the canvas
+  is the window minus whatever panels are open, not the window. So `useBottomBars`
+  (`src/ui/bottomBars.ts`) measures the two boxes and lifts the cluster above the dock by the dock's
+  own height — measured, not named, because either bar's width follows what a board can do — and
+  `placeBottomBars` is the arithmetic `test/bottom-bars.test.ts` holds. `dock.spec.ts` asks
+  `elementFromPoint` at every control's centre with the library open and again with the board list
+  docked too, and checks that a wide window still has the dock at the drawing's middle and the
+  cluster 12px inside its right edge.
 - **A hue is bound, never defaulted in a component.** `hueVars()` sets `--dag-h`/`--dag-t` only when
   an element has a hue, and CSS falls back to `--dag-h-default`. Setting the property to an empty
   string would *not* trigger the `var()` fallback, which is why "bind nothing" is the mechanism.
@@ -498,6 +523,12 @@
   write resolves `null` and `dag:upload-problem` tells the person. Unlike a note's save, a board
   write is not retried: the file is the document and the person can see what it says.
   `e2e/offline-write.spec.ts` fails `/__board/patch` with `page.route` and reads `pageerror`.
+- **A write retried after a 409 is the edit rebased, not the edit again.** `write` adopted the 409's
+  text and re-posted the same ops, which is right for an `attrs` op and wrong for a body: the body
+  was rendered from the old text, so the retry overwrote the item whole and an agent's line added
+  to the same fence was gone, with nobody told (#393). A drag merged and a retitle did not, because
+  one sends `x=`/`y=` and the other the whole fence. `src/board/rebase.ts` merges each body against
+  the 409's text and refuses, with a notice, what it cannot merge. See *Editing* in `editing.md`.
 
 - **A peek that slides over the control that summoned it swallows the click meant for it.** The
   sidebar's hover peek first ran the full height of the window, so it arrived on top of the toolbar
@@ -585,6 +616,13 @@
   had gone — a 404 on the console, which fails the suite. `Store.rename` takes an `edit` now, and
   the renamed file *arrives* holding the edited text. Anything that both moves and changes
   a file wants the same shape.
+- **A folder moved on disk is one event, at the folder.** The watcher reports nothing at the
+  documents inside it, and `classify()` does not take a folder for a document, so for a long time
+  the only thing said was `dag:boards`: the sidebar moved, and the page holding a board inside drew
+  it as live while every edit was a 404 it snapped back from in silence (#403). A folder's delete is
+  read as every document `present` had under it going (`Vault.folderWent`), and a write answered 404
+  says the file is gone. Anything else that holds a path open has to hear a folder too, not only a
+  file.
 - **A title in the text makes every write a change to the list.** A note being typed in is four
   writes a second, in every tab, and the page used to refetch `/__board/list` for each — requests
   that queue behind a note's own fetches in the browser's six connections, which is how those
@@ -717,6 +755,19 @@
   which carries its polyfills, and `optimizeDeps` names that entry. The lesson is the snapshot
   rule's: a browser the gate does not run is not the one the page has to work in.
 
+- **A board file's line endings and BOM are the file's, and a pattern anchored at `$` or `^---`
+  sees neither.** A fence line written on Windows ends in `\r`, and `OPEN` (`…$`) matched no line of a
+  CRLF board: it read as one prose card, and Delete on it erased the board (#391). A UTF-8 BOM is
+  not `---`, so a BOM board's frontmatter became a card, and since `String.trim` takes U+FEFF for a
+  space, that card's span started after the mark and the first drag wrote two blocks through
+  overlapping spans (#392). `src/board/eol.ts` holds the rule: a `\r` before `\n` is part of the
+  break, a BOM at offset 0 is part of no line. `scanFences` and `locateItems` keep both outside every
+  offset and hand out LF bodies; every writer (`applyPatch`, `renameItemId`, the repairs, the server's
+  `withKeys`/`withTitle`) puts the mark back and writes the line endings of the block it replaced, or
+  the file's for a new one (`eolAt`, `eolOf`). An offset counted in an LF `body` is not an offset
+  into a CRLF file — use the fence's `bodyStart`/`bodyEnd`. `test/board-eol.test.ts` runs every op
+  against CRLF, mixed and BOM twins of one board and holds each to the LF twin's result.
+
 - **A board fence's unquoted attribute ends at the `}` that closes the braces.** `src=plan.assets/x.png}`
   is how a regex over the text reads the last attribute of an image fence if `}` is allowed in a
   path, and the zip export went looking for a file called `x.png}`. `namedAssets` in
@@ -753,6 +804,17 @@
   last hour's grammar, and the e2e suite then fails on behaviour the source no longer has. Kill it
   by port. The CLI's launcher checks its own bundle's inputs on every run (`cli/dist/meta.json`);
   the server's does not.
+- **A bundle has no repository above it, and a file it reads off disk does not come along by being
+  in the checkout.** `server/handle.ts` resolves the cheat sheets as `../docs` from wherever it
+  runs: from `server/`, Vitest's import of the source, that is the repository's `docs/` — and from
+  `server/dist/anydag-server.mjs` it is `server/docs`, which no build wrote. So `GET /__board/dsl`
+  answered `{"types":[]}`, every `dsl_reference` was a 404, the Inspector's cheat sheet said *No
+  cheat sheet for this type*, and `/system` assembled the generation prompt with no guide and no
+  grammar in it — in `anydag serve`, in `npm run dev` and in the packaged app, while every test that
+  asked passed because the unit suite imports the handler from source (#398). `server/build.mjs`
+  copies `docs/dsl/` and `docs/generate/` beside the bundle now, and `test/server-build.test.ts`
+  builds one and asks it for a sheet. Anything else a route reads off disk wants the same two
+  halves: a build that puts it there, and a test of the built layout.
 - **The token is a header from a shell and a cookie for a browser, and never a value in page
   script.** Every request to the API carries the per-launch token (`x-anydag-token`, or the
   `anydag_token` cookie), and the `Host` must be `127.0.0.1`, `localhost` or `[::1]` — anything else
@@ -806,7 +868,9 @@
   when something links or embeds it by id, or when the app made it — never on its first edit: an id
   added during a `put` changes bytes the page sent, and the sha1 the page then holds is of a text
   the disk does not have, so its next save is a `409` against itself. `test/server/` holds both
-  halves. A synced vault depends on it as well: a write on open is a conflict on every machine.
+  halves. The one byte a write adds is the id the file already had, put back into a text that
+  omitted it (#401): dropping it would unlink the document at the next index rebuild, and every
+  writer takes its base from the answer, not from what it sent. A synced vault depends on it as well: a write on open is a conflict on every machine.
 - **A name is any portable file name, and portable means three file systems.** `Meeting notes.md`
   and `Écoles.md` are names, so the store refuses what Windows or macOS would:
   `: * ? " < > | \`, a trailing dot or space, `CON` and its kin, and a name or a folder differing

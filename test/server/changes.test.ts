@@ -115,6 +115,32 @@ describe("the change feed", () => {
     await tree(f);
   });
 
+  /* #403: a folder moved by another program is one event at the folder's own path, and a page holding
+     a document inside it heard nothing — its edits went to a path that was no longer there, as 404s. */
+  it("a folder moved by another program says each document in it went", async () => {
+    await env.vault.create("work/plan", "board", BOARD);
+    await env.vault.create("work/deep/notes", "note", NOTE);
+    await env.vault.create("work-other/keep", "board", BOARD);
+    const f = await feed();
+    await sleep(100);
+    fs.renameSync(path.join(env.root, "work"), path.join(env.root, "moved"));
+    expect(await doc(f, "work/plan", (d) => d.sha1 === null)).toMatchObject({ kind: "board", sha1: null });
+    expect(await doc(f, "work/deep/notes", (d) => d.sha1 === null)).toMatchObject({ kind: "note", sha1: null });
+    await tree(f);
+    await sleep(200);
+    // A sibling whose name only starts the same is not inside it. (Watched from the start, its
+    // making is a change too, so only its going is asked about.)
+    expect(f.docs("work-other/keep").filter((d) => d.sha1 === null)).toEqual([]);
+  });
+
+  it("a folder removed by another program says each document in it went", async () => {
+    await env.vault.create("gone/plan", "board", BOARD);
+    const f = await feed();
+    await sleep(100);
+    fs.rmSync(path.join(env.root, "gone"), { recursive: true });
+    await doc(f, "gone/plan", (d) => d.sha1 === null);
+  });
+
   it("a rename says the old name went and the new one came", async () => {
     await env.vault.create("old", "board", BOARD);
     const f = await feed();

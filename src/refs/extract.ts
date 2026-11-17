@@ -133,7 +133,8 @@ const FRONT = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** A board's or a note's `title:` from its frontmatter, when it has one — what a reference shows. */
 export function titleOf(text: string): string | undefined {
-  const m = FRONT.exec(text);
+  /* Past a byte-order mark, which a board written by Notepad starts with (#392). */
+  const m = FRONT.exec(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
   if (!m) return undefined;
   try {
     const data = parseYaml(m[1]!, QUIET) as { title?: unknown } | null;

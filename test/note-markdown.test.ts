@@ -14,19 +14,8 @@ import type { List, Nodes, Root } from "mdast";
 import { parseBoard } from "@/board/parseBoard";
 import { CALLOUT_KINDS } from "@/note/callout";
 import { joinNote, splitNote } from "@/note/format";
-import {
-  applySteps,
-  blocksToMd,
-  lcs,
-  load,
-  mdToBlocks,
-  plan,
-  save,
-  saved,
-  settle,
-  type NoteBlock,
-  type Step,
-} from "@/note/markdown";
+import { applySteps, blocksToMd, load, mdToBlocks, plan, save, saved, settle, type NoteBlock, type Step } from "@/note/markdown";
+import { lcs } from "@/note/lcs";
 import { merge3 } from "@/note/merge";
 import { noteSchema } from "@/note/schema";
 

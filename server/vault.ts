@@ -284,11 +284,12 @@ export class Vault {
 
   private listeners = new Set<(c: Change) => void>();
   /**
-   * The documents on disk at the last walk, lowercased, kept up to date by the watcher. A save is a
-   * rename onto the file, which the watcher reports as a create; one at a path already here is an
-   * edit, and does not change the tree.
+   * The documents on disk at the last walk, kept up to date by the watcher: the path lowercased, to
+   * the path as it is spelled on disk. A save is a rename onto the file, which the watcher reports as
+   * a create; one at a path already here is an edit, and does not change the tree. The spelling is
+   * what a folder that went names its documents by (`folderWent`).
    */
-  private present: Set<string> | null = null;
+  private present: Map<string, string> | null = null;
   private stopping: Promise<() => Promise<void>> | null = null;
   /** Attachments whose sha1 the watcher is reading, and whether another event came in meanwhile. */
   private hashing = new Map<string, boolean>();
@@ -401,12 +402,36 @@ export class Vault {
     return entries.some((e) => wanted.has(e.toLowerCase()));
   }
 
+  /**
+   * The documents a folder that went held, as `gone` changes, each taken out of `present`. Only a
+   * document that is really not there any more: on a disk that ignores case, `Plan` renamed to `plan`
+   * is reported as `Plan` going, and the file is still where its name says. `seen` is the watcher
+   * batch's own, so a backend that also reports each file is not told twice.
+   */
+  private folderWent(rel: string, seen: Set<string>): Change[] {
+    if (!this.present || !rel) return [];
+    const under = `${rel.toLowerCase()}/`;
+    const out: Change[] = [];
+    for (const [low, file] of this.present) {
+      if (!low.startsWith(under)) continue;
+      if (isFile(path.join(this.root, file))) continue;
+      this.present.delete(low);
+      const found = classify(file, this.types);
+      if (!found) continue;
+      const key = `${found.kind}:${found.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ type: "doc", kind: found.kind, name: found.name, sha1: null, title: null });
+    }
+    return out;
+  }
+
   // -- the walk --------------------------------------------------------------
 
   /** Every document of every kind, and every folder, sorted — on this thread, for the callers that need it now. */
   private walk(): { docs: Listed[]; folders: string[] } {
     const out = walk(this.root, this.types);
-    this.present = new Set(out.docs.map((d) => d.file.toLowerCase()));
+    this.present = presentOf(out.docs);
     return out;
   }
 
@@ -833,7 +858,7 @@ export class Vault {
   ): Promise<{ tree: Tree; rows: Map<string, DocRow>; templates: string | null } | null> {
     if (still && !still()) return null;
     // Only when there is none: a running watcher has kept it since this walk, which is older.
-    this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+    this.present ??= presentOf(docs);
     const t: Tree = {
       boards: [],
       notes: [],
@@ -1468,6 +1493,12 @@ export class Vault {
   /**
    * Replace a document's text. `base` of `null`/`undefined` is "I have not seen it", which overwrites
    * — what `/asset` does when it appends a fence. Raises `Conflict` when it is not the current sha1.
+   *
+   * **A text with no `id:` keeps the one the file has** (#401): the id is the document, every `dag:`
+   * link names it, and the index that would otherwise remember it is rebuildable. So a replacement
+   * that carries no `id:` line — an agent's fresh body, a draft written whole — is written with the
+   * file's id put back, and the answer is that text, whose sha1 is the new base. A file with no id
+   * of its own is written as given (an edit never mints one), and so is a text that says `id:`.
    */
   async write(name: string, kind: TextKind, text: string, base?: string | null): Promise<Version> {
     const file = this.writeAt(this.fileOf(name, kind));
@@ -1478,13 +1509,15 @@ export class Vault {
       throw new NotFound(`no ${kind} \`${name}\``);
     }
     if (base && base !== now.base) throw new Conflict(now.base, now.text);
-    if (now.text !== text) {
-      writeAtomic(file, text);
-      this.mintTargets(text, now.text);
+    const own = frontId(now.text);
+    const body = typeof own === "string" && frontId(text) === null ? withId(text, own) : text;
+    if (now.text !== body) {
+      writeAtomic(file, body);
+      this.mintTargets(body, now.text);
       if (this.component(name) !== null)
-        this.emit({ type: "doc", kind: "board", name, sha1: sha1(text), title: titleOf(text) ?? null });
+        this.emit({ type: "doc", kind: "board", name, sha1: sha1(body), title: titleOf(body) ?? null });
     }
-    return version(text);
+    return version(body);
   }
 
   /**
@@ -2499,6 +2532,9 @@ export class Vault {
           const found = classify(rel, this.types);
           if (!found) {
             if (ev.type !== "update") tree = true; // a folder came or went
+            /* A folder moved or removed by another program is one event at the folder's own path,
+               and nothing at the documents in it (#403): a page holding one must still hear it went. */
+            if (ev.type === "delete") for (const gone of this.folderWent(rel, seen)) this.emit(gone);
             continue;
           }
           const key = `${found.kind}:${found.name}`;
@@ -2510,7 +2546,7 @@ export class Vault {
             this.present?.delete(low);
             tree = true;
           } else if (ev.type === "create" && !this.present?.has(low)) {
-            this.present?.add(low);
+            this.present?.set(low, rel);
             tree = true;
           }
           if (gone) {
@@ -2566,7 +2602,7 @@ export class Vault {
     // listing running or kept already says what is present.
     if (!this.present && !this.listing && !this.kept) {
       const { docs } = await listVault(this.lister, this.types, true);
-      this.present ??= new Set(docs.map((d) => d.file.toLowerCase()));
+      this.present ??= presentOf(docs);
     }
     return async () => {
       try {
@@ -2653,6 +2689,9 @@ function pluralOf(kind: Kind): Exclude<keyof Removed, "folders"> {
 
 const exists = (abs: string): boolean => fs.existsSync(abs);
 const isFile = (abs: string): boolean => !!fs.statSync(abs, { throwIfNoEntry: false })?.isFile();
+
+/** What `present` holds for a listing: each document's path lowercased, to its spelling on disk. */
+const presentOf = (docs: readonly Listed[]): Map<string, string> => new Map(docs.map((d) => [d.file.toLowerCase(), d.file]));
 const isDir = (abs: string): boolean => !!fs.statSync(abs, { throwIfNoEntry: false })?.isDirectory();
 
 function sameFile(a: string, b: string): boolean {

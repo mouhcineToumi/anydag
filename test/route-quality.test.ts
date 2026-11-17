@@ -12,6 +12,7 @@ import { sizeGraph, sizeLabels } from "@/layout/size";
 import theme from "../themes/paper/theme.json";
 import type { Theme } from "@/theme/contract";
 
+import { QUALITY_CODES } from "@/quality/codes";
 import { distanceTo, flatten } from "@/quality/geometry";
 import { addTotals, emptyTotals, scoreGraph, type QualityTotals } from "@/quality/score";
 
@@ -136,6 +137,20 @@ describe.each(files)("%s", (file) => {
         const drift = distanceTo({ x: e.label.x, y: e.label.y }, flatten(e.d));
         expect(drift, `${e.id} label is ${drift.toFixed(1)}px from its path`).toBeLessThanOrEqual(T.metric.edge.labelOffset * 2);
       }
+    }
+  });
+
+  /*
+   * A rule, like the one above: a line or a label past the item's box is drawn where the page clips
+   * it, and no layout has a reason to. `Q_EDGE_OUTSIDE` is the scorer's word for it; a lane
+   * layout's back edge and self-loop earned it on every flow and activity with one (#407).
+   */
+  it("draws every line and label inside its item", async () => {
+    for (const { id, graph } of graphsOf(file)) {
+      const labels = sizeLabels(graph, T);
+      const placed = await layoutGraph(graph, sizeGraph(graph, T), labels, T.metric);
+      const outside = scoreGraph(graph, placed, labels, T).findings.filter((f) => f.code === QUALITY_CODES.Q_EDGE_OUTSIDE);
+      expect(outside, `${id}: ${outside.map((f) => f.ids[0]).join(", ")} outside the item`).toEqual([]);
     }
   });
 });
