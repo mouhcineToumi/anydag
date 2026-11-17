@@ -120,6 +120,23 @@ Six things about that are load-bearing:
   server never receives is a refusal too: `useBoard`'s `write` resolves `null` when `fetch` rejects
   (so `commit` returns `false` and clears the painted overrides) and raises `dag:upload-problem`,
   the notice a refused drop already uses. Board writes are not retried (`e2e/offline-write.spec.ts`).
+- **A 409 is retried once, with the patch rebased onto the text it carried** (`useBoard`'s `write`,
+  `src/board/rebase.ts`). An `attrs` op, a remove, an insert and a move say what they do and are sent
+  again as they were. A **body** is the whole span between the fences, rendered from the text the
+  edit started from, so re-sending it overwrote whatever the other writer did inside that item —
+  an agent's new line in the fence a person was retitling, deleting, dropping or connecting a card
+  in, gone without a word (#393). Each body is now merged three ways (the item's body in the text
+  the edit started from, the edit's body, the item's body in the 409's text) by `mergeBody`, which
+  works at the grain of the edits rather than `merge3`'s stretches: a line retyped or deleted next
+  to a line inserted merges, and a deletion is one edit a line, so a line put between two deleted
+  ones stays. Two different changes to one line, an insertion inside a replaced range, or an item
+  the other writer removed is a conflict: nothing is sent, their text stays, and the person is told
+  the change was not saved (`dag:upload-problem`) — as they are after a second 409. The write is
+  recorded against the 409's text, so undo puts the other writer's version back, never the one the
+  page held before it (`test/board-rebase.test.ts`, `e2e/body-race.spec.ts`). **A page's writes to
+  a board go one at a time**, each with the version the one before produced: typing writes every
+  250 ms, and a second write out before the first one's answer used to 409 against the page's own
+  edit — harmless while the retry re-sent the body, a refused keystroke once it merges.
 - **Undo is a version of the file, not an inverse op.** `src/edit/history.ts` keeps the text from
   before and after each edit and `POST /__board/put` puts one back — under the same `base` rule,
   and with one more check on top: an entry whose *after* is no longer what the file holds is not

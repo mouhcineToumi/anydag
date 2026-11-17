@@ -498,6 +498,12 @@
   write resolves `null` and `dag:upload-problem` tells the person. Unlike a note's save, a board
   write is not retried: the file is the document and the person can see what it says.
   `e2e/offline-write.spec.ts` fails `/__board/patch` with `page.route` and reads `pageerror`.
+- **A write retried after a 409 is the edit rebased, not the edit again.** `write` adopted the 409's
+  text and re-posted the same ops, which is right for an `attrs` op and wrong for a body: the body
+  was rendered from the old text, so the retry overwrote the item whole and an agent's line added
+  to the same fence was gone, with nobody told (#393). A drag merged and a retitle did not, because
+  one sends `x=`/`y=` and the other the whole fence. `src/board/rebase.ts` merges each body against
+  the 409's text and refuses, with a notice, what it cannot merge. See *Editing* in `editing.md`.
 
 - **A peek that slides over the control that summoned it swallows the click meant for it.** The
   sidebar's hover peek first ran the full height of the window, so it arrived on top of the toolbar
