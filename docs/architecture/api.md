@@ -21,7 +21,9 @@ start, never a build argument, and never a value in output.
 |---|---|
 | `api/server/config.ts` | every variable, read once; old `ANYDAG_SYNC_*` names read for one release with a deprecation warning; `describe`, what boot prints; the production checks |
 | `api/server/app.ts` | the Hono app: which path may ask, which feature is off, error mapping, per-route metrics |
-| `api/server/routes/service.ts` | `GET /v1` (what runs) and `GET /v1/ready` (the database answers) |
+| `api/server/routes/service.ts` | `GET /v1` (what runs), `GET /v1/ready` (the database answers) and `GET /v1/openapi.json` (the document) |
+| `api/protocol/schema.ts` · `api/server/openapi.ts` | every `/v1` body and answer as a zod schema, held to `wire.ts` · the route table the OpenAPI document is made from (*The OpenAPI document*) |
+| `api/openapi/` | the builder and the Markdown renderer every spec goes through, shared with the local server's (#531) |
 | `api/server/routes/{pair,vaults,blobs,commit,changes}.ts` | sync's surface under `/v1`, gated by a device token |
 | `api/server/routes/logs.ts` | `POST /v1/logs`, the per-address and whole-server rates, and the day file's cap (`ANYDAG_API_LOGS_DAY_MB`, 64 by default) |
 | `api/server/routes/feedback.ts` (#96) | `POST /v1/feedback`, stateless: no file, no row, no payload in logs |
@@ -62,6 +64,63 @@ token under 32 characters, and that is the whole production check: a feature mis
 secret is not a crash — feedback without its token answers 503 at request time, which is one
 feature down instead of the server down (#50's contract, kept).
 
+## The OpenAPI document
+
+The server describes itself in **OpenAPI 3.1, generated from the code and never written by hand**
+(#530): `GET /v1/openapi.json` answers it, with no token and no protocol header, and
+[`docs/api/sync.openapi.json`](../api/sync.openapi.json) is the committed copy, with its reference
+beside it ([`docs/api/sync.md`](../api/sync.md)) — what an agent or a self-hoster reads instead of the
+handlers.
+
+| Where | Owns |
+|---|---|
+| `api/protocol/schema.ts` | every `/v1` request and answer as a zod schema; the handlers read their bodies through these (`read`, `parse` in `routes/http.ts`) |
+| `api/server/openapi.ts` | the route table: method, path, who may ask, the switch it is behind, parameters, body, every answer with its status and `ES_*` codes; `syncDocument(features)` |
+| `api/openapi/document.ts` · `markdown.ts` | the builder (route table + zod → OpenAPI, through zod's own `z.toJSONSchema`) and the reference renderer, both generic |
+| `scripts/openapi.mjs` | `npm run openapi` writes every spec in its `SPECS` list; `npm run check:openapi`, in `npm run checks`, fails on a committed copy the code no longer makes |
+
+**Why no `@hono/zod-openapi`.** It works with zod 4, but it registers a route through its own
+`app.openapi(createRoute(…))` and reads the body through its own validator: a body that is not JSON,
+or not sent as JSON, would be refused with its answer instead of ours, and every message a route says
+today would change. Here routes stay plain Hono, the body is read through the same zod schema the
+document is made from, and zod 4 writes the JSON Schema itself — so no dependency was added for it,
+and the local server's 170 routes (#531) get a table of their own rather than a rewrite.
+
+Load-bearing:
+
+- **`wire.ts` stays the contract, and the schemas cannot disagree with it.** `wire.ts` is plain
+  TypeScript the app's sync client takes verbatim; `schema.ts` ends with a list holding each
+  schema's parsed type identical to its `wire.ts` type, which `npm run checks`' typecheck compiles —
+  a field added, dropped, made optional or retyped on one side does not build. *Frozen* still holds:
+  a shape an older peer would misread moves `PROTOCOL`.
+- **A schema refuses with the old sentence, in the old order.** Each check carries the message the
+  hand-written one said, fields are declared in the order they were checked, and `parse` answers the
+  first fault in that order (an earlier list element's first; an element's own fault, a key changed
+  twice, before its fields'). `api/test/schema.test.ts` keeps the hand-written checks verbatim and
+  reads thousands of bodies both ways. Where a route looked something up between two checks
+  (`…/accounts/{id}/plan`), or wrote between them (`PUT /v1/admin/plan`), it still does: `body`,
+  then `parse` in halves.
+- **A request is described as it is accepted**, sometimes wider than `wire.ts` (an optional field may
+  be `null`; `report`'s counts may be left out): the document shows the input form, the handler gets
+  the wire's. The log batch is described from `EVENTS`, the table `cleanBatch` reads — it keeps what it
+  can and refuses nothing — and the feedback form's caps are `feedbackProblem`'s.
+- **The table is held to the app both ways** (`api/test/openapi.test.ts`): every route `createApp`
+  registers is a row and every row a route (a `HEAD` row is Hono's `GET`); the document is a valid
+  OpenAPI 3.1 document by the OpenAPI Initiative's own schema; and the routes of a switched-off
+  feature are absent from `/v1/openapi.json` and answer 404.
+- **Every answer the api suites record is held to the document.** The test harness hands each
+  answer back through `api/test/spec.ts`: a status the row does not list, a missing protocol header,
+  a body its schema refuses — with every object closed, so an unnamed field fails too — fails the
+  test that met it. A route answered on a path the document lacks fails unless it is the app's 404.
+- **`info.version` is the protocol**, not the build: the committed copy changes when the API does,
+  not on every release. `GET /v1` says the build.
+
+Adding a route: a row in `api/server/openapi.ts`, its body and answer in `schema.ts` (and in
+`wire.ts` when a client reads it), `npm run openapi`, and commit the two files in `docs/api/`.
+`docs/parity.json` does not list the api server's routes: it is the local app's surface through the
+page, the CLI and MCP, and none of the three calls `anydag-api` (the app's own server does); the
+api server's two-way rule is the table above.
+
 ## What it stores, and what it never stores
 
 | It keeps | It never keeps |
@@ -89,6 +148,7 @@ is on, and a release publishes no `anydag-api` binary or image — the server ru
 | `npm run api:dev` · `api:db` | the server and Postgres in api/compose.yaml · Postgres alone, on `ANYDAG_API_PG_PORT` |
 | `node api/dist/anydag-api.mjs account add <name>` · `pair <account>` | an account · a one-time code a device pairs with |
 | `npm run api:test` · `api:test:pg` · `api:converge` | the suites: the routes over PGlite, the suites on the compose Postgres, a hundred convergence seeds |
+| `npm run openapi` · `check:openapi` | write `docs/api/sync.openapi.json` and `docs/api/sync.md` from the code · fail when they are stale |
 | `docker build api/` · `npm run api:up` | the image (from `api/dist/`; non-root, `.env*` never in the context) · the dev stack up |
 | `deploy/` | the production machine: `deploy/compose.yaml` (Caddy, api, Postgres) and its tunnel override, `backup.sh`, `restore.sh`, `check-disk.sh`, `provision.sh` and the systemd timers, `deploy/README.md` |
 

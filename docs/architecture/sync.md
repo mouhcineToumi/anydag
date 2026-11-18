@@ -236,6 +236,7 @@ so nothing is migrated in place:
   refuses an answer that says another number, or none (a 0.2.0 server, which would not keep `parent`
   on a head or count pending bytes), with `ES_PROTOCOL` and a message naming which side to update.
   `/v1` and `/v1/health` (whose bodies say the protocol), `/v1/ready` (a probe that sends none),
+  `/v1/openapi.json` (how a client finds out what a server speaks),
   `/v1/logs`, `/v1/feedback`, the poke stream and `/v1/admin/*` are not checked: nothing they carry
   changed.
 - **A protocol-1 `meta` is refused by name.** A 0.2.0 server's database migrates (`002-quota-and-binding.sql`:

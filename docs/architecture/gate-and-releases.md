@@ -160,7 +160,7 @@ file the release does not have.
 
 **`npm run checks` is the fast tier** (`scripts/checks.sh`): `biome lint` → `biome format` (check only) → knip → typecheck →
 `check:version` → `check:case` → `check:theme` → `check:literals` → `check:icons` → `check:skill` →
-`check:design` → vitest (parity included). It has three readers — the pre-commit hook, CI's `checks.yml`, and
+`check:design` → `check:openapi` → vitest (parity included). It has three readers — the pre-commit hook, CI's `checks.yml`, and
 `scripts/gate.sh` — one list, so a check added is added everywhere. It needs no browser and no
 network and takes about half a minute, which is what lets it sit in a commit hook: `tsc` is
 incremental (its build info under `node_modules/.cache/tsc/`, which CI caches too) and the unit suite
@@ -307,6 +307,10 @@ vocabulary is `chart`'s statement and form words; *Writing a note* names every b
 the CLI* is a command `anydag help --json` lists, and every command group is named; and the quiz and
 table code tables match `QUIZ_CODES` and `TABLE_CODES`. A missing skill is a failure, not a skip. The
 cheat sheets under `skills/anydag/references/dsl` are a symlink to `docs/dsl/`, so they cannot drift.
+
+`check:openapi` regenerates the OpenAPI documents in memory (`scripts/openapi.mjs`, the `SPECS` list)
+and fails when a committed copy in `docs/api/` is not those bytes: an API change is a diff in review,
+and a spec nobody regenerated cannot land. *The OpenAPI document* in [`api.md`](api.md) has the rest.
 
 `check:design` holds `DESIGN.md`, the chrome's design system, to the code in the same way. Every
 `--dag-*` variable it names exists in every theme. Every theme path it puts in backticks

@@ -19,10 +19,11 @@
 
 import { Hono } from "hono";
 
+import { NewAccount, PairFor, PlanAndAccount, PlanFor, PlanLimits } from "../../protocol/schema";
 import type { AdminAccount, AdminPair, Plan, UsageResponse } from "../../protocol/wire";
 import type { Account, Meta } from "../meta/types";
 import { collect } from "../gc";
-import { body, HttpError, str, type Deps } from "./http";
+import { body, HttpError, parse, read, type Deps } from "./http";
 import { live, mintPairCode } from "./pair";
 
 export async function findAccount(meta: Meta, ref: string): Promise<Account | null> {
@@ -39,21 +40,15 @@ export async function planExists(meta: Meta, id: string): Promise<boolean> {
   return (await meta.plan(id)).id === id;
 }
 
-const LIMITS = ["storage_bytes", "history_days", "history_bytes", "max_file_bytes", "devices"] as const;
-
+/** A plan's limits, its id the one given (a path's, or the CLI's argument) whatever the body says. */
 export function parsePlan(id: string, v: Record<string, unknown>): Plan {
-  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(id))
-    throw new HttpError("ES_BAD_REQUEST", "a plan id is 1 to 64 letters, digits, dots, dashes or underscores");
-  const plan: Plan = { id, storage_bytes: null, history_days: null, history_bytes: null, max_file_bytes: null, devices: null };
-  for (const k of LIMITS) {
-    const x = v[k];
-    if (x === undefined || x === null) continue;
-    if (typeof x !== "number" || !Number.isSafeInteger(x) || x < 0)
-      throw new HttpError("ES_BAD_REQUEST", `${k} must be a whole number of at least 0, or null for unlimited`);
-    plan[k] = x;
-  }
-  return plan;
+  return parse(PlanLimits, { ...v, id });
 }
+
+/* `PUT /v1/admin/plan` writes the plan before it reads `account`, as it always has: the body is read
+   through one schema in two halves, the plan's and then the account's. */
+const PLAN_HALF = PlanAndAccount.omit({ account: true });
+const ACCOUNT_HALF = PlanAndAccount.pick({ account: true });
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -66,11 +61,7 @@ export function adminRoutes(deps: Deps): Hono {
   });
 
   app.post("/v1/admin/accounts", async (c) => {
-    const b = await body(c);
-    const name = str(b.name, "name", 100);
-    if (!/^[A-Za-z0-9_.@-]+$/.test(name))
-      throw new HttpError("ES_BAD_REQUEST", "an account name is letters, digits, dots, dashes, underscores and @");
-    const plan = b.plan === undefined || b.plan === null ? undefined : str(b.plan, "plan", 64);
+    const { name, plan } = await read(c, NewAccount);
     if (plan !== undefined && !(await planExists(deps.meta, plan))) throw new HttpError("ES_NOT_FOUND", `no plan ${plan}`);
     if (await deps.meta.accountByName(name)) throw new HttpError("ES_BAD_REQUEST", `an account called ${name} exists`);
     const a = await deps.meta.createAccount(name, plan);
@@ -78,8 +69,7 @@ export function adminRoutes(deps: Deps): Hono {
   });
 
   app.post("/v1/admin/pair", async (c) => {
-    const b = await body(c);
-    const a = await findAccount(deps.meta, str(b.account, "account", 100));
+    const a = await findAccount(deps.meta, (await read(c, PairFor)).account);
     if (!a) throw new HttpError("ES_NOT_FOUND", "no such account");
     const { code, expires } = await mintPairCode(deps.meta, a.id, deps.now());
     return c.json({ code, expires, url: deps.config.publicUrl } satisfies AdminPair);
@@ -93,10 +83,11 @@ export function adminRoutes(deps: Deps): Hono {
 
   app.put("/v1/admin/plan", async (c) => {
     const b = await body(c);
-    const plan = parsePlan(str(b.id, "id", 64), b);
+    const plan: Plan = parse(PLAN_HALF, b);
     await deps.meta.putPlan(plan);
-    if (b.account !== undefined && b.account !== null) {
-      const a = await findAccount(deps.meta, str(b.account, "account", 100));
+    const { account } = parse(ACCOUNT_HALF, b);
+    if (account !== undefined) {
+      const a = await findAccount(deps.meta, account);
       if (!a) throw new HttpError("ES_NOT_FOUND", "no such account");
       await deps.meta.setAccountPlan(a.id, plan.id);
     }
@@ -107,7 +98,7 @@ export function adminRoutes(deps: Deps): Hono {
     const b = await body(c);
     const a = await findAccount(deps.meta, c.req.param("id"));
     if (!a) throw new HttpError("ES_NOT_FOUND", "no such account");
-    const plan = str(b.plan, "plan", 64);
+    const { plan } = parse(PlanFor, b);
     if (!(await planExists(deps.meta, plan))) throw new HttpError("ES_NOT_FOUND", `no plan ${plan}`);
     await deps.meta.setAccountPlan(a.id, plan);
     return c.json(await adminAccount(deps.meta, { ...a, plan }));

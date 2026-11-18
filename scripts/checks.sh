@@ -90,6 +90,11 @@ node scripts/check-skill.mjs
 step "check:design"
 node scripts/check-design.mjs
 
+# The OpenAPI documents in `docs/api/` are generated from the code (`npm run openapi`); a committed
+# copy the code no longer makes is a failure, so an API change shows in review as a diff.
+step "check:openapi"
+node scripts/openapi.mjs --check
+
 fi
 
 if [ "$part" != static ]; then
