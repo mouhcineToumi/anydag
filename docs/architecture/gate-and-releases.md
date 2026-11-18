@@ -96,7 +96,11 @@ stable build never sees a pre-release and a nightly build follows nightlies. `de
 `allowDowngrade`. **electron-builder does not read the channel off the version for the `github`
 provider** (its `detectUpdateChannel` is for `generic` and S3-like ones), so `desktop/package.mjs`
 passes `-c.publish.channel=<word>` for a pre-release, and fails a build whose update files do not match
-its channel. Without it every nightly wrote `latest*.yml` and none published (#116).
+its channel. Without it every nightly wrote `latest*.yml` and none published (#116). The word is the
+*default*: Settings → About lets a person follow another channel on their machine (#525), handed to
+the updater as a feed (`desktop/feed.ts`), still without `autoUpdater.channel`, and going back to a
+steadier channel installs an older version only after the person confirms it (*Updates* in
+[`desktop.md`](desktop.md)). Nothing about how a release or a nightly publishes changed with it.
 
 **The file names are the updater's URLs**, so none has a space: `AnyDag-<v>.AppImage`,
 `AnyDag-Setup-<v>.exe`, `AnyDag-<v>-<arm64|x64>.dmg` and `.zip`. electron-builder's default
