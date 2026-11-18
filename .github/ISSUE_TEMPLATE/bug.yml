@@ -58,7 +58,7 @@ body:
     id: version
     attributes:
       label: AnyDag version
-      description: Settings → About, or `anydag --version`. For a build from source, the commit.
+      description: Settings → About, or `anydag --version`. For a build from source, the commit. The maintainer reads this at triage to set `escaped` when it is a stable release.
       placeholder: "0.1.0, or 0.2.0-nightly.202611071200"
     validations:
       required: true

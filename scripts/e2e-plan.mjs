@@ -55,7 +55,7 @@ const RULES = [
   [/\.md$/, "ignore"],
   [/^(docs|\.github|\.githooks|\.claude|test|skills|desktop)\//, "ignore"],
   [
-    /^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh|lib\/change\.mjs|complexity-baseline\.json)$/,
+    /^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|openapi\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh|lib\/change\.mjs|complexity-baseline\.json)$/,
     "ignore",
   ],
   [

@@ -6,8 +6,9 @@
  * from, because `develop` moves under it about twenty-five times a day. Comparing with
  * `origin/develop`'s tip would report a clone the branch has held for a week as new the moment
  * somebody fixed its other copy on `develop` — the branch did not add that clone, it inherited it.
- * On a pull request's merge commit the merge base is the base commit itself, so the two agree; on a
- * shallow checkout, where git cannot compute one, the fetched base commit is used as it is.
+ * On a pull request's merge commit, or a merge of the base being committed, the merge base is the
+ * base commit itself, so the two agree; on a shallow checkout, where git cannot compute one, the
+ * fetched base commit is used as it is.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -45,19 +46,24 @@ export function baseRef(explicit) {
     if (!name) continue;
     const sha = rev(name);
     if (!sha) continue;
-    return gitOrNull("merge-base", sha, "HEAD") ?? sha;
+    /* Mid-merge — the commit hook on a merge of `develop` into the branch — `HEAD` is still the
+       branch's tip, and what `develop` brought would read as this change's: take the merge base
+       with the merge being made, which git computes from both parents. */
+    const tips = rev("MERGE_HEAD") ? ["HEAD", "MERGE_HEAD"] : ["HEAD"];
+    return gitOrNull("merge-base", sha, ...tips) ?? sha;
   }
   return null;
 }
 
 /**
- * Every file the working tree has changed against `base`: what the branch adds since `base`
- * (`base..HEAD`, which is what a CI checkout is), what is staged or not (`HEAD`), and files git does
- * not know yet. Deleted files are left out — there is nothing in them to measure — and a rename
- * counts as its new path.
+ * Every file the working tree has changed against `base`: the tracked tree against `base` (what the
+ * branch adds, committed, staged or not), and files git does not know yet. Deleted files are left
+ * out — there is nothing in them to measure — and a rename counts as its new path.
  *
- * The three are unioned because the same check runs in three places: a clean CI checkout has only
- * the first, a commit hook has the first two, and a developer trying a helper file out has the third.
+ * The tree against `base`, not `base..HEAD` plus the tree against `HEAD`: in a commit hook on a merge
+ * of `develop`, `HEAD` is still the branch's tip, and the tree against it is everything `develop`
+ * brought. The two are unioned with the untracked files because the same check runs in three places:
+ * a clean CI checkout, a commit hook, and a developer trying a helper file out.
  */
 export function changedFiles(base) {
   const paths = new Set();
@@ -66,8 +72,7 @@ export function changedFiles(base) {
       if (line) paths.add(line);
     }
   };
-  add(base, "HEAD");
-  add("HEAD");
+  add(base);
   for (const line of (gitOrNull("ls-files", "--others", "--exclude-standard") ?? "").split("\n")) {
     if (line) paths.add(line);
   }
