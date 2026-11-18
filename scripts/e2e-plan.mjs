@@ -70,16 +70,9 @@ export function kindOf(file) {
   return "app";
 }
 
-/**
- * @param {string[]} files   changed paths, relative to the repository root
- * @param {(string[]) => string[]} [tracedSpecs]  the spec files Playwright's `--only-changed` names,
- *        given the changed `e2e/` paths; only asked when something under `e2e/` changed
- */
-export function plan(files, tracedSpecs = () => []) {
-  const kinds = new Map();
-  for (const f of files) kinds.set(kindOf(f), [...(kinds.get(kindOf(f)) ?? []), f]);
+/** What the kinds ask for by themselves: the smoke tier, and the specs a kind or a baseline names. */
+function asked(kinds) {
   const has = (k) => kinds.has(k);
-
   const smoke = has("app") || has("pixels") || has("chrome") || has("sync") || has("harness");
   const specs = new Set();
   if (has("pixels")) specs.add("reference.spec.ts");
@@ -89,6 +82,18 @@ export function plan(files, tracedSpecs = () => []) {
     const m = /^e2e\/([^/]+\.spec\.ts)-snapshots\//.exec(f);
     if (m) specs.add(m[1]);
   }
+  return { smoke, specs };
+}
+
+/**
+ * @param {string[]} files   changed paths, relative to the repository root
+ * @param {(string[]) => string[]} [tracedSpecs]  the spec files Playwright's `--only-changed` names,
+ *        given the changed `e2e/` paths; only asked when something under `e2e/` changed
+ */
+export function plan(files, tracedSpecs = () => []) {
+  const kinds = new Map();
+  for (const f of files) kinds.set(kindOf(f), [...(kinds.get(kindOf(f)) ?? []), f]);
+  const { smoke, specs } = asked(kinds);
   const e2eSide = [...(kinds.get("spec") ?? []), ...(kinds.get("snapshot") ?? [])];
 
   /* A change under `e2e/` that no spec traces to — `global-setup.ts`, which only the config imports —
