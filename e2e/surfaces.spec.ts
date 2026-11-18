@@ -176,7 +176,9 @@ test.afterEach(() => {
 async function go(page: Page, theme: Theme, query: string, { clock = true } = {}): Promise<void> {
   if (clock) await page.clock.setFixedTime(NOW);
   await page.goto(`/?${query}${query ? "&" : ""}vault=${ws}&theme=${theme}`);
-  await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+  /* Longer than an assertion's default: the first visit to a page compiles its chunks on a cold dev
+     server, which is every page in the visual review's fresh worktrees. */
+  await expect(page.locator("html")).toHaveAttribute("data-theme", theme, { timeout: 30_000 });
 }
 
 /** Every font in, and nothing still moving. */
