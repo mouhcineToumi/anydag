@@ -157,7 +157,7 @@ test("Generate flashcards off: the quiz editor offers only the questions a perso
   await seed(page, { flashcards: false });
   await page.goto(`/?quiz=${name}`);
   await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(1);
-  await expect(page.locator("[data-dag-quiz-add-flashcard]")).toBeVisible();
+  await expect(page.locator("[data-dag-quiz-add]")).toBeVisible();
   await expect(page.locator("[data-dag-quiz-generate]")).toHaveCount(0);
 });
 

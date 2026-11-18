@@ -148,6 +148,7 @@
 .dag-quiz > * { max-width: 760px; margin-inline: auto; }
 /* A field's and a problem list's own `margin` shorthand would undo the centring above. */
 .dag-quiz > .dag-quiz__rich,
+.dag-quiz > .dag-quiz__label,
 .dag-quiz > .dag-quiz__shuffle,
 .dag-quiz > .dag-quiz__problems { margin-inline: auto; }
 .dag-quiz__bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -166,10 +167,15 @@
   line-height: 1.45;
   color: var(--dag-color-ink);
   background: var(--dag-color-card);
-  border: 1px solid var(--dag-color-outlineSoft);
+  border: 1px solid var(--dag-color-outline);
   border-radius: var(--dag-ui-radius-control);
   cursor: text;
 }
+/* Nothing written in it: a dashed slot with nothing on its ground, so a blank quiz does not look
+   filled in. A filled field is the white box above (#257). */
+.dag-quiz__rich[data-dag-quiz-empty]:not([data-dag-quiz-open-field]):not(:focus-within) { background: transparent; border-style: dashed; }
+/* An empty answer its card says is empty. */
+.dag-quiz__rich[data-dag-quiz-wants]:not([data-dag-quiz-open-field]) { border-color: var(--dag-color-warning); }
 .dag-quiz__rich[data-dag-quiz-open-field],
 .dag-quiz__rich:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
 .dag-quiz__rich-view { min-height: 20px; padding: 7px 10px; outline: none; overflow-wrap: anywhere; }
@@ -177,7 +183,17 @@
 .dag-quiz__rich-view > :last-child { margin-bottom: 0; }
 .dag-quiz__rich-view[aria-readonly="true"] { color: var(--dag-color-slate); background: var(--dag-color-paper100); cursor: default; }
 .dag-quiz__rich--line .dag-quiz__rich-view { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dag-quiz__placeholder { color: var(--dag-color-slate); }
+/* Regular weight in every field, the question's included: a placeholder is never mistaken for words. */
+.dag-quiz__placeholder { font-weight: var(--dag-ui-weight-regular); color: var(--dag-color-slate); }
+/* Every field's name, above it, filled or not (#257). */
+.dag-quiz__label {
+  margin: 0 0 4px;
+  font-size: var(--chrome-text-sm);
+  line-height: var(--dag-ui-leading-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+}
+.dag-quiz__label-note { font-weight: var(--dag-ui-weight-regular); }
 .dag-quiz__prompt { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); }
 .dag-quiz__description { margin-bottom: 12px; }
 /* The editor in the field's box, at the field's size: no gutter, no background of its own. */
@@ -199,7 +215,94 @@
 }
 .dag-quiz__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dag-quiz__card-number { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
-.dag-select.dag-quiz__kind { width: auto; min-width: 0; font-size: var(--chrome-text-sm); }
+/* The question's kind, and the menu that changes it. */
+.dag-quiz__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__kind:hover:not(:disabled),
+.dag-quiz__kind[aria-expanded="true"] { background: var(--dag-color-paper200); }
+.dag-quiz__kind:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-quiz__kind:disabled { color: var(--dag-color-slate); cursor: default; }
+.dag-quiz__kind-icon,
+.dag-quiz__kind-chevron { flex: none; color: var(--dag-color-slate); }
+/* A menu hanging from its button: *Add a question*'s kinds, a question's kind. */
+.dag-quiz__menu-box { position: relative; display: inline-flex; }
+.dag-quiz__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+/* A kind: its glyph, its name, the key that picks it, and what the learner does under them. */
+.dag-quiz__tile {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 7px 10px;
+  font: inherit;
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__tile:hover { background: var(--dag-color-paper100); }
+.dag-quiz__tile:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+/* The kind a question is: `ink` on the tint, never `accent`. */
+.dag-quiz__tile[aria-checked="true"] { background: var(--dag-color-accentSoft); }
+.dag-quiz__tile-icon { color: var(--dag-color-accent); }
+.dag-quiz__tile[aria-checked="true"] .dag-quiz__tile-icon { color: var(--dag-color-ink); }
+.dag-quiz__tile-name { font-size: var(--chrome-text-md); line-height: var(--dag-ui-leading-md); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz__tile-key { font-family: var(--dag-font-mono); font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-quiz__tile-does { grid-column: 2 / 4; font-size: var(--chrome-text-sm); line-height: var(--dag-ui-leading-sm); color: var(--dag-color-slate); }
+/* An empty quiz: the four kinds are the first thing on it, as tiles. */
+.dag-quiz__first {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 20px;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+}
+.dag-quiz__first-title { margin: 0; font-size: var(--chrome-text-xl); line-height: var(--dag-ui-leading-xl); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz__first-hint { margin: 0 0 4px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-quiz__first-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.dag-quiz__first-kinds .dag-quiz__tile {
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-content: start;
+  padding: 12px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+}
+.dag-quiz__first-kinds .dag-quiz__tile:hover { border-color: var(--dag-color-slate); }
+.dag-quiz__first-kinds .dag-quiz__tile:focus-visible { box-shadow: var(--focus-ring); }
+.dag-quiz__first-kinds .dag-quiz__tile-does { grid-column: 1 / 3; }
+.dag-quiz__first-generate { justify-self: start; }
 /* A handle to drag by: the row moves, the handle says so. */
 .dag-quiz__grip { cursor: grab; touch-action: none; color: var(--dag-color-muted); }
 .dag-quiz__grip:hover:not(:disabled) { color: var(--dag-color-ink); }
@@ -258,8 +361,8 @@
 .dag-check--round { border-radius: 50%; }
 /* A right answer is ticked in the success colour: it is the key, not a setting. */
 .dag-quiz__option > .dag-check:checked { background: var(--dag-color-success); border-color: var(--dag-color-success); }
-/* No answer is marked: the ticks are where to look. */
-.dag-quiz__card[data-dag-quiz-needs-answer] .dag-quiz__option > .dag-check { border-color: var(--dag-color-dangerBorder); box-shadow: 0 0 0 3px var(--dag-color-dangerSoft); }
+/* No answer is marked: the ticks are where to look. A warning, not a failure (#257). */
+.dag-quiz__card[data-dag-quiz-needs-answer] .dag-quiz__option > .dag-check { border-color: var(--dag-color-warning); box-shadow: 0 0 0 3px var(--dag-color-warningSoft); }
 .dag-quiz__option > .dag-icon { margin-top: 2px; }
 /* Pressed, a pin wears the accent: the option keeps its place when a run shuffles. */
 .dag-quiz__pin[aria-pressed="true"] { color: var(--dag-color-accent); }
@@ -290,10 +393,18 @@
 .dag-quiz__note { margin: 0 0 10px; font-size: var(--chrome-text-md); color: var(--dag-color-warningText); }
 .dag-quiz__note[data-dag-quiz-open] { color: var(--dag-color-slate); }
 .dag-quiz__adds { display: flex; flex-wrap: wrap; gap: 8px; }
-.dag-quiz__empty { margin: 24px auto 12px; font-size: var(--chrome-text-lg); color: var(--dag-color-slate); }
-.dag-quiz__problems { margin: 0 0 10px; padding: 0; list-style: none; }
-.dag-quiz__problem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 0; font-size: var(--chrome-text-sm); color: var(--dag-color-warningText); }
-.dag-quiz__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
+/* What a question still lacks, or what is wrong around it: the warning role, never red — an
+   unfinished question is not a failure (#257) — and a fix on each line. */
+.dag-quiz__problems {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-quiz__problems-title { margin: 0 0 2px; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz__problem-list { margin: 0; padding: 0; list-style: none; }
+.dag-quiz__problem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 0; font-size: var(--chrome-text-md); }
 .dag-quiz__fix {
   min-height: 24px;
   padding: 2px 8px;
