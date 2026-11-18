@@ -318,6 +318,9 @@ async function work(r, required, number) {
         say(`#${number} is ${pr.behind} behind ${BASE}: updating the branch`);
         if (pr.autoMerge) disableAuto(number);
         const result = updateBranch(r, pr);
+        /* GitHub can merge the pull request between the snapshot and the update: it is then one
+           behind its own squash, and the refused update is not a conflict. */
+        if (result === "conflict" && fetchPr(r, number).state === "MERGED") break;
         if (result === "conflict") return prepareConflict(pr);
         await sleep(5_000);
         break;
