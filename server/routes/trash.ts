@@ -7,7 +7,8 @@
 import type { Hono } from "hono";
 
 import type { Session } from "../context";
-import { bodyOf, err } from "../http";
+import { bodyAs, err } from "../http";
+import { TrashIdBody } from "../schema/folders";
 import { live, trashAnswer, trashDays } from "../trash";
 import { NotFound } from "../vault";
 
@@ -24,7 +25,7 @@ export function trashRoutes(app: Hono, s: Session): void {
   };
 
   app.post("/__board/trash/restore", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, TrashIdBody);
     const id = String(body.id ?? "");
     await mustBeThere(id);
     try {
@@ -36,7 +37,7 @@ export function trashRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/trash/delete", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, TrashIdBody);
     const id = String(body.id ?? "");
     await mustBeThere(id);
     try {

@@ -15,17 +15,12 @@
 
 import type { Hono } from "hono";
 
-import type { FeedbackDoc, FeedbackKind } from "../../api/protocol/feedback";
+import type { FeedbackDoc } from "../../api/protocol/feedback";
 import type { Session } from "../context";
 import { feedbackDestination, feedbackEnv, forwardFeedback } from "../feedback";
-import { bodyOf, err, mustRead } from "../http";
+import { bodyAs, err, mustRead } from "../http";
+import { FeedbackBody, names } from "../schema/cloud";
 import { leafOf, SUFFIX } from "../names";
-
-function names(raw: unknown, what: string): string[] {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || !raw.every((n) => typeof n === "string" && n)) throw err(400, `\`${what}\` is a list of names`);
-  return [...new Set(raw as string[])];
-}
 
 function files(raw: unknown): { name: string; type: string; bytes: Uint8Array }[] {
   if (raw === undefined || raw === null) return [];
@@ -49,9 +44,7 @@ export function feedbackRoutes(app: Hono, s: Session, fetchImpl: typeof fetch = 
   app.post("/api/feedback", async (c) => {
     const to = feedbackDestination(s.env);
     if (!to) throw err(503, "feedback not available: this app has no feedback relay set", { code: "ES_UNAVAILABLE" });
-    const b = await bodyOf(c);
-    if (b.kind !== "bug" && b.kind !== "idea") throw err(400, "`kind` is bug or idea");
-    if (typeof b.text !== "string") throw err(400, "`text` is what happened, or what you would like");
+    const b = await bodyAs(c, FeedbackBody);
     const read = async (list: string[], kind: "board" | "note"): Promise<FeedbackDoc[]> => {
       const out: FeedbackDoc[] = [];
       /* By its own name and not its folder's: where it lives in the vault is not what was ticked. */
@@ -62,9 +55,9 @@ export function feedbackRoutes(app: Hono, s: Session, fetchImpl: typeof fetch = 
     const sent = await forwardFeedback(
       to,
       {
-        kind: b.kind as FeedbackKind,
+        kind: b.kind,
         text: b.text,
-        boards: await read(names(b.boards, "boards"), "board"),
+        boards: await read(b.boards, "board"),
         notes: await read(names(b.notes, "notes"), "note"),
         files: files(b.files),
         env: feedbackEnv(s.version),

@@ -23,7 +23,7 @@ start, never a build argument, and never a value in output.
 | `api/server/app.ts` | the Hono app: which path may ask, which feature is off, error mapping, per-route metrics |
 | `api/server/routes/service.ts` | `GET /v1` (what runs), `GET /v1/ready` (the database answers) and `GET /v1/openapi.json` (the document) |
 | `api/protocol/schema.ts` · `api/server/openapi.ts` | every `/v1` body and answer as a zod schema, held to `wire.ts` · the route table the OpenAPI document is made from (*The OpenAPI document*) |
-| `api/openapi/` | the builder and the Markdown renderer every spec goes through, shared with the local server's (#531) |
+| `api/openapi/` | the builder and the Markdown renderer every spec goes through, shared with the local server's (*The local OpenAPI document* in `server.md`) |
 | `api/server/routes/{pair,vaults,blobs,commit,changes}.ts` | sync's surface under `/v1`, gated by a device token |
 | `api/server/routes/logs.ts` | `POST /v1/logs`, the per-address and whole-server rates, and the day file's cap (`ANYDAG_API_LOGS_DAY_MB`, 64 by default) |
 | `api/server/routes/feedback.ts` (#96) | `POST /v1/feedback`, stateless: no file, no row, no payload in logs |
@@ -84,7 +84,7 @@ handlers.
 or not sent as JSON, would be refused with its answer instead of ours, and every message a route says
 today would change. Here routes stay plain Hono, the body is read through the same zod schema the
 document is made from, and zod 4 writes the JSON Schema itself — so no dependency was added for it,
-and the local server's 170 routes (#531) get a table of their own rather than a rewrite.
+and the local server's routes got a table of their own rather than a rewrite (#531, `server/openapi.ts`).
 
 Load-bearing:
 

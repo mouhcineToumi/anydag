@@ -114,6 +114,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Sync | [`sync.md`](sync.md) |
 | The api server | [`api.md`](api.md) |
 | The OpenAPI document | [`api.md`](api.md) |
+| The local OpenAPI document | [`server.md`](server.md) |
 | The bench | [`limits.md`](limits.md) |
 | Tables | [`tables.md`](tables.md) |
 | Tags | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
