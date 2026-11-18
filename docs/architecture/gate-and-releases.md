@@ -112,6 +112,17 @@ It runs the whole tier — `checks.yml` with the api's harness and its Postgres 
 secrets allow — see *The desktop app*) — and publishes only when `scripts/check-release-assets.mjs`
 finds every installer and the update feeds for the version's channel.
 
+**A stable release carries its development health report** (#529). After publishing, `release.yml`
+runs `node scripts/release-report.mjs <version>` and attaches the JSON and the Markdown to the release.
+The script gathers the window **since the previous stable tag** — fixed by the tags, not by the clock —
+from the tags, the GitHub API and `docs/bench/`, and writes `docs/metrics/<version>.json`, the raw
+record, plus the report rendered from every JSON in that folder. Each metric has a value, a rolling
+7-day value and a trend across the releases before it; a metric whose source does not exist yet (or
+depends on #526, #527, #112 or #528) says `n/a` and why. The back-merge commits the files
+([`docs/RELEASING.md`](../RELEASING.md), steps 9–10), so the next release renders the trend offline and
+a moved number is a diff. The report informs; it gates nothing. Definitions, the window and the
+security-counts-only rule: [`docs/metrics/README.md`](../metrics/README.md).
+
 **A nightly is built from develop by itself.** `nightly.yml` runs at 02:00 UTC (and by hand): if
 develop has moved since the last one, it makes a `nightly/<version>` branch holding one commit that
 stamps the version, tags it `v<version>`, runs the whole tier against it, and publishes a
