@@ -139,6 +139,20 @@ describe("decide", () => {
     expect(decide(front({ checks }), { required })).toMatchObject({ do: "eject", failed: ["Linked issue"] });
   });
 
+  it("takes out a policy failure before resolving a conflict or updating, which cannot fix it", () => {
+    const checks = { ...green, "PR title": { state: "failure", runId: 9 } };
+    expect(decide(front({ checks, behind: 4 }), { required })).toMatchObject({ do: "eject", failed: ["PR title"] });
+    expect(decide(front({ checks, mergeable: "CONFLICTING" }), { required })).toMatchObject({
+      do: "eject",
+      failed: ["PR title"],
+    });
+  });
+
+  it("updates before judging any other failure, which a newer develop may fix", () => {
+    const checks = { ...green, e2e: { state: "failure", runId: 7 } };
+    expect(decide(front({ checks, behind: 2 }), { required }).do).toBe("update");
+  });
+
   it("takes out a failure it cannot re-run, a status with no workflow run", () => {
     const checks = { ...green, e2e: { state: "failure" } };
     expect(decide(front({ checks }), { required }).do).toBe("eject");
