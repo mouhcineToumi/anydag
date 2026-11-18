@@ -45,14 +45,14 @@ quiz file, and a question leaves Mistakes after N right answers in a row inside 
 | the sidebar | **Quizzes** (with the Mistakes count) opens the Quizzes page; **New** → *Quiz* makes `untitled` titled *Untitled* with no questions and names it in the top bar; a quiz's row wears a cap |
 | the Quizzes page, `?quizzes=1` | Mistakes first, then a card per quiz — questions, how many in Mistakes, Practice — a filter, a folder (with *Practice the folder* once one is chosen), and a box that makes a quiz named after what is typed |
 | a folder's menu in the sidebar | *Practice the quizzes*, when anything under it is a quiz |
-| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab: a card per question — a grip to drag it, its kind as a menu on its label (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), the question as one rich line, *Add details*, the answers as rows (a grip, a round tick or a box, rich text, a pin while *Shuffle the options* is on), the explanation or model answer; every field named above it, filled or not, and an empty one drawn as a dashed slot; what a question still lacks said in words on its card once it is left unfinished (never on a blank one), each with a button that fixes it; *Add a question*, a menu of the four kinds, each saying what the learner does (an empty quiz shows them as tiles), and *Generate flashcards*, which asks a model for cards from a topic or a note and writes the ones kept; Practice, Export (the file) |
+| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab. The title is the top bar's. A header: the description, named above its field, *Shuffle the answers* as a switch with one line under it, and *N questions · K unfinished · Show them*. A list of questions, each one line — a grip, its number, its kind, its words, and what it is or what it lacks — and one open at a time. The open card has its kind as a menu on its label (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), *Edit* / *Preview*, and a ⋯ menu (*Duplicate*, *Delete*). In it, the question is one rich line, then *Add details*, the answers as rows (a grip, a round tick or a box, rich text, and while the quiz shuffles a pin in words: *Keep in place*, *Kept in place*, *Stays last: it names the others*), and the explanation or model answer. Every field is named above it, filled or not, and an empty one is a dashed slot. What a question still lacks is said in words once it is left unfinished (never on a blank one), each with a button that fixes it. *Preview* draws the question as a run asks it, answerable, recording nothing. *Add a question* is a menu of the four kinds, each saying what the learner does (an empty quiz shows them as tiles). *Generate flashcards* asks a model for cards from a topic or a note and writes the ones kept. Practice, Export (the file) |
 | a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; a flashcard's front with no box, Space or Enter to see the back, and the same `1`/`2`; the end says the score, what was skipped and what went into Mistakes |
 | a board, or a note, embedding one | a card: the title, the questions, how many in Mistakes, Practice |
 | `?view=1` | a run that records nothing |
 | a snapshot | the sheet: every question with its answers marked, a flashcard's back under it |
 | Settings | how many right in a row take a question out of Mistakes, 1 to 10 |
 
-Sixteen things are load-bearing:
+Eighteen things are load-bearing:
 
 - **A question is a `##` heading and everything up to the next one**, and only `##` delimits. Fences
   are tracked across the whole file, so a `##` or a `- [ ]` in a code sample is code; and a line that
@@ -115,6 +115,15 @@ Sixteen things are load-bearing:
   opens each in turn; a search target opens its question's card. A grip moves its question or
   answer with Alt+↑ and Alt+↓ as well as by dragging, and keeps the focus where the row lands.
   Duplicate and Delete are in the open card's ⋯ menu.
+- **The Preview is the run's own drawing, not a copy of it** (#257). `src/ui/quiz/Asked.tsx` draws
+  one question as a run asks it: the prompt and details, the line on what to do, the options or
+  the box, and the verdict. It holds no state. `Runner.tsx` draws it with its round from
+  `round.ts`, and the open card's *Preview* (`Preview.tsx`) draws it with a throwaway round of its
+  own: shuffled as a run would (`optionOrder`), answerable, recording nothing and writing nothing.
+  The runner's head, its description, Previous and Next and its keys stay in `Runner.tsx`. The
+  Preview is keyed by what its order is drawn from, so a write by another hand that adds an option
+  or a pin starts a new one. Under 720px *Edit* / *Preview* moves into the card's ⋯ menu, whose
+  rows hidden at a width are skipped by the arrows (`Menu.tsx`).
 - **A question in a run is answered once, and a skip is no answer** (`src/ui/quiz/round.ts`).
   Going back to an answered question shows it read-only, because its answer was recorded the moment
   it was given and a second would count twice; a question left unanswered records nothing, never a
@@ -143,7 +152,10 @@ Sixteen things are load-bearing:
 - **A shuffle is a run's, never the file's**: `optionOrder` draws one order per question
   when a run starts — pinned options at their own index — and the runner keeps it until Again or a
   new list; answering the skipped ones keeps the order seen. A pick is the file's index, so grading
-  and what is recorded never see the order. The sheet is the written order.
+  and what is recorded never see the order. The sheet is the written order. The builder shows a pin
+  only while the quiz shuffles, in words (#257): *Keep in place* and *Kept in place* toggle `{pin}`,
+  and an answer whose words name the others (`pinned()` without `{pin}`) says *Stays last: it names
+  the others* (*Stays in place* when it is not last), with nothing to press.
 - **Flashcards a model wrote are a list to choose from until the person adds them** (#140). *Generate
   flashcards* opens a dialog (`src/ui/quiz/GenerateCards.tsx`) that asks `/generate` for cards from
   a topic or one of the vault's notes — the model's half, and the parser check before anything comes
@@ -186,7 +198,8 @@ for the builder's kinds and labels (#257), `dag-quiz__label*`, `dag-quiz__menu*`
 `dag-quiz__dot`, `dag-quiz__count*`, `dag-quiz__show`, `dag-quiz__card-more`, `dag-quiz__fold`,
 `data-dag-quiz-folded`, `data-dag-quiz-unfinished`, `data-dag-quiz-row*`, `data-dag-quiz-count`,
 `data-dag-quiz-show-unfinished`, `data-dag-quiz-fold`, `data-dag-quiz-card-more`,
-`data-dag-quiz-card-menu` — and,
+`data-dag-quiz-card-menu`, `dag-quiz__shuffle-*`, `dag-quiz__pin--words`, `dag-quiz__preview*`,
+`data-dag-quiz-preview*` — and,
 for the builder, `dag-rich-field*` (not `dag-field`, the panel's labels), `dag-blocks--field`,
 `data-dag-field-editor`, `dag-quiz__rich*`, `dag-quiz__placeholder`, `dag-quiz__grip`,
 `dag-quiz__kind`, `dag-quiz__more`, `dag-quiz__fix`, `dag-quiz__stray*`, `dag-quiz__list`,
@@ -203,7 +216,8 @@ Retired with the Source tab: `dag:quiz-mode`, `data-dag-quiz-mode`, `data-dag-qu
 `data-dag-quiz-multi`, `dag-quiz__mode`, `dag-quiz__source*`, `dag-quiz__field` and
 `dag-quiz__problem-line`.
 Retired with the four add buttons and the kind `<select>` (#257): `data-dag-quiz-add-open`,
-`data-dag-quiz-add-flashcard`, `data-dag-quiz-kind-select` and `dag-quiz__empty`.
+`data-dag-quiz-add-flashcard`, `data-dag-quiz-kind-select` and `dag-quiz__empty`; with the
+shuffle checkbox's sentence, `dag-quiz__hint`.
 
 **Generating flashcards was out, and is in (#140).** It was left out because an agent already writes
 a quiz — `quiz_create`, `quiz_write`, `quiz_question_set` — and that is still true. But it answers

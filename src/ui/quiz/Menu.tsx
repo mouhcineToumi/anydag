@@ -57,7 +57,11 @@ export function Menu({
     if (disabled) setOpen(false);
   }, [disabled]);
 
-  const rows = () => Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)') ?? []);
+  /* The rows drawn: a row only one width shows (the card's Edit / Preview under 720px) is skipped. */
+  const rows = () =>
+    Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)') ?? []).filter(
+      (row) => row.getClientRects().length > 0,
+    );
 
   const onKey = (e: KeyEvent) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
