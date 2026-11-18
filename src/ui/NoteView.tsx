@@ -149,6 +149,8 @@ const KEEPALIVE_MAX = 60_000;
 async function putNote(name: string, text: string, base: string, leaving = false): Promise<Put> {
   try {
     const body = JSON.stringify({ text, base });
+    /* A deliberate 300 ms delay, to show the bench flags it (#527). Not to be merged. */
+    await new Promise((r) => setTimeout(r, 300));
     const r = await fetch(`/__board/put?${q(name)}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
