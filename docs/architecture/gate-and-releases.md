@@ -53,7 +53,8 @@ own merge queue is offered only to repositories an organization owns, so the que
   pinned to that commit, and GitHub merges it when the required checks pass. Auto-merge is turned off
   on every other queued pull request, so none lands out of turn. A failed check is re-run once
   (`playwright.config.ts` already retries a test once inside a run; this is for a runner that died);
-  a second failure, a policy check (`PR title`, `PR target`, `Linked issue`), a draft, another base,
+  a second failure, a policy check (`PR title`, `PR target`, `Linked issue` — at once, before the
+  branch is updated, since no update can fix one), a draft, another base,
   an hour at the front, or green-but-blocked (an unresolved thread) takes it out with a comment
   saying why. A pull request labelled again goes to the back.
 - **A conflict stops the queue** (exit 3): the merge of `develop` is left half done in a worktree

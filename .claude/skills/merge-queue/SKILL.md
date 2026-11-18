@@ -55,8 +55,9 @@ the queue again — when any of these hold:
    (`gh pr view <n>`, and the commits on `develop` that touched the file since the branch point).
    Keep both intentions. In an append-only list (`things-that-will-bite.md`, an index, a changelog)
    keep both entries, in the order the file uses.
-2. `npm ci`, then `npm run checks`. Fix what the merge broke, nothing else.
-3. `git add` the files and `git commit --no-edit` (the pre-commit hook runs the checks again).
+2. `npm ci` (the worktree has no `node_modules`).
+3. `git add` the files and `git commit --no-edit`. The pre-commit hook runs `npm run checks`; if it
+   fails, fix what the merge broke, nothing else, and commit again.
 4. Push with the command in the JSON's `push` field. It is a new commit on the branch, not a
    force-push.
 5. Comment on the pull request with what conflicted and how you resolved it, one line a file — this

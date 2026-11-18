@@ -90,12 +90,16 @@ export function decide(pr, { required, retried = false }) {
   if (!pr.labels.includes(LABEL)) return { do: "drop", reason: `it is no longer labelled \`${LABEL}\`` };
   if (pr.isDraft) return { do: "eject", reason: "it is a draft" };
   if (pr.base !== BASE) return { do: "eject", reason: `it targets \`${pr.base}\`, and the queue merges into \`${BASE}\`` };
+  const failed = required.filter((name) => pr.checks[name]?.state === "failure");
+  /* A policy failure is the title or the linked issue, which no update from develop changes: out
+     before a conflict is resolved or a CI run is spent on it. */
+  const policy = failed.filter((name) => NO_RETRY.has(name));
+  if (policy.length > 0) return { do: "eject", reason: `${policy.map((n) => `\`${n}\``).join(", ")} failed`, failed: policy };
   if (pr.mergeable === "CONFLICTING") return { do: "conflict" };
   if (pr.behind > 0) return { do: "update" };
-  const failed = required.filter((name) => pr.checks[name]?.state === "failure");
   if (failed.length > 0) {
     const runs = [...new Set(failed.map((name) => pr.checks[name].runId))];
-    const final = retried || failed.some((name) => NO_RETRY.has(name)) || runs.some((id) => !id);
+    const final = retried || runs.some((id) => !id);
     if (final) return { do: "eject", reason: `${failed.map((n) => `\`${n}\``).join(", ")} failed`, failed };
     return { do: "retry", runs };
   }
