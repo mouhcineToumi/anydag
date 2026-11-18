@@ -35,7 +35,7 @@ No other pre-release word (`rc`, `alpha`) is a release: `release.yml` refuses th
 | a push to `develop` | fast tier; e2e |
 | a push to `release/**` or `hotfix/**`, a pull request into one, a pull request into `main` | the fast tier and the desktop app on **Linux, Windows and macOS**; e2e |
 | `nightly.yml`, every night at 02:00 UTC | everything: fast tier, the api server's convergence harness and Postgres suites, full e2e, desktop on all three — then publishes |
-| a release tag | the same everything, then publishes |
+| a release tag | the same everything, then publishes — and a stable release carries its development health report |
 
 Docs-only changes (`**/*.md`, `docs/**`) skip the heavy jobs; the fast tier always runs, so a required
 check always reports. **`CI passed`** (in `ci.yml`) is the one check that stands for the tier — a skipped
@@ -102,18 +102,31 @@ Pull requests into `develop` must have a Conventional Commit title and close an 
    (`.github/release.yml`: `type: feature`, `type: bug`, `type: docs`, `type: chore`, `dependencies`;
    `skip-changelog` leaves one out). Read them on the release page and edit, and paste the bench table
    from step 5 at the foot — it carries its own `### Bench` heading: one table, the same rows every
-   release, with no commentary.
-9. **Back-merge into `develop`, and bump it — in one pull request:**
+   release, with no commentary. The development health report (step 9) is attached to the release
+   beside the notes.
+9. **Take the report.** `release.yml` ran `node scripts/release-report.mjs 0.2.0` after publishing and
+   attached `0.2.0.json` and `0.2.0.md` to the release. Download them onto the back-merge branch
+   instead of regenerating them, so the committed JSON is the one the release carries:
    ```sh
-   git fetch origin
-   git switch -c chore/back-merge-0.2.0 origin/main
-   node scripts/set-version.mjs 0.3.0          # the next version
-   git commit -am "chore: begin 0.3.0"
-   git push -u origin chore/back-merge-0.2.0
+   mkdir -p docs/metrics
+   gh release download v0.2.0 --pattern '0.2.0.*' --dir docs/metrics
    ```
-   Open it into `develop`, titled `chore: merge 0.2.0 into develop and begin 0.3.0`, and merge it with
-   a **merge commit**. Do it the same day: until `develop` says `0.3.0`, the nightly would be stamped
-   `0.2.0-nightly.…`, a version that sorts *before* the release that has already shipped.
+   The window is fixed by the tags, so a local run writes the same numbers, but the `npm audit`
+   snapshot is recorded once (a live advisory database is not a historical record) — download the
+   release's file rather than regenerating it. The definitions and the `n/a` rules are in
+   [`docs/metrics/README.md`](metrics/README.md).
+10. **Back-merge into `develop`, and bump it — in one pull request:**
+    ```sh
+    git fetch origin
+    git switch -c chore/back-merge-0.2.0 origin/main
+    node scripts/set-version.mjs 0.3.0          # the next version
+    git add docs/metrics
+    git commit -am "chore: merge 0.2.0 into develop and begin 0.3.0"
+    git push -u origin chore/back-merge-0.2.0
+    ```
+    Open it into `develop`, titled `chore: merge 0.2.0 into develop and begin 0.3.0`, and merge it with
+    a **merge commit**. Do it the same day: until `develop` says `0.3.0`, the nightly would be stamped
+    `0.2.0-nightly.…`, a version that sorts *before* the release that has already shipped.
 
 ## A hotfix
 
@@ -129,8 +142,9 @@ git push -u origin hotfix/0.2.1
 ```
 
 Then it is a stable release from step 6: a pull request `hotfix/0.2.1` → `main` (merge commit, titled
-`chore(release): 0.2.1`), the tag `v0.2.1` on the merge commit, and the back-merge into `develop`.
-A beta of a hotfix is tagged `v0.2.1-beta.1` on the hotfix branch like any other.
+`chore(release): 0.2.1`), the tag `v0.2.1` on the merge commit, the report attached and taken with the
+back-merge (steps 9–10), and the back-merge into `develop`. A beta of a hotfix is tagged
+`v0.2.1-beta.1` on the hotfix branch like any other.
 
 **The back-merge conflicts on the version files**, because `develop` is already on the next version.
 Keep `develop`'s:
