@@ -73,6 +73,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Diagnostics | [`diagnostics.md`](diagnostics.md) |
 | Dragging a card | [`editing-drag.md`](editing-drag.md) |
 | Editing on the canvas | [`editing.md`](editing.md) |
+| Editing, timed | [`limits.md`](limits.md) |
 | Equations | [`notes.md`](notes.md) |
 | Feedback | [`feedback.md`](feedback.md) |
 | Flashcards from a model | [`prompt-cards.md`](prompt-cards.md) |
