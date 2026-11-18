@@ -1,11 +1,12 @@
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
+  ChevronRight,
+  ChevronUp,
   CircleDot,
   Copy,
   GripVertical,
   ListChecks,
+  MoreHorizontal,
   PenLine,
   Pin,
   Plus,
@@ -15,7 +16,17 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 
 import { preloadFieldEditor } from "@/blocks";
 import { assertNever } from "@/board/useBoard";
@@ -40,13 +51,13 @@ import {
 } from "@/quiz/write";
 import { ownAssets } from "@/render/assets";
 import { useAi } from "@/settings/useAi";
-import { Button } from "@/ui/controls";
+import { Button, IconButton } from "@/ui/controls";
 import { startDrag } from "@/ui/pointerDrag";
 
 import { addCards } from "./generate";
 import { GenerateCards } from "./GenerateCards";
 import { Menu } from "./Menu";
-import { blank, said, fixLabel, unfinished, type Fix, type Said } from "./problems";
+import { blank, brief, said, fixLabel, unfinished, type Fix, type Said } from "./problems";
 import { FieldHostContext, focusField, RichField, STILL_OURS, type FieldHost } from "./RichField";
 import { QuizMarkdown } from "./QuizMarkdown";
 
@@ -136,6 +147,36 @@ function KindTile({
 
 /** The kinds with no answers to choose from: a model answer, or a card's back. */
 const wordsOnly = (k: Kind): k is "written" | "card" => k === "written" || k === "card";
+
+/** What a folded question's line says of it when nothing is missing: how many answers, or its kind. */
+function summary(q: Question, kind: Kind): string {
+  switch (kind) {
+    case "one":
+    case "several": {
+      const n = q.options.length;
+      const right = q.options.filter((o) => o.correct).length;
+      return `${n} ${n === 1 ? "answer" : "answers"}${kind === "several" ? ` · ${right} right` : ""}`;
+    }
+    case "written":
+      return "Model answer";
+    case "card":
+      return "Flashcard";
+    default:
+      return assertNever(kind);
+  }
+}
+
+/**
+ * Alt+↑ and Alt+↓ on a grip: the place it moves to, or `null` for a key that is not a move — or a
+ * move off either end, which is swallowed so the page does not scroll instead.
+ */
+function moveKey(e: ReactKeyboardEvent, at: number, count: number): number | null {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;
+  const to = e.key === "ArrowUp" ? at - 1 : e.key === "ArrowDown" ? at + 1 : null;
+  if (to === null) return null;
+  e.preventDefault();
+  return to >= 0 && to < count ? to : null;
+}
 
 /** The problems on the lines of one question: from its heading to the line before the next one. */
 function problemsOf(diagnostics: QuizDiagnostic[], questions: Question[], i: number): QuizDiagnostic[] {
@@ -305,16 +346,18 @@ interface CardProps {
   index: number;
   count: number;
   name: string;
-  problems: QuizDiagnostic[];
+  /**
+   * What the card says is wrong, in words (`said`), with what a question being written still lacks
+   * already left out (#257, rule 3) — the editor decides that, as it counts the unfinished ones.
+   */
+  shown: Said[];
   focus: boolean;
   /** The quiz shuffles its options: each option offers to keep its place. */
   shuffle: boolean;
-  /**
-   * Blank, or being written: what it still lacks is not said (#257, rule 3) — not on a question
-   * nobody has written in, and not on one somebody is in the middle of. A problem with the file
-   * around it, which nothing typed into the card would fix, is said all the same.
-   */
-  quiet: boolean;
+  /** The one card open; every other is one line (#257). */
+  open: boolean;
+  onOpen(): void;
+  onFold(): void;
   /** The focus or a press went into this card: it is the one being written. */
   onEnter(): void;
   /** Why the last edit was not written, until the next one. */
@@ -330,15 +373,49 @@ interface CardProps {
   onNext(): void;
 }
 
+/**
+ * A folded question: a row of the list, as DESIGN.md keeps one — a plain button, full width, with
+ * an ellipsis — that opens it. It says the question, and either what the question is (`summary`) or
+ * what it still lacks.
+ */
+function FoldedRow({ q, kind, name, shown, onOpen }: { q: Question; kind: Kind; name: string; shown: Said[]; onOpen(): void }) {
+  const lacks = shown.length > 0;
+  return (
+    <button type="button" className="dag-quiz__row" aria-expanded={false} data-dag-quiz-row="" onClick={onOpen}>
+      <KindIcon kind={kind} />
+      <span className="dag-quiz__row-words" data-dag-quiz-row-words="">
+        {q.prompt.trim() ? (
+          <QuizMarkdown name={name} md={q.prompt} inline />
+        ) : (
+          <span className="dag-quiz__placeholder">No question yet</span>
+        )}
+      </span>
+      <span className={lacks ? "dag-quiz__row-meta dag-quiz__row-meta--warn" : "dag-quiz__row-meta"} data-dag-quiz-row-meta="">
+        {lacks ? (
+          <>
+            <span className="dag-quiz__dot" aria-hidden="true" />
+            {shown.length === 1 ? brief(shown[0]!.code, q) : `${shown.length} things to finish`}
+          </>
+        ) : (
+          summary(q, kind)
+        )}
+      </span>
+      <ChevronRight className="dag-quiz__row-chevron" size={14} strokeWidth={2} aria-hidden="true" />
+    </button>
+  );
+}
+
 function QuestionCard({
   q,
   index,
   count,
   name,
-  problems,
+  shown,
   focus,
   shuffle,
-  quiet,
+  open,
+  onOpen,
+  onFold,
   onEnter,
   refused,
   onEdit,
@@ -369,10 +446,6 @@ function QuestionCard({
   };
   const kind = kindOf(q);
   const words = WORDS[kind];
-  const shown = problems.flatMap((d) => {
-    const s = said(d, q);
-    return s && !(quiet && unfinished(s.code)) ? [s] : [];
-  });
   /* An empty answer the card says is empty: its slot is marked, so the words have a place to point. */
   const emptyAnswers = new Set(
     shown.flatMap((p) => (p.fix.kind === "focus" && p.fix.field === "option" ? [p.fix.option ?? 0] : [])),
@@ -389,6 +462,14 @@ function QuestionCard({
     kind === "one"
       ? onEdit({ ...input, options: input.options.map((o, k) => ({ ...o, correct: k === i })) })
       : setOption(i, { correct: on });
+  /* An answer moved from the keyboard: its rows are keyed by place, so the focus is put back on
+     its grip where it lands. */
+  const regrip = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (regrip.current === null) return;
+    optionList.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__option .dag-quiz__grip")[regrip.current]?.focus();
+    regrip.current = null;
+  });
   const moveOption = (i: number, to: number) => {
     const options = [...input.options];
     options.splice(to, 0, ...options.splice(i, 1));
@@ -441,6 +522,49 @@ function QuestionCard({
 
   const showDetails = details || !!q.body.trim();
 
+  /* Folded, a question's open-only asks are let go: a confirm left showing would come back with it. */
+  useEffect(() => {
+    if (open) return;
+    setAsking(false);
+    setDropping(null);
+  }, [open]);
+
+  /* The grip: dragged by the pointer, moved a place by Alt+↑/↓ — the one way to reorder (#257). */
+  const grip = (
+    <button
+      type="button"
+      className="dag-icon dag-quiz__grip"
+      aria-label={`Move question ${index + 1}: drag it, or Alt+Up and Alt+Down`}
+      data-dag-quiz-grip=""
+      onPointerDown={onDragStart}
+      onKeyDown={(e) => {
+        const to = moveKey(e, index, count);
+        if (to !== null) onMove(to);
+      }}
+    >
+      <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
+    </button>
+  );
+
+  if (!open)
+    return (
+      <section
+        ref={card}
+        className="dag-quiz__card dag-quiz__card--folded"
+        data-dag-quiz-question={q.id ?? `L${q.line}`}
+        data-dag-quiz-kind={kind}
+        data-dag-quiz-folded=""
+        data-dag-quiz-unfinished={shown.length ? "" : undefined}
+        aria-label={`Question ${index + 1}`}
+        onFocusCapture={onEnter}
+        onPointerDownCapture={onEnter}
+      >
+        {grip}
+        <span className="dag-quiz__row-number">{index + 1}</span>
+        <FoldedRow q={q} kind={kind} name={name} shown={shown} onOpen={onOpen} />
+      </section>
+    );
+
   return (
     <section
       ref={card}
@@ -448,21 +572,13 @@ function QuestionCard({
       data-dag-quiz-question={q.id ?? `L${q.line}`}
       data-dag-quiz-kind={kind}
       data-dag-quiz-needs-answer={needsAnswer ? "" : undefined}
+      data-dag-quiz-unfinished={shown.length ? "" : undefined}
       aria-label={`Question ${index + 1}`}
       onFocusCapture={onEnter}
       onPointerDownCapture={onEnter}
     >
       <header className="dag-quiz__card-head">
-        <button
-          type="button"
-          className="dag-icon dag-quiz__grip"
-          title="Drag to move"
-          aria-label={`Drag question ${index + 1} to move it`}
-          data-dag-quiz-grip=""
-          onPointerDown={onDragStart}
-        >
-          <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
-        </button>
+        {grip}
         <span className="dag-quiz__card-number">Question {index + 1}</span>
         {/* The kind is changed here, on the question; *Add a question* is where one is chosen to begin with. */}
         <Menu
@@ -475,7 +591,7 @@ function QuestionCard({
           button={
             <>
               <KindIcon kind={kind} />
-              {KIND[kind].label}
+              <span className="dag-quiz__kind-name">{KIND[kind].label}</span>
               <ChevronDown className="dag-quiz__kind-chevron" size={14} strokeWidth={2} aria-hidden="true" />
             </>
           }
@@ -497,61 +613,69 @@ function QuestionCard({
           }
         </Menu>
         <span className="dag-quiz__card-tools">
-          <button
-            type="button"
-            className="dag-icon"
-            title="Move up"
-            aria-label="Move up"
-            disabled={index === 0}
-            onClick={() => onMove(index - 1)}
+          <Menu
+            label={`Question ${index + 1}`}
+            buttonClass="dag-icon dag-icon--md dag-quiz__card-more"
+            buttonAttrs={{ "data-dag-quiz-card-more": "", "aria-label": `More for question ${index + 1}` }}
+            menuClass="dag-quiz__menu--end"
+            menuAttrs={{ "data-dag-quiz-card-menu": "" }}
+            button={<MoreHorizontal size={16} strokeWidth={2} aria-hidden="true" />}
           >
-            <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="dag-icon"
-            title="Move down"
-            aria-label="Move down"
-            disabled={index === count - 1}
-            onClick={() => onMove(index + 1)}
+            {(close) => (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dag-more__item"
+                  data-dag-quiz-duplicate=""
+                  disabled={held}
+                  onClick={() => {
+                    close();
+                    onDuplicate();
+                  }}
+                >
+                  <Copy size={14} strokeWidth={2} aria-hidden="true" />
+                  <span>Duplicate</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dag-more__item dag-quiz__menu-danger"
+                  data-dag-quiz-delete=""
+                  onClick={() => {
+                    close();
+                    setAsking(true);
+                  }}
+                >
+                  <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                  <span>Delete</span>
+                </button>
+              </>
+            )}
+          </Menu>
+          <IconButton
+            size="md"
+            className="dag-quiz__fold"
+            aria-label={`Fold question ${index + 1}`}
+            aria-expanded={true}
+            data-dag-quiz-fold=""
+            onClick={onFold}
           >
-            <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="dag-icon"
-            title="Duplicate question"
-            aria-label="Duplicate question"
-            data-dag-quiz-duplicate=""
-            disabled={held}
-            onClick={onDuplicate}
-          >
-            <Copy size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
-          {asking ? (
-            <span className="dag-quiz__confirm" data-dag-quiz-confirm="">
-              <span>Delete this question?</span>
-              <button type="button" className="dag-quiz__danger" data-dag-quiz-delete-yes="" onClick={onRemove}>
-                Delete
-              </button>
-              <button type="button" onClick={() => setAsking(false)}>
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="dag-icon"
-              title="Delete question"
-              aria-label="Delete question"
-              data-dag-quiz-delete=""
-              onClick={() => setAsking(true)}
-            >
-              <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
-          )}
+            <ChevronUp size={16} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
         </span>
       </header>
+      {asking ? (
+        <p className="dag-quiz__confirm dag-quiz__confirm--line" data-dag-quiz-confirm="">
+          <span>Delete this question?</span>
+          <button type="button" className="dag-quiz__danger" data-dag-quiz-delete-yes="" onClick={onRemove}>
+            Delete
+          </button>
+          <button type="button" onClick={() => setAsking(false)}>
+            Cancel
+          </button>
+        </p>
+      ) : null}
       {dropping ? (
         <p className="dag-quiz__confirm dag-quiz__confirm--line" data-dag-quiz-drop-answers="">
           <span>
@@ -643,9 +767,14 @@ function QuestionCard({
                 <button
                   type="button"
                   className="dag-icon dag-quiz__grip"
-                  title="Drag to move"
-                  aria-label={`Drag answer ${i + 1} to move it`}
+                  aria-label={`Move answer ${i + 1}: drag it, or Alt+Up and Alt+Down`}
                   disabled={held}
+                  onKeyDown={(e) => {
+                    const to = moveKey(e, i, q.options.length);
+                    if (to === null) return;
+                    regrip.current = to;
+                    moveOption(i, to);
+                  }}
                   onPointerDown={(e) =>
                     dragRow(
                       e,
@@ -827,14 +956,41 @@ export function QuizEditor({
     void preloadFieldEditor();
   }, []);
 
-  useEffect(() => {
-    if (!target || quiz.questions.length === 0) return;
-    const card = root.current?.querySelector<HTMLElement>(`[data-dag-quiz-question="${CSS.escape(target)}"]`);
+  /*
+   * **One card open at a time** (#257): every other question is one line. Opening one folds the
+   * one that was open — a field in it has already written what was typed, on each keystroke — and
+   * folding is leaving it, so what it lacks is said on its line from then on. Kept by the card's
+   * React key, which a minted id does not change. `reveal` is a card opened from elsewhere — a
+   * search result, *Show them* — to scroll to once it is drawn open, `true` for the caret in its
+   * prompt as well.
+   */
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const reveal = useRef<{ key: string; prompt: boolean } | null>(null);
+  const openCard = (key: string | null, show?: { prompt: boolean }) => {
+    /* Folding the card being written leaves it; a press on another card has already left it. */
+    if (key !== openKey && active.current !== null && active.current === openKey) enter(null);
+    setOpenKey(key);
+    reveal.current = key !== null && show ? { key, prompt: show.prompt } : null;
+  };
+  useLayoutEffect(() => {
+    const want = reveal.current;
+    if (!want || want.key !== openKey) return;
+    reveal.current = null;
+    const card = root.current?.querySelector<HTMLElement>(".dag-quiz__card:not([data-dag-quiz-folded])");
     if (!card) return;
-    card.scrollIntoView({ block: "center" });
-    focusField(card.querySelector("[data-dag-quiz-prompt]"));
-    onTargetShown?.();
-  }, [target, quiz, onTargetShown]);
+    card.scrollIntoView({ block: want.prompt ? "center" : "start" });
+    if (want.prompt) focusField(card.querySelector("[data-dag-quiz-prompt]"));
+  });
+
+  /* A question moved from the keyboard: the focus goes back on its grip where it lands, which a
+     moved element can lose on the way. */
+  const regrip = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (regrip.current === null) return;
+    const at = rows.findIndex((r) => r.key === regrip.current);
+    regrip.current = null;
+    if (at >= 0) cards()[at]?.querySelector<HTMLElement>(":scope [data-dag-quiz-grip]")?.focus();
+  });
 
   const host = useMemo<FieldHost>(
     () => ({
@@ -919,6 +1075,7 @@ export function QuizEditor({
       }),
     );
     setFocus(id);
+    openCard(id);
   };
 
   const description = quiz.questions.length ? quiz.diagnostics.filter((d) => d.line < quiz.questions[0]!.line) : quiz.diagnostics;
@@ -927,8 +1084,36 @@ export function QuizEditor({
     return s ? [s] : [];
   });
   const cards = () => Array.from(list.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__card") ?? []);
-  /* Which question each card is, for `enter`: drawn afresh with the cards below. */
+  /* Which question each card is, for `enter`, and what each says is wrong: drawn afresh each time. */
   byKey.current.clear();
+  const rows = quiz.questions.map((q, i) => {
+    /* The second of two sharing an id is keyed by its line, so React keeps two cards apart. */
+    const shared = q.id !== undefined && quiz.questions.findIndex((x) => x.id === q.id) !== i;
+    const key = shared ? `line-${q.line}` : keyOf(q);
+    byKey.current.set(key, q);
+    const quietHere = blank(q) || quiet.has(key);
+    const shown = problemsOf(quiz.diagnostics, quiz.questions, i).flatMap((d) => {
+      const s = said(d, q);
+      return s && !(quietHere && unfinished(s.code)) ? [s] : [];
+    });
+    return { q, i, key, shown };
+  });
+  const unfinishedRows = rows.filter((r) => r.shown.length > 0);
+  /* *Show them*: the next unfinished question after the one open, round to the first. */
+  const showNext = () => {
+    const from = rows.findIndex((r) => r.key === openKey);
+    const next = unfinishedRows.find((r) => r.i > from) ?? unfinishedRows[0];
+    if (next) openCard(next.key, { prompt: false });
+  };
+
+  /* A search result or a `dag:` link: its card opened, scrolled to, the caret in its prompt. Once. */
+  useEffect(() => {
+    if (!target || quiz.questions.length === 0) return;
+    const row = rows.find((r) => r.q.id === target || `L${r.q.line}` === target);
+    if (!row) return;
+    openCard(row.key, { prompt: true });
+    onTargetShown?.();
+  }, [target, quiz, onTargetShown]);
 
   return (
     <FieldHostContext.Provider value={host}>
@@ -956,6 +1141,24 @@ export function QuizEditor({
           Shuffle the answers in each run
           <span className="dag-quiz__hint"> — a pinned answer, and one that begins “All of the above”, keeps its place</span>
         </label>
+        {quiz.questions.length > 0 ? (
+          <p className="dag-quiz__count" data-dag-quiz-count="">
+            {quiz.questions.length} {quiz.questions.length === 1 ? "question" : "questions"}
+            {unfinishedRows.length > 0 ? (
+              <>
+                {" · "}
+                <span className="dag-quiz__count-unfinished">
+                  <span className="dag-quiz__dot" aria-hidden="true" />
+                  {unfinishedRows.length} unfinished
+                </span>
+                {" · "}
+                <button type="button" className="dag-quiz__show" data-dag-quiz-show-unfinished="" onClick={showNext}>
+                  Show them
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {/* Before the first question only a code block left open can be wrong: what it swallowed. */}
         <ProblemList
           list={top}
@@ -990,11 +1193,7 @@ export function QuizEditor({
           </section>
         ) : null}
         <div className="dag-quiz__list" ref={list}>
-          {quiz.questions.map((q, i) => {
-            /* The second of two sharing an id is keyed by its line, so React keeps two cards apart. */
-            const shared = q.id !== undefined && quiz.questions.findIndex((x) => x.id === q.id) !== i;
-            const key = shared ? `line-${q.line}` : keyOf(q);
-            byKey.current.set(key, q);
+          {rows.map(({ q, i, key, shown }) => {
             return (
               <QuestionCard
                 key={key}
@@ -1002,19 +1201,25 @@ export function QuizEditor({
                 index={i}
                 count={quiz.questions.length}
                 name={name}
-                problems={problemsOf(quiz.diagnostics, quiz.questions, i)}
+                shown={shown}
                 focus={q.id !== undefined && q.id === focus}
                 shuffle={quiz.shuffle}
-                quiet={blank(q) || quiet.has(key)}
+                open={key === openKey}
+                onOpen={() => openCard(key)}
+                onFold={() => openCard(null)}
                 onEnter={() => enter(key)}
                 refused={refused?.key === key ? refused.why : null}
                 onEdit={(input) => write(key, (t, qs) => replaceQuestion(t, idAt(qs, i), { ...input, id: idAt(qs, i) }))}
-                onMove={(to) => write(null, (t) => atQuestion(t, i, (u, id) => moveQuestion(u, id, to)))}
+                onMove={(to) => {
+                  regrip.current = key;
+                  write(null, (t) => atQuestion(t, i, (u, id) => moveQuestion(u, id, to)));
+                }}
                 onRemove={() => write(null, (t) => atQuestion(t, i, removeQuestion))}
                 onDuplicate={() => {
                   const id = mintQuestionId(new Set(quiz.questions.flatMap((x) => (x.id ? [x.id] : []))));
                   write(null, (t, qs) => addQuestion(t, { ...inputOf(qs[i]!), id }, i + 1));
                   setFocus(id);
+                  openCard(id);
                 }}
                 onRepair={(how) => {
                   switch (how.kind) {

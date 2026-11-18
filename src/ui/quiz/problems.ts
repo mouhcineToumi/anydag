@@ -102,6 +102,38 @@ export function blank(q: Question): boolean {
   return !q.prompt.trim() && !q.body.trim() && !q.why.trim() && !q.stray?.trim() && q.options.every((o) => !o.text.trim());
 }
 
+/**
+ * A problem in a few words, for a folded question's line, where a sentence will not fit: what is
+ * missing, not how to fix it — that is on the card, once it is open.
+ */
+export function brief(code: QuizDiagnostic["code"], q?: Question): string {
+  switch (code) {
+    case "EQ_NO_PROMPT":
+      return "Nothing asked yet";
+    case "EQ_NO_OPTIONS":
+      return q?.card ? "No back yet" : "No model answer yet";
+    case "EQ_ONE_OPTION":
+      return "Only one answer";
+    case "EQ_NO_ANSWER":
+      return "No right answer marked";
+    case "EQ_EMPTY_OPTION":
+      return "An answer is empty";
+    case "EQ_STRAY":
+      return "Some text to place";
+    case "EQ_DUPLICATE_ID":
+      return "Shares its identity";
+    case "WQ_UNKNOWN_ATTR":
+      return "An unknown setting";
+    case "WQ_OPEN_FENCE":
+      return "A code block never ends";
+    case "WQ_EMPTY":
+    case "WQ_NO_ID":
+      return "";
+    default:
+      return assertNever(code);
+  }
+}
+
 /** The label on a fix's button, for the fixes that are a button. */
 export function fixLabel(fix: Fix): string | null {
   switch (fix.kind) {

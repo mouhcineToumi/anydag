@@ -74,6 +74,14 @@ async function open(field: Locator): Promise<void> {
   await expect(field.locator('[contenteditable="true"]')).toBeFocused();
 }
 
+/** Open a folded question by its line: the one card open, every other folded (#257). */
+async function openCard(page: Page, id: string): Promise<Locator> {
+  const card = page.locator(`[data-dag-quiz-question="${id}"]`);
+  await card.locator("[data-dag-quiz-row]").click();
+  await expect(card).not.toHaveAttribute("data-dag-quiz-folded");
+  return card;
+}
+
 /** Change a question's kind through the menu on its kind label. */
 async function setKind(card: Locator, kind: "one" | "several" | "written" | "card"): Promise<void> {
   await card.locator("[data-dag-quiz-kind-button]").click();
@@ -115,7 +123,7 @@ test("a flashcard added in the form is written with `card`, and no other byte mo
 test("turning a question with answers into a flashcard asks before it drops them", async ({ page }) => {
   const name = write("turn", `---\ntitle: Cards\n---\n\n${CHOICE}`);
   await page.goto(`/?quiz=${name}`);
-  const card = page.locator('[data-dag-quiz-question="qvis"]');
+  const card = await openCard(page, "qvis");
   await setKind(card, "card");
   await expect(card.locator("[data-dag-quiz-drop-answers]")).toContainText("A flashcard");
   expect(read("turn")).toContain(CHOICE);
